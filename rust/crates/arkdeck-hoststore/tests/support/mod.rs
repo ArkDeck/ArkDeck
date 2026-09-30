@@ -7,11 +7,17 @@
 //! inode and claim generation are read as labels.
 #![allow(dead_code)]
 
-pub mod debug_hap;
+// The device-lane oracles' support is macOS-only; the Flash lane's replays
+// on Windows too (TASK-XPA-010).
 #[cfg(target_os = "macos")]
+pub mod debug_hap;
+#[cfg(any(target_os = "macos", windows))]
 pub mod flash_lane;
+#[cfg(target_os = "macos")]
 pub mod hdc_oracle;
+#[cfg(target_os = "macos")]
 pub mod native_library;
+#[cfg(target_os = "macos")]
 pub mod reconcile;
 
 use arkdeck_hoststore::{StorageProbe, StorageSnapshot};
@@ -20,6 +26,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -39,6 +46,7 @@ pub fn document(fixture: &Path, name: &str) -> Value {
     serde_json::from_slice(&fs::read(fixture.join(name)).unwrap()).unwrap()
 }
 
+#[cfg(unix)]
 pub fn chmod(path: &Path, mode: u32) {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
 }
@@ -97,6 +105,7 @@ impl StorageProbe for OracleProbe {
 /// The given source Jobs as Swift published them before any run, the one a
 /// case later removes rebuilt from its mode, and the empty owner and
 /// Sessions roots.
+#[cfg(unix)]
 pub fn rebuild(fixture: &Path, sources: &[&str], cases: &[Value]) -> PathBuf {
     let root = PathBuf::from(ROOT);
     let _ = fs::remove_dir_all(&root);
@@ -317,6 +326,19 @@ pub fn assert_store_except(
     (actual_row, recorded_row)
 }
 
+/// An entry's permission bits as the oracle records them. Windows has none:
+/// its owner-only boundary is a DACL, which the owners check themselves, so
+/// the replays there compare kinds and bytes and leave modes out.
+#[cfg(unix)]
+pub fn mode(metadata: &fs::Metadata) -> String {
+    format!("{:o}", metadata.permissions().mode() & 0o777)
+}
+
+#[cfg(windows)]
+pub fn mode(_metadata: &fs::Metadata) -> String {
+    "-".into()
+}
+
 /// Every entry below `base` as `prefix/<relative path>`: each file's bytes
 /// (a Job record's read machine-independently) and each entry's kind and mode.
 fn walk(
@@ -355,11 +377,7 @@ fn walk(
         } else {
             "file"
         };
-        tree.push((
-            name.clone(),
-            kind,
-            format!("{:o}", metadata.permissions().mode() & 0o777),
-        ));
+        tree.push((name.clone(), kind, mode(&metadata)));
         if metadata.is_file() && !snapshot {
             let bytes = fs::read(&path).unwrap();
             files.insert(

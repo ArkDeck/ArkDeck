@@ -30,8 +30,17 @@ use crate::target_owner::TargetStore;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::io::Read;
+#[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+#[cfg(windows)]
+use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
+
+/// `EIO`, the errno Swift reports when an open failed without one.
+const EIO: i32 = 5;
+/// Win32 `FILE_FLAG_OPEN_REPARSE_POINT`: a reparse point is opened as itself.
+#[cfg(windows)]
+const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
 
 /// The six steps a Flash must have confirmed before it can prove an alias
 /// (Swift `requiredConfirmedStepIDs`), with the effect each one's intent
@@ -215,12 +224,21 @@ pub(crate) fn journal(directory: &Path) -> Result<(ReplayFacts, Vec<Value>), Str
         format!(
             "openFailed(path: {}, errno: {})",
             swift_quoted(&path.to_string_lossy()),
-            error.raw_os_error().unwrap_or(libc::EIO)
+            error.raw_os_error().unwrap_or(EIO)
         )
     };
+    #[cfg(unix)]
     let file = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
+        .open(&path)
+        .map_err(open_failed)?;
+    // On Windows a reparse point is opened as itself, never followed; the
+    // regular-file check below then refuses it.
+    #[cfg(windows)]
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
         .open(&path)
         .map_err(open_failed)?;
     let Some(before) = file.metadata().ok().filter(std::fs::Metadata::is_file) else {
@@ -232,6 +250,7 @@ pub(crate) fn journal(directory: &Path) -> Result<(ReplayFacts, Vec<Value>), Str
     (&file).read_to_end(&mut bytes).map_err(open_failed)?;
     // Swift's `sameJournalSnapshot`, but for the generation number, which
     // only the superuser reads.
+    #[cfg(unix)]
     let snapshot = |metadata: &std::fs::Metadata| {
         (
             metadata.dev(),
@@ -239,6 +258,16 @@ pub(crate) fn journal(directory: &Path) -> Result<(ReplayFacts, Vec<Value>), Str
             metadata.size(),
             (metadata.mtime(), metadata.mtime_nsec()),
             (metadata.ctime(), metadata.ctime_nsec()),
+        )
+    };
+    // On Windows, of the same open handle: its size and its write and
+    // creation times (NTFS keeps no change time std can read).
+    #[cfg(windows)]
+    let snapshot = |metadata: &std::fs::Metadata| {
+        (
+            metadata.file_size(),
+            metadata.last_write_time(),
+            metadata.creation_time(),
         )
     };
     if file.metadata().ok().as_ref().map(snapshot) != Some(snapshot(&before)) {

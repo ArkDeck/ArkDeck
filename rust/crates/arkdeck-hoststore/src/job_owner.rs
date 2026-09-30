@@ -39,11 +39,11 @@ pub(crate) use mutation_state_continuity::require_retained_sessions_without_owne
 #[path = "job_flash_state.rs"]
 mod flash_state;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "arkforge_job_state.rs"]
 pub(crate) mod arkforge_job_state;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "flash_recovery.rs"]
 pub(crate) mod flash_recovery;
 

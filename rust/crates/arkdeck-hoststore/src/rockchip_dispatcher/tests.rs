@@ -5,33 +5,38 @@ use super::*;
 use crate::rockchip_records::ExecutionResult;
 use arkdeck_contract::sha256_hex;
 use std::collections::BTreeMap;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[cfg(unix)]
+const ARKFORGED: &str = "arkforged";
+#[cfg(windows)]
+const ARKFORGED: &str = "arkforged.exe";
 
 struct Root(PathBuf);
 
 impl Root {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let path = crate::test_private::temporary_root().join(format!(
             "arkdeck-rockchip-dispatcher-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         let _ = std::fs::remove_dir_all(&path);
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&path)
-            .unwrap();
+        crate::test_private::create_private_directory(&path);
         Self(path)
     }
 
-    /// A configured `arkforged`: an executable file and its digest.
+    /// A configured `arkforged`: an executable file and its digest (on
+    /// Windows the `.exe` image a Windows child must be).
     fn arkforged(&self) -> (NativeRockUsbIdentity, String) {
-        let path = self.0.join("arkforged");
+        let path = self.0.join(ARKFORGED);
         std::fs::write(&path, b"#!/bin/sh\nexit 0\n").unwrap();
+        #[cfg(unix)]
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
         let digest = sha256_hex(&std::fs::read(&path).unwrap());
         (
@@ -171,7 +176,7 @@ fn the_native_identity_is_measured_before_the_host() {
     let (identity, digest) = root.arkforged();
     let executor = Executor::default();
     let dispatcher = NativeRockchipDispatcher::durable(identity, executor.clone(), &root.0);
-    std::fs::write(root.0.join("arkforged"), b"#!/bin/sh\nexit 1\n").unwrap();
+    std::fs::write(root.0.join(ARKFORGED), b"#!/bin/sh\nexit 1\n").unwrap();
     assert_eq!(
         dispatcher.dispatch(&enter_loader("job-1", &digest)),
         Err(LaneFailure::Failed(

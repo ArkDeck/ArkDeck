@@ -127,7 +127,7 @@ fn statuses(
 /// Swift `appendFlashArtifactLineage`: what every Flash product names of the
 /// Job it came from — its catalog, provider, Target binding, identity, plan
 /// and the authority it ran under.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn flash_lineage(fields: &mut Map<String, Value>, record: &JobRecord) {
     let target = &record.request["target"];
     fields.insert("catalogDigest".into(), json!(record.catalog_digest()));
@@ -157,7 +157,7 @@ fn flash_lineage(fields: &mut Map<String, Value>, record: &JobRecord) {
 /// Swift `finalArtifactContents` of a Flash's report: the status of every
 /// other declared product, the Job's lineage, the steps it confirmed and the
 /// canonical request it ran.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn flash_report(
     descriptor: &CatalogOperation,
     record: &JobRecord,
@@ -188,7 +188,7 @@ pub(crate) fn flash_report(
 /// Swift `artifactContents` for a Flash step's facts product: the Job and
 /// the observation it made, the facts the step verified, and the Job's
 /// lineage.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn flash_facts(
     descriptor: &CatalogOperation,
     record: &JobRecord,

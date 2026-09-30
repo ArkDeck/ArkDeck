@@ -5,7 +5,14 @@
 //! availability, dispatcher reason, lane toolchain and facts are composed as
 //! it names them. Every answer, the plan document's digest included, must be
 //! Swift's; so must the reason Swift's own Rockchip dispatcher gives.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-010) the same oracle replays over the same bytes:
+//! the fixture's owner-only files are created in owner-only directories, and
+//! its sealed (0400) payloads sealed as the Artifact store seals them.
+#![cfg(any(target_os = "macos", windows))]
+
+#[path = "fixture_fs/mod.rs"]
+mod fixture_fs;
 
 use arkdeck_hoststore::{
     ArtifactReadStore, FlashPlanner, FlashPlanning, ImportUploadStore, JobPlanner,
@@ -14,6 +21,7 @@ use arkdeck_hoststore::{
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -25,11 +33,11 @@ struct Root(PathBuf);
 
 impl Root {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = fixture_fs::temporary_root().join(format!(
             "arkdeck-flash-plan-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        fixture_fs::private_dir(&root);
         Self(root)
     }
 }
@@ -40,6 +48,7 @@ impl Drop for Root {
     }
 }
 
+#[cfg(unix)]
 fn directory(path: &Path) {
     fs::DirBuilder::new()
         .recursive(true)
@@ -47,6 +56,35 @@ fn directory(path: &Path) {
         .create(path)
         .unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+/// Every missing level of `path` created owner-only.
+#[cfg(windows)]
+fn directory(path: &Path) {
+    if path.exists() {
+        return;
+    }
+    directory(path.parent().unwrap());
+    fixture_fs::private_dir(path);
+}
+
+/// A laid-down file with the recorded mode: 0400 is a sealed document.
+#[cfg(unix)]
+fn install(destination: &Path, bytes: &[u8], mode: u32) {
+    fs::write(destination, bytes).unwrap();
+    fs::set_permissions(destination, fs::Permissions::from_mode(mode)).unwrap();
+}
+
+#[cfg(windows)]
+fn install(destination: &Path, bytes: &[u8], mode: u32) {
+    let directory = arkdeck_platform::HostDirectory::open(destination.parent().unwrap()).unwrap();
+    let name = destination.file_name().unwrap().to_str().unwrap();
+    directory.create_document(name, bytes).unwrap();
+    match mode {
+        0o400 => directory.seal_document(name).unwrap(),
+        0o600 => {}
+        other => panic!("no Windows form of mode {other:o}"),
+    }
 }
 
 /// The Artifact root and Target store as Swift's Import left them.
@@ -66,9 +104,8 @@ fn lay_down(root: &Path, cases: &Value) {
             ),
         };
         directory(destination.parent().unwrap());
-        fs::write(&destination, fs::read(source).unwrap()).unwrap();
         let mode = u32::from_str_radix(input["mode"].as_str().unwrap(), 8).unwrap();
-        fs::set_permissions(&destination, fs::Permissions::from_mode(mode)).unwrap();
+        install(&destination, &fs::read(source).unwrap(), mode);
     }
 }
 
@@ -173,6 +210,7 @@ fn every_flash_plan_is_swifts() {
 /// Swift's Rockchip dispatcher (`dispatch.json`) replayed through the Rust
 /// port over the same record-root states: every reason, and an absent root
 /// created owner-only.
+#[cfg(unix)]
 ///
 /// `records.privatePrefix` is the declared difference. Swift's canonical
 /// check standardizes an existing `/private/tmp/…` path to `/tmp/…` and so
@@ -247,6 +285,106 @@ fn every_dispatcher_reason_is_swifts() {
             let metadata = fs::symlink_metadata(records.unwrap()).unwrap();
             assert!(metadata.is_dir(), "{name}");
             assert_eq!(format!("{:o}", metadata.mode() & 0o7777), mode, "{name}");
+        }
+    }
+}
+
+/// Swift's Rockchip dispatcher (`dispatch.json`) replayed on Windows over
+/// the same record-root states made the Windows way: owner-only is the
+/// platform's private DACL; group-readable adds a read entry for the local
+/// Users group; the link is a directory junction, which needs no privilege.
+/// Every reason is Swift's, with two declared differences:
+///
+/// - `records.stateMissing`: Windows reports a missing parent as
+///   `ERROR_PATH_NOT_FOUND` (3) where Darwin reports `ENOENT` (2), in the
+///   same words;
+/// - `records.privatePrefix` is a `/private/tmp` spelling, which Windows
+///   paths do not have.
+#[cfg(windows)]
+#[test]
+fn every_dispatcher_reason_is_swifts() {
+    use std::process::{Command, Stdio};
+    let run = |program: &str, arguments: &[&std::ffi::OsStr]| {
+        let status = Command::new(program)
+            .args(arguments)
+            .stdout(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "{program} {arguments:?}");
+    };
+    let cases: Value =
+        serde_json::from_slice(&fs::read(fixtures().join("dispatch.json")).unwrap()).unwrap();
+    let root = Root::new();
+    let daemon = root.0.join("arkforged.exe");
+    let bytes = b"MZ stand-in";
+    fs::write(&daemon, bytes).unwrap();
+    let configured = NativeRockUsbIdentity::configured(
+        Some(daemon.to_string_lossy().into_owned()),
+        Some(arkdeck_contract::sha256_hex(bytes)),
+    );
+    let cases = cases.as_array().unwrap();
+    assert_eq!(cases.len(), 10);
+    for case in cases {
+        let name = case["name"].as_str().unwrap();
+        if name == "records.privatePrefix" {
+            continue;
+        }
+        let identity = if case["identityConfigured"] == true {
+            configured.clone()
+        } else {
+            NativeRockUsbIdentity::unconfigured()
+        };
+        let records = case["records"].as_str().map(|records| {
+            let state = root.0.join(name);
+            if records != "stateMissing" {
+                fixture_fs::private_dir(&state);
+            }
+            let path = state.join("rockchip-runtime");
+            match records {
+                "ownerOnly" => fixture_fs::private_dir(&path),
+                "groupReadable" => {
+                    fixture_fs::private_dir(&path);
+                    run(
+                        "icacls",
+                        &[
+                            path.as_os_str(),
+                            "/grant".as_ref(),
+                            "*S-1-5-32-545:(RX)".as_ref(),
+                        ],
+                    );
+                }
+                "symlink" => {
+                    let elsewhere = state.join("elsewhere");
+                    fixture_fs::private_dir(&elsewhere);
+                    run(
+                        "cmd",
+                        &[
+                            "/C".as_ref(),
+                            "mklink".as_ref(),
+                            "/J".as_ref(),
+                            path.as_os_str(),
+                            elsewhere.as_os_str(),
+                        ],
+                    );
+                }
+                "file" | "ownerOnlyFile" => fs::write(&path, b"not a directory").unwrap(),
+                _ => {}
+            }
+            path
+        });
+        let reason = rockchip_dispatch_unavailable(&identity, records.as_deref());
+        let expected = match name {
+            "records.stateMissing" => case["reason"]
+                .as_str()
+                .map(|reason| reason.replace("(errno 2)", "(errno 3)")),
+            _ => case["reason"].as_str().map(str::to_owned),
+        };
+        assert_eq!(reason, expected, "{name}");
+        if case["createdMode"].as_str().is_some() {
+            let path = records.unwrap();
+            assert!(fs::symlink_metadata(&path).unwrap().is_dir(), "{name}");
+            // Created owner-only: the store opens it as a private directory.
+            arkdeck_platform::HostDirectory::open(&path).unwrap();
         }
     }
 }

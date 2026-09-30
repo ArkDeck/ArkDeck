@@ -40,6 +40,8 @@ pub struct BoundTarget<'a> {
 /// with:)`: the singleton binding switched to an advanced Target, at its
 /// own revision, only with the complete same-revision reactivation
 /// evidence and a confirmed HDC-normal alias.
+// Its one caller, the Loader binding owner, is not built on Windows yet.
+#[cfg_attr(windows, allow(dead_code))]
 pub(crate) fn activate_selected_target(
     store: &RockchipBindingStore,
     expected_revision: i64,
