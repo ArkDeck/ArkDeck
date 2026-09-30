@@ -20,6 +20,7 @@ use windows_sys::Win32::System::Threading::*;
 mod account;
 mod console_secret;
 mod credential;
+mod daemon_fingerprint;
 mod daemon_start;
 mod deveco_files;
 mod host_fs;
@@ -43,6 +44,7 @@ pub use credential::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
     KeychainPresence,
 };
+pub use daemon_fingerprint::trusted_daemon_fingerprint;
 pub use daemon_start::{
     DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
 };

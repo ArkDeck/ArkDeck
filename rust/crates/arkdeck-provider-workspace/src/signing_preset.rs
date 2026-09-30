@@ -241,13 +241,28 @@ impl SigningPresetStore {
             .map(|root| root.join("Signing/OpenHarmony"))
     }
 
-    /// The Windows preset root (TASK-XPA-011, proposal):
+    /// The Windows preset root (TASK-XPA-011, maintainer-accepted):
     /// `<LocalAppData>\ArkDeck\Signing\OpenHarmony`, under the same relative
     /// names as on macOS beside the daemon's `ArkDeck\Agentd` state.
     #[cfg(windows)]
     pub fn default_root() -> Option<PathBuf> {
         arkdeck_platform::arkdeck_application_support_root()
             .map(|root| root.join("Signing").join("OpenHarmony"))
+    }
+
+    /// The Windows signing attempt root (TASK-XPA-011, accepted with the
+    /// preset root): `<root>\Attempts`, one private directory per signing
+    /// Job below it ([`crate::signing_action::SigningAttemptPaths::for_job`]),
+    /// created owner-only — every missing level, and the root's DACL made
+    /// private whether or not it existed — as the credential owner creates
+    /// the preset root. macOS keeps its attempts in the daemon's state
+    /// directory.
+    #[cfg(windows)]
+    pub fn attempts_root(&self) -> Result<PathBuf, SigningError> {
+        let root = self.root.join("Attempts");
+        arkdeck_platform::HostDirectory::open_or_create_private(&root)
+            .map_err(|_| SigningError::unsafe_file("signing attempt root is unsafe"))?;
+        Ok(root)
     }
 
     pub fn root(&self) -> &Path {

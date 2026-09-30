@@ -375,7 +375,7 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &["doctor", "operation.list"];
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
 /// support bundle's service is `operationUnavailable`), each for the macOS
 /// host primitive it needs and Windows does not have yet: the LaunchAgent
-/// (`launchctl`), the Keychain, the App container's update lifecycle, the
+/// (`launchctl`), DevEco's password material, the App container's update lifecycle, the
 /// diagnostic-bundle publisher, the update-feed artifact measure, the I/O
 /// Registry USB census, and the host store's no-follow Import source reader
 /// (TASK-XPA-018).
@@ -392,16 +392,10 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "agentd.status",
     "agentd.verify",
     "agentd.uninstall",
-    "runtime.signing.install-sdk-release",
-    "runtime.signing.install",
+    // DevEco's password material is not read on Windows (TASK-XPA-011); the
+    // other signing leaves are served there over Credential Manager.
     "runtime.signing.migrate-deveco",
-    "runtime.signing.status",
-    "runtime.signing.remove",
-    "signing.install-sdk-release",
-    "signing.install",
     "signing.migrate-deveco",
-    "signing.status",
-    "signing.remove",
     "runtime.update.check",
     "runtime.update.download",
     "runtime.update.handoff",
