@@ -87,9 +87,25 @@ Run from `rust/` with `CARGO_TARGET_DIR=D:/cargo-target/g2-signing-leaves` on th
 | `cargo fmt --all --check` | clean |
 | `cargo clippy --workspace --all-targets -- -D warnings` | clean |
 | `cargo test --no-fail-fast -p arkdeck-platform -p arkdeck-provider-workspace -p arkdeck-hoststore -p arkdeck-cli -p arkdeck-agentd` (with `ARKDECK_DEV_SIGNER_THUMBPRINT` set, after `cargo build --workspace`) | pass (exit 0, 235 test binaries ok, none failed) |
+| the same, again after merging `origin/main` `755f449f` (#2352 merged) | 234 binaries ok, 1 failed: `windows_credential_store::concurrent_writers_keep_each_others_credentials` (see below) |
 | `generate-contract.py --check` | pass (no contract change) |
 | `sh scripts/check-sdd.sh` (`PYTHONUTF8=1`) | pass |
 | `git diff --check` | clean |
+
+The one failure is #2354's churn measurement. In its `ForeignUser` phase (8 threads × 40
+rounds), 3 credentials that had been read back were later `Absent`. This is the loss the
+credential-store run record describes on the hosted runner, and here it appeared once on the
+reference host. Other agents' test runs were loading the host at the same time.
+
+The four criteria for an unrelated failure hold:
+- neither the store nor its test is changed by this branch;
+- it is the recorded load-sensitive loss;
+- the file then passed 3 of 3 runs alone;
+- no code in this diff writes that phase's credentials.
+
+The product answers such a loss with the typed `Absent` / `Status(1168)`, never a value, and
+`set` refuses a write it cannot read back. The observation is recorded here for the
+credential-store follow-up.
 
 macOS and Linux were not built here. The macOS code is unchanged except for three things, which
 the macOS and ubuntu CI legs check:
