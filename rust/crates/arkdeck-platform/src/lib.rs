@@ -396,6 +396,13 @@ pub use windows::{
 // and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
 #[cfg(windows)]
 pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
+// The Authenticode signature of a registered DevEco tool and the DevEco
+// launcher's publisher, with the macOS answer type (TASK-XPA-011, G12).
+#[cfg(windows)]
+pub use windows::{
+    DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,
+    inspect_native_code_signature, inspect_publisher,
+};
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]
