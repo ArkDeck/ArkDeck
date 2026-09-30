@@ -135,6 +135,18 @@ impl Authority {
     ///   provider, Import owner or capability authority beside them: every
     ///   operation is refused before admission with zero dispatch, as macOS
     ///   refuses it without that owner, and nothing is admitted.
+    /// * the workspace project owner (`WorkspaceProjectStore`) in
+    ///   `workspace-projects`, the name both macOS compositions give it:
+    ///   `projects.json` under `.projects.lock`, the same document as on
+    ///   macOS, a Windows root pinned by its volume serial and NTFS file
+    ///   reference. `workspace.project.register|list|show` and
+    ///   `workspace.preset.list|show` answer from it, and a restart reads
+    ///   back what it holds. Neither the DevEco toolchain or signing
+    ///   credential owner nor the workspace composition is composed, so a
+    ///   project stays `runtimeRestartRequired`; the Job owner's workspace
+    ///   censuses are not built on Windows yet, so nothing proves that no
+    ///   workspace Job names a project or preset, and every project or preset
+    ///   mutation is refused (`recordUnreadable`, no new dispatch).
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each
@@ -176,8 +188,27 @@ impl Authority {
             "arkdeck-agentd composes the Artifact owner over {}",
             path.display()
         ));
+        let host = host.with_artifacts(artifacts);
+        let name = "workspace-projects";
+        let unusable = |path: &Path, error: &dyn std::fmt::Display| {
+            format!(
+                "the workspace project store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let path = self
+            .root
+            .private_child(name)
+            .map_err(|error| unusable(&self.root.path().join(name), &error))?;
+        let projects = arkdeck_hoststore::WorkspaceProjectStore::open(&path)
+            .map_err(|error| unusable(&path, &error))?;
+        // Read now, as the macOS start reads it to compose the registered
+        // projects: a document it cannot read ends the start.
+        projects
+            .startup_records()
+            .map_err(|error| unusable(&path, &error.message))?;
         let host = host
-            .with_artifacts(artifacts)
+            .with_workspace_projects(projects)
             .with_planning(self.root.path());
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);

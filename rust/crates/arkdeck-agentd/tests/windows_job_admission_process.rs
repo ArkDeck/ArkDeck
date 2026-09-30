@@ -383,9 +383,10 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     let mut first = Daemon::start(executable, &root.0);
     let pipe = first.serving();
     assert!(
-        first
-            .seen
-            .contains(&"arkdeck-agentd owners: targets, jobs, artifacts, planning".to_owned()),
+        first.seen.contains(
+            &"arkdeck-agentd owners: targets, jobs, artifacts, workspaceProjects, planning"
+                .to_owned()
+        ),
         "{:?}",
         first.seen
     );
