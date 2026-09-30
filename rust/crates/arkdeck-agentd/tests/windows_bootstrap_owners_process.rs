@@ -10,10 +10,10 @@
 //!     revision aside: the empty bundle and tool pages, a page size out of
 //!     range, an invalid tool reference to remove, a relative HDC to
 //!     register, and `runtime.tool.select` with no tool-selection owner;
-//!   - what the Windows owners do not take yet is refused with zero
-//!     dispatch and writes nothing: a daemon Bundle and an HDC (their
-//!     Windows registration is not built yet), a macOS-spelled path, and an
-//!     absent bundle, tool or toolchain;
+//!   - what Windows cannot hold is refused with zero dispatch and writes
+//!     nothing: a daemon Bundle (no Windows daemon-bundle form), an HDC (no
+//!     Windows HDC tuple is registered, CHG-2026-078), a macOS-spelled path,
+//!     and an absent bundle, tool or toolchain;
 //!   - the registry reads back the same after a restart.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
@@ -314,14 +314,14 @@ fn empty_registry_answers(pipe: &str, root: &Root) {
         "runtime.bundle.register",
         json!({"kind": "daemon-bundle", "file": root.path("ArkDeckAgent.app")}),
         "operationUnavailable",
-        "daemon bundle registration is not built on Windows yet; nothing was registered",
+        "daemon bundle registration is unavailable on Windows: the Runtime is installed as a signed package",
     );
     refused(
         pipe,
         "runtime.tool.register",
         json!({"kind": "hdc", "file": root.path("hdc.exe")}),
-        "operationUnavailable",
-        "HDC registration is not built on Windows yet; nothing was captured",
+        "admissionDenied",
+        "no Windows HDC tuple is registered (CHG-2026-078); nothing was captured",
     );
     // A macOS spelling is not a local path here.
     refused(
@@ -602,7 +602,7 @@ fn the_registry_leaves_run_through_the_cli_against_a_dev_signed_daemon() {
         &[
             "runtime", "tool", "register", "--kind", "hdc", "--file", &hdc_file,
         ],
-        "operationUnavailable",
+        "admissionDenied",
     );
     cli_refused(
         &daemon,

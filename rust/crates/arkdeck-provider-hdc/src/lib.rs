@@ -33,6 +33,7 @@ mod semantic;
 mod status;
 mod target_observation;
 mod trace_probe;
+mod windows_registry;
 
 pub use capture_files::{
     DirectoryPurpose, FaultLogName, FileAction, FileActionError, FilePlan, FileReceipt,
@@ -122,4 +123,8 @@ pub use trace_probe::{
     BYTRACE_HELP_FAMILY, HITRACE_HELP_FAMILY, TRACE_PARAMETERS, TraceParameterObservation,
     TraceProbe, TraceSelection, TraceTool, TraceToolObservation, evaluate_help, evaluate_tag_list,
     trace_probe,
+};
+pub use windows_registry::{
+    WINDOWS_HDC_TUPLES, WindowsHdcTuple, malformed as malformed_windows_tuple, tuple_in,
+    windows_tuple,
 };

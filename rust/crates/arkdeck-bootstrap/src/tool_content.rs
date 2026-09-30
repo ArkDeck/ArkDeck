@@ -108,14 +108,15 @@ pub fn inspect_tool_content(path: &Path) -> io::Result<ToolContent> {
     })
 }
 
-/// The Windows HDC content checks are not built yet (`windows_registration`),
-/// so no retained HDC content is admitted, and a record naming one is refused
-/// as failing its native trust policy. Nothing is read or run.
+/// Windows has no HDC tool content policy while no Windows HDC tuple is
+/// registered (CHG-2026-078), so no retained HDC content is admitted, and a
+/// record naming one is refused as failing its native trust policy. Nothing
+/// is read or run, and no macOS layout or value stands in for it.
 #[cfg(windows)]
 pub fn inspect_tool_content(_path: &Path) -> io::Result<ToolContent> {
     Err(io::Error::new(
         io::ErrorKind::PermissionDenied,
-        "the Windows HDC content checks are not built yet",
+        "no Windows HDC tool content policy: no Windows HDC tuple is registered",
     ))
 }
 

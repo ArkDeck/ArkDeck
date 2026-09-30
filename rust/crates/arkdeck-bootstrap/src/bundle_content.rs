@@ -111,10 +111,10 @@ pub(crate) fn verify_bundle_content(
 ) -> io::Result<()> {
     inspect(path, Some(expected), validate).map(|_| ())
 }
-/// A retained Bundle on Windows: the store's policy decides before any content
-/// is measured, and until the Windows daemon-bundle checks are built
-/// (`windows_registration`) the Windows policy (`no_windows_bundle_policy`)
-/// admits none.
+/// A retained Bundle on Windows: no Windows daemon-bundle form exists (the
+/// daemon is installed as the signed release-candidate package, decision 11),
+/// so the store's policy decides before any content is measured, and the
+/// Windows policy (`no_windows_bundle_policy`) admits none.
 #[cfg(windows)]
 pub(crate) fn verify_bundle_content(
     path: &Path,
@@ -123,13 +123,13 @@ pub(crate) fn verify_bundle_content(
 ) -> io::Result<()> {
     validate(path).map(|_| ())
 }
-/// The Windows daemon-bundle policy until its checks are built: nothing is
-/// admitted; a refusal is `PermissionDenied`, as the macOS helper policy
-/// refuses an untrusted Bundle.
+/// The Windows daemon-bundle policy: nothing is admitted, since no Windows
+/// daemon-bundle form exists; a refusal is `PermissionDenied`, as the macOS
+/// helper policy refuses an untrusted Bundle.
 #[cfg(windows)]
 pub fn no_windows_bundle_policy(_path: &Path) -> io::Result<PathBuf> {
     Err(io::Error::new(
         io::ErrorKind::PermissionDenied,
-        "the Windows daemon-bundle checks are not built yet",
+        "no Windows daemon-bundle policy: the Runtime is installed as a signed package",
     ))
 }

@@ -24,7 +24,8 @@ impl ControlActionResources {
 }
 
 /// Swift's `runtime.tool.select` answer with no tool-selection owner, which
-/// the Windows daemon gives until its tool-selection owner is composed.
+/// the Windows daemon gives: no Windows HDC can be registered while no
+/// Windows HDC tuple is (CHG-2026-078), so no selection candidate exists.
 pub fn tool_selection_without_owner() -> WireError {
     WireError {
         code: "operationUnavailable".into(),

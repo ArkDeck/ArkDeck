@@ -16,8 +16,8 @@
 //! listener owned by that PID are the proof. A server this daemon launched is
 //! further proved by its own Job object (`ManagedServer::verifies`).
 use super::Handle;
-use super::identity::{ProcessIdentity, file_identity, process_image, process_started};
-use crate::{ServerIdentityReceipt, VerifiedTool, denied, invalid};
+use super::identity::{ProcessIdentity, Token, file_identity, process_image, process_started};
+use crate::{ProvedProcessEnd, ServerIdentityReceipt, VerifiedTool, denied, invalid};
 use std::io;
 use std::mem::{offset_of, size_of};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4};
@@ -30,6 +30,7 @@ use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 use windows_sys::Win32::System::Threading::{
     OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, WaitForSingleObject,
 };
+use windows_sys::Win32::System::Threading::{PROCESS_TERMINATE, TerminateProcess};
 
 /// Holds a kernel-proven, already-running HDC process through an observation.
 /// Acquiring/revalidating this lease performs no network connect and no process
@@ -217,6 +218,86 @@ pub(crate) fn open_process(pid: u32) -> io::Result<Handle> {
 pub(crate) fn process_started_by_pid(pid: u32) -> Option<u64> {
     let process = open_process(pid).ok()?;
     process_started(process.raw()).ok()
+}
+
+/// The exit code a proved process ended here reports.
+const ENDED_EXIT_CODE: u32 = 1;
+
+/// Ends the one process an identity receipt names, as the daemon's stop ends
+/// the HDC server a confirmed restart proved (the macOS
+/// `macos_server::end_proved_process`, TASK-XPA-014 on macOS, TASK-XPA-005
+/// here), and returns once that process's exit has finished (its process
+/// object signalled), so no listener of its own accepts any more.
+///
+/// Windows has no TERM (a server gets no chance to drain there, as
+/// `ManagedServer::stop` already has none), so `grace` is not waited: the
+/// process is terminated at once and given `kill_grace` to finish. The
+/// handle opened here pins the PID for the whole call, which is how a PID
+/// reused since the receipt is never ended: the creation time and the user
+/// read on that handle must be the receipt's birth and this process's user
+/// before anything is terminated. A PID with no process, one that has
+/// already exited, or one now naming another birth means the receipt's
+/// process has ended: nothing is terminated. Whether the process is the
+/// caller's to end is the caller's proof; this never decides it.
+pub fn end_proved_process(
+    receipt: &ServerIdentityReceipt,
+    grace: std::time::Duration,
+    kill_grace: std::time::Duration,
+) -> io::Result<ProvedProcessEnd> {
+    let _ = grace;
+    let pid = u32::try_from(receipt.pid)
+        .ok()
+        .filter(|pid| *pid > 4)
+        .ok_or_else(|| invalid("a proved process has a PID of its own"))?;
+    // SAFETY: query, synchronize and terminate access; the owned handle is
+    // retained for the whole call.
+    let process = match Handle::new(unsafe {
+        OpenProcess(
+            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE | PROCESS_TERMINATE,
+            0,
+            pid,
+        )
+    }) {
+        Ok(process) => process,
+        Err(error) if error.raw_os_error() == Some(ERROR_INVALID_PARAMETER as i32) => {
+            return Ok(ProvedProcessEnd::AlreadyEnded);
+        }
+        Err(error) => return Err(error),
+    };
+    let ended_within = |within: std::time::Duration| {
+        let milliseconds = u32::try_from(within.as_millis()).unwrap_or(u32::MAX);
+        // SAFETY: retained process handle with SYNCHRONIZE access.
+        unsafe { WaitForSingleObject(process.raw(), milliseconds) == WAIT_OBJECT_0 }
+    };
+    if ended_within(std::time::Duration::ZERO) {
+        return Ok(ProvedProcessEnd::AlreadyEnded);
+    }
+    let birth = unix_birth(process_started(process.raw())?)?;
+    if birth != (receipt.start_seconds, receipt.start_microseconds) {
+        return Ok(ProvedProcessEnd::AlreadyEnded);
+    }
+    if !Token::for_process(process.raw())?
+        .user()?
+        .equals(&Token::current()?.user()?)
+    {
+        return Err(denied("the proved process runs as another user"));
+    }
+    // SAFETY: the retained handle has PROCESS_TERMINATE access and names the
+    // receipt's process, checked just now on that same handle.
+    if unsafe { TerminateProcess(process.raw(), ENDED_EXIT_CODE) } == 0 {
+        let error = io::Error::last_os_error();
+        if !ended_within(std::time::Duration::ZERO) {
+            return Err(error);
+        }
+    }
+    if ended_within(kill_grace) {
+        Ok(ProvedProcessEnd::Killed)
+    } else {
+        Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "the proved process did not finish exiting",
+        ))
+    }
 }
 
 /// 100 ns intervals between 1601-01-01 (`FILETIME`) and 1970-01-01.

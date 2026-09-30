@@ -2546,6 +2546,24 @@ them on Windows, since no Windows HDC tuple is registered.
 test binary itself; no real HDC is launched. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
 
+The managed server's start and stop follow #2131's semantics on Windows as
+well.
+- A start refuses an endpoint something already listens on before launching
+  anything, and names the holder.
+- The stop's `end_proved_process` (the macOS one's Windows counterpart) ends
+  only the process a proof names: a replacement server a confirmed restart
+  left outside the Runtime's Job. It opens the PID once, which pins it, and
+  checks the receipt's birth and this user on that handle before
+  `TerminateProcess`. Another birth, or a PID of 4 or less, ends nothing.
+  Windows has no TERM, so the grace is not waited.
+- `windows_tool_dispatch.rs` proves the end, and that no other birth is ever
+  ended. `windows_managed_hdc.rs` runs restart, then stop, then start: the
+  replacement blocks the start, and once the proved replacement is ended,
+  the next start owns the endpoint.
+- The daemon's own managed-HDC owner (`managed_hdc.rs`, with its restart
+  lifecycle) stays macOS-only. It needs a registered HDC, and a Windows
+  development root refuses `ARKDECK_DEVELOPMENT_HDC_PATH` and
+  `ARKDECK_DEVELOPMENT_HDC_SERVER` before starting anything.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
@@ -2800,9 +2818,11 @@ directory), created owner-only at the start. The census names `bootstrap` after
   toolchain's inspection, listing and retirement over the DevEco registry. The control layer and
   the CLI take a registration path as the host spells an absolute one (`X:\…` on Windows), and the
   CLI expects the host's `platform` in a returned record.
-- **Not built on Windows yet** (their Windows forms are the next slice): registering a daemon
-  Bundle or an HDC, whose content checks refuse any retained record meanwhile, and the
-  tool-selection owner, so `runtime.tool.select` answers Swift's no-owner refusal.
+- **Refused on Windows**, before the store is locked: registering a daemon Bundle (no Windows
+  daemon-bundle form; the daemon is installed as the signed package) or an HDC (no Windows HDC
+  tuple is registered, CHG-2026-078); a retained record of either is refused as failing its
+  native trust policy. With no HDC to select, `runtime.tool.select` answers Swift's no-owner
+  refusal.
 - **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
   team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
   `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.

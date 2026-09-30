@@ -37,7 +37,10 @@ mod loopback_ports {
 #[cfg(windows)]
 mod windows {
     use super::loopback_ports::free_endpoint;
-    use arkdeck_platform::{ServerExit, VerifiedTool, random_bytes};
+    use arkdeck_platform::{
+        LoopbackServerLease, ProvedProcessEnd, ServerExit, VerifiedTool, end_proved_process,
+        random_bytes,
+    };
     use arkdeck_provider_hdc::{
         Action, HdcDispatch, ManagedHdcServer, ProcessDispatch, ProcessPlan, Property, StartBudget,
         StartFailure,
@@ -149,6 +152,10 @@ mod windows {
         (
             "an_occupied_endpoint_launches_nothing",
             an_occupied_endpoint_launches_nothing,
+        ),
+        (
+            "a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start",
+            a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start,
         ),
         (
             "a_listener_of_another_process_never_binds_the_launch",
@@ -369,6 +376,79 @@ mod windows {
              that is not the configured HDC executable holds it"
         );
         assert!(fake.calls().is_empty(), "{:?}", fake.calls());
+    }
+
+    /// TASK-XPA-014's replacement lifetime (#2131) on Windows: a confirmed
+    /// restart leaves a replacement server that no Job of this process holds.
+    /// While it listens, a start launches nothing and names it by PID, never
+    /// adopting or stopping it. Once the daemon's stop ends the proved
+    /// replacement (`end_proved_process` over the commandless proof), the
+    /// next start owns the endpoint.
+    fn a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start() {
+        let fake = FakeHdc::new("hdc");
+        let endpoint = free_endpoint();
+        let spelled = endpoint.to_string();
+        let mut replacement = std::process::Command::new(fake.tool.path())
+            .args(["-s", spelled.as_str(), "-m"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let lease = loop {
+            match LoopbackServerLease::acquire(&fake.tool, endpoint) {
+                Ok(lease) => break lease,
+                Err(_) => {
+                    assert!(Instant::now() < deadline, "the replacement never listened");
+                    assert!(replacement.try_wait().unwrap().is_none());
+                    std::thread::yield_now();
+                }
+            }
+        };
+        assert_eq!(lease.identity().pid as u32, replacement.id());
+        let launched = fake.calls().len();
+
+        // While it listens, nothing is launched; the holder is named.
+        let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(5)))
+            .err()
+            .expect("an endpoint the replacement holds is refused");
+        let StartFailure::Occupied(reason) = error else {
+            panic!("expected the occupant, got {error:?}");
+        };
+        assert!(
+            reason.contains(&format!(
+                "a server of the configured HDC executable that this launch did not start \
+                 listens there (pid {}",
+                replacement.id()
+            )),
+            "{reason}"
+        );
+        assert_eq!(fake.calls().len(), launched, "{:?}", fake.calls());
+        assert!(replacement.try_wait().unwrap().is_none());
+
+        // The stop ends the proved replacement, and its listener with it.
+        lease.revalidate().unwrap();
+        assert_eq!(
+            end_proved_process(
+                lease.identity(),
+                Duration::from_millis(250),
+                Duration::from_secs(5)
+            )
+            .unwrap(),
+            ProvedProcessEnd::Killed
+        );
+        assert!(replacement.try_wait().unwrap().is_some());
+        assert!(!reachable(endpoint));
+        drop(lease);
+
+        // The next start owns the endpoint.
+        let server =
+            ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(15))).unwrap();
+        assert_eq!(server.endpoint(), endpoint);
+        assert_ne!(server.identity().pid as u32, replacement.id());
+        server.stop().unwrap();
+        let _ = replacement.wait();
     }
 
     /// A listener that appears only after the launch — once the fake has run

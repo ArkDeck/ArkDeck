@@ -1,17 +1,23 @@
-//! Registration of Bootstrap content on Windows, not built yet: the Windows
-//! forms of a daemon Bundle and of an HDC tool (per maintainer ruling
-//! 2026-09-30, the macOS content, trust and capture logic with Authenticode,
-//! PE and NTFS equivalents) are the next slice. Until then both refuse before
-//! the store is locked or any source byte is read, and nothing is captured,
-//! published, selected or run.
+//! Registration of Bootstrap content on Windows. Both refuse before the store
+//! is locked or any source byte is read, and nothing is captured, published,
+//! selected or run.
+//!
+//! * A daemon Bundle: the Windows daemon is installed as the signed
+//!   release-candidate package and started by its client (decision 11);
+//!   `runtime service install` and `update`, which consume registered Bundles
+//!   on macOS, are macOS-only.
+//! * An HDC tool: a Windows HDC is identified by its executable's SHA-256 and
+//!   the exact bytes its `-v` prints (CHG-2026-078 §1). Until a Windows HDC
+//!   tuple is registered, no HDC is registered; no macOS identity, layout or
+//!   value stands in for one.
 use crate::{BundleRegistryReadStore, ToolRegistryStore};
 use arkdeck_contract::WireError;
 use serde_json::{Value, json};
 use std::path::Path;
 
-fn unavailable(message: &str) -> WireError {
+fn failure(code: &str, message: &str) -> WireError {
     WireError {
-        code: "operationUnavailable".into(),
+        code: code.into(),
         message: message.into(),
         details: Some(serde_json::Map::from_iter([
             ("phase".into(), json!("bootstrapRegistryOwner")),
@@ -22,25 +28,29 @@ fn unavailable(message: &str) -> WireError {
 
 /// The published identity (`version`, `profileReferences`) a Windows HDC
 /// executable's SHA-256 matches, the Windows counterpart of the macOS
-/// `published_identity`: none until the Windows HDC registration is built.
+/// `published_identity`: none while no Windows HDC tuple is registered.
 pub(crate) fn windows_published_identity(_sha256: &str) -> Option<Value> {
     None
 }
 
 impl BundleRegistryReadStore {
-    /// Refused before the store is locked or the source is opened.
+    /// No Windows daemon Bundle is registered: the refusal comes before the
+    /// store is locked or the source is opened.
     pub fn register(&self, _source: &Path, _now: &str) -> Result<Value, WireError> {
-        Err(unavailable(
-            "daemon bundle registration is not built on Windows yet; nothing was registered",
+        Err(failure(
+            "operationUnavailable",
+            "daemon bundle registration is unavailable on Windows: the Runtime is installed as a signed package",
         ))
     }
 }
 
 impl ToolRegistryStore {
-    /// Refused before the store is locked or the source is opened.
+    /// No Windows HDC tuple is registered (CHG-2026-078): every registration
+    /// is refused before the store is locked or the source is opened.
     pub fn register(&self, _source: &Path, _now: &str) -> Result<Value, WireError> {
-        Err(unavailable(
-            "HDC registration is not built on Windows yet; nothing was captured",
+        Err(failure(
+            "admissionDenied",
+            "no Windows HDC tuple is registered (CHG-2026-078); nothing was captured",
         ))
     }
 }

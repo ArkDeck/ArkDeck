@@ -2131,10 +2131,10 @@ impl HostServices for Host {
     }
 
     /// `runtime.tool.select` on Windows, as Swift's handler answers it with no
-    /// tool-selection owner, which is not composed on Windows yet (nor is an HDC
-    /// registered to select). The HDC lifecycle's and the control actions'
-    /// methods keep the read-only foundation's refusal until their owners are
-    /// built.
+    /// tool-selection owner: no Windows HDC can be registered while no Windows
+    /// HDC tuple is (CHG-2026-078), so there is nothing to select. The HDC
+    /// lifecycle's and the control actions' methods keep the read-only
+    /// foundation's refusal until their owners are built.
     #[cfg(windows)]
     fn control_action(
         &self,

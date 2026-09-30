@@ -6,9 +6,12 @@ No device was contacted and no `hdc` ran. The host's DevEco Studio
 (`C:\Program Files\Huawei\DevEco Studio`) was read, never run or written, by the opt-in live
 checks named below. Host tests are not Windows acceptance.
 
-Per maintainer ruling 2026-09-30 (macOS logic is the standard). This part composes the owners
-and serves everything whose Windows form exists. The Windows forms of HDC registration, daemon
-Bundle registration and the tool-selection owner are the next part (below).
+Basis: maintainer ruling 17 (the daemon's signer or publisher identity) and the maintainer's
+delegation of 2026-09-30 (non-major choices follow the agent's recommendation, as rulings 18-28
+record); the delegated minor decisions below. This part composes the owners and serves
+everything whose Windows form exists. HDC registration stays refused until a Windows HDC tuple is
+registered (CHG-2026-078), and so does `runtime.tool.select`; daemon Bundle registration is
+refused until a Windows daemon-bundle form exists (below).
 
 ## The gap
 
@@ -32,8 +35,10 @@ retirement.
   - macOS-only: the native content readers (Mach-O, the bundle signature, the tree walker and the
     tool capture) and `create_store` (the CLI's zero-Runtime install).
   - On Windows, a retained HDC's content check and the daemon-bundle policy refuse
-    (`PermissionDenied`). So any record present is refused as failing its native trust policy,
-    and none can be written yet.
+    (`PermissionDenied`). So any record present is refused as failing its native trust policy.
+    Registration refuses before the store is locked: an HDC `admissionDenied` (no Windows HDC
+    tuple is registered, CHG-2026-078), a daemon Bundle `operationUnavailable` (the Windows
+    daemon is installed as the signed package).
   - The published HDC identities table is macOS's `published_identity`. It is not used on Windows,
     whose counterpart answers none.
 - **`arkdeck-hoststore`.** The paged bundle and tool inventories and DevEco retirement are built
@@ -88,10 +93,10 @@ retirement.
    macOS relative name below the product directory, as the Sessions and Trace locations decision
    placed theirs (`runs/TASK-XPA-005/windows-account-locations-run.md`). A development root keeps
    `bootstrap`.
-2. **Until their Windows forms are built, registering a daemon Bundle or an HDC is
-   `operationUnavailable`, and `runtime.tool.select` gives Swift's no-owner answer.** Each is
-   refused before the store is locked, and nothing is written. The next part builds them per
-   the ruling.
+2. **Registering an HDC is `admissionDenied` until a Windows HDC tuple is registered
+   (CHG-2026-078), a daemon Bundle `operationUnavailable` until a Windows daemon-bundle form
+   exists, and `runtime.tool.select` gives Swift's no-owner answer.** Each is refused before the
+   store is locked, and nothing is written.
 3. **The contract widening above**, through the generator's shared-member rule rather than a
    Windows-recorded frame in the Swift corpus.
 4. **DevEco retirement's Windows index encoding** (above).
@@ -130,26 +135,22 @@ retirement.
     `childTools[2].trust.teamIdentifier: null`.
 - **`windows_method_conformance_process.rs`.** No reply of the nine methods is replaced as
   non-conforming.
-- **Census** (`rust/scripts/windows-method-census.py`): 78 methods answered by a composed owner
+- **Census** (`rust/scripts/windows-method-census.py`, before the merge of #2425 and #2426): 78 methods answered by a composed owner
   (11 results, 67 owner refusals), 25 with no owner, and 2 whose recorded requests are malformed
   on Windows. Those two are `runtime.bundle.register` and `runtime.tool.register`: every
   corpus request names a macOS path, which the process test replaces with a Windows one. The
   dashboard (`windows-remaining.md`) is refreshed per milestone in its own commit, so it is not
   changed here.
 
-## The next part (per the ruling)
+## The next part
 
-1. **HDC registration on Windows.** `hdc.exe` with its sibling `libusb_shared.dll`, as the macOS
-   layout pairs `hdc` with `libusb_shared.dylib`:
-   - the tree walker and capture on NTFS;
-   - PE in place of the Mach-O relocation check;
-   - Authenticode in place of codesign;
-   - the published identities from the Windows HDC identity table that the ruling admits.
-2. **The tool-selection owner** (`runtime.tool.select`) over the control-action owner.
-3. **A Windows daemon-bundle form** for `runtime.bundle.register`.
-
-The coordination question (the owner of the Windows HDC identity table and of the control-action
-owner) is with the lead.
+1. **HDC registration machinery on Windows**: `hdc.exe` with its sibling `libusb_shared.dll`, the
+   tree walker and capture on NTFS, PE in place of the Mach-O check, Authenticode in place of
+   codesign, admitting only an executable a registered Windows HDC tuple names (#2426's
+   `WINDOWS_HDC_TUPLES`, empty until CHG-2026-078 registers one, so registration still refuses).
+2. **A Windows daemon-bundle form** for `runtime.bundle.register|inspect|remove`: the RC xcopy
+   tree verified against its `rc-manifest.json` and the signer or publisher pin (ruling 17).
+3. The tool-selection owner is S1's, over this registry.
 
 ## Local checks
 
