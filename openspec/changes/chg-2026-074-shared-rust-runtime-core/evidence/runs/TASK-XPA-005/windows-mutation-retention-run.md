@@ -6,7 +6,8 @@ fail-closed gaps the earlier Windows slices left:
 - the Runtime's mutation-state proof;
 - the start-up Artifact retention sweep.
 
-Branch `agent/xpa-005-windows-mutation-retention-20260930`, one commit on `origin/main`.
+Branch `agent/xpa-005-windows-mutation-retention-20260930` (PR #2394), on `origin/main`, with main
+merged in after #2391 landed.
 
 Host: the Windows 11 x64 reference host, non-elevated, NTFS. The limits of this run:
 
@@ -54,7 +55,8 @@ short-name `TEMP`.
   were macOS-only).
 - The census adds `mutationAuthority` in its macOS position:
   `jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects,
-  planning, traceCache`.
+  planning, agentExecutions, humanActions, traceCache` (with #2391's agent owners, after main
+  was merged in).
 - The runner's mutation execution (`job.run`) already took `self.authority()`. With a root named,
   it now proves the state instead of refusing it.
 - `main.rs`: the start's `collect_expired_artifacts` runs on Windows after the Job recovery and
@@ -110,7 +112,7 @@ retention lapsed on 2026-09-21. The test reads:
 
 - **The first start:**
   - `arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage,
-    workspaceProjects, planning, traceCache`;
+    workspaceProjects, planning, agentExecutions, humanActions, traceCache`;
   - `recovered 1 active job(s); unknown outcomes parked`;
   - `reclaimed 4 expired artifact(s)`.
 - **The swept Jobs:** index rows and payloads are gone. `job.result` of a swept Job answers with

@@ -1203,7 +1203,8 @@ impl AgentExecutionStore {
     /// read without the owner (whose open makes its pager directory) and
     /// without writing anything. Records are published whole, so a read beside
     /// a running owner sees each one before or after a change. An absent store
-    /// holds no execution.
+    /// holds no execution. (The cutover preflight is macOS's.)
+    #[cfg(target_os = "macos")]
     pub(crate) fn cutover_executions(
         path: &Path,
     ) -> Result<Vec<(String, String, Option<String>)>, String> {

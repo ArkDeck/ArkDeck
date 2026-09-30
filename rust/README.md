@@ -1116,22 +1116,16 @@ The Windows daemon composes the runner, `job.cancel`, `job.result` and
 owner (`session-state`, and `sessions` in a development root or
 `%LOCALAPPDATA%\ArkDeck\Sessions` for the account; see the Session owner
 section) and `operation.list` (the HDC and analyzer operations
-owner (`session-state`, `sessions`, below `Agentd` on the account root; see
-the Session owner section) and `operation.list` (the HDC and analyzer operations
 `provider_not_registered`), and recovers the active Jobs at its start
 (`recover_active_jobs`, then the staged Sessions) as the macOS daemon does.
 No HDC provider is composed until the Windows HDC tuple is registered, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
 `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
-workspaceProjects, planning, traceCache` over a development root (the
-account's daemon composes no Trace cache), the macOS census's order.
-`jobs, capabilities, targets, artifacts, storage, workspaceProjects,
-planning, traceCache` over a development root and the account's root alike,
-the macOS census's order. The start's Artifact retention
-planning, traceCache` over a development root (the account's daemon composes
-no Trace cache), the macOS census's order. The start's Artifact retention
-sweep stays macOS-only for now.
+workspaceProjects, planning, agentExecutions, humanActions, traceCache` over a
+development root and the account's root alike, the macOS census's order. The
+start's Artifact retention sweep runs as on macOS (see the mutation authority
+section below).
 
 Tests on Windows: `arkdeck-hoststore/tests/job_recovery.rs` (the five macOS
 restart and recovery cases), `tests/windows_job_runner.rs` (the recorded
@@ -1183,6 +1177,50 @@ recorded store), the host's mutation-root test (`host_tests.rs`), and
 the authority's census through the real daemon across a restart, and with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` through `arkdeck artifact list|quota` and
 `arkdeck capability list` against a dev-signed daemon).
+## Job reconciler and agent executions on Windows (TASK-XPA-005)
+
+`JobReconciler` (`job_reconcile.rs` with `job_reconcile_device.rs`), the agent
+execution owner and engine (`agent_execution.rs`) and the combined
+human-action owner (`human_action.rs`) build on Windows. The union
+control-action owner is the HDC lifecycle's and the tool selection's, not
+built on Windows yet: `absent_control_action.rs` gives Windows a
+`ControlActionResources` with no value, so the human-action owner is the same
+code and pages the executions' actions alone. Still macOS-only, each refused
+on Windows as a Job this Runtime does not reconcile: the workspace Jobs
+(signing, the workspace mutations and reads, symbolization, the sweep) and a
+delegated Flash's lane receipt (`flash_reconcile.rs`, AF-W1).
+
+The Windows daemon composes `job.reconcile` (the Session publication writer
+and the runner its runs use, no HDC composition or Flash lane), the agent
+execution owner in `agent-executions` and the human-action owner in
+`human-action-snapshots` (`agent.*`, `human-action.*`), on the development
+and the account root. An execution admits its Job as `job.submit` does here
+and observes no Target, since no Windows HDC tuple is registered. The census
+reads `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
+workspaceProjects, planning, agentExecutions, humanActions, traceCache`.
+
+Tests on Windows: `arkdeck-hoststore/tests/windows_job_reconcile.rs` (the
+Swift restart and reconcile oracle's store, with its first Session laid down,
+replayed through the reconciler: every answer and read Swift's, but a
+refusal's wording and the Manifest digest naming `PLATFORM-WINDOWS`),
+`tests/windows_agent_human_action_records.rs` (the physical-assistance
+oracle's execution records read, run, abandoned and expired as Swift's owner
+answers), and `arkdeck-agentd/tests/windows_reconcile_agent_process.rs` (both
+through the real daemon across a restart, on the daemon's own clock, and with
+`ARKDECK_DEV_SIGNER_THUMBPRINT` through
+`arkdeck job reconcile|agent status|human-action show` against a dev-signed
+daemon).
+
+Found on the way, on every host: the current contract types an agent
+execution's `failureCode` and a human action's `selectionSchema` as null and
+lists no `orchestrationBudgetExpired` among `agent.run`'s error codes. A
+pick-a-device action, an expired execution and its refusal are answered as a
+conformance failure (`internalError`) by the daemon; the process test reads
+them from the records instead.
+
+Follow-ups: the start's Artifact retention sweep is still macOS-only; the
+control actions (with the HDC lifecycle) and an execution's Target
+observation wait for the Windows HDC tuple.
 
 ## Job index and record writers (TASK-XPA-014)
 

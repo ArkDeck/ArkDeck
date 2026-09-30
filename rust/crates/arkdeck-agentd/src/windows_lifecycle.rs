@@ -148,6 +148,15 @@ impl Authority {
     ///   and `artifact.list` snapshot pages as on macOS. Every Artifact
     ///   belongs to a Job, which the Job store above proves before anything
     ///   is read, listed or exported;
+    /// * the agent execution owner (`AgentExecutionStore`) in
+    ///   `agent-executions` and the combined human-action owner
+    ///   (`HumanActionResources`) in `human-action-snapshots`, the names both
+    ///   macOS compositions give them: the same execution records and pages
+    ///   as on macOS. `agent.*` and `human-action.*` answer from them; an
+    ///   execution admits its Job as `job.submit` does here, observes no
+    ///   Target (no Windows HDC tuple is registered), and no control action
+    ///   is built, so the human-action owner pages the executions' actions
+    ///   alone;
     /// * the Session owner and the Artifact usage owner
     ///   ([`Self::session_store`]): `runtime.storage.*`, `session.list|show|
     ///   pin|unpin`, `session.cleanup.*` and `session.export.*`;
@@ -244,6 +253,39 @@ impl Authority {
                 },
             )?
         });
+        // Beside the Job state, as the macOS daemons keep their agent
+        // executions, and the combined human-action owner in its own
+        // directory beside them (over no control-action owner: none is built
+        // on Windows yet).
+        let name = "agent-executions";
+        let unusable = |path: &Path, error: std::io::Error| {
+            format!(
+                "the agent execution store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let path = self
+            .root
+            .private_child(name)
+            .map_err(|error| unusable(&self.root.path().join(name), error))?;
+        let agents = arkdeck_hoststore::AgentExecutionStore::open(&path)
+            .map_err(|error| unusable(&path, error))?;
+        let name = "human-action-snapshots";
+        let unusable = |path: &Path, error: std::io::Error| {
+            format!(
+                "the human-action store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let path = self
+            .root
+            .private_child(name)
+            .map_err(|error| unusable(&self.root.path().join(name), error))?;
+        let humans = arkdeck_hoststore::HumanActionResources::open(&path)
+            .map_err(|error| unusable(&path, error))?;
+        let host = host
+            .with_agent_executions(agents)
+            .with_human_actions(humans);
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(

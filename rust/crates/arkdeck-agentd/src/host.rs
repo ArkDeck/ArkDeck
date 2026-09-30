@@ -115,7 +115,7 @@ pub struct Host {
     #[cfg(any(target_os = "macos", windows))]
     jobs: Option<std::sync::Arc<arkdeck_hoststore::JobStore>>,
     /// The agent execution owner beside the Job state.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     agents: Option<std::sync::Arc<arkdeck_hoststore::AgentExecutionStore>>,
     #[cfg(any(target_os = "macos", windows))]
     capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
@@ -199,12 +199,13 @@ pub struct Host {
     code_sign_helper: Option<arkdeck_provider_hdc::CodeSignHelper>,
     /// The combined human-action owner over the agent executions and the
     /// union control-action owner.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     human_actions: Option<arkdeck_hoststore::HumanActionResources>,
     /// The union control-action owner, over the HDC control-action owner
     /// when the isolated owner starts a managed HDC server, and never over a
-    /// tool-selection owner.
-    #[cfg(target_os = "macos")]
+    /// tool-selection owner. None on Windows, where no control action is
+    /// built yet (the HDC lifecycle's wait for the Windows HDC tuple).
+    #[cfg(any(target_os = "macos", windows))]
     control_actions: Option<arkdeck_hoststore::ControlActionResources>,
     /// Swift `ProductRockchipPostFlashAliasReconciler`: the post-flash alias
     /// of the Application Support root, repaired against the one board the
@@ -327,7 +328,7 @@ impl Host {
     }
     /// `agent.run` and `agent.status` advance and read this owner's
     /// executions, which own Jobs of the Job owner.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_agent_executions(mut self, agents: arkdeck_hoststore::AgentExecutionStore) -> Self {
         self.agents = Some(std::sync::Arc::new(agents));
         self
@@ -509,7 +510,7 @@ impl Host {
     /// `human-action.list` and `human-action.show` read the physical
     /// assistance this owner's agent executions ask for and the impact
     /// approvals of the union control-action owner's actions.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_human_actions(
         mut self,
         resources: arkdeck_hoststore::HumanActionResources,
@@ -813,6 +814,90 @@ impl Host {
                         message: refusal.message,
                         details: Some(refusal.details),
                     })
+            }))
+            .unwrap_or_else(|_| {
+                Err(WireError {
+                    code: "internalError".into(),
+                    message: "the Runtime could not complete the Job lifecycle request".into(),
+                    details: Some(serde_json::Map::new()),
+                })
+            });
+            slot.cancellation.end();
+            slot.finish(&result);
+            if let Ok(mut runs) = running.lock() {
+                runs.remove(&start.job);
+            }
+            agents.finish(&start, &jobs);
+        });
+    }
+    /// Swift `startJob` on Windows: the owned Job runs in the background in
+    /// the slot every `job.run` and `job.cancel` of it meets, through the
+    /// runner `job.run` composes here (no HDC, analyzer, workspace provider
+    /// or Flash lane), and its end is reported to the execution.
+    #[cfg(windows)]
+    fn start_agent_run(&self, start: arkdeck_hoststore::AgentStart) {
+        let (Some(agents), Some(jobs), Some(artifacts), Some(state_root)) = (
+            self.agents.clone(),
+            self.jobs.clone(),
+            self.artifacts.clone(),
+            self.planning.clone(),
+        ) else {
+            return;
+        };
+        let (storage, claims, running, home) = (
+            self.storage.clone(),
+            self.claims.clone(),
+            self.running.clone(),
+            self.home.clone(),
+        );
+        let default_mutation_root = self.default_mutation_root.clone();
+        let capabilities = self.capabilities.clone();
+        let holds = self.holds.clone();
+        let slot = std::sync::Arc::new(RunSlot::default());
+        match running.lock() {
+            Ok(mut runs) if !runs.contains_key(&start.job) => {
+                runs.insert(start.job.clone(), slot.clone());
+            }
+            _ => return,
+        }
+        std::thread::spawn(move || {
+            let probe = arkdeck_hoststore::SystemStorageProbe;
+            let publisher = storage
+                .as_ref()
+                .map(|storage| arkdeck_hoststore::SessionPublisher {
+                    sessions: &storage.0,
+                    claims: &claims,
+                    probe: &probe,
+                });
+            let authority = capabilities
+                .as_deref()
+                .zip(default_mutation_root.as_deref())
+                .map(
+                    |(capabilities, default_root)| arkdeck_hoststore::MutationAuthority {
+                        default_root,
+                        sessions: storage.as_ref().map(|storage| &storage.0),
+                        capabilities,
+                        holds: &holds,
+                    },
+                );
+            let params =
+                serde_json::Map::from_iter([("jobId".into(), serde_json::json!(start.job))]);
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                windows_runner(
+                    &state_root,
+                    &jobs,
+                    &artifacts,
+                    authority,
+                    &home,
+                    publisher.as_ref(),
+                    Some(&slot.cancellation),
+                )
+                .handle(&params)
+                .map_err(|refusal| WireError {
+                    code: refusal.code.into(),
+                    message: refusal.message,
+                    details: Some(refusal.details),
+                })
             }))
             .unwrap_or_else(|_| {
                 Err(WireError {
@@ -1244,6 +1329,8 @@ impl Host {
             ("storage", self.storage.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
             ("planning", self.planning.is_some()),
+            ("agentExecutions", self.agents.is_some()),
+            ("humanActions", self.human_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
@@ -1321,7 +1408,7 @@ impl Host {
             claims: Default::default(),
             #[cfg(target_os = "macos")]
             hdc: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             agents: None,
             #[cfg(any(target_os = "macos", windows))]
             holds: Default::default(),
@@ -1333,9 +1420,9 @@ impl Host {
             usb_registry: false,
             #[cfg(target_os = "macos")]
             code_sign_helper: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             human_actions: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             control_actions: None,
             #[cfg(target_os = "macos")]
             flash_alias: None,
@@ -1356,6 +1443,91 @@ impl Host {
             #[cfg(all(test, target_os = "macos"))]
             test_hdc_impact: None,
         }
+    }
+}
+
+impl Host {
+    /// A Job's reconcile (`reconcile`), unless a run of this owner holds the
+    /// Job, whose status (`status`) is answered with nothing written; a
+    /// concurrent reconcile of one Job joins the one under way, as Swift's
+    /// callers join `jobReconciliations`.
+    #[cfg(any(target_os = "macos", windows))]
+    fn reconcile_once(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+        reconcile: &dyn Fn() -> Result<serde_json::Value, WireError>,
+        status: &dyn Fn() -> Result<serde_json::Value, WireError>,
+    ) -> Result<serde_json::Value, WireError> {
+        // Swift attaches no details to any `job.reconcile` refusal.
+        let uncertain = || WireError {
+            code: "internalError".into(),
+            message: "the Runtime could not complete the Job lifecycle request".into(),
+            details: None,
+        };
+        let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
+            return reconcile();
+        };
+        let slot = {
+            // `running`, then `reconciling`, as `claim_run` takes them: a run
+            // and a reconcile never both begin on one Job.
+            let running = self.running.lock().map_err(|_| uncertain())?;
+            if running.get(job).is_some_and(|slot| !slot.cancelling) {
+                drop(running);
+                return status();
+            }
+            let mut reconciling = self.reconciling.lock().map_err(|_| uncertain())?;
+            if let Some(slot) = reconciling.get(job).cloned() {
+                drop(reconciling);
+                drop(running);
+                return slot.wait().unwrap_or_else(|| Err(uncertain()));
+            }
+            let slot = std::sync::Arc::new(RunSlot::default());
+            reconciling.insert(job.to_owned(), slot.clone());
+            slot
+        };
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(reconcile))
+            .unwrap_or_else(|_| Err(uncertain()));
+        if let Ok(mut reconciling) = self.reconciling.lock() {
+            reconciling.remove(job);
+        }
+        slot.finish(&result);
+        result
+    }
+}
+
+/// The Job runner a Windows composition runs a Job with (`job.run`, an
+/// agent execution's owned Job and `job.reconcile`'s finalization): the Job
+/// and Artifact owners, the Session publication writer and the mutation
+/// authority, with no HDC composition (no Windows HDC tuple is registered),
+/// analyzer, Import owner or workspace provider.
+#[cfg(windows)]
+fn windows_runner<'a>(
+    state_root: &'a std::path::Path,
+    jobs: &'a arkdeck_hoststore::JobStore,
+    artifacts: &'a arkdeck_hoststore::ArtifactReadStore,
+    authority: Option<arkdeck_hoststore::MutationAuthority<'a>>,
+    home: &'a str,
+    sessions: Option<&'a arkdeck_hoststore::SessionPublisher<'a>>,
+    cancellation: Option<&'a arkdeck_hoststore::RunCancellation>,
+) -> arkdeck_hoststore::JobRunner<'a> {
+    arkdeck_hoststore::JobRunner {
+        imports: None,
+        mutation: authority.map(|authority| arkdeck_hoststore::MutationExecution {
+            authority,
+            state_root,
+        }),
+        jobs,
+        artifacts,
+        analyzer: None,
+        quota: ARTIFACT_QUOTA,
+        home,
+        now: arkdeck_hoststore::runtime_now,
+        precise_now: arkdeck_hoststore::runtime_precise_now,
+        sessions,
+        cancellation,
+        after_commit: None,
+        hdc: None,
+        workspace: None,
     }
 }
 
@@ -1751,6 +1923,73 @@ impl HostServices for Host {
         )
     }
 
+    /// `agent.run`, `agent.status`, `agent.list`, `agent.abandon`,
+    /// `agent.resume` and `human-action.resume` on Windows: the agent
+    /// execution owner over the Target, Job and Artifact owners, admitting an
+    /// execution's request as `job.submit` admits it here. No Target is
+    /// observed (no Windows HDC tuple is registered) and no control action is
+    /// built, so a resume reference names an execution's action alone.
+    #[cfg(windows)]
+    fn agent_execution(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(agents), Some(state_root), Some(jobs), Some(artifacts), Some(targets)) = (
+            &self.agents,
+            &self.planning,
+            &self.jobs,
+            &self.artifacts,
+            &self.targets,
+        ) else {
+            return Err(WireError {
+                code: "operationUnavailable".into(),
+                message: "AgentExecution owner is unavailable".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            });
+        };
+        let admitter = arkdeck_hoststore::JobAdmitter {
+            planner: self.planner(state_root),
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+            authority: self.authority(),
+        };
+        let engine = arkdeck_hoststore::AgentEngine {
+            targets,
+            jobs,
+            admitter: &admitter,
+            now: arkdeck_hoststore::runtime_precise_now,
+            observations: None,
+        };
+        let answer = agents
+            .advance(method, params, &engine)
+            .map_err(|mut error| {
+                if method == "human-action.resume" && error.code != "internalError" {
+                    let details = error.details.get_or_insert_with(Default::default);
+                    details.insert("phase".into(), serde_json::json!("preAdmission"));
+                    details.insert("newDispatchCount".into(), serde_json::json!(0));
+                }
+                error
+            })?;
+        if let Some(start) = answer.start {
+            self.start_agent_run(start);
+        }
+        if !matches!(
+            method,
+            "agent.run" | "agent.status" | "agent.resume" | "human-action.resume"
+        ) {
+            return Ok(answer.value);
+        }
+        arkdeck_hoststore::AgentExecutionStore::project(
+            answer.value,
+            jobs,
+            &arkdeck_hoststore::JobResultReader { jobs, artifacts },
+        )
+    }
+
     #[cfg(target_os = "macos")]
     fn interactive_human_action_resume(
         &self,
@@ -1851,8 +2090,8 @@ impl HostServices for Host {
 
     /// `human-action.list` and `human-action.show`, as the Swift daemon
     /// answers them with its combined human-action owner over the agent
-    /// executions and the union control-action owner.
-    #[cfg(target_os = "macos")]
+    /// executions and the union control-action owner (none on Windows).
+    #[cfg(any(target_os = "macos", windows))]
     fn human_action(
         &self,
         method: &str,
@@ -2079,27 +2318,15 @@ impl HostServices for Host {
                     probe: &probe,
                 });
         let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
-            arkdeck_hoststore::JobRunner {
-                imports: None,
-                mutation: self
-                    .authority()
-                    .map(|authority| arkdeck_hoststore::MutationExecution {
-                        authority,
-                        state_root,
-                    }),
+            windows_runner(
+                state_root,
                 jobs,
                 artifacts,
-                analyzer: None,
-                quota: ARTIFACT_QUOTA,
-                home: &self.home,
-                now: arkdeck_hoststore::runtime_now,
-                precise_now: arkdeck_hoststore::runtime_precise_now,
-                sessions: publisher.as_ref(),
+                self.authority(),
+                &self.home,
+                publisher.as_ref(),
                 cancellation,
-                after_commit: None,
-                hdc: None,
-                workspace: None,
-            }
+            )
             .handle(params)
             .map_err(|refusal| WireError {
                 code: refusal.code.into(),
@@ -2495,42 +2722,60 @@ impl HostServices for Host {
             reconciler,
             lane: self.flash_runtime.as_ref().map(|runtime| &*runtime.lane),
         };
-        // Swift attaches no details to any `job.reconcile` refusal.
-        let uncertain = || WireError {
-            code: "internalError".into(),
-            message: "the Runtime could not complete the Job lifecycle request".into(),
-            details: None,
+        self.reconcile_once(params, &|| flash_reconciler.handle(params), &|| {
+            flash_reconciler.reconciler.status(params)
+        })
+    }
+    /// `job.reconcile` on Windows: the macOS reconciler over this
+    /// composition's owners, with the Session publication writer and the
+    /// runner its runs use, and no HDC composition (no Windows HDC tuple is
+    /// registered) or Flash lane. A Job a run of this owner holds is decided
+    /// by that run alone, and a concurrent reconcile joins the one under way.
+    #[cfg(windows)]
+    fn job_reconcile(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(jobs), Some(artifacts)) = (&self.jobs, &self.artifacts) else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
         };
-        let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
-            return flash_reconciler.handle(params);
+        let probe = arkdeck_hoststore::SystemStorageProbe;
+        let publisher =
+            self.storage
+                .as_deref()
+                .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
+                    sessions,
+                    claims: &self.claims,
+                    probe: &probe,
+                });
+        let runner = self.planning.as_deref().map(|state_root| {
+            windows_runner(
+                state_root,
+                jobs,
+                artifacts,
+                self.authority(),
+                &self.home,
+                publisher.as_ref(),
+                None,
+            )
+        });
+        let reconciler = arkdeck_hoststore::JobReconciler {
+            jobs,
+            artifacts,
+            imports: None,
+            now: arkdeck_hoststore::runtime_now,
+            sessions: publisher.as_ref(),
+            hdc: None,
+            capabilities: self.capabilities.as_deref(),
+            runner: runner.as_ref(),
         };
-        let slot = {
-            // `running`, then `reconciling`, as `claim_run` takes them: a run
-            // and a reconcile never both begin on one Job.
-            let running = self.running.lock().map_err(|_| uncertain())?;
-            if running.get(job).is_some_and(|slot| !slot.cancelling) {
-                drop(running);
-                return flash_reconciler.reconciler.status(params);
-            }
-            let mut reconciling = self.reconciling.lock().map_err(|_| uncertain())?;
-            if let Some(slot) = reconciling.get(job).cloned() {
-                drop(reconciling);
-                drop(running);
-                return slot.wait().unwrap_or_else(|| Err(uncertain()));
-            }
-            let slot = std::sync::Arc::new(RunSlot::default());
-            reconciling.insert(job.to_owned(), slot.clone());
-            slot
-        };
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            flash_reconciler.handle(params)
-        }))
-        .unwrap_or_else(|_| Err(uncertain()));
-        if let Ok(mut reconciling) = self.reconciling.lock() {
-            reconciling.remove(job);
-        }
-        slot.finish(&result);
-        result
+        self.reconcile_once(params, &|| reconciler.handle(params), &|| {
+            reconciler.status(params)
+        })
     }
     #[cfg(target_os = "macos")]
     fn bootstrap_register_bundle(&self, source: &str) -> Result<serde_json::Value, WireError> {
