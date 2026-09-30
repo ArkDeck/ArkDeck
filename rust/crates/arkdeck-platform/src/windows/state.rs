@@ -9,7 +9,9 @@
 //!   directory handle that refuses a reparse point and must be owned by the
 //!   user SID, and every directory from the drive down to the root is held
 //!   open without delete sharing while the daemon runs, so no path it names
-//!   under the root can be redirected by renaming an ancestor.
+//!   under the root can be redirected by renaming an ancestor. An existing
+//!   account root (or product directory) whose DACL grants anyone else
+//!   anything refuses the start; its access is never rewritten.
 //! * The durable owner lock is `LockFileEx` on a separate lock file of the
 //!   root (`instance.lock`; `.owner.lock` for an isolated development root),
 //!   on a range beyond its end: NTFS locks are mandatory, so the lock never
@@ -180,13 +182,80 @@ pub struct StateRoot {
 impl StateRoot {
     /// The account's root, `%LOCALAPPDATA%\ArkDeck\Agentd`, and its product
     /// parent, each created owner-only if absent.
+    ///
+    /// An existing product directory or root whose DACL grants anyone but the
+    /// user and SYSTEM anything refuses the start: its access is never
+    /// rewritten, and a daemon never serves from a directory others can reach
+    /// ([`Self::access_findings`]).
     pub fn account() -> io::Result<Self> {
         let product = local_application_data()?.join(PRODUCT);
         create_private_directory(&product)?;
         open_directory(&product)?;
         let state = product.join(STATE);
         create_private_directory(&state)?;
-        Self::open(&state, false)
+        let root = Self::open(&state, false)?;
+        let findings = root.access_findings()?;
+        if !findings.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!(
+                    "the account's state root is not owner-only ({}); {OWNER_ONLY_REMEDY}; its \
+                     access is not rewritten and nothing was started",
+                    findings.join("; ")
+                ),
+            ));
+        }
+        Ok(root)
+    }
+
+    /// `%LOCALAPPDATA%\ArkDeck\Agentd` as the Known Folder API resolves it;
+    /// nothing is opened or created.
+    pub fn account_path() -> io::Result<PathBuf> {
+        Ok(local_application_data()?.join(PRODUCT).join(STATE))
+    }
+
+    /// The account's root if it exists, opened as [`Self::account`] opens it
+    /// but never created and never refused for its access (which
+    /// [`Self::access_findings`] reports); `None` if the root or its product
+    /// directory does not exist yet.
+    pub fn existing_account() -> io::Result<Option<Self>> {
+        let product = local_application_data()?.join(PRODUCT);
+        let state = product.join(STATE);
+        for path in [&product, &state] {
+            match std::fs::symlink_metadata(path) {
+                Ok(_) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+                Err(error) => return Err(error),
+            }
+        }
+        open_directory(&product)?;
+        Self::open(&state, false).map(Some)
+    }
+
+    /// Whether this is an isolated development root.
+    pub fn is_development(&self) -> bool {
+        self.development
+    }
+
+    /// Every grant of the root's DACL (and, for the account's root, its
+    /// product directory's) to anyone but this user and SYSTEM, in words; an
+    /// owner-only root has none. A missing DACL grants everyone everything.
+    pub fn access_findings(&self) -> io::Result<Vec<String>> {
+        let mut findings = foreign_grants(self.directory.as_raw_handle())?
+            .into_iter()
+            .map(|grant| format!("{} grants {grant}", self.path.display()))
+            .collect::<Vec<_>>();
+        if !self.development
+            && let Some(product) = self.path.parent()
+        {
+            let directory = open_directory(product)?;
+            findings.extend(
+                foreign_grants(directory.as_raw_handle())?
+                    .into_iter()
+                    .map(|grant| format!("{} grants {grant}", product.display())),
+            );
+        }
+        Ok(findings)
     }
 
     /// An isolated development root: an existing directory of this user,
@@ -250,12 +319,14 @@ impl StateRoot {
 
     /// The name every kernel object of this root's daemon derives from.
     pub fn scope(&self) -> io::Result<InstanceScope> {
+        if !self.development {
+            return InstanceScope::account();
+        }
         let user = Token::current()?.user()?.text()?;
-        Ok(InstanceScope(if self.development {
-            format!("ArkDeck.Agentd.Dev.{user}.{}", self.identity.text())
-        } else {
-            format!("ArkDeck.Agentd.{user}")
-        }))
+        Ok(InstanceScope(format!(
+            "ArkDeck.Agentd.Dev.{user}.{}",
+            self.identity.text()
+        )))
     }
 
     /// The endpoint this root's daemon serves: the account's logon-scoped
@@ -427,6 +498,86 @@ impl StateRoot {
     }
 }
 
+/// What to fix when an account state root is not owner-only (maintainer
+/// ruling 5 of 2026-09-30: the refusal names the directory and the fix).
+pub const OWNER_ONLY_REMEDY: &str = "to fix it, remove every access entry but the user's and \
+                                     SYSTEM's from the named directory (ArkDeck never rewrites \
+                                     it)";
+
+/// `S-1-5-18`, SYSTEM.
+const SYSTEM_SID: &str = "S-1-5-18";
+
+/// Each grant of the DACL behind `handle` to a SID other than this user and
+/// SYSTEM, as `<SID> access <mask>`. Deny entries are not grants. An allow
+/// entry whose SID this does not read (an object ACE) counts as a grant, and
+/// a missing DACL grants everyone: the check fails closed.
+fn foreign_grants(handle: HANDLE) -> io::Result<Vec<String>> {
+    use windows_sys::Win32::Security::Authorization::GetSecurityInfo;
+    use windows_sys::Win32::Security::{
+        ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, DACL_SECURITY_INFORMATION, GetAce,
+    };
+    let mut dacl: *mut ACL = null_mut();
+    let mut descriptor = null_mut();
+    // SAFETY: a live handle opened with READ_CONTROL; the descriptor
+    // GetSecurityInfo allocates is freed by the allocation guard, and `dacl`
+    // points into it.
+    let status = unsafe {
+        GetSecurityInfo(
+            handle,
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION,
+            null_mut(),
+            null_mut(),
+            &mut dacl,
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    let _allocation = super::identity::LocalAllocation(descriptor);
+    if status != ERROR_SUCCESS {
+        return Err(io::Error::from_raw_os_error(status as i32));
+    }
+    if dacl.is_null() {
+        return Ok(vec!["everyone full access (no DACL)".into()]);
+    }
+    let user = Token::current()?.user()?.text()?;
+    let mut grants = Vec::new();
+    // SAFETY: a valid DACL inside the live descriptor.
+    let count = unsafe { (*dacl).AceCount };
+    for index in 0..u32::from(count) {
+        let mut ace = null_mut();
+        // SAFETY: an index below the DACL's own count.
+        bool_result(unsafe { GetAce(dacl, index, &mut ace) })?;
+        // SAFETY: every ACE starts with its header.
+        let header = unsafe { *ace.cast::<ACE_HEADER>() };
+        match header.AceType {
+            // ACCESS_ALLOWED_ACE_TYPE and ACCESS_ALLOWED_CALLBACK_ACE_TYPE:
+            // the same layout up to the SID.
+            0 | 9 => {
+                // SAFETY: an allow ACE: its header, its mask, then its SID.
+                let (mask, sid) = unsafe {
+                    (
+                        (*ace.cast::<ACCESS_ALLOWED_ACE>()).Mask,
+                        super::identity::Sid::copy(
+                            ace.cast::<u8>()
+                                .add(offset_of!(ACCESS_ALLOWED_ACE, SidStart))
+                                .cast(),
+                        )?,
+                    )
+                };
+                let sid = sid.text()?;
+                if sid != user && sid != SYSTEM_SID {
+                    grants.push(format!("{sid} access {mask:#010x}"));
+                }
+            }
+            // ACCESS_ALLOWED_OBJECT_ACE_TYPE and its callback form.
+            5 | 11 => grants.push(format!("an object ACE (type {})", header.AceType)),
+            _ => {}
+        }
+    }
+    Ok(grants)
+}
+
 /// Only a plain file name directly inside the root.
 fn document_name(name: &str) -> io::Result<&str> {
     if name.is_empty() || name.contains(['\\', '/', ':']) || name == "." || name == ".." {
@@ -488,6 +639,20 @@ impl Drop for OwnerLock {
 pub struct InstanceScope(String);
 
 impl InstanceScope {
+    /// The account daemon's scope, `ArkDeck.Agentd.<user SID>`; its state
+    /// root is neither opened nor created.
+    pub fn account() -> io::Result<Self> {
+        let user = Token::current()?.user()?.text()?;
+        Ok(Self(format!("ArkDeck.Agentd.{user}")))
+    }
+
+    /// The mutex that clients starting this scope's daemon take in turn, so
+    /// that concurrent starters start it once ([`super::StarterLock`]); never
+    /// the daemon's own guard.
+    pub fn starter_name(&self) -> String {
+        format!(r"Local\{}.Start", self.0)
+    }
+
     /// The single-instance guard's name.
     pub fn guard_name(&self) -> String {
         format!(r"Local\{}", self.0)
@@ -647,6 +812,31 @@ mod tests {
         let file = parent.0.join("file");
         std::fs::write(&file, b"x").unwrap();
         assert!(open_directory(&file).is_err());
+    }
+
+    #[test]
+    fn only_an_owner_only_root_has_no_access_findings() {
+        let parent = directory();
+        let private = parent.0.join("private");
+        create_private_directory(&private).unwrap();
+        let root = StateRoot::development(&private).unwrap();
+        assert_eq!(root.access_findings().unwrap(), Vec::<String>::new());
+        // A directory granting the Users group access is reported by SID.
+        let users = parent.0.join("users");
+        let loose = SecurityDescriptor::from_sddl("D:P(A;OICI;GA;;;BU)(A;OICI;GA;;;SY)").unwrap();
+        let attributes = loose.attributes();
+        let name = wide(users.as_os_str()).unwrap();
+        // SAFETY: NUL-terminated path, descriptor alive for the call.
+        bool_result(unsafe { CreateDirectoryW(name.as_ptr(), &attributes) }).unwrap();
+        let findings = StateRoot::development(&users)
+            .unwrap()
+            .access_findings()
+            .unwrap();
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert!(
+            findings[0].contains("grants S-1-5-32-545 access"),
+            "{findings:?}"
+        );
     }
 
     #[test]

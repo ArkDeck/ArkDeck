@@ -34,7 +34,10 @@ mod cutover_preflight;
 mod development_admission;
 #[cfg(target_os = "macos")]
 mod development_mutation;
-#[cfg(target_os = "macos")]
+// The USB relation rule the Target observations read by, on macOS and
+// Windows; its development relation file is composed on macOS only.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod development_usb;
 #[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;

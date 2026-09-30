@@ -14,8 +14,9 @@ arkdeck-provider-hdc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-# The Artifact read and export owners are composed on macOS and Windows
-# (TASK-XPA-006); every other host-store owner on macOS only.
+# The Target owners (TASK-XPA-004) and the Artifact read and export
+# owners (TASK-XPA-006) are composed on macOS and Windows; every other
+# host-store owner on macOS only.
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 arkdeck-hoststore.workspace = true
 
@@ -25,6 +26,12 @@ arkdeck-provider-arkforge.workspace = true
 # A stand-in for `arkforged`'s public socket, spoken with ArkForge's own codec.
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 arkforge-ipc.workspace = true
+
+# The Windows client start path and service leaves, driven against this
+# crate's daemon (`tests/windows_client_start_process.rs`).
+[target.'cfg(windows)'.dev-dependencies]
+arkdeck-cli = { path = "../arkdeck-cli" }
+arkdeck-client.workspace = true
 
 # The daemon launches this test binary as its lane's stand-in `arkforged`,
 # which must take the daemon role before any test framework reads the
