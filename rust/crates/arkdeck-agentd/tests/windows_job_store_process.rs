@@ -115,7 +115,9 @@ impl Root {
     }
     /// The recorded Swift `observe.device@1` Jobs, recorded by the Job store
     /// owner into a private `jobs-state`: admitted in admission order and
-    /// advanced to their recorded version, each Journal beside its record.
+    /// advanced to their recorded version, each Journal beside its record,
+    /// then recovered as the daemon's start recovers them (the parked Job
+    /// its unknown outcome left is marked so, and nothing is dispatched).
     /// Returns every Job identity.
     fn with_recorded_jobs(&self) -> Vec<String> {
         let state = self.jobs_state();
@@ -152,6 +154,8 @@ impl Root {
             .unwrap();
             ids.push(id.to_owned());
         }
+        arkdeck_hoststore::recover_active_jobs(&store, None, arkdeck_hoststore::runtime_now)
+            .unwrap();
         ids
     }
     /// What the store answers in process to every read of every Job, and to
@@ -450,7 +454,7 @@ fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, planning, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, targets, artifacts, storage, workspaceProjects, planning, traceCache"
                 .to_owned()
         ),
         "{:?}",

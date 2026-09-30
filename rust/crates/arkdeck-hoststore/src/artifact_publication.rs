@@ -78,9 +78,6 @@ pub(crate) fn publish_landed_file(
     byte_count: u64,
     sha256: &str,
 ) -> Result<Value, String> {
-    use std::io::Read;
-    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
-    let errno = |error: &io::Error| error.raw_os_error().unwrap_or(0);
     if !path.is_absolute()
         || byte_count == 0
         || byte_count > MAX_PAYLOAD as u64
@@ -92,17 +89,36 @@ pub(crate) fn publish_landed_file(
             "file-backed publication requires an absolute binary file with exact size and SHA-256",
         ));
     }
+    let bytes =
+        landed_file_bytes(path, byte_count, sha256).map_err(|detail| io_failure(&detail))?;
+    publisher.publish(product, &bytes)
+}
+
+/// The bytes of a file a step left on the host, as `publishFile` reads them:
+/// opened without following a link, still the declared regular file of the
+/// declared size, read whole and unchanged — the same inode, size and
+/// timestamps — once read, and of the declared digest. A refusal is its
+/// detail.
+#[cfg(target_os = "macos")]
+pub(crate) fn landed_file_bytes(
+    path: &std::path::Path,
+    byte_count: u64,
+    sha256: &str,
+) -> Result<Vec<u8>, String> {
+    use std::io::Read;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    let errno = |error: &io::Error| error.raw_os_error().unwrap_or(0);
     let file = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC | libc::O_NOFOLLOW)
         .open(path)
         .map_err(|error| {
-            io_failure(&format!(
+            format!(
                 "cannot open file-backed Artifact source (errno {})",
                 errno(&error)
-            ))
+            )
         })?;
-    let declared = || io_failure("file-backed Artifact source is not the declared regular file");
+    let declared = || "file-backed Artifact source is not the declared regular file".to_owned();
     let before = file.metadata().map_err(|_| declared())?;
     if !before.is_file() || before.len() != byte_count {
         return Err(declared());
@@ -112,10 +128,10 @@ pub(crate) fn publish_landed_file(
         .take(byte_count.saturating_add(1))
         .read_to_end(&mut bytes)
         .map_err(|error| {
-            io_failure(&format!(
+            format!(
                 "cannot read file-backed Artifact source (errno {})",
                 errno(&error)
-            ))
+            )
         })?;
     let unchanged = file.metadata().is_ok_and(|after| {
         (after.dev(), after.ino(), after.len()) == (before.dev(), before.ino(), before.len())
@@ -123,11 +139,52 @@ pub(crate) fn publish_landed_file(
             && (after.ctime(), after.ctime_nsec()) == (before.ctime(), before.ctime_nsec())
     });
     if bytes.len() as u64 != byte_count || sha256_hex(&bytes) != sha256 || !unchanged {
-        return Err(io_failure(
-            "file-backed Artifact source changed while being published",
-        ));
+        return Err("file-backed Artifact source changed while being published".to_owned());
     }
-    publisher.publish(product, &bytes)
+    Ok(bytes)
+}
+
+/// The same read on Windows: the file measured without following a reparse
+/// point (`measure_host_file`: a regular, non-empty file of at most the
+/// declared size, its volume serial, file id, size and times, and digest)
+/// before and after its bytes are read, and those bytes of the declared
+/// size and digest.
+#[cfg(windows)]
+pub(crate) fn landed_file_bytes(
+    path: &std::path::Path,
+    byte_count: u64,
+    sha256: &str,
+) -> Result<Vec<u8>, String> {
+    use arkdeck_platform::{HostFileMeasureError, measure_host_file};
+    let measure = || {
+        measure_host_file(path, byte_count).map_err(|error| match error {
+            HostFileMeasureError::Unreadable => {
+                "file-backed Artifact source is not the declared regular file".to_owned()
+            }
+            HostFileMeasureError::Changed => {
+                "file-backed Artifact source changed while being published".to_owned()
+            }
+        })
+    };
+    let before = measure()?;
+    if before.identity.size != byte_count {
+        return Err("file-backed Artifact source is not the declared regular file".to_owned());
+    }
+    let bytes = std::fs::read(path).map_err(|error| {
+        format!(
+            "cannot read file-backed Artifact source (errno {})",
+            error.raw_os_error().unwrap_or(0)
+        )
+    })?;
+    let after = measure()?;
+    if bytes.len() as u64 != byte_count
+        || sha256_hex(&bytes) != sha256
+        || before.identity != after.identity
+        || before.sha256 != after.sha256
+    {
+        return Err("file-backed Artifact source changed while being published".to_owned());
+    }
+    Ok(bytes)
 }
 
 impl ArtifactPublisher<'_> {
@@ -816,7 +873,8 @@ fn value_char(c: char) -> bool {
     !(space(c) || matches!(c, '"' | '\'' | ',' | '}'))
 }
 
-#[cfg(test)]
+// Unix fixtures (mode bits); Windows publication is proved by the Job runner tests.
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::os::unix::fs::{DirBuilderExt, PermissionsExt};

@@ -241,6 +241,9 @@ impl JobResultReader<'_> {
     /// its confirmed steps' kinds (`flash_step_kinds`). Every other Job
     /// reads the kinds its record kept.
     fn durable_step_kinds(&self, record: &JobRecord) -> Option<Value> {
+        // No Flash lane is built on Windows (AF-W1), so no Flash Job exists
+        // there to project.
+        #[cfg(target_os = "macos")]
         if crate::job_plan::is_flash(record.operation()) {
             return Some(
                 self.flash_step_kinds(record)
@@ -272,6 +275,7 @@ impl JobResultReader<'_> {
     /// are proven, in catalog order, then any other kind the record kept;
     /// none, rather than a partial answer, while an intent is unresolved or
     /// the journal cannot be read.
+    #[cfg(target_os = "macos")]
     fn flash_step_kinds(&self, record: &JobRecord) -> Option<Vec<String>> {
         let descriptor = descriptor_of(record.operation())?;
         let directory = self.jobs.job_directory(&record.job_id).ok()?;

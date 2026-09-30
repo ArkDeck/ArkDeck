@@ -244,7 +244,7 @@ pub use windows::host_store::{
     UploadChunkCheckpoint, UploadWritePoint,
 };
 #[cfg(windows)]
-pub use windows::{application_support_directory, arkdeck_application_support_root};
+pub use windows::{application_support_directory, arkdeck_application_support_root, runtime_home};
 // A workspace project root, pinned by the identity it was registered with
 // (TASK-XPA-015).
 #[cfg(windows)]

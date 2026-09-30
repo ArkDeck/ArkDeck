@@ -227,7 +227,8 @@ impl Authority {
             .map_err(|error| unusable(&path, &error.message))?;
         let host = host
             .with_workspace_projects(projects)
-            .with_planning(self.root.path());
+            .with_planning(self.root.path())
+            .with_capabilities(self.capability_store()?);
         let host = if self.development {
             let name = "trace-cache";
             let unusable = |path: &Path, error: std::io::Error| {
@@ -253,6 +254,10 @@ impl Authority {
             host.with_trace_cache(cache)
         } else {
             host
+        };
+        let host = match self.session_store()? {
+            Some((sessions, usage)) => host.with_storage(sessions, usage),
+            None => host,
         };
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
@@ -301,6 +306,69 @@ impl Authority {
                 path.display()
             )
         })
+    }
+
+    /// The capability store beside the Job state (`jobs-state\capabilities`,
+    /// created owner-only when absent), as the macOS isolated owner keeps
+    /// it: `job.run` settles a device Job's capability use in it and the
+    /// start's Job recovery re-asserts the uses it settles. Nothing issues a
+    /// capability on Windows yet (no mutation authority is composed).
+    fn capability_store(&self) -> Result<arkdeck_hoststore::CapabilityStore, String> {
+        let path = self.root.path().join("jobs-state").join("capabilities");
+        arkdeck_hoststore::CapabilityStore::open(&path).map_err(|error| {
+            format!(
+                "the capability store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        })
+    }
+
+    /// The Session owner a terminal Job is published through, over a
+    /// development root as the macOS isolated owner names it: its state in
+    /// `session-state` and the default Sessions root `sessions`, both private
+    /// children of the root, beside the Artifact usage owner over
+    /// `artifacts`. The macOS owner also bounds a Session root a storage
+    /// request selects to the development root (`SessionStore::isolated`),
+    /// which the host store opens as a private directory; a Windows
+    /// development root need not be one (the lifecycle's rule), and no
+    /// storage request is served on Windows yet, so the default root is the
+    /// only one a publication can reach.
+    /// The account's root composes none yet: where its Sessions live beside
+    /// `%LOCALAPPDATA%\ArkDeck\Agentd` is a layout decision still open, so
+    /// its terminal Jobs are not published, as a Swift engine without a
+    /// publication writer leaves them.
+    fn session_store(
+        &self,
+    ) -> Result<
+        Option<(
+            arkdeck_hoststore::SessionStore,
+            arkdeck_hoststore::ArtifactUsage,
+        )>,
+        String,
+    > {
+        if !self.development {
+            return Ok(None);
+        }
+        let unusable = |error: &dyn std::fmt::Display| {
+            format!("the Session owner is unusable: {error}; nothing was started")
+        };
+        for name in ["session-state", "sessions"] {
+            self.root
+                .private_child(name)
+                .map_err(|error| unusable(&error))?;
+        }
+        let root = self.root.path();
+        let sessions = arkdeck_hoststore::SessionStore::open(
+            &root.join("session-state"),
+            &root.join("sessions"),
+        )
+        .map_err(|error| unusable(&error))?;
+        let usage = arkdeck_hoststore::ArtifactUsage::open(
+            &root.join("artifacts"),
+            crate::host::ARTIFACT_QUOTA,
+        )
+        .map_err(|error| unusable(&error))?;
+        Ok(Some((sessions, usage)))
     }
 
     /// After a complete drain: the owner lock, then the guard, on the thread

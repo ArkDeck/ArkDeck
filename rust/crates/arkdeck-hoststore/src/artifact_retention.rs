@@ -183,7 +183,8 @@ impl ArtifactPublisher<'_> {
     }
 }
 
-#[cfg(test)]
+// Unix fixtures (mode bits).
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::fs;

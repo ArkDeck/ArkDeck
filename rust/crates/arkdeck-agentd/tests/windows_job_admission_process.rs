@@ -302,6 +302,26 @@ fn request(pipe: &str, method: &str, params: Value) -> Value {
     serde_json::from_slice(&reply).unwrap()
 }
 
+/// The Job store's files as they were: the same paths with the same bytes.
+fn assert_unchanged(before: &[(PathBuf, Vec<u8>)], after: &[(PathBuf, Vec<u8>)]) {
+    let paths = |files: &[(PathBuf, Vec<u8>)]| {
+        files
+            .iter()
+            .map(|(path, _)| path.clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(paths(after), paths(before), "the Job store's files changed");
+    for ((path, was), (_, is)) in before.iter().zip(after) {
+        assert!(
+            was == is,
+            "{} changed:
+{}",
+            path.display(),
+            String::from_utf8_lossy(is)
+        );
+    }
+}
+
 /// A refusal before admission: its code and message, and the zero-dispatch
 /// proof macOS attaches to it.
 fn assert_refused(reply: &Value, code: &str, message: &str) {
@@ -386,14 +406,16 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     let _turn = turn();
     let root = Root::new();
     root.with_recorded_jobs();
-    let before = root.snapshot();
     let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
 
     let mut first = Daemon::start(executable, &root.0);
     let pipe = first.serving();
+    // The start's Job recovery has marked the recorded Job its unknown
+    // outcome parked, as Swift's start marks it; nothing below writes.
+    let before = root.snapshot();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, planning, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, targets, artifacts, storage, workspaceProjects, planning, traceCache"
                 .to_owned()
         ),
         "{:?}",
@@ -409,7 +431,7 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     );
     assert_eq!(listed["result"]["items"].as_array().unwrap().len(), 4);
     first.stop(&root.0);
-    assert!(root.snapshot() == before, "the Job store changed");
+    assert_unchanged(&before, &root.snapshot());
 
     // A restart answers the same, and still admits nothing.
     let mut second = Daemon::start(executable, &root.0);
@@ -421,7 +443,7 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
         "{again}"
     );
     second.stop(&root.0);
-    assert!(root.snapshot() == before, "the Job store changed");
+    assert_unchanged(&before, &root.snapshot());
 }
 
 #[test]
@@ -521,7 +543,6 @@ fn gj1_plan_and_submit_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     let _turn = turn();
     let root = Root::new();
     root.with_recorded_jobs();
-    let before = root.snapshot();
     let signed = root.0.join("signed-bin");
     std::fs::create_dir(&signed).unwrap();
     let daemon = signed.join("arkdeck-agentd.exe");
@@ -554,6 +575,8 @@ fn gj1_plan_and_submit_hops_run_through_the_cli_against_a_dev_signed_daemon() {
 
     let mut first = Daemon::start(&daemon, &root.0);
     first.serving();
+    // After the start's Job recovery (see above).
+    let before = root.snapshot();
     first.stop(&root.0);
     let mut second = Daemon::start(&daemon, &root.0);
     let pipe = second.serving();
@@ -585,5 +608,5 @@ fn gj1_plan_and_submit_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     assert_eq!(envelope["result"]["deduplicated"], true, "{envelope}");
     assert_eq!(envelope["result"]["newDispatchCount"], 0, "{envelope}");
     second.stop(&root.0);
-    assert!(root.snapshot() == before, "the Job store changed");
+    assert_unchanged(&before, &root.snapshot());
 }

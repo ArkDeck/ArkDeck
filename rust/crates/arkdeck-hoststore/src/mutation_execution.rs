@@ -219,7 +219,9 @@ impl JobRunner<'_> {
     /// again — so a tree that moved since admission is refused here rather
     /// than changed anyway — the capability's policy identity recomputed, and
     /// the Job's one use consumed and made durable with its correlated
-    /// evidence before the step's write-ahead intent can exist.
+    /// evidence before the step's write-ahead intent can exist. (The
+    /// workspace lane is macOS-only.)
+    #[cfg(target_os = "macos")]
     pub(crate) fn consume_workspace_authority(
         &self,
         run: &mut Run,

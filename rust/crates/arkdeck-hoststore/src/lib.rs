@@ -116,9 +116,10 @@ pub use job_owner::JobStore;
 pub use job_record::JobRecord;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_repository::{AdmissionVerdict, JobWriteError};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod mutation_execution;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use mutation_execution::MutationExecution;
 // The planner and the admitter build on Windows too (TASK-XPA-005, GJ-1):
 // there no HDC, workspace or analyzer provider, Artifact or Import owner and
@@ -126,7 +127,8 @@ pub use mutation_execution::MutationExecution;
 // before admission as macOS refuses it without that owner.
 #[cfg(any(target_os = "macos", windows))]
 mod job_plan;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod operation_availability;
 #[cfg(target_os = "macos")]
 pub use job_plan::{
@@ -134,8 +136,12 @@ pub use job_plan::{
 };
 #[cfg(any(target_os = "macos", windows))]
 pub use job_plan::{JobPlanner, PlanRefusal};
+// The analyzer operations' fixed facts, read on every host.
 #[cfg(target_os = "macos")]
 mod analyzer_composition;
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod analyzer_operations;
 // No analyzer exists on Windows yet (its ArkTrace profiles pin a
 // trace_streamer Windows does not have); the Job planner is the same code
 // with none.
@@ -178,7 +184,7 @@ pub use arktrace_profile::{
     DistributionTrust, DoctorContract, DoctorProbe, LoaderHooks, PinnedFile, PinnedTree,
     ResolvedExecutable, TrustContract, TrustEvidence,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use operation_availability::{
     OperationAvailabilityContext, hdc_operation_runs, operation_unavailability,
 };
@@ -191,7 +197,8 @@ mod device_facts;
 mod trace_probe;
 #[cfg(any(target_os = "macos", windows))]
 pub use device_facts::HdcComposition;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod capture_documents;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -200,7 +207,8 @@ mod cleanup_debt;
 pub use cleanup_debt::list_cleanup_debt;
 #[cfg(target_os = "macos")]
 mod cleanup_debt_continue;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod device_run;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -263,27 +271,35 @@ mod hilog_summary;
 pub use hilog_summary::{
     MAXIMUM_INPUT_BYTES as HILOG_MAXIMUM_INPUT_BYTES, analyze_hilog, hilog_source, profile_path,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod artifact_publication;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use artifact_publication::collect_expired_artifacts;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_run;
 #[cfg(target_os = "macos")]
-pub use job_run::{FlashExecution, FlashRunner, JobRunner, RunRefusal, runtime_precise_now};
-#[cfg(target_os = "macos")]
+pub use job_run::{FlashExecution, FlashRunner};
+#[cfg(any(target_os = "macos", windows))]
+pub use job_run::{JobRunner, RunRefusal, runtime_precise_now};
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_result;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_result::JobResultReader;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_cancel;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_cancel::{CancelledRun, JobCanceller, RunCancellation, cancel_running};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_recovery;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_recovery::{RecoveredJobs, RecoveryError, recover_active_jobs, recover_jobs};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_lineage_repair;
 #[cfg(target_os = "macos")]
 mod job_reconcile;
@@ -411,12 +427,12 @@ pub use session_export_destination::session_export_destination_facts;
 pub use session_inventory::{CleanupSession, CleanupSnapshot, session_cleanup_snapshot};
 #[cfg(target_os = "macos")]
 pub use session_inventory::{SessionExportSnapshot, session_export_snapshot};
-// The Artifact index decoder the read owner shares; the usage and quota
-// answers are still macOS-only.
+// The Artifact index decoder the read owner shares, and the usage owner a
+// Session publication reads; its quota answer is still macOS-only.
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod artifact_usage;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use artifact_usage::ArtifactUsage;
 
 #[cfg(target_os = "macos")]

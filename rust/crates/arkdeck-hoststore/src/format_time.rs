@@ -158,7 +158,7 @@ pub(crate) fn format_timestamp_seconds(value: &str) -> Option<f64> {
 /// The current instant as Swift's precise Runtime clock spells it
 /// (`ISO8601Timestamps.string(includingFractionalSeconds: true)`): UTC with
 /// milliseconds, truncated.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn utc_precise_now() -> Option<String> {
     let elapsed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -191,7 +191,7 @@ pub(crate) fn plain_utc_seconds(text: &str) -> Option<u64> {
     (utc_timestamp(seconds) == text).then_some(seconds)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn utc_precise_timestamp(seconds: u64, milliseconds: u32) -> String {
     let plain = utc_timestamp(seconds);
     format!("{}.{milliseconds:03}Z", &plain[..plain.len() - 1])

@@ -10,13 +10,10 @@ use crate::artifact_read_owner::swift_string;
 use crate::job_run::{JobRunner, Run};
 use crate::operation_catalog::CatalogArtifact;
 use crate::swift_decoding::swift_value;
-use arkdeck_contract::sha256_hex;
 use arkdeck_provider_hdc::{FileReceipt, Landed};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Read;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 
 /// Swift `RuntimeScreenSequence` from a verified summary that carries both
 /// frame counts: the counts, and each frame's own span in capture order, as
@@ -45,10 +42,6 @@ fn io_failure(detail: &str) -> String {
     format!("ioFailure({})", swift_string(detail))
 }
 
-fn errno(error: &std::io::Error) -> i32 {
-    error.raw_os_error().unwrap_or(0)
-}
-
 /// Swift `publishFile`'s source checks, then the bytes it copies: an absolute,
 /// non-empty file of the declared digest, opened without following a
 /// link, still the declared regular file of the declared size, read whole
@@ -71,41 +64,9 @@ fn publish_file(
             "file-backed publication requires an absolute binary file with exact size and SHA-256",
         ));
     }
-    let file = fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC | libc::O_NOFOLLOW)
-        .open(&landed.path)
-        .map_err(|error| {
-            io_failure(&format!(
-                "cannot open file-backed Artifact source (errno {})",
-                errno(&error)
-            ))
-        })?;
-    let declared = || io_failure("file-backed Artifact source is not the declared regular file");
-    let before = file.metadata().map_err(|_| declared())?;
-    if !before.is_file() || before.len() != landed.byte_count {
-        return Err(declared());
-    }
-    let mut bytes = Vec::new();
-    (&file)
-        .take(landed.byte_count.saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(|error| {
-            io_failure(&format!(
-                "cannot read file-backed Artifact source (errno {})",
-                errno(&error)
-            ))
-        })?;
-    let unchanged = file.metadata().is_ok_and(|after| {
-        (after.dev(), after.ino(), after.len()) == (before.dev(), before.ino(), before.len())
-            && (after.mtime(), after.mtime_nsec()) == (before.mtime(), before.mtime_nsec())
-            && (after.ctime(), after.ctime_nsec()) == (before.ctime(), before.ctime_nsec())
-    });
-    if bytes.len() as u64 != landed.byte_count || sha256_hex(&bytes) != digest || !unchanged {
-        return Err(io_failure(
-            "file-backed Artifact source changed while being published",
-        ));
-    }
+    let bytes =
+        crate::artifact_publication::landed_file_bytes(&landed.path, landed.byte_count, digest)
+            .map_err(|detail| io_failure(&detail))?;
     // The existing publisher redacts text/JSON; binary payloads stay exact.
     publisher.publish(product, &bytes)
 }

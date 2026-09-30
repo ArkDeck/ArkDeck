@@ -38,7 +38,7 @@ mod state;
 mod stop;
 mod tool;
 mod verified_source;
-pub use account::{application_support_directory, arkdeck_application_support_root};
+pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
 pub use console_secret::{TerminalSecretError, read_terminal_secret};
 pub use credential::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,

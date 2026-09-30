@@ -20,18 +20,20 @@
 //! executor.
 //!
 //! On Windows (TASK-XPA-005, GJ-1) the same admission runs over the same
-//! members, but two owners do not exist there yet: the mutation authority
-//! (`MutationAuthority` has no value on Windows: it proves the Runtime's
-//! mutation state across the Session root, whose owner and the Job owner's
-//! continuity census are not built there) and the ArkForge Flash lane
-//! (`FlashAdmitter`, AF-W1); nor is the Agent engine that
-//! `submit_for_agent` serves. So nothing above `readOnly` is admitted on
-//! Windows, as macOS admits nothing above it without an authority.
+//! members. The mutation authority is the same type, but its proof of the
+//! Runtime's mutation state fails closed there (the Job owner's continuity
+//! census is not built on Windows yet) and no daemon composes one; the
+//! ArkForge Flash lane (`FlashAdmitter`, AF-W1) and the Agent engine that
+//! `submit_for_agent` serves are not built. So nothing above `readOnly` is
+//! admitted on Windows, as macOS admits nothing above it without an
+//! authority.
 use crate::JobStore;
+use crate::capability_policy::DeviceHolds;
 #[cfg(target_os = "macos")]
-use crate::capability_policy::{self, DeviceHolds, IssueFailure};
+use crate::capability_policy::{self, IssueFailure};
+use crate::capability_store::CapabilityStore;
 #[cfg(target_os = "macos")]
-use crate::capability_store::{CapabilityQuery, CapabilityStore, CapabilityStoreError, Effect};
+use crate::capability_store::{CapabilityQuery, CapabilityStoreError, Effect};
 use crate::job_journal_events::{self, Envelope};
 use crate::job_journal_writer::JournalWriter;
 use crate::job_plan::{JobPlanner, Materialized, PlanRefusal, request_json};
@@ -171,7 +173,6 @@ fn denial_code(error: &CapabilityStoreError) -> &'static str {
 
 /// What a device mutation is authorized from: the capability store, and the
 /// device sessions this daemon holds.
-#[cfg(target_os = "macos")]
 #[derive(Clone, Copy)]
 pub struct MutationAuthority<'a> {
     pub default_root: &'a std::path::Path,
@@ -180,7 +181,6 @@ pub struct MutationAuthority<'a> {
     pub holds: &'a DeviceHolds,
 }
 
-#[cfg(target_os = "macos")]
 impl MutationAuthority<'_> {
     /// Swift's `validateMutationState`, before an admission and before each
     /// consumption: the Runtime's mutation state is continuous across the
@@ -214,6 +214,7 @@ impl MutationAuthority<'_> {
         self.prove(jobs, status.as_ref()).is_ok()
     }
 
+    #[cfg(target_os = "macos")]
     fn prove(
         &self,
         jobs: &JobStore,
@@ -232,6 +233,22 @@ impl MutationAuthority<'_> {
         }
         jobs.require_mutation_state(self.default_root, &roots)
     }
+
+    /// The Job owner's mutation-state continuity census
+    /// (`mutation_state_continuity.rs`) is not built on Windows yet, so the
+    /// state is never proved there: every device mutation fails closed.
+    #[cfg(windows)]
+    fn prove(
+        &self,
+        _jobs: &JobStore,
+        _status: Option<&Value>,
+    ) -> Result<(), arkdeck_contract::WireError> {
+        Err(arkdeck_contract::WireError {
+            code: "recordUnreadable".into(),
+            message: "the Runtime mutation state's continuity is not proved on Windows yet".into(),
+            details: None,
+        })
+    }
 }
 
 /// The owners an admission writes: the Job store, through the planner's
@@ -243,16 +260,6 @@ pub struct JobAdmitter<'a> {
     pub now: fn() -> Option<String>,
     #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub authority: Option<MutationAuthority<'a>>,
-}
-
-/// The mutation authority, not composed on Windows yet (its Session root
-/// owner and the Job owner's mutation-state continuity census are not built
-/// there): a type with no value, so `authority` is always `None`.
-#[cfg(windows)]
-#[derive(Clone, Copy)]
-pub enum MutationAuthority<'a> {
-    #[allow(dead_code)]
-    Never(std::convert::Infallible, std::marker::PhantomData<&'a ()>),
 }
 
 impl JobAdmitter<'_> {

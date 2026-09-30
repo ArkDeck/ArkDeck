@@ -391,7 +391,7 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     let pipe = daemon.serving();
     assert!(
         daemon.seen.contains(
-            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, planning, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, targets, artifacts, storage, workspaceProjects, planning, traceCache"
                 .to_owned()
         ),
         "{:?}",

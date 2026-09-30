@@ -11,7 +11,7 @@ mod epoch_indexes;
 #[cfg(any(target_os = "macos", windows))]
 #[path = "import_references.rs"]
 pub(crate) mod import_references;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "job_retention_census.rs"]
 mod retention_census;
 #[cfg(target_os = "macos")]

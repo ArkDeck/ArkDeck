@@ -24,4 +24,15 @@ impl WorkspaceComposition {
     ) -> Result<Option<WorkspaceUse<'_>>, (&'static str, String)> {
         match *self {}
     }
+
+    pub(crate) fn provider_unavailability(
+        &self,
+        _reference: &str,
+    ) -> Option<(&'static str, String)> {
+        match *self {}
+    }
+
+    pub(crate) fn dispatcher_unavailability(&self) -> Option<String> {
+        match *self {}
+    }
 }
