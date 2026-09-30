@@ -58,6 +58,8 @@
   <ItemGroup Condition="'$(ArkDeckRuntimeDirectory)' != ''">
     <Content Include="$(ArkDeckRuntimeDirectory)\arkdeck-agentd.exe" Link="arkdeck-agentd.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="$(ArkDeckRuntimeDirectory)\arkdeck.exe" Link="bin\arkdeck.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <!-- The OpenHarmony code-sign helper the daemon looks for beside itself (TASK-XPA-009). -->
+    <Content Include="$(ArkDeckRuntimeDirectory)\ArkDeckKit_ArkDeckWorkflows.bundle\OpenHarmonyNativeCodeSign\arkdeck-code-sign-enable" Link="ArkDeckKit_ArkDeckWorkflows.bundle\OpenHarmonyNativeCodeSign\arkdeck-code-sign-enable" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">

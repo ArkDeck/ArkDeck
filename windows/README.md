@@ -150,13 +150,14 @@ whole product from one recorded checkout (r12 decision 10, rulings 8, 12 and 17)
 - the App published unpackaged (`WindowsPackageType=None`; self-contained Windows App SDK and
   .NET, ReadyToRun and trimmed), `ArkDeck.exe` signed like the runtime;
 - the **xcopy form**: `arkdeck-rc-<version>-windows-x64-<revision>\` with the App, `arkdeck.exe`
-  and `arkdeck-agentd.exe` side by side (the layout both clients default to) and
+  and `arkdeck-agentd.exe` side by side (the layout both clients default to), the runtime's
+  code-sign helper bundle (`ArkDeckKit_ArkDeckWorkflows.bundle\`) beside the daemon, and
   `rc-manifest.json` (`arkdeck.windows-rc-package/1`: every file's size and SHA-256, the
   toolchains, the signer pin), zipped, with the manifest beside the zip carrying its SHA-256;
-- the **MSIX form**: the same App with the signed daemon and CLI at the package root
-  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12), write
-  virtualization off (ruling 8), **unsigned**; its SHA-256 and the daemon's and CLI's inside it
-  are in the manifest.
+- the **MSIX form**: the same App with the signed daemon and CLI and the helper bundle at the
+  package root (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12),
+  write virtualization off (ruling 8), **unsigned**; its SHA-256 and the daemon's and CLI's
+  inside it are in the manifest, and the helper inside it must be the runtime package's.
 
 `-SigningMode none` (CI) signs nothing; `development` signs with the host-trusted development
 certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`). A production RC is not built here.

@@ -11,7 +11,13 @@ Build mode (default) builds `arkdeck.exe` and `arkdeck-agentd.exe` from one reco
      unless -AllowDirty (recorded in the manifest with the entries it found).
   2. `cargo build --release --locked -p arkdeck-agentd -p arkdeck-cli
      --target x86_64-pc-windows-msvc` in rust/.
-  3. Stages both executables side by side (the CLI's default daemon is its sibling).
+  3. Stages both executables side by side (the CLI's default daemon is its sibling), and
+     beside them the OpenHarmony code-sign helper a native deployment stages
+     (TASK-XPA-009): the checked-in arm64 resource at the recorded revision, in the bundle
+     layout the daemon looks in beside itself
+     (ArkDeckKit_ArkDeckWorkflows.bundle/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable).
+     It is an ELF the device runs, data on the host: never Authenticode-signed; the
+     manifest pins its bytes as it pins the executables'.
   4. Signs both (-SigningMode):
        none         nothing is signed; the CLI refuses the daemon (no signer to pin).
        development  rust/scripts/windows-dev-identity.ps1 sign with the host-trusted
@@ -79,6 +85,9 @@ $Target = 'x86_64-pc-windows-msvc'
 $CliName = 'arkdeck.exe'
 $DaemonName = 'arkdeck-agentd.exe'
 $ManifestName = 'manifest.json'
+# The code-sign helper: where the checkout holds it, and where the daemon looks beside itself.
+$HelperSource = 'Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable'
+$HelperPath = 'ArkDeckKit_ArkDeckWorkflows.bundle/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable'
 $Schema = 'arkdeck.windows-xcopy-package/1'
 $SmokeSchema = 'arkdeck.windows-xcopy-smoke/1'
 # A command that has not answered in this time is reported, never waited on further.
@@ -259,6 +268,9 @@ function New-PackageBuild {
     [void](New-Item -ItemType Directory -Path $stage)
     foreach ($file in @($CliName, $DaemonName)) { Copy-Item -LiteralPath (Join-Path $binaries $file) -Destination $stage }
     $staged = @($CliName, $DaemonName | ForEach-Object { Join-Path $stage $_ })
+    $helper = Join-Path $stage $HelperPath
+    [void](New-Item -ItemType Directory -Path (Split-Path -Parent $helper))
+    Copy-Item -LiteralPath (Join-Path $repository $HelperSource) -Destination $helper
 
     $signing = [ordered]@{ mode = $SigningMode; signerSha256 = $null; publisher = $null }
     if ($SigningMode -ne 'none') {
@@ -309,7 +321,7 @@ function New-PackageBuild {
         signing              = $signing
         files                = @(foreach ($path in $staged) {
                 [ordered]@{ path = [System.IO.Path]::GetFileName($path); bytes = (Get-Item -LiteralPath $path).Length; sha256 = Get-Sha256 $path }
-            })
+            }) + @([ordered]@{ path = $HelperPath; bytes = (Get-Item -LiteralPath $helper).Length; sha256 = Get-Sha256 $helper })
         daemonConfiguration  = if ($signing.publisher) {
             [ordered]@{
                 ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = $signing.publisher.organization

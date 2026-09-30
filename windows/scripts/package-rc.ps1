@@ -16,13 +16,16 @@ Build mode (default), from one recorded checkout:
      ReadyToRun and trimmed, x64) unpackaged (`WindowsPackageType=None`), and signs
      `ArkDeck.exe` the same way as the runtime.
   4. Stages the xcopy form: the App with its daemon beside it (`ArkDeck.exe` and
-     `arkdeck-agentd.exe` at the root, the App's default daemon) and the CLI in `bin\` — NTFS
+     `arkdeck-agentd.exe` at the root, the App's default daemon, with the runtime's
+     code-sign helper bundle `ArkDeckKit_ArkDeckWorkflows.bundle\` beside it) and the CLI in
+     `bin\` — NTFS
      names are case-insensitive, so `arkdeck.exe` cannot sit beside `ArkDeck.exe`; the CLI is
      pointed at the root's daemon with ARKDECK_DAEMON_PATH. It writes `rc-manifest.json`
      (every file with its size and SHA-256) inside it, zips it, and writes the manifest beside
      the zip with the zip's SHA-256 added.
-  5. Builds the MSIX form (r12 decision 10) with the same layout (daemon at the package root,
-     CLI in `bin\`), write virtualization off (ruling 8), identity `CN=ArkDeck Development`
+  5. Builds the MSIX form (r12 decision 10) with the same layout (daemon and helper bundle at
+     the package root, CLI in `bin\`), write virtualization off (ruling 8), identity
+     `CN=ArkDeck Development`
      (ruling 12). The MSIX is never signed here: its development certificate and the
      production signature are maintainer steps. Its SHA-256 goes into the manifest.
 
@@ -75,6 +78,9 @@ $ManifestName = 'rc-manifest.json'
 $DaemonName = 'arkdeck-agentd.exe'
 $CliName = 'arkdeck.exe'
 $AppName = 'ArkDeck.exe'
+# The OpenHarmony code-sign helper the runtime package carries beside its daemon (TASK-XPA-009).
+$HelperBundle = 'ArkDeckKit_ArkDeckWorkflows.bundle'
+$HelperPath = "$HelperBundle/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
 $CommandTimeoutMs = 300000
 $DaemonDeadlineMs = 30000
 
@@ -173,7 +179,7 @@ function New-RcBuild {
     Write-Host "dotnet $($publish -join ' ')"
     & $dotnet @publish | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish (unpackaged App) exited $LASTEXITCODE" }
-    foreach ($name in @($DaemonName, 'bin')) {
+    foreach ($name in @($DaemonName, $HelperBundle, 'bin')) {
         if (Test-Path -LiteralPath (Join-Path $appPublish $name)) { throw "The App's publish output already holds $name." }
     }
     $appPin = $null
@@ -187,6 +193,7 @@ function New-RcBuild {
     $stage = Join-Path $output $name
     Copy-Item -LiteralPath $appPublish -Destination $stage -Recurse
     Copy-Item -LiteralPath (Join-Path $runtimeStage $DaemonName) -Destination $stage
+    Copy-Item -LiteralPath (Join-Path $runtimeStage $HelperBundle) -Destination $stage -Recurse
     [void](New-Item -ItemType Directory -Path (Join-Path $stage 'bin'))
     Copy-Item -LiteralPath (Join-Path $runtimeStage $CliName) -Destination (Join-Path $stage 'bin')
 
@@ -204,11 +211,11 @@ function New-RcBuild {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
         try {
             $entries = @($archive.Entries | ForEach-Object { $_.FullName })
-            foreach ($required in @($AppName, $DaemonName, "bin/$CliName", 'AppxManifest.xml')) {
+            foreach ($required in @($AppName, $DaemonName, "bin/$CliName", $HelperPath, 'AppxManifest.xml')) {
                 if ($entries -notcontains $required) { throw "The MSIX has no $required." }
             }
             $inside = @{}
-            foreach ($file in @($DaemonName, "bin/$CliName")) {
+            foreach ($file in @($DaemonName, "bin/$CliName", $HelperPath)) {
                 $stream = $archive.GetEntry($file).Open()
                 try { $inside[(Split-Path -Leaf $file)] = ([System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($stream))).ToLowerInvariant() } finally { $stream.Dispose() }
             }
@@ -220,6 +227,7 @@ function New-RcBuild {
         foreach ($file in @($DaemonName, $CliName)) {
             if ($inside[$file] -ne (Get-Sha256 (Join-Path $runtimeStage $file))) { throw "The MSIX's $file is not the runtime build's." }
         }
+        if ($inside[(Split-Path -Leaf $HelperPath)] -ne (Get-Sha256 (Join-Path $runtimeStage $HelperPath))) { throw "The MSIX's code-sign helper is not the runtime package's." }
         $identity = $appx.Package.Identity
         $msix = [ordered]@{
             name                        = $packages[0].Name
