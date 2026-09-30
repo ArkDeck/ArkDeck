@@ -107,8 +107,9 @@ parent may grant others access but must be owned by the token user.
 `document_metadata`/`remove_document` answer and take a `HostFileIdentity`
 (device, inode, size, modification and change times) on both OSes (maintainer
 ruling 7); `owner_only_document` is the same identity of a document that is
-exactly owner read/write. Not yet on Windows: the import-upload, update,
-trace-removal, session-removal and diagnostic-log submodules.
+exactly owner read/write. The import-upload submodule is on Windows
+(TASK-XPA-008). Not yet on Windows: the update, trace-removal,
+session-removal and diagnostic-log submodules.
 `PayloadCheck::Unopenable` carries a
 Win32 error code on Windows. `HostJournal::generation` is 0 on NTFS, whose
 file reference already carries a reuse sequence number.
@@ -120,6 +121,45 @@ recorded bytes and reads it back under the lock. It also covers the refusals
 (hard links, junctions, foreign ACEs, reserved name characters, non-canonical
 paths), lock exclusion within and across processes and its release on kill,
 and readers that keep their bytes across a replace.
+
+## Import upload on NTFS (TASK-XPA-008)
+
+`src/windows/host_import_upload.rs` gives Windows the import-upload submodule
+with the Unix names, bounds, bytes and refusals: `HostImportSource`,
+`HostUploadFile` (with `HostUploadReader`, `UploadChunkCheckpoint`,
+`UploadWritePoint`) and `HostDirectory::publish_import_checkpoint`.
+
+- The source is opened by `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT`
+  (a link or junction as its last component is refused as `O_NOFOLLOW`
+  refuses it; a `:` stream name and any non-disk handle too) and shared for
+  reading only: while it is held nobody writes it, renames it, or replaces or
+  deletes its name. Its `FileIdInfo` identity, size, link count, attributes
+  and both times are still compared before and after every chunk, and its name
+  is reopened for its attributes and must still name the same file, which
+  catches what no share mode refuses (a metadata change, a new hard link, a
+  replaced parent directory).
+- Staging files are created owner-only (`0600`) only for a durable
+  zero-offset checkpoint, written by offset, flushed with `FlushFileBuffers`,
+  and must stay the owner's single-link regular file bound to their name.
+- An Artifact payload is copied into a private `.<name>.<nonce>.tmp`, digest
+  checked, sealed owner read-only (`0400`) through the handle opened before
+  the seal, flushed and renamed with POSIX semantics and no replace
+  (`RENAME_EXCL`): an existing Artifact is never replaced. An interrupted
+  copy is deleted through its own handle; one left by a killed process is
+  reclaimed by the next publication after the same owner-only check.
+- `checkpoint_identity` keeps the Unix eleven-field order (generation 0; the
+  owner's granted rights and the attributes where Unix has uid and mode). It
+  is an in-memory cache key, never persisted.
+
+`tests/host_import_upload.rs` runs on macOS and Windows alike: the recorded
+`import-upload-current` source read by identity, staged to the recorded Swift
+committed prefix (T0), recovered, completed and published to the recorded
+digest; the frozen checkpoint records published and replaced; a source whose
+identity changes mid-read refused (and on Windows its name cannot be replaced
+while it is held); symbolic-link and junction sources refused; an existing
+Artifact never replaced; and a writer killed inside an append leaving a byte
+prefix and no Artifact, rolled back to the recorded prefix and completed by
+the next lifetime, which also reclaims a killed publisher's copy file.
 
 ## Validation
 
@@ -224,4 +264,50 @@ measured library facts are in the TASK-XPA-005 run record; print them with:
 
 ```sh
 cargo test -p arkdeck-platform --lib linked_library_supports_the_runtime_store -- --nocapture
+```
+
+## DevEco files and pinned signing files on Windows (TASK-XPA-011)
+
+`src/windows/deveco_files.rs` is the Windows `DevEcoRoot`/`DevEcoRole`
+reader (gate G15): the same no-follow, bounded, identity-checked reads as
+`host_deveco_files.rs` over a Windows DevEco Studio directory (default
+`%ProgramFiles%\Huawei\DevEco Studio`), which is a plain directory rather than
+a signed `.app` bundle:
+
+| Role | macOS (`<X>.app/Contents/…`) | Windows (`<root>\…`) |
+| --- | --- | --- |
+| `productManifest` | `Resources/product-info.json` | `product-info.json` |
+| `sdkManifest` | `sdk/default/sdk-pkg.json` | `sdk\default\sdk-pkg.json` |
+| `node` | `tools/node/bin/node` (execute bits) | `tools\node\node.exe` (a `.exe` the caller holds `FILE_EXECUTE` on) |
+| `hvigor` | `tools/hvigor/bin/hvigorw.js` | `tools\hvigor\bin\hvigorw.js` |
+| `signedResourceEnvelope` | `_CodeSignature/CodeResources` | none: Windows binds no manifest to a publisher signature, so the role does not exist |
+
+The root must be a canonical drive path holding the Windows launcher
+`bin\devecostudio64.exe`; any other layout (a macOS tree on a Windows disk, a
+relative, UNC, `.`/`..`, other-case or short-name spelling, a junction
+anywhere) is refused. Every directory from the drive root down and every
+child is opened relative to its parent without following a reparse point and
+must be owned by the token user or a trusted principal (`SYSTEM`,
+`Administrators`, `TrustedInstaller`, the places of Unix root) with no write
+right for anyone else; the drive root alone may let others add entries (the
+`/Applications`/sticky `/tmp` exception). A child's facts are the host store's
+`HostFileIdentity` (volume serial, `FileIdInfo` file id, size, last-write and
+change times), its link count (exactly 1) and whether it is executable.
+`host_deveco_resources` and `property_list` stay macOS-only: Windows DevEco
+ships no property list. The manifests' facts are parsed portably by
+`arkdeck-hoststore::parse_deveco_manifests` (launch entry `Windows`/`amd64`).
+
+`src/windows/pinned_file.rs` (`measure_host_file`, `host_resolved_path`) is
+what the signing layer's `measure`/`foundation_resolved_path`
+(`arkdeck-provider-workspace/src/file_identity.rs`) run on Windows: one
+no-follow handle answers the file's identity, owner and DACL, execute right
+and SHA-256, and the identity is taken again on that handle and on a second
+open of the path after the last byte, so a file written or replaced while it
+is measured is refused. `tests/windows_deveco_files.rs` covers both against
+fixture trees (synthetic manifests; the scratch base is the account's
+`LocalAppData`, since the temporary directory may grant other principals
+write), plus an ignored, shape-only probe of a local installation:
+
+```sh
+ARKDECK_LIVE_DEVECO_ROOT='<DevEco root>' cargo test -p arkdeck-platform --test windows_deveco_files -- --ignored live_deveco
 ```

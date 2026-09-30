@@ -25,6 +25,11 @@ pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};
 #[path = "host_file_export.rs"]
 mod file_export;
 pub use file_export::FileExportStaging;
+#[path = "host_import_upload.rs"]
+mod import_upload;
+pub use import_upload::{
+    HostImportSource, HostUploadFile, HostUploadReader, UploadChunkCheckpoint, UploadWritePoint,
+};
 
 pub struct HostDirectory(pub(super) File, pub(super) Ownership);
 
@@ -53,7 +58,7 @@ pub struct HostFileIdentity {
 }
 
 impl HostFileIdentity {
-    fn of(stat: &Stat) -> io::Result<Self> {
+    pub(crate) fn of(stat: &Stat) -> io::Result<Self> {
         Ok(Self {
             device: stat.volume,
             inode: stat.inode()?,

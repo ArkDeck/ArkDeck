@@ -19,7 +19,7 @@ impl SigningError {
         Self::InvalidConfiguration(message.into())
     }
 
-    #[cfg_attr(not(unix), allow(dead_code))]
+    #[cfg_attr(not(any(unix, windows)), allow(dead_code))]
     pub(crate) fn unsafe_file(message: impl Into<String>) -> Self {
         Self::UnsafeFile(message.into())
     }
