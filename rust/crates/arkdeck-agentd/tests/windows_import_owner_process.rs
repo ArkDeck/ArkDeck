@@ -16,8 +16,10 @@
 //!   `artifact import hap`, `native-library` (the recorded code-signed ELF of
 //!   `rust/tests/fixtures/deploy-native-library`) and `workspace-patch` upload
 //!   and commit their exact bytes; `inspect`, `list` and `release` answer for
-//!   them; `abort` ends an Import begun and not committed; `flash-bundle` is
-//!   refused at publication (AF-W1) with nothing published. The measured
+//!   them; `abort` ends an Import begun and not committed; `flash-bundle`
+//!   commits the Flash archive reader's recorded DAYU200 archive, judged by
+//!   reading it, and refuses one that is no archive with nothing published.
+//!   The measured
 //!   leaves are Windows `implemented` in the coverage manifest the CLI renders
 //!   (`WINDOWS_MEASURED_LEAVES`). Without that variable this test says so and
 //!   checks nothing.
@@ -332,32 +334,74 @@ fn gj1_import_commands_run_through_the_cli_against_a_dev_signed_daemon() {
         let shown = run(&["artifact", "import", "inspect", "--import", id]);
         assert_eq!(shown["import"]["receipt"], committed["receipt"], "{shown}");
     }
-    let listed = run(&["artifact", "import", "list"]);
-    assert_eq!(listed["items"].as_array().unwrap().len(), 3, "{listed}");
-
-    // A flash bundle uploads and is refused at publication: nothing is
-    // published until the Flash archive reader is on Windows (AF-W1).
-    let bundle = root.file("images.tar.gz", b"\x1f\x8bnot-an-archive");
-    let (status, envelope) = cli(
-        &daemon,
-        &pin,
-        &pipe,
-        &[
-            "artifact",
-            "import",
-            "flash-bundle",
-            "--import-request-id",
-            "windows-cli-flash-bundle",
-            "--target",
-            TARGET,
-            "--file",
-            bundle.to_str().unwrap(),
-            "--device-profile",
-            "dayu200",
-        ],
+    // A DAYU200 flash bundle (the Flash archive reader's recorded complete
+    // archive) is judged by reading it, on Windows too, and committed with
+    // its exact digest; one that is no gzip archive is refused at
+    // publication and nothing is published.
+    let bundle = std::fs::read(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/flash-archive/archives/complete.tar.gz"),
+    )
+    .unwrap();
+    let flash = |request: &str, bytes: &[u8]| {
+        let file = root.file(&format!("{request}.tar.gz"), bytes);
+        cli(
+            &daemon,
+            &pin,
+            &pipe,
+            &[
+                "artifact",
+                "import",
+                "flash-bundle",
+                "--import-request-id",
+                request,
+                "--target",
+                TARGET,
+                "--file",
+                file.to_str().unwrap(),
+                "--device-profile",
+                "dayu200",
+            ],
+        )
+    };
+    let (status, envelope) = flash("windows-cli-flash-bundle", &bundle);
+    assert_eq!(status, Some(0), "{envelope}");
+    let committed = &envelope["result"];
+    assert_eq!(committed["state"], "committed", "{envelope}");
+    assert_eq!(committed["receipt"]["artifactDigest"], sha256(&bundle));
+    assert_eq!(
+        committed["receipt"]["validation"],
+        json!({"kind": "flash-bundle", "deviceProfile": "dayu200"}),
+        "{envelope}"
     );
+    let shown = run(&[
+        "artifact",
+        "import",
+        "inspect",
+        "--import",
+        committed["importId"].as_str().unwrap(),
+    ]);
+    assert_eq!(shown["import"]["receipt"], committed["receipt"], "{shown}");
+    let (status, envelope) = flash("windows-cli-flash-garbage", b"\x1f\x8bnot-an-archive");
     assert_ne!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert_eq!(
+        envelope["error"]["message"], "Import content failed its registered format validator",
+        "{envelope}"
+    );
+    // The four committed Imports, and the refused one with no receipt.
+    let listed = run(&["artifact", "import", "list"]);
+    let items = listed["items"].as_array().unwrap();
+    assert_eq!(items.len(), 5, "{listed}");
+    let unpublished: Vec<&Value> = items
+        .iter()
+        .filter(|item| item["receipt"].is_null())
+        .map(|item| &item["importRequestId"])
+        .collect();
+    assert_eq!(
+        unpublished,
+        [&json!("windows-cli-flash-garbage")],
+        "{listed}"
+    );
 
     // An Import begun and not committed is aborted through the CLI.
     let begun = answered(
@@ -378,6 +422,7 @@ fn gj1_import_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     assert_eq!(aborted["state"], "aborted", "{aborted}");
     running.stop(&root.0);
     assert_measured(&[
+        "artifact.import.flash-bundle",
         "artifact.import.workspace-patch",
         "artifact.import.begin",
         "artifact.import.append",
