@@ -110,6 +110,7 @@ impl Authority {
     /// (`targets`) composes them, in a private child of the root created
     /// owner-only when absent (`StateRoot::private_child`):
     ///
+    /// * the Job store (`jobs-state`, [`Self::job_store`]);
     /// * the Target store: `targets.json` and the display names under
     ///   `.targets.lock` and `.target-display-names.lock`, the same bytes
     ///   as on macOS; `target.list`, `target.show`, `target.availability`
@@ -127,9 +128,8 @@ impl Authority {
     ///   root's `artifacts` (the name the macOS isolated owner and production
     ///   composition both give it): the same Job index documents, payloads
     ///   and `artifact.list` snapshot pages as on macOS. Every Artifact
-    ///   belongs to a Job, which the Job owner below proves before anything
+    ///   belongs to a Job, which the Job owner above proves before anything
     ///   is read, listed or exported;
-    /// * the Job store (`jobs-state`, [`Self::job_store`]);
     /// * the Job planner and admitter over the Job store and the root
     ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
     ///   tuple is registered): a device operation is refused before admission
@@ -153,6 +153,7 @@ impl Authority {
     /// open or read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
+        let host = host.with_jobs(self.job_store()?);
         let name = if self.development {
             "targets-state"
         } else {
@@ -184,7 +185,7 @@ impl Authority {
                 path.display()
             )
         })?;
-        let host = host.with_artifacts(artifacts).with_jobs(self.job_store()?);
+        let host = host.with_artifacts(artifacts);
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(

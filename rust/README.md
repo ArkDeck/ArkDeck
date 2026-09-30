@@ -3100,12 +3100,12 @@ component (`arkdeck_platform::InspectedDirectory`), must be named by the system
 with exactly that spelling (so another case or a short name is refused), and is
 pinned by the volume serial and the 64-bit NTFS file reference as its device
 and inode (a ReFS 128-bit id is refused). `projects.json` keeps the macOS keys
-and digests. No DevEco toolchain or credential owner, workspace composition or
-Job owner is composed there yet: a project stays `runtimeRestartRequired`, a
+and digests. No DevEco toolchain or credential owner or workspace composition
+is composed there yet: a project stays `runtimeRestartRequired`, a
 symbol preset registers, a preset that pins a toolchain is refused as without
 its owner, and every project or preset update or removal is refused
-(`recordUnreadable`, no new dispatch) because nothing proves that no Job names
-it. `tests/windows_workspace_project.rs` (hoststore) and
+(`recordUnreadable`, no new dispatch) because the composition does not yet ask
+the Job owner whether a Job names it. `tests/windows_workspace_project.rs` (hoststore) and
 `tests/windows_workspace_projects_process.rs` (agentd, the real daemon and CLI)
 measure it.
 
