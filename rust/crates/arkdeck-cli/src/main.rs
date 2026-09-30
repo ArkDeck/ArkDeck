@@ -63,6 +63,8 @@ fn runtime_endpoint(invocation: &Invocation) -> Result<(LocalEndpoint, ServerIde
         executable: daemon,
         authenticode_sha256: std::env::var("ARKDECK_DAEMON_SIGNER_SHA256").ok(),
         package_family: std::env::var("ARKDECK_DAEMON_PACKAGE_FAMILY").ok(),
+        publisher_organization: std::env::var("ARKDECK_DAEMON_PUBLISHER_ORGANIZATION").ok(),
+        publisher_eku: std::env::var("ARKDECK_DAEMON_PUBLISHER_EKU").ok(),
     };
     // Decision 11: on Windows the client starts the daemon it needs when its
     // pipe is absent (never for `--socket`), before anything is sent; the

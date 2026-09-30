@@ -153,6 +153,31 @@ fn same_image_without_product_signing_identity_is_refused_before_any_frame() {
     refused_before_first_byte(identity, "signing identity");
 }
 
+/// Maintainer ruling 17: a publisher identity with only one of its two values
+/// refuses the server outright, even beside a certificate pin or a package
+/// family, rather than silently not applying.
+#[test]
+fn partial_publisher_identity_is_refused_before_any_frame() {
+    let mut identity = ServerIdentity::new(std::env::current_exe().unwrap());
+    identity.package_family = Some("Contoso.ArkDeck_8wekyb3d8bbwe".into());
+    identity.authenticode_sha256 = Some("0".repeat(64));
+    identity.publisher_organization = Some("Contoso Ltd".into());
+    refused_before_first_byte(identity, "partial daemon publisher identity");
+}
+
+/// An unsigned, unpackaged image satisfies neither a publisher identity nor
+/// a package family.
+#[test]
+fn publisher_identity_or_package_family_without_their_proof_is_refused_before_any_frame() {
+    let mut identity = ServerIdentity::new(std::env::current_exe().unwrap());
+    identity.publisher_organization = Some("Contoso Ltd".into());
+    identity.publisher_eku =
+        Some("1.3.6.1.4.1.311.97.990309390.766961637.194916062.941502583".into());
+    refused_before_first_byte(identity.clone(), "signing identity");
+    identity.package_family = Some("Contoso.ArkDeck_8wekyb3d8bbwe".into());
+    refused_before_first_byte(identity, "signing identity");
+}
+
 #[test]
 fn missing_signing_and_package_configuration_has_no_implicit_fallback() {
     refused_before_first_byte(

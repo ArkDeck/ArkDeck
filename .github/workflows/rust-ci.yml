@@ -276,6 +276,17 @@ jobs:
         working-directory: .
         run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings
 
+      # Maintainer ruling 17 (TASK-XPA-002): the WinVerifyTrust-integrated daemon
+      # signer unit test uses the same runner-only development signer as the
+      # contracts job; without it that test reports its signed path as skipped.
+      - name: Temporary development daemon signer (Windows runner only)
+        if: runner.os == 'Windows'
+        working-directory: .
+        shell: pwsh
+        run: |
+          $identity = ./rust/scripts/windows-dev-identity.ps1 create -Machine | ConvertFrom-Json
+          "ARKDECK_DEV_SIGNER_THUMBPRINT=$($identity.thumbprint)" >> $env:GITHUB_ENV
+
       # Wrapped: two `corpus_parity` cases assert the checkout equals its
       # committed manifest. The wrapper names an edited-but-not-regenerated
       # input with the regenerate command before the tests run; it never

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ArkDeck.App.Core: the UI-free half of the Windows App (TASK-XPA-007). It reads the daemon
+    only through ArkDeck.ClientKit and turns each answer into a page state the WinUI pages
+    render as they are: no runtime semantics, no state derivation beyond "which answer came
+    back" (tasks.md TASK-XPA-007 stop condition). Unit-tested by ArkDeck.App.Tests.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>ArkDeck.App.Core</RootNamespace>
+    <AssemblyName>ArkDeck.App.Core</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClientKit\ArkDeck.ClientKit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ArkDeck.App.Tests" />
+  </ItemGroup>
+</Project>
