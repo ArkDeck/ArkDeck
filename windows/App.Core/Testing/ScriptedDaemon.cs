@@ -45,10 +45,12 @@ public static class ScriptedDaemon
     /// <c>trace.inspect</c> is refused as on Windows today.</summary>
     public const string Jobs = "jobs";
 
-    /// <summary>The Windows daemon as <c>origin/main</c> composes it over a development state
-    /// root (TASK-XPA-004): the Target store holds the Swift adoption oracle's Target, whose
-    /// display name can be set and cleared; no HDC (<c>device.observations</c> refused), no
-    /// Job owner, no Artifact owner, no Trace inspector.</summary>
+    /// <summary>The Windows daemon over a development state root, with the Target owners
+    /// (TASK-XPA-004) and the Job and Session owners (TASK-XPA-005, #2385): the Target store holds
+    /// the Swift adoption oracle's Target, whose display name can be set and cleared; the Job
+    /// store is empty; the Session catalog holds the recorded observe.device@1 Sessions, which
+    /// can be pinned, exported and cleaned up; no HDC (<c>device.observations</c> refused), no
+    /// Artifact of a Job, no Trace inspector.</summary>
     public const string DevelopmentRoot = "targets";
 
     /// <summary><see cref="Jobs"/> with a Trace inspector: <c>trace.inspect</c> answers the
@@ -60,6 +62,15 @@ public static class ScriptedDaemon
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
     public const string TraceJobId = "job-0000000000000000000000000000a003";
+
+    /// <summary>A queued Job of <see cref="Jobs"/> that stays queued until it is cancelled.</summary>
+    public const string QueuedJobId = "job-0000000000000000000000000000a004";
+
+    /// <summary>The recorded Swift observe.device@1 Sessions (rust/tests/fixtures/observe-device/sessions),
+    /// as the Windows Session owner lists them.</summary>
+    public const string ObservedSessionId = "session-job-0f77f8c52864d676372962eccb17389c";
+
+    public const string FailedSessionId = "session-job-efd52ab9c633074171a19ddd916fffd9";
     public static readonly IReadOnlyList<string> RunningJobStates = ["running", "waitingForDevice", "running", "succeeded"];
 
     /// <summary>The Target of <see cref="Jobs"/> (the adopted candidate's).</summary>
@@ -98,6 +109,10 @@ public static class ScriptedDaemon
         };
         private int _connections;
         private int _statusReads;
+        private bool _queuedCancelled;
+        private readonly List<(string Id, string Completed, string Expires, long Generation, bool Pinned, string Size)> _sessions = [];
+        private long _catalogGeneration = 2;
+        private string? _cleanupPreviewId;
 
         public Stream Connect()
         {
@@ -138,7 +153,12 @@ public static class ScriptedDaemon
                 {
                     "doctor" => Success(request, Parse(BlockedDoctor)),
                     "device.observations" => Failure(request, "rejected", "hdc.notConfigured"),
-                    _ when method.StartsWith("job.", StringComparison.Ordinal) => Failure(request, "rejected", "The Job owner is not configured"),
+                    "job.list" => Success(request, Parse(JobPage([]))),
+                    _ when method.StartsWith("job.", StringComparison.Ordinal) => Failure(request, "notFound",
+                        "unknown job " + (request.TryGetValue("params", out var jp) && jp is JsonObject jo && jo.TryGetValue("jobId", out var jid) ? ((JsonString)jid).Value : "")),
+                    _ when method.StartsWith("session.", StringComparison.Ordinal) => Session(request, method, recorded: true),
+                    "runtime.storage.status" => Success(request, Parse(RecordedStorageJson(Recorded()))),
+                    "trace.cache.status" => Success(request, Parse("""{"activeEntryCount":0,"entryCount":0,"inactiveEntryCount":0,"purgeScope":"inactiveDerivedDatabases","schemaVersion":"arkdeck.trace-cache-status/1","totalByteCount":"0"}""")),
                     _ when method.StartsWith("target.", StringComparison.Ordinal) => Target(request, method, [OracleTargetId]),
                     _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
                     "trace.inspect" => NoTraceInspector(request),
@@ -156,6 +176,10 @@ public static class ScriptedDaemon
                     "artifact.list" => ArtifactList(request),
                     "artifact.read" => ArtifactRead(request),
                     "trace.inspect" => mode == Inspector ? TraceInspect(request) : NoTraceInspector(request),
+                    "job.cancel" => JobCancel(request),
+                    "job.result" => JobResult(request),
+                    "job.evidence" => JobEvidence(request),
+                    _ when method.StartsWith("session.", StringComparison.Ordinal) => Session(request, method, recorded: false),
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     "runtime.hdc.status" => Success(request, Parse(HdcStatusJson)),
                     "runtime.tool.list" => Success(request, Parse(ToolPageJson)),
@@ -171,6 +195,7 @@ public static class ScriptedDaemon
             (RunningJobId, "observe.device@1", RunningJobStates[Math.Min(_statusReads, RunningJobStates.Count - 1)], "2026-09-30T08:02:00Z"),
             (FailedJobId, "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
             (TraceJobId, "trace.capture@1", "succeeded", "2026-09-30T08:00:00Z"),
+            (QueuedJobId, "observe.device@1", _queuedCancelled ? "cancelled" : "queued", "2026-09-30T08:04:00Z"),
         ];
 
         private byte[] JobStatus(JsonObject request)
@@ -348,11 +373,182 @@ public static class ScriptedDaemon
             new("phase", new JsonString("traceInspectionOwner")),
         ]);
 
+        /// <summary><c>job.cancel</c>: the queued Job is cancelled at once (it never ran); an
+        /// active one is asked to stop at a safe boundary.</summary>
+        private byte[] JobCancel(JsonObject request)
+        {
+            var id = ((JsonString)request["params"]["jobId"]).Value;
+            var job = JobsNow().FirstOrDefault(j => j.Id == id);
+            if (job.Id is null) return Failure(request, "notFound", "unknown job " + id);
+            if (id == QueuedJobId) _queuedCancelled = true;
+            return Success(request, new JsonObject([new("cancelRequested", JsonBool.Of(!Presentation.JobSummary.TerminalStates.Contains(job.State)))]));
+        }
+
+        /// <summary><c>job.result</c> as the Runtime answers it: a terminal Job's verified
+        /// Artifacts and evidence; for any other, <c>resultNotReady</c>.</summary>
+        private byte[] JobResult(JsonObject request)
+        {
+            var id = ((JsonString)request["params"]["jobId"]).Value;
+            var job = JobsNow().FirstOrDefault(j => j.Id == id);
+            if (job.Id is null) return Failure(request, "notFound", "unknown job " + id);
+            if (!Presentation.JobSummary.TerminalStates.Contains(job.State))
+            {
+                return Failure(request, "resultNotReady", "the Job has no terminal result yet", new JsonObject(
+                [
+                    new("jobId", new JsonString(id)),
+                    new("newDispatchCount", JsonNumber.FromInt64(0)),
+                    new("nextAction", Parse($$"""{"kind":"wait","owner":{"id":"{{id}}","kind":"job"},"reasonCode":"job.running","resource":{"id":"{{id}}","kind":"job"},"retryAfter":"250ms"}""")),
+                    new("phase", new JsonString("preAdmission")),
+                    new("state", new JsonString(job.State)),
+                ]));
+            }
+            var artifacts = Artifacts.Where(a => a.JobId == id).Select(a => (JsonValue)Parse($$"""
+                {"artifactId":"{{a.Id}}","byteCount":"{{a.Bytes.Length}}","bytesVerified":{{(a.Status == "published" ? "true" : "false")}},"mediaType":"{{a.MediaType}}","name":"{{a.Name}}","owner":{"id":"{{id}}","kind":"job"},"privacy":"{{a.Privacy}}","reference":"arkdeck-artifact://{{id}}/{{a.Id}}","sha256":"{{a.Sha256}}","status":"{{a.Status}}"}
+                """));
+            return Success(request, new JsonObject(
+            [
+                new("artifacts", new JsonArray(artifacts)),
+                new("cleanup", new JsonArray([])),
+                new("evidence", Evidence(job)),
+                new("job", Parse(JobJson(job, list: false))),
+                new("nextAction", JsonNull.Instance),
+                new("outcomeUnknown", JsonBool.False),
+                new("schemaVersion", new JsonString("arkdeck.job-result/1")),
+                new("terminal", JsonBool.True),
+            ]));
+        }
+
+        private byte[] JobEvidence(JsonObject request)
+        {
+            var id = ((JsonString)request["params"]["jobId"]).Value;
+            var job = JobsNow().FirstOrDefault(j => j.Id == id);
+            return job.Id is null ? Failure(request, "notFound", "unknown job " + id) : Success(request, Evidence(job));
+        }
+
+        /// <summary>The recorded Swift evidence of an observe.device@1 Job (rust/tests/fixtures/observe-device,
+        /// "observed.evidence"), restated for this Job.</summary>
+        private static JsonObject Evidence((string Id, string Operation, string State, string Created) job)
+        {
+            var terminal = Presentation.JobSummary.TerminalStates.Contains(job.State);
+            return (JsonObject)Parse($$"""
+                {"actualEffect":{{(terminal ? "\"readOnly\"" : "null")}},"actualStepKinds":{{(terminal ? "[\"probeHostTool\",\"probeHDCServer\",\"probeDevice\"]" : "null")}},"artifacts":[],"authority":{"admittedAtUtc":"{{job.Created}}","consumptionFingerprintSha256":null,"kind":"defaultReadOnlyPolicy","recoveryEpoch":null,"reference":"default-read-only-policy","validUntilUtc":null},"bindingRevision":3,"blockers":{{(job.State == "failed" ? "[\"executionFailed\"]" : "[]")}},"catalogDigest":"508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684","executionMode":"execute","finishedAtUtc":{{(terminal ? $"\"{job.Created}\"" : "null")}},"firstEvidenceStepAtUtc":{{(terminal ? $"\"{job.Created}\"" : "null")}},"inventoryAvailable":true,"jobId":"{{job.Id}}","missingRequiredArtifacts":[],"observation":null,"operationReference":"{{job.Operation}}","outcomeUnknown":false,"parameters":{},"providerId":"hdc","recoveryEpoch":null,"schemaVersion":"arkdeck.job-evidence/1","startedAtUtc":"{{job.Created}}","status":"{{(job.State == "succeeded" ? "verified" : terminal ? job.State : "resultNotReady")}}","targetId":"TGT-FIXTURE-1","terminalState":{{(terminal ? $"\"{job.State}\"" : "null")}},"traceProbeAfter":null,"traceProbeBefore":null}
+                """);
+        }
+
+        /// <summary>The recorded Sessions (as the Windows Session owner lists them over the
+        /// fixture), or the scripted Jobs' Sessions; both kept in this Script's catalog.</summary>
+        private List<(string Id, string Completed, string Expires, long Generation, bool Pinned, string Size)> Catalog(bool recorded)
+        {
+            if (_sessions.Count == 0)
+            {
+                if (recorded)
+                {
+                    _sessions.Add((ObservedSessionId, "2026-09-14T00:00:00Z", "2026-12-13T00:00:00Z", 2, false, "13586"));
+                    _sessions.Add((FailedSessionId, "2026-09-14T00:00:00Z", "2026-12-13T00:00:00Z", 2, false, "7013"));
+                }
+                else
+                {
+                    _sessions.Add(("session-" + TraceJobId, "2026-09-30T08:00:00Z", "2026-09-29T08:00:00Z", 1, false, "300512"));
+                    _sessions.Add(("session-" + FailedJobId, "2026-09-30T08:01:00Z", "2026-12-29T08:01:00Z", 1, true, "4096"));
+                }
+            }
+            return _sessions;
+        }
+
+        private List<(string Id, string Completed, string Expires, long Generation, bool Pinned, string Size)> Recorded() => Catalog(recorded: true);
+
+        private static string SessionJson((string Id, string Completed, string Expires, long Generation, bool Pinned, string Size) s) => $$"""
+            {"completedAtUtc":"{{s.Completed}}","expiresAtUtc":"{{s.Expires}}","generation":"{{s.Generation}}","pinned":{{(s.Pinned ? "true" : "false")}},"policyGeneration":"1","schemaVersion":"arkdeck.session/1","sessionId":"{{s.Id}}","sizeBytes":"{{s.Size}}"}
+            """;
+
+        /// <summary>The Session owner (TASK-XPA-005 H3b): the catalog, generation-guarded pin
+        /// and unpin, the cleanup preview-then-apply and the export preview-then-apply, as the
+        /// Windows daemon answered them over the recorded Sessions.</summary>
+        private byte[] Session(JsonObject request, string method, bool recorded)
+        {
+            var catalog = Catalog(recorded);
+            var parameters = request.TryGetValue("params", out var p) ? (JsonObject)p : new JsonObject();
+            string? Param(string key) => parameters.TryGetValue(key, out var v) && v is JsonString s ? s.Value : null;
+            var details = new JsonObject([new("newDispatchCount", JsonNumber.FromInt64(0)), new("phase", new JsonString("sessionOwner"))]);
+            switch (method)
+            {
+                case "session.list":
+                    return Success(request, Parse($$"""
+                        {"hasMore":false,"items":[{{string.Join(",", catalog.Select(SessionJson))}}],"nextCursor":null,"order":"completedAtDescSessionIdAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"4c48c179-cf2c-4baa-941d-96b1c439e9ce"}
+                        """));
+                case "session.show" or "session.pin" or "session.unpin" or "session.export.preview":
+                {
+                    var index = catalog.FindIndex(s => s.Id == Param("sessionId"));
+                    if (index < 0) return Failure(request, "resourceNotFound", "Session is not in the catalog", details);
+                    var session = catalog[index];
+                    if (method == "session.show") return Success(request, Parse(SessionJson(session)));
+                    if (method == "session.export.preview")
+                    {
+                        var destination = Param("destinationPath") ?? "";
+                        return Success(request, Parse($$$"""
+                            {"allowSensitive":false,"artifacts":[],"catalogStatus":{"blocker":null,"complete":true,"measurementIncomplete":false,"unaccountedSessionCount":"0","usedBytes":"20599"},"confirmationRequired":true,"createdAtUtc":"2026-09-30T10:11:17Z","destination":{"expectedState":"absent","parentDevice":"1736215490155947674","parentInode":"41095346600272962","path":{{{Quote(destination)}}},"volumeIdentity":"uuid:7b793737-7c74-481d-a8e2-c3560ae073f3"},"deviceIdentifierPolicy":"redact","digestAlgorithm":"sha256-jcs","estimatedBytes":"4672","expiresAtUtc":"2026-09-30T10:21:17Z","generation":"{{{_catalogGeneration}}}","newDispatchCount":0,"policyGeneration":"1","previewDigest":"9ea90421f897ee80c1719aa1b02d78e75505ea648fe95f967c2796ffeb6c0c12","previewId":"84810dd9-9897-4cfe-810c-3c48ab1d31a1","schemaVersion":"arkdeck.session-export-preview/1","sensitiveDefaultExcluded":true,"sessionId":"{{{session.Id}}}","source":{"jobId":"{{{session.Id["session-".Length..]}}}","journalSha256":"1d97fa23a3819289a720d379233a5b4b42ec7f6c589f224624ad4ab6a65fd69c","manifestSha256":"fcd29f3f78aa58ae3fc82aecd1d5c1f1d3f11d546862c05bfb1763f2a61d5c3d","rootDevice":"1736215490155947674","rootInode":"48695170971460554","sessionDevice":"1736215490155947674","sessionInode":"49258120924882116","volumeIdentity":"uuid:7b793737-7c74-481d-a8e2-c3560ae073f3"}}
+                            """));
+                    }
+                    if (Param("expectedGeneration") != session.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    {
+                        return Failure(request, "resourceConflict", "Session catalog generation changed", details);
+                    }
+                    session = session with { Generation = session.Generation + 1, Pinned = method == "session.pin" };
+                    catalog[index] = session;
+                    _catalogGeneration++;
+                    return Success(request, Parse(SessionJson(session)));
+                }
+                case "session.export.apply":
+                    if (Param("previewId") != "84810dd9-9897-4cfe-810c-3c48ab1d31a1") return Failure(request, "resourceConflict", "export preview is stale", details);
+                    return Success(request, Parse($$"""
+                        {"catalogStatus":{"blocker":null,"complete":true,"measurementIncomplete":false,"unaccountedSessionCount":"0","usedBytes":"20599"},"deviceIdentifierPolicy":"redact","evidenceClass":"derivedExport","excludedArtifactIds":[],"exportedPath":"C:\\Exports\\session","generation":"{{_catalogGeneration}}","newDispatchCount":0,"previewDigest":"9ea90421f897ee80c1719aa1b02d78e75505ea648fe95f967c2796ffeb6c0c12","previewId":"84810dd9-9897-4cfe-810c-3c48ab1d31a1","publishedAtUtc":"2026-09-30T10:11:17Z","resultGeneration":"{{_catalogGeneration}}","schemaVersion":"arkdeck.session-export-result/1","sessionId":"{{catalog[0].Id}}","source":{"jobId":"{{catalog[0].Id["session-".Length..]}}","journalSha256":"1d97fa23a3819289a720d379233a5b4b42ec7f6c589f224624ad4ab6a65fd69c","manifestSha256":"fcd29f3f78aa58ae3fc82aecd1d5c1f1d3f11d546862c05bfb1763f2a61d5c3d","rootDevice":"1736215490155947674","rootInode":"48695170971460554","sessionDevice":"1736215490155947674","sessionInode":"49258120924882116","volumeIdentity":"uuid:7b793737-7c74-481d-a8e2-c3560ae073f3"},"sourceArtifactIds":[]}
+                        """));
+                case "session.cleanup.preview":
+                {
+                    _cleanupPreviewId = "9bee03f1-41a0-4fe8-9660-ef746acc2319-" + _catalogGeneration;
+                    var rows = catalog.Select(s => $$"""
+                        {"activeLease":false,"artifacts":[],"disposition":"{{(s.Pinned ? "retain" : "reclaim")}}","expiresAtUtc":"{{s.Expires}}","pinned":{{(s.Pinned ? "true" : "false")}},"reason":"{{(s.Pinned ? "pinned" : "expiredQuotaPressure")}}","sessionId":"{{s.Id}}","sizeBytes":"{{s.Size}}"}
+                        """);
+                    var reclaim = catalog.Where(s => !s.Pinned).Sum(s => long.Parse(s.Size, System.Globalization.CultureInfo.InvariantCulture));
+                    var current = catalog.Sum(s => long.Parse(s.Size, System.Globalization.CultureInfo.InvariantCulture));
+                    return Success(request, Parse($$"""
+                        {"blocksNewHeavyWriters":true,"confirmationRequired":true,"createdAtUtc":"2026-09-30T10:11:17Z","currentBytes":"{{current}}","digestAlgorithm":"sha256-jcs","expiresAtUtc":"2026-09-30T10:21:17Z","generation":"{{_catalogGeneration}}","newDispatchCount":0,"policyGeneration":"2","previewDigest":"239d73c4cd46906fc2b9ba23844a0162993e9dfbb522573d2d1d0a734d867147","previewId":"{{_cleanupPreviewId}}","projectedBytes":"{{current - reclaim}}","reclaimBytes":"{{reclaim}}","safetyTargetBytes":"1","schemaVersion":"arkdeck.session-cleanup-preview/1","sessions":[{{string.Join(",", rows)}}]}
+                        """));
+                }
+                case "session.cleanup.apply":
+                {
+                    if (_cleanupPreviewId is null || Param("previewId") != _cleanupPreviewId) return Failure(request, "resourceConflict", "cleanup preview is stale", details);
+                    var removed = catalog.Where(s => !s.Pinned).ToList();
+                    catalog.RemoveAll(s => !s.Pinned);
+                    _catalogGeneration++;
+                    _cleanupPreviewId = null;
+                    var reclaimed = removed.Sum(s => long.Parse(s.Size, System.Globalization.CultureInfo.InvariantCulture));
+                    var remaining = catalog.Sum(s => long.Parse(s.Size, System.Globalization.CultureInfo.InvariantCulture));
+                    return Success(request, Parse($$"""
+                        {"appliedAtUtc":"2026-09-30T10:11:17Z","generation":"{{_catalogGeneration - 1}}","newDispatchCount":0,"previewDigest":"239d73c4cd46906fc2b9ba23844a0162993e9dfbb522573d2d1d0a734d867147","previewId":"{{Param("previewId")}}","reclaimedBytes":"{{reclaimed}}","remainingBytes":"{{remaining}}","removedArtifacts":[],"removedSessionIds":[{{string.Join(",", removed.Select(s => $"\"{s.Id}\""))}}],"resultGeneration":"{{_catalogGeneration}}","schemaVersion":"arkdeck.session-cleanup-result/1"}
+                        """));
+                }
+                default:
+                    return Failure(request, "rejected", "not scripted");
+            }
+        }
+
+        /// <summary>The storage status the Windows daemon answered over the recorded Sessions.</summary>
+        private static string RecordedStorageJson(List<(string Id, string Completed, string Expires, long Generation, bool Pinned, string Size)> sessions)
+        {
+            var used = sessions.Sum(s => long.Parse(s.Size, System.Globalization.CultureInfo.InvariantCulture));
+            var pinned = sessions.Where(s => s.Pinned).ToList();
+            return $$$"""
+                {"artifactDomain":{"policy":"refuseNewWorkNeverEvict","remainingBytes":"8589934592","rootReference":"arkdeck-runtime://artifacts","schemaVersion":"arkdeck.artifact-storage-status/1","totalBytes":"8589934592","usedBytes":"0"},"schemaVersion":"arkdeck.runtime-storage/1","sessionDomain":{"catalogGeneration":"2","generation":"1","policy":{"retentionDays":"90","safetyMarginBytes":"2147483648","totalQuotaBytes":"21474836480"},"rootKind":"default","rootPath":"C:\\Users\\Example\\AppData\\Local\\Temp\\ad-root\\sessions","schemaVersion":"arkdeck.session-storage-status/1","usage":{"measurementIncomplete":false,"pinnedBytes":"{{{pinned.Sum(s => long.Parse(s.Size, System.Globalization.CultureInfo.InvariantCulture))}}}","pinnedSessionCount":"{{{pinned.Count}}}","sessionCount":"{{{sessions.Count}}}","unaccountedSessionCount":"0","usedBytes":"{{{used}}}"
+                """ + "}}}";
+        }
+
         /// <summary>The Settings reads of the Windows daemon without their owners (its real answers).</summary>
         private static byte[] SettingsOwnerAbsent(JsonObject request, string method) => method switch
         {
             "runtime.tool.list" or "runtime.bundle.list" => Failure(request, "operationUnavailable", "Bootstrap bundle list owner is not configured", Details("bootstrapRegistryOwner")),
-            "runtime.storage.status" => Failure(request, "rejected", "Runtime storage owners are not configured"),
+            "runtime.storage.status" => Failure(request, "rejected", "Runtime storage owners are not configured", Details("runtimeStorageOwner")),
+            _ when method.StartsWith("session.", StringComparison.Ordinal) => Failure(request, "rejected", "Session owner is not configured"),
             "trace.cache.status" => Failure(request, "rejected", "Trace cache owner is not configured"),
             _ => Failure(request, "rejected", "this method is unavailable in the read-only Rust foundation"),
         };

@@ -88,6 +88,55 @@ fn bytes(value: &Value) -> Result<Vec<u8>, WireError> {
     Ok(bytes)
 }
 impl SessionStore {
+    /// The settings in `state` after the default Sessions root moved from
+    /// `from` to `to` (the Windows account daemon's one-time move out of its
+    /// state directory): a document that still selects the default root at
+    /// `from` is published selecting it at `to`, one generation on, under the
+    /// storage lock. Anything else is left as it is (`false`): no document
+    /// yet, a custom root, or the default root already at `to`; a default
+    /// root elsewhere is left for the owner to refuse when it reads it.
+    /// Repeating it after a completed rebase changes nothing, so a start that
+    /// died between the move and this publication completes it.
+    #[cfg(windows)]
+    pub fn rebase_default_root(state: &Path, from: &Path, to: &Path) -> io::Result<bool> {
+        let invalid =
+            |message: &str| io::Error::new(io::ErrorKind::InvalidData, message.to_owned());
+        let root = HostDirectory::open(state)?;
+        root.validate_path(state)?;
+        let lock = root.wait_lock(LOCK, false)?;
+        let loaded = match root.read(DOCUMENT, MAXIMUM) {
+            Ok(loaded) => loaded,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error),
+        };
+        decode_session_configuration(&loaded)
+            .map_err(|_| invalid("the Session settings are unreadable"))?;
+        let mut document: Value = serde_json::from_slice(&loaded)
+            .map_err(|_| invalid("the Session settings are unreadable"))?;
+        let from = from
+            .to_str()
+            .ok_or_else(|| invalid("the old root is not text"))?;
+        if document["rootKind"] != "default" || document["rootPath"] != from {
+            return Ok(false);
+        }
+        let generation = document["generation"]
+            .as_u64()
+            .filter(|generation| *generation < i64::MAX as u64)
+            .ok_or_else(|| invalid("the Session settings generation is exhausted"))?;
+        document["rootPath"] = json!(to);
+        document["generation"] = json!(generation + 1);
+        let next = bytes(&document).map_err(|error| invalid(&error.message))?;
+        decode_session_configuration(&next)
+            .map_err(|_| invalid("the rebased Session settings do not decode"))?;
+        lock.validate_link(&root, LOCK)?;
+        root.publish_document(DOCUMENT, &next, MAXIMUM)
+            .map_err(|error| match error {
+                DocumentPublishError::BeforePublication(error)
+                | DocumentPublishError::OutcomeUnknown(error) => error,
+            })?;
+        Ok(true)
+    }
+
     pub fn handle_resource(
         &self,
         method: &str,

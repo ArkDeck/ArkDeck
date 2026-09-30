@@ -52,7 +52,7 @@ public sealed class ControlClient : IDisposable
         AuthenticatedPipe pipe;
         try
         {
-            pipe = PipeConnector.Connect(endpoint, identity);
+            pipe = PipeConnector.Connect(endpoint, identity, Stopwatch.GetElapsedTime(Stopwatch.GetTimestamp(), deadline));
         }
         catch (ServerAuthenticationException error)
         {

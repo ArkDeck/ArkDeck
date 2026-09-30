@@ -178,6 +178,22 @@ public static class UiStrings
     public const string SettingsStoragePinned = "settings.storage.pinned";
     public const string SettingsStoragePinGuarantee = "settings.storage.pinGuarantee";
     public const string SettingsStorageMeasurementUnavailable = "settings.storage.measurementUnavailable";
+    public const string JobInspectorActionCancel = "jobInspector.action.cancel";
+    public const string JobInspectorCancelRequested = "jobInspector.cancel.requested";
+    public const string JobInspectorCancelRefused = "jobInspector.cancel.refused";
+    public const string JobInspectorActionOpenRecord = "jobInspector.action.openRecord";
+    public const string HistoryDetailEvidence = "history.detail.evidence";
+    public const string HistoryValueNotReported = "history.value.notReported";
+    public const string HistoryEvidenceProvider = "history.evidence.provider";
+    public const string HistoryEvidenceCatalog = "history.evidence.catalog";
+    public const string HistoryEvidenceBinding = "history.evidence.binding";
+    public const string HistoryEvidenceAuthority = "history.evidence.authority";
+    public const string HistoryEvidenceAuthorityReference = "history.evidence.authorityReference";
+    public const string HistoryEvidenceTerminalState = "history.evidence.terminalState";
+    public const string HistoryEvidenceMode = "history.evidence.mode";
+    public const string HistoryEvidenceEffect = "history.evidence.effect";
+    public const string HistoryEvidenceFirstEvidence = "history.evidence.firstEvidence";
+    public const string SettingsCommonCancel = "settings.common.cancel";
     public const string WindowsRecoveryTitle = "windows.recovery.title";
     public const string WindowsRecoveryMessageNotRunning = "windows.recovery.message.notRunning";
     public const string WindowsRecoveryMessageImpostor = "windows.recovery.message.impostor";
@@ -294,6 +310,44 @@ public static class UiStrings
     public const string WindowsSettingsWorkspacePresetsEmpty = "windows.settings.workspace.presetsEmpty";
     public const string WindowsSettingsWorkspacePresetsUnavailable = "windows.settings.workspace.presetsUnavailable";
     public const string WindowsSettingsWorkspaceTimeout = "windows.settings.workspace.timeout";
+    public const string WindowsNavigationSessions = "windows.navigation.sessions";
+    public const string WindowsSessionsSubtitle = "windows.sessions.subtitle";
+    public const string WindowsSessionsUnavailable = "windows.sessions.unavailable";
+    public const string WindowsSessionsEmpty = "windows.sessions.empty";
+    public const string WindowsSessionsSelect = "windows.sessions.select";
+    public const string WindowsSessionsPinned = "windows.sessions.pinned";
+    public const string WindowsSessionsCompleted = "windows.sessions.completed";
+    public const string WindowsSessionsExpires = "windows.sessions.expires";
+    public const string WindowsSessionsSize = "windows.sessions.size";
+    public const string WindowsSessionsGeneration = "windows.sessions.generation";
+    public const string WindowsSessionsPin = "windows.sessions.pin";
+    public const string WindowsSessionsUnpin = "windows.sessions.unpin";
+    public const string WindowsSessionsPinnedDone = "windows.sessions.pinnedDone";
+    public const string WindowsSessionsUnpinnedDone = "windows.sessions.unpinnedDone";
+    public const string WindowsSessionsRefused = "windows.sessions.refused";
+    public const string WindowsSessionsExport = "windows.sessions.export";
+    public const string WindowsSessionsExportTitle = "windows.sessions.export.title";
+    public const string WindowsSessionsExportMessage = "windows.sessions.export.message";
+    public const string WindowsSessionsExportConfirm = "windows.sessions.export.confirm";
+    public const string WindowsSessionsExportDone = "windows.sessions.export.done";
+    public const string WindowsSessionsExportFailed = "windows.sessions.export.failed";
+    public const string WindowsSessionsExportArtifact = "windows.sessions.export.artifact";
+    public const string WindowsSessionsCleanup = "windows.sessions.cleanup";
+    public const string WindowsSessionsCleanupTitle = "windows.sessions.cleanup.title";
+    public const string WindowsSessionsCleanupMessage = "windows.sessions.cleanup.message";
+    public const string WindowsSessionsCleanupNothing = "windows.sessions.cleanup.nothing";
+    public const string WindowsSessionsCleanupConfirm = "windows.sessions.cleanup.confirm";
+    public const string WindowsSessionsCleanupDone = "windows.sessions.cleanup.done";
+    public const string WindowsSessionsCleanupFailed = "windows.sessions.cleanup.failed";
+    public const string WindowsJobInspectorCancelTitle = "windows.jobInspector.cancel.title";
+    public const string WindowsJobInspectorCancelMessage = "windows.jobInspector.cancel.message";
+    public const string WindowsJobInspectorResult = "windows.jobInspector.result";
+    public const string WindowsJobInspectorResultArtifacts = "windows.jobInspector.result.artifacts";
+    public const string WindowsJobInspectorResultUnavailable = "windows.jobInspector.result.unavailable";
+    public const string WindowsHistoryEvidenceUnavailable = "windows.history.evidence.unavailable";
+    public const string WindowsHistoryEvidenceStatus = "windows.history.evidence.status";
+    public const string WindowsSessionsPinnedYes = "windows.sessions.pinnedYes";
+    public const string WindowsSessionsPinnedNo = "windows.sessions.pinnedNo";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -468,6 +522,22 @@ public static class UiStrings
         SettingsStoragePinned,
         SettingsStoragePinGuarantee,
         SettingsStorageMeasurementUnavailable,
+        JobInspectorActionCancel,
+        JobInspectorCancelRequested,
+        JobInspectorCancelRefused,
+        JobInspectorActionOpenRecord,
+        HistoryDetailEvidence,
+        HistoryValueNotReported,
+        HistoryEvidenceProvider,
+        HistoryEvidenceCatalog,
+        HistoryEvidenceBinding,
+        HistoryEvidenceAuthority,
+        HistoryEvidenceAuthorityReference,
+        HistoryEvidenceTerminalState,
+        HistoryEvidenceMode,
+        HistoryEvidenceEffect,
+        HistoryEvidenceFirstEvidence,
+        SettingsCommonCancel,
         WindowsRecoveryTitle,
         WindowsRecoveryMessageNotRunning,
         WindowsRecoveryMessageImpostor,
@@ -584,5 +654,43 @@ public static class UiStrings
         WindowsSettingsWorkspacePresetsEmpty,
         WindowsSettingsWorkspacePresetsUnavailable,
         WindowsSettingsWorkspaceTimeout,
+        WindowsNavigationSessions,
+        WindowsSessionsSubtitle,
+        WindowsSessionsUnavailable,
+        WindowsSessionsEmpty,
+        WindowsSessionsSelect,
+        WindowsSessionsPinned,
+        WindowsSessionsCompleted,
+        WindowsSessionsExpires,
+        WindowsSessionsSize,
+        WindowsSessionsGeneration,
+        WindowsSessionsPin,
+        WindowsSessionsUnpin,
+        WindowsSessionsPinnedDone,
+        WindowsSessionsUnpinnedDone,
+        WindowsSessionsRefused,
+        WindowsSessionsExport,
+        WindowsSessionsExportTitle,
+        WindowsSessionsExportMessage,
+        WindowsSessionsExportConfirm,
+        WindowsSessionsExportDone,
+        WindowsSessionsExportFailed,
+        WindowsSessionsExportArtifact,
+        WindowsSessionsCleanup,
+        WindowsSessionsCleanupTitle,
+        WindowsSessionsCleanupMessage,
+        WindowsSessionsCleanupNothing,
+        WindowsSessionsCleanupConfirm,
+        WindowsSessionsCleanupDone,
+        WindowsSessionsCleanupFailed,
+        WindowsJobInspectorCancelTitle,
+        WindowsJobInspectorCancelMessage,
+        WindowsJobInspectorResult,
+        WindowsJobInspectorResultArtifacts,
+        WindowsJobInspectorResultUnavailable,
+        WindowsHistoryEvidenceUnavailable,
+        WindowsHistoryEvidenceStatus,
+        WindowsSessionsPinnedYes,
+        WindowsSessionsPinnedNo,
     ];
 }

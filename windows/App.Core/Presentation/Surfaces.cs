@@ -37,6 +37,20 @@ public static class CliCommands
     public const string WorkspaceProjectShow = "arkdeck workspace project show --project <project-ref>"; // workspace.project.show
     public const string WorkspacePresetList = "arkdeck workspace preset list --project <project-ref>";   // workspace.preset.list
 
+    public const string JobCancel = "arkdeck job cancel --job <job-id>";           // job.cancel
+    public const string JobResult = "arkdeck job result --job <job-id>";           // job.result
+    public const string JobEvidence = "arkdeck job evidence --job <job-id>";       // job.evidence
+    public const string SessionList = "arkdeck session list";                      // session.list
+    public const string SessionShow = "arkdeck session show --session <session-id>"; // session.show
+    public const string SessionPin = "arkdeck session pin --session <session-id> --expected-generation <non-negative-integer>"; // session.pin
+    public const string SessionUnpin = "arkdeck session unpin --session <session-id> --expected-generation <non-negative-integer>"; // session.unpin
+    public const string SessionCleanupPreview = "arkdeck session cleanup preview"; // session.cleanup.preview
+    public const string SessionCleanupApply = "arkdeck session cleanup apply --preview-id <id> --preview-digest <sha256>"; // session.cleanup.apply
+    public const string SessionExportPreview = "arkdeck session export preview --session <session-id> --destination <new-directory>"; // session.export.preview
+    public const string SessionExportApply = "arkdeck session export apply --preview-id <id> --preview-digest <sha256>"; // session.export.apply
+
+    public static string ForSession(string template, string sessionId) => template.Replace("<session-id>", sessionId, StringComparison.Ordinal);
+
     public static string ForProject(string template, string projectRef) => template.Replace("<project-ref>", projectRef, StringComparison.Ordinal);
 
     public static string ForJob(string template, string jobId) => template.Replace("<job-id>", jobId, StringComparison.Ordinal);
@@ -86,7 +100,7 @@ public sealed record JobDetailState(string JobId, Loaded<JobSummary> Status, Loa
 
 /// <summary>The History detail of one Job: its status and its Artifacts.</summary>
 public sealed record HistoryDetailState(string JobId, Loaded<JobSummary> Status, Loaded<IReadOnlyList<ArtifactSummary>> Artifacts,
-    ControlFailure? DaemonFailure, bool Reached) : SurfaceState(DaemonFailure, Reached);
+    Loaded<JobEvidenceFacts> Evidence, ControlFailure? DaemonFailure, bool Reached) : SurfaceState(DaemonFailure, Reached);
 
 /// <summary>What <c>trace.inspect</c> answered for one Job's raw Trace.</summary>
 public sealed record TraceInspectionState(string JobId, string ArtifactId, Loaded<TraceInspection> Inspection,
@@ -182,15 +196,18 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
         return new(jobId, status, events, run.DaemonFailure, run.Reached);
     }
 
-    /// <summary>The History detail of one Job: <c>job.status</c> and every <c>artifact.list</c>
-    /// page of the Job (macOS <c>RuntimeAppReadResources.artifactInventory</c>).</summary>
+    /// <summary>The History detail of one Job: <c>job.status</c>, every <c>artifact.list</c>
+    /// page of the Job (macOS <c>RuntimeAppReadResources.artifactInventory</c>) and its
+    /// <c>job.evidence</c> (the macOS History evidence section).</summary>
     public async Task<HistoryDetailState> HistoryDetailAsync(string jobId)
     {
         var run = new Run(channel);
         var status = await run.Load(c => c.RequestAsync("job.status", Params(("jobId", new JsonString(jobId)))), JobSummary.Parse,
             CliCommands.ForJob(CliCommands.JobStatus, jobId));
         var artifacts = await run.LoadPages(c => ArtifactPagesAsync(c, jobId), CliCommands.ArtifactListForJob(jobId));
-        return new(jobId, status, artifacts, run.DaemonFailure, run.Reached);
+        var evidence = await run.Load(c => c.RequestAsync("job.evidence", Params(("jobId", new JsonString(jobId)))), JobEvidenceFacts.Parse,
+            CliCommands.ForJob(CliCommands.JobEvidence, jobId));
+        return new(jobId, status, artifacts, evidence, run.DaemonFailure, run.Reached);
     }
 
     /// <summary>Asks the Runtime's Trace inspector about a Job's raw Trace (<c>trace.inspect</c>):

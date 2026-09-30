@@ -38,6 +38,8 @@ public sealed class AccessibilityTests
         ["device", "targets", new[] { "device.target.TGT-3ba3f5f43b92" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a003" }],
         ["settings", "targets", new[] { "settings.tab.workspace", "settings.workspace.project.project-04dfc9a54d0e77e090fbb537" }],
+        ["sessions", "targets", new[] { "sessions.row.session-job-0f77f8c52864d676372962eccb17389c" }],
+        ["overview", "jobs", new[] { "jobInspector.row.job-0000000000000000000000000000a004" }],
     ];
 
     [TestMethod]
@@ -100,6 +102,7 @@ public sealed class AccessibilityTests
         app.Find("overview.refresh");
         var keys = new Dictionary<string, (string Key, int Unused)>
         {
+            ["sessions"] = ("N", 0),
             ["history"] = ("H", 0),
             ["device"] = ("D", 0),
             ["settings"] = ("S", 0),
@@ -175,17 +178,27 @@ public sealed class AccessibilityTests
             app.Select("device.target.TGT-3ba3f5f43b92");
             app.Invoke("device.target.rename");
             app.Find("device.rename.field").Focus();
-            KeyInput.Press(app.Handle, KeyInput.Escape);
-            SemanticSnapshotTests.WaitUntil(() => app.TryFind("device.rename", TimeSpan.FromMilliseconds(200)) is null, "Escape closes the rename dialog");
+            EscapeCloses(app, "device.rename", "Escape closes the rename dialog");
             Assert.AreEqual("", AppSession.Name(app.Find("device.target.nameStatus")), "nothing was renamed");
+        }
+        using (var app = AppSession.Launch(exe, ["--test-transport", "targets", "--language", "en-US", "--page", "sessions"]))
+        {
+            app.Invoke("sessions.cleanup");
+            app.Find("sessions.cleanup.preview");
+            EscapeCloses(app, "sessions.cleanup.preview", "Escape closes the cleanup preview");
+            Assert.IsNotNull(app.TryFind("sessions.row.session-job-efd52ab9c633074171a19ddd916fffd9", TimeSpan.FromSeconds(2)), "nothing was removed");
         }
         using (var app = AppSession.Launch(exe, ["--test-transport", "jobs", "--language", "en-US", "--page", "history"]))
         {
             app.Select("history.row.job-0000000000000000000000000000a003");
             app.Invoke("history.artifact.export.ART-00000000000000000000000000000c01");
             app.Find("history.artifacts.exportPreview");
-            KeyInput.Press(app.Handle, KeyInput.Escape);
-            SemanticSnapshotTests.WaitUntil(() => app.TryFind("history.artifacts.exportPreview", TimeSpan.FromMilliseconds(200)) is null, "Escape closes the export preview");
+            EscapeCloses(app, "history.artifacts.exportPreview", "Escape closes the export preview");
+            app.Select("jobInspector.row.job-0000000000000000000000000000a004");
+            app.Invoke("jobInspector.cancel");
+            app.Find("jobInspector.cancel.confirm");
+            EscapeCloses(app, "jobInspector.cancel.confirm", "Escape closes the cancellation confirmation");
+            Assert.IsNull(app.TryFind("jobInspector.cancel.result", TimeSpan.FromMilliseconds(300)), "nothing was cancelled");
             Assert.IsNull(app.TryFind("history.artifact.exporting.ART-00000000000000000000000000000c01", TimeSpan.FromMilliseconds(300)), "nothing was read");
         }
     }
@@ -205,6 +218,9 @@ public sealed class AccessibilityTests
         ["settings", "jobs", new[] { "settings.tab.storage" }],
         ["settings", "jobs", new[] { "settings.tab.trace" }],
         ["settings", "targets", new[] { "settings.tab.workspace", "settings.workspace.project.project-04dfc9a54d0e77e090fbb537" }],
+        ["sessions", "targets", new[] { "sessions.row.session-job-0f77f8c52864d676372962eccb17389c" }],
+        ["sessions", "foundation", Array.Empty<string>()],
+        ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a002" }],
     ];
 
     [TestMethod]
@@ -268,6 +284,23 @@ public sealed class AccessibilityTests
         var contrast = Ink(["--high-contrast-tokens"]);
         TestContext.WriteLine($"ink: tokens {tokens}, high-contrast tokens {contrast}, system window text {windowText}");
         Assert.AreEqual(windowText.ToString(System.Globalization.CultureInfo.InvariantCulture), contrast, "high contrast: the ink is the system window-text colour");
+    }
+
+    /// <summary>Escape, once the dialog is fully shown (its buttons exist), closes it. A
+    /// stroke that arrived while the dialog was still being shown is repeated once, and said.</summary>
+    private void EscapeCloses(AppSession app, string dialog, string what)
+    {
+        app.Find("CloseButton");
+        Thread.Sleep(300);
+        KeyInput.Press(app.Handle, KeyInput.Escape);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        while (app.TryFind(dialog, TimeSpan.FromMilliseconds(200)) is not null && watch.Elapsed < TimeSpan.FromSeconds(3)) Thread.Sleep(100);
+        if (app.TryFind(dialog, TimeSpan.FromMilliseconds(200)) is not null)
+        {
+            TestContext.WriteLine($"{dialog}: still open 3 s after Escape; Escape sent again");
+            KeyInput.Press(app.Handle, KeyInput.Escape);
+        }
+        SemanticSnapshotTests.WaitUntil(() => app.TryFind(dialog, TimeSpan.FromMilliseconds(200)) is null, what);
     }
 
     private static string Refresh(string page) => page == "device" ? "hdc.devices.refresh" : page + ".refresh";

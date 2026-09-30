@@ -83,8 +83,8 @@ public sealed class SurfaceTests
         Assert.AreEqual("fixture-serial-2", candidates[1].Title);
 
         var history = await loader.HistoryAsync();
-        Assert.AreEqual(3, history.Jobs.Value!.Count);
-        Assert.AreEqual(1, history.Jobs.Value.Count(j => j.IsActive));
+        Assert.AreEqual(4, history.Jobs.Value!.Count);
+        Assert.AreEqual(2, history.Jobs.Value.Count(j => j.IsActive), "the running Job and the queued one");
 
         var seen = new List<string>();
         for (var i = 0; i < ScriptedDaemon.RunningJobStates.Count + 1; i++)

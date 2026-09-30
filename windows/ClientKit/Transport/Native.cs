@@ -63,6 +63,12 @@ internal static partial class Native
         public fixed byte FileId[16];
     }
 
+    internal const int ERROR_PIPE_BUSY = 231;
+
+    [LibraryImport("kernel32.dll", EntryPoint = "WaitNamedPipeW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool WaitNamedPipe(string name, uint timeoutMilliseconds);
+
     [LibraryImport("kernel32.dll", EntryPoint = "CreateFileW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     internal static partial SafeFileHandle CreateFile(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
 

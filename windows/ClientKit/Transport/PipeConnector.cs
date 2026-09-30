@@ -59,19 +59,38 @@ public sealed class ServerAuthenticationException(DaemonUnavailableReason reason
 public static class PipeConnector
 {
     public static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected) =>
-        Connect(endpoint, expected, ProcessToken.Owner());
+        Connect(endpoint, expected, ProcessToken.Owner(), TimeSpan.Zero);
+
+    /// <summary>As <see cref="Connect(PipeEndpoint, DaemonIdentity)"/>; while every instance of
+    /// the pipe is busy (the server has not offered the next one yet: <c>ERROR_PIPE_BUSY</c>),
+    /// the kernel's wait for a free instance is taken within <paramref name="wait"/>, as the
+    /// Rust client's <c>connect_verified</c> does. Nothing is written while waiting.</summary>
+    public static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, TimeSpan wait) =>
+        Connect(endpoint, expected, ProcessToken.Owner(), wait);
 
     /// <summary>Tests substitute the expected owner to exercise the layer-1 refusal: a
     /// non-elevated account cannot create a pipe owned by another SID.</summary>
-    internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner)
+    internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner) =>
+        Connect(endpoint, expected, expectedOwner, TimeSpan.Zero);
+
+    internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner, TimeSpan wait)
     {
-        var file = Native.CreateFile(endpoint.Name,
-            Native.GENERIC_READ | Native.GENERIC_WRITE | Native.READ_CONTROL, 0, IntPtr.Zero, Native.OPEN_EXISTING,
-            Native.FILE_FLAG_OVERLAPPED | Native.SECURITY_SQOS_PRESENT | Native.SECURITY_IDENTIFICATION, IntPtr.Zero);
-        if (file.IsInvalid)
+        var deadline = Environment.TickCount64 + (long)Math.Max(0, wait.TotalMilliseconds);
+        SafeFileHandle file;
+        while (true)
         {
-            var error = new Win32Exception(Marshal.GetLastPInvokeError());
+            file = Native.CreateFile(endpoint.Name,
+                Native.GENERIC_READ | Native.GENERIC_WRITE | Native.READ_CONTROL, 0, IntPtr.Zero, Native.OPEN_EXISTING,
+                Native.FILE_FLAG_OVERLAPPED | Native.SECURITY_SQOS_PRESENT | Native.SECURITY_IDENTIFICATION, IntPtr.Zero);
+            if (!file.IsInvalid) break;
+            var code = Marshal.GetLastPInvokeError();
             file.Dispose();
+            var left = deadline - Environment.TickCount64;
+            if (code == Native.ERROR_PIPE_BUSY && left > 0 && Native.WaitNamedPipe(endpoint.Name, (uint)Math.Min(left, uint.MaxValue - 1)))
+            {
+                continue;
+            }
+            var error = new Win32Exception(code);
             throw new ServerAuthenticationException(DaemonUnavailableReason.EndpointUnavailable,
                 $"the local Runtime endpoint is unavailable: {error.Message} (Win32 error {error.NativeErrorCode})", error);
         }

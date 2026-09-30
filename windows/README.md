@@ -35,7 +35,9 @@ holds no runtime semantics: everything it shows is a projection read from the lo
 - **Connection (T1 with `arkdeck-client`).** `health` first on the same connection, validated
   against this contract; a failed preflight sends zero business frames; a failed exchange leaves the
   connection unusable and is never replayed; a malformed local request sends no byte; connection,
-  authentication and every read and write share one time budget.
+  authentication and every read and write share one time budget. While every instance of the pipe
+  is busy (`ERROR_PIPE_BUSY`), the open waits for a free one within that budget, as the Rust
+  client's `connect_verified` does (the App reads a page and the Job Inspector at once).
 - **Server authentication (design §F.2), before any byte is written.** The pipe is opened with
   `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION`. Layer 1: the pipe object's owner SID must equal
   this process token's owner SID. Layer 2: the connection's server PID is opened and held, its image
@@ -99,6 +101,14 @@ first, `ControlResult` back.
   (`health` and every `doctor` check; service status/verify/restart and signing status as their
   CLI commands, since the App never controls the Runtime) and Workspace
   (`workspace.project.list|show`, `workspace.preset.list`). All read-only.
+- **Sessions and Job actions (TASK-XPA-020).** A Sessions page lists the Session catalog
+  (`session.list|show`), pins and unpins by generation, and exports and cleans up through the
+  Runtime's preview-then-apply (`session.export.preview|apply`, `session.cleanup.preview|apply`):
+  the person confirms the preview, and the apply names its id and digest. The export goes to a
+  new folder inside the one the person picks; the Runtime proves it absent and writes it. The Job
+  Inspector requests `job.cancel` for a queued or active Job after a confirmation (a request, not
+  an outcome: the state is read back), shows a terminal Job's `job.result`, and opens the record
+  in History, whose detail now carries the macOS evidence section (`job.evidence`).
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, S); rows of facts and actions wrap (`FlowPanel`, a grid for
@@ -164,7 +174,8 @@ stops the daemon through its stop event, and uninstalls by removing the director
 may run from it, no new entry may appear in the local application data and `%LOCALAPPDATA%\ArkDeck`
 must be as it was. The record is `smoke.json` beside the zip.
 
-Uninstall of the xcopy form is deleting its directory; the daemon's state (`%LOCALAPPDATA%\ArkDeck`,
+Uninstall of the xcopy form is deleting its directory; the daemon's state (`%LOCALAPPDATA%\ArkDeck`:
+its state directory `Agentd`, the default Sessions root `Sessions` and the Trace cache `Trace`;
 or a development root) stays. The workflow `.github/workflows/windows-rc.yml` builds the
 unsigned RC on `main` and keeps it as the artifact `arkdeck-windows-rc-<revision>`; it uses no
 secret.

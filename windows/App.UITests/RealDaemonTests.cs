@@ -170,10 +170,9 @@ public sealed class RealDaemonTests
             app.WaitForName("device.target.nameStatus", n => n == strings["windows.device.rename.cleared"]);
             app.WaitForName("device.target." + OracleTarget, n => n == OracleTarget);
 
-            // History: no Job owner is composed over the root yet.
+            // History: the Job owner over the root, which holds no Job.
             app.Navigate("history");
-            var history = app.WaitForName("history.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal));
-            TestContext.WriteLine("history: " + history);
+            Assert.AreEqual(strings["history.empty.title"], app.WaitForName("history.empty.title", n => n.Length > 0));
             foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
         }
         finally
@@ -239,9 +238,12 @@ public sealed class RealDaemonTests
             TestContext.WriteLine("runtime checks: " + AppSession.Name(app.Find("settings.runtime.overall")) + " / hdc " + AppSession.Name(app.Find("settings.runtime.check.hdc"))
                                   + " / targets " + AppSession.Name(app.Find("settings.runtime.check.targets")));
             app.Select("settings.tab.storage");
-            TestContext.WriteLine("storage: " + app.WaitForName("settings.storage.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
+            // The Session owner over the root: its default Sessions root and policy.
+            Assert.AreEqual(Path.Combine(root, "sessions"), app.WaitForName("settings.storage.root", n => n.Length > 0));
+            TestContext.WriteLine("storage: retention " + AppSession.Name(app.Find("settings.storage.retention")) + " · Session bytes "
+                                  + AppSession.Name(app.Find("settings.storage.session.used")));
             app.Select("settings.tab.trace");
-            TestContext.WriteLine("trace cache: " + app.WaitForName("settings.trace.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
+            TestContext.WriteLine("trace cache: " + app.WaitForName("settings.trace.entries", n => n.Length > 0) + " · " + AppSession.Name(app.Find("settings.trace.scope")));
             app.Select("settings.tab.toolchains");
             TestContext.WriteLine("hdc: " + app.WaitForName("settings.toolchains.hdc.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
             app.Select("settings.tab.workspace");
@@ -273,9 +275,110 @@ public sealed class RealDaemonTests
         }
     }
 
+    /// <summary>
+    /// Sessions against the real daemon (the Job and Session owners, TASK-XPA-005) over a
+    /// development root holding the recorded observe.device@1 Sessions: the App lists them,
+    /// pins one, and — after a retention policy the Sessions exceed (set over the pipe, as the
+    /// CLI's <c>runtime storage policy</c> does) — cleans up through the Runtime's preview:
+    /// exactly the unpinned Session is removed from the disk. The Job Inspector reads the
+    /// daemon's empty Job store and a cancellation of an unknown Job is refused as it came.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void SessionsArePinnedAndCleanedUpByTheRealRuntime()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        const string observed = "session-job-0f77f8c52864d676372962eccb17389c";
+        const string failed = "session-job-efd52ab9c633074171a19ddd916fffd9";
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-sessions-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            // The first start creates the owner-only Sessions root; the recorded Sessions are
+            // copied into it (inheriting its DACL) before the second start reads the catalog.
+            (process, _) = StartRootDaemon(signed, root);
+            process.Kill();
+            process.WaitForExit();
+            process.Dispose();
+            CopyTree(RepoPaths.At("rust", "tests", "fixtures", "observe-device", "sessions"), Path.Combine(root, "sessions"));
+            (process, var endpoint) = StartRootDaemon(signed, root);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "sessions"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            if (app.TryFind("sessions.row." + observed, AppSession.Timeout) is null)
+            {
+                Assert.Fail("no Session listed: " + (app.TryFind("sessions.unavailable.reason", TimeSpan.FromSeconds(1)) is { } why ? AppSession.Name(why) : "no refusal shown")
+                            + " / inspector " + (app.TryFind("jobInspector.unavailable.reason", TimeSpan.FromSeconds(1)) is { } j ? AppSession.Name(j) : "-"));
+            }
+            app.Select("sessions.row." + observed);
+            app.Find("sessions.row." + failed);
+            app.Invoke("sessions.pin");
+            Assert.AreEqual(strings["windows.sessions.pinnedDone"], app.WaitForName("sessions.status", n => n.Length > 0));
+
+            var status = Frame(endpoint, "runtime.storage.status", "{}");
+            var generation = status.GetProperty("result").GetProperty("sessionDomain").GetProperty("generation").GetString();
+            Frame(endpoint, "runtime.storage.policy",
+                $$"""{"expectedGeneration":"{{generation}}","retentionDays":"1","safetyMarginBytes":"1","totalQuotaBytes":"2"}""");
+
+            app.Invoke("sessions.cleanup");
+            TestContext.WriteLine("cleanup preview: " + app.WaitForName("sessions.cleanup.message", n => n.Length > 0));
+            app.Find("sessions.cleanup.session." + failed);
+            Assert.IsNull(app.TryFind("sessions.cleanup.session." + observed, TimeSpan.FromMilliseconds(300)), "the pinned Session is kept");
+            app.Invoke("PrimaryButton");
+            TestContext.WriteLine("cleanup: " + app.WaitForName("sessions.status", n => n.StartsWith("Removed", StringComparison.Ordinal)));
+            SemanticSnapshotTests.WaitUntil(() => app.TryFind("sessions.row." + failed, TimeSpan.FromMilliseconds(200)) is null, "the removed Session leaves the list");
+            Assert.IsFalse(Directory.Exists(Path.Combine(root, "sessions", "2026", "09", failed)), "the Runtime removed the Session");
+            Assert.IsTrue(File.Exists(Path.Combine(root, "sessions", "2026", "09", observed, "manifest.json")), "the pinned Session stays");
+
+            // The Job Inspector over the empty Job store.
+            Assert.AreEqual(strings["jobInspector.compact.empty"], app.WaitForName("jobInspector.compact.status", n => n == strings["jobInspector.compact.empty"]));
+            var refused = Frame(endpoint, "job.cancel", """{"jobId":"job-00000000000000000000000000000000"}""", expectOk: false);
+            TestContext.WriteLine("cancel of an unknown Job: " + refused.GetProperty("error").GetProperty("code").GetString());
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            if (process is { HasExited: false })
+            {
+                process.Kill();
+                process.WaitForExit();
+            }
+            process?.Dispose();
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                try
+                {
+                    directory.Delete(recursive: true);
+                    break;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    Thread.Sleep(100);
+                }
+            }
+        }
+    }
+
+    private static void CopyTree(string from, string to)
+    {
+        Directory.CreateDirectory(to);
+        foreach (var file in Directory.GetFiles(from)) File.Copy(file, Path.Combine(to, Path.GetFileName(file)));
+        foreach (var child in Directory.GetDirectories(from)) CopyTree(child, Path.Combine(to, Path.GetFileName(child)));
+    }
+
     /// <summary>One control frame on a plain handle of the daemon's pipe (test setup only, as
     /// the Rust process tests register a project); the reply must succeed.</summary>
-    private static JsonElement Frame(string endpoint, string method, string parameters)
+    private static JsonElement Frame(string endpoint, string method, string parameters, bool expectOk = true)
     {
         using var pipe = new System.IO.Pipes.NamedPipeClientStream(".", endpoint[@"\\.\pipe\".Length..], System.IO.Pipes.PipeDirection.InOut);
         pipe.Connect(10_000);
@@ -284,7 +387,7 @@ public sealed class RealDaemonTests
         var reply = new List<byte>();
         for (var b = pipe.ReadByte(); b >= 0 && b != '\n'; b = pipe.ReadByte()) reply.Add((byte)b);
         var document = JsonDocument.Parse(reply.ToArray()).RootElement.Clone();
-        Assert.IsTrue(document.GetProperty("ok").GetBoolean(), $"{method}: {System.Text.Encoding.UTF8.GetString(reply.ToArray())}");
+        Assert.AreEqual(expectOk, document.GetProperty("ok").GetBoolean(), $"{method}: {System.Text.Encoding.UTF8.GetString(reply.ToArray())}");
         return document;
     }
 
