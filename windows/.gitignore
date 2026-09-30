@@ -1,0 +1,9 @@
+# .NET / WinUI build outputs (never committed)
+bin/
+obj/
+AppPackages/
+BundleArtifacts/
+*.user
+*.binlog
+# Spike measurement outputs (numbers are copied into the run record instead)
+spikes/spk4/out/

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ArkDeck.Spk4 (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ArkDeck.Spk4 (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

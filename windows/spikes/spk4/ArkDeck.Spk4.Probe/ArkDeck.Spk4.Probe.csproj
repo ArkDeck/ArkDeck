@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- SPK-4 out-of-process UIA probe (design §H.6): startup timing, UIA tree walk, live-region
+       event, keyboard path and layout bounds, through UI Automation (UIA3 COM via FlaUI). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.22000.0</SupportedOSPlatformVersion>
+    <RootNamespace>ArkDeck.Spk4.Probe</RootNamespace>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FlaUI.UIA3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArkDeck.Spk4.Fixtures\ArkDeck.Spk4.Fixtures.csproj" />
+  </ItemGroup>
+</Project>

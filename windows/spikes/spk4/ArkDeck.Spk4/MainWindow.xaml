@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="ArkDeck.Spk4.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="ArkDeck">
+    <!-- Mica (Base) behind the NavigationView shell; Mica Alt is for a window whose title bar
+         hosts a TabView, which this shell does not have. -->
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="Base" />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TitleBar
+            x:Name="AppTitleBar"
+            Title="ArkDeck"
+            Subtitle="SPK-4 fixture"
+            BackRequested="TitleBar_BackRequested"
+            IsBackButtonVisible="{x:Bind NavFrame.CanGoBack, Mode=OneWay}"
+            IsPaneToggleButtonVisible="True"
+            PaneToggleRequested="TitleBar_PaneToggleRequested">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <NavigationView
+            x:Name="NavView"
+            Grid.Row="1"
+            AutomationProperties.AutomationId="Shell.Navigation"
+            AutomationProperties.Name="Workspaces"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            IsSettingsVisible="True"
+            PaneDisplayMode="Auto"
+            SelectionChanged="NavView_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="NavOverview" Content="Overview" Tag="overview"
+                                    AutomationProperties.AutomationId="Nav.Overview">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="History" Tag="history"
+                                    AutomationProperties.AutomationId="Nav.History">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE81C;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Viewer" Tag="viewer"
+                                    AutomationProperties.AutomationId="Nav.Viewer">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8A9;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Job Inspector" Tag="job"
+                                    AutomationProperties.AutomationId="Nav.JobInspector">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D9;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Debug" Tag="debug"
+                                    AutomationProperties.AutomationId="Nav.Debug">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xEBE8;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Trace" Tag="trace"
+                                    AutomationProperties.AutomationId="Nav.Trace">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D2;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <!-- Honest provenance: nothing on screen comes from a daemon. -->
+                <InfoBar
+                    AutomationProperties.AutomationId="Shell.FixtureBanner"
+                    AutomationProperties.Name="Fixture data"
+                    Margin="{StaticResource ArkDeckSpace2Thickness}"
+                    IsClosable="False"
+                    IsOpen="True"
+                    Severity="Informational"
+                    Title="Fixture data"
+                    Message="SPK-4 spike: every value on these pages is a local fixture. No Runtime daemon is connected." />
+                <Frame x:Name="NavFrame" Grid.Row="1" />
+            </Grid>
+        </NavigationView>
+    </Grid>
+</Window>

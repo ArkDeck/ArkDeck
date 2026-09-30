@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="ArkDeck.Spk4.Pages.OverviewPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:fx="using:ArkDeck.Spk4.Fixtures"
+    xmlns:app="using:ArkDeck.Spk4">
+
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource ArkDeckSpace6Thickness}" Spacing="{StaticResource ArkDeckSpace4}" MaxWidth="880" HorizontalAlignment="Left">
+            <TextBlock Style="{StaticResource ArkDeckPageTitleStyle}" Text="Overview" />
+
+            <Border Style="{StaticResource ArkDeckCardStyle}">
+                <StackPanel Spacing="{StaticResource ArkDeckSpace2}">
+                    <TextBlock Style="{StaticResource ArkDeckCaptionStyle}" Text="Current target" />
+                    <TextBlock Style="{StaticResource ArkDeckBodyStyle}" FontWeight="SemiBold" Text="fixture-target-1" />
+                    <TextBlock Style="{StaticResource ArkDeckCaptionStyle}" Text="Binding and availability come from the Runtime in TASK-XPA-007; here they are fixture text." TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource ArkDeckCardStyle}">
+                <StackPanel Spacing="{StaticResource ArkDeckSpace2}">
+                    <TextBlock Style="{StaticResource ArkDeckCaptionStyle}" Text="Latest jobs" />
+                    <ItemsRepeater x:Name="Latest">
+                        <ItemsRepeater.Layout>
+                            <StackLayout Spacing="4" />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="fx:HistoryRow">
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource ArkDeckSpace2}"
+                                            AutomationProperties.Name="{x:Bind AutomationName}">
+                                    <FontIcon Glyph="{x:Bind StateGlyph}" FontSize="14"
+                                              Foreground="{x:Bind app:StateVisuals.Brush(State)}" />
+                                    <TextBlock Style="{StaticResource ArkDeckMonoStyle}" Text="{x:Bind JobId}" />
+                                    <TextBlock Style="{StaticResource ArkDeckBodyStyle}" Text="{x:Bind Operation}" />
+                                    <TextBlock Style="{StaticResource ArkDeckCaptionStyle}" Text="{x:Bind StateLabel}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="ArkDeck.Spk4.Pages.JobInspectorPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource ArkDeckSpace6Thickness}" Spacing="{StaticResource ArkDeckSpace4}" MaxWidth="880" HorizontalAlignment="Left">
+            <TextBlock Style="{StaticResource ArkDeckPageTitleStyle}" Text="Job Inspector" />
+
+            <Border Style="{StaticResource ArkDeckCardStyle}">
+                <StackPanel Spacing="{StaticResource ArkDeckSpace3}">
+                    <TextBlock Style="{StaticResource ArkDeckCaptionStyle}" Text="job-000042 · observe.device · fixture-target-1" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource ArkDeckSpace2}">
+                        <FontIcon x:Name="StateGlyph" FontSize="20" />
+                        <!-- Live region: Narrator announces every Job state change (design §H.3). -->
+                        <TextBlock
+                            x:Name="StateText"
+                            AutomationProperties.AutomationId="Job.State"
+                            AutomationProperties.LiveSetting="Assertive"
+                            AutomationProperties.HeadingLevel="Level2"
+                            Style="{StaticResource ArkDeckPageTitleStyle}" />
+                    </StackPanel>
+                    <TextBlock x:Name="NextStep" Style="{StaticResource ArkDeckBodyStyle}" TextWrapping="Wrap" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource ArkDeckSpace2}">
+                        <Button
+                            x:Name="AdvanceButton"
+                            AutomationProperties.AutomationId="Job.Advance"
+                            Click="Advance_Click"
+                            Content="Advance fixture state"
+                            Style="{StaticResource AccentButtonStyle}" />
+                        <!-- Cancel is shown only while cancellable; otherwise the reason is shown instead. -->
+                        <Button
+                            x:Name="CancelButton"
+                            AutomationProperties.AutomationId="Job.Cancel"
+                            Click="Cancel_Click"
+                            Content="Cancel job" />
+                        <TextBlock
+                            x:Name="CancelReason"
+                            VerticalAlignment="Center"
+                            Style="{StaticResource ArkDeckCaptionStyle}"
+                            Text="Cancel is not offered: the Job has ended." />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <InfoBar
+                x:Name="HumanBar"
+                IsClosable="False"
+                Severity="Warning"
+                Title="Waiting for you"
+                Message="Fixture: the Runtime would describe the human action here (human-action.show)." />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

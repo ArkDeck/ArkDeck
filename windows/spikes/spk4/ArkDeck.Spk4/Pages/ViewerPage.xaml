@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="ArkDeck.Spk4.Pages.ViewerPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:fx="using:ArkDeck.Spk4.Fixtures">
+
+    <Grid Padding="{StaticResource ArkDeckSpace6Thickness}" RowSpacing="{StaticResource ArkDeckSpace3}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock Style="{StaticResource ArkDeckPageTitleStyle}" Text="Viewer" />
+        <TextBlock
+            x:Name="Stats"
+            Grid.Row="1"
+            AutomationProperties.AutomationId="Viewer.LoadStats"
+            Style="{StaticResource ArkDeckCaptionStyle}"
+            Text="Loading…" />
+
+        <Border Grid.Row="2" Style="{StaticResource ArkDeckCardStyle}" Padding="0">
+            <!-- Node mode: TreeViewNode hierarchy built off-tree, fully expanded, then attached once. -->
+            <TreeView
+                x:Name="Tree"
+                AutomationProperties.AutomationId="Viewer.Tree"
+                AutomationProperties.Name="UI dump, fixture nodes"
+                SelectionMode="Single">
+                <TreeView.ItemTemplate>
+                    <DataTemplate x:DataType="TreeViewNode">
+                        <TreeViewItem>
+                            <TextBlock Style="{StaticResource ArkDeckMonoStyle}"
+                                       Text="{x:Bind ((fx:ViewerNode)Content).Display}" />
+                        </TreeViewItem>
+                    </DataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </Border>
+    </Grid>
+</Page>
