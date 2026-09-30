@@ -105,7 +105,7 @@ pub use macos_server::{
 pub use windows::{
     ConnectionCloser, GuardAcquisition, GuardObject, InstanceScope, Latch, ListenerLock,
     LocalConnection, LocalListener, LoopbackServerLease, ManagedServer, OwnerLock, Readiness,
-    SingleInstanceGuard, StateRoot, StopSignal, default_user_endpoint,
+    SingleInstanceGuard, StateRoot, StopSignal, default_user_endpoint, send_console_break,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.

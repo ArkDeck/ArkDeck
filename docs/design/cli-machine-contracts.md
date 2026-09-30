@@ -118,7 +118,9 @@ and `classification == targetClassification` unless the entry is `blocked`.
 closed entry, `partial` for `blocked`. On Windows it states what the Rust CLI
 serves there (TASK-XPA-018): `implemented` where every leaf the entry reaches
 answers without the Runtime (the registry's `connectsToRuntime: false`: `help`,
-`commands`, `completion` and the refused stubs), `notImplemented` where a leaf
+`commands`, `completion` and the refused stubs) or is answered by the Windows
+daemon and measured end to end against a development-signed daemon over the
+named pipe (`doctor`, `operation list`), `notImplemented` where a leaf
 it reaches is refused off macOS for a macOS host primitive (the Import upload
 kinds, and the macOS-only families below), and `partial` otherwise: the leaves
 parse, send their frames and render their envelopes on Windows, but the target
