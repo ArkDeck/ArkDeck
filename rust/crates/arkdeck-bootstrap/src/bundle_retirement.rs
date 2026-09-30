@@ -3,9 +3,9 @@
 //! owner is entered, and no reference can be acquired or released through here.
 use crate::{BundleRegistryReadStore, decode_bundles};
 use arkdeck_contract::{WireError, canonical_json};
-use arkdeck_platform::{DocumentPublishError, HostReadLock};
+use arkdeck_platform::{DocumentPublishError, HostFileIdentity, HostReadLock};
 use serde_json::{Value, json};
-use std::{fs::Metadata, io, os::unix::fs::MetadataExt};
+use std::io;
 
 const MAX_INDEX: usize = 4 * 1024 * 1024;
 fn failure(code: &str, message: &str) -> WireError {
@@ -33,18 +33,10 @@ fn publication(error: DocumentPublishError) -> WireError {
         ),
     }
 }
-fn same_metadata(before: &Metadata, after: &Metadata) -> bool {
-    before.dev() == after.dev()
-        && before.ino() == after.ino()
-        && before.mode() == after.mode()
-        && before.uid() == after.uid()
-        && before.gid() == after.gid()
-        && before.nlink() == after.nlink()
-        && before.len() == after.len()
-        && before.mtime() == after.mtime()
-        && before.mtime_nsec() == after.mtime_nsec()
-        && before.ctime() == after.ctime()
-        && before.ctime_nsec() == after.ctime_nsec()
+/// The same index: its device and inode, size and modification and change
+/// times. A change of its mode, owner or links moves the change time.
+fn same_metadata(before: &HostFileIdentity, after: &HostFileIdentity) -> bool {
+    before == after
 }
 fn find(document: &Value, reference: &str) -> Result<usize, WireError> {
     if !reference
@@ -197,7 +189,7 @@ impl BundleRegistryReadStore {
         &self,
         lock: &HostReadLock,
         bytes: &[u8],
-        identity: &Metadata,
+        identity: &HostFileIdentity,
     ) -> Result<(), WireError> {
         self.retirement_binding(lock)?;
         if self
@@ -223,10 +215,24 @@ impl BundleRegistryReadStore {
 mod tests {
     use super::*;
     use std::{
-        fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt},
+        fs::{self, Metadata},
+        os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt},
         path::PathBuf,
     };
+    /// Every stat field the tests compare of an entry, directories included.
+    fn same_metadata(before: &Metadata, after: &Metadata) -> bool {
+        before.dev() == after.dev()
+            && before.ino() == after.ino()
+            && before.mode() == after.mode()
+            && before.uid() == after.uid()
+            && before.gid() == after.gid()
+            && before.nlink() == after.nlink()
+            && before.len() == after.len()
+            && before.mtime() == after.mtime()
+            && before.mtime_nsec() == after.mtime_nsec()
+            && before.ctime() == after.ctime()
+            && before.ctime_nsec() == after.ctime_nsec()
+    }
     fn root() -> PathBuf {
         let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
         let root = std::env::temp_dir()

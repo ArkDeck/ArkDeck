@@ -4,9 +4,9 @@
 //! Runtime's DevEco registry retires through too (`arkdeck-hoststore`).
 use crate::{ToolRegistryStore, decode_bundles, decode_tools};
 use arkdeck_contract::{WireError, canonical_json};
-use arkdeck_platform::{DocumentPublishError, HostDirectory, HostReadLock};
+use arkdeck_platform::{DocumentPublishError, HostDirectory, HostFileIdentity, HostReadLock};
 use serde_json::{Value, json};
-use std::{fs::Metadata, io, os::unix::fs::MetadataExt, path::Path};
+use std::{io, path::Path};
 const MAX_INDEX: usize = 4 * 1024 * 1024;
 const BUNDLES: &str = "bundles.json";
 const TOOLS: &str = "tools.json";
@@ -43,23 +43,15 @@ fn publication(error: DocumentPublishError, name: &str) -> WireError {
         DocumentPublishError::OutcomeUnknown(_) => unknown(),
     }
 }
-fn same_metadata(a: &Metadata, b: &Metadata) -> bool {
-    a.dev() == b.dev()
-        && a.ino() == b.ino()
-        && a.mode() == b.mode()
-        && a.uid() == b.uid()
-        && a.gid() == b.gid()
-        && a.nlink() == b.nlink()
-        && a.len() == b.len()
-        && a.mtime() == b.mtime()
-        && a.mtime_nsec() == b.mtime_nsec()
-        && a.ctime() == b.ctime()
-        && a.ctime_nsec() == b.ctime_nsec()
+/// The same index: its device and inode, size and modification and change
+/// times. A change of its mode, owner or links moves the change time.
+fn same_metadata(a: &HostFileIdentity, b: &HostFileIdentity) -> bool {
+    a == b
 }
 /// One index as a retirement read it: its bytes and file identity.
 pub struct IndexSnapshot {
     pub bytes: Vec<u8>,
-    pub metadata: Metadata,
+    pub metadata: HostFileIdentity,
 }
 fn find(document: &Value, reference: &str) -> Result<usize, WireError> {
     if !reference

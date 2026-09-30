@@ -5,9 +5,9 @@ use crate::{
     deveco_registry, snapshot_pager::SnapshotPager,
 };
 use arkdeck_contract::WireError;
-use arkdeck_platform::{DocumentPublishError, HostReadLock};
+use arkdeck_platform::{DocumentPublishError, HostFileIdentity, HostReadLock};
 use serde_json::{Value, json};
-use std::{fs::Metadata, io, os::unix::fs::MetadataExt};
+use std::io;
 const MAX_INDEX: usize = 4 * 1024 * 1024;
 const BUNDLES: &str = "bundles.json";
 const TOOLS: &str = "tools.json";
@@ -34,23 +34,15 @@ fn unreadable(_: impl std::fmt::Debug) -> WireError {
         "Bootstrap tool registry or retained content is unreadable",
     )
 }
-fn same_document(a: &Metadata, b: &Metadata) -> bool {
-    a.dev() == b.dev()
-        && a.ino() == b.ino()
-        && a.mode() == b.mode()
-        && a.uid() == b.uid()
-        && a.gid() == b.gid()
-        && a.nlink() == b.nlink()
-        && a.len() == b.len()
-        && a.mtime() == b.mtime()
-        && a.mtime_nsec() == b.mtime_nsec()
-        && a.ctime() == b.ctime()
-        && a.ctime_nsec() == b.ctime_nsec()
+/// The same index: its device and inode, size and modification and change
+/// times. A change of its mode, owner or links moves the change time.
+fn same_document(a: &HostFileIdentity, b: &HostFileIdentity) -> bool {
+    a == b
 }
 struct Index {
     name: &'static str,
     bytes: Vec<u8>,
-    identity: Metadata,
+    identity: HostFileIdentity,
 }
 impl BootstrapListPage for ToolRegistryStore {
     /// Fresh inventory validation precedes page-size/cursor validation on every

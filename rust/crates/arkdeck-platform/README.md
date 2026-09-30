@@ -91,10 +91,26 @@ from the SPK-5 facts measured on NTFS.
 
 `application_support_directory()` is the account's `FOLDERID_LocalAppData`
 (Known Folder API, never the `LOCALAPPDATA` variable, as Unix ignores `HOME`);
-`arkdeck_application_support_root()` is its `ArkDeck` child. Not yet on
-Windows: the export, update, trace-removal, session-removal,
-diagnostic-log and payload-cache submodules, and the `std::fs::Metadata`-typed
-`document_metadata`/`remove_document`. `PayloadCheck::Unopenable` carries a
+`arkdeck_application_support_root()` is its `ArkDeck` child. The export
+(`ExportStaging`, `HostExportCapacity`), file-export (`FileExportStaging`) and
+payload-cache (`PayloadVerification`) submodules are on Windows too
+(TASK-XPA-006): the staging entries are created with `FILE_CREATE` and the
+owner-only DACL relative to the held export parent, which is held with
+add-entry rights for its directory flush, a destination is published by the
+POSIX rename (replacing only with an explicit overwrite of the exact file seen
+before copying), a staged entry is removed through the very handle whose
+identity was checked, and a proof is bound to the payload's `FileIdInfo`,
+times, links and DACL, where "sealed" means the owner may read and nobody may
+write (Unix `0400`). The capacity is `GetDiskFreeSpaceExW` and
+`GetVolumeInformationByHandleW` of the held handle. As on macOS an export
+parent may grant others access but must be owned by the token user.
+`document_metadata`/`remove_document` answer and take a `HostFileIdentity`
+(device, inode, size, modification and change times) on both OSes (maintainer
+ruling 7); `owner_only_document` is the same identity of a document that is
+exactly owner read/write. The import-upload submodule is on Windows
+too (TASK-XPA-008, below). Not yet on Windows: the update, trace-removal,
+session-removal and diagnostic-log submodules.
+`PayloadCheck::Unopenable` carries a
 Win32 error code on Windows. `HostJournal::generation` is 0 on NTFS, whose
 file reference already carries a reuse sequence number.
 

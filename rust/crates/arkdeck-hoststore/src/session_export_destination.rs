@@ -8,6 +8,46 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
+/// The Windows spelling of the rule below: an absolute path on a local drive
+/// (`C:\…` or `\\?\C:\…`), its `.` and `..` resolved lexically, spelled
+/// `C:\…` with the drive letter upper-case. A UNC, device or drive-relative
+/// path is not local. No component is resolved on disk here: the owner that
+/// opens the result refuses any spelling that is not the directory's own
+/// (junctions, links, short names, other case).
+#[cfg(windows)]
+pub(crate) fn physical(path: &Path) -> Result<PathBuf, WireError> {
+    use std::path::Prefix;
+    let not_local = || failure("invalidInput", "Session export path is not local");
+    let mut components = path.components();
+    let drive = match components.next() {
+        Some(Component::Prefix(prefix)) => match prefix.kind() {
+            Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) if letter.is_ascii_alphabetic() => {
+                letter.to_ascii_uppercase()
+            }
+            _ => return Err(not_local()),
+        },
+        _ => return Err(not_local()),
+    };
+    if components.next() != Some(Component::RootDir) {
+        return Err(not_local());
+    }
+    let mut clean = PathBuf::from(format!("{}:\\", char::from(drive)));
+    for component in components {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                clean.pop();
+            }
+            Component::Normal(part) => clean.push(part),
+            Component::Prefix(_) | Component::RootDir => return Err(not_local()),
+        }
+    }
+    Ok(clean)
+}
+
+/// An absolute path as its physical spelling: `.` and `..` resolved
+/// lexically, and `/tmp`, `/var` and `/etc` spelled below `/private`.
+#[cfg(unix)]
 pub(crate) fn physical(path: &Path) -> Result<PathBuf, WireError> {
     let mut clean = PathBuf::from("/");
     for component in path.components() {
@@ -102,7 +142,9 @@ pub fn session_export_destination_facts(
     )
 }
 
-#[cfg(test)]
+// Unix fixtures (mode bits, symbolic links); the Windows owners are proved
+// by `tests/windows_artifact_owners.rs`.
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{

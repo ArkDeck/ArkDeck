@@ -316,6 +316,58 @@ fn export_requires_explicit_destination_and_exact_inspected_receipt() {
     }
 }
 
+/// The Windows spelling of the same export contract (TASK-XPA-006): a local
+/// drive's absolute path, `.` and `..` resolved, an upper-case drive letter,
+/// and the receipt's file joined with `\`, as the Windows daemon joins it.
+#[cfg(windows)]
+#[test]
+fn windows_export_destination_is_a_local_drive_path_and_the_receipt_uses_its_separator() {
+    let mut metadata = corpus("artifact.inspect")
+        .into_iter()
+        .find(|r| {
+            r["ok"] == true
+                && r["result"]["status"] == "published"
+                && r["result"]["owner"]["kind"] == "job"
+        })
+        .unwrap()["result"]
+        .clone();
+    metadata["name"] = json!("folder/../fixture.txt");
+    let inv = invocation(
+        "export",
+        metadata["owner"]["id"].as_str().unwrap(),
+        metadata["artifactId"].as_str().unwrap(),
+        &["--destination", r"c:\Users\fixture\..\output\."],
+    );
+    let expected = r"C:\Users\output";
+    let params = arkdeck_cli::artifact_export_params(&inv).unwrap();
+    assert_eq!(params["destinationDirectory"], expected);
+    let exported = format!(
+        r"{expected}\{}-folder___fixture.txt",
+        metadata["artifactId"].as_str().unwrap()
+    );
+    let mut result = json!({"schemaVersion":"arkdeck.artifact-export/1", "owner":metadata["owner"],
+        "artifactId":metadata["artifactId"], "artifactDigest":metadata["artifactDigest"],
+        "byteCount":metadata["byteCount"], "privacy":metadata["privacy"],
+        "exportedPath": exported, "overwritten":false});
+    arkdeck_cli::validate_artifact_export(&inv, &metadata, &result).unwrap();
+    // The macOS spelling of the same receipt is not this daemon's.
+    result["exportedPath"] = json!(exported.replace('\\', "/"));
+    assert_eq!(
+        arkdeck_cli::validate_artifact_export(&inv, &metadata, &result)
+            .unwrap_err()
+            .code,
+        "outcomeUnknown"
+    );
+    for destination in [r"\\server\share\output", r"\\.\pipe\output", "C:output"] {
+        let inv = invocation("export", "JOB-1", "ART-1", &["--destination", destination]);
+        assert_eq!(
+            arkdeck_cli::artifact_export_params(&inv).unwrap_err().code,
+            "invalidInput",
+            "{destination}"
+        );
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod endpoint {
     use super::*;
