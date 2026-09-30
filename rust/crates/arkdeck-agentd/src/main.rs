@@ -316,6 +316,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         None => default_user_endpoint()?,
     };
     let host = host::Host::from_environment();
+    // The owners a Windows daemon of a state root composes over it
+    // (`windows_lifecycle::Authority::compose`); the private-endpoint
+    // foundation owns no root and composes none.
+    #[cfg(windows)]
+    let host = match &authority {
+        Some(authority) => authority.compose(host)?,
+        None => host,
+    };
     // Swift's `HDCNativeCodeSignHelperArtifact.bundled()`: the helper this
     // bundle holds, verified. Without one, a native deployment stays
     // unavailable with the reason the availability answer carries; a helper

@@ -26,6 +26,16 @@ fn typed_observations(
     })
 }
 
+/// Swift's answer for a Job-owned resource when no Job owner is composed.
+#[cfg(any(target_os = "macos", windows))]
+fn job_owner_not_configured() -> WireError {
+    WireError {
+        code: "operationUnavailable".into(),
+        message: "The Job owner is not configured".into(),
+        details: None,
+    }
+}
+
 /// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
 #[cfg(target_os = "macos")]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
@@ -95,7 +105,7 @@ pub struct Host {
     // answered are shared with it.
     #[cfg(target_os = "macos")]
     targets: Option<std::sync::Arc<arkdeck_hoststore::TargetStore>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     artifacts: Option<std::sync::Arc<arkdeck_hoststore::ArtifactReadStore>>,
     #[cfg(target_os = "macos")]
     jobs: Option<std::sync::Arc<arkdeck_hoststore::JobStore>>,
@@ -330,7 +340,7 @@ impl Host {
         self.planning = Some((state_root.to_owned(), analyzer.unwrap_or_default()));
         self
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_artifacts(mut self, artifacts: arkdeck_hoststore::ArtifactReadStore) -> Self {
         self.artifacts = Some(std::sync::Arc::new(artifacts));
         self
@@ -772,13 +782,17 @@ impl Host {
     fn require_artifact_job(&self, job_id: &str) -> Result<(), WireError> {
         self.jobs
             .as_ref()
-            .ok_or_else(|| WireError {
-                code: "operationUnavailable".into(),
-                message: "The Job owner is not configured".into(),
-                details: None,
-            })?
+            .ok_or_else(job_owner_not_configured)?
             .read_snapshot(job_id)
             .map(|_| ())
+    }
+    /// The Windows daemon composes no Job owner yet (its store follows the
+    /// Job index on SQLite), so every Artifact a Job owns is refused as the
+    /// macOS daemon refuses it without one: before any Artifact is read,
+    /// listed or exported.
+    #[cfg(windows)]
+    fn require_artifact_job(&self, _job_id: &str) -> Result<(), WireError> {
+        Err(job_owner_not_configured())
     }
     #[cfg(target_os = "macos")]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
@@ -1195,7 +1209,7 @@ impl Host {
             imports: None,
             #[cfg(target_os = "macos")]
             targets: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             artifacts: None,
             #[cfg(target_os = "macos")]
             jobs: None,
@@ -1487,7 +1501,7 @@ impl HostServices for Host {
         }
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn artifact_resource(
         &self,
         method: &str,
@@ -1507,12 +1521,20 @@ impl HostServices for Host {
             .and_then(serde_json::Value::as_str)
             == Some("import")
         {
-            let imports = self.imports.as_ref().ok_or_else(|| WireError {
+            let import_owner_unavailable = || WireError {
                 code: "operationUnavailable".into(),
                 message: "Import owner is unavailable".into(),
                 details: None,
-            })?;
-            return imports.artifact_resource(artifacts, method, params);
+            };
+            #[cfg(target_os = "macos")]
+            {
+                let imports = self.imports.as_ref().ok_or_else(import_owner_unavailable)?;
+                return imports.artifact_resource(artifacts, method, params);
+            }
+            // The Import owner is not on Windows yet (its upload store waits
+            // for the host store's import-upload primitives).
+            #[cfg(windows)]
+            return Err(import_owner_unavailable());
         }
         if method == "artifact.list" {
             // The pages are kept where Swift keeps them, below the Artifact

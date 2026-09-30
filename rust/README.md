@@ -2021,6 +2021,36 @@ The development-signed package passes `Get-AuthenticodeSignature` only on a host
 that trusts the development certificate. A clean host needs the production
 signature. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/xcopy-package-run.md`.
+## Windows Artifact read and export (TASK-XPA-006)
+
+The Artifact read, inspect, list and export owner (`ArtifactReadStore`,
+`ArtifactReadRequest`, `ArtifactInspectRequest`, `ArtifactExportRequest`) is
+built on Windows over the host store's NTFS export, file-export and
+payload-cache primitives (`crates/arkdeck-platform/README.md`), with the same
+Job index documents, payloads and snapshot pages as macOS; its Import owner,
+usage and quota answers stay macOS-only. An export destination on Windows is a
+local drive's absolute path (`C:\…`), `.` and `..` resolved and the drive
+letter upper-case, which must be the directory's own spelling (no junction,
+link, short name or other case); the receipt's `exportedPath` joins the file
+with `\`. The CLI spells a destination the same way. A name containing `\` or
+another NTFS-reserved character is refused rather than rewritten.
+
+The Windows daemon composes the owner over its root's `artifacts` (the
+development root and the account's `%LOCALAPPDATA%\ArkDeck\Agentd` alike),
+created owner-only when absent and never re-permissioned: an existing
+`artifacts` that is not owner-only refuses the start. Every Artifact belongs to
+a Job, which the Job owner proves before anything is read, listed or exported;
+no Job owner is composed on Windows yet, so `artifact list`, `inspect`, `read`
+and `export` answer `operationUnavailable` ("Artifact Job owner is
+unavailable") and touch nothing, as the macOS daemon answers without a Job
+owner. `tests/windows_artifact_owners.rs` (hoststore) reads and exports the
+macOS-recorded Artifacts of `rust/tests/fixtures/agent-execution` with their
+recorded bytes and digests and reproduces the Swift daemon's recorded
+`artifact.inspect`/`artifact.read` frames; `tests/windows_artifact_owner_process.rs`
+(agentd) runs the real daemon over its pipe and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
+development-signed copy. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 

@@ -12,9 +12,10 @@
 //!   daemon decision 11's client will start;
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
-//!   a guard and a pipe named after the root's file identity. Only the
-//!   lifecycle is composed over it; every input that would compose an owner
-//!   on macOS is refused, not ignored, until its store is ported (G01);
+//!   a guard and a pipe named after the root's file identity. Beside the
+//!   lifecycle only the Artifact read and export owner is composed over it
+//!   (see [`Authority::compose`]); every input that would compose another
+//!   owner on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
 //!   standalone daemon does (the black-box read-only check runs it).
@@ -99,6 +100,44 @@ pub(crate) struct Authority {
 }
 
 impl Authority {
+    /// The owners a Windows daemon composes over its root, in the directory
+    /// the macOS isolated owner and production composition both name
+    /// `artifacts`, a private child of the root created owner-only when
+    /// absent and never re-permissioned when present
+    /// (`StateRoot::private_child`; an existing one that is not owner-only
+    /// is refused when the owner opens it):
+    ///
+    /// * the Artifact read and export owner (`ArtifactReadStore`): the same
+    ///   Job index documents, payloads and `artifact.list` snapshot pages as
+    ///   on macOS. Every Artifact belongs to a Job, and its Job is proved by
+    ///   the Job owner before anything is read, listed or exported; no Job
+    ///   owner is composed on Windows yet, so `artifact.list`, `inspect`,
+    ///   `read` and `export` answer "The Job owner is not configured" and
+    ///   read and write nothing, as the macOS daemon answers without one.
+    ///
+    /// A store it cannot open ends the start, as on macOS.
+    pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
+        let name = "artifacts";
+        let path = self.root.private_child(name).map_err(|error| {
+            format!(
+                "the Artifact store {} is unusable: {error}; nothing was started",
+                self.root.path().join(name).display()
+            )
+        })?;
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&path).map_err(|error| {
+            format!(
+                "the Artifact store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        })?;
+        report(&format!(
+            "arkdeck-agentd composes the Artifact owner over {}; no Job owner is composed, so \
+             every Job's Artifact is refused before it is read",
+            path.display()
+        ));
+        Ok(host.with_artifacts(artifacts))
+    }
+
     /// After a complete drain: the owner lock, then the guard, on the thread
     /// that took the guard.
     pub(crate) fn release(self) {

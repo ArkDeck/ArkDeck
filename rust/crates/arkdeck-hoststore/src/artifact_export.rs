@@ -52,7 +52,13 @@ impl ArtifactExportRequest {
             .get("destinationDirectory")
             .and_then(Value::as_str)
             .ok_or_else(invalid)?;
-        if !path.starts_with('/') || path.len() > 4096 || path.chars().any(host_control_character) {
+        // An absolute host path: `/…` on macOS, a local drive's `C:\…` on
+        // Windows (`physical` refuses any other kind).
+        #[cfg(unix)]
+        let absolute = path.starts_with('/');
+        #[cfg(windows)]
+        let absolute = Path::new(path).is_absolute();
+        if !absolute || path.len() > 4096 || path.chars().any(host_control_character) {
             return Err(invalid());
         }
         let flag = |key| match params.get(key) {

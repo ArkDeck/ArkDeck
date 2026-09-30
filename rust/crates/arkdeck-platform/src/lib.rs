@@ -203,15 +203,17 @@ pub use host_store::{
 };
 
 // The same durable host store on NTFS (TASK-XPA-005): the core document,
-// lock, publication and Job journal surface. The export, import-upload,
-// update, trace-removal, session-removal, diagnostic-log and payload-cache
-// submodules, and the `std::fs::Metadata`-typed `document_metadata`/
-// `remove_document`, are not on Windows yet.
+// lock, publication and Job journal surface, and (TASK-XPA-006) the export,
+// file-export and payload-cache submodules and the identity-typed
+// `document_metadata`/`remove_document`. The import-upload, update,
+// trace-removal, session-removal and diagnostic-log submodules are not on
+// Windows yet.
 #[cfg(windows)]
 pub use windows::host_store::{
-    DocumentPublishError, ExclusiveOutcome, HostDirectory, HostDirectoryFacts, HostDocument,
-    HostDocumentPass, HostEntryKind, HostFileIdentity, HostJournal, HostJournalAppender,
-    HostReadLock, JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck,
+    DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
+    HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass, HostEntryKind,
+    HostExportCapacity, HostFileIdentity, HostJournal, HostJournalAppender, HostReadLock,
+    JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck, PayloadVerification,
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};

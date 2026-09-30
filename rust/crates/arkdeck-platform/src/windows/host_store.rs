@@ -16,6 +16,15 @@ use windows_sys::Win32::Storage::FileSystem::{DELETE, READ_CONTROL, WRITE_DAC};
 #[path = "host_journal.rs"]
 mod journal;
 pub use journal::{HostJournal, HostJournalAppender, JournalAppendError, JournalWritePoint};
+#[path = "host_payload_verification.rs"]
+mod payload_verification;
+pub use payload_verification::PayloadVerification;
+#[path = "host_export.rs"]
+mod export;
+pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};
+#[path = "host_file_export.rs"]
+mod file_export;
+pub use file_export::FileExportStaging;
 
 pub struct HostDirectory(pub(super) File, pub(super) Ownership);
 
@@ -64,11 +73,13 @@ pub(super) enum Ownership {
 }
 impl Ownership {
     /// The access a directory of this ownership is held with: the store
-    /// writes (and flushes) only in private and Session trees.
+    /// writes (and flushes) only in private and Session trees and in the
+    /// export parent an explicit export publishes into (a directory flush
+    /// needs a handle that may add entries, SPK-5).
     fn directory_access(self) -> u32 {
         match self {
-            Self::Private | Self::SessionTree { .. } => DIRECTORY_WRITE,
-            Self::TraceInventory | Self::ExportParent => DIRECTORY,
+            Self::Private | Self::SessionTree { .. } | Self::ExportParent => DIRECTORY_WRITE,
+            Self::TraceInventory => DIRECTORY,
         }
     }
     /// The Unix `mode & mode_mask() == 0` rule, read from the DACL.
@@ -322,13 +333,71 @@ impl HostDirectory {
     }
 
     /// An export parent is an existing owned physical directory. Unlike
-    /// Runtime records it can be an ordinary user directory others may read;
-    /// this entry point does not grant document publication or locking.
+    /// Runtime records it can be an ordinary user directory others may read
+    /// (as a Unix one may have public mode bits); its owner must still be the
+    /// token user. It is held with the right to add entries, which the
+    /// export's staging file and directory flush need; this entry point does
+    /// not grant document publication or locking.
     pub fn open_export_parent(path: &Path) -> io::Result<Self> {
-        let file = host_fs::open_directory_path(path, DIRECTORY)?;
+        let file = host_fs::open_directory_path(path, Ownership::ExportParent.directory_access())?;
         host_fs::canonical(path, &file)?;
         owned(&file, true, Ownership::ExportParent)?;
         Ok(Self(file, Ownership::ExportParent))
+    }
+
+    /// The identity of a private regular document, resolved relative to the
+    /// held directory. Snapshot retention uses this instead of trusting path
+    /// stats. A change of the file's DACL, owner or links moves its change
+    /// time, which the identity carries.
+    pub fn document_metadata(&self, name: &str) -> io::Result<HostFileIdentity> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let file = self.open_at(name)?;
+        owned(&file, false, self.1)?;
+        let stat = Stat::of(&file)?;
+        if !stat.same_file(&self.stat_at(name)?) {
+            return Err(fail());
+        }
+        HostFileIdentity::of(&stat)
+    }
+
+    /// [`Self::document_metadata`] of a document the owner alone may read
+    /// and write (Swift `RockchipPostFlashHDCBindingStore.validateFile`).
+    pub fn owner_only_document(&self, name: &str) -> io::Result<HostFileIdentity> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let file = self.open_at(name)?;
+        let stat = owner_only(&file, self.1)?;
+        if !stat.same_file(&self.stat_at(name)?) {
+            return Err(fail());
+        }
+        HostFileIdentity::of(&stat)
+    }
+
+    /// Reclaim exactly the private document inspected by snapshot retention.
+    /// The caller holds its snapshot-store lock throughout selection and
+    /// removal. The identity is checked again on the very handle that deletes.
+    pub fn remove_document(&self, name: &str, expected: &HostFileIdentity) -> io::Result<()> {
+        if self.document_metadata(name)? != *expected {
+            return Err(fail());
+        }
+        let entry = host_fs::open_relative(
+            &self.0,
+            &segment(name)?,
+            READ | DELETE,
+            FILE_OPEN,
+            Kind::NonDirectory,
+            None,
+        )?;
+        owned(&entry, false, self.1)?;
+        if HostFileIdentity::of(&Stat::of(&entry)?)? != *expected {
+            return Err(fail());
+        }
+        host_fs::delete(&entry)?;
+        drop(entry);
+        host_fs::flush_directory(&self.0)
     }
 
     /// Check owner rights and actual create/remove access before a Session
@@ -760,7 +829,7 @@ impl HostDirectory {
         Ok(self.inspect_at(name)?.0)
     }
 
-    fn inspect_at(&self, name: &str) -> io::Result<(Stat, Access)> {
+    pub(super) fn inspect_at(&self, name: &str) -> io::Result<(Stat, Access)> {
         let entry = self.inspect_entry(name)?;
         Ok((Stat::of(&entry)?, Access::of(&entry)?))
     }

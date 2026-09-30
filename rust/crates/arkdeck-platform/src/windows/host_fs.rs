@@ -313,6 +313,8 @@ pub(crate) struct Stat {
     pub(crate) attributes: u32,
     pub(crate) written: i64,
     pub(crate) changed: i64,
+    /// The creation time (Unix `st_birthtime`).
+    pub(crate) created: i64,
 }
 
 impl Stat {
@@ -328,6 +330,7 @@ impl Stat {
             attributes: basic.FileAttributes,
             written: basic.LastWriteTime,
             changed: basic.ChangeTime,
+            created: basic.CreationTime,
         })
     }
     pub(crate) fn directory(&self) -> bool {
@@ -469,6 +472,13 @@ impl Access {
     pub(crate) fn no_public_write(&self) -> bool {
         self.others & WRITE_RIGHTS == 0
     }
+    /// Unix mode `0400` on a sealed payload: nobody else is granted
+    /// anything, and the owner may read its data but not write it.
+    pub(crate) fn sealed(&self) -> bool {
+        self.others == 0
+            && self.user & FILE_READ_DATA != 0
+            && self.user & (FILE_WRITE_DATA | FILE_APPEND_DATA) == 0
+    }
     /// Unix owner `rw-` on a file: the owner may read and write its data.
     pub(crate) fn owner_read_write(&self) -> bool {
         self.user & (FILE_READ_DATA | FILE_WRITE_DATA) == FILE_READ_DATA | FILE_WRITE_DATA
@@ -547,6 +557,41 @@ pub(crate) fn seal(file: &File) -> io::Result<()> {
 pub(crate) fn flush(file: &File) -> io::Result<()> {
     // SAFETY: a live handle opened with write access.
     bool_result(unsafe { FlushFileBuffers(file.as_raw_handle()) })
+}
+
+/// `fstatfs` of Windows for the volume a held handle is on: its total and
+/// caller-available bytes, and whether it is read-only.
+pub(crate) fn volume_capacity(file: &File) -> io::Result<(u64, u64, bool)> {
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetDiskFreeSpaceExW, GetVolumeInformationByHandleW,
+    };
+    /// The file-system flag of a read-only volume (`winnt.h`).
+    const FILE_READ_ONLY_VOLUME: u32 = 0x0008_0000;
+    let mut flags = 0u32;
+    // SAFETY: a live handle; only the flags output is requested.
+    bool_result(unsafe {
+        GetVolumeInformationByHandleW(
+            file.as_raw_handle(),
+            null_mut(),
+            0,
+            null_mut(),
+            null_mut(),
+            &mut flags,
+            null_mut(),
+            0,
+        )
+    })?;
+    // A directory name ends with a separator, as the call documents for a
+    // volume-GUID path.
+    let mut directory = final_path(file, true)?.into_os_string();
+    directory.push("\\");
+    let path = wide(&directory)?;
+    let (mut available, mut total) = (0u64, 0u64);
+    // SAFETY: a NUL-terminated path of the held handle and live outputs.
+    bool_result(unsafe {
+        GetDiskFreeSpaceExW(path.as_ptr(), &mut available, &mut total, null_mut())
+    })?;
+    Ok((total, available, flags & FILE_READ_ONLY_VOLUME != 0))
 }
 
 /// A directory's namespace barrier: `FlushFileBuffers` on the held

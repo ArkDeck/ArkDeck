@@ -320,6 +320,55 @@ impl StateRoot {
         Ok(Some(OwnerLock(file)))
     }
 
+    /// A private owner directory of this root (the Target store's, say), as
+    /// the host store keeps one: created when absent, relative to the held
+    /// root handle, with the store's owner-only descriptor (owned by the user
+    /// SID, a protected DACL granting only that user), so that it is private
+    /// whatever the root's own DACL grants SYSTEM; an existing one is opened
+    /// as it is and never re-permissioned, for the owner that opens it to
+    /// judge (`HostDirectory::open` refuses one that is not owner-only). The
+    /// answer is the child's path as the file system resolves the opened
+    /// handle, the spelling the host store's canonical-path rule compares.
+    pub fn private_child(&self, name: &str) -> io::Result<PathBuf> {
+        use super::host_fs::{self, Descriptor, Kind};
+        use windows_sys::Wdk::Storage::FileSystem::{FILE_CREATE, FILE_OPEN};
+        let segment = host_fs::segment(document_name(name)?)?;
+        let child = match host_fs::open_relative(
+            &self.directory,
+            &segment,
+            host_fs::DIRECTORY,
+            FILE_CREATE,
+            Kind::Directory,
+            Some(&Descriptor::private(true)?),
+        ) {
+            Ok(child) => {
+                // SAFETY: the root handle was opened with GENERIC_WRITE.
+                bool_result(unsafe { FlushFileBuffers(self.directory.as_raw_handle()) })?;
+                child
+            }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => host_fs::open_relative(
+                &self.directory,
+                &segment,
+                host_fs::DIRECTORY,
+                FILE_OPEN,
+                Kind::Directory,
+                None,
+            )?,
+            Err(error) => return Err(error),
+        };
+        let resolved = final_path(&child)?;
+        // `\\?\C:\…` names the same directory as `C:\…`; a UNC form stays.
+        Ok(
+            match resolved
+                .to_str()
+                .and_then(|path| path.strip_prefix(r"\\?\"))
+            {
+                Some(plain) if !plain.starts_with("UNC\\") => PathBuf::from(plain),
+                _ => resolved,
+            },
+        )
+    }
+
     /// A document of this root, at most `limit` bytes; `None` if there is none.
     pub fn read_document(&self, name: &str, limit: u64) -> io::Result<Option<Vec<u8>>> {
         let file = match std::fs::OpenOptions::new()
