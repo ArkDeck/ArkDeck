@@ -82,9 +82,18 @@ use arkdeck_contract::WireError;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
 
+#[cfg(target_os = "macos")]
 #[path = "flash_reconcile.rs"]
 mod flash_reconcile;
+#[cfg(target_os = "macos")]
 pub use flash_reconcile::FlashReconciler;
+
+/// The ArkForge Flash lane a delegated Flash's reconcile reads its daemon's
+/// receipt through; none is built on Windows (AF-W1).
+#[cfg(target_os = "macos")]
+type Lane<'a> = &'a dyn arkdeck_provider_arkforge::FlashLane;
+#[cfg(windows)]
+type Lane<'a> = &'a std::convert::Infallible;
 
 #[path = "job_reconcile_device.rs"]
 mod device;
@@ -94,30 +103,43 @@ fn analyzer(operation: &str) -> bool {
     crate::analyzer_composition::EXECUTED.contains(&operation)
 }
 /// The read-only workspace operations, which write nothing.
+#[cfg(target_os = "macos")]
 fn workspace_read(operation: &str) -> bool {
     crate::workspace_read::READS.contains(&operation)
 }
 const HAP: &str = "debug.hap@1";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
+#[cfg(target_os = "macos")]
 const APPLY: &str = "workspace.apply-patch@1";
+#[cfg(target_os = "macos")]
 const REVERT: &str = "workspace.revert-patch@1";
+#[cfg(target_os = "macos")]
 const BUILD: &str = crate::workspace_build::BUILD;
+#[cfg(target_os = "macos")]
 const SIGN: &str = crate::workspace_composition::SIGN;
+#[cfg(target_os = "macos")]
 const CHECKPOINT: &str = crate::workspace_checkpoint::CHECKPOINT;
+#[cfg(target_os = "macos")]
 const SWEEP: &str = crate::workspace_sweep::SWEEP;
+#[cfg(target_os = "macos")]
 const TESTS: &str = crate::workspace_tests_symbolize::TESTS;
+#[cfg(target_os = "macos")]
 const SYMBOLIZE: &str = crate::workspace_tests_symbolize::SYMBOLIZE;
 /// The workspace mutations: none has a dedicated readback.
+#[cfg(target_os = "macos")]
 const WORKSPACE_MUTATIONS: [&str; 5] = [APPLY, REVERT, BUILD, CHECKPOINT, TESTS];
 /// Swift's provider answer for a symbolization whose receipt was lost.
+#[cfg(target_os = "macos")]
 const PROCESS_UNKNOWN: &str = "read/build process completion is not inferable after receipt loss";
 /// Swift's provider answer for a sweep whose receipt was lost: which trees
 /// it destroyed is readable only from its findings, and an interrupted
 /// teardown resumes safely on the next sweep.
+#[cfg(target_os = "macos")]
 const SWEEP_UNKNOWN: &str =
     "sweep outcome is derivable only from its findings; submit a fresh sweep";
 /// Swift's engine answers a workspace mutation's reconcile from its provider's
 /// dedicated readback, which the workspace provider does not have.
+#[cfg(target_os = "macos")]
 const NO_READBACK: &str = "mutation has no dedicated readback; original not resent";
 /// Swift's Manifest proposal beside a Job's record.
 const PROPOSAL: &str = "session-manifest.proposal.json";
@@ -478,6 +500,7 @@ pub struct JobReconciler<'a> {
 /// Whether this Runtime reconciles a Job of `operation` in `state`: the
 /// analyzer, and the device-bound operations it runs — but a terminal debug
 /// HAP, whose own lineage repair is not ported.
+#[cfg(target_os = "macos")]
 fn reconciled(operation: &str, state: &str) -> bool {
     analyzer(operation)
         || workspace_read(operation)
@@ -485,6 +508,15 @@ fn reconciled(operation: &str, state: &str) -> bool {
         || operation == SYMBOLIZE
         || operation == SIGN
         || WORKSPACE_MUTATIONS.contains(&operation)
+        || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
+}
+
+/// On Windows the workspace lane is not built (XPA-011): the analyzer and
+/// the device-bound operations are reconciled, every other Job is refused
+/// as one this Runtime does not reconcile.
+#[cfg(windows)]
+fn reconciled(operation: &str, state: &str) -> bool {
+    analyzer(operation)
         || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
 }
 
@@ -517,12 +549,13 @@ impl JobReconciler<'_> {
         let operation = record.operation();
         let hap_finalizing =
             operation == HAP && record.state == "finalizing" && !record.outcome_unknown();
-        if analyzer(operation)
-            || workspace_read(operation)
-            || operation == SWEEP
-            || operation == SYMBOLIZE
-            || (!record.outcome_unknown() && !hap_finalizing)
-        {
+        #[cfg(target_os = "macos")]
+        let host_workspace =
+            workspace_read(operation) || operation == SWEEP || operation == SYMBOLIZE;
+        // No workspace Job is reconciled on Windows.
+        #[cfg(windows)]
+        let host_workspace = false;
+        if analyzer(operation) || host_workspace || (!record.outcome_unknown() && !hap_finalizing) {
             return Ok(None);
         }
         let refusal = |what: String| {
@@ -533,6 +566,7 @@ impl JobReconciler<'_> {
         };
         // A signing Job's reconcile reads back its own product; a confirmed
         // one is republished through the runner, before its step completes.
+        #[cfg(target_os = "macos")]
         if operation == SIGN {
             if self.runner.and_then(|runner| runner.workspace).is_none() {
                 return Ok(refusal(format!(
@@ -543,6 +577,7 @@ impl JobReconciler<'_> {
         }
         // A workspace mutation's reconcile reads its own records only; it
         // needs no device facts, only the store its use is settled in.
+        #[cfg(target_os = "macos")]
         if WORKSPACE_MUTATIONS.contains(&operation) {
             if lineage::runtime_capability(record) && self.capabilities.is_none() {
                 return Ok(refusal(
@@ -702,11 +737,7 @@ impl JobReconciler<'_> {
     /// terminal, with what a failure has journaled kept resident. A Job whose
     /// outcome is known and that is no stuck cancellation is answered as it
     /// is: the lineage repair Swift calls there needs a failed Job.
-    fn resident(
-        &self,
-        record: JobRecord,
-        lane: Option<&dyn arkdeck_provider_arkforge::FlashLane>,
-    ) -> Result<Value, WireError> {
+    fn resident(&self, record: JobRecord, lane: Option<Lane<'_>>) -> Result<Value, WireError> {
         // Swift continues a debug HAP's failure finalization first.
         if record.operation() == HAP && record.state == "finalizing" && !record.outcome_unknown() {
             let directory = self
@@ -799,7 +830,7 @@ impl JobReconciler<'_> {
     fn reconcile_unknown(
         &self,
         held: &mut Held,
-        lane: Option<&dyn arkdeck_provider_arkforge::FlashLane>,
+        lane: Option<Lane<'_>>,
     ) -> Result<Option<Value>, WireError> {
         let id = held.run.record.job_id.clone();
         let mut events = held.events(self.jobs)?;
@@ -877,9 +908,13 @@ impl JobReconciler<'_> {
             // A delegated Flash has one durable intent and its daemon
             // correlation: only that daemon job's canonical completed-plan
             // receipt can settle it.
+            #[cfg(target_os = "macos")]
             if flash_reconcile::ARKFORGE.contains(&record.operation()) {
                 return self.reconcile_lane(held, lane);
             }
+            // No Flash lane is built on Windows (AF-W1).
+            #[cfg(windows)]
+            let _ = lane;
             return Err(engine(
                 "internalFailure",
                 &format!("unknown outcome has no persisted exact typed action for {id}"),
@@ -979,10 +1014,12 @@ impl JobReconciler<'_> {
                 Decision::NotExecuted
             }
         });
+        #[cfg(target_os = "macos")]
         if operation == SIGN {
             return self
                 .reconcile_signing(held, &events, &action, &intent, &step, &attempt, durable);
         }
+        #[cfg(target_os = "macos")]
         if descriptor.binding() == "none" && WORKSPACE_MUTATIONS.contains(&operation.as_str()) {
             // A workspace mutation: its input lease resolved again and its
             // persisted typed action materialized, then — as Swift's engine
@@ -1010,6 +1047,7 @@ impl JobReconciler<'_> {
             let decision = durable.unwrap_or_else(|| Decision::Unknown(NO_READBACK.into()));
             return self.finish(held, &events, &intent, &step, &attempt, decision, None);
         }
+        #[cfg(target_os = "macos")]
         if workspace_read(&operation) {
             // A read writes nothing, so there is no external effect for the
             // reconcile to confirm: Swift's provider confirms it not executed,
@@ -1021,6 +1059,7 @@ impl JobReconciler<'_> {
             let decision = durable.unwrap_or(Decision::NotExecuted);
             return self.finish(held, &events, &intent, &step, &attempt, decision, None);
         }
+        #[cfg(target_os = "macos")]
         if operation == SYMBOLIZE {
             // A symbolization's child left nothing behind to read: Swift's
             // provider cannot infer whether it completed, so the intent stays
@@ -1032,6 +1071,7 @@ impl JobReconciler<'_> {
             let decision = durable.unwrap_or_else(|| Decision::Unknown(PROCESS_UNKNOWN.into()));
             return self.finish(held, &events, &intent, &step, &attempt, decision, None);
         }
+        #[cfg(target_os = "macos")]
         if operation == SWEEP {
             // What a sweep destroyed is derivable only from its findings, so
             // Swift's provider neither confirms nor denies it: the intent
@@ -1101,6 +1141,7 @@ impl JobReconciler<'_> {
     /// the step is marked complete; a known terminal Job's attempt directory
     /// is then removed.
     #[allow(clippy::too_many_arguments)]
+    #[cfg(target_os = "macos")]
     fn reconcile_signing(
         &self,
         held: &mut Held,
@@ -1165,8 +1206,11 @@ impl JobReconciler<'_> {
             operation if analyzer(operation) => "sourceArtifactRef",
             HAP => "hapArtifactLease",
             NATIVE => "libraryArtifactLease",
+            #[cfg(target_os = "macos")]
             APPLY => "patchArtifactRef",
+            #[cfg(target_os = "macos")]
             SIGN => "unsignedHapArtifactLease",
+            #[cfg(target_os = "macos")]
             SYMBOLIZE => "dumpArtifactRef",
             _ => return Ok(None),
         };
@@ -1184,6 +1228,7 @@ impl JobReconciler<'_> {
         };
         // A symbolization reads a crash another target captured: Swift checks
         // that exact product instead of the request's own binding.
+        #[cfg(target_os = "macos")]
         let refusal = if record.operation() == SYMBOLIZE {
             let target = &record.request["target"];
             crate::workspace_tests_symbolize::dump_refusal(
@@ -1194,6 +1239,8 @@ impl JobReconciler<'_> {
         } else {
             binding_refusal(&leased, record)
         };
+        #[cfg(windows)]
+        let refusal = binding_refusal(&leased, record);
         if let Some(reason) = refusal {
             return Err(refused("rejected", reason));
         }

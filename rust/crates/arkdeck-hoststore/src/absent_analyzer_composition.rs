@@ -8,7 +8,7 @@
 //! without a profile. `operation.list` answers from the same operation facts
 //! (`analyzer_operations.rs`) and the answers below, which are macOS's with
 //! no composition.
-pub(crate) use crate::analyzer_operations::EXECUTED;
+pub(crate) use crate::analyzer_operations::{EXECUTED, TRACE_ANALYSIS};
 
 /// The analyzers a host composed; none on Windows yet.
 pub trait AnalyzerComposition: Sync {}
