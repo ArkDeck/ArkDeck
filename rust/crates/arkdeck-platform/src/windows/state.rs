@@ -401,43 +401,112 @@ impl StateRoot {
     /// answer is the child's path as the file system resolves the opened
     /// handle, the spelling the host store's canonical-path rule compares.
     pub fn private_child(&self, name: &str) -> io::Result<PathBuf> {
-        use super::host_fs::{self, Descriptor, Kind};
-        use windows_sys::Wdk::Storage::FileSystem::{FILE_CREATE, FILE_OPEN};
-        let segment = host_fs::segment(document_name(name)?)?;
-        let child = match host_fs::open_relative(
-            &self.directory,
-            &segment,
-            host_fs::DIRECTORY,
-            FILE_CREATE,
-            Kind::Directory,
-            Some(&Descriptor::private(true)?),
-        ) {
-            Ok(child) => {
-                // SAFETY: the root handle was opened with GENERIC_WRITE.
-                bool_result(unsafe { FlushFileBuffers(self.directory.as_raw_handle()) })?;
-                child
-            }
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => host_fs::open_relative(
-                &self.directory,
-                &segment,
-                host_fs::DIRECTORY,
-                FILE_OPEN,
-                Kind::Directory,
-                None,
-            )?,
-            Err(error) => return Err(error),
+        private_child_of(&self.directory, name)
+    }
+
+    /// The account's product directory, `%LOCALAPPDATA%\ArkDeck`, the state
+    /// root's parent: opened as the root is (never through a reparse point,
+    /// owned by this user, writable). Its access was judged with the root's
+    /// ([`Self::access_findings`]), and it stays pinned by the root's
+    /// namespace handles while the daemon runs. A development root has none.
+    fn product(&self) -> io::Result<File> {
+        if self.development {
+            return Err(invalid("a development root has no product directory"));
+        }
+        let product = self
+            .path
+            .parent()
+            .ok_or_else(|| invalid("the account's state root has no product directory"))?;
+        open_directory(product)
+    }
+
+    /// A private directory of the account's product directory, beside the
+    /// state root (the Sessions root, the Trace cache): created and answered
+    /// as [`Self::private_child`] creates and answers a child of the root.
+    pub fn product_child(&self, name: &str) -> io::Result<PathBuf> {
+        private_child_of(&self.product()?, name)
+    }
+
+    /// Whether this root (`product` false) or the account's product directory
+    /// holds an entry `name`, not following a link: a reparse point is an
+    /// entry.
+    pub fn has_entry(&self, name: &str, product: bool) -> io::Result<bool> {
+        use super::host_fs;
+        let product_directory;
+        let directory = if product {
+            product_directory = self.product()?;
+            &product_directory
+        } else {
+            &self.directory
         };
-        let resolved = final_path(&child)?;
-        // `\\?\C:\…` names the same directory as `C:\…`; a UNC form stays.
-        Ok(
-            match resolved
-                .to_str()
-                .and_then(|path| path.strip_prefix(r"\\?\"))
-            {
-                Some(plain) if !plain.starts_with("UNC\\") => PathBuf::from(plain),
-                _ => resolved,
-            },
-        )
+        match host_fs::inspect_relative(directory, &host_fs::segment(document_name(name)?)?) {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Removes this root's directory `name` if it is empty; `false` if it
+    /// holds anything. Never through a reparse point.
+    pub fn remove_empty_child(&self, name: &str) -> io::Result<bool> {
+        use super::host_fs::{self, Kind};
+        use windows_sys::Wdk::Storage::FileSystem::FILE_OPEN;
+        let child = host_fs::open_relative(
+            &self.directory,
+            &host_fs::segment(document_name(name)?)?,
+            host_fs::DIRECTORY | DELETE,
+            FILE_OPEN,
+            Kind::Directory,
+            None,
+        )?;
+        if !host_fs::names(&child, 1)?.is_empty() {
+            return Ok(false);
+        }
+        let mut info = FILE_DISPOSITION_INFO { DeleteFile: true };
+        // SAFETY: live handle opened with DELETE access; the directory is
+        // deleted when the handle closes, and only if it is still empty.
+        bool_result(unsafe {
+            SetFileInformationByHandle(
+                child.as_raw_handle(),
+                FileDispositionInfo,
+                std::ptr::from_mut(&mut info).cast(),
+                size_of::<FILE_DISPOSITION_INFO>() as u32,
+            )
+        })?;
+        drop(child);
+        // SAFETY: the root handle was opened with GENERIC_WRITE.
+        bool_result(unsafe { FlushFileBuffers(self.directory.as_raw_handle()) })?;
+        Ok(true)
+    }
+
+    /// Moves this root's directory `name` into the account's product
+    /// directory as `target`, in one rename on the same volume: the directory
+    /// keeps its identity and its own descriptor, and nothing is copied. An
+    /// existing `target` is never replaced (`AlreadyExists`); `name` must be
+    /// a directory, never a reparse point. Both directories are flushed.
+    pub fn move_child_to_product(&self, name: &str, target: &str) -> io::Result<()> {
+        use super::host_fs::{self, Kind};
+        use windows_sys::Wdk::Storage::FileSystem::FILE_OPEN;
+        let product = self.product()?;
+        let product_path = self
+            .path
+            .parent()
+            .ok_or_else(|| invalid("the account's state root has no product directory"))?;
+        let child = host_fs::open_relative(
+            &self.directory,
+            &host_fs::segment(document_name(name)?)?,
+            host_fs::DIRECTORY | DELETE,
+            FILE_OPEN,
+            Kind::Directory,
+            None,
+        )?;
+        rename(&child, &product_path.join(document_name(target)?), 0)?;
+        drop(child);
+        for directory in [&self.directory, &product] {
+            // SAFETY: both handles were opened with GENERIC_WRITE.
+            bool_result(unsafe { FlushFileBuffers(directory.as_raw_handle()) })?;
+        }
+        Ok(())
     }
 
     /// A document of this root, at most `limit` bytes; `None` if there is none.
@@ -586,9 +655,56 @@ fn document_name(name: &str) -> io::Result<&str> {
     Ok(name)
 }
 
+/// [`StateRoot::private_child`] of `directory`.
+fn private_child_of(directory: &File, name: &str) -> io::Result<PathBuf> {
+    use super::host_fs::{self, Descriptor, Kind};
+    use windows_sys::Wdk::Storage::FileSystem::{FILE_CREATE, FILE_OPEN};
+    let segment = host_fs::segment(document_name(name)?)?;
+    let child = match host_fs::open_relative(
+        directory,
+        &segment,
+        host_fs::DIRECTORY,
+        FILE_CREATE,
+        Kind::Directory,
+        Some(&Descriptor::private(true)?),
+    ) {
+        Ok(child) => {
+            // SAFETY: the parent handle was opened with GENERIC_WRITE.
+            bool_result(unsafe { FlushFileBuffers(directory.as_raw_handle()) })?;
+            child
+        }
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => host_fs::open_relative(
+            directory,
+            &segment,
+            host_fs::DIRECTORY,
+            FILE_OPEN,
+            Kind::Directory,
+            None,
+        )?,
+        Err(error) => return Err(error),
+    };
+    let resolved = final_path(&child)?;
+    // `\\?\C:\…` names the same directory as `C:\…`; a UNC form stays.
+    Ok(
+        match resolved
+            .to_str()
+            .and_then(|path| path.strip_prefix(r"\\?\"))
+        {
+            Some(plain) if !plain.starts_with("UNC\\") => PathBuf::from(plain),
+            _ => resolved,
+        },
+    )
+}
+
 /// `SetFileInformationByHandle(FileRenameInfoEx)` with
 /// [`RENAME_REPLACE_POSIX`], naming the target by its full path.
 fn rename_replacing(file: &File, target: &Path) -> io::Result<()> {
+    rename(file, target, RENAME_REPLACE_POSIX)
+}
+
+/// `SetFileInformationByHandle(FileRenameInfoEx)` with `flags`, naming the
+/// target by its full path.
+fn rename(file: &File, target: &Path, flags: u32) -> io::Result<()> {
     let name: Vec<u16> = wide(target.as_os_str())?;
     let name = &name[..name.len() - 1];
     let offset = offset_of!(FILE_RENAME_INFO, FileName);
@@ -598,7 +714,7 @@ fn rename_replacing(file: &File, target: &Path) -> io::Result<()> {
     // SAFETY: the u64 storage is aligned for FILE_RENAME_INFO and holds its
     // header and the name with its NUL; each write stays inside it.
     unsafe {
-        (*info).Anonymous.Flags = RENAME_REPLACE_POSIX;
+        (*info).Anonymous.Flags = flags;
         (*info).RootDirectory = null_mut();
         (*info).FileNameLength = size_of_val(name) as u32;
         std::ptr::copy_nonoverlapping(
