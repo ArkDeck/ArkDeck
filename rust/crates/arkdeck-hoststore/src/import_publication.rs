@@ -41,6 +41,7 @@ fn validate_content(
         }
         // Swift's production policy registers the one DAYU200 profile and
         // judges the archive by reading it.
+        #[cfg(target_os = "macos")]
         "flash-bundle" => {
             if intent.device_profile.as_deref() != Some("dayu200") {
                 return Err(failure(

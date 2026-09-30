@@ -1,10 +1,12 @@
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
+
+#[path = "fixture_fs/mod.rs"]
+mod fixture_fs;
 use arkdeck_contract::{ImportIntent, sha256_hex};
 use arkdeck_hoststore::{ImportUploadStore, TargetStore};
 use serde_json::{Value, json};
 use std::{
     fs,
-    os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
     path::{Path, PathBuf},
 };
 const NOW: &str = "2026-09-12T00:00:00Z";
@@ -14,16 +16,13 @@ struct Fixture {
 }
 impl Fixture {
     fn new(kind: &str) -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = fixture_fs::temporary_root().join(format!(
             "import-target-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        fixture_fs::private_dir(&root);
         for name in ["targets", "artifacts"] {
-            fs::DirBuilder::new()
-                .mode(0o700)
-                .create(root.join(name))
-                .unwrap();
+            fixture_fs::private_dir(&root.join(name));
         }
         let source = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/fixtures/import-target-current")
@@ -31,7 +30,7 @@ impl Fixture {
         for name in ["targets.json", "target-display-names.json"] {
             let path = root.join("targets").join(name);
             fs::copy(source.join(name), &path).unwrap();
-            fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+            fixture_fs::owner_only(&path);
         }
         let document: Value =
             serde_json::from_slice(&fs::read(root.join("targets/targets.json")).unwrap()).unwrap();
@@ -206,7 +205,7 @@ fn malformed_alias_history_and_linked_target_files_fail_closed() {
             "symlink" => {
                 let raw = f.root.join("original-targets");
                 fs::rename(&path, &raw).unwrap();
-                symlink(&raw, &path).unwrap();
+                fixture_fs::link(&raw, &path);
             }
             _ => {
                 fs::hard_link(&path, f.root.join("linked-targets")).unwrap();

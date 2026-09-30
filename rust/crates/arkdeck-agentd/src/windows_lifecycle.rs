@@ -235,7 +235,16 @@ impl Authority {
                 path.display()
             )
         })?;
-        let host = host.with_artifacts(artifacts);
+        // The Import owner over the same Artifact root, in its private
+        // `.imports-v1`, as both macOS compositions give it: `artifact.import.*`,
+        // an Import's Artifacts and a Job's Import inputs.
+        let imports = arkdeck_hoststore::ImportUploadStore::open(&path).map_err(|error| {
+            format!(
+                "the Import store {} is unusable: {error}; nothing was started",
+                path.join(".imports-v1").display()
+            )
+        })?;
+        let host = host.with_artifacts(artifacts).with_imports(imports);
         let host = host.with_storage(self.session_store()?, {
             // The Artifact read owner's directory, as it opened it.
             let path = self.root.private_child("artifacts").map_err(|error| {

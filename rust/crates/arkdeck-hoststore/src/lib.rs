@@ -829,18 +829,13 @@ pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
 #[cfg(any(target_os = "macos", windows))]
 mod artifact_resources;
 
-#[cfg(target_os = "macos")]
+// The Import owner (`artifact.import.*`) on macOS and Windows; on Windows a
+// flash-bundle Import is refused at publication, as a kind whose validator
+// is not configured, until the Flash archive reader is ported (AF-W1).
+#[cfg(any(target_os = "macos", windows))]
 mod import_upload;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
-// The Import owner has no value on Windows yet (its publication needs the
-// Artifact publication and Flash archive owners); the Job planner is the
-// same code with none.
-#[cfg(windows)]
-#[path = "absent_import_upload.rs"]
-mod import_upload;
-#[cfg(windows)]
-pub use import_upload::ImportUploadStore;
 
 #[cfg(any(target_os = "macos", windows))]
 mod artifact_export;

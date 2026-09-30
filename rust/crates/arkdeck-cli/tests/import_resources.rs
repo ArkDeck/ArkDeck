@@ -151,10 +151,11 @@ fn import_owner_errors_remain_distinct_and_lost_mutation_responses_are_unknown()
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod upload {
     use super::*;
     use arkdeck_cli::execute_import;
+    #[cfg(unix)]
     use std::os::unix::fs::DirBuilderExt;
     use std::{fs, path::PathBuf};
     struct Source {
@@ -168,7 +169,10 @@ mod upload {
                 "cli-import-{:032x}",
                 u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
             ));
+            #[cfg(unix)]
             fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+            #[cfg(windows)]
+            fs::create_dir(&root).unwrap();
             let path = root.join(name);
             fs::write(&path, &bytes).unwrap();
             Self { root, path, bytes }
@@ -231,6 +235,16 @@ mod upload {
     fn corrupted_recovery_changed_source_and_other_owner_never_continue_upload() {
         for failure in ["backward", "owner", "source", "sourceMetadata", "target"] {
             let source = Source::new("fixture.hap", b"abcdefgh".to_vec());
+            // Windows holds the source open without write sharing while it is
+            // sent, so it cannot change under the upload at all.
+            #[cfg(windows)]
+            if failure == "source" {
+                let held =
+                    arkdeck_platform::HostImportSource::open(&source.path, 64, || Ok(())).unwrap();
+                assert!(fs::write(&source.path, b"changed!").is_err());
+                drop(held);
+                continue;
+            }
             let intent = source.intent();
             let mut reads = 0;
             let mut appends = 0;
@@ -456,7 +470,10 @@ mod upload {
                 "cli-import-oracle-{:032x}",
                 u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
             ));
+            #[cfg(unix)]
             fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+            #[cfg(windows)]
+            fs::create_dir(&root).unwrap();
             let path = root.join(file);
             if let Some(bytes) = bytes {
                 fs::write(&path, bytes).unwrap();
@@ -984,11 +1001,12 @@ fn inspection_and_release_refusals_reach_the_caller_with_the_import_owners_code(
     }
 }
 
-/// Off macOS no host store reads an Import source yet, so an upload is refused
-/// as the platform's before any frame is sent, and names its request.
-#[cfg(not(target_os = "macos"))]
+/// Off macOS and Windows no host store reads an Import source, so an upload
+/// is refused as the platform's before any frame is sent, and names its
+/// request.
+#[cfg(not(any(target_os = "macos", windows)))]
 #[test]
-fn an_upload_is_refused_off_macos_before_any_frame_is_sent() {
+fn an_upload_is_refused_off_macos_and_windows_before_any_frame_is_sent() {
     let file = std::env::temp_dir().join("fixture.hap");
     let invocation = parse(&argv(&[
         "artifact",

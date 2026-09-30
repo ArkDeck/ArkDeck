@@ -449,7 +449,7 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     assert_eq!(reply["result"], quota, "{reply}");
     assert!(
         daemon.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
                 .to_owned()
         ),
         "{:?}",
@@ -504,14 +504,20 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
         "invalidInput",
     );
     assert_eq!(reply["error"]["details"]["phase"], "artifactOwner");
-    // An Import's Artifacts need the Import owner, which is not composed.
-    refused(
+    // An Import's Artifacts are the Import owner's: one it never began is
+    // refused before anything is read.
+    let reply = refused(
         &pipe,
         "artifact.inspect",
         json!({"owner": {"kind": "import", "id": "imp-00000000-0000-4000-8000-000000000000"},
             "artifactId": ARTIFACT}),
-        "operationUnavailable",
+        "resourceNotFound",
     );
+    assert_eq!(
+        reply["error"]["message"], "Import does not exist",
+        "{reply}"
+    );
+    assert_eq!(reply["error"]["details"]["newDispatchCount"], 0, "{reply}");
     daemon.stop(&root.0);
 
     // After a restart the same answers; the quota still counts only the
