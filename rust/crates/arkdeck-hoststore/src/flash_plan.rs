@@ -710,6 +710,7 @@ mod tests {
     /// A record root not spelled as its components rebuild it is refused
     /// before anything is created; each parent here does not exist, so a
     /// path that got through would fail its creation instead.
+    #[cfg(unix)]
     #[test]
     fn a_record_root_not_spelled_canonically_is_refused_before_it_is_created() {
         for path in [
@@ -733,6 +734,37 @@ mod tests {
             Some(
                 "durable Rockchip host record root is unavailable: failed(\"cannot create \
                  Rockchip record directory (errno 2)\")"
+                    .to_owned()
+            )
+        );
+    }
+
+    /// The same on Windows, over drive-letter paths; a missing parent is
+    /// `ERROR_PATH_NOT_FOUND` (3) where Darwin reports `ENOENT` (2).
+    #[cfg(windows)]
+    #[test]
+    fn a_record_root_not_spelled_canonically_is_refused_before_it_is_created() {
+        for path in [
+            r"arkdeck-no-such-parent\rockchip-runtime",
+            r"C:\arkdeck-no-such-parent\.\rockchip-runtime",
+            r"C:\arkdeck-no-such-parent\x\..\rockchip-runtime",
+            r"C:\arkdeck-no-such-parent\\rockchip-runtime",
+        ] {
+            assert_eq!(
+                record_root_unavailable(path),
+                Some(
+                    "durable Rockchip host record root is unavailable: failed(\"Rockchip record \
+                     path is not canonical\")"
+                        .to_owned()
+                ),
+                "{path}"
+            );
+        }
+        assert_eq!(
+            record_root_unavailable(r"C:\arkdeck-no-such-parent\rockchip-runtime"),
+            Some(
+                "durable Rockchip host record root is unavailable: failed(\"cannot create \
+                 Rockchip record directory (errno 3)\")"
                     .to_owned()
             )
         );

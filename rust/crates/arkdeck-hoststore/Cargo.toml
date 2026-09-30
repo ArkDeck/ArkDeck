@@ -28,8 +28,10 @@ arkdeck-provider-workspace.workspace = true
 # (TASK-XPA-010).
 sha2.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies]
+# The ArkForge Flash lane's provider (TASK-XPA-010).
 arkdeck-provider-arkforge.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
 libc.workspace = true
 
 # A stand-in for the ArkForge lane daemon's public socket, spoken with

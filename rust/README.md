@@ -2717,6 +2717,34 @@ bundle is refused with nothing published, and, with
 releases. Run record:
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
 
+## Windows Flash lane (TASK-XPA-010)
+
+The software part of GJ-4 on Windows. `ManagedServer::launch_paired` starts
+the bundle's `bin/arkforged.exe` in its own kill-on-close Job and hands it
+the pairing secret on stdin. Its stop is the end of input, half a second,
+then `TerminateJobObject`. `arkdeck-provider-arkforge`'s `Lane` composes
+over ArkForge's named pipes (#2403). The Flash archive reader reads a
+bundle through the platform's raw DEFLATE decoder (#2410).
+
+`arkdeck-hoststore` builds the Runtime's Flash owners on Windows:
+
+- the planner, the admitter, the run, the recovery and the reconcile
+  (`flash_plan`, `flash_admission`, `flash_run`, `flash_recovery`,
+  `flash_reconcile`), including the delegated Flash's lane receipt;
+- the Rockchip host's dispatcher, durable records, executor and startup
+  reconcile;
+- the Flash facts, the post-flash alias, and the flash-bundle Import
+  validator.
+
+The records keep the platform's owner-only boundary: private directories
+and files, owner-only single-link reads, and no directory `fsync` on NTFS.
+The Swift `flash-plan` oracle, plan digests included, and the `flash-run`
+oracle's eight stories replay on Windows. What a Windows Session names of
+its platform is read back as Swift's wrote it before it is compared. The
+owners that compose only beside a managed HDC stay macOS-only:
+`control_performer`, `rockchip_reactivation` and `loader_binding`. No
+Windows HDC tuple is registered.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in
