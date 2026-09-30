@@ -262,7 +262,7 @@ fn the_target_owners_answer_over_the_pipe_and_survive_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
                 .to_owned(),
         ),
         "{:?}",
