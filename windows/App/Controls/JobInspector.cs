@@ -123,8 +123,7 @@ public sealed partial class JobInspector : UserControl
             return;
         }
         SetCompact(S.Format(UiStrings.JobInspectorCompactActiveCount, jobs.Count(j => j.IsActive)));
-        var list = Ui.List("jobInspector.list", S.Text(UiStrings.JobInspectorRuntimeFacts));
-        list.SelectionMode = ListViewSelectionMode.Single;
+        var list = Ui.Choice("jobInspector.list", S.Text(UiStrings.JobInspectorRuntimeFacts));
         // As on macOS: Jobs that need attention first, then active ones, then the rest.
         foreach (var job in jobs.OrderBy(j => j.OutcomeUnknown || j.WaitingForHuman ? 0 : j.IsActive ? 1 : 2))
         {
@@ -173,7 +172,7 @@ public sealed partial class JobInspector : UserControl
                      ("jobInspector.fact.mode", UiStrings.JobInspectorFactMode, job.ExecutionMode),
                  })
         {
-            _detail.Children.Add(Ui.Row(Ui.Text(id + ".label", S.Text(key), "ArkDeckCaptionStyle"), Ui.Text(id, value, "ArkDeckMonoStyle")));
+            _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
         }
         _detail.Children.Add(Ui.Heading("jobInspector.timeline", S.Text(UiStrings.JobInspectorTimeline)));
         if (state.Events.Unavailable is { } eventsWhy)

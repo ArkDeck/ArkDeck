@@ -48,8 +48,7 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
         }
         else
         {
-            var table = Ui.List("history.table", S.Text(UiStrings.AppNavigationHistory));
-            table.SelectionMode = ListViewSelectionMode.Single;
+            var table = Ui.Choice("history.table", S.Text(UiStrings.AppNavigationHistory));
             foreach (var job in state.Jobs.Value!)
             {
                 var stateText = Ui.JobState("history.state.", job.State) + (job.OutcomeUnknown ? S.Text(UiStrings.HistoryStateOutcomeUnknownSuffix) : string.Empty);
@@ -146,10 +145,10 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
                 S.Text(job.ExecutionMode == "planOnly" ? UiStrings.HistoryArtifactsEmptyPlanned : UiStrings.HistoryArtifactsEmpty), "ArkDeckCaptionStyle"));
             return;
         }
-        var list = Ui.List("history.artifacts", S.Text(UiStrings.HistoryDetailArtifacts));
+        var list = Ui.ActionList("history.artifacts", S.Text(UiStrings.HistoryDetailArtifacts));
         foreach (var artifact in artifacts)
         {
-            list.Items.Add(Ui.Item("history.artifact." + artifact.ArtifactId, $"{artifact.Name}, {artifact.Status}", ArtifactRow(state.JobId, artifact)));
+            list.Rows.Add(Ui.ActionItem("history.artifact." + artifact.ArtifactId, $"{artifact.Name}, {artifact.Status}", ArtifactRow(state.JobId, artifact)));
         }
         _detail.Children.Add(list);
         _detail.Children.Add(Ui.Text("history.artifacts.exportBoundary", S.Text(UiStrings.HistoryArtifactsExportBoundary), "ArkDeckCaptionStyle"));
@@ -183,7 +182,7 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             actions.Children.Add(Ui.Button("history.artifact.inspectTrace." + id, S.Text(UiStrings.WindowsTraceInspectAction), async (_, _) => await InspectAsync(jobId, artifact)));
         }
         if (actions.Children.Count > 0) row.Children.Add(actions);
-        var result = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        var result = new ContentControl { HorizontalContentAlignment = HorizontalAlignment.Stretch, IsTabStop = false };
         AutomationProperties.SetAutomationId(result, $"history.artifact.{id}.result");
         if (_artifactResults.TryGetValue(id, out var kept)) result.Content = kept().Content;
         _resultHosts[id] = result;

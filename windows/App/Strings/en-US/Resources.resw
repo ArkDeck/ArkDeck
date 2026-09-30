@@ -527,6 +527,170 @@ SHA-256: %4$@</value>
     <value>Exporting Artifact</value>
     <comment>history.artifacts.exporting (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="settings_tab_general" xml:space="preserve">
+    <value>General</value>
+    <comment>settings.tab.general (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_toolchains" xml:space="preserve">
+    <value>Toolchains</value>
+    <comment>settings.tab.toolchains (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_storage" xml:space="preserve">
+    <value>Storage</value>
+    <comment>settings.tab.storage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_trace" xml:space="preserve">
+    <value>Trace</value>
+    <comment>settings.tab.trace (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_refresh" xml:space="preserve">
+    <value>Refresh</value>
+    <comment>settings.common.refresh (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_loading" xml:space="preserve">
+    <value>Loading settings…</value>
+    <comment>settings.common.loading (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_subtitle" xml:space="preserve">
+    <value>Customize ArkDeck and review build identity, platform information, and privacy guarantees.</value>
+    <comment>settings.general.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_build" xml:space="preserve">
+    <value>Application</value>
+    <comment>settings.general.build (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_app" xml:space="preserve">
+    <value>Name</value>
+    <comment>settings.general.app (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_version" xml:space="preserve">
+    <value>Version</value>
+    <comment>settings.general.version (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_platform" xml:space="preserve">
+    <value>Platform</value>
+    <comment>settings.general.platform (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_architecture" xml:space="preserve">
+    <value>Architecture</value>
+    <comment>settings.general.architecture (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_privacy" xml:space="preserve">
+    <value>Privacy</value>
+    <comment>settings.general.privacy (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_localFirst" xml:space="preserve">
+    <value>Local-first artifacts</value>
+    <comment>settings.general.localFirst (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_localFirst_detail" xml:space="preserve">
+    <value>Session artifacts stay in the configured local storage root unless you explicitly export them.</value>
+    <comment>settings.general.localFirst.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_noUpload" xml:space="preserve">
+    <value>No automatic diagnostics upload</value>
+    <comment>settings.general.noUpload (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_noUpload_detail" xml:space="preserve">
+    <value>Crashes and Job failures never create or upload a diagnostic bundle automatically.</value>
+    <comment>settings.general.noUpload.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_subtitle" xml:space="preserve">
+    <value>Inspect the selected HDC executable and its verified server context.</value>
+    <comment>settings.toolchains.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_hdc" xml:space="preserve">
+    <value>OpenHarmony HDC</value>
+    <comment>settings.toolchains.hdc (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_path" xml:space="preserve">
+    <value>Executable</value>
+    <comment>settings.toolchains.path (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_sha256" xml:space="preserve">
+    <value>SHA-256</value>
+    <comment>settings.toolchains.sha256 (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_source" xml:space="preserve">
+    <value>Source</value>
+    <comment>settings.toolchains.source (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_clientVersion" xml:space="preserve">
+    <value>Client version</value>
+    <comment>settings.toolchains.clientVersion (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_daemonVersion" xml:space="preserve">
+    <value>Daemon version</value>
+    <comment>settings.toolchains.daemonVersion (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_endpoint" xml:space="preserve">
+    <value>Endpoint</value>
+    <comment>settings.toolchains.endpoint (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_subtitle" xml:space="preserve">
+    <value>Manage the Session root, quota and retention window, and read what each store is actually holding.</value>
+    <comment>settings.storage.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeUsage" xml:space="preserve">
+    <value>ArkDeck Runtime artifacts</value>
+    <comment>settings.storage.runtimeUsage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeUsage_detail" xml:space="preserve">
+    <value>These are the bytes ArkDeck Runtime stores for Jobs. Runtime measures and enforces this quota itself; the policy above applies to the Session output root instead.</value>
+    <comment>settings.storage.runtimeUsage.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeUnavailable" xml:space="preserve">
+    <value>ArkDeck Runtime did not report its artifact usage, so no figure is shown here.</value>
+    <comment>settings.storage.runtimeUnavailable (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_sessionUsage" xml:space="preserve">
+    <value>Session output root</value>
+    <comment>settings.storage.sessionUsage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_sessionUsage_detail" xml:space="preserve">
+    <value>The quota, safety margin and retention window above apply to this root only. Runtime artifacts are stored separately and are not counted here.</value>
+    <comment>settings.storage.sessionUsage.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_root" xml:space="preserve">
+    <value>Root</value>
+    <comment>settings.storage.root (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_quota" xml:space="preserve">
+    <value>Total quota</value>
+    <comment>settings.storage.quota (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_margin" xml:space="preserve">
+    <value>Safety margin</value>
+    <comment>settings.storage.margin (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_retention" xml:space="preserve">
+    <value>Retention</value>
+    <comment>settings.storage.retention (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_currentUsage" xml:space="preserve">
+    <value>Stored bytes</value>
+    <comment>settings.storage.currentUsage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_remaining" xml:space="preserve">
+    <value>Remaining</value>
+    <comment>settings.storage.remaining (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeTotal" xml:space="preserve">
+    <value>Runtime quota</value>
+    <comment>settings.storage.runtimeTotal (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_pinned" xml:space="preserve">
+    <value>Pinned Sessions</value>
+    <comment>settings.storage.pinned (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_pinGuarantee" xml:space="preserve">
+    <value>Retention cleanup never deletes pinned Sessions.</value>
+    <comment>settings.storage.pinGuarantee (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_measurementUnavailable" xml:space="preserve">
+    <value>Current usage is unavailable. The saved quota and retention policy remain visible above.</value>
+    <comment>settings.storage.measurementUnavailable (SettingsLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime unavailable</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -794,5 +958,201 @@ SHA-256: %4$@</value>
   <data name="windows_trace_viewerDeferred" xml:space="preserve">
     <value>The Trace viewer is not available on Windows yet: the Runtime inspects the Trace, and Export… saves it for another tool.</value>
     <comment>windows.trace.viewerDeferred (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_settings" xml:space="preserve">
+    <value>Settings</value>
+    <comment>windows.navigation.settings (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tab_runtime" xml:space="preserve">
+    <value>Runtime</value>
+    <comment>windows.settings.tab.runtime (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tab_workspace" xml:space="preserve">
+    <value>Workspace</value>
+    <comment>windows.settings.tab.workspace (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_subtitle" xml:space="preserve">
+    <value>What the ArkDeck Runtime reports about itself, and the CLI commands that control it.</value>
+    <comment>windows.settings.runtime.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_identity" xml:space="preserve">
+    <value>Runtime identity</value>
+    <comment>windows.settings.runtime.identity (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_status" xml:space="preserve">
+    <value>Status</value>
+    <comment>windows.settings.runtime.status (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_catalog" xml:space="preserve">
+    <value>Catalog digest</value>
+    <comment>windows.settings.runtime.catalog (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_methods" xml:space="preserve">
+    <value>Published methods</value>
+    <comment>windows.settings.runtime.methods (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_providers" xml:space="preserve">
+    <value>Registered providers</value>
+    <comment>windows.settings.runtime.providers (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_none" xml:space="preserve">
+    <value>None</value>
+    <comment>windows.settings.runtime.none (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_checks" xml:space="preserve">
+    <value>Runtime checks</value>
+    <comment>windows.settings.runtime.checks (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_hdc" xml:space="preserve">
+    <value>HDC</value>
+    <comment>windows.settings.runtime.check.hdc (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_targets" xml:space="preserve">
+    <value>Target store</value>
+    <comment>windows.settings.runtime.check.targets (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_recovery" xml:space="preserve">
+    <value>Recovery</value>
+    <comment>windows.settings.runtime.check.recovery (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_sessionOutput" xml:space="preserve">
+    <value>Session output</value>
+    <comment>windows.settings.runtime.check.sessionOutput (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_artifacts" xml:space="preserve">
+    <value>Runtime artifacts</value>
+    <comment>windows.settings.runtime.check.artifacts (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_configured" xml:space="preserve">
+    <value>Configured</value>
+    <comment>windows.settings.runtime.configured (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_notConfigured" xml:space="preserve">
+    <value>Not configured</value>
+    <comment>windows.settings.runtime.notConfigured (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_notChecked" xml:space="preserve">
+    <value>Not checked</value>
+    <comment>windows.settings.runtime.notChecked (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_adoptedCount" xml:space="preserve">
+    <value>Configured · %lld adopted</value>
+    <comment>windows.settings.runtime.adoptedCount (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_outstanding" xml:space="preserve">
+    <value>Checked · %lld outstanding cleanups</value>
+    <comment>windows.settings.runtime.outstanding (Windows only)</comment>
+  </data>
+  <data name="windows_settings_service_title" xml:space="preserve">
+    <value>Runtime service</value>
+    <comment>windows.settings.service.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_service_detail" xml:space="preserve">
+    <value>Status, verification and restart of the Runtime run in the CLI. The App only reads the Runtime through its authenticated pipe; it never starts, stops or replaces it.</value>
+    <comment>windows.settings.service.detail (Windows only)</comment>
+  </data>
+  <data name="windows_settings_signing_title" xml:space="preserve">
+    <value>Signing</value>
+    <comment>windows.settings.signing.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_signing_detail" xml:space="preserve">
+    <value>Signing credentials are held by the Runtime in Windows Credential Manager and are never shown here; read their status with the CLI.</value>
+    <comment>windows.settings.signing.detail (Windows only)</comment>
+  </data>
+  <data name="windows_settings_hdc_unavailable" xml:space="preserve">
+    <value>HDC status unavailable</value>
+    <comment>windows.settings.hdc.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tools_title" xml:space="preserve">
+    <value>Registered tools</value>
+    <comment>windows.settings.tools.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tools_unavailable" xml:space="preserve">
+    <value>Tool registry unavailable</value>
+    <comment>windows.settings.tools.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tools_empty" xml:space="preserve">
+    <value>No tool is registered.</value>
+    <comment>windows.settings.tools.empty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_title" xml:space="preserve">
+    <value>Trace cache</value>
+    <comment>windows.settings.trace.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_subtitle" xml:space="preserve">
+    <value>The derived Trace cache the Runtime keeps; the original Traces are never cache entries.</value>
+    <comment>windows.settings.trace.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_unavailable" xml:space="preserve">
+    <value>Trace cache status unavailable</value>
+    <comment>windows.settings.trace.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_entries" xml:space="preserve">
+    <value>%1$lld entries · %2$lld active · %3$lld inactive</value>
+    <comment>windows.settings.trace.entries (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_scope" xml:space="preserve">
+    <value>Purge scope</value>
+    <comment>windows.settings.trace.scope (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_subtitle" xml:space="preserve">
+    <value>Workspace projects and presets registered with the Runtime. Registering and changing them runs in the CLI; the project roots stay with the Runtime.</value>
+    <comment>windows.settings.workspace.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_projects" xml:space="preserve">
+    <value>Projects</value>
+    <comment>windows.settings.workspace.projects (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_empty" xml:space="preserve">
+    <value>No workspace project is registered.</value>
+    <comment>windows.settings.workspace.empty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_unavailable" xml:space="preserve">
+    <value>Workspace projects unavailable</value>
+    <comment>windows.settings.workspace.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_select" xml:space="preserve">
+    <value>Select a project to see its presets.</value>
+    <comment>windows.settings.workspace.select (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_kind" xml:space="preserve">
+    <value>Kind</value>
+    <comment>windows.settings.workspace.kind (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_availability" xml:space="preserve">
+    <value>Availability</value>
+    <comment>windows.settings.workspace.availability (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_configuration" xml:space="preserve">
+    <value>Configuration</value>
+    <comment>windows.settings.workspace.configuration (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_generation" xml:space="preserve">
+    <value>Generation</value>
+    <comment>windows.settings.workspace.generation (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_registered" xml:space="preserve">
+    <value>Registered</value>
+    <comment>windows.settings.workspace.registered (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_detailUnavailable" xml:space="preserve">
+    <value>Project details unavailable</value>
+    <comment>windows.settings.workspace.detailUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_presets" xml:space="preserve">
+    <value>Presets</value>
+    <comment>windows.settings.workspace.presets (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_presetsEmpty" xml:space="preserve">
+    <value>No preset is registered for this project.</value>
+    <comment>windows.settings.workspace.presetsEmpty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_presetsUnavailable" xml:space="preserve">
+    <value>Presets unavailable</value>
+    <comment>windows.settings.workspace.presetsUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_timeout" xml:space="preserve">
+    <value>Timeout %lld s</value>
+    <comment>windows.settings.workspace.timeout (Windows only)</comment>
   </data>
 </root>

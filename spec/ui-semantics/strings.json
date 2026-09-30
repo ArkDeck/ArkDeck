@@ -781,6 +781,252 @@
       "zh-Hans": "正在导出 Artifact"
     },
     {
+      "key": "settings.tab.general",
+      "table": "SettingsLocalizable",
+      "en": "General",
+      "zh-Hans": "通用"
+    },
+    {
+      "key": "settings.tab.toolchains",
+      "table": "SettingsLocalizable",
+      "en": "Toolchains",
+      "zh-Hans": "工具链"
+    },
+    {
+      "key": "settings.tab.storage",
+      "table": "SettingsLocalizable",
+      "en": "Storage",
+      "zh-Hans": "存储"
+    },
+    {
+      "key": "settings.tab.trace",
+      "table": "SettingsLocalizable",
+      "en": "Trace",
+      "zh-Hans": "跟踪"
+    },
+    {
+      "key": "settings.common.refresh",
+      "table": "SettingsLocalizable",
+      "en": "Refresh",
+      "zh-Hans": "刷新"
+    },
+    {
+      "key": "settings.common.loading",
+      "table": "SettingsLocalizable",
+      "en": "Loading settings…",
+      "zh-Hans": "正在加载设置……"
+    },
+    {
+      "key": "settings.general.subtitle",
+      "table": "SettingsLocalizable",
+      "en": "Customize ArkDeck and review build identity, platform information, and privacy guarantees.",
+      "zh-Hans": "自定义 ArkDeck，并查看构建身份、平台信息与隐私保证。"
+    },
+    {
+      "key": "settings.general.build",
+      "table": "SettingsLocalizable",
+      "en": "Application",
+      "zh-Hans": "应用"
+    },
+    {
+      "key": "settings.general.app",
+      "table": "SettingsLocalizable",
+      "en": "Name",
+      "zh-Hans": "名称"
+    },
+    {
+      "key": "settings.general.version",
+      "table": "SettingsLocalizable",
+      "en": "Version",
+      "zh-Hans": "版本"
+    },
+    {
+      "key": "settings.general.platform",
+      "table": "SettingsLocalizable",
+      "en": "Platform",
+      "zh-Hans": "平台"
+    },
+    {
+      "key": "settings.general.architecture",
+      "table": "SettingsLocalizable",
+      "en": "Architecture",
+      "zh-Hans": "架构"
+    },
+    {
+      "key": "settings.general.privacy",
+      "table": "SettingsLocalizable",
+      "en": "Privacy",
+      "zh-Hans": "隐私"
+    },
+    {
+      "key": "settings.general.localFirst",
+      "table": "SettingsLocalizable",
+      "en": "Local-first artifacts",
+      "zh-Hans": "产物默认保存在本地"
+    },
+    {
+      "key": "settings.general.localFirst.detail",
+      "table": "SettingsLocalizable",
+      "en": "Session artifacts stay in the configured local storage root unless you explicitly export them.",
+      "zh-Hans": "除非你主动导出，否则 Session 产物始终保存在已配置的本地存储目录。"
+    },
+    {
+      "key": "settings.general.noUpload",
+      "table": "SettingsLocalizable",
+      "en": "No automatic diagnostics upload",
+      "zh-Hans": "不会自动上传诊断信息"
+    },
+    {
+      "key": "settings.general.noUpload.detail",
+      "table": "SettingsLocalizable",
+      "en": "Crashes and Job failures never create or upload a diagnostic bundle automatically.",
+      "zh-Hans": "崩溃或任务失败都不会自动生成或上传诊断包。"
+    },
+    {
+      "key": "settings.toolchains.subtitle",
+      "table": "SettingsLocalizable",
+      "en": "Inspect the selected HDC executable and its verified server context.",
+      "zh-Hans": "检查当前选中的 HDC 可执行文件及其已验证的服务端上下文。"
+    },
+    {
+      "key": "settings.toolchains.hdc",
+      "table": "SettingsLocalizable",
+      "en": "OpenHarmony HDC",
+      "zh-Hans": "OpenHarmony HDC"
+    },
+    {
+      "key": "settings.toolchains.path",
+      "table": "SettingsLocalizable",
+      "en": "Executable",
+      "zh-Hans": "可执行文件"
+    },
+    {
+      "key": "settings.toolchains.sha256",
+      "table": "SettingsLocalizable",
+      "en": "SHA-256",
+      "zh-Hans": "SHA-256"
+    },
+    {
+      "key": "settings.toolchains.source",
+      "table": "SettingsLocalizable",
+      "en": "Source",
+      "zh-Hans": "来源"
+    },
+    {
+      "key": "settings.toolchains.clientVersion",
+      "table": "SettingsLocalizable",
+      "en": "Client version",
+      "zh-Hans": "客户端版本"
+    },
+    {
+      "key": "settings.toolchains.daemonVersion",
+      "table": "SettingsLocalizable",
+      "en": "Daemon version",
+      "zh-Hans": "守护进程版本"
+    },
+    {
+      "key": "settings.toolchains.endpoint",
+      "table": "SettingsLocalizable",
+      "en": "Endpoint",
+      "zh-Hans": "端点"
+    },
+    {
+      "key": "settings.storage.subtitle",
+      "table": "SettingsLocalizable",
+      "en": "Manage the Session root, quota and retention window, and read what each store is actually holding.",
+      "zh-Hans": "管理 Session 根目录、配额与保留周期，并查看每个存储实际占用了多少。"
+    },
+    {
+      "key": "settings.storage.runtimeUsage",
+      "table": "SettingsLocalizable",
+      "en": "ArkDeck Runtime artifacts",
+      "zh-Hans": "ArkDeck Runtime Artifact"
+    },
+    {
+      "key": "settings.storage.runtimeUsage.detail",
+      "table": "SettingsLocalizable",
+      "en": "These are the bytes ArkDeck Runtime stores for Jobs. Runtime measures and enforces this quota itself; the policy above applies to the Session output root instead.",
+      "zh-Hans": "这里是 ArkDeck Runtime 为任务保存的 Artifact 字节。该配额由 Runtime 自行计量与执行；上方的策略作用于 Session 输出根，不作用于这里。"
+    },
+    {
+      "key": "settings.storage.runtimeUnavailable",
+      "table": "SettingsLocalizable",
+      "en": "ArkDeck Runtime did not report its artifact usage, so no figure is shown here.",
+      "zh-Hans": "ArkDeck Runtime 未报告 Artifact 用量，因此这里不显示数字。"
+    },
+    {
+      "key": "settings.storage.sessionUsage",
+      "table": "SettingsLocalizable",
+      "en": "Session output root",
+      "zh-Hans": "Session 输出根"
+    },
+    {
+      "key": "settings.storage.sessionUsage.detail",
+      "table": "SettingsLocalizable",
+      "en": "The quota, safety margin and retention window above apply to this root only. Runtime artifacts are stored separately and are not counted here.",
+      "zh-Hans": "上方的配额、安全余量与保留周期只作用于这个根目录。Runtime Artifact 单独存放，不计入这里。"
+    },
+    {
+      "key": "settings.storage.root",
+      "table": "SettingsLocalizable",
+      "en": "Root",
+      "zh-Hans": "根目录"
+    },
+    {
+      "key": "settings.storage.quota",
+      "table": "SettingsLocalizable",
+      "en": "Total quota",
+      "zh-Hans": "总配额"
+    },
+    {
+      "key": "settings.storage.margin",
+      "table": "SettingsLocalizable",
+      "en": "Safety margin",
+      "zh-Hans": "安全余量"
+    },
+    {
+      "key": "settings.storage.retention",
+      "table": "SettingsLocalizable",
+      "en": "Retention",
+      "zh-Hans": "保留周期"
+    },
+    {
+      "key": "settings.storage.currentUsage",
+      "table": "SettingsLocalizable",
+      "en": "Stored bytes",
+      "zh-Hans": "已用空间"
+    },
+    {
+      "key": "settings.storage.remaining",
+      "table": "SettingsLocalizable",
+      "en": "Remaining",
+      "zh-Hans": "剩余"
+    },
+    {
+      "key": "settings.storage.runtimeTotal",
+      "table": "SettingsLocalizable",
+      "en": "Runtime quota",
+      "zh-Hans": "Runtime 配额"
+    },
+    {
+      "key": "settings.storage.pinned",
+      "table": "SettingsLocalizable",
+      "en": "Pinned Sessions",
+      "zh-Hans": "已固定 Session"
+    },
+    {
+      "key": "settings.storage.pinGuarantee",
+      "table": "SettingsLocalizable",
+      "en": "Retention cleanup never deletes pinned Sessions.",
+      "zh-Hans": "保留策略清理绝不会删除已固定的 Session。"
+    },
+    {
+      "key": "settings.storage.measurementUnavailable",
+      "table": "SettingsLocalizable",
+      "en": "Current usage is unavailable. The saved quota and retention policy remain visible above.",
+      "zh-Hans": "当前用量不可用；已保存的配额与保留策略仍显示在上方。"
+    },
+    {
       "key": "windows.recovery.title",
       "table": null,
       "en": "ArkDeck Runtime unavailable",
@@ -1181,6 +1427,300 @@
       "table": null,
       "en": "The Trace viewer is not available on Windows yet: the Runtime inspects the Trace, and Export… saves it for another tool.",
       "zh-Hans": "Windows 版暂不提供 Trace 查看器：Trace 由 Runtime 检查，可用“导出…”保存后在其他工具中打开。"
+    },
+    {
+      "key": "windows.navigation.settings",
+      "table": null,
+      "en": "Settings",
+      "zh-Hans": "设置"
+    },
+    {
+      "key": "windows.settings.tab.runtime",
+      "table": null,
+      "en": "Runtime",
+      "zh-Hans": "Runtime"
+    },
+    {
+      "key": "windows.settings.tab.workspace",
+      "table": null,
+      "en": "Workspace",
+      "zh-Hans": "工作区"
+    },
+    {
+      "key": "windows.settings.runtime.subtitle",
+      "table": null,
+      "en": "What the ArkDeck Runtime reports about itself, and the CLI commands that control it.",
+      "zh-Hans": "ArkDeck Runtime 自身报告的信息，以及控制它的 CLI 命令。"
+    },
+    {
+      "key": "windows.settings.runtime.identity",
+      "table": null,
+      "en": "Runtime identity",
+      "zh-Hans": "Runtime 身份"
+    },
+    {
+      "key": "windows.settings.runtime.status",
+      "table": null,
+      "en": "Status",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "windows.settings.runtime.catalog",
+      "table": null,
+      "en": "Catalog digest",
+      "zh-Hans": "Catalog 摘要"
+    },
+    {
+      "key": "windows.settings.runtime.methods",
+      "table": null,
+      "en": "Published methods",
+      "zh-Hans": "已发布的方法"
+    },
+    {
+      "key": "windows.settings.runtime.providers",
+      "table": null,
+      "en": "Registered providers",
+      "zh-Hans": "已注册的 Provider"
+    },
+    {
+      "key": "windows.settings.runtime.none",
+      "table": null,
+      "en": "None",
+      "zh-Hans": "无"
+    },
+    {
+      "key": "windows.settings.runtime.checks",
+      "table": null,
+      "en": "Runtime checks",
+      "zh-Hans": "Runtime 检查"
+    },
+    {
+      "key": "windows.settings.runtime.check.hdc",
+      "table": null,
+      "en": "HDC",
+      "zh-Hans": "HDC"
+    },
+    {
+      "key": "windows.settings.runtime.check.targets",
+      "table": null,
+      "en": "Target store",
+      "zh-Hans": "目标存储"
+    },
+    {
+      "key": "windows.settings.runtime.check.recovery",
+      "table": null,
+      "en": "Recovery",
+      "zh-Hans": "恢复"
+    },
+    {
+      "key": "windows.settings.runtime.check.sessionOutput",
+      "table": null,
+      "en": "Session output",
+      "zh-Hans": "Session 输出"
+    },
+    {
+      "key": "windows.settings.runtime.check.artifacts",
+      "table": null,
+      "en": "Runtime artifacts",
+      "zh-Hans": "Runtime Artifact"
+    },
+    {
+      "key": "windows.settings.runtime.configured",
+      "table": null,
+      "en": "Configured",
+      "zh-Hans": "已配置"
+    },
+    {
+      "key": "windows.settings.runtime.notConfigured",
+      "table": null,
+      "en": "Not configured",
+      "zh-Hans": "未配置"
+    },
+    {
+      "key": "windows.settings.runtime.notChecked",
+      "table": null,
+      "en": "Not checked",
+      "zh-Hans": "未检查"
+    },
+    {
+      "key": "windows.settings.runtime.adoptedCount",
+      "table": null,
+      "en": "Configured · %lld adopted",
+      "zh-Hans": "已配置 · 已接管 %lld 台"
+    },
+    {
+      "key": "windows.settings.runtime.outstanding",
+      "table": null,
+      "en": "Checked · %lld outstanding cleanups",
+      "zh-Hans": "已检查 · %lld 项待清理"
+    },
+    {
+      "key": "windows.settings.service.title",
+      "table": null,
+      "en": "Runtime service",
+      "zh-Hans": "Runtime 服务"
+    },
+    {
+      "key": "windows.settings.service.detail",
+      "table": null,
+      "en": "Status, verification and restart of the Runtime run in the CLI. The App only reads the Runtime through its authenticated pipe; it never starts, stops or replaces it.",
+      "zh-Hans": "Runtime 的状态、校验与重启在 CLI 中执行。App 只通过经过认证的管道读取 Runtime，从不启动、停止或替换它。"
+    },
+    {
+      "key": "windows.settings.signing.title",
+      "table": null,
+      "en": "Signing",
+      "zh-Hans": "签名"
+    },
+    {
+      "key": "windows.settings.signing.detail",
+      "table": null,
+      "en": "Signing credentials are held by the Runtime in Windows Credential Manager and are never shown here; read their status with the CLI.",
+      "zh-Hans": "签名凭据由 Runtime 保存在 Windows 凭据管理器中，此处从不显示；请用 CLI 查看其状态。"
+    },
+    {
+      "key": "windows.settings.hdc.unavailable",
+      "table": null,
+      "en": "HDC status unavailable",
+      "zh-Hans": "无法读取 HDC 状态"
+    },
+    {
+      "key": "windows.settings.tools.title",
+      "table": null,
+      "en": "Registered tools",
+      "zh-Hans": "已登记的工具"
+    },
+    {
+      "key": "windows.settings.tools.unavailable",
+      "table": null,
+      "en": "Tool registry unavailable",
+      "zh-Hans": "无法读取工具登记"
+    },
+    {
+      "key": "windows.settings.tools.empty",
+      "table": null,
+      "en": "No tool is registered.",
+      "zh-Hans": "尚未登记任何工具。"
+    },
+    {
+      "key": "windows.settings.trace.title",
+      "table": null,
+      "en": "Trace cache",
+      "zh-Hans": "Trace 缓存"
+    },
+    {
+      "key": "windows.settings.trace.subtitle",
+      "table": null,
+      "en": "The derived Trace cache the Runtime keeps; the original Traces are never cache entries.",
+      "zh-Hans": "Runtime 维护的 Trace 派生缓存；原始 Trace 从不属于缓存条目。"
+    },
+    {
+      "key": "windows.settings.trace.unavailable",
+      "table": null,
+      "en": "Trace cache status unavailable",
+      "zh-Hans": "无法读取 Trace 缓存状态"
+    },
+    {
+      "key": "windows.settings.trace.entries",
+      "table": null,
+      "en": "%1$lld entries · %2$lld active · %3$lld inactive",
+      "zh-Hans": "%1$lld 个条目 · %2$lld 个活跃 · %3$lld 个非活跃"
+    },
+    {
+      "key": "windows.settings.trace.scope",
+      "table": null,
+      "en": "Purge scope",
+      "zh-Hans": "清理范围"
+    },
+    {
+      "key": "windows.settings.workspace.subtitle",
+      "table": null,
+      "en": "Workspace projects and presets registered with the Runtime. Registering and changing them runs in the CLI; the project roots stay with the Runtime.",
+      "zh-Hans": "已向 Runtime 登记的工作区项目与预设。登记和修改在 CLI 中执行；项目根目录只由 Runtime 保存。"
+    },
+    {
+      "key": "windows.settings.workspace.projects",
+      "table": null,
+      "en": "Projects",
+      "zh-Hans": "项目"
+    },
+    {
+      "key": "windows.settings.workspace.empty",
+      "table": null,
+      "en": "No workspace project is registered.",
+      "zh-Hans": "尚未登记工作区项目。"
+    },
+    {
+      "key": "windows.settings.workspace.unavailable",
+      "table": null,
+      "en": "Workspace projects unavailable",
+      "zh-Hans": "无法读取工作区项目"
+    },
+    {
+      "key": "windows.settings.workspace.select",
+      "table": null,
+      "en": "Select a project to see its presets.",
+      "zh-Hans": "选择一个项目以查看其预设。"
+    },
+    {
+      "key": "windows.settings.workspace.kind",
+      "table": null,
+      "en": "Kind",
+      "zh-Hans": "类型"
+    },
+    {
+      "key": "windows.settings.workspace.availability",
+      "table": null,
+      "en": "Availability",
+      "zh-Hans": "可用性"
+    },
+    {
+      "key": "windows.settings.workspace.configuration",
+      "table": null,
+      "en": "Configuration",
+      "zh-Hans": "配置状态"
+    },
+    {
+      "key": "windows.settings.workspace.generation",
+      "table": null,
+      "en": "Generation",
+      "zh-Hans": "代次"
+    },
+    {
+      "key": "windows.settings.workspace.registered",
+      "table": null,
+      "en": "Registered",
+      "zh-Hans": "登记时间"
+    },
+    {
+      "key": "windows.settings.workspace.detailUnavailable",
+      "table": null,
+      "en": "Project details unavailable",
+      "zh-Hans": "无法读取项目详情"
+    },
+    {
+      "key": "windows.settings.workspace.presets",
+      "table": null,
+      "en": "Presets",
+      "zh-Hans": "预设"
+    },
+    {
+      "key": "windows.settings.workspace.presetsEmpty",
+      "table": null,
+      "en": "No preset is registered for this project.",
+      "zh-Hans": "此项目尚未登记预设。"
+    },
+    {
+      "key": "windows.settings.workspace.presetsUnavailable",
+      "table": null,
+      "en": "Presets unavailable",
+      "zh-Hans": "无法读取预设"
+    },
+    {
+      "key": "windows.settings.workspace.timeout",
+      "table": null,
+      "en": "Timeout %lld s",
+      "zh-Hans": "超时 %lld 秒"
     }
   ]
 }

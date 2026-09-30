@@ -199,6 +199,95 @@ public sealed class RealDaemonTests
         }
     }
 
+    /// <summary>
+    /// Settings against the real daemon over a development root: the Runtime tab shows the
+    /// daemon's own health and doctor; Storage and Trace show its refusals as they came; the
+    /// Workspace tab lists a project registered over the pipe (as the CLI's
+    /// <c>workspace project register</c> does) with its symbol preset.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void SettingsShowTheDevelopmentRootsRuntimeAndWorkspace()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-settings-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            (process, var endpoint) = StartRootDaemon(signed, root);
+            var source = Directory.CreateDirectory(Path.Combine(root, "sources", "first")).FullName;
+            var project = Frame(endpoint, "workspace.project.register",
+                $$"""{"kind":"openharmony","registrationRequestId":"request-first","root":{{JsonSerializer.Serialize(source)}}}""");
+            var reference = project.GetProperty("result").GetProperty("projectRef").GetString()!;
+            var preset = Frame(endpoint, "workspace.preset.register",
+                $$"""{"kind":"symbol","projectRef":"{{reference}}","registrationRequestId":"preset-one","relativeSourceMap":"entry/build/sourceMaps.map","templateRef":"openharmony.arkts-symbol@1","timeoutSeconds":"600"}""");
+            var presetRef = preset.GetProperty("result").GetProperty("presetRef").GetString()!;
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "settings"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            app.Select("settings.tab.runtime");
+            Assert.AreEqual("ok", app.WaitForName("settings.runtime.status", n => n.Length > 0));
+            TestContext.WriteLine("runtime checks: " + AppSession.Name(app.Find("settings.runtime.overall")) + " / hdc " + AppSession.Name(app.Find("settings.runtime.check.hdc"))
+                                  + " / targets " + AppSession.Name(app.Find("settings.runtime.check.targets")));
+            app.Select("settings.tab.storage");
+            TestContext.WriteLine("storage: " + app.WaitForName("settings.storage.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
+            app.Select("settings.tab.trace");
+            TestContext.WriteLine("trace cache: " + app.WaitForName("settings.trace.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
+            app.Select("settings.tab.toolchains");
+            TestContext.WriteLine("hdc: " + app.WaitForName("settings.toolchains.hdc.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
+            app.Select("settings.tab.workspace");
+            app.Select("settings.workspace.project." + reference);
+            Assert.AreEqual("runtimeRestartRequired", app.WaitForName("settings.workspace.detail.configuration", n => n.Length > 0));
+            TestContext.WriteLine("preset: " + app.WaitForName("settings.workspace.preset." + presetRef, n => n.Length > 0));
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            if (process is { HasExited: false })
+            {
+                process.Kill();
+                process.WaitForExit();
+            }
+            process?.Dispose();
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                try
+                {
+                    directory.Delete(recursive: true);
+                    break;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    Thread.Sleep(100);
+                }
+            }
+        }
+    }
+
+    /// <summary>One control frame on a plain handle of the daemon's pipe (test setup only, as
+    /// the Rust process tests register a project); the reply must succeed.</summary>
+    private static JsonElement Frame(string endpoint, string method, string parameters)
+    {
+        using var pipe = new System.IO.Pipes.NamedPipeClientStream(".", endpoint[@"\\.\pipe\".Length..], System.IO.Pipes.PipeDirection.InOut);
+        pipe.Connect(10_000);
+        var frame = $$"""{"contractIdentity":"{{ArkDeck.ClientKit.Contract.ControlContract.ContractIdentity}}","id":"setup","method":"{{method}}","params":{{parameters}},"protocolVersion":"{{ArkDeck.ClientKit.Contract.ControlContract.ProtocolVersion}}"}""" + "\n";
+        pipe.Write(System.Text.Encoding.UTF8.GetBytes(frame));
+        var reply = new List<byte>();
+        for (var b = pipe.ReadByte(); b >= 0 && b != '\n'; b = pipe.ReadByte()) reply.Add((byte)b);
+        var document = JsonDocument.Parse(reply.ToArray()).RootElement.Clone();
+        Assert.IsTrue(document.GetProperty("ok").GetBoolean(), $"{method}: {System.Text.Encoding.UTF8.GetString(reply.ToArray())}");
+        return document;
+    }
+
     private const string OracleTarget = "TGT-3ba3f5f43b92";
 
     /// <summary>The development signer, a built daemon and PowerShell 7, or the test is skipped.</summary>

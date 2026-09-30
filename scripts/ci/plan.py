@@ -118,6 +118,7 @@ WINDOWS_INPUT_FILES = frozenset({
     "ArkDeckApp/Resources/Localizable.xcstrings",
     "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
     "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
+    "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
     # The App's theme is generated from the design tokens (generate-xaml-tokens.py).
     "docs/design/arkdeck-ds/src/tokens.css",
     # The App's tests read the Job state classes and the CLI coverage commands.

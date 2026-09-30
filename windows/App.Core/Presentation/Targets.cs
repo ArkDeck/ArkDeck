@@ -171,6 +171,9 @@ internal static class Json
     public static string? NullableString(JsonObject o, string key) =>
         TypedJson.Required(o, key, v => v is JsonNull ? null : TypedJson.String(v));
 
+    /// <summary>A scalar as text (string as is; boolean, number and null as JSON spells them).</summary>
+    public static string Text(JsonValue value) => value is JsonString s ? s.Value : value.ToString();
+
     /// <summary>A member that may be absent or null.</summary>
     public static string? OptionalString(JsonObject o, string key) =>
         o.TryGetValue(key, out var v) && v is JsonString s ? s.Value : null;

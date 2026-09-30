@@ -128,6 +128,10 @@ public sealed class SurfaceTests
     {
         var options = LaunchOptions.Parse(["--language", "zh-Hans", "--page", "history", "--test-transport", "jobs"]);
         Assert.AreEqual(new LaunchOptions("zh-Hans", "history", "jobs"), options);
+        Assert.AreEqual(new LaunchOptions(null, null, "jobs", 2.25, true), LaunchOptions.Parse(["--test-transport", "jobs", "--text-scale", "2.25", "--high-contrast-tokens"]));
+        Assert.AreEqual(new LaunchOptions(null, null, null), LaunchOptions.Parse(["--text-scale", "2.25", "--high-contrast-tokens", "--focus-walk", "x.json"]),
+            "the test hooks exist only beside the scripted transport; a real run follows Windows");
+        Assert.AreEqual("x.json", LaunchOptions.Parse(["--test-transport", "jobs", "--focus-walk", "x.json"]).FocusWalkFile);
         Assert.ThrowsExactly<ArgumentException>(() => ScriptedDaemon.Channel("no-such-scenario"));
     }
 }
