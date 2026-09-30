@@ -104,4 +104,27 @@ boundary check, and no macOS answer changes. CI's macOS and ubuntu lanes are the
 
 ## CI
 
-To be recorded by the next slice; not verified here.
+First head `3c7a8ffb` (PR #2377): run 36694381427 red on `rust-checks / Rust workspace
+(windows-latest)`, step "Workspace tests" (job 109819127718). Both causes were real, not load:
+
+1. The hosted runner's TEMP is spelled short (`C:\Users\RUNNER~1\...`). The daemon opened the
+   Session store and the Artifact usage owner by `<root>\<name>` paths spelled from that root,
+   which the host store's canonical-path rule refuses ("host snapshot refused"), so every
+   daemon of a development root below TEMP ended its start: `windows_client_start_process`,
+   `windows_lifecycle_process`, `windows_trace_offline_process` and the CLI's
+   `windows_signed_runtime`. Reproduced here with TEMP set to an 8.3 spelling of the scratch
+   directory. Fixed: `session-state`, `sessions` and the usage owner's `artifacts` are the
+   paths `StateRoot::private_child` answers, the directories as the file system resolves the
+   opened handles; the development isolation boundary is their parent in that spelling.
+2. `gj1_session_commands_run_through_the_cli_against_a_dev_signed_daemon`: the CLI refused the
+   export preview the daemon answered (the same preview passed over the pipe). The CLI required
+   every device and inode field to fit `i64`, as macOS `dev_t`/`ino_t` do; an NTFS file
+   reference carries its sequence number in the top 16 bits and may use the whole `u64` (the
+   method schema only requires a string). Fixed on Windows (`session_resources::file_decimal`,
+   with a unit test); macOS keeps the `i64` bound. Not reproducible on this host, whose file
+   references are small: it is the only host-dependent value the CLI checks there, so this
+   cause is inferred, and CI decides.
+
+After the fixes, the four crates' tests pass here both with the normal TEMP and with the
+short-name TEMP (231 test binaries each, the signed-CLI tests run, none SKIPPED); fmt and
+clippy exit 0. CI of the fixed head: to be recorded, not verified.

@@ -15,6 +15,22 @@ fn decimal(value: &Value) -> Option<u64> {
     let number = text.parse::<u64>().ok()?;
     (number <= i64::MAX as u64 && number.to_string() == text).then_some(number)
 }
+/// A device or file identity as the daemon spells it: a canonical decimal,
+/// within `i64` where the host's `dev_t` and `ino_t` are (macOS); on Windows
+/// a volume serial or an NTFS file reference, whose sequence number fills the
+/// top 16 bits and so may use the whole `u64`.
+fn file_decimal(value: &Value) -> Option<u64> {
+    #[cfg(not(windows))]
+    {
+        decimal(value)
+    }
+    #[cfg(windows)]
+    {
+        let text = value.as_str()?;
+        let number = text.parse::<u64>().ok()?;
+        (number.to_string() == text).then_some(number)
+    }
+}
 pub(super) fn uuid(text: &str) -> bool {
     text.len() == 36
         && text.bytes().enumerate().all(|(index, byte)| {
@@ -508,8 +524,8 @@ fn export_preview(value: &Value) -> Result<(), CliError> {
             ],
         )
         || !dest["path"].as_str().is_some_and(absolute)
-        || decimal(&dest["parentDevice"]).is_none()
-        || decimal(&dest["parentInode"]).is_none()
+        || file_decimal(&dest["parentDevice"]).is_none()
+        || file_decimal(&dest["parentInode"]).is_none()
         || !dest["volumeIdentity"]
             .as_str()
             .is_some_and(|s| !s.is_empty())
@@ -602,6 +618,16 @@ mod export_tests {
         value["previewDigest"] = json!(sha256_hex(&canonical_json(&value).unwrap()));
         value
     }
+    /// An NTFS file reference whose sequence number uses the top bit is a
+    /// file identity on Windows, not a malformed one.
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_file_reference_may_use_the_whole_u64() {
+        let mut value = preview();
+        value["source"]["sessionInode"] = json!(u64::MAX.to_string());
+        value["destination"]["parentInode"] = json!("9223372036854775808");
+        assert!(export_preview(&sign(value)).is_ok());
+    }
     #[test]
     fn accepts_actual_owner_record_and_rejects_tampering() {
         let mut value = preview();
@@ -654,7 +680,7 @@ fn export_source(source: &Value) -> Result<(), CliError> {
         || !(source["journalSha256"].is_null() || digest(&source["journalSha256"]))
         || ["rootDevice", "rootInode", "sessionDevice", "sessionInode"]
             .iter()
-            .any(|key| decimal(&source[*key]).is_none())
+            .any(|key| file_decimal(&source[*key]).is_none())
         || !source["volumeIdentity"]
             .as_str()
             .is_some_and(|s| !s.is_empty())

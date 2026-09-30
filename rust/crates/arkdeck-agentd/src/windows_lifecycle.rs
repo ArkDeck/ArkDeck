@@ -206,7 +206,13 @@ impl Authority {
         let host =
             host.with_workspace_projects(projects)
                 .with_storage(self.session_store()?, {
-                    let path = self.root.path().join("artifacts");
+                    // The Artifact read owner's directory, as it opened it.
+                    let path = self.root.private_child("artifacts").map_err(|error| {
+                        format!(
+                            "the Artifact usage owner {} is unusable: {error}; nothing was started",
+                            self.root.path().join("artifacts").display()
+                        )
+                    })?;
                     arkdeck_hoststore::ArtifactUsage::open(&path, crate::host::ARTIFACT_QUOTA)
                     .map_err(|error| {
                         format!(
@@ -280,25 +286,21 @@ impl Authority {
                 path.display()
             )
         };
-        for name in ["session-state", "sessions"] {
+        // Each child as the file system resolves the opened handle
+        // (`StateRoot::private_child`): the canonical plain spelling (`D:\…`)
+        // the Session owner opens its roots by and compares them with, which
+        // a verbatim (`\\?\D:\…`) or short (`RUNNER~1`) spelling of the
+        // root is not.
+        let child = |name: &str| {
             self.root
                 .private_child(name)
-                .map_err(|error| unusable(&self.root.path().join(name), &error))?;
-        }
-        // The Session owner compares its roots with their canonical plain
-        // spelling (`D:\…`), which a verbatim root (`\\?\D:\…`) is not.
-        let root = &match self
-            .root
-            .path()
-            .to_str()
-            .and_then(|text| text.strip_prefix(r"\\?\"))
-        {
-            Some(plain) if plain.as_bytes().get(1) == Some(&b':') => {
-                std::path::PathBuf::from(plain)
-            }
-            _ => self.root.path().to_path_buf(),
+                .map_err(|error| unusable(&self.root.path().join(name), &error))
         };
-        let (state, sessions) = (root.join("session-state"), root.join("sessions"));
+        let (state, sessions) = (child("session-state")?, child("sessions")?);
+        let root = &state
+            .parent()
+            .ok_or_else(|| unusable(&state, &"it has no parent"))?
+            .to_path_buf();
         let store = arkdeck_hoststore::SessionStore::open(&state, &sessions)
             .map_err(|error| unusable(&state, &error))?;
         if !self.development {
