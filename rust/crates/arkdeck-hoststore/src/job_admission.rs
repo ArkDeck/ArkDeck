@@ -274,7 +274,6 @@ impl JobAdmitter<'_> {
     /// is refused with the zero-dispatch proof before anything is
     /// materialized, as an operation outside the plan allowlist is; a
     /// `job.submit` of it is still admitted and waits in `preflight`.
-    #[cfg(target_os = "macos")]
     pub fn submit_for_agent(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
         let request = OperationRequest::decode(request_json)
             .map_err(|rejection| refused(rejection.code.wire_code(), rejection.message))?;

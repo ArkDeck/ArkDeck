@@ -404,9 +404,10 @@ def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpo
         if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
                       "artifact.export", "artifact.list"}:
             expected = "operationUnavailable"
-        # Only the macOS daemon composes an agent execution owner; without one it
-        # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
-        if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.resume", "human-action.list", "human-action.show"} and platform.system() == "Darwin":
+        # The macOS and Windows daemons compose an agent execution owner over a
+        # state root; without one (as here) they answer as Swift's daemon does.
+        # Elsewhere they stay the foundation's refusal.
+        if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.resume", "human-action.list", "human-action.show"} and platform.system() in {"Darwin", "Windows"}:
             expected = "operationUnavailable"
         # The macOS daemon starts no managed HDC server, so it answers the live HDC
         # status as Swift's daemon without its HDC host does.
