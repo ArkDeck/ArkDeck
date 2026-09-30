@@ -107,6 +107,36 @@ public static class UiStrings
     public const string JobStateFailed = "job.state.failed";
     public const string JobStateCancelled = "job.state.cancelled";
     public const string JobStateInterrupted = "job.state.interrupted";
+    public const string DeviceActionRename = "device.action.rename";
+    public const string DeviceRenameTitle = "device.rename.title";
+    public const string DeviceRenameMessage = "device.rename.message";
+    public const string DeviceRenameField = "device.rename.field";
+    public const string DeviceRenameCommit = "device.rename.commit";
+    public const string DeviceRenameCancel = "device.rename.cancel";
+    public const string HistoryDetailTitle = "history.detail.title";
+    public const string HistoryDetailSelect = "history.detail.select";
+    public const string HistoryDetailLoading = "history.detail.loading";
+    public const string HistoryDetailReload = "history.detail.reload";
+    public const string HistoryDetailJob = "history.detail.job";
+    public const string HistoryDetailOperation = "history.detail.operation";
+    public const string HistoryDetailTarget = "history.detail.target";
+    public const string HistoryDetailState = "history.detail.state";
+    public const string HistoryDetailMode = "history.detail.mode";
+    public const string HistoryDetailCreated = "history.detail.created";
+    public const string HistoryDetailFinished = "history.detail.finished";
+    public const string HistoryDetailOutcomeUnknown = "history.detail.outcomeUnknown";
+    public const string HistoryDetailWaitingForHuman = "history.detail.waitingForHuman";
+    public const string HistoryDetailArtifacts = "history.detail.artifacts";
+    public const string HistoryArtifactsEmpty = "history.artifacts.empty";
+    public const string HistoryArtifactsEmptyPlanned = "history.artifacts.emptyPlanned";
+    public const string HistoryArtifactsExport = "history.artifacts.export";
+    public const string HistoryArtifactsExportSensitive = "history.artifacts.exportSensitive";
+    public const string HistoryArtifactsExportBoundary = "history.artifacts.exportBoundary";
+    public const string HistoryArtifactsExportPreviewTitle = "history.artifacts.exportPreview.title";
+    public const string HistoryArtifactsExportPreviewMessage = "history.artifacts.exportPreview.message";
+    public const string HistoryArtifactsExportConfirm = "history.artifacts.exportConfirm";
+    public const string HistoryArtifactsExportCancel = "history.artifacts.exportCancel";
+    public const string HistoryArtifactsExporting = "history.artifacts.exporting";
     public const string WindowsRecoveryTitle = "windows.recovery.title";
     public const string WindowsRecoveryMessageNotRunning = "windows.recovery.message.notRunning";
     public const string WindowsRecoveryMessageImpostor = "windows.recovery.message.impostor";
@@ -140,6 +170,40 @@ public static class UiStrings
     public const string WindowsHistoryColumnCreated = "windows.history.column.created";
     public const string WindowsTestTransportTitle = "windows.testTransport.title";
     public const string WindowsTestTransportMessage = "windows.testTransport.message";
+    public const string WindowsBytes = "windows.bytes";
+    public const string WindowsDeviceTargetsTitle = "windows.device.targets.title";
+    public const string WindowsDeviceTargetsEmpty = "windows.device.targets.empty";
+    public const string WindowsDeviceTargetsUnavailable = "windows.device.targets.unavailable";
+    public const string WindowsDeviceTargetSelect = "windows.device.target.select";
+    public const string WindowsDeviceTargetDetailUnavailable = "windows.device.target.detail.unavailable";
+    public const string WindowsDeviceTargetAdoptedAt = "windows.device.target.adoptedAt";
+    public const string WindowsDeviceTargetToolVersion = "windows.device.target.toolVersion";
+    public const string WindowsDeviceTargetIdentity = "windows.device.target.identity";
+    public const string WindowsDeviceTargetConfirmedAt = "windows.device.target.confirmedAt";
+    public const string WindowsDeviceTargetBinding = "windows.device.target.binding";
+    public const string WindowsDeviceTargetPresence = "windows.device.target.presence";
+    public const string WindowsDeviceTargetProfile = "windows.device.target.profile";
+    public const string WindowsDeviceTargetTool = "windows.device.target.tool";
+    public const string WindowsDeviceTargetOperations = "windows.device.target.operations";
+    public const string WindowsDeviceTargetOperationsScope = "windows.device.target.operationsScope";
+    public const string WindowsDeviceRenameClear = "windows.device.rename.clear";
+    public const string WindowsDeviceRenameSaved = "windows.device.rename.saved";
+    public const string WindowsDeviceRenameCleared = "windows.device.rename.cleared";
+    public const string WindowsDeviceRenameRefused = "windows.device.rename.refused";
+    public const string WindowsHistoryArtifactsUnavailable = "windows.history.artifacts.unavailable";
+    public const string WindowsHistoryArtifactsExported = "windows.history.artifacts.exported";
+    public const string WindowsHistoryArtifactsExportFailed = "windows.history.artifacts.exportFailed";
+    public const string WindowsHistoryArtifactsShowInExplorer = "windows.history.artifacts.showInExplorer";
+    public const string WindowsTraceInspectAction = "windows.trace.inspect.action";
+    public const string WindowsTraceInspectInspecting = "windows.trace.inspect.inspecting";
+    public const string WindowsTraceInspectTitle = "windows.trace.inspect.title";
+    public const string WindowsTraceInspectUnavailable = "windows.trace.inspect.unavailable";
+    public const string WindowsTraceInspectEngine = "windows.trace.inspect.engine";
+    public const string WindowsTraceInspectParser = "windows.trace.inspect.parser";
+    public const string WindowsTraceInspectDuration = "windows.trace.inspect.duration";
+    public const string WindowsTraceInspectCapabilities = "windows.trace.inspect.capabilities";
+    public const string WindowsTraceInspectQuality = "windows.trace.inspect.quality";
+    public const string WindowsTraceViewerDeferred = "windows.trace.viewerDeferred";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -243,6 +307,36 @@ public static class UiStrings
         JobStateFailed,
         JobStateCancelled,
         JobStateInterrupted,
+        DeviceActionRename,
+        DeviceRenameTitle,
+        DeviceRenameMessage,
+        DeviceRenameField,
+        DeviceRenameCommit,
+        DeviceRenameCancel,
+        HistoryDetailTitle,
+        HistoryDetailSelect,
+        HistoryDetailLoading,
+        HistoryDetailReload,
+        HistoryDetailJob,
+        HistoryDetailOperation,
+        HistoryDetailTarget,
+        HistoryDetailState,
+        HistoryDetailMode,
+        HistoryDetailCreated,
+        HistoryDetailFinished,
+        HistoryDetailOutcomeUnknown,
+        HistoryDetailWaitingForHuman,
+        HistoryDetailArtifacts,
+        HistoryArtifactsEmpty,
+        HistoryArtifactsEmptyPlanned,
+        HistoryArtifactsExport,
+        HistoryArtifactsExportSensitive,
+        HistoryArtifactsExportBoundary,
+        HistoryArtifactsExportPreviewTitle,
+        HistoryArtifactsExportPreviewMessage,
+        HistoryArtifactsExportConfirm,
+        HistoryArtifactsExportCancel,
+        HistoryArtifactsExporting,
         WindowsRecoveryTitle,
         WindowsRecoveryMessageNotRunning,
         WindowsRecoveryMessageImpostor,
@@ -276,5 +370,39 @@ public static class UiStrings
         WindowsHistoryColumnCreated,
         WindowsTestTransportTitle,
         WindowsTestTransportMessage,
+        WindowsBytes,
+        WindowsDeviceTargetsTitle,
+        WindowsDeviceTargetsEmpty,
+        WindowsDeviceTargetsUnavailable,
+        WindowsDeviceTargetSelect,
+        WindowsDeviceTargetDetailUnavailable,
+        WindowsDeviceTargetAdoptedAt,
+        WindowsDeviceTargetToolVersion,
+        WindowsDeviceTargetIdentity,
+        WindowsDeviceTargetConfirmedAt,
+        WindowsDeviceTargetBinding,
+        WindowsDeviceTargetPresence,
+        WindowsDeviceTargetProfile,
+        WindowsDeviceTargetTool,
+        WindowsDeviceTargetOperations,
+        WindowsDeviceTargetOperationsScope,
+        WindowsDeviceRenameClear,
+        WindowsDeviceRenameSaved,
+        WindowsDeviceRenameCleared,
+        WindowsDeviceRenameRefused,
+        WindowsHistoryArtifactsUnavailable,
+        WindowsHistoryArtifactsExported,
+        WindowsHistoryArtifactsExportFailed,
+        WindowsHistoryArtifactsShowInExplorer,
+        WindowsTraceInspectAction,
+        WindowsTraceInspectInspecting,
+        WindowsTraceInspectTitle,
+        WindowsTraceInspectUnavailable,
+        WindowsTraceInspectEngine,
+        WindowsTraceInspectParser,
+        WindowsTraceInspectDuration,
+        WindowsTraceInspectCapabilities,
+        WindowsTraceInspectQuality,
+        WindowsTraceViewerDeferred,
     ];
 }

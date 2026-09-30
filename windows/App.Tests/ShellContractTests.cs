@@ -49,16 +49,24 @@ public sealed class ShellContractTests
     [TestMethod]
     public void TheAppHoldsNoRuntimeSemantics()
     {
-        // Stop condition: the App only reads (ClientKit calls through App.Core); no business
-        // write method is named anywhere in the App or App.Core.
-        var writes = new[] { "job.submit", "job.cancel", "job.run", "job.reconcile", "target.adopt", "target.display-name.set", "device.display-name.set" };
+        // Stop condition: the App reads through ClientKit calls in App.Core and derives no
+        // state. Its one write is the Runtime-owned display name of an adopted Target
+        // (TASK-XPA-020, app.device.rename: host state, generation-guarded, the CLI's
+        // `target display-name set|clear`), named only by the loader; no Job, adoption,
+        // device or other business write is named anywhere in the App or App.Core.
+        var forbidden = new[] { "job.submit", "job.cancel", "job.run", "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "artifact.import.begin", "trace.cache.purge" };
+        var allowed = new[] { "target.display-name.set", "target.display-name.clear" };
         var sources = RepoPaths.AppSources("*.cs")
             .Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
                 .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")));
         foreach (var file in sources)
         {
             var text = File.ReadAllText(file);
-            foreach (var write in writes) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
+            foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
+            if (Path.GetFileName(file) is not ("Surfaces.cs" or "ScriptedDaemon.cs"))
+            {
+                foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
+            }
             Assert.IsFalse(text.Contains("System.IO.Pipes", StringComparison.Ordinal), $"{Path.GetFileName(file)}: the daemon is reached only through ClientKit");
         }
     }
@@ -72,7 +80,12 @@ public sealed class ShellContractTests
                 .Concat(e.TryGetProperty("equivalentCommands", out var eq) ? eq.EnumerateArray().Select(c => c.GetString()) : []))
             .Where(c => c is not null)
             .ToHashSet();
-        foreach (var command in new[] { CliCommands.Doctor, CliCommands.RuntimeHealth, CliCommands.DeviceCandidates, CliCommands.JobList, CliCommands.JobStatus, CliCommands.JobEvents, RecoveryBannerState.DoctorCommand })
+        foreach (var command in new[]
+                 {
+                     CliCommands.Doctor, CliCommands.RuntimeHealth, CliCommands.DeviceCandidates, CliCommands.JobList, CliCommands.JobStatus, CliCommands.JobEvents,
+                     CliCommands.TargetList, CliCommands.TargetShow, CliCommands.TargetAvailability, CliCommands.TargetDisplayNameSet, CliCommands.TargetDisplayNameClear,
+                     CliCommands.ArtifactList, CliCommands.ArtifactRead, CliCommands.TraceInspect, RecoveryBannerState.DoctorCommand,
+                 })
         {
             Assert.IsTrue(commands.Contains(command), command);
         }
@@ -97,6 +110,14 @@ public sealed class ShellContractTests
         {
             Assert.IsTrue(scenarios.Contains(snapshot.GetProperty("scenario").GetString()!));
             Assert.IsTrue(new[] { "overview", "device", "history" }.Contains(snapshot.GetProperty("page").GetString()));
+            if (snapshot.TryGetProperty("steps", out var steps))
+            {
+                foreach (var step in steps.EnumerateArray())
+                {
+                    var action = step.EnumerateObject().Single();
+                    Assert.IsTrue(action.Name is "select" or "invoke", $"{snapshot.GetProperty("id")}: step {action.Name}");
+                }
+            }
             var ids = new HashSet<string>();
             foreach (var element in snapshot.GetProperty("elements").EnumerateArray())
             {

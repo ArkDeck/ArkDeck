@@ -141,4 +141,46 @@ internal static class Ui
         var key = prefix + state;
         return UiStrings.All.Contains(key) ? S.Text(key) : state;
     }
+
+    /// <summary>A labelled Runtime fact: the label (<c>{id}.label</c>) and the value as the
+    /// daemon gave it (<c>{id}</c>, monospaced, selectable).</summary>
+    public static StackPanel Fact(string id, string label, string value) =>
+        Row(Text(id + ".label", label, "ArkDeckCaptionStyle"), Text(id, value, "ArkDeckMonoStyle"));
+
+    /// <summary>Changes a text element and its UIA name together.</summary>
+    public static void SetText(TextBlock block, string text)
+    {
+        block.Text = text;
+        AutomationProperties.SetName(block, text);
+    }
+
+    /// <summary>A live status line (polite unless stated): empty until <see cref="Say"/>.</summary>
+    public static TextBlock Status(string automationId, AutomationLiveSetting setting = AutomationLiveSetting.Polite) =>
+        Live(Text(automationId, string.Empty, "ArkDeckCaptionStyle"), setting);
+
+    /// <summary>Sets a live status line and has Narrator read it.</summary>
+    public static void Say(TextBlock status, string text)
+    {
+        SetText(status, text);
+        status.DispatcherQueue.TryEnqueue(() => Announce(status));
+    }
+
+    /// <summary>A Fluent content dialog in the App's window: title, content, a primary action
+    /// and a close action (no secondary action, no disabled button).</summary>
+    public static ContentDialog Dialog(XamlRoot root, string automationId, string title, UIElement content, string primary, string close)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = root,
+            Style = (Style)Application.Current.Resources["DefaultContentDialogStyle"],
+            Title = title,
+            Content = content,
+            PrimaryButtonText = primary,
+            CloseButtonText = close,
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        AutomationProperties.SetAutomationId(dialog, automationId);
+        AutomationProperties.SetName(dialog, title);
+        return dialog;
+    }
 }
