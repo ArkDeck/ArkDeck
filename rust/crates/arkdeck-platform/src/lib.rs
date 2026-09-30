@@ -422,6 +422,9 @@ pub use usb_registry::{RegistryEntry, RegistryUnavailable, RegistryValue, UsbHos
 pub use usb_registry::{registry_census, usb_host_devices};
 
 mod usb_device_nodes;
+pub use usb_device_nodes::{
+    CENSUS_MAPPING, CensusField, CensusSample, DeviceNode, NodeProperty, NodeValue,
+    unconfirmed_census_fields,
+};
 #[cfg(windows)]
-pub use usb_device_nodes::usb_host_devices;
-pub use usb_device_nodes::{DeviceNode, NodeProperty, NodeValue};
+pub use usb_device_nodes::{usb_device_node_census, usb_host_devices};
