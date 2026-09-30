@@ -24,7 +24,66 @@ fn second_daemon_cannot_take_an_existing_pipe_name() {
         .err()
         .expect("duplicate daemon rejected");
     assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
-    assert!(error.to_string().contains("Win32 error 5"));
+    assert!(
+        error
+            .to_string()
+            .contains("is held by another instance (Win32 error 5)")
+    );
+}
+
+#[test]
+fn single_instance_squatter_is_refused_as_a_held_name() {
+    use std::os::windows::ffi::OsStrExt;
+    use std::os::windows::io::{FromRawHandle, OwnedHandle};
+    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_FLAG_FIRST_PIPE_INSTANCE, PIPE_ACCESS_DUPLEX,
+    };
+    use windows_sys::Win32::System::Pipes::{
+        CreateNamedPipeW, PIPE_READMODE_BYTE, PIPE_REJECT_REMOTE_CLIENTS, PIPE_TYPE_BYTE, PIPE_WAIT,
+    };
+
+    let endpoint = endpoint();
+    // A same-account squatter that created the name first, allowing a single
+    // instance, as the SPK-3 `raw-squat` probe does.
+    let name: Vec<u16> = endpoint
+        .as_path()
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    // SAFETY: NUL-terminated name alive for the synchronous call; default
+    // security; the handle is owned at once.
+    let raw = unsafe {
+        CreateNamedPipeW(
+            name.as_ptr(),
+            PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
+            PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
+            1,
+            4096,
+            4096,
+            5000,
+            std::ptr::null(),
+        )
+    };
+    assert_ne!(raw, INVALID_HANDLE_VALUE, "{}", io::Error::last_os_error());
+    // SAFETY: a newly created, valid pipe handle, owned from here on.
+    let _squatter = unsafe { OwnedHandle::from_raw_handle(raw) };
+
+    let error = LocalListener::bind(&endpoint)
+        .err()
+        .expect("a squatted name refuses the daemon");
+    assert_eq!(error.kind(), io::ErrorKind::PermissionDenied, "{error}");
+    assert_eq!(error.raw_os_error(), None, "not the raw pipe-busy error");
+    let message = error.to_string();
+    assert!(
+        message.contains(&format!(
+            "named pipe {} is held by another instance (Win32 error 231)",
+            endpoint.as_path().display()
+        )),
+        "{message}"
+    );
+    assert!(message.ends_with("daemon did not start"), "{message}");
 }
 
 #[test]
