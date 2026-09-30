@@ -66,6 +66,10 @@ pub enum RegistryUnavailable {
     /// `SetupDiEnumDeviceInfo` stopped before the end of the set, with this
     /// Win32 error.
     Enumeration(u32),
+    /// The Windows census's field mapping still holds a `TBD(sample)` field
+    /// (`crate::usb_device_nodes::CENSUS_MAPPING`), so no census is trusted
+    /// to prove a relation.
+    MappingUnconfirmed,
 }
 
 impl fmt::Display for RegistryUnavailable {
@@ -88,6 +92,12 @@ impl fmt::Display for RegistryUnavailable {
             Self::Enumeration(error) => write!(
                 formatter,
                 "USB registry unavailable: SetupDiEnumDeviceInfo answered error {error}"
+            ),
+            Self::MappingUnconfirmed => write!(
+                formatter,
+                "USB registry unavailable: the Windows census field mapping awaits the DAYU200 \
+                 USB sample (CHG-2026-078 WHR-003); TBD(sample): {}",
+                crate::usb_device_nodes::unconfirmed_census_fields().join(", ")
             ),
         }
     }

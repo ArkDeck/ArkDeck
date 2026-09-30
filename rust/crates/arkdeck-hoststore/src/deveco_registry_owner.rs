@@ -78,6 +78,50 @@ fn publication(error: DocumentPublishError) -> WireError {
         ),
     }
 }
+/// A registration source as this host spells a local root: `/…` without a
+/// `.` or `..` component on macOS; a standard `X:\…` path on Windows (the
+/// spelling on disk is then checked by the reader, which also refuses any
+/// link, junction or other layout).
+#[cfg(not(windows))]
+fn host_root_text(text: &str) -> bool {
+    text.starts_with('/')
+        && !text.as_bytes().contains(&0)
+        && !text.split('/').any(|part| matches!(part, "." | ".."))
+}
+#[cfg(windows)]
+fn host_root_text(text: &str) -> bool {
+    !text.as_bytes().contains(&0)
+        && super::deveco_registry::host_root_path(text.trim_end_matches('\\'))
+}
+
+/// macOS: the app's `Contents` root. Foundation's file URL removes a trailing
+/// directory slash but retains internal double slashes; the latter remain
+/// part of the stored identity and can conflict with an existing
+/// registration of the same content.
+#[cfg(not(windows))]
+fn host_source(text: &str) -> Result<&Path, WireError> {
+    let source = Path::new(text.trim_end_matches('/'));
+    if source.file_name().is_none_or(|name| name != "Contents")
+        || source
+            .parent()
+            .and_then(Path::extension)
+            .is_none_or(|extension| extension != "app")
+    {
+        return Err(failure(
+            "invalidInput",
+            "DevEco registration requires the app's Contents root",
+        ));
+    }
+    Ok(source)
+}
+
+/// Windows: the DevEco Studio directory itself (it must hold the Windows
+/// launcher; the reader refuses anything else).
+#[cfg(windows)]
+fn host_source(text: &str) -> Result<&Path, WireError> {
+    Ok(Path::new(text.trim_end_matches('\\')))
+}
+
 impl DevEcoRegistryStore {
     pub fn open_existing(path: &Path) -> io::Result<Self> {
         Ok(Self {
@@ -124,11 +168,7 @@ impl DevEcoRegistryStore {
         let text = source
             .to_str()
             .ok_or_else(|| failure("invalidInput", "a local root is required"))?;
-        if !text.starts_with('/')
-            || text.as_bytes().contains(&0)
-            || text.split('/').any(|part| matches!(part, "." | ".."))
-            || arkdeck_platform::host_legacy_iso8601(now) != Some(true)
-        {
+        if !host_root_text(text) || arkdeck_platform::host_legacy_iso8601(now) != Some(true) {
             return Err(failure(
                 "invalidInput",
                 "the local root or host timestamp is invalid",
@@ -183,21 +223,7 @@ impl DevEcoRegistryStore {
             Err(error) => return Err(unreadable(error)),
         };
         let (mut index, _) = read_index(&bytes).map_err(unreadable)?;
-        // Foundation's file URL removes a trailing directory slash but retains
-        // internal double slashes. The latter remain part of the stored identity
-        // and can conflict with an existing registration of the same content.
-        let source = Path::new(text.trim_end_matches('/'));
-        if source.file_name().is_none_or(|name| name != "Contents")
-            || source
-                .parent()
-                .and_then(Path::extension)
-                .is_none_or(|extension| extension != "app")
-        {
-            return Err(failure(
-                "invalidInput",
-                "DevEco registration requires the app's Contents root",
-            ));
-        }
+        let source = host_source(text)?;
         let mut measured =
             deveco_content::inspect_root(source).map_err(native_registration_error)?;
         let existing = index
@@ -328,7 +354,7 @@ impl DevEcoRegistryStore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod registration_tests {
     use super::*;
     use std::{
@@ -605,5 +631,349 @@ mod registration_tests {
             "quotaExceeded"
         );
         assert_eq!(fs::read(root.0.join(DOCUMENT)).unwrap(), bytes);
+    }
+}
+
+/// The Windows registration (TASK-XPA-011) over a fixture DevEco Studio
+/// directory under the account's local application data: the launcher and
+/// node are copies of system executables signed with the host's development
+/// signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`), the fixture's stand-in for the
+/// DevEco publisher and the OpenJS Foundation; the signed cases are skipped,
+/// saying so, where the host has no such signer. Nothing is run.
+#[cfg(all(test, windows))]
+mod windows_registration_tests {
+    use super::*;
+    use crate::deveco_content::TEST_PUBLISHER;
+    use arkdeck_platform::{create_private_directory, create_private_file};
+    use std::fs;
+    use std::io::Write;
+
+    const NOW: &str = "2026-09-30T00:00:00Z";
+    const PRODUCT: &str = r#"{"name":"DevEco Studio","version":"6.0.0.868","buildNumber":"DS-253.1.2","productCode":"DS","productVendor":"Huawei","dataDirectoryName":"fixture","launch":[{"os":"Windows","arch":"amd64","launcherPath":"bin/devecostudio64.exe"}]}"#;
+    const SDK: &str = r#"{"meta":{"version":"1.0.0"},"data":{"apiVersion":"26","displayName":"fixture","platformVersion":"6.0.0","version":"6.0.0.43"}}"#;
+    const DEVELOPMENT_SIGNER: &str = "ArkDeck Development Daemon (host-trusted only)";
+
+    struct Scratch(PathBuf);
+    impl Scratch {
+        fn new(label: &str) -> Self {
+            let base = arkdeck_platform::application_support_directory()
+                .unwrap()
+                .canonicalize()
+                .unwrap();
+            let base = base.to_str().unwrap();
+            let path = PathBuf::from(base.strip_prefix(r"\\?\").unwrap_or(base)).join(format!(
+                "arkdeck-test-{label}-{:032x}",
+                u128::from_le_bytes(arkdeck_platform::random_bytes().unwrap())
+            ));
+            create_private_directory(&path).unwrap();
+            Self(path)
+        }
+        fn directories(&self, relative: &str) -> PathBuf {
+            let mut path = self.0.clone();
+            for part in relative.split('\\') {
+                path.push(part);
+                if !path.exists() {
+                    create_private_directory(&path).unwrap();
+                }
+            }
+            path
+        }
+        fn file(&self, relative: &str, bytes: &[u8]) -> PathBuf {
+            let (parent, _) = relative.rsplit_once('\\').unwrap();
+            let path = self
+                .directories(parent)
+                .join(relative.rsplit_once('\\').unwrap().1);
+            let _ = fs::remove_file(&path);
+            create_private_file(&path)
+                .unwrap()
+                .write_all(bytes)
+                .unwrap();
+            path
+        }
+        /// `System32\<system>` copied to `relative`, signed when `sign`.
+        fn executable(&self, relative: &str, system: &str, sign: bool) -> bool {
+            let source = PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+                .join("System32")
+                .join(system);
+            let path = self.file(relative, &fs::read(source).unwrap());
+            !sign || sign_file(&path)
+        }
+        /// A DevEco Studio directory in the Windows layout.
+        fn deveco(&self, sign_node: bool) -> Option<PathBuf> {
+            if !self.executable(r"DevEco Studio\bin\devecostudio64.exe", "whoami.exe", true)
+                || !self.executable(
+                    r"DevEco Studio\tools\node\node.exe",
+                    "hostname.exe",
+                    sign_node,
+                )
+            {
+                return None;
+            }
+            self.file(r"DevEco Studio\product-info.json", PRODUCT.as_bytes());
+            self.file(r"DevEco Studio\sdk\default\sdk-pkg.json", SDK.as_bytes());
+            self.directories(r"DevEco Studio\sdk\default\openharmony");
+            self.file(
+                r"DevEco Studio\tools\hvigor\bin\hvigorw.js",
+                b"// fixture hvigor wrapper; never run\n",
+            );
+            Some(self.0.join("DevEco Studio"))
+        }
+        fn store(&self) -> DevEcoRegistryStore {
+            DevEcoRegistryStore::open_existing(&self.directories("bootstrap")).unwrap()
+        }
+        fn index(&self) -> Vec<u8> {
+            fs::read(self.0.join("bootstrap").join(DOCUMENT)).unwrap()
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn sign_file(path: &Path) -> bool {
+        let Some(thumbprint) = std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT") else {
+            eprintln!("ARKDECK_DEV_SIGNER_THUMBPRINT is not set; the signed path is not exercised");
+            return false;
+        };
+        let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../scripts/windows-dev-identity.ps1");
+        let alias = std::env::var_os("LOCALAPPDATA")
+            .map(|local| PathBuf::from(local).join(r"Microsoft\WindowsApps\pwsh.exe"))
+            .filter(|alias| alias.exists());
+        let pwsh = std::env::var_os("PATH")
+            .and_then(|paths| {
+                std::env::split_paths(&paths)
+                    .map(|directory| directory.join("pwsh.exe"))
+                    .find(|candidate| candidate.is_file())
+            })
+            .or(alias)
+            .expect("PowerShell 7 signs the fixture executables");
+        let output = std::process::Command::new(pwsh)
+            .args(["-NoProfile", "-NonInteractive", "-File"])
+            .arg(&script)
+            .arg("sign")
+            .arg("-Thumbprint")
+            .arg(&thumbprint)
+            .arg("-Path")
+            .arg(path)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        true
+    }
+
+    /// The development signer stands in for the DevEco publisher.
+    struct Publisher;
+    impl Publisher {
+        fn development() -> Self {
+            TEST_PUBLISHER
+                .with(|publisher| *publisher.borrow_mut() = Some(DEVELOPMENT_SIGNER.into()));
+            Self
+        }
+    }
+    impl Drop for Publisher {
+        fn drop(&mut self) {
+            TEST_PUBLISHER.with(|publisher| *publisher.borrow_mut() = None);
+        }
+    }
+
+    #[test]
+    fn node_and_hvigor_register_as_one_windows_toolchain_reference() {
+        let scratch = Scratch::new("deveco-registration");
+        let Some(root) = scratch.deveco(true) else {
+            return;
+        };
+        let _publisher = Publisher::development();
+        let store = scratch.store();
+        let value = store.register(&root, NOW).unwrap();
+        let reference = value["toolRef"].as_str().unwrap().to_owned();
+        assert!(reference.starts_with("toolchain:sha256:"), "{value}");
+        assert_eq!(value["kind"], "deveco");
+        assert_eq!(value["platform"], "windows");
+        assert_eq!(
+            value["contentSchemaVersion"],
+            "arkdeck.deveco-toolchain-content/2"
+        );
+        assert_eq!(value["productVersion"], "6.0.0.868");
+        assert_eq!(value["apiVersion"], "26");
+        let children = value["childTools"].as_array().unwrap();
+        let roles: Vec<&str> = children
+            .iter()
+            .map(|c| c["role"].as_str().unwrap())
+            .collect();
+        assert_eq!(roles, ["productManifest", "sdkManifest", "node", "hvigor"]);
+        // node: executable, its own Authenticode signature verified and named.
+        assert_eq!(children[2]["executable"], true);
+        assert_eq!(children[2]["trust"]["signature"], "verified");
+        assert_eq!(
+            children[2]["trust"]["signingIdentifier"],
+            DEVELOPMENT_SIGNER
+        );
+        assert_eq!(
+            children[2]["trust"]["codeDirectoryIdentitySHA256"]
+                .as_str()
+                .unwrap()
+                .len(),
+            64
+        );
+        // hvigor: the script, pinned by its bytes, not itself executable.
+        assert_eq!(children[3]["executable"], false);
+        assert!(children[3]["trust"].is_null());
+        assert_eq!(value["trust"]["signature"], "verified");
+        assert_eq!(value["trust"]["signingIdentifier"], DEVELOPMENT_SIGNER);
+
+        // The durable index holds the Windows form and reads back exactly.
+        let bytes = scratch.index();
+        let (index, document) = read_index(&bytes).unwrap();
+        assert_eq!(document, bytes);
+        assert_eq!(index.records.len(), 1);
+        assert_eq!(index.records[0].root.path, root.to_str().unwrap());
+        assert_eq!(index.records[0].registered_at, NOW);
+        // The same content again answers the same record and writes nothing;
+        // inspect and list re-measure the content.
+        assert_eq!(
+            store.register(&root, "2026-09-30T01:00:00Z").unwrap(),
+            value
+        );
+        assert_eq!(scratch.index(), bytes);
+        assert_eq!(store.inspect(&reference).unwrap(), value);
+        assert_eq!(store.list().unwrap(), vec![value.clone()]);
+
+        // Other hvigor bytes: the registered reference no longer verifies,
+        // and the index is left as it was.
+        scratch.file(
+            r"DevEco Studio\tools\hvigor\bin\hvigorw.js",
+            b"// another wrapper\n",
+        );
+        assert_eq!(
+            store.inspect(&reference).unwrap_err().kind(),
+            io::ErrorKind::InvalidData
+        );
+        assert_eq!(scratch.index(), bytes);
+    }
+
+    #[test]
+    fn an_unsigned_node_or_another_publisher_is_refused_before_anything_is_written() {
+        let scratch = Scratch::new("deveco-registration-refusals");
+        let Some(root) = scratch.deveco(false) else {
+            return;
+        };
+        let store = scratch.store();
+        {
+            let _publisher = Publisher::development();
+            assert_eq!(
+                store.register(&root, NOW).unwrap_err().code,
+                "admissionDenied"
+            );
+        }
+        // node signed now, but the launcher is not the DevEco publisher's.
+        assert!(scratch.executable(r"DevEco Studio\tools\node\node.exe", "hostname.exe", true));
+        assert_eq!(
+            store.register(&root, NOW).unwrap_err().code,
+            "admissionDenied"
+        );
+        assert_eq!(scratch.index(), EMPTY_DEVECO);
+    }
+
+    #[test]
+    fn only_a_windows_deveco_root_spelled_as_on_disk_is_a_source() {
+        let scratch = Scratch::new("deveco-registration-sources");
+        let store = scratch.store();
+        let root = scratch.0.join("DevEco Studio");
+        let text = root.to_str().unwrap();
+        for source in [
+            "DevEco Studio".to_owned(),
+            text.replace('\\', "/"),
+            format!(r"{text}\."),
+            format!(r"{text}\..\DevEco Studio"),
+            "/Applications/DevEco-Studio.app/Contents".to_owned(),
+            format!(r"\\?\{text}"),
+        ] {
+            assert_eq!(
+                store.register(Path::new(&source), NOW).unwrap_err().code,
+                "invalidInput",
+                "{source}"
+            );
+        }
+        // Absent, or not a DevEco layout: the reader refuses it.
+        assert_eq!(
+            store.register(&root, NOW).unwrap_err().code,
+            "fileIdentityChanged"
+        );
+        scratch.directories("DevEco Studio");
+        assert_eq!(
+            store
+                .register(Path::new(&format!(r"{text}\")), NOW)
+                .unwrap_err()
+                .code,
+            "fileIdentityChanged"
+        );
+    }
+
+    #[test]
+    fn a_macos_record_is_not_this_hosts() {
+        let child = |role: &str| {
+            json!({"role":role,"relativePath":"x","device":1,"inode":2,"byteCount":1,
+                "modifiedSeconds":0,"modifiedNanos":0,"changedSeconds":0,"changedNanos":0,
+                "sha256":"b".repeat(64),"executable":false})
+        };
+        let record = |path: &str, roles: &[&str]| {
+            json!({"schemaVersion":"arkdeck.bootstrap-deveco-toolchains/1","records":[{
+                "reference":format!("toolchain:sha256:{}", "a".repeat(64)),"contentDigest":"a".repeat(64),
+                "root":{"path":path,"device":1,"inode":2,"modifiedSeconds":0,"modifiedNanos":0,
+                    "changedSeconds":0,"changedNanos":0},
+                "productVersion":"6.0.0.868","buildNumber":"DS-253.1.2","sdkVersion":"6.0.0.43",
+                "apiVersion":"26","registeredAtUTC":NOW,"bundleTrust":{"signature":"verified"},
+                "children":roles.iter().map(|role| child(role)).collect::<Vec<_>>(),
+                "generation":1,"state":"available","references":[]}]})
+        };
+        let windows = ["productManifest", "sdkManifest", "node", "hvigor"];
+        let macos = [
+            "productManifest",
+            "sdkManifest",
+            "node",
+            "hvigor",
+            "signedResourceEnvelope",
+        ];
+        assert!(
+            read_index(&serde_json::to_vec(&record(r"C:\DevEco Studio", &windows)).unwrap())
+                .is_ok()
+        );
+        for (path, roles) in [
+            ("/Applications/DevEco-Studio.app/Contents", &macos[..]),
+            (r"C:\DevEco Studio", &macos[..]),
+            ("/Applications/DevEco-Studio.app/Contents", &windows[..]),
+            ("C:/DevEco Studio", &windows[..]),
+            (r"C:\DevEco Studio\..\x", &windows[..]),
+        ] {
+            assert!(
+                read_index(&serde_json::to_vec(&record(path, roles)).unwrap()).is_err(),
+                "{path} {roles:?}"
+            );
+        }
+    }
+
+    /// The host's real DevEco Studio, read only: node signed by the OpenJS
+    /// Foundation, the launcher by the DevEco publisher.
+    #[test]
+    #[ignore = "requires ARKDECK_LIVE_DEVECO_ROOT naming an installed DevEco Studio directory"]
+    fn the_installed_deveco_studio_registers() {
+        let source =
+            PathBuf::from(std::env::var_os("ARKDECK_LIVE_DEVECO_ROOT").expect("DevEco root"));
+        let scratch = Scratch::new("deveco-registration-live");
+        let value = scratch.store().register(&source, NOW).unwrap();
+        assert_eq!(value["platform"], "windows");
+        let children = value["childTools"].as_array().unwrap();
+        assert_eq!(children[2]["trust"]["signature"], "verified");
+        assert_eq!(
+            children[2]["trust"]["signingIdentifier"],
+            "OpenJS Foundation"
+        );
+        assert_eq!(
+            value["trust"]["signingIdentifier"],
+            arkdeck_platform::DEVECO_PUBLISHER
+        );
     }
 }

@@ -23,8 +23,12 @@
 //! * a restart reads all of it back and changes nothing;
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
-//!   `job run`, `job cancel` and `job result` report the same. Without that
-//!   variable this test says so and checks nothing.
+//!   `job run`, `job cancel` and `job result` report the same, every
+//!   recorded answer of `job result` and `job evidence` reads as Swift
+//!   answered it, and `job wait` on a finished Job answers its terminal
+//!   status at once. The measured leaves are Windows `implemented` in the
+//!   coverage manifest the CLI renders (`WINDOWS_MEASURED_LEAVES`). Without
+//!   that variable this test says so and checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory;
@@ -636,5 +640,57 @@ fn gj1_run_cancel_and_result_hops_run_through_the_cli_against_a_dev_signed_daemo
         .unwrap()["answer"]["result"]
         .clone();
     assert_eq!(envelope["result"], recorded, "{envelope}");
+    // Every recorded answer the pipe replays above, through the CLI.
+    let mut replayed = 0;
+    for exchange in document(fixture("cases.json"))["exchanges"]
+        .as_array()
+        .unwrap()
+    {
+        let method = exchange["method"].as_str().unwrap();
+        if !matches!(method, "job.result" | "job.evidence") || exchange["answer"]["ok"] != true {
+            continue;
+        }
+        replayed += 1;
+        let job = exchange["params"]["jobId"].as_str().unwrap();
+        let verb = method.trim_start_matches("job.");
+        let (_, envelope) = cli(&daemon, &pin, &pipe, &["job", verb, "--job", job]);
+        assert_eq!(envelope["ok"], true, "{}: {envelope}", exchange["name"]);
+        assert_eq!(
+            envelope["result"], exchange["answer"]["result"],
+            "{}: {envelope}",
+            exchange["name"]
+        );
+    }
+    assert_eq!(replayed, 7);
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["job", "wait", "--job", observed]);
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"]["jobId"], observed, "{envelope}");
+    assert_eq!(envelope["result"]["state"], "succeeded", "{envelope}");
     started.stop(&root.0);
+    assert_measured(&["job.cancel", "job.result", "job.evidence", "job.wait"]);
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }

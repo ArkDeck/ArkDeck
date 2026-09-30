@@ -496,6 +496,8 @@ mod tests {
         assert_eq!(host_platform(), "macos/arm64");
         #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
         assert_eq!(host_platform(), "macos/x86_64");
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        assert_eq!(host_platform(), "windows/x86_64");
         assert!(host_platform().contains('/'));
     }
 }

@@ -14,13 +14,15 @@
 //! * `target.display-name.clear` of a Target that does not exist is the
 //!   Target display-name owner's `resourceNotFound`, as Swift's
 //!   `clearTargetDisplayName` answers it;
-//! * `artifact.import.list` without the Import owner is Swift's
+//! * `artifact.import.list` answers the Import owner's page (TASK-XPA-008
+//!   composes the owner on Windows; without it the answer is Swift's
 //!   `operationUnavailable` "Import owner services are unavailable", phase
-//!   `importOwner`, no new dispatch.
+//!   `importOwner`, which the contract now publishes).
 //!
 //! check-contracts' published view compiles this build against the merge
-//! base's contract, which predates the widening of those two methods: there
-//! the two answers are still replaced, and nothing else may be.
+//! base's contract, which may predate the widening of
+//! `target.display-name.clear`: there that answer is still replaced, and
+//! nothing else may be.
 //!
 //! The daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root; nothing installed is read or written, and no HDC or
@@ -230,21 +232,11 @@ fn every_method_answers_in_its_published_contract() {
         );
         assert_eq!(cleared["error"]["message"], NON_CONFORMING, "{cleared}");
     }
-    if publishes("artifact.import.list", "operationUnavailable") {
-        assert_eq!(
-            listed["error"],
-            json!({"code": "operationUnavailable",
-                "message": "Import owner services are unavailable",
-                "details": {"phase": "importOwner", "newDispatchCount": 0}}),
-            "{listed}"
-        );
-    } else {
-        assert!(
-            published_view(),
-            "artifact.import.list must publish operationUnavailable"
-        );
-        assert_eq!(listed["error"]["message"], NON_CONFORMING, "{listed}");
-    }
+    // The Import owner is composed: the list answers its (empty) page.
+    assert_eq!(listed["ok"], true, "{listed}");
+    arkdeck_contract::validate_method_value("artifact.import.list", "result", &listed["result"])
+        .unwrap_or_else(|error| panic!("{error}: {listed}"));
+    assert_eq!(listed["result"]["items"], json!([]), "{listed}");
     // The existing Target's clear still answers its result.
     let existing = request(
         &pipe,

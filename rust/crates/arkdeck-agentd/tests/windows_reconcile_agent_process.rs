@@ -35,8 +35,11 @@
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
 //!   `job reconcile`, `agent status` (the abandoned and the waiting
 //!   execution) and `human-action show` (the expired action and the
-//!   pick-a-device one) report the same.
-//!   Without that variable this test says so and checks nothing.
+//!   pick-a-device one) report the same, and `agent list` and
+//!   `human-action list` the pages the pipe answers. These leaves are Windows
+//!   `implemented` in the coverage manifest the CLI renders
+//!   (`WINDOWS_MEASURED_LEAVES`). Without that variable this test says so and
+//!   checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory;
@@ -629,7 +632,7 @@ fn jobs_are_reconciled_and_executions_answered_as_swift_s_across_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, \
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, \
               workspaceProjects, planning, agentExecutions, humanActions, traceCache"
                 .to_owned()
         ),
@@ -733,21 +736,24 @@ fn cli(daemon: &Path, pin: &str, pipe: &str, arguments: &[&str]) -> (Option<i32>
     (output.status.code(), envelope)
 }
 
-#[test]
-fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signed_daemon() {
-    let Some(thumbprint) =
-        std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT").filter(|value| !value.is_empty())
-    else {
+/// The host-trusted development signer's thumbprint, or `None` once the
+/// test has said it checks nothing without one.
+fn development_signer() -> Option<std::ffi::OsString> {
+    let thumbprint =
+        std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT").filter(|value| !value.is_empty());
+    if thumbprint.is_none() {
         eprintln!(
             "SKIPPED: ARKDECK_DEV_SIGNER_THUMBPRINT is not set (or empty), so no host-trusted development \
              signer can sign the daemon the CLI must verify (rust/scripts/windows-dev-identity.ps1 \
              create); nothing was checked"
         );
-        return;
-    };
-    let _turn = turn();
-    let root = Root::new();
-    let exchanges = agent_exchanges();
+    }
+    thumbprint
+}
+
+/// A copy of the daemon below `root`, signed by `thumbprint`: its path and
+/// the signer pin the CLI verifies it by.
+fn signed_daemon(root: &Root, thumbprint: &std::ffi::OsStr) -> (PathBuf, String) {
     let signed = root.0.join("signed-bin");
     std::fs::create_dir(&signed).unwrap();
     let daemon = signed.join("arkdeck-agentd.exe");
@@ -759,7 +765,7 @@ fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signe
         .arg(&script)
         .arg("sign")
         .arg("-Thumbprint")
-        .arg(&thumbprint)
+        .arg(thumbprint)
         .arg("-Path")
         .arg(&daemon)
         .stdin(Stdio::null())
@@ -767,7 +773,18 @@ fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signe
         .unwrap();
     assert!(signing.status.success(), "{signing:?}");
     let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
-    let pin = pin["pin"].as_str().unwrap().to_owned();
+    (daemon, pin["pin"].as_str().unwrap().to_owned())
+}
+
+#[test]
+fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signed_daemon() {
+    let Some(thumbprint) = development_signer() else {
+        return;
+    };
+    let _turn = turn();
+    let root = Root::new();
+    let exchanges = agent_exchanges();
+    let (daemon, pin) = signed_daemon(&root, &thumbprint);
 
     let mut started = Daemon::start(&daemon, &root.0);
     let pipe = started.serving();
@@ -826,5 +843,49 @@ fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signe
         envelope["result"], expired["answer"]["result"],
         "{envelope}"
     );
+    // The whole execution list and every action, as the pipe pages them.
+    for (arguments, method) in [
+        (["agent", "list"], "agent.list"),
+        (["human-action", "list"], "human-action.list"),
+    ] {
+        let (status, envelope) = cli(&daemon, &pin, &pipe, &arguments);
+        assert_eq!(status, Some(0), "{envelope}");
+        let page = request(&pipe, method, json!({}))["result"].clone();
+        assert!(!page["items"].as_array().unwrap().is_empty(), "{page}");
+        assert_eq!(envelope["result"]["items"], page["items"], "{envelope}");
+        assert_eq!(envelope["result"]["hasMore"], false, "{envelope}");
+    }
     started.stop(&root.0);
+    assert_measured(&[
+        "job.reconcile",
+        "agent.status",
+        "agent.list",
+        "human-action.show",
+        "human-action.list",
+    ]);
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }

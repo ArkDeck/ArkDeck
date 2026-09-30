@@ -14,7 +14,10 @@
 //! - The real daemon (`arkdeck-agentd`, built beside the CLI), signed, on a
 //!   private pipe with every other `ARKDECK_`/`OHOS_HDC_` input removed:
 //!   `doctor`, `doctor --deep`, `operation list` and `device candidates` are
-//!   answered as `check-readonly.py`'s signed matrix records them.
+//!   answered as `check-readonly.py`'s signed matrix records them, and
+//!   `runtime health`, `operation describe`, `example` and `validate` answer
+//!   `observe.device@1`'s contract (its Catalog entry, a submittable request,
+//!   its empty typed inputs valid) with nothing dispatched.
 //! - The same daemon over a development root holding a recorded Target
 //!   (`rust/tests/fixtures/target-adoption`) and a project directory: every
 //!   leaf in `WINDOWS_MEASURED_LEAVES` beyond `doctor` and `operation list`
@@ -348,10 +351,35 @@ mod windows {
             .unwrap()
             .trim_start_matches("arkdeck-agentd listening on ")
             .to_owned();
+        let inputs = directory.0.join("inputs.json");
+        std::fs::write(&inputs, b"{}").unwrap();
+        let inputs = inputs.to_str().unwrap();
+        let observe = ["--operation", "observe.device@1"];
         for (argv, code, error) in [
             (&["doctor"][..], 0, None),
             (&["doctor", "--deep"][..], 0, None),
+            (&["runtime", "health"][..], 0, None),
             (&["operation", "list"][..], 0, None),
+            (
+                &[&["operation", "describe"][..], &observe].concat()[..],
+                0,
+                None,
+            ),
+            (
+                &[&["operation", "example"][..], &observe].concat()[..],
+                0,
+                None,
+            ),
+            (
+                &[
+                    &["operation", "validate"][..],
+                    &observe,
+                    &["--inputs-file", inputs],
+                ]
+                .concat()[..],
+                0,
+                None,
+            ),
             // No registered HDC tuple on Windows: the observation owner
             // refuses, structured, and nothing is observed.
             (&["device", "candidates"][..], 1, Some("operationFailed")),
@@ -368,6 +396,27 @@ mod windows {
             match error {
                 None => assert!(!envelope["result"].is_null(), "{argv:?}: {envelope}"),
                 Some(error) => assert_eq!(envelope["error"]["code"], error, "{envelope}"),
+            }
+            match argv[..argv.len().min(2)] {
+                ["runtime", "health"] => {
+                    assert_eq!(envelope["result"]["contractIdentity"], CONTRACT_IDENTITY);
+                    assert_eq!(envelope["result"]["catalogDigest"], CATALOG_DIGEST);
+                    assert_eq!(envelope["result"]["publishedMethods"], json!(METHODS));
+                }
+                ["operation", "describe"] => {
+                    assert_eq!(envelope["result"]["reference"], "observe.device@1");
+                }
+                ["operation", "example"] => {
+                    assert_eq!(
+                        envelope["result"]["operation"],
+                        json!({"id": "observe.device", "version": 1})
+                    );
+                }
+                ["operation", "validate"] => {
+                    assert_eq!(envelope["result"]["structurallyValid"], true, "{envelope}");
+                    assert_eq!(envelope["result"]["findings"], json!([]), "{envelope}");
+                }
+                _ => {}
             }
             if argv == ["operation", "list"] {
                 let operations = envelope["result"].as_array().unwrap();
@@ -397,6 +446,20 @@ mod windows {
         server.line_starting("arkdeck-agentd stopped");
         let status = server.child.wait().unwrap();
         assert!(status.success(), "{status:?}");
+
+        // What this measured is what the coverage manifest counts.
+        for leaf in [
+            "health",
+            "operation.describe",
+            "operation.example",
+            "operation.validate",
+        ] {
+            let statuses = windows_statuses(leaf);
+            assert!(
+                !statuses.is_empty() && statuses.iter().all(|status| status == "implemented"),
+                "{leaf}: {statuses:?}"
+            );
+        }
     }
 
     /// The daemon over its development root, started and serving: its pipe.

@@ -28,6 +28,7 @@ arkforge-authority-api = { git = "https://github.com/ArkDeck/ArkForge.git", rev 
 arkforge-client = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
 arkforge-core = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
 arkforge-ipc = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
+arkforge-platform = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["float_roundtrip"] }
 sha2 = "0.10.9"

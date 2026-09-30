@@ -4,7 +4,7 @@
 mod lifecycle;
 #[path = "import_publication.rs"]
 mod publication;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 #[path = "import_refusal_oracle_tests.rs"]
 mod refusal_oracle_tests;
 use arkdeck_contract::{

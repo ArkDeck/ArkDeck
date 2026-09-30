@@ -25,7 +25,9 @@
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
 //!   `artifact list`, `artifact quota` and `capability list` report the
-//!   same. Without that variable this test says so and checks nothing.
+//!   same; `capability list` is Windows `implemented` in the coverage
+//!   manifest the CLI renders (`WINDOWS_MEASURED_LEAVES`). Without that
+//!   variable this test says so and checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory;
@@ -409,7 +411,7 @@ fn the_start_sweeps_lapsed_artifacts_and_names_the_mutation_authority_across_a_r
     let pipe = first.serving();
     for line in [
         "arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, \
-         storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache",
+         imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache",
         "recovered 1 active job(s); unknown outcomes parked",
         "reclaimed 4 expired artifact(s)",
     ] {
@@ -556,5 +558,36 @@ fn swept_artifacts_and_capabilities_read_through_the_cli_against_a_dev_signed_da
     );
     let (status, envelope) = cli(&daemon, &pin, &pipe, &["capability", "list"]);
     assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(
+        envelope["result"],
+        request(&pipe, "capability.list", json!({}))["result"],
+        "{envelope}"
+    );
     started.stop(&root.0);
+    assert_measured(&["capability.list"]);
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }

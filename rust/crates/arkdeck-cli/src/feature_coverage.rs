@@ -365,14 +365,68 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &[
 /// end to end on Windows: the CLI authenticates a daemon signed with a
 /// host-trusted development signer over the named pipe and renders its
 /// answer (`check-readonly.py` `signed_windows_matrix`, `tests/
-/// windows_signed_runtime.rs`; TASK-XPA-018). `device candidates` is not one:
-/// without a registered Windows HDC tuple its method answers a structured
-/// refusal, not the live candidates its target contract names, and the entry
-/// for that method reaches `device wait` and `device list`, which no Windows
-/// run has measured.
+/// windows_signed_runtime.rs`, and the owners' `arkdeck-agentd/tests/
+/// windows_*_process.rs` signed-CLI tests, each of which checks that what it
+/// measured is `implemented` here; TASK-XPA-018). `device candidates` is not
+/// one: without a registered Windows HDC tuple its method answers a
+/// structured refusal, not the live candidates its target contract names,
+/// and the entry for that method reaches `device wait` and `device list`,
+/// which no Windows run has measured.
 const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "doctor",
+    "runtime.health",
     "operation.list",
+    // The Catalog reads of one operation (`observe.device@1`); they dispatch
+    // nothing.
+    "operation.describe",
+    "operation.example",
+    "operation.validate",
+    // The Job store, runner and reconciler over recorded Swift Jobs
+    // (TASK-XPA-005; `windows_job_store_process.rs`,
+    // `windows_job_runner_process.rs`, `windows_reconcile_agent_process.rs`).
+    // Not `job plan`, `job submit` or `job run`: without a registered HDC
+    // a new device Job is refused before admission or before its run.
+    "job.list",
+    "job.show",
+    "job.status",
+    "job.events",
+    "job.timeline",
+    "job.result",
+    "job.evidence",
+    "job.wait",
+    "job.cancel",
+    "job.reconcile",
+    // The agent execution and human-action owners over Swift's
+    // physical-assistance records (TASK-XPA-005). Not `agent run`, `resume`
+    // or `abandon`, nor `human-action resume`: each reaches a Target, which
+    // needs a registered HDC.
+    "agent.list",
+    "agent.status",
+    "human-action.list",
+    "human-action.show",
+    // The Artifact owner over a recorded Job's Artifacts (TASK-XPA-006;
+    // `windows_artifact_owner_process.rs`).
+    "artifact.list",
+    "artifact.inspect",
+    "artifact.read",
+    "artifact.export",
+    "artifact.quota",
+    // The capability store's list (`windows_mutation_retention_process.rs`);
+    // not `capability inspect`, as nothing is issued without a device Job.
+    "capability.list",
+    // The Session and storage owners over recorded Swift Sessions
+    // (TASK-XPA-005/014; `windows_session_owner_process.rs`). Not `runtime
+    // storage root`, which no Windows run has moved yet.
+    "runtime.storage.status",
+    "runtime.storage.policy",
+    "session.list",
+    "session.show",
+    "session.pin",
+    "session.unpin",
+    "session.export.preview",
+    "session.export.apply",
+    "session.cleanup.preview",
+    "session.cleanup.apply",
     // The Target store (TASK-XPA-004): its reads and display names. Not
     // `target availability` (presence stays unresolved without a registered
     // HDC) nor `target adopt` (refused before admission without one).
@@ -1085,17 +1139,21 @@ mod tests {
             ("target.show", "implemented"),
             ("workspace.project.register", "implemented"),
             ("trace.cache.status", "implemented"),
+            ("health", "implemented"),
+            ("job.status", "implemented"),
+            ("session.cleanup.apply", "implemented"),
             // Refused by the Windows daemon without an HDC or a Job owner.
             ("target.availability", "partial"),
             ("target.adopt", "partial"),
             ("workspace.project.update", "partial"),
             ("trace.cache.purge", "partial"),
             ("device.observations", "partial"),
-            ("health", "partial"),
+            ("job.submit", "partial"),
+            ("agent.run", "partial"),
+            ("runtime.storage.root", "partial"),
             ("help", "implemented"),
             ("completion", "implemented"),
             ("capability.install", "implemented"),
-            ("job.status", "partial"),
             ("artifact.import.list", "partial"),
             ("artifact.import.release", "partial"),
             ("human-action.resume", "partial"),

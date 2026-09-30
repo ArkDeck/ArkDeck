@@ -1,5 +1,11 @@
 //! Current Swift DevEco metadata schema. Offline decoding does not validate
 //! external content; only the read owner revalidates available registrations.
+//!
+//! The index is the host's own: on macOS a record is a `.app/Contents` root
+//! with five child roles (the Swift schema, unchanged); on Windows
+//! (TASK-XPA-011) an `X:\…` DevEco Studio directory with four (no signed
+//! resource envelope), projected with `"platform":"windows"`. Each host
+//! refuses the other's records.
 use crate::deveco_manifest::{identifier, version};
 use crate::{DecodeError, DecodedStore, roundtrip};
 use serde::{Deserialize, Serialize};
@@ -101,9 +107,54 @@ pub(crate) struct Record {
     pub state: String,
     pub references: Vec<Owner>,
 }
+/// The platform a record of this host projects.
+#[cfg(not(windows))]
+const PLATFORM: &str = "macos";
+#[cfg(windows)]
+const PLATFORM: &str = "windows";
+
+/// The child roles a record of this host carries, in their sorted set.
+#[cfg(not(windows))]
+const ROLES: &[&str] = &[
+    "productManifest",
+    "sdkManifest",
+    "node",
+    "hvigor",
+    "signedResourceEnvelope",
+];
+#[cfg(windows)]
+const ROLES: &[&str] = &["productManifest", "sdkManifest", "node", "hvigor"];
+
+/// A registered root of this host: `/…` on macOS, a standard `X:\…` path on
+/// Windows.
+#[cfg(not(windows))]
+fn root_path(path: &str) -> bool {
+    path.starts_with('/')
+}
+#[cfg(windows)]
+fn root_path(path: &str) -> bool {
+    host_root_path(path)
+}
+#[cfg(windows)]
+pub(crate) fn host_root_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() > 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && bytes[2] == b'\\'
+        && path[3..].split('\\').all(|component| {
+            !component.is_empty()
+                && component != "."
+                && component != ".."
+                && !component
+                    .chars()
+                    .any(|c| c < ' ' || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+        })
+}
+
 impl Record {
     pub(crate) fn value(&self) -> Value {
-        json!({"schemaVersion":"arkdeck.runtime-tool/1","toolRef":self.reference,"kind":"deveco","platform":"macos","source":"registeredRoot","generation":self.generation.to_string(),"state":self.state,"contentDigest":self.content_digest,"digestAlgorithm":"sha256-jcs","contentSchemaVersion":"arkdeck.deveco-toolchain-content/2","productVersion":self.product_version,"buildNumber":self.build_number,"sdkVersion":self.sdk_version,"apiVersion":self.api_version,"trust":self.bundle_trust.value(),"childTools":self.children.iter().map(Child::value).collect::<Vec<_>>(),"selected":false,"references":self.references,"contentRetained":false})
+        json!({"schemaVersion":"arkdeck.runtime-tool/1","toolRef":self.reference,"kind":"deveco","platform":PLATFORM,"source":"registeredRoot","generation":self.generation.to_string(),"state":self.state,"contentDigest":self.content_digest,"digestAlgorithm":"sha256-jcs","contentSchemaVersion":"arkdeck.deveco-toolchain-content/2","productVersion":self.product_version,"buildNumber":self.build_number,"sdkVersion":self.sdk_version,"apiVersion":self.api_version,"trust":self.bundle_trust.value(),"childTools":self.children.iter().map(Child::value).collect::<Vec<_>>(),"selected":false,"references":self.references,"contentRetained":false})
     }
 }
 #[derive(Deserialize, Serialize)]
@@ -141,23 +192,14 @@ pub(crate) fn read_index(bytes: &[u8]) -> Result<(Index, Vec<u8>), DecodeError> 
         let mut owners = std::collections::BTreeSet::new();
         if record.reference != format!("toolchain:sha256:{}", record.content_digest)
             || !digest(&record.content_digest)
-            || !record.root.path.starts_with('/')
+            || !root_path(&record.root.path)
             || !version(&record.product_version)
             || !identifier(&record.build_number)
             || !version(&record.sdk_version)
             || !identifier(&record.api_version)
             || !record.bundle_trust.well_formed()
-            || record.children.len() != 5
-            || roles
-                != [
-                    "productManifest",
-                    "sdkManifest",
-                    "node",
-                    "hvigor",
-                    "signedResourceEnvelope",
-                ]
-                .into_iter()
-                .collect()
+            || record.children.len() != ROLES.len()
+            || roles != ROLES.iter().copied().collect()
             || !record
                 .children
                 .iter()

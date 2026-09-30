@@ -16,6 +16,9 @@
     <AssemblyName>ArkDeck</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <!-- The release candidate is published trimmed; the trim analyzer runs on every build, so
+         code the trimmer cannot keep fails the build (warnings are errors), not only the RC. -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <Platforms>x64</Platforms>
     <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -35,19 +38,23 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="Assets\SplashScreen.scale-200.png" />
-    <Content Include="Assets\LockScreenLogo.scale-200.png" />
-    <Content Include="Assets\Square150x150Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
-    <Content Include="Assets\StoreLogo.png" />
-    <Content Include="Assets\AppIcon.ico" />
-    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+    <!-- Generated from the macOS AppIcon by windows/scripts/generate-app-icons.py. -->
+    <Content Include="Assets\*.png" />
+    <!-- Also beside the unpackaged exe: the window and title bar load it (AppWindow.SetIcon, the
+         TitleBar icon), and the xcopy package ships the output folder. -->
+    <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <!-- The release candidate's production MSIX (package-rc.ps1 -MsixPublisher): a copy of
+       Package.appxmanifest whose Identity/@Publisher is the signing certificate's subject.
+       Named before the MSIX tooling's own default, so it replaces Package.appxmanifest; the
+       tracked manifest is never rewritten. -->
+  <ItemGroup Condition="'$(ArkDeckPackageManifest)' != ''">
+    <AppxManifest Include="$(ArkDeckPackageManifest)" />
   </ItemGroup>
 
   <!-- The release-candidate MSIX (windows/scripts/package-rc.ps1, TASK-XPA-022): the daemon,

@@ -9,6 +9,13 @@
 //! `resolvingSymlinksInPath` also drops a leading `/private` whose remainder
 //! exists. The CLI's `runtime service` leaves and the daemon's ArkForge lane
 //! read a bundle through this one reader.
+//!
+//! On Windows (TASK-XPA-010) the same manifest names the two executables
+//! where ArkForge's Windows package puts them, `bin/arkforge.exe` and
+//! `bin/arkforged.exe`, since a Windows child must be an `.exe` image;
+//! everything else is the same. Member paths stay `/`-separated in the
+//! manifest and are joined component by component, because a canonical
+//! (`\\?\`) Windows root takes no `/` separator.
 use crate::foundation_path::{lexical, resolved};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -17,6 +24,22 @@ use std::path::{Path, PathBuf};
 
 const MANIFEST_PATH: &str = "Contents/Resources/arkforge-bundle.json";
 const MANIFEST_SCHEMA: &str = "arkforge.release-bundle/v1";
+/// The one path each executable role may have.
+#[cfg(not(windows))]
+pub const CLI_PATH: &str = "Contents/MacOS/arkforge";
+#[cfg(not(windows))]
+pub const DAEMON_PATH: &str = "Contents/MacOS/arkforged";
+#[cfg(windows)]
+pub const CLI_PATH: &str = "bin/arkforge.exe";
+#[cfg(windows)]
+pub const DAEMON_PATH: &str = "bin/arkforged.exe";
+
+/// `root` joined with the `/`-separated `relative`, one component at a time.
+fn joined(root: &Path, relative: &str) -> PathBuf {
+    relative
+        .split('/')
+        .fold(root.to_path_buf(), |path, component| path.join(component))
+}
 
 /// Swift `ArkForgeReleaseBundleError`, whose descriptions name what to fix.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -212,7 +235,7 @@ fn member_path(root: &Path, relative: &str) -> Result<PathBuf, BundleError> {
     {
         return Err(BundleError::UnsafePath(relative.to_owned()));
     }
-    let candidate = lexical(&root.join(relative));
+    let candidate = lexical(&joined(root, relative));
     let resolved_root = resolved(root);
     let resolved_candidate = resolved(&candidate);
     if !resolved_candidate.starts_with(&resolved_root) || resolved_candidate == resolved_root {
@@ -249,7 +272,13 @@ fn reject_undeclared(
     for path in entries {
         let relative = path
             .strip_prefix(root)
-            .map(|relative| relative.to_string_lossy().into_owned())
+            .map(|relative| {
+                relative
+                    .components()
+                    .map(|component| component.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            })
             .unwrap_or_default();
         let metadata = inspect(&path)?;
         if metadata.file_type().is_symlink() {
@@ -283,7 +312,7 @@ pub fn load(bundle: &Path) -> Result<ReleaseBundle, BundleError> {
         )));
     }
     let root = resolved(&requested);
-    let manifest_path = root.join(MANIFEST_PATH);
+    let manifest_path = joined(&root, MANIFEST_PATH);
     let (_, manifest_sha256) = regular_file_facts(&manifest_path, MANIFEST_PATH)?;
     let bytes = fs::read(&manifest_path).map_err(|error| {
         BundleError::Filesystem(format!("cannot read ArkForge bundle manifest: {error}"))
@@ -326,7 +355,7 @@ pub fn load(bundle: &Path) -> Result<ReleaseBundle, BundleError> {
         }
         match member.role.as_str() {
             "cli" => {
-                if member.path != "Contents/MacOS/arkforge" || member.profile_id.is_some() {
+                if member.path != CLI_PATH || member.profile_id.is_some() {
                     return Err(BundleError::InvalidRole(member.path.clone()));
                 }
                 if cli.replace(path).is_some() {
@@ -334,7 +363,7 @@ pub fn load(bundle: &Path) -> Result<ReleaseBundle, BundleError> {
                 }
             }
             "daemon" => {
-                if member.path != "Contents/MacOS/arkforged" || member.profile_id.is_some() {
+                if member.path != DAEMON_PATH || member.profile_id.is_some() {
                     return Err(BundleError::InvalidRole(member.path.clone()));
                 }
                 if daemon.replace(path).is_some() {

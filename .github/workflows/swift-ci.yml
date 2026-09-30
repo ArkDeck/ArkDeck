@@ -382,6 +382,9 @@ jobs:
       - name: App design tokens generated from tokens.css
         run: python windows/scripts/generate-xaml-tokens.py --check
 
+      - name: App icon and MSIX assets generated from the macOS AppIcon
+        run: python windows/scripts/generate-app-icons.py --check
+
       - name: Build the Windows client solution
         run: dotnet build windows/ArkDeck.Windows.slnx -c Release
 

@@ -1,0 +1,1 @@
+{"command":"device.candidates","error":{"attentionRequired":false,"code":"operationFailed","controlRequestRetryable":false,"details":{"method":"device.observations","wireCode":"rejected"},"message":"hdc.notConfigured"},"meta":{"cliVersion":"0.1.0","controlProtocolVersion":"1.0.0","controlRequestId":"ctl-candidates"},"ok":false,"schemaVersion":"arkdeck.cli.result/1"}

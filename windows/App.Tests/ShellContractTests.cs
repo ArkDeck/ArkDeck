@@ -96,6 +96,20 @@ public sealed class ShellContractTests
     }
 
     [TestMethod]
+    public void EveryBuildRunsTheTrimAnalyzer()
+    {
+        // The release candidate publishes the App trimmed, which PR builds never do: the trim
+        // analyzer runs on every build instead (warnings are errors), so code the trimmer cannot
+        // keep fails the windows lane, not first the RC (IL2026 in FocusWalk.cs, #2404).
+        foreach (var project in new[] { RepoPaths.At("windows", "App", "ArkDeck.App.csproj"), RepoPaths.At("windows", "App.Core", "ArkDeck.App.Core.csproj") })
+        {
+            StringAssert.Contains(File.ReadAllText(project), "<EnableTrimAnalyzer>true</EnableTrimAnalyzer>", project);
+        }
+        StringAssert.Contains(File.ReadAllText(RepoPaths.At("windows", "ClientKit", "ArkDeck.ClientKit.csproj")), "<IsTrimmable>true</IsTrimmable>");
+        StringAssert.Contains(File.ReadAllText(RepoPaths.At("windows", "Directory.Build.props")), "<TreatWarningsAsErrors>true</TreatWarningsAsErrors>");
+    }
+
+    [TestMethod]
     public void CliCommandsAreTheCoverageTargetCommands()
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(RepoPaths.At("openspec", "contracts", "cli-feature-coverage.json")));

@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 using Microsoft.Win32.SafeHandles;
 
 namespace ArkDeck.ClientKit.Transport;
@@ -71,7 +70,9 @@ internal sealed class ProcessIdentity : IDisposable
 
     /// <summary>The Rust <c>require_server</c>: the image is the installed daemon (same
     /// canonical path and the same file), and it carries the installed package family or a
-    /// trusted Authenticode signature whose signer certificate has the pinned SHA-256.</summary>
+    /// trusted Authenticode signature that satisfies a signing pin (the signer certificate's
+    /// SHA-256, or the publisher identity of maintainer ruling 17). A partial or malformed
+    /// publisher identity refuses the server outright, whatever else is configured.</summary>
     public void RequireServer(DaemonIdentity expected)
     {
         if (!Path.IsPathFullyQualified(expected.ExecutablePath)
@@ -79,6 +80,7 @@ internal sealed class ProcessIdentity : IDisposable
         {
             throw new UnauthorizedAccessException("pipe server image differs from installed daemon; zero frames sent");
         }
+        var pins = SignerPins.Configured(expected);
         using (var installed = FileIdentity.OpenLocked(expected.ExecutablePath))
         {
             if (!FileIdentity.Of(installed).Equals(FileIdentity.Of(_image)))
@@ -87,7 +89,9 @@ internal sealed class ProcessIdentity : IDisposable
             }
         }
         var packageMatches = expected.PackageFamily is { Length: > 0 } family && PackageFamily(_process) == family;
-        var signatureMatches = expected.AuthenticodeSha256 is { } pin && Authenticode.SignerMatches(_image, ImagePath, pin);
+        var signatureMatches = !pins.IsEmpty
+            && Authenticode.TrustedSignerChain(_image, ImagePath) is { } chain
+            && pins.ChainMatches(chain, PublisherIdentity.ArtifactSigningRootSha256);
         if (!packageMatches && !signatureMatches)
         {
             throw new UnauthorizedAccessException(
@@ -248,14 +252,16 @@ internal readonly record struct FileIdentity(ulong Volume, UInt128 Index)
     }
 }
 
-/// <summary>The Rust <c>verify_signature</c>: <c>WinVerifyTrust</c> (generic verify v2, no
+/// <summary>The Rust <c>trusted_signer_chain</c>: <c>WinVerifyTrust</c> (generic verify v2, no
 /// UI, whole-chain revocation from the cache only, root excluded) over the held image
-/// handle, then the first signer's certificate DER must hash to the pin.</summary>
+/// handle; the pins (<see cref="SignerPins"/>) are then checked against the chain it
+/// verified.</summary>
 internal static class Authenticode
 {
-    public static bool SignerMatches(SafeFileHandle image, string path, string pin)
+    /// <summary>The DER certificates, leaf first and root last, of the first signer of an
+    /// image <c>WinVerifyTrust</c> accepted; null when it did not.</summary>
+    public static List<byte[]>? TrustedSignerChain(SafeFileHandle image, string path)
     {
-        if (pin.Length != 64 || !pin.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f')) return false;
         var pathMemory = Marshal.StringToHGlobalUni(path);
         var fileInfo = Marshal.AllocHGlobal(Marshal.SizeOf<Native.WINTRUST_FILE_INFO>());
         var addedReference = false;
@@ -280,27 +286,31 @@ internal static class Authenticode
             };
             var action = Native.WINTRUST_ACTION_GENERIC_VERIFY_V2;
             var status = Native.WinVerifyTrust(new IntPtr(-1), ref action, ref data);
-            var verified = false;
+            var chain = new List<byte[]>();
             try
             {
                 if (status == 0)
                 {
                     var provider = Native.WTHelperProvDataFromStateData(data.hWVTStateData);
                     var signer = provider == IntPtr.Zero ? IntPtr.Zero : Native.WTHelperGetProvSignerFromChain(provider, 0, false, 0);
-                    var certificate = signer == IntPtr.Zero ? IntPtr.Zero : Native.WTHelperGetProvCertFromChain(signer, 0);
-                    // CRYPT_PROVIDER_CERT { DWORD cbStruct; PCCERT_CONTEXT pCert; ... }
-                    var context = certificate == IntPtr.Zero ? IntPtr.Zero : Marshal.ReadIntPtr(certificate, IntPtr.Size);
-                    if (context != IntPtr.Zero)
+                    // CRYPT_PROVIDER_SGNR { DWORD cbStruct; FILETIME sftVerifyAsOf; DWORD csCertChain; ... }
+                    var count = signer == IntPtr.Zero ? 0 : Marshal.ReadInt32(signer, 12);
+                    for (var index = 0; index < count; index++)
                     {
+                        var certificate = Native.WTHelperGetProvCertFromChain(signer, (uint)index);
+                        // CRYPT_PROVIDER_CERT { DWORD cbStruct; PCCERT_CONTEXT pCert; ... }
+                        var context = certificate == IntPtr.Zero ? IntPtr.Zero : Marshal.ReadIntPtr(certificate, IntPtr.Size);
                         // CERT_CONTEXT { DWORD dwCertEncodingType; BYTE* pbCertEncoded; DWORD cbCertEncoded; ... }
-                        var encoded = Marshal.ReadIntPtr(context, IntPtr.Size);
-                        var length = Marshal.ReadInt32(context, 2 * IntPtr.Size);
-                        if (encoded != IntPtr.Zero && length > 0)
+                        var encoded = context == IntPtr.Zero ? IntPtr.Zero : Marshal.ReadIntPtr(context, IntPtr.Size);
+                        var length = context == IntPtr.Zero ? 0 : Marshal.ReadInt32(context, 2 * IntPtr.Size);
+                        if (encoded == IntPtr.Zero || length <= 0)
                         {
-                            var der = new byte[length];
-                            Marshal.Copy(encoded, der, 0, length);
-                            verified = Convert.ToHexStringLower(SHA256.HashData(der)) == pin;
+                            chain.Clear();
+                            break;
                         }
+                        var der = new byte[length];
+                        Marshal.Copy(encoded, der, 0, length);
+                        chain.Add(der);
                     }
                 }
             }
@@ -309,7 +319,7 @@ internal static class Authenticode
                 data.dwStateAction = Native.WTD_STATEACTION_CLOSE;
                 Native.WinVerifyTrust(new IntPtr(-1), ref action, ref data);
             }
-            return verified;
+            return chain.Count == 0 ? null : chain;
         }
         finally
         {

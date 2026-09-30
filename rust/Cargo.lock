@@ -148,6 +148,7 @@ dependencies = [
  "arkforge-client",
  "arkforge-core",
  "arkforge-ipc",
+ "arkforge-platform",
  "serde_json",
 ]
 

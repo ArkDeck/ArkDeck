@@ -104,7 +104,7 @@ pub struct Host {
     /// root, and why (`recover_staged_sessions`); `doctor` names them.
     #[cfg(any(target_os = "macos", windows))]
     staged_kept: std::sync::OnceLock<Vec<(String, String)>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     imports: Option<std::sync::Arc<arkdeck_hoststore::ImportUploadStore>>,
     // The owners a background agent run keeps using after its request has
     // answered are shared with it.
@@ -247,7 +247,7 @@ pub struct Host {
 }
 
 impl Host {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_imports(mut self, imports: arkdeck_hoststore::ImportUploadStore) -> Self {
         self.imports = Some(std::sync::Arc::new(imports));
         self
@@ -360,13 +360,13 @@ impl Host {
         self
     }
     /// The Job planner over this Windows composition's owners, as macOS
-    /// builds it: the Artifact owner, and no Import owner, workspace or HDC
+    /// builds it: the Artifact and Import owners, and no workspace or HDC
     /// provider (none is composed on Windows yet; the HDC waits for the
     /// Windows HDC tuple's registration) and no analyzer.
     #[cfg(windows)]
     fn planner<'a>(&'a self, state_root: &'a std::path::Path) -> arkdeck_hoststore::JobPlanner<'a> {
         arkdeck_hoststore::JobPlanner {
-            imports: None,
+            imports: self.imports.as_deref(),
             artifacts: self.artifacts.as_deref(),
             analyzer: None,
             state_root,
@@ -853,6 +853,7 @@ impl Host {
         let default_mutation_root = self.default_mutation_root.clone();
         let capabilities = self.capabilities.clone();
         let holds = self.holds.clone();
+        let imports = self.imports.clone();
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
             Ok(mut runs) if !runs.contains_key(&start.job) => {
@@ -887,6 +888,7 @@ impl Host {
                     &state_root,
                     &jobs,
                     &artifacts,
+                    imports.as_deref(),
                     authority,
                     &home,
                     publisher.as_ref(),
@@ -1326,6 +1328,7 @@ impl Host {
             ("mutationAuthority", self.authority().is_some()),
             ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
+            ("imports", self.imports.is_some()),
             ("storage", self.storage.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
             ("planning", self.planning.is_some()),
@@ -1360,7 +1363,7 @@ impl Host {
             quarantined: std::sync::OnceLock::new(),
             #[cfg(any(target_os = "macos", windows))]
             staged_kept: std::sync::OnceLock::new(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             imports: None,
             #[cfg(any(target_os = "macos", windows))]
             targets: None,
@@ -1497,22 +1500,25 @@ impl Host {
 }
 
 /// The Job runner a Windows composition runs a Job with (`job.run`, an
-/// agent execution's owned Job and `job.reconcile`'s finalization): the Job
-/// and Artifact owners, the Session publication writer and the mutation
-/// authority, with no HDC composition (no Windows HDC tuple is registered),
-/// analyzer, Import owner or workspace provider.
+/// agent execution's owned Job and `job.reconcile`'s finalization): the Job,
+/// Artifact and Import owners, the Session publication writer and the
+/// mutation authority, with no HDC composition (no Windows HDC tuple is
+/// registered), analyzer or workspace provider. One argument per owner, as
+/// the runner's own fields are: the background run passes its own clones.
 #[cfg(windows)]
+#[allow(clippy::too_many_arguments)]
 fn windows_runner<'a>(
     state_root: &'a std::path::Path,
     jobs: &'a arkdeck_hoststore::JobStore,
     artifacts: &'a arkdeck_hoststore::ArtifactReadStore,
+    imports: Option<&'a arkdeck_hoststore::ImportUploadStore>,
     authority: Option<arkdeck_hoststore::MutationAuthority<'a>>,
     home: &'a str,
     sessions: Option<&'a arkdeck_hoststore::SessionPublisher<'a>>,
     cancellation: Option<&'a arkdeck_hoststore::RunCancellation>,
 ) -> arkdeck_hoststore::JobRunner<'a> {
     arkdeck_hoststore::JobRunner {
-        imports: None,
+        imports,
         mutation: authority.map(|authority| arkdeck_hoststore::MutationExecution {
             authority,
             state_root,
@@ -1608,7 +1614,7 @@ impl HostServices for Host {
         )
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn import_resource(
         &self,
         method: &str,
@@ -1622,7 +1628,7 @@ impl HostServices for Host {
     /// it, so a restart keeps that ownership; it refuses to append to, abort
     /// or commit any other before it writes anything. Discovery, inspection
     /// and release stay local.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn app_import_resource(
         &self,
         method: &str,
@@ -1806,15 +1812,8 @@ impl HostServices for Host {
                 message: "Import owner is unavailable".into(),
                 details: None,
             };
-            #[cfg(target_os = "macos")]
-            {
-                let imports = self.imports.as_ref().ok_or_else(import_owner_unavailable)?;
-                return imports.artifact_resource(artifacts, method, params);
-            }
-            // The Import owner is not on Windows yet (its upload store waits
-            // for the host store's import-upload primitives).
-            #[cfg(windows)]
-            return Err(import_owner_unavailable());
+            let imports = self.imports.as_ref().ok_or_else(import_owner_unavailable)?;
+            return imports.artifact_resource(artifacts, method, params);
         }
         if method == "artifact.list" {
             // The pages are kept where Swift keeps them, below the Artifact
@@ -2323,6 +2322,7 @@ impl HostServices for Host {
                 state_root,
                 jobs,
                 artifacts,
+                self.imports.as_deref(),
                 self.authority(),
                 &self.home,
                 publisher.as_ref(),
@@ -2758,6 +2758,7 @@ impl HostServices for Host {
                 state_root,
                 jobs,
                 artifacts,
+                self.imports.as_deref(),
                 self.authority(),
                 &self.home,
                 publisher.as_ref(),
@@ -2767,7 +2768,7 @@ impl HostServices for Host {
         let reconciler = arkdeck_hoststore::JobReconciler {
             jobs,
             artifacts,
-            imports: None,
+            imports: self.imports.as_deref(),
             now: arkdeck_hoststore::runtime_now,
             sessions: publisher.as_ref(),
             hdc: None,
@@ -3716,7 +3717,7 @@ impl Host {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl Host {
     /// The Import owner's answer with the transport provenance the caller's
     /// entry point proved: `app_owned` only for the authenticated App.

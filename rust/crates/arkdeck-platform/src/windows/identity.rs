@@ -569,6 +569,19 @@ pub(crate) fn trusted_signer_chain(
     file: &File,
     path: &std::path::Path,
 ) -> io::Result<Vec<Vec<u8>>> {
+    match authenticode_chain(file, path)? {
+        Ok(chain) => Ok(chain),
+        Err(_) => Err(denied("daemon Authenticode trust failed")),
+    }
+}
+
+/// `WinVerifyTrust`'s answer for an image: the first signer's chain (leaf
+/// first) when it accepted the image, otherwise its status (for example
+/// `TRUST_E_NOSIGNATURE` for an image that carries no signature at all).
+pub(crate) fn authenticode_chain(
+    file: &File,
+    path: &std::path::Path,
+) -> io::Result<Result<Vec<Vec<u8>>, i32>> {
     let path = wide(path.as_os_str())?;
     let mut file_info = WINTRUST_FILE_INFO {
         cbStruct: size_of::<WINTRUST_FILE_INFO>() as u32,
@@ -591,7 +604,7 @@ pub(crate) fn trusted_signer_chain(
     let mut action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
     // SAFETY: file/path/data remain alive throughout verify, inspect and close;
     // the certificates are copied out before the state is closed.
-    let chain = unsafe {
+    let (status, chain) = unsafe {
         let status = WinVerifyTrust(
             INVALID_HANDLE_VALUE,
             &mut action,
@@ -632,12 +645,13 @@ pub(crate) fn trusted_signer_chain(
             &mut action,
             std::ptr::from_mut(&mut data).cast(),
         );
-        chain
+        (status, chain)
     };
-    if chain.is_empty() {
-        return Err(denied("daemon Authenticode trust failed"));
+    if status != 0 || chain.is_empty() {
+        // An accepted image with no readable chain is not accepted.
+        return Ok(Err(if status != 0 { status } else { -1 }));
     }
-    Ok(chain)
+    Ok(Ok(chain))
 }
 
 #[cfg(test)]
