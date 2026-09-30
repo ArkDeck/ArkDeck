@@ -2746,6 +2746,23 @@ owners that compose only beside a managed HDC stay macOS-only:
 `control_performer`, `rockchip_reactivation` and `loader_binding`. No
 Windows HDC tuple is registered.
 
+The Windows daemon composes the lane beside its Job state
+(`Authority::compose_arkforge`): the account root, or a development root's
+`jobs-state`, with the lane's runtime directory `arkforge` in it. It
+composes, as the macOS compositions do:
+
+- the lane from `ARKDECK_ARKFORGE_BUNDLE_PATH`, with Swift's absences;
+- the Flash planning over it;
+- the Flash facts over the Windows USB census, which fails closed until the
+  DAYU200 sample confirms its mapping;
+- the device access observer.
+
+The lane's authority binds the managed-control HDC's digest, and no HDC is
+composed on Windows. So a verified bundle is refused before its
+`arkforged.exe` is launched, with Swift's words. A Flash `job.plan` or
+`job.submit` is refused before admission with that reason and zero
+dispatch (`windows_flash_lane_process.rs`).
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in

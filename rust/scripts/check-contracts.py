@@ -23,6 +23,10 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
 REVIEW_PROJECTION = "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift"
+# The bundled OpenHarmony code-sign helper the Rust tests verify and compose
+# (arkdeck-agentd's code-sign helper process test, the provider's helper
+# facts): a checked-in package resource beside rust/, not a protocol input.
+CODE_SIGN_HELPER = "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
 
 
 def review_projection() -> bytes:
@@ -85,6 +89,13 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
     companion = destination / REVIEW_PROJECTION
     companion.parent.mkdir(parents=True, exist_ok=True)
     companion.write_bytes(review_projection() if review_source is None else review_source)
+    # The views compile and test the checkout's own Rust, which reads this
+    # resource at its repository path.
+    helper = ROOT / CODE_SIGN_HELPER
+    if helper.is_file():
+        copied = destination / CODE_SIGN_HELPER
+        copied.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(helper, copied)
     write_json(destination / "spec/baselines/swift-single-v1.json", published_info)
     if info["kind"] == "candidate":
         write_json(destination / "spec/baselines/swift-candidate-inputs.json", info)

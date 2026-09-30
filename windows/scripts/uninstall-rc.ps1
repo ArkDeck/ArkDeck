@@ -9,10 +9,16 @@ Xcopy form (-InstallDirectory):
 
   1. The directory must hold a package-rc.ps1 manifest (`rc-manifest.json`,
      arkdeck.windows-rc-package/1); anything else is refused, so no other directory is removed.
-  2. If the daemon runs from that directory, it is asked to stop through its own stop event (the
-     account daemon's `Local\ArkDeck.Agentd.<user SID>.Stop.<pid>`, or a development root's with
-     -DevelopmentStateRoot), and its exit is awaited. The process is proved to run the
-     installed image first; nothing else is signalled and no process is ever killed.
+  2. If the daemon runs from that directory (the pid its instance document names runs the
+     installed `arkdeck-agentd.exe`; a daemon of another installation is left alone), it is
+     stopped by the installation's own CLI, `bin\arkdeck.exe runtime service uninstall`, pinned
+     to that image and its signer certificate: the CLI proves the daemon's identity on its pipe,
+     refuses while a Runtime Job is active or unclosed (exit 75), asks it to stop through its
+     own stop event and awaits its single-instance guard. Any other answer of the CLI refuses
+     the uninstall. An unsigned image, which no CLI can prove, is asked to stop through its stop
+     event directly (the account daemon's `Local\ArkDeck.Agentd.<user SID>.Stop.<pid>`, or a
+     development root's with -DevelopmentStateRoot), and its exit is awaited. Nothing else is
+     signalled and no process is ever killed.
   3. Any other process still running from the directory (the App, a CLI) refuses the uninstall:
      close it and run again.
   4. The directory is removed.
@@ -67,6 +73,40 @@ function Get-DaemonInstance([string]$StateRoot, [bool]$Development) {
     return [ordered]@{ pid = [int]$instance.pid; stopEvent = $event }
 }
 
+# `runtime service uninstall` of the installation's own CLI, with only the inputs that pin the
+# installed image: its path and its signer certificate's SHA-256 (as
+# rust/scripts/windows-dev-identity.ps1 pins one), over the same state root. Any exit but 0
+# refuses: 75 (a Runtime Job is active or unclosed) and 69 (the daemon could not be proved or
+# stopped) alike, since the image was already proved to be this installation's.
+function Invoke-CliUninstall([string]$Directory, [string]$Image, [string]$Pin, [string]$StateRoot, [bool]$Development, [int]$InstancePid) {
+    $cli = Join-Path $Directory 'bin\arkdeck.exe'
+    if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) { throw "$cli is missing, so the daemon $InstancePid cannot be stopped through its CLI; nothing was removed." }
+    $saved = @{}
+    foreach ($name in @(Get-ChildItem Env: | Where-Object { $_.Name -like 'ARKDECK_*' -or $_.Name -like 'OHOS_HDC_*' } | ForEach-Object Name)) {
+        $saved[$name] = [Environment]::GetEnvironmentVariable($name)
+        [Environment]::SetEnvironmentVariable($name, $null)
+    }
+    try {
+        $env:ARKDECK_DAEMON_PATH = $Image
+        $env:ARKDECK_DAEMON_SIGNER_SHA256 = $Pin
+        if ($Development) { $env:ARKDECK_DEVELOPMENT_STATE_ROOT = $StateRoot }
+        $errorFile = New-TemporaryFile
+        try {
+            $stdout = & $cli --output json runtime service uninstall 2> $errorFile.FullName
+            $status = $LASTEXITCODE
+            $stderr = (Get-Content -LiteralPath $errorFile.FullName -Raw) ?? ''
+        } finally { Remove-Item -LiteralPath $errorFile.FullName -Force }
+    } finally {
+        foreach ($name in @('ARKDECK_DAEMON_PATH', 'ARKDECK_DAEMON_SIGNER_SHA256', 'ARKDECK_DEVELOPMENT_STATE_ROOT')) { [Environment]::SetEnvironmentVariable($name, $null) }
+        foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+    }
+    if ($status -eq 75) { throw "The daemon $InstancePid refused to stop while Runtime Jobs are active or unclosed; nothing was removed. $($stderr.Trim())" }
+    if ($status -ne 0) { throw "runtime service uninstall exited $status, so the daemon $InstancePid was not proved stopped; nothing was removed. $($stderr.Trim())" }
+    $uninstall = (($stdout -join "`n") | ConvertFrom-Json).result.uninstall
+    if ($null -ne $uninstall.stoppedPid -and [int]$uninstall.stoppedPid -ne $InstancePid) { throw "runtime service uninstall stopped $($uninstall.stoppedPid), not the installation's daemon $InstancePid; nothing was removed." }
+    return [ordered]@{ running = $true; pid = $InstancePid; stopRequest = 'runtimeServiceUninstall'; stoppedPid = $uninstall.stoppedPid; drain = $uninstall.drain; exited = $true }
+}
+
 # Stops the daemon only when it runs the image installed under $Directory.
 function Stop-InstalledDaemon([string]$Directory, [string]$StateRoot, [bool]$Development) {
     $instance = Get-DaemonInstance $StateRoot $Development
@@ -77,12 +117,20 @@ function Stop-InstalledDaemon([string]$Directory, [string]$StateRoot, [bool]$Dev
         # Another daemon (another installation, or none): not this uninstall's to stop.
         return [ordered]@{ running = $false; instancePid = $instance.pid; note = 'the state root names a daemon that does not run from this installation' }
     }
+    $signature = Get-AuthenticodeSignature -LiteralPath $image
+    if ($signature.Status -eq 'Valid') {
+        $pin = [Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData)).ToLowerInvariant()
+        return Invoke-CliUninstall $Directory $image $pin $StateRoot $Development $instance.pid
+    }
+    if ($signature.Status -ne 'NotSigned') {
+        throw "The installed daemon image's signature is $($signature.Status); the daemon $($instance.pid) was not stopped and nothing was removed."
+    }
     $event = [System.Threading.EventWaitHandle]::OpenExisting($instance.stopEvent)
     try { [void]$event.Set() } finally { $event.Dispose() }
     if (-not $process.WaitForExit($StopTimeoutSeconds * 1000)) {
         throw "The daemon $($instance.pid) did not exit within $StopTimeoutSeconds s of its stop event; nothing was removed. Stop it and run again."
     }
-    return [ordered]@{ running = $true; pid = $instance.pid; stopEvent = ($instance.stopEvent -replace 'S-1-5-21-[0-9-]+', '<user SID>'); exited = $true }
+    return [ordered]@{ running = $true; pid = $instance.pid; stopRequest = 'stopEvent'; stopEvent = ($instance.stopEvent -replace 'S-1-5-21-[0-9-]+', '<user SID>'); exited = $true }
 }
 
 function Get-KeptState {

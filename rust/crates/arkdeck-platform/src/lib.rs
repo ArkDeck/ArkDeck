@@ -15,10 +15,12 @@ mod unix;
 #[cfg(windows)]
 mod windows;
 
+#[cfg(any(target_os = "macos", windows))]
+pub use process::ToolLaunchIdentity;
 #[cfg(target_os = "macos")]
 pub use process::{
     AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ManagedServer,
-    ToolLaunchIdentity, VerifiedNamespace, VerifiedResource, VerifiedSource,
+    VerifiedNamespace, VerifiedResource, VerifiedSource,
 };
 #[cfg(any(target_os = "macos", windows))]
 pub use process::{

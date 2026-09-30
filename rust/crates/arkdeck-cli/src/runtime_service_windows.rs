@@ -18,15 +18,31 @@
 //!   process speaking the same catalog with the same closed Jobs. A drain its
 //!   deadline cut short leaves the guard abandoned, which is reported; the
 //!   successor then starts as after a crash.
+//! * `runtime service uninstall`: macOS boots the LaunchAgent out, which
+//!   stops its daemon, and removes what it installed (plist, daemon bundle,
+//!   receipt), keeping the state and log directories. The Windows service is
+//!   client-started (decision 11): nothing is registered with the system, and
+//!   the installed daemon image is the xcopy directory's or the package's,
+//!   which leave by deleting the directory or removing the package, never by
+//!   this CLI. So `uninstall` is the stop: with the same checks and
+//!   refusals as `restart` (the daemon's identity proved on its pipe, its
+//!   instance document naming it, its current Jobs read and any active or
+//!   unclosed one refusing with exit 75), the running daemon is asked to stop
+//!   through its own stop event and its single-instance guard awaited for
+//!   30 s (restart's default; the leaf takes no options but its output
+//!   mode); no successor is started, the
+//!   state root is kept, and with no daemon running there is nothing to do.
+//!   macOS has no separate stop leaf, so neither has Windows. Any later
+//!   command that needs the Runtime starts it again.
 //!
 //! The documents follow the macOS leaves' (`runtime_service.rs`): the same
 //! members where the fact is the same (`daemonHealth`, `runtime`,
 //! `runtimeVerified`, `restartProof`), `daemonService` where macOS has
 //! `launchAgent`, and the same exit statuses (64 for an option out of range,
 //! 69 for a service that is not ready or a daemon that cannot be proved, 75
-//! for a restart refused by current Jobs). `install`, `update` and
-//! `uninstall` stay macOS-only (`unsupportedOnPlatform`), as do the retired
-//! `agentd` spellings.
+//! for a restart refused by current Jobs). `install` and `update` stay
+//! macOS-only (`unsupportedOnPlatform`), as do the retired `agentd`
+//! spellings.
 use crate::{CliError, Invocation};
 use arkdeck_client::start::{StartFailure, StartTarget, Started, connect_verified, ensure_running};
 use arkdeck_client::{Client, ClientError};
@@ -41,6 +57,7 @@ use std::time::{Duration, Instant};
 
 const RESTART_SCHEMA: &str = "arkdeck-windows-daemon-restart/v1";
 const RESTART_PROOF_SCHEMA: &str = "arkdeck-windows-daemon-restart-proof/v1";
+const UNINSTALL_SCHEMA: &str = "arkdeck-windows-daemon-uninstall/v1";
 const INSTANCE_DOCUMENT: &str = "instance.json";
 const DOCUMENT_LIMIT: u64 = 64 * 1024;
 /// How long a command waits for the daemon it started.
@@ -587,6 +604,99 @@ fn await_guard(
     })
 }
 
+/// What `restart` and `uninstall` stopped.
+struct Stopped {
+    pid: u32,
+    digest: String,
+    instance: Value,
+    jobs: Option<arkdeck_contract::RestartPreflight>,
+    drain: Drain,
+    deadline: Instant,
+}
+
+/// The daemon serving the target's pipe, stopped as maintenance: its
+/// identity proved on the pipe, its `health` and instance document read,
+/// its current Jobs read (any active or unclosed one refuses `leaf`, exit
+/// 75), then asked to stop through its own stop event and its
+/// single-instance guard awaited for at most `wait`.
+fn stop_serving(
+    target: &ServiceTarget,
+    id: &str,
+    wait: Duration,
+    leaf: &str,
+) -> Result<Stopped, PlainFailure> {
+    let maximum_wait_seconds = wait.as_secs();
+    let (mut client, pid_before) =
+        connect(target).map_err(|detail| PlainFailure::new(69, detail))?;
+    let health = client
+        .health(id)
+        .map_err(|error| PlainFailure::new(1, error.to_string()))?;
+    let digest_before = health_catalog_digest(&health)?;
+    // Read after `health`: a daemon publishes its instance document
+    // after its pipe exists and before it serves, so only a daemon that
+    // answered is sure to have published it.
+    let instance_before = inspect(target)
+        .instance
+        .filter(|instance| instance["pid"] == json!(pid_before))
+        .ok_or_else(|| {
+            PlainFailure::new(
+                69,
+                format!(
+                    "the state root's instance document does not name the daemon serving \
+                     the pipe (pid {pid_before})"
+                ),
+            )
+        })?;
+    let jobs_before = job_preflight(&mut client, id)?;
+    if let Some(jobs) = &jobs_before
+        && !jobs.blocking_job_ids.is_empty()
+    {
+        return Err(PlainFailure::new(
+            75,
+            format!(
+                "runtime service {leaf} refused while Runtime Jobs are active or unclosed: {}",
+                jobs.blocking_job_ids.join(", ")
+            ),
+        ));
+    }
+    drop(client);
+    let deadline = Instant::now() + wait;
+    target
+        .start
+        .scope
+        .request_stop(pid_before)
+        .map_err(|error| {
+            PlainFailure::new(
+                69,
+                format!("the daemon (pid {pid_before}) could not be asked to stop: {error}"),
+            )
+        })?;
+    let drain = await_guard(&target.start.scope, wait)
+        .map_err(|detail| {
+            PlainFailure::new(
+                69,
+                format!("the daemon's single-instance guard is unusable: {detail}"),
+            )
+        })?
+        .ok_or_else(|| {
+            PlainFailure::new(
+                69,
+                format!(
+                    "the daemon (pid {pid_before}) did not release its single-instance guard \
+                     within {maximum_wait_seconds}s of its stop request; nothing was started"
+                ),
+            )
+        })?;
+    Ok(Stopped {
+        pid: pid_before,
+        digest: digest_before,
+        instance: instance_before,
+        jobs: jobs_before,
+        drain,
+        deadline,
+    })
+}
+
 /// `runtime service restart`: maintenance, never a way to interrupt a Job,
 /// with the macOS leaf's refusals; see the module's documentation.
 pub fn restart_leaf(
@@ -623,67 +733,15 @@ pub fn restart_leaf(
                 ),
             ));
         }
-        let (mut client, pid_before) =
-            connect(target).map_err(|detail| PlainFailure::new(69, detail))?;
-        let health = client
-            .health(id)
-            .map_err(|error| PlainFailure::new(1, error.to_string()))?;
-        let digest_before = health_catalog_digest(&health)?;
-        // Read after `health`: a daemon publishes its instance document
-        // after its pipe exists and before it serves, so only a daemon that
-        // answered is sure to have published it.
-        let instance_before = inspect(target)
-            .instance
-            .filter(|instance| instance["pid"] == json!(pid_before))
-            .ok_or_else(|| {
-                PlainFailure::new(
-                    69,
-                    format!(
-                        "the state root's instance document does not name the daemon serving \
-                         the pipe (pid {pid_before})"
-                    ),
-                )
-            })?;
-        let jobs_before = job_preflight(&mut client, id)?;
-        if let Some(jobs) = &jobs_before
-            && !jobs.blocking_job_ids.is_empty()
-        {
-            return Err(PlainFailure::new(
-                75,
-                format!(
-                    "runtime service restart refused while Runtime Jobs are active or unclosed: {}",
-                    jobs.blocking_job_ids.join(", ")
-                ),
-            ));
-        }
-        drop(client);
-        let deadline = Instant::now() + wait;
-        target
-            .start
-            .scope
-            .request_stop(pid_before)
-            .map_err(|error| {
-                PlainFailure::new(
-                    69,
-                    format!("the daemon (pid {pid_before}) could not be asked to stop: {error}"),
-                )
-            })?;
-        let drain = await_guard(&target.start.scope, wait)
-            .map_err(|detail| {
-                PlainFailure::new(
-                    69,
-                    format!("the daemon's single-instance guard is unusable: {detail}"),
-                )
-            })?
-            .ok_or_else(|| {
-                PlainFailure::new(
-                    69,
-                    format!(
-                        "the daemon (pid {pid_before}) did not release its single-instance guard \
-                         within {maximum_wait_seconds}s of its stop request; nothing was started"
-                    ),
-                )
-            })?;
+        let stopped = stop_serving(target, id, wait, "restart")?;
+        let Stopped {
+            pid: pid_before,
+            digest: digest_before,
+            instance: instance_before,
+            jobs: jobs_before,
+            drain,
+            deadline,
+        } = stopped;
         let remaining = deadline
             .checked_duration_since(Instant::now())
             .filter(|left| !left.is_zero())
@@ -776,13 +834,73 @@ pub fn restart_leaf(
     }
 }
 
+/// `runtime service uninstall`: the stop of the client-started service (see
+/// the module's documentation). Answers what was stopped, what was kept and
+/// the service as it is now.
+pub fn uninstall_leaf(target: &ServiceTarget, id: &str) -> ServiceAnswer {
+    let wait = Duration::from_secs(30);
+    let run = || -> Result<Value, PlainFailure> {
+        let before = inspect(target);
+        let stopped = if before.socket_present {
+            if !before.ready {
+                return Err(PlainFailure::new(
+                    69,
+                    format!(
+                        "daemon service is not ready: {}; nothing was stopped",
+                        before.diagnostics.join("; ")
+                    ),
+                ));
+            }
+            Some(stop_serving(target, id, wait, "uninstall")?)
+        } else {
+            None
+        };
+        let after = inspect(target);
+        if after.socket_present {
+            return Err(PlainFailure::new(
+                69,
+                format!(
+                    "a daemon still serves {} after the stop; nothing else was changed",
+                    after.socket_path
+                ),
+            ));
+        }
+        Ok(json!({
+            "uninstall": {
+                "schemaVersion": UNINSTALL_SCHEMA,
+                "stoppedPid": stopped.as_ref().map(|stopped| stopped.pid),
+                "stopRequest": stopped.as_ref().map(|_| "stopEvent"),
+                "drain": stopped.as_ref().map(|stopped| match stopped.drain {
+                    Drain::Complete => "complete",
+                    Drain::DeadlineElapsed => "deadlineElapsed",
+                }),
+                "stoppedInstance": stopped.as_ref().map(|stopped| stopped.instance.clone()),
+                "jobOwner": stopped.as_ref().map(|stopped| stopped.jobs.is_some()),
+                // Nothing is registered with the system to remove (decision
+                // 11); the image leaves with its directory or package.
+                "removedRegistration": false,
+                "removedDaemon": false,
+                "preservedStateDirectory": target.root_path.display().to_string(),
+            },
+            "daemonService": after.document,
+        }))
+    };
+    match run() {
+        Ok(document) => ServiceAnswer::emit(document),
+        Err(failure) => ServiceAnswer::fail(failure),
+    }
+}
+
 /// The Windows service leaves; the others are macOS-only.
 pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
     let empty = Map::new();
     let options = invocation.params.as_ref().unwrap_or(&empty);
     if !matches!(
         invocation.command,
-        "runtime.service.status" | "runtime.service.verify" | "runtime.service.restart"
+        "runtime.service.status"
+            | "runtime.service.verify"
+            | "runtime.service.restart"
+            | "runtime.service.uninstall"
     ) {
         return ServiceAnswer {
             refusal: Some(CodedFailure {
@@ -800,6 +918,7 @@ pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
     match invocation.command {
         "runtime.service.status" => status_leaf(&target, id),
         "runtime.service.verify" => verify_leaf(&target, id, options),
+        "runtime.service.uninstall" => uninstall_leaf(&target, id),
         _ => restart_leaf(
             &target,
             id,
