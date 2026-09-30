@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- MSTest, run with `dotnet test` (plain MSTest, no packaged WinUI test host: SPK-4).
+       Page states, the shared string catalogue and the App's static contracts; the UIA
+       behaviour of the running App is ArkDeck.App.UITests. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>ArkDeck.App.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\App.Core\ArkDeck.App.Core.csproj" />
+  </ItemGroup>
+</Project>

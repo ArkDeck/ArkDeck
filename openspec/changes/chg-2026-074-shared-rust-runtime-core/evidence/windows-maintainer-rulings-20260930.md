@@ -43,3 +43,23 @@ Related rulings the same day: the WinUI alpha project templates are accepted, th
 latest stable stack (.NET 10, Windows App SDK 2.5.1, WinUI 3) with a Fluent 2 style whose product
 semantics come from `docs/design/arkdeck-ds/src/tokens.css`; the Windows support tuple is Windows
 11 x64 only (CHG-2026-074 r13, #2342).
+
+Rulings 18–28 were settled later the same day under the maintainer's delegation of 2026-09-30:
+non-major choices follow the agent's recommendation. Ruling 18 was put to the lead and approved on
+that delegation. Rulings 19–28 record the choices the slices made under it, so later slices can cite
+them. None changes a Requirement, Acceptance Scenario, Core baseline, safety invariant or hardware
+criterion.
+
+| # | Question (source) | Ruling |
+| --- | --- | --- |
+| 18 | How a mutation refused because an owner is not composed is answered (#2350 `target.adopt`, #2370 `trace.cache.purge`) | `operationUnavailable` with `phase: preAdmission` and `newDispatchCount: 0`, on macOS and Windows alike, so a client reads a refusal rather than an unknown outcome. |
+| 19 | Windows Credential Manager store (#2354) | A credential blob is limited to 2560 bytes. The presence check reads the secret. |
+| 20 | Windows Artifact read and export, E1 (#2356) | NTFS reserved names and characters are refused. |
+| 21 | NTFS import upload source, U1 (#2357) | The import source is opened shared read-only. |
+| 22 | ConPTY prompt and secret exchange, G19 (#2358) | ConPTY's differences (CR line ends, VT-stripped rendering) are accepted as T1-equal. |
+| 23 | Windows Job store, H2 (#2361) | `job.list` answers one page until the Windows pager lands. The NTFS replace retries for about 1 s on an access-denied or sharing violation. The Windows account root keeps the Job store in `jobs-state`. |
+| 24 | Windows DevEco files and file identity, D2 (#2362) | SYSTEM, Administrators and TrustedInstaller count as root. "Private" means nobody else is granted anything, and the owner is checked. |
+| 25 | Windows signing, G2 (#2369) | The signing `default_root` is `<LocalAppData>\ArkDeck\Signing\OpenHarmony`. Held file and ancestor handles replace `/.vol`, descriptors are set explicitly private, and stored paths use the host's spelling. |
+| 26 | `observe.device` on Windows, S1 | The daemon has no fake-HDC bypass. On Windows, `observe.device` is refused before admission as without an HDC until the Windows HDC tuple's integration change lands. |
+| 27 | CI speed-up options | The maintainer approved options B, C and E. Option A (#2364) is merged. |
+| 28 | The account daemon's Trace cache on Windows, W1 (#2367) | The account daemon composes no Trace cache until the Windows App cache location is decided. |
