@@ -12,11 +12,19 @@
 //! than resynchronising a stream whose position is no longer trustworthy; and
 //! a command whose frame never completes is an unknown outcome, never a
 //! failure, because the device may well have carried it out.
+//!
+//! The framing, the bounds and the outcomes are shared; the client under
+//! them is the platform's: a pseudo-terminal here on macOS, a pseudo console
+//! on Windows (`windows/shell.rs`, TASK-XPA-016).
 use super::VerifiedTool;
+#[cfg(target_os = "macos")]
 use super::macos_process::spawn_pty;
 use crate::random_bytes;
+#[cfg(windows)]
+use crate::windows::shell::{SHELL_LINE_ENDING, ShellClient};
 use std::ffi::OsString;
 use std::io;
+#[cfg(target_os = "macos")]
 use std::os::fd::{AsRawFd, OwnedFd};
 use std::time::{Duration, Instant};
 
@@ -49,8 +57,7 @@ pub enum DeviceShellChannelError {
 const OVERFLOW_TOLERANCE_BYTES: usize = 4 * 1024 * 1024;
 
 pub struct DeviceShellChannel {
-    master: Option<OwnedFd>,
-    child: libc::pid_t,
+    client: ShellClient,
     closed: bool,
     pending: Vec<u8>,
 }
@@ -74,11 +81,10 @@ impl DeviceShellChannel {
         };
         tool.revalidate()
             .map_err(|error| unavailable("channel executable identity refused", error))?;
-        let (child, master) = spawn_pty(tool, arguments, environment, None, false)
+        let client = ShellClient::start(tool, arguments, environment)
             .map_err(|error| unavailable("cannot start the channel client", error))?;
         let mut channel = Self {
-            master: Some(master),
-            child,
+            client,
             closed: false,
             pending: Vec::new(),
         };
@@ -149,11 +155,15 @@ impl DeviceShellChannel {
         // The opening marker separates the command's output from the prompt
         // and echo that precede it; the closing one is written by the shell
         // only once the command has returned, and carries its own status.
-        let line = format!("echo {nonce}B; {}; echo {nonce}:$?\n", arguments.join(" "));
+        let line = format!(
+            "echo {nonce}B; {}; echo {nonce}:$?{}",
+            arguments.join(" "),
+            char::from(SHELL_LINE_ENDING)
+        );
         // Anything still buffered belongs to the previous command's trailing
         // prompt. It is dropped before writing so it cannot be read as output.
         self.pending.clear();
-        if let Err(error) = self.write_all(line.as_bytes()) {
+        if let Err(error) = self.client.write_all(line.as_bytes()) {
             self.close();
             return Err(DeviceShellChannelError::Unavailable(format!(
                 "cannot write to the channel: {error}"
@@ -202,36 +212,17 @@ impl DeviceShellChannel {
 
     /// Whether the client is still running; a reaped client is gone for good.
     pub fn is_alive(&mut self) -> bool {
-        if self.child <= 0 {
-            return false;
-        }
-        let mut status = 0;
-        // SAFETY: only this channel's own child is queried, without blocking.
-        let reaped = unsafe { libc::waitpid(self.child, &mut status, libc::WNOHANG) };
-        if reaped == self.child {
-            self.child = -1;
-            return false;
-        }
-        reaped == 0
+        self.client.is_alive()
     }
 
-    /// Closes the terminal and takes the client's whole process group with it.
+    /// Closes the terminal and takes the client's whole process group (its
+    /// Job object on Windows) with it.
     pub fn close(&mut self) {
         if self.closed {
             return;
         }
         self.closed = true;
-        self.master = None;
-        if self.child > 0 {
-            // SAFETY: the child's group is its own (POSIX_SPAWN_SETPGROUP), so
-            // the signal reaches nothing else; the wait reaps only that child.
-            unsafe {
-                libc::kill(-self.child, libc::SIGKILL);
-                let mut status = 0;
-                libc::waitpid(self.child, &mut status, 0);
-            }
-            self.child = -1;
-        }
+        self.client.close();
         self.pending.clear();
     }
 
@@ -249,6 +240,71 @@ impl DeviceShellChannel {
     /// something: waiting out the rest of a window after the answer has
     /// already arrived would add that window to every command.
     fn drain(&mut self, deadline: Instant) {
+        self.client.read(deadline, &mut self.pending);
+    }
+}
+
+impl Drop for DeviceShellChannel {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
+/// What a framed line ends with: the terminal maps it for the shell.
+#[cfg(target_os = "macos")]
+const SHELL_LINE_ENDING: u8 = b'\n';
+
+/// The client on its pseudo-terminal: the master and the child whose
+/// process group is its own.
+#[cfg(target_os = "macos")]
+struct ShellClient {
+    master: Option<OwnedFd>,
+    child: libc::pid_t,
+}
+
+#[cfg(target_os = "macos")]
+impl ShellClient {
+    fn start(
+        tool: &VerifiedTool,
+        arguments: &[OsString],
+        environment: &[(OsString, OsString)],
+    ) -> io::Result<Self> {
+        let (child, master) = spawn_pty(tool, arguments, environment, None, false)?;
+        Ok(Self {
+            master: Some(master),
+            child,
+        })
+    }
+
+    fn is_alive(&mut self) -> bool {
+        if self.child <= 0 {
+            return false;
+        }
+        let mut status = 0;
+        // SAFETY: only this channel's own child is queried, without blocking.
+        let reaped = unsafe { libc::waitpid(self.child, &mut status, libc::WNOHANG) };
+        if reaped == self.child {
+            self.child = -1;
+            return false;
+        }
+        reaped == 0
+    }
+
+    fn close(&mut self) {
+        self.master = None;
+        if self.child > 0 {
+            // SAFETY: the child's group is its own (POSIX_SPAWN_SETPGROUP), so
+            // the signal reaches nothing else; the wait reaps only that child.
+            unsafe {
+                libc::kill(-self.child, libc::SIGKILL);
+                let mut status = 0;
+                libc::waitpid(self.child, &mut status, 0);
+            }
+            self.child = -1;
+        }
+    }
+
+    fn read(&mut self, deadline: Instant, pending: &mut Vec<u8>) {
         let Some(master) = self.master.as_ref() else {
             return;
         };
@@ -273,7 +329,7 @@ impl DeviceShellChannel {
             // SAFETY: the buffer is writable for its whole length.
             let count = unsafe { libc::read(master, buffer.as_mut_ptr().cast(), buffer.len()) };
             if count > 0 {
-                self.pending.extend_from_slice(&buffer[..count as usize]);
+                pending.extend_from_slice(&buffer[..count as usize]);
                 return;
             }
             if count == 0 {
@@ -288,7 +344,7 @@ impl DeviceShellChannel {
         }
     }
 
-    fn write_all(&self, bytes: &[u8]) -> io::Result<()> {
+    fn write_all(&mut self, bytes: &[u8]) -> io::Result<()> {
         let master = self
             .master
             .as_ref()
@@ -317,12 +373,6 @@ impl DeviceShellChannel {
             return Err(io::Error::other("channel write failed"));
         }
         Ok(())
-    }
-}
-
-impl Drop for DeviceShellChannel {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 

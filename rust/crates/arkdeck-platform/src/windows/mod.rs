@@ -28,6 +28,7 @@ mod pinned_file;
 mod process;
 mod pty;
 mod server;
+pub(crate) mod shell;
 mod state;
 mod stop;
 mod tool;
