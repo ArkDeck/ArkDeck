@@ -619,7 +619,8 @@ daemon composes the owner over `trace-cache/traces` in a development root and,
 for the account, over `%LOCALAPPDATA%\ArkDeck\Trace	races` (beside its
 `staging`), the counterpart of the macOS App's `Caches/ArkDeck/Trace`, which
 the daemon creates owner-only because the App, the daemon and the CLI share
-one physical `%LOCALAPPDATA%` (ruling 8, ruling 29); `trace.cache.status`
+one physical `%LOCALAPPDATA%` (ruling 8; the account-location decision in
+`runs/TASK-XPA-005/windows-account-locations-run.md`); `trace.cache.status`
 answers there, and `trace.cache.purge` is refused
 as the macOS daemon refuses it without its retention owners: the Job owner's
 active-Session census is not asked on Windows yet. `trace export` is the
@@ -1054,7 +1055,7 @@ its root, the macOS isolated names, isolated to the development root as on
 macOS (its reserved owners' directories are never a Sessions root). The
 account keeps its settings in `Agentd\session-state` and its default Sessions
 root in `%LOCALAPPDATA%\ArkDeck\Sessions`, beside `Agentd` as macOS keeps
-`ArkDeck/Sessions` (ruling 29); a start moves an earlier build's
+`ArkDeck/Sessions` (the same decision); a start moves an earlier build's
 `Agentd\sessions` there once, in one rename, and publishes the settings that
 selected it at the new place (`SessionStore::rebase_default_root`); beside an
 existing `Sessions` an empty earlier root is removed and one holding anything

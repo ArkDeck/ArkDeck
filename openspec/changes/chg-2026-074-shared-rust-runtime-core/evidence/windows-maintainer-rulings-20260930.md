@@ -44,9 +44,9 @@ latest stable stack (.NET 10, Windows App SDK 2.5.1, WinUI 3) with a Fluent 2 st
 semantics come from `docs/design/arkdeck-ds/src/tokens.css`; the Windows support tuple is Windows
 11 x64 only (CHG-2026-074 r13, #2342).
 
-Rulings 18–29 were settled later the same day under the maintainer's delegation of 2026-09-30:
+Rulings 18–28 were settled later the same day under the maintainer's delegation of 2026-09-30:
 non-major choices follow the agent's recommendation. Ruling 18 was put to the lead and approved on
-that delegation. Rulings 19–29 record the choices the slices made under it, so later slices can cite
+that delegation. Rulings 19–28 record the choices the slices made under it, so later slices can cite
 them. None changes a Requirement, Acceptance Scenario, Core baseline, safety invariant or hardware
 criterion.
 
@@ -63,4 +63,3 @@ criterion.
 | 26 | `observe.device` on Windows, S1 | The daemon has no fake-HDC bypass. On Windows, `observe.device` is refused before admission as without an HDC until the Windows HDC tuple's integration change lands. |
 | 27 | CI speed-up options | The maintainer approved options B, C and E. Option A (#2364) is merged. |
 | 28 | The account daemon's Trace cache on Windows, W1 (#2367) | The account daemon composes no Trace cache until the Windows App cache location is decided. |
-| 29 | The account daemon's Sessions root and Trace cache locations on Windows (H3, W1; `runs/TASK-XPA-005/windows-account-locations-run.md`) | Beside the state directory in the product directory, mirroring macOS: the default Sessions root is `%LOCALAPPDATA%\ArkDeck\Sessions` (settings stay in `Agentd\session-state`), the Trace cache `%LOCALAPPDATA%\ArkDeck\Trace\traces` beside its `staging`, which the daemon creates owner-only (no App container on Windows; ruling 8). An earlier build's `Agentd\sessions` is moved once by one rename and its settings rebased; beside an existing `Sessions` an empty one is removed and one holding anything refuses the start. Supersedes ruling 28. |

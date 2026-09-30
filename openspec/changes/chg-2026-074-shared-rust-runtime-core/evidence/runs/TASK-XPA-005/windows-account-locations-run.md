@@ -40,7 +40,12 @@ setting was changed. Host tests are not Windows acceptance.
   location. Both ask the daemon (`runtime.storage.status`, `trace.cache.status`), so they agree
   by construction as long as the daemon answers one location.
 
-## Decision (delegated minor decision, recorded as ruling 29)
+## Decision (delegated minor decision, pending the next rulings batch)
+
+Taken under the maintainer's delegation of 2026-09-30 and accepted by the lead for this PR. It
+supersedes ruling 28 (the account daemon composes no Trace cache) once the maintainer merges it
+into `windows-maintainer-rulings-20260930.md` in the next rulings batch; that governance file is
+not changed here.
 
 The locations mirror macOS, in the product directory beside the state directory:
 
