@@ -38,6 +38,9 @@ use windows_sys::Win32::System::IO::CancelSynchronousIo;
 const KILL_GRACE: Duration = Duration::from_secs(1);
 /// Swift `waitForGroupToDisappear`: how often the group is looked for.
 const DRAIN_PROBE: Duration = Duration::from_millis(10);
+/// How long a lifecycle client's streams may stay open after it exited
+/// before its capture ends with what arrived (`run_lifecycle_tool`).
+const DETACHED_DRAIN: Duration = Duration::from_millis(500);
 
 /// Names the overlay can never set: the base itself, and the application
 /// compatibility layer, which would change how the verified image runs.
@@ -57,6 +60,27 @@ impl VerifiedTool {
         &self,
         request: &ToolRequest<'_>,
         cancelled: &dyn Fn() -> bool,
+    ) -> Result<ToolExecution, ToolRunError> {
+        self.run_in_job(request, cancelled, false)
+    }
+
+    /// `run_tool` for the HDC lifecycle client alone: the child is ended as
+    /// every child is, but a process it creates breaks away from its Job, as
+    /// the server `hdc kill -r` starts outlives the client in its own
+    /// session on macOS (`process::spawn_detaching`).
+    pub fn run_lifecycle_tool(
+        &self,
+        request: &ToolRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<ToolExecution, ToolRunError> {
+        self.run_in_job(request, cancelled, true)
+    }
+
+    fn run_in_job(
+        &self,
+        request: &ToolRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+        detaching: bool,
     ) -> Result<ToolExecution, ToolRunError> {
         let limits = request.limits;
         check_limits(limits).map_err(ToolRunError::Refused)?;
@@ -81,7 +105,12 @@ impl VerifiedTool {
         let started = Instant::now();
         // The child starts suspended and is killed unless the retained
         // executable still verifies, so any failure here ran no tool code.
-        let mut child = spawn_in(
+        let spawn = if detaching {
+            super::process::spawn_detaching
+        } else {
+            spawn_in
+        };
+        let mut child = spawn(
             self,
             request.arguments,
             request.environment,
@@ -101,6 +130,7 @@ impl VerifiedTool {
         );
         let (mut status, mut stdout, mut stderr) = (None, None, None);
         let mut failure = None;
+        let mut exited: Option<Instant> = None;
         let ended = loop {
             out.poll(&mut stdout);
             err.poll(&mut stderr);
@@ -117,8 +147,17 @@ impl VerifiedTool {
                         break None;
                     }
                 }
+                if status.is_some() {
+                    exited = Some(Instant::now());
+                }
             }
             if status.is_some() && stdout.is_some() && stderr.is_some() {
+                break None;
+            }
+            // A lifecycle client's output ends with it: the server it started
+            // outside its Job may hold the pipes it inherited, and would keep
+            // the capture open to the deadline. What arrived is kept.
+            if detaching && exited.is_some_and(|at| at.elapsed() >= DETACHED_DRAIN) {
                 break None;
             }
             if cancelled() {
