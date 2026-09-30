@@ -197,9 +197,9 @@ pub use host_store::{
     UploadWritePoint,
 };
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use host_sqlite::{HostSqlite, SqliteValue};
 
 #[cfg(target_os = "macos")]
