@@ -859,8 +859,9 @@ handed out); a longer list, any cursor and `job.timeline` are refused
 `rejected` ("… the Job snapshot pager, which is not built on Windows yet").
 That one page is what `runtime service restart` reads the current Jobs from,
 so a restart still refuses to interrupt a current Job; its proof now reports
-`jobOwner: true`. Nothing admits a Job on Windows yet (no planner, admitter or runner, no
-registered HDC). The Windows CLI coverage statuses stay `partial`.
+`jobOwner: true`. Nothing admits a Job on Windows yet (no registered HDC
+or runner; the planner and the admitter refuse before admission, below).
+The Windows CLI coverage statuses stay `partial`.
 
 The NTFS store's document replacement (`publish_document`) now waits out,
 for about a second, a moment's holder of the replaced file (an
@@ -889,8 +890,40 @@ owner (`SessionStore`, `snapshot_pager`, `session_inventory`), which need
 the `document_metadata`/`remove_document` port and the export submodules;
 the HDC lifecycle interlock and the current-Job census (over
 `hdc_impact_source`); the Job owner's Import, workspace, retention and
-Session-continuity censuses; Flash recovery; and every planner, admitter,
-runner and reconciler.
+Session-continuity censuses; Flash recovery; and the runner and
+reconciler. The planner and the admitter build on Windows without their
+owners (next section).
+
+## Job planner and admitter on Windows (TASK-XPA-005)
+
+`JobPlanner` (`job_plan.rs`) and `JobAdmitter` (`job_admission.rs`) build
+on Windows with none of the owners they materialize and authorize against:
+no HDC provider (no Windows HDC tuple is registered; its integration change
+waits for the maintainer's samples), no workspace or analyzer provider, no
+Artifact or Import owner and no capability authority. Those fields and the
+code that reads them stay `cfg(target_os = "macos")`; on macOS only
+attributes were added (and the native deployment's reference is spelled in
+`job_plan.rs` rather than read from `device_steps`). On Windows
+`materialized` refuses an HDC or workspace operation as `provider <id> is
+not registered` and an analyzer as `… is runtime unavailable:
+analyzer.profileUnavailable`, the refusals macOS answers without that
+owner, after the Import holds (a request with Import inputs is refused as
+without an Import owner). Everything before materialization is the macOS
+code: the typed request, the Catalog and its inputs, the idempotency
+lookup (a retry answers with the existing Job, `deduplicated`) and the
+admission interlock. The Windows daemon composes both (`Host::with_planning`
+over its root, census `targets, jobs, planning`) and answers `job.plan` and
+`job.submit` with them, every refusal carrying `{"phase": "preAdmission",
+"newDispatchCount": 0}`; nothing is admitted. Not on Windows: the Flash
+operations (no Flash lane; `… is not materialized by the Rust Runtime yet`)
+and the ArkTrace analysis request's cross-field check (the analyzer's
+parser, G20). `arkdeck-agentd/tests/windows_job_admission_process.rs`
+checks it against the real daemon over its pipe and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through `arkdeck job plan|submit` against a
+dev-signed daemon, before and after a restart, with the recorded Swift
+`observe.device@1` Jobs in the store: a fresh submission is refused, the
+recorded one retried is answered with its recorded Job, and the store's
+files are unchanged.
 
 ## Job index and record writers (TASK-XPA-014)
 

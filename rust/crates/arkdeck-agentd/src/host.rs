@@ -111,6 +111,10 @@ pub struct Host {
     capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
     #[cfg(target_os = "macos")]
     planning: Option<(std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles)>,
+    /// The state root `job.plan` and `job.submit` plan against on Windows,
+    /// where no analyzer is composed (G20).
+    #[cfg(windows)]
+    planning: Option<std::path::PathBuf>,
     #[cfg(target_os = "macos")]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     pub(crate) provider: Option<HdcReadOnlyProvider>,
@@ -333,6 +337,15 @@ impl Host {
         analyzer: Option<arkdeck_hoststore::AnalyzerProfiles>,
     ) -> Self {
         self.planning = Some((state_root.to_owned(), analyzer.unwrap_or_default()));
+        self
+    }
+    /// `job.plan` and `job.submit` on Windows: the same planner and
+    /// admitter over the Job store, with no provider, Artifact, Import or
+    /// capability owner composed beside them, so every operation is refused
+    /// before admission as macOS refuses it without that owner.
+    #[cfg(windows)]
+    pub fn with_planning(mut self, state_root: &std::path::Path) -> Self {
+        self.planning = Some(state_root.to_owned());
         self
     }
     #[cfg(target_os = "macos")]
@@ -1201,6 +1214,7 @@ impl Host {
         [
             ("targets", self.targets.is_some()),
             ("jobs", self.jobs.is_some()),
+            ("planning", self.planning.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
@@ -1238,7 +1252,7 @@ impl Host {
             jobs: None,
             #[cfg(target_os = "macos")]
             capabilities: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             planning: None,
             #[cfg(target_os = "macos")]
             bootstrap: None,
@@ -1833,6 +1847,66 @@ impl HostServices for Host {
                     ("newDispatchCount".into(), serde_json::json!(0)),
                 ])),
             })
+    }
+    /// `job.plan` on Windows: the Job planner with none of its owners (no
+    /// Flash planning either), so a plan is refused before admission with
+    /// zero dispatch, as on macOS.
+    #[cfg(windows)]
+    fn job_plan(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let Some(state_root) = &self.planning else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        arkdeck_hoststore::JobPlanner { state_root }
+            .handle(params)
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })
+    }
+    /// `job.submit` on Windows: the Job admitter over the Job store, its
+    /// idempotency lookup and admission interlock included, with the
+    /// planner above and no capability authority.
+    #[cfg(windows)]
+    fn job_submit(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(state_root), Some(jobs)) = (&self.planning, &self.jobs) else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        arkdeck_hoststore::JobAdmitter {
+            planner: arkdeck_hoststore::JobPlanner { state_root },
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+        }
+        .handle(params)
+        .map_err(|refusal| WireError {
+            code: refusal.code.into(),
+            message: refusal.message,
+            details: Some(if refusal.proven {
+                serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])
+            } else {
+                serde_json::Map::new()
+            }),
+        })
     }
     /// `job.submit` admits into the Job owner the planner materializes for,
     /// the ArkForge Flash operations over the Flash composition and facts.

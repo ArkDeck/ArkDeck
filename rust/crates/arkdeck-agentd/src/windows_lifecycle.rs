@@ -122,7 +122,12 @@ impl Authority {
     ///   yet (its integration change waits for the maintainer's samples),
     ///   so no relation is read, nothing is observed or dispatched, and
     ///   `target.adopt` is refused before admission with zero dispatch;
-    /// * the Job store (`jobs-state`, [`Self::job_store`]).
+    /// * the Job store (`jobs-state`, [`Self::job_store`]);
+    /// * the Job planner and admitter over it and the root (`job.plan`,
+    ///   `job.submit`), with no HDC, workspace or analyzer provider, Artifact
+    ///   or Import owner or capability authority beside them: every
+    ///   operation is refused before admission with zero dispatch, as macOS
+    ///   refuses it without that owner, and nothing is admitted.
     ///
     /// Composing opens the stores, which read their documents under their
     /// locks; a store it cannot read ends the start, as on macOS.
@@ -145,7 +150,10 @@ impl Authority {
                 path.display()
             )
         })?;
-        let host = host.with_targets(targets).with_jobs(self.job_store()?);
+        let host = host
+            .with_targets(targets)
+            .with_jobs(self.job_store()?)
+            .with_planning(self.root.path());
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {

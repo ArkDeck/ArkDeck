@@ -224,7 +224,7 @@ pub(crate) fn utc_precise_from_millis(milliseconds: u64) -> String {
 
 /// The current instant as Swift durable records spell it
 /// (`ISO8601Timestamps.string`): whole seconds in UTC.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn utc_now() -> Option<String> {
     let seconds = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -235,7 +235,7 @@ pub(crate) fn utc_now() -> Option<String> {
 
 /// Unix seconds as `YYYY-MM-DDTHH:MM:SSZ` in the proleptic Gregorian calendar
 /// (Hinnant's `civil_from_days`).
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn utc_timestamp(seconds: u64) -> String {
     let days = (seconds / 86_400) as i64 + 719_468;
     let era = days.div_euclid(146_097);

@@ -102,15 +102,20 @@ pub use job_repository::{AdmissionVerdict, JobWriteError};
 mod mutation_execution;
 #[cfg(target_os = "macos")]
 pub use mutation_execution::MutationExecution;
-#[cfg(target_os = "macos")]
+// The planner and the admitter build on Windows too (TASK-XPA-005, GJ-1):
+// there no HDC, workspace or analyzer provider, Artifact or Import owner and
+// no capability authority is composed yet, so every operation is refused
+// before admission as macOS refuses it without that owner.
+#[cfg(any(target_os = "macos", windows))]
 mod job_plan;
 #[cfg(target_os = "macos")]
 mod operation_availability;
 #[cfg(target_os = "macos")]
 pub use job_plan::{
-    AnalyzerProfile, FlashPlanner, FlashPlanning, JobPlanner, PlanRefusal, RockchipFactsPort,
-    rockchip_dispatch_unavailable,
+    AnalyzerProfile, FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable,
 };
+#[cfg(any(target_os = "macos", windows))]
+pub use job_plan::{JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
 mod analyzer_composition;
 #[cfg(target_os = "macos")]
@@ -159,12 +164,12 @@ mod cleanup_debt_continue;
 mod device_run;
 #[cfg(target_os = "macos")]
 mod device_steps;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod job_admission;
+#[cfg(any(target_os = "macos", windows))]
+pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};
 #[cfg(target_os = "macos")]
-pub use job_admission::{
-    AdmissionRefusal, FlashAdmitter, JobAdmitter, MutationAuthority, runtime_now,
-};
+pub use job_admission::{FlashAdmitter, MutationAuthority};
 #[cfg(target_os = "macos")]
 mod agent_execution;
 #[cfg(target_os = "macos")]
@@ -728,7 +733,8 @@ mod artifact_export;
 #[cfg(target_os = "macos")]
 pub use artifact_export::ArtifactExportRequest;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod catalog_review;
 #[cfg(target_os = "macos")]
 pub use catalog_review::flash_catalog_review;

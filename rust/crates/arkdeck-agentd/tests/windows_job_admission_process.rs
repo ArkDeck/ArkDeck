@@ -1,35 +1,37 @@
-//! The Windows daemon's Job store (TASK-XPA-005), as the real daemon
-//! composes it over an isolated development root: GJ-1's Job-record hops
-//! (index, `job-record.json`, Journal, restart readback) for the recorded
-//! Swift `observe.device@1` Jobs.
+//! The Windows daemon's Job planner and admitter (TASK-XPA-005, GJ-1): the
+//! `job.plan` and `job.submit` hops of `observe.device@1`, as the real daemon
+//! composes them over an isolated development root.
 //!
-//! Nothing admits a Job on Windows yet (no planner, admitter or runner and
-//! no registered HDC), so the Jobs are recorded into `jobs-state` by the Job
-//! store owner itself before the daemon starts: each recorded Swift record
-//! admitted and advanced to its recorded version, its recorded Journal
-//! beside it. Then:
+//! No Windows HDC tuple is registered (its integration change waits for the
+//! maintainer's samples), so the daemon composes no HDC provider, and no
+//! workspace or analyzer provider, Artifact or Import owner or capability
+//! authority either. The planner and the admitter are the macOS code with
+//! those owners absent, so:
 //!
-//! * over the daemon's pipe, with a plain pipe handle (no signer needed):
-//!   `job.status`, `job.show`, `job.events` and a one-page `job.list`
-//!   answer exactly what the store answers in process (a list's snapshot
-//!   revision and the sealed `jec1` cursors are fresh on every read), before
-//!   and after a restart, and a cursor handed out before the restart reads
-//!   on after it; `job.timeline` and a list of more than one page are
-//!   refused as the read-only foundation refuses a method it lacks
-//!   (`rejected`: the snapshot pager is not built on Windows yet); a Job
-//!   directory that is not owner-only refuses the start;
+//! * a plan or a new submission of `observe.device@1` is refused before
+//!   admission with zero dispatch, as macOS refuses it without an HDC
+//!   provider (`provider hdc is not registered`), and nothing is admitted:
+//!   the index, the Job directories and `job.list` are unchanged;
+//! * the admission's own order still holds: the typed request, the Catalog
+//!   and its inputs are judged first, and the idempotency lookup comes
+//!   before materialization, so a retry of a recorded Swift submission is
+//!   answered with the recorded Job (`deduplicated`), exactly the acceptance
+//!   Swift answered, and a changed request under its key is an idempotency
+//!   conflict, both with nothing materialized or dispatched;
+//! * all of it is answered the same after a restart;
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
-//!   `rust/scripts/check-readonly.py` signs one): `job status`, `job show`,
-//!   `job events` and `job list` print the same answers after a restart, and
-//!   `job timeline` reports the refusal. Without that variable this test
-//!   says so and checks nothing.
+//!   `windows_job_store_process.rs` signs one), `job plan` and `job submit`
+//!   report the same. Without that variable this test says so and checks
+//!   nothing.
 //!
-//! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
-//! its development root, a fresh directory below the temporary directory:
+//! The recorded Swift `observe.device@1` Jobs (`rust/tests/fixtures/
+//! observe-device/store`) are recorded into `jobs-state` by the Job store
+//! owner before the daemon starts, as the Job store's own test does. Every
+//! daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but its
+//! development root, a fresh directory below the temporary directory:
 //! nothing installed is read or written, no HDC is configured, and no device
-//! or `hdc` is involved. Each daemon is stopped by its own stop request, or
-//! ended by this test if it outlives a failed assertion.
+//! or `hdc` is involved.
 #![cfg(windows)]
 
 use arkdeck_hoststore::{AdmissionVerdict, JobRecord, JobStore};
@@ -52,51 +54,25 @@ fn turn() -> MutexGuard<'static, ()> {
 const DEADLINE: Duration = Duration::from_secs(60);
 /// The recorded `observe.device@1` Job that observed its device.
 const OBSERVED: &str = "job-0f77f8c52864d676372962eccb17389c";
-/// The reads this build answers on Windows from the Job store, each Job's
-/// and the list of them all (one page).
-const READS: [&str; 3] = ["job.status", "job.show", "job.events"];
-const LIST: &str = "job.list";
-
-/// A read's parameters: the Job's identity, or none for the list.
-fn params(id: &str, method: &str) -> Value {
-    if method == LIST {
-        json!({})
-    } else {
-        json!({"jobId": id})
-    }
-}
-
-/// A read's answer with each `job.events` cursor labelled: a cursor is the
-/// position sealed (AES-GCM) under the store's cursor key with a fresh nonce,
-/// so two reads of one page never spell it alike. That a cursor still opens
-/// under the key the store keeps is checked by reading on from one.
-fn labelled(mut answer: Value) -> Value {
-    if let Some(items) = answer["result"]["items"].as_array_mut() {
-        for item in items {
-            if item["cursor"]
-                .as_str()
-                .is_some_and(|c| c.starts_with("jec1."))
-            {
-                item["cursor"] = json!("jec1.<sealed>");
-            }
-        }
-    }
-    if answer["result"]["snapshotRevision"].is_string() {
-        answer["result"]["snapshotRevision"] = json!("<revision>");
-    }
-    if answer["result"]["nextCursor"]
-        .as_str()
-        .is_some_and(|c| c.starts_with("jec1."))
-    {
-        answer["result"]["nextCursor"] = json!("jec1.<sealed>");
-    }
-    answer
-}
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/observe-device/store")
         .join(name)
+}
+
+/// The Swift submission the observed Job was admitted from.
+fn recorded_submission() -> Value {
+    let record: Value = serde_json::from_slice(
+        &std::fs::read(fixture("jobs").join(OBSERVED).join("job-record.json")).unwrap(),
+    )
+    .unwrap();
+    record["originalSubmissionRequest"].clone()
+}
+
+/// The `job.plan` / `job.submit` parameters for a request document.
+fn request_json(request: &Value) -> Value {
+    json!({"requestJson": serde_json::to_string(request).unwrap()})
 }
 
 /// A fresh development root, removed afterwards.
@@ -107,7 +83,7 @@ impl Root {
         let path = std::env::temp_dir()
             .canonicalize()
             .unwrap()
-            .join(format!("ad-winjobs-{nonce:016x}"));
+            .join(format!("ad-winadmit-{nonce:016x}"));
         std::fs::create_dir(&path).unwrap();
         Self(path)
     }
@@ -117,8 +93,7 @@ impl Root {
     /// The recorded Swift `observe.device@1` Jobs, recorded by the Job store
     /// owner into a private `jobs-state`: admitted in admission order and
     /// advanced to their recorded version, each Journal beside its record.
-    /// Returns every Job identity.
-    fn with_recorded_jobs(&self) -> Vec<String> {
+    fn with_recorded_jobs(&self) {
         let state = self.jobs_state();
         HostDirectory::open_or_create_private(&state).unwrap();
         let store = JobStore::open_owner(&state).unwrap();
@@ -126,7 +101,6 @@ impl Root {
             serde_json::from_slice(&std::fs::read(fixture("index.json")).unwrap()).unwrap();
         let mut rows = index["rows"].as_array().unwrap().clone();
         rows.sort_by_key(|row| row["admissionSequence"].as_i64().unwrap());
-        let mut ids = Vec::new();
         for row in &rows {
             let id = row["jobId"].as_str().unwrap();
             let directory = fixture("jobs").join(id);
@@ -144,45 +118,36 @@ impl Root {
                     .persist(&record, row["updatedAtUTC"].as_str().unwrap())
                     .unwrap();
             }
-            // The Job's private directory exists once its record is
-            // published; a file created in it inherits its owner-only DACL.
             std::fs::copy(
                 directory.join("journal.jsonl"),
                 state.join("jobs").join(id).join("journal.jsonl"),
             )
             .unwrap();
-            ids.push(id.to_owned());
         }
-        ids
     }
-    /// What the store answers in process to every read of every Job, and to
-    /// the list of them all.
-    fn answers(&self, ids: &[String]) -> Vec<(String, &'static str, Value)> {
-        let store = JobStore::open(&self.jobs_state()).unwrap();
-        let mut answers = Vec::new();
-        let reads = ids
-            .iter()
-            .flat_map(|id| READS.map(|method| (id.as_str(), method)))
-            .chain([("", LIST)]);
-        for (id, method) in reads {
-            let answer = labelled(
-                match store.handle_resource(method, params(id, method).as_object().unwrap()) {
-                    Ok(result) => json!({"ok": true, "result": result}),
-                    Err(error) => panic!("{id} {method}: {}", error.message),
-                },
-            );
-            answers.push((id.to_owned(), method, answer));
+    /// Every file below `jobs-state` with its bytes, the SQLite index's
+    /// companions aside (their bytes follow the connection, not the rows).
+    fn snapshot(&self) -> Vec<(PathBuf, Vec<u8>)> {
+        fn walk(directory: &Path, into: &mut Vec<(PathBuf, Vec<u8>)>) {
+            let mut entries: Vec<_> = std::fs::read_dir(directory)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .collect();
+            entries.sort();
+            for path in entries {
+                if path.is_dir() {
+                    walk(&path, into);
+                } else {
+                    let name = path.file_name().unwrap().to_string_lossy().into_owned();
+                    if !name.starts_with("runtime-jobs.sqlite3") && !name.starts_with('.') {
+                        into.push((path.clone(), std::fs::read(&path).unwrap()));
+                    }
+                }
+            }
         }
-        answers
-    }
-    fn record(&self, id: &str) -> Vec<u8> {
-        std::fs::read(
-            self.jobs_state()
-                .join("jobs")
-                .join(id)
-                .join("job-record.json"),
-        )
-        .unwrap()
+        let mut files = Vec::new();
+        walk(&self.jobs_state(), &mut files);
+        files
     }
 }
 impl Drop for Root {
@@ -236,10 +201,6 @@ impl Daemon {
         }
     }
 
-    fn pid(&self) -> u32 {
-        self.child.as_ref().unwrap().id()
-    }
-
     /// Every line up to the first that starts with `prefix`, which is returned.
     fn line_starting(&mut self, prefix: &str) -> String {
         let deadline = Instant::now() + DEADLINE;
@@ -270,7 +231,9 @@ impl Daemon {
     /// Asks it to stop, by its root's scope and its pid, and waits for its end.
     fn stop(&mut self, root: &Path) {
         let scope = StateRoot::development(root).unwrap().scope().unwrap();
-        scope.request_stop(self.pid()).unwrap();
+        scope
+            .request_stop(self.child.as_ref().unwrap().id())
+            .unwrap();
         self.line_starting("arkdeck-agentd stopped");
         let status = wait(self.child.take().unwrap());
         assert!(status.success(), "{status:?}");
@@ -330,64 +293,91 @@ fn request(pipe: &str, method: &str, params: Value) -> Value {
     serde_json::from_slice(&reply).unwrap()
 }
 
-/// Every recorded read answered over the pipe as the store answers it, and
-/// the snapshot-paged reads refused before admission with zero dispatch.
-fn assert_reads(pipe: &str, answers: &[(String, &'static str, Value)]) {
-    for (id, method, expected) in answers {
-        let reply = request(pipe, method, params(id, method));
-        let actual = labelled(json!({"ok": reply["ok"], "result": reply["result"]}));
-        assert!(
-            actual == *expected,
-            "{id} {method}:\n  store  {expected}\n  daemon {actual}"
-        );
-    }
-    // The timeline pages through the snapshot pager, not built on Windows.
-    let reply = request(pipe, "job.timeline", json!({"jobId": OBSERVED}));
-    assert_eq!(reply["error"]["code"], "rejected", "{reply}");
+/// A refusal before admission: its code and message, and the zero-dispatch
+/// proof macOS attaches to it.
+fn assert_refused(reply: &Value, code: &str, message: &str) {
+    assert_eq!(reply["ok"], false, "{reply}");
+    assert_eq!(reply["error"]["code"], code, "{reply}");
+    assert_eq!(reply["error"]["message"], message, "{reply}");
     assert_eq!(
-        reply["error"]["message"],
-        "the Job snapshot pager is not built on Windows yet; nothing was read",
+        reply["error"]["details"],
+        json!({"phase": "preAdmission", "newDispatchCount": 0}),
         "{reply}"
     );
-    // A list of more than one page needs it too.
-    let reply = request(pipe, "job.list", json!({"pageSize": 1}));
-    assert_eq!(reply["error"]["code"], "rejected", "{reply}");
-    let absent = request(
-        pipe,
-        "job.status",
-        json!({"jobId": "job-00000000000000000000000000000000"}),
+}
+
+/// A fresh `observe.device@1` submission: the recorded one under a new key.
+fn fresh_submission() -> Value {
+    let mut request = recorded_submission();
+    request["idempotencyKey"] = json!("idem-windows-observe-fresh");
+    request["requestId"] = json!("req-windows-observe-fresh");
+    request
+}
+
+/// Every answer this build gives to the planner and the admitter, checked
+/// against the macOS answers without the owners Windows lacks.
+fn assert_admission(pipe: &str) {
+    let not_registered = "provider hdc is not registered";
+    // `job.plan` and a new submission materialize against no HDC provider.
+    for method in ["job.plan", "job.submit"] {
+        assert_refused(
+            &request(pipe, method, request_json(&fresh_submission())),
+            "invalidInput",
+            not_registered,
+        );
+    }
+    // The recorded submission retried: the idempotency lookup answers with
+    // the recorded Job before anything is materialized, as Swift answered it.
+    let retry = request(pipe, "job.submit", request_json(&recorded_submission()));
+    assert_eq!(
+        retry,
+        json!({"id": "job.submit", "ok": true, "result": {
+            "schemaVersion": "arkdeck.job-acceptance/1",
+            "jobId": OBSERVED,
+            "deduplicated": true,
+            "newDispatchCount": 0,
+        }}),
+        "{retry}"
     );
-    assert_eq!(absent["error"]["code"], "notFound", "{absent}");
+    // A changed request under that key conflicts, again before anything is
+    // materialized.
+    let mut changed = recorded_submission();
+    changed["requestId"] = json!("req-observe-observed-changed");
+    changed["target"]["expectedBindingRevision"] = json!(2);
+    assert_refused(
+        &request(pipe, "job.submit", request_json(&changed)),
+        "idempotencyConflict",
+        "idempotency key reuse with a different request",
+    );
+    // The request, the Catalog and its inputs come first.
+    let mut unknown = fresh_submission();
+    unknown["operation"] = json!({"id": "observe.nothing", "version": 1});
+    assert_refused(
+        &request(pipe, "job.submit", request_json(&unknown)),
+        "operationUnavailable",
+        "operation observe.nothing@1 is not in the catalog",
+    );
+    let mut capability = fresh_submission();
+    capability["authorization"] = json!({"capabilityId": "CAP-RT-windows"});
+    assert_refused(
+        &request(pipe, "job.plan", request_json(&capability)),
+        "invalidInput",
+        "planOnly does not accept or consume a Runtime capability",
+    );
+    let malformed = request(pipe, "job.submit", json!({"requestJson": ""}));
+    assert_refused(
+        &malformed,
+        "invalidInput",
+        "requestJson must be a non-empty typed request document",
+    );
 }
 
 #[test]
-fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
+fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     let _turn = turn();
     let root = Root::new();
-    let ids = root.with_recorded_jobs();
-    assert_eq!(ids.len(), 4);
-    let answers = root.answers(&ids);
-    let recorded: Vec<Vec<u8>> = ids.iter().map(|id| root.record(id)).collect();
-    // The observed Job reads as the Swift oracle left it: succeeded, with
-    // its 16 Journal records paged by `job.events`.
-    let observed = |method: &str| {
-        answers
-            .iter()
-            .find(|(id, m, _)| id == OBSERVED && *m == method)
-            .unwrap()
-            .2
-            .clone()
-    };
-    assert_eq!(observed("job.status")["result"]["state"], "succeeded");
-    assert_eq!(
-        observed("job.events")["result"]["items"]
-            .as_array()
-            .unwrap()
-            .len(),
-        16,
-        "{}",
-        observed("job.events")
-    );
+    root.with_recorded_jobs();
+    let before = root.snapshot();
     let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
 
     let mut first = Daemon::start(executable, &root.0);
@@ -399,66 +389,59 @@ fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
         "{:?}",
         first.seen
     );
-    assert_reads(&pipe, &answers);
-    // A cursor this daemon hands out ...
-    let page = request(
-        &pipe,
-        "job.events",
-        json!({"jobId": OBSERVED, "pageSize": 1}),
+    let listed = request(&pipe, "job.list", json!({}));
+    assert_admission(&pipe);
+    // Nothing was admitted: the same four Jobs listed, the same files.
+    let after = request(&pipe, "job.list", json!({}));
+    assert_eq!(
+        after["result"]["items"], listed["result"]["items"],
+        "{after}"
     );
-    assert_eq!(page["result"]["hasMore"], true, "{page}");
-    let cursor = page["result"]["items"][0]["cursor"].clone();
+    assert_eq!(listed["result"]["items"].as_array().unwrap().len(), 4);
     first.stop(&root.0);
+    assert!(root.snapshot() == before, "the Job store changed");
 
+    // A restart answers the same, and still admits nothing.
     let mut second = Daemon::start(executable, &root.0);
     let pipe = second.serving();
-    assert_reads(&pipe, &answers);
-    // ... reads on after the restart, under the cursor key the store keeps.
-    let rest = request(
-        &pipe,
-        "job.events",
-        json!({"jobId": OBSERVED, "afterCursor": cursor}),
-    );
-    let events = labelled(observed("job.events"))["result"]["items"]
-        .as_array()
-        .unwrap()[1..]
-        .to_vec();
+    assert_admission(&pipe);
+    let again = request(&pipe, "job.list", json!({}));
     assert_eq!(
-        labelled(json!({"ok": rest["ok"], "result": rest["result"]}))["result"]["items"],
-        json!(events),
-        "{rest}"
+        again["result"]["items"], listed["result"]["items"],
+        "{again}"
     );
     second.stop(&root.0);
-
-    // Reading changed no record, and the index still validates.
-    let after: Vec<Vec<u8>> = ids.iter().map(|id| root.record(id)).collect();
-    assert_eq!(after, recorded);
-    assert_eq!(root.answers(&ids), answers);
+    assert!(root.snapshot() == before, "the Job store changed");
 }
 
 #[test]
-fn a_job_directory_that_is_not_owner_only_refuses_the_start() {
+fn a_fresh_root_admits_nothing_and_lists_no_job() {
     let _turn = turn();
     let root = Root::new();
-    // Created as any directory below the temporary directory is: it
-    // inherits grants to others, which the store refuses and never rewrites.
-    std::fs::create_dir(root.jobs_state()).unwrap();
-    let output = daemon(Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")), &root.0)
-        .output()
-        .unwrap();
-    assert_eq!(output.status.code(), Some(69), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(
-        stderr.contains("the Job store") && stderr.contains("nothing was started"),
-        "{stderr}"
+    let mut daemon = Daemon::start(Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")), &root.0);
+    let pipe = daemon.serving();
+    for method in ["job.plan", "job.submit"] {
+        assert_refused(
+            &request(&pipe, method, request_json(&recorded_submission())),
+            "invalidInput",
+            "provider hdc is not registered",
+        );
+    }
+    // The other providers are absent too: a workspace operation's provider
+    // is not registered and an analyzer has no profile.
+    let mut workspace = fresh_submission();
+    workspace["operation"] = json!({"id": "workspace.inspect-source", "version": 1});
+    workspace["inputs"] = json!({});
+    let reply = request(&pipe, "job.plan", request_json(&workspace));
+    assert_eq!(reply["ok"], false, "{reply}");
+    assert_eq!(
+        reply["error"]["details"],
+        json!({"phase": "preAdmission", "newDispatchCount": 0}),
+        "{reply}"
     );
-    assert!(
-        !String::from_utf8(output.stdout)
-            .unwrap()
-            .contains("listening on"),
-        "nothing served"
-    );
-    assert!(!root.jobs_state().join("runtime-jobs.sqlite3").exists());
+    let listed = request(&pipe, "job.list", json!({}));
+    assert_eq!(listed["result"]["items"], json!([]), "{listed}");
+    daemon.stop(&root.0);
 }
 
 /// PowerShell 7, which signs the development daemon.
@@ -514,7 +497,7 @@ fn cli(daemon: &Path, pin: &str, pipe: &str, arguments: &[&str]) -> (Option<i32>
 }
 
 #[test]
-fn gj1_job_record_hops_run_through_the_cli_against_a_dev_signed_daemon() {
+fn gj1_plan_and_submit_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     let Some(thumbprint) =
         std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT").filter(|value| !value.is_empty())
     else {
@@ -527,8 +510,8 @@ fn gj1_job_record_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     };
     let _turn = turn();
     let root = Root::new();
-    let ids = root.with_recorded_jobs();
-    let answers = root.answers(&ids);
+    root.with_recorded_jobs();
+    let before = root.snapshot();
     let signed = root.0.join("signed-bin");
     std::fs::create_dir(&signed).unwrap();
     let daemon = signed.join("arkdeck-agentd.exe");
@@ -549,42 +532,48 @@ fn gj1_job_record_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     assert!(signing.status.success(), "{signing:?}");
     let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
     let pin = pin["pin"].as_str().unwrap().to_owned();
+    let requests = root.0.join("requests");
+    std::fs::create_dir(&requests).unwrap();
+    let write = |name: &str, request: &Value| {
+        let path = requests.join(name);
+        std::fs::write(&path, serde_json::to_vec(request).unwrap()).unwrap();
+        path.to_str().unwrap().to_owned()
+    };
+    let fresh = write("fresh.json", &fresh_submission());
+    let recorded = write("recorded.json", &recorded_submission());
 
-    // Recorded before the first start, read after a restart.
     let mut first = Daemon::start(&daemon, &root.0);
-    let pipe = first.serving();
-    let (status, envelope) = cli(&daemon, &pin, &pipe, &["job", "status", "--job", OBSERVED]);
-    assert_eq!(status, Some(0), "{envelope}");
+    first.serving();
     first.stop(&root.0);
-
     let mut second = Daemon::start(&daemon, &root.0);
     let pipe = second.serving();
-    for (id, method, expected) in &answers {
-        let verb = method.trim_start_matches("job.");
-        let arguments: &[&str] = if *method == LIST {
-            &["job", "list"]
-        } else {
-            &["job", verb, "--job", id]
-        };
-        let (status, envelope) = cli(&daemon, &pin, &pipe, arguments);
-        assert_eq!(status, Some(0), "{id} {method}: {envelope}");
+    for verb in ["plan", "submit"] {
+        let (status, envelope) = cli(
+            &daemon,
+            &pin,
+            &pipe,
+            &["job", verb, "--request-file", &fresh],
+        );
+        assert_ne!(status, Some(0), "{verb}: {envelope}");
         assert_eq!(
-            labelled(json!({"result": envelope["result"]}))["result"],
-            expected["result"],
-            "{id} {method}: {envelope}"
+            envelope["error"]["details"]["wireCode"], "invalidInput",
+            "{verb}: {envelope}"
+        );
+        assert_eq!(
+            envelope["error"]["message"], "provider hdc is not registered",
+            "{verb}: {envelope}"
         );
     }
     let (status, envelope) = cli(
         &daemon,
         &pin,
         &pipe,
-        &["job", "timeline", "--job", OBSERVED],
+        &["job", "submit", "--request-file", &recorded],
     );
-    assert_ne!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["error"]["code"], "operationFailed", "{envelope}");
-    assert_eq!(
-        envelope["error"]["details"]["wireCode"], "rejected",
-        "{envelope}"
-    );
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"]["jobId"], OBSERVED, "{envelope}");
+    assert_eq!(envelope["result"]["deduplicated"], true, "{envelope}");
+    assert_eq!(envelope["result"]["newDispatchCount"], 0, "{envelope}");
     second.stop(&root.0);
+    assert!(root.snapshot() == before, "the Job store changed");
 }

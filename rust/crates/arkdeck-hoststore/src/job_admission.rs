@@ -18,8 +18,15 @@
 //!
 //! Nothing is dispatched: an admitted Job waits in `preflight` for an
 //! executor.
+//!
+//! On Windows (TASK-XPA-005, GJ-1) the same admission runs without a
+//! capability authority, a Flash lane or an Agent engine: the planner
+//! refuses every operation before admission (`job_plan`), so nothing is
+//! admitted yet; the authority's code stays macOS-only until it is ported.
 use crate::JobStore;
+#[cfg(target_os = "macos")]
 use crate::capability_policy::{self, DeviceHolds, IssueFailure};
+#[cfg(target_os = "macos")]
 use crate::capability_store::{CapabilityQuery, CapabilityStore, CapabilityStoreError, Effect};
 use crate::job_journal_events::{self, Envelope};
 use crate::job_journal_writer::JournalWriter;
@@ -31,8 +38,10 @@ use crate::operation_request::OperationRequest;
 use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
 
+#[cfg(target_os = "macos")]
 #[path = "flash_admission.rs"]
 mod flash_admission;
+#[cfg(target_os = "macos")]
 pub use flash_admission::FlashAdmitter;
 
 /// Swift `RuntimeDefaultReadOnlyPolicy` bounds.
@@ -144,6 +153,7 @@ fn default_read_only(
     )
 }
 
+#[cfg(target_os = "macos")]
 /// Swift `denialCode(of:)`: the machine-readable half of a capability
 /// refusal. Only decisions are named; a store fault is `unclassified`.
 fn denial_code(error: &CapabilityStoreError) -> &'static str {
@@ -157,6 +167,7 @@ fn denial_code(error: &CapabilityStoreError) -> &'static str {
 
 /// What a device mutation is authorized from: the capability store, and the
 /// device sessions this daemon holds.
+#[cfg(target_os = "macos")]
 #[derive(Clone, Copy)]
 pub struct MutationAuthority<'a> {
     pub default_root: &'a std::path::Path,
@@ -165,6 +176,7 @@ pub struct MutationAuthority<'a> {
     pub holds: &'a DeviceHolds,
 }
 
+#[cfg(target_os = "macos")]
 impl MutationAuthority<'_> {
     /// Swift's `validateMutationState`, before an admission and before each
     /// consumption: the Runtime's mutation state is continuous across the
@@ -225,6 +237,7 @@ pub struct JobAdmitter<'a> {
     pub planner: JobPlanner<'a>,
     pub jobs: &'a JobStore,
     pub now: fn() -> Option<String>,
+    #[cfg(target_os = "macos")]
     pub authority: Option<MutationAuthority<'a>>,
 }
 
@@ -240,6 +253,7 @@ impl JobAdmitter<'_> {
     /// is refused with the zero-dispatch proof before anything is
     /// materialized, as an operation outside the plan allowlist is; a
     /// `job.submit` of it is still admitted and waits in `preflight`.
+    #[cfg(target_os = "macos")]
     pub fn submit_for_agent(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
         let request = OperationRequest::decode(request_json)
             .map_err(|rejection| refused(rejection.code.wire_code(), rejection.message))?;
@@ -278,6 +292,7 @@ impl JobAdmitter<'_> {
         // Swift `repairProvablyTerminalCapabilityOutcomeGaps`, before the
         // plan is materialized: a use whose Job's journal already proves it
         // settled is recorded again, and nothing is dispatched.
+        #[cfg(target_os = "macos")]
         if !matches!(effect.as_str(), "hostOnly" | "readOnly")
             && let (Some(revision), Some(authority)) =
                 (request.expected_binding_revision, self.authority)
@@ -360,6 +375,7 @@ impl JobAdmitter<'_> {
     /// admission, and nothing is consumed yet. A destructive effect and the
     /// Runtime-capability policy are not served yet; a workspace subject is
     /// `preauthorize_workspace`'s.
+    #[cfg(target_os = "macos")]
     fn preauthorize(
         &self,
         request: &OperationRequest,
@@ -485,6 +501,7 @@ impl JobAdmitter<'_> {
     ///
     /// Either capability is then checked against its envelope and lineage;
     /// nothing is reserved or consumed, and every refusal dispatches nothing.
+    #[cfg(target_os = "macos")]
     fn preauthorize_workspace(
         &self,
         request: &OperationRequest,
@@ -620,6 +637,25 @@ impl JobAdmitter<'_> {
                 )
             })?;
         Ok(capability)
+    }
+
+    /// Without a capability authority nothing above `readOnly` is admitted,
+    /// as macOS refuses it without one.
+    #[cfg(windows)]
+    fn preauthorize(
+        &self,
+        _request: &OperationRequest,
+        descriptor: &CatalogOperation,
+        _effect: &str,
+        _materialized: &Materialized<'_>,
+    ) -> Result<String, AdmissionRefusal> {
+        Err(refused(
+            "rejected",
+            format!(
+                "{} needs a Runtime capability, which the Rust Runtime does not issue yet",
+                descriptor.reference()
+            ),
+        ))
     }
 
     /// Swift `currentCatalogDuplicate` and the reviewed-plan check of a
