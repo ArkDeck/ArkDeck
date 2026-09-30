@@ -6,9 +6,9 @@ production-signed release candidate. The agent does not sign, does not hold a cr
 only processes the record that is handed back.
 
 This runbook details §5 of `docs/design/cross-platform/windows-phase-a-runbook.md`. Where the two
-differ, the steps here apply, and they say why. A production RC cannot be smoked with
-`package-rc.ps1 -SmokeZip` yet: the script refuses it because the App has no publisher pin. And
-the MSIX daemon's package identity is unsettled. Both points are under "Current limits".
+differ, the steps here apply, and they say why. The App now pins a production daemon by its
+publisher identity as the CLI does, so `package-rc.ps1 -SmokeZip <production zip>` also runs on
+the reference host. The MSIX daemon's package identity is still unsettled; see "Current limits".
 
 A clean-host PASS is evidence for the packaging exit condition 7. It is not GJ acceptance and not
 device evidence: this runbook never connects a board and never runs `hdc`.
@@ -57,12 +57,9 @@ any means.
 
 Current limits that shape the steps:
 
-- **The App's publisher pin (ruling 17) is not implemented yet.** The App reads only
-  `ARKDECK_DAEMON_SIGNER_SHA256` or `ARKDECK_DAEMON_PACKAGE_FAMILY`.
-  - The xcopy App is therefore pinned for this smoke by the daemon's leaf SHA-256 (step 4).
-    That pin stays valid only until the next signing, since Artifact Signing leaves last 72
-    hours.
-  - The MSIX App is pinned by its package family.
+- **Both clients pin the xcopy daemon by publisher identity (ruling 17).** The CLI and the App
+  read the same `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` and `ARKDECK_DAEMON_PUBLISHER_EKU`; no
+  certificate hash is pinned. The MSIX App is pinned by its package family.
 - **The packaged daemon's identity is not settled.** A process has a package family only if it
   was activated with package identity. A CLI outside the package that starts
   `<InstallLocation>\arkdeck-agentd.exe` directly starts it *without* one, so a
@@ -129,17 +126,18 @@ must refuse the daemon (exit 69), never answer.
 
 ### 5. Xcopy form: the App (standard user)
 
-The App is pinned by the daemon's leaf SHA-256 for now (see "Current limits"):
+In the same window as step 4, so the App reads the same two publisher variables (it finds
+`arkdeck-agentd.exe` beside itself; `ARKDECK_DAEMON_PATH` names the same file):
 
 ```powershell
-$leaf = (Get-AuthenticodeSignature "$root\arkdeck-agentd.exe").SignerCertificate
-$env:ARKDECK_DAEMON_SIGNER_SHA256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($leaf.RawData)).ToLower()
 Start-Process "$root\ArkDeck.exe"
 ```
 
 Expect the Overview page to show the daemon's doctor report (`blocked`, no HDC on this host) and
 protocol `1.0.0`, with **no** recovery banner. Device shows `unavailable(rejected): hdc…`. Close
-the App. Screenshot the Overview page without account names.
+the App. Screenshot the Overview page without account names. Then check the negative: started
+from a new window with only `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` set, or with another
+organisation, the App must show the recovery banner, never data.
 
 ### 6. Xcopy form: uninstall (standard user)
 

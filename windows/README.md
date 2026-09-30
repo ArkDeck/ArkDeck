@@ -73,9 +73,13 @@ first, `ControlResult` back.
   Trace can be inspected by the Runtime (`trace.inspect`; without a Windows Trace inspector the
   refusal is shown as it came, and the viewer is deferred, decision 5).
 - **Which daemon.** The installation inputs the CLI reads: `ARKDECK_DAEMON_PATH` (default
-  `arkdeck-agentd.exe` beside the App), `ARKDECK_DAEMON_SIGNER_SHA256` or
-  `ARKDECK_DAEMON_PACKAGE_FAMILY`, optional `ARKDECK_ENDPOINT`. Without a pin there is nothing
-  to verify, so the App connects to nothing and shows the recovery banner. The App does not
+  `arkdeck-agentd.exe` beside the App), `ARKDECK_DAEMON_SIGNER_SHA256` (the development
+  signer), `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` with `ARKDECK_DAEMON_PUBLISHER_EKU` (a
+  production daemon, maintainer ruling 17: the chain `WinVerifyTrust` accepted ends at the
+  Microsoft Identity Verification Root 2020, and the leaf has exactly that one `O=` and the
+  Artifact Signing profile EKU; both or neither), or `ARKDECK_DAEMON_PACKAGE_FAMILY`, optional
+  `ARKDECK_ENDPOINT`. Without a pin there is nothing to verify, so the App connects to nothing
+  and shows the recovery banner. The App does not
   start the daemon (the client-started daemon lives in the CLI); the banner names
   `arkdeck doctor`, which starts it and says what is wrong.
 - **Recovery banner.** A daemon-unavailable failure (ClientKit refused or reached nothing)
@@ -187,7 +191,8 @@ pwsh windows/scripts/package-rc.ps1 -OutputDirectory D:\out\rc -SigningMode deve
 
 `-Smoke` installs the zip into a new owner-only directory under the account's local application
 data with a private development state root, checks every file against the manifest and every
-executable's signer against the pin, lets `arkdeck doctor` start the installed daemon (decision
+executable's signer against the pin (a production RC: its timestamped signature against the
+manifest's publisher identity, which then configures the CLI and the App), lets `arkdeck doctor` start the installed daemon (decision
 11), runs the App's UIA smoke (`App.UITests` `InstalledRcTests`: the installed `ArkDeck.exe`
 connects to that daemon and shows its doctor report, no recovery banner), runs doctor again,
 and uninstalls with `uninstall-rc.ps1`: no process may run from the directory, no new entry

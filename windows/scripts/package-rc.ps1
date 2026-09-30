@@ -53,11 +53,13 @@ the manifest's Publisher (a package whose publisher is not its certificate's sub
 install); with -SigningMode production it must be timestamped. Without it the MSIX stays unsigned
 and is recorded as not installable.
 
--Smoke after a development build (or -SmokeZip <zip> alone, for a package built before) installs the zip into a new private directory under the
+-Smoke after a signed build (or -SmokeZip <zip> alone, for a package built before) installs the zip into a new private directory under the
 account's local application data (owner-only: the user and SYSTEM), with a private development
 state root inside it, and then:
 
-  - checks every file against the manifest and the daemon's signer against the pin;
+  - checks every file against the manifest and each executable's signer against the pin, or for
+    a production RC its timestamped signature against the manifest's publisher identity, which
+    the CLI and the App are then configured with (ruling 17);
   - runs `arkdeck --output json doctor`, which starts the installed daemon (decision 11); the
     started process must be the installed image, and doctor must answer `ok: true`;
   - runs the App's UIA smoke (windows/App.UITests `InstalledRcTests`) against the installed
@@ -478,8 +480,8 @@ function New-RcBuild {
             [ordered]@{
                 ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = $runtimeManifest.signing.publisher.organization
                 ARKDECK_DAEMON_PUBLISHER_EKU          = $runtimeManifest.signing.publisher.eku
-                ARKDECK_DAEMON_PATH                   = "the CLI: <install>\$DaemonName"
-                note                                  = 'The App reads only ARKDECK_DAEMON_SIGNER_SHA256 or ARKDECK_DAEMON_PACKAGE_FAMILY today: its publisher-identity pin (ruling 17) is not implemented yet.'
+                ARKDECK_DAEMON_PATH                   = "the App: unset ($DaemonName beside ArkDeck.exe); the CLI: <install>\$DaemonName"
+                note                                  = 'The CLI and the App read the same publisher inputs (ruling 17); no certificate hash is pinned in production.'
             }
         } else {
             [ordered]@{
@@ -576,17 +578,21 @@ function Invoke-RcSmoke($Built) {
             if ((Get-Sha256 (Join-Path $install $file.path)) -ne $file.sha256) { throw "$($file.path) differs from the package manifest." }
         }
         $record.files = $installed.Count
-        $pin = $manifest.signing.signerSha256
-        if ($manifest.signing.mode -eq 'production') {
-            throw 'A production RC cannot be smoked by this script yet: the App pins its daemon only by a certificate SHA-256 or a package family, not by the publisher identity (ruling 17). Follow evidence/runs/TASK-XPA-022/windows-clean-host-smoke-runbook.md.'
-        }
-        if (-not $pin) { throw 'The package is unsigned; the CLI and the App refuse an unsigned daemon, so there is nothing to smoke.' }
+        # A production RC is pinned by its publisher identity (ruling 17): the leaf renews
+        # daily, so no certificate hash is pinned. A development RC keeps its signer pin.
+        $publisher = if ($manifest.signing.mode -eq 'production') { $manifest.signing.publisher } else { $null }
+        $pin = if ($publisher) { $null } else { $manifest.signing.signerSha256 }
+        if (-not $pin -and -not $publisher) { throw 'The package is unsigned; the CLI and the App refuse an unsigned daemon, so there is nothing to smoke.' }
         foreach ($name in @($AppName, "bin\$CliName", $DaemonName)) {
-            $signature = Get-AuthenticodeSignature -LiteralPath (Join-Path $install $name)
-            $actual = ([System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData))).ToLowerInvariant()
-            if ($signature.Status -ne 'Valid' -or $actual -ne $pin) { throw "$name does not carry the manifest's signer." }
+            $signer = Get-VerifiedSigner (Join-Path $install $name) ([bool]$publisher)
+            if ($publisher) {
+                $identity = Get-PublisherIdentity $signer.certificate
+                if ($identity.organization -ne $publisher.organization -or $identity.eku -ne $publisher.eku) { throw "$name does not carry the manifest's publisher." }
+            } elseif ($signer.pin -ne $pin) {
+                throw "$name does not carry the manifest's signer."
+            }
         }
-        $record.signerSha256 = $pin
+        if ($publisher) { $record.publisher = [ordered]@{ organization = $publisher.organization; eku = $publisher.eku } } else { $record.signerSha256 = $pin }
 
         $state = Join-Path $work 'state'
         New-PrivateDirectory $state
@@ -594,7 +600,12 @@ function Invoke-RcSmoke($Built) {
         foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
             if ($entry.Key -notmatch '^(ARKDECK_|OHOS_HDC_)') { $environment[$entry.Key] = $entry.Value }
         }
-        $environment['ARKDECK_DAEMON_SIGNER_SHA256'] = $pin
+        if ($publisher) {
+            $environment['ARKDECK_DAEMON_PUBLISHER_ORGANIZATION'] = $publisher.organization
+            $environment['ARKDECK_DAEMON_PUBLISHER_EKU'] = $publisher.eku
+        } else {
+            $environment['ARKDECK_DAEMON_SIGNER_SHA256'] = $pin
+        }
         $environment['ARKDECK_DEVELOPMENT_STATE_ROOT'] = $state
         $environment['ARKDECK_DAEMON_PATH'] = Join-Path $install $DaemonName
         $cli = Join-Path $install "bin\$CliName"
@@ -620,13 +631,18 @@ function Invoke-RcSmoke($Built) {
         $build = Invoke-Process $dotnet @('build', $uitests, '-c', 'Release', '--nologo') $environment $Built.Repository
         if ($build.exitCode -ne 0) { throw "Building the UIA tests failed: $($build.stdout) $($build.stderr)" }
         $uiEnvironment = $environment.Clone()
-        $uiEnvironment.Remove('ARKDECK_DAEMON_SIGNER_SHA256')
-        $uiEnvironment.Remove('ARKDECK_DEVELOPMENT_STATE_ROOT')
-        $uiEnvironment.Remove('ARKDECK_DAEMON_PATH')
+        foreach ($key in @('ARKDECK_DAEMON_SIGNER_SHA256', 'ARKDECK_DAEMON_PUBLISHER_ORGANIZATION', 'ARKDECK_DAEMON_PUBLISHER_EKU', 'ARKDECK_DEVELOPMENT_STATE_ROOT', 'ARKDECK_DAEMON_PATH')) {
+            $uiEnvironment.Remove($key)
+        }
         $uiEnvironment['ARKDECK_APP_UITESTS'] = '1'
         $uiEnvironment['ARKDECK_RC_APP'] = Join-Path $install $AppName
         $uiEnvironment['ARKDECK_RC_ENDPOINT'] = $instance.socketPath
-        $uiEnvironment['ARKDECK_RC_SIGNER_SHA256'] = $pin
+        if ($publisher) {
+            $uiEnvironment['ARKDECK_RC_PUBLISHER_ORGANIZATION'] = $publisher.organization
+            $uiEnvironment['ARKDECK_RC_PUBLISHER_EKU'] = $publisher.eku
+        } else {
+            $uiEnvironment['ARKDECK_RC_SIGNER_SHA256'] = $pin
+        }
         # The outcome is read from the TRX, not the (localised) console: exactly one test, passed.
         $results = Join-Path $work 'uitest'
         $ui = Invoke-Process $dotnet @('test', $uitests, '-c', 'Release', '--no-build', '--nologo', '--filter', 'FullyQualifiedName~InstalledRcTests',
@@ -695,8 +711,8 @@ if ($PSCmdlet.ParameterSetName -eq 'SmokeOnly') {
     Invoke-RcSmoke ([pscustomobject]@{ Zip = $zip; Output = (Split-Path -Parent $zip); Repository = (Invoke-Checked git @('-C', $PSScriptRoot, 'rev-parse', '--show-toplevel')).Trim() })
     return
 }
-if ($Smoke -and $SigningMode -ne 'development') {
-    throw '-Smoke needs -SigningMode development: the clients refuse an unsigned daemon, and the App cannot pin a production daemon by publisher identity yet.'
+if ($Smoke -and $SigningMode -eq 'none') {
+    throw '-Smoke needs a signed release candidate: the clients refuse an unsigned daemon.'
 }
 $outputExisted = Test-Path -LiteralPath $OutputDirectory
 try {
