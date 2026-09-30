@@ -16,14 +16,23 @@ use windows_sys::Win32::Security::Credentials::{
 const SERVICE: &str = "dev.arkdeck.openharmony-local-signing";
 const BLOB_LIMIT: usize = 2560;
 
+/// The tests of this file run one at a time (see
+/// `concurrent_writers_keep_each_others_credentials`).
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// One fixture namespace and the accounts it may hold, deleted on drop.
 struct Fixture {
     items: KeychainItems,
     targets: Vec<Vec<u16>>,
+    // Released after `Drop::drop` has deleted the targets.
+    _serial: std::sync::MutexGuard<'static, ()>,
 }
 
 impl Fixture {
     fn new() -> Self {
+        let serial = SERIAL
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let token: String = random_bytes::<8>()
             .unwrap()
             .iter()
@@ -33,16 +42,21 @@ impl Fixture {
         Self {
             items: KeychainItems::fixture_namespace(SERVICE, &namespace).unwrap(),
             targets: Vec::new(),
+            _serial: serial,
         }
     }
 
     /// Registers `account` for cleanup before anything can create it.
     fn account<'a>(&mut self, account: &'a str) -> &'a str {
+        self.register(account);
+        account
+    }
+
+    fn register(&mut self, account: &str) {
         let target = self.items.target_name(account).unwrap().unwrap();
         assert!(target.starts_with("ArkDeck-fixture/test-"));
         self.targets
             .push(target.encode_utf16().chain(Some(0)).collect());
-        account
     }
 }
 
@@ -218,5 +232,70 @@ fn neither_the_value_nor_its_errors_print_the_secret() {
     assert_eq!(
         format!("{absent}"),
         format!("Credential Manager status {CREDENTIAL_NOT_FOUND}")
+    );
+}
+
+/// Churns `rounds` credentials of its own next to one kept credential and
+/// counts how often the kept one was no longer present.
+fn churn(items: &KeychainItems, keep: &str, prefix: &str, rounds: usize) -> (usize, Vec<String>) {
+    let mut lost = 0;
+    let mut errors = Vec::new();
+    for round in 0..rounds {
+        let account = format!("{prefix}-{round}");
+        if let Err(error) = items.set(&account, b"churn") {
+            errors.push(format!("set {error:?}"));
+        }
+        if let Err(error) = items.remove(&account) {
+            errors.push(format!("remove {error:?}"));
+        }
+        let presence = items.presence(keep);
+        if presence != KeychainPresence::Present {
+            lost += 1;
+            errors.push(format!("round {round}: kept {presence:?}"));
+            let _ = items.set(keep, b"kept");
+        }
+    }
+    (lost, errors)
+}
+
+#[test]
+fn concurrent_writers_keep_each_others_credentials() {
+    const THREADS: usize = 8;
+    const ROUNDS: usize = 50;
+    let mut fixture = Fixture::new();
+    for thread in 0..THREADS {
+        fixture.register(&format!("kept-{thread}"));
+        for round in 0..ROUNDS {
+            fixture.register(&format!("churn-{thread}-{round}"));
+        }
+    }
+    let items = &fixture.items;
+    items.set("kept-0", b"kept").unwrap();
+    let sequential = churn(items, "kept-0", "churn-0", ROUNDS);
+    let concurrent: Vec<(usize, Vec<String>)> = std::thread::scope(|scope| {
+        let handles: Vec<_> = (0..THREADS)
+            .map(|thread| {
+                scope.spawn(move || {
+                    let keep = format!("kept-{thread}");
+                    items.set(&keep, b"kept").unwrap();
+                    churn(items, &keep, &format!("churn-{thread}"), ROUNDS)
+                })
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect()
+    });
+    let lost: usize = concurrent.iter().map(|(lost, _)| lost).sum();
+    assert!(
+        sequential.0 == 0 && lost == 0,
+        "credentials lost: sequential {} {:?}; concurrent {lost} {:?}",
+        sequential.0,
+        sequential.1,
+        concurrent
+            .iter()
+            .flat_map(|(_, errors)| errors.iter().take(3))
+            .collect::<Vec<_>>()
     );
 }
