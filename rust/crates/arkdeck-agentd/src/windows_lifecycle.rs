@@ -196,7 +196,10 @@ impl Authority {
     /// owner-only is refused when its owner opens it. Composing opens each
     /// store, which reads its documents under its locks; a store it cannot
     /// open or read ends the start, as on macOS.
-    pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
+    pub(crate) fn compose(
+        &self,
+        host: crate::host::Host,
+    ) -> Result<(crate::host::Host, crate::arkforge_lane::Composed), String> {
         use crate::development_usb::{RelationSource, relation_source};
         let host = host
             .with_jobs(self.job_store()?)
@@ -334,11 +337,61 @@ impl Authority {
             "arkdeck-agentd composes no HDC: no Windows HDC tuple is registered; device \
              observation and target adoption are refused before any dispatch",
         );
+        let (host, composed) = self.compose_arkforge(host);
         report(&format!(
             "arkdeck-agentd owners: {}",
             host.owner_census().join(", ")
         ));
-        Ok(host)
+        Ok((host, composed))
+    }
+
+    /// The ArkForge lane (TASK-XPA-010), as the macOS compositions compose
+    /// it beside the Job state: the account's root (the macOS production
+    /// `Agentd`) or a development root's `jobs-state`, with the lane's
+    /// runtime directory `arkforge` in it and the facts' root its
+    /// Application Support (the account root's parent, or the development
+    /// root itself).
+    ///
+    /// One validated `ARKDECK_ARKFORGE_BUNDLE_PATH` bundle names the
+    /// `arkforged.exe` to start and pair, but its authority must name the
+    /// managed-control HDC's digest, and no HDC is composed until the Windows
+    /// HDC tuple is registered: the lane is refused before anything is
+    /// launched, and the start reports why. Its planning, its facts (over the
+    /// Windows USB census, which fails closed until the DAYU200 sample
+    /// confirms its mapping) and the device access observer of the lane's
+    /// directory are composed either way, as on macOS; no executable lane is
+    /// installed without an HDC, so an admissible Flash is refused before
+    /// admission with zero dispatch.
+    fn compose_arkforge(
+        &self,
+        host: crate::host::Host,
+    ) -> (crate::host::Host, crate::arkforge_lane::Composed) {
+        let root = self.root.path();
+        let (state, application_support) = if self.development {
+            (root.join("jobs-state"), root.to_path_buf())
+        } else {
+            (
+                root.to_path_buf(),
+                root.parent().unwrap_or(root).to_path_buf(),
+            )
+        };
+        let composed = crate::arkforge_lane::compose(&state, |key| std::env::var(key).ok(), None);
+        composed.report();
+        let host = host
+            .with_flash_planning(composed.planning(&state, false))
+            .with_flash_host_facts(
+                arkdeck_hoststore::FlashHostFacts::new(
+                    &application_support,
+                    arkdeck_platform::usb_host_devices,
+                )
+                .with_rockusb(composed.rockusb())
+                .with_arkforge_loader(&composed.runtime_directory),
+            )
+            .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
+                &composed.runtime_directory,
+            ))
+            .with_lane_plan_preview(composed.lane_plan_preview());
+        (host, composed)
     }
 
     /// The Job store owner over its private child of the root (created

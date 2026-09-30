@@ -219,23 +219,23 @@ pub struct Host {
     /// Swift's bootloader status observer and Rockchip facts port: the
     /// binding and the alias of the Application Support root, the census,
     /// the native RockUSB identity and the live probe over this host's HDC.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     flash_facts: Option<std::sync::Arc<arkdeck_hoststore::FlashHostFacts>>,
     /// What a Flash `job.plan` reads beyond the Artifact and Import owners
     /// and those facts: the ArkForge provider's availability, the Rockchip
     /// dispatcher's reason and the lane's toolchain, as Swift's daemon
     /// composes them.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     flash_planning: Option<std::sync::Arc<arkdeck_hoststore::FlashPlanning>>,
     #[cfg(target_os = "macos")]
     flash_runtime: Option<std::sync::Arc<FlashRuntime>>,
     /// Swift `ProductRockchipDeviceAccessObserver`: ArkForge's public socket
     /// in the lane's runtime directory, a fresh bounded session per read.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     device_access: Option<arkdeck_provider_arkforge::DeviceAccessObserver>,
     /// Swift's `ComposedLanePlanPreviewer`, which exists only with a composed
     /// ArkForge lane, holding only that generation's read-only preview ports.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     lane_plan_preview: Option<std::sync::Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>>,
     /// Swift `ProductRockchipLoaderBindingCoordinator`: the binding of the
     /// Application Support root, the Runtime's records below it, the census
@@ -1048,7 +1048,7 @@ impl Host {
     }
     /// `flash.bootloader-status` and `flash.prerequisites` read these facts,
     /// against this host's Target store and, for the live probe, its HDC.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_flash_host_facts(mut self, facts: arkdeck_hoststore::FlashHostFacts) -> Self {
         self.flash_facts = Some(std::sync::Arc::new(facts));
         self
@@ -1057,7 +1057,7 @@ impl Host {
     /// `job.plan` materializes the ArkForge Flash operations over this
     /// composition and the Rockchip facts; without it they stay the
     /// planner's, which does not materialize them.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_flash_planning(mut self, planning: arkdeck_hoststore::FlashPlanning) -> Self {
         self.flash_planning = Some(std::sync::Arc::new(planning));
         self
@@ -1241,6 +1241,72 @@ impl Host {
         })
     }
 
+    /// Swift's ArkForge facts port on Windows: the Target store's facts over
+    /// no HDC (none is composed until the Windows HDC tuple is registered).
+    #[cfg(windows)]
+    fn flash_facts_port(
+        &self,
+    ) -> Option<impl Fn(&str) -> Result<arkdeck_hoststore::RockchipFacts, String> + '_> {
+        let (Some(facts), Some(targets)) = (&self.flash_facts, &self.targets) else {
+            return None;
+        };
+        Some(move |target_id: &str| facts.current_facts(targets, None, target_id))
+    }
+
+    /// The Windows `job.plan` planner: the Job planner with the Flash
+    /// composition and the facts port above (TASK-XPA-010).
+    #[cfg(windows)]
+    fn with_flash_planner<T>(
+        &self,
+        run: impl FnOnce(&arkdeck_hoststore::FlashPlanner<'_>) -> T,
+    ) -> Option<T> {
+        let state_root = self.planning.as_ref()?;
+        let facts = self.flash_facts_port();
+        Some(run(&arkdeck_hoststore::FlashPlanner {
+            planner: self.planner(state_root),
+            flash: self.flash_planning.as_deref(),
+            facts: facts
+                .as_ref()
+                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
+        }))
+    }
+
+    /// The Windows Flash admission: the Flash planning and facts, and no
+    /// executable lane — none is installed without a descriptor-bound HDC —
+    /// so an admissible Flash is refused before admission as Swift refuses
+    /// one this Runtime does not execute, with zero dispatch.
+    #[cfg(windows)]
+    fn with_flash_admitter<T>(
+        &self,
+        admitter: arkdeck_hoststore::JobAdmitter<'_>,
+        run: impl FnOnce(&arkdeck_hoststore::FlashAdmitter<'_>) -> T,
+    ) -> T {
+        let facts = self.flash_facts_port();
+        run(&arkdeck_hoststore::FlashAdmitter {
+            admitter,
+            flash: self.flash_planning.as_deref(),
+            facts: facts
+                .as_ref()
+                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
+            executes: false,
+            campaign: None,
+        })
+    }
+
+    /// The HDC the Flash facts probe over: this host's, on macOS; none on
+    /// Windows until its HDC tuple is registered.
+    #[cfg(target_os = "macos")]
+    fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
+        self.hdc
+            .as_deref()
+            .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
+    }
+
+    #[cfg(windows)]
+    fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
+        None
+    }
+
     /// `flash.bind-current-loader` binds through this owner, against this
     /// host's Target store and Jobs.
     #[cfg(target_os = "macos")]
@@ -1251,7 +1317,7 @@ impl Host {
 
     /// `flash.device-access` reads the flashing modes the ArkForge lane's
     /// daemon sees attached through this observer.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_device_access(
         mut self,
         observer: arkdeck_provider_arkforge::DeviceAccessObserver,
@@ -1263,7 +1329,7 @@ impl Host {
     /// `flash.lanePlanPreview` previews through the ArkForge lane composed
     /// over this host's Target store and Rockchip facts; none
     /// without a lane, as Swift composes its previewer only with one.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_lane_plan_preview(
         mut self,
         previewer: Option<std::sync::Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>>,
@@ -1337,6 +1403,9 @@ impl Host {
             ("traceCache", self.trace_cache.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("codeSignHelper", self.code_sign_helper.is_some()),
+            ("flashHostFacts", self.flash_facts.is_some()),
+            ("deviceAccess", self.device_access.is_some()),
+            ("lanePlanPreview", self.lane_plan_preview.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
         .into_iter()
@@ -1432,15 +1501,15 @@ impl Host {
             flash_alias: None,
             #[cfg(target_os = "macos")]
             flash_invocations: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             flash_facts: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             flash_planning: None,
             #[cfg(target_os = "macos")]
             flash_runtime: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             device_access: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             lane_plan_preview: None,
             #[cfg(target_os = "macos")]
             loader_binding: None,
@@ -2165,23 +2234,21 @@ impl HostServices for Host {
                 ])),
             })
     }
-    /// `job.plan` on Windows: the Job planner (no Flash planning, no Flash
-    /// lane being composed), so a device plan is refused before admission
-    /// with zero dispatch, as on macOS without an HDC provider.
+    /// `job.plan` on Windows: the Job planner with the Flash planning and
+    /// facts (TASK-XPA-010), so a Flash plan is materialized as on macOS and
+    /// a device plan is refused before admission with zero dispatch, as on
+    /// macOS without an HDC provider.
     #[cfg(windows)]
     fn job_plan(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let Some(state_root) = &self.planning else {
-            return Err(WireError {
+        self.with_flash_planner(|planner| planner.handle(params))
+            .ok_or_else(|| WireError {
                 code: "rejected".into(),
                 message: "this method is unavailable in the read-only Rust foundation".into(),
                 details: None,
-            });
-        };
-        self.planner(state_root)
-            .handle(params)
+            })?
             .map_err(|refusal| WireError {
                 code: refusal.code.into(),
                 message: refusal.message,
@@ -2193,7 +2260,7 @@ impl HostServices for Host {
     }
     /// `job.submit` on Windows: the Job admitter over the Job store, its
     /// idempotency lookup and admission interlock included, with the
-    /// planner above and no capability authority.
+    /// planner above and no capability authority, under the Flash admission.
     #[cfg(windows)]
     fn job_submit(
         &self,
@@ -2206,26 +2273,27 @@ impl HostServices for Host {
                 details: None,
             });
         };
-        arkdeck_hoststore::JobAdmitter {
+        let admitter = arkdeck_hoststore::JobAdmitter {
             planner: self.planner(state_root),
             jobs,
             now: arkdeck_hoststore::runtime_now,
             // No mutation authority is composed on Windows yet.
             authority: None,
-        }
-        .handle(params)
-        .map_err(|refusal| WireError {
-            code: refusal.code.into(),
-            message: refusal.message,
-            details: Some(if refusal.proven {
-                serde_json::Map::from_iter([
-                    ("phase".into(), serde_json::json!("preAdmission")),
-                    ("newDispatchCount".into(), serde_json::json!(0)),
-                ])
-            } else {
-                serde_json::Map::new()
-            }),
-        })
+        };
+        // A Flash is judged through the Flash admission (TASK-XPA-010).
+        self.with_flash_admitter(admitter, |admitter| admitter.handle(params))
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: Some(if refusal.proven {
+                    serde_json::Map::from_iter([
+                        ("phase".into(), serde_json::json!("preAdmission")),
+                        ("newDispatchCount".into(), serde_json::json!(0)),
+                    ])
+                } else {
+                    serde_json::Map::new()
+                }),
+            })
     }
     /// `job.submit` admits into the Job owner the planner materializes for,
     /// the ArkForge Flash operations over the Flash composition and facts.
@@ -3285,22 +3353,17 @@ impl HostServices for Host {
         }
     }
     /// Swift composes the prerequisite observer with the Target store, and
-    /// its probe only with an HDC.
-    #[cfg(target_os = "macos")]
+    /// its probe only with an HDC (none on Windows yet).
+    #[cfg(any(target_os = "macos", windows))]
     fn flash_prerequisites(
         &self,
         target_id: &str,
         profile_reference: &str,
     ) -> Result<serde_json::Value, WireError> {
         match (&self.flash_facts, &self.targets) {
-            (Some(facts), Some(targets)) => facts.prerequisites(
-                targets,
-                self.hdc
-                    .as_deref()
-                    .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
-                target_id,
-                profile_reference,
-            ),
+            (Some(facts), Some(targets)) => {
+                facts.prerequisites(targets, self.flash_hdc(), target_id, profile_reference)
+            }
             _ => Err(WireError {
                 code: "internalError".into(),
                 message: "Flash prerequisite observation is not configured".into(),
@@ -3330,7 +3393,7 @@ impl HostServices for Host {
             expected_binding_revision,
         )
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn flash_bootloader_status(&self) -> Result<serde_json::Value, WireError> {
         match (&self.flash_facts, &self.targets) {
             (Some(facts), Some(targets)) => facts.bootloader_status(targets),
@@ -3345,7 +3408,7 @@ impl HostServices for Host {
     /// previewer: the Target's facts through the ArkForge provider's port —
     /// this host's, measured over its HDC — or, with no facts composed, the
     /// provider's refusal to resolve any.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn flash_lane_plan_preview(
         &self,
         target_id: &str,
@@ -3359,10 +3422,7 @@ impl HostServices for Host {
                 details: None,
             });
         };
-        let hdc = self
-            .hdc
-            .as_deref()
-            .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch);
+        let hdc = self.flash_hdc();
         let previewer = self.lane_plan_preview.as_ref().map(|lane| {
             move |target: &str| {
                 arkdeck_hoststore::preview_before_lane(
@@ -3386,7 +3446,7 @@ impl HostServices for Host {
         )
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn flash_device_access(&self) -> Result<serde_json::Value, WireError> {
         let Some(observer) = &self.device_access else {
             return Err(WireError {
