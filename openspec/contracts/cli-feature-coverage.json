@@ -1613,7 +1613,7 @@
       "feature": "artifact.import.abort",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1631,7 +1631,7 @@
       "feature": "artifact.import.append",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "bounded chunk frame behind `artifact import <kind>`",
@@ -1650,7 +1650,7 @@
       "feature": "artifact.import.begin",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "durable import session opening behind `artifact import <kind>`",
@@ -1669,7 +1669,7 @@
       "feature": "artifact.import.commit",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "digest-checked commit behind `artifact import <kind>`",
@@ -1688,7 +1688,7 @@
       "feature": "artifact.import.flash-bundle",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1706,7 +1706,7 @@
       "feature": "artifact.import.inspect",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1724,7 +1724,7 @@
       "feature": "artifact.import.inspection",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "idempotent re-entry probe behind `artifact import <kind>`",
@@ -1743,7 +1743,7 @@
       "feature": "artifact.import.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1761,7 +1761,7 @@
       "feature": "artifact.import.release",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1779,7 +1779,7 @@
       "feature": "artifact.import.workspace-patch",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
