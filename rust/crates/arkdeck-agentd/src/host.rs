@@ -2719,7 +2719,7 @@ impl HostServices for Host {
             .inspect(kind, reference)
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn session_resource(
         &self,
         method: &str,
@@ -2841,7 +2841,7 @@ impl HostServices for Host {
             sessions.handle_resource(method, params)
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn runtime_storage(
         &self,
         method: &str,

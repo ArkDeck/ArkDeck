@@ -92,10 +92,8 @@ impl SessionStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt},
-    };
+    use crate::test_private::{file_id, owner_only_file};
+    use std::fs;
     struct Fixture {
         root: PathBuf,
         session: PathBuf,
@@ -103,27 +101,19 @@ mod tests {
     }
     impl Fixture {
         fn new() -> Self {
-            let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            let root = crate::test_private::temporary_root().join(format!(
                 "export-owner-{:032x}",
                 u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
             ));
             for child in ["state", "sessions", "output"] {
-                fs::DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(root.join(child))
-                    .unwrap();
+                crate::test_private::create_private_directories(&root.join(child));
             }
             let source =
                 include_bytes!("../../../tests/fixtures/session-export/swift-derived-source.json");
             let manifest: Value = serde_json::from_slice(source).unwrap();
             let id = manifest["sessionId"].as_str().unwrap().to_owned();
             let session = root.join("sessions/2026/07").join(&id);
-            fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(&session)
-                .unwrap();
+            crate::test_private::create_private_directories(&session);
             fs::write(session.join("manifest.json"), source).unwrap();
             fs::write(
                 session.join(".session-identity.json"),
@@ -135,11 +125,7 @@ mod tests {
             .unwrap();
             for artifact in manifest["artifacts"].as_array().unwrap() {
                 let path = session.join(artifact["relativePath"].as_str().unwrap());
-                fs::DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(path.parent().unwrap())
-                    .unwrap();
+                crate::test_private::create_private_directories(path.parent().unwrap());
                 fs::write(
                     &path,
                     if artifact["id"] == "export-raw" {
@@ -149,7 +135,7 @@ mod tests {
                     },
                 )
                 .unwrap();
-                fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+                owner_only_file(&path);
             }
             Self { root, session, id }
         }
@@ -206,7 +192,7 @@ mod tests {
         assert_eq!(result["excludedArtifactIds"], json!(["export-raw"]));
         assert_eq!(f.record(&preview)["state"], "applied");
         assert_eq!(f.record(&preview)["result"], result);
-        let original_inode = fs::metadata(f.target()).unwrap().ino();
+        let original_inode = file_id(&f.target()).1;
         fs::rename(f.target(), f.root.join("output/moved-result")).unwrap();
         fs::rename(&f.session, f.root.join("moved-source")).unwrap();
         let again = apply(&f, &preview, || {
@@ -216,9 +202,7 @@ mod tests {
         assert_eq!(again, result);
         assert!(!f.target().exists());
         assert_eq!(
-            fs::metadata(f.root.join("output/moved-result"))
-                .unwrap()
-                .ino(),
+            file_id(&f.root.join("output/moved-result")).1,
             original_inode
         );
     }
@@ -258,7 +242,7 @@ mod tests {
             "outcomeUnknown"
         );
         assert_eq!(f.record(&preview)["state"], "applying");
-        let inode = fs::metadata(f.target()).unwrap().ino();
+        let inode = file_id(&f.target()).1;
         assert_eq!(
             apply(&f, &preview, || panic!(
                 "unknown outcome must not rerun export"
@@ -267,7 +251,7 @@ mod tests {
             .code,
             "outcomeUnknown"
         );
-        assert_eq!(fs::metadata(f.target()).unwrap().ino(), inode);
+        assert_eq!(file_id(&f.target()).1, inode);
     }
     #[test]
     fn stale_tuple_expiry_and_destination_conflict_never_spend_preview() {

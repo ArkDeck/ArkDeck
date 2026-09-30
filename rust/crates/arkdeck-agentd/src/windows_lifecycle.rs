@@ -13,10 +13,11 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Job store, the Target owners, the Artifact read and
-//!   export owner, the workspace project owner, the Job planner and admitter
-//!   and (in a development root) the Trace cache owner are composed over it
-//!   (see [`Authority::compose`]); every input that would compose another
+//!   lifecycle only the Job store and its capability store, the Target
+//!   owners, the Artifact read and export owner, the Session owner, the
+//!   workspace project owner, the Job planner and admitter and (in a
+//!   development root) the Trace cache owner are composed over it (see
+//!   [`Authority::compose`]); every input that would compose another
 //!   owner on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
@@ -111,7 +112,8 @@ impl Authority {
     /// (`targets`) composes them, in a private child of the root created
     /// owner-only when absent (`StateRoot::private_child`):
     ///
-    /// * the Job store (`jobs-state`, [`Self::job_store`]);
+    /// * the Job store (`jobs-state`, [`Self::job_store`]) and the capability
+    ///   store beside it ([`Self::capability_store`]);
     /// * the Target store: `targets.json` and the display names under
     ///   `.targets.lock` and `.target-display-names.lock`, the same bytes
     ///   as on macOS; `target.list`, `target.show`, `target.availability`
@@ -131,10 +133,9 @@ impl Authority {
     ///   and `artifact.list` snapshot pages as on macOS. Every Artifact
     ///   belongs to a Job, which the Job store above proves before anything
     ///   is read, listed or exported;
-    /// * the Job planner and admitter over the Job store and the root
-    ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
-    ///   tuple is registered): a device operation is refused before admission
-    ///   with zero dispatch, as macOS refuses it without an HDC provider;
+    /// * the Session owner and the Artifact usage owner
+    ///   ([`Self::session_store`]): `runtime.storage.*`, `session.list|show|
+    ///   pin|unpin`, `session.cleanup.*` and `session.export.*`;
     /// * the workspace project owner (`WorkspaceProjectStore`) in
     ///   `workspace-projects`, the name both macOS compositions give it:
     ///   `projects.json` under `.projects.lock`, the same document as on
@@ -151,6 +152,10 @@ impl Authority {
     ///   yet ask the Job owner whether a workspace Job names a project or
     ///   preset, so every project or preset mutation is refused
     ///   (`recordUnreadable`, no new dispatch);
+    /// * the Job planner and admitter over the Job store and the root
+    ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
+    ///   tuple is registered): a device operation is refused before admission
+    ///   with zero dispatch, as macOS refuses it without an HDC provider;
     /// * in a development root only, the Trace cache owner
     ///   (`TraceCacheStore`) over `trace-cache\traces`, beside its `staging`,
     ///   the layout the macOS isolated owner creates: `trace.cache.status`
@@ -169,7 +174,9 @@ impl Authority {
     /// open or read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
-        let host = host.with_jobs(self.job_store()?);
+        let host = host
+            .with_jobs(self.job_store()?)
+            .with_capabilities(self.capability_store()?);
         let name = if self.development {
             "targets-state"
         } else {
@@ -202,6 +209,23 @@ impl Authority {
             )
         })?;
         let host = host.with_artifacts(artifacts);
+        let host = host.with_storage(self.session_store()?, {
+            // The Artifact read owner's directory, as it opened it.
+            let path = self.root.private_child("artifacts").map_err(|error| {
+                format!(
+                    "the Artifact usage owner {} is unusable: {error}; nothing was started",
+                    self.root.path().join("artifacts").display()
+                )
+            })?;
+            arkdeck_hoststore::ArtifactUsage::open(&path, crate::host::ARTIFACT_QUOTA).map_err(
+                |error| {
+                    format!(
+                        "the Artifact usage owner {} is unusable: {error}; nothing was started",
+                        path.display()
+                    )
+                },
+            )?
+        });
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(
@@ -227,8 +251,7 @@ impl Authority {
             .map_err(|error| unusable(&path, &error.message))?;
         let host = host
             .with_workspace_projects(projects)
-            .with_planning(self.root.path())
-            .with_capabilities(self.capability_store()?);
+            .with_planning(self.root.path());
         let host = if self.development {
             let name = "trace-cache";
             let unusable = |path: &Path, error: std::io::Error| {
@@ -254,10 +277,6 @@ impl Authority {
             host.with_trace_cache(cache)
         } else {
             host
-        };
-        let host = match self.session_store()? {
-            Some((sessions, usage)) => host.with_storage(sessions, usage),
-            None => host,
         };
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
@@ -323,52 +342,62 @@ impl Authority {
         })
     }
 
-    /// The Session owner a terminal Job is published through, over a
-    /// development root as the macOS isolated owner names it: its state in
-    /// `session-state` and the default Sessions root `sessions`, both private
-    /// children of the root, beside the Artifact usage owner over
-    /// `artifacts`. The macOS owner also bounds a Session root a storage
-    /// request selects to the development root (`SessionStore::isolated`),
-    /// which the host store opens as a private directory; a Windows
-    /// development root need not be one (the lifecycle's rule), and no
-    /// storage request is served on Windows yet, so the default root is the
-    /// only one a publication can reach.
-    /// The account's root composes none yet: where its Sessions live beside
-    /// `%LOCALAPPDATA%\ArkDeck\Agentd` is a layout decision still open, so
-    /// its terminal Jobs are not published, as a Swift engine without a
-    /// publication writer leaves them.
-    fn session_store(
-        &self,
-    ) -> Result<
-        Option<(
-            arkdeck_hoststore::SessionStore,
-            arkdeck_hoststore::ArtifactUsage,
-        )>,
-        String,
-    > {
-        if !self.development {
-            return Ok(None);
-        }
-        let unusable = |error: &dyn std::fmt::Display| {
-            format!("the Session owner is unusable: {error}; nothing was started")
+    /// The Session storage owner: its settings in the private `session-state`
+    /// and its default Sessions root in the private `sessions`, the macOS
+    /// isolated owner's names. A development root's owner is isolated as the
+    /// macOS one is: a selected Sessions root stays inside the development
+    /// root and outside every other owner's directory. The account's root
+    /// keeps both in the same children, below `Agentd`, until the Windows App
+    /// names its Sessions location (macOS keeps them in `ArkDeck/Sessions`).
+    /// Its Artifact usage owner (`artifacts`) is the one the Artifact read
+    /// owner reads.
+    fn session_store(&self) -> Result<arkdeck_hoststore::SessionStore, String> {
+        let unusable = |path: &Path, error: &dyn std::fmt::Display| {
+            format!(
+                "the Session store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
         };
-        for name in ["session-state", "sessions"] {
+        // Each child as the file system resolves the opened handle
+        // (`StateRoot::private_child`): the canonical plain spelling (`D:\…`)
+        // the Session owner opens its roots by and compares them with, which
+        // a verbatim (`\\?\D:\…`) or short (`RUNNER~1`) spelling of the
+        // root is not.
+        let child = |name: &str| {
             self.root
                 .private_child(name)
-                .map_err(|error| unusable(&error))?;
+                .map_err(|error| unusable(&self.root.path().join(name), &error))
+        };
+        let (state, sessions) = (child("session-state")?, child("sessions")?);
+        let root = &state
+            .parent()
+            .ok_or_else(|| unusable(&state, &"it has no parent"))?
+            .to_path_buf();
+        let store = arkdeck_hoststore::SessionStore::open(&state, &sessions)
+            .map_err(|error| unusable(&state, &error))?;
+        if !self.development {
+            return Ok(store);
         }
-        let root = self.root.path();
-        let sessions = arkdeck_hoststore::SessionStore::open(
-            &root.join("session-state"),
-            &root.join("sessions"),
-        )
-        .map_err(|error| unusable(&error))?;
-        let usage = arkdeck_hoststore::ArtifactUsage::open(
-            &root.join("artifacts"),
-            crate::host::ARTIFACT_QUOTA,
-        )
-        .map_err(|error| unusable(&error))?;
-        Ok(Some((sessions, usage)))
+        store
+            .isolated(
+                root,
+                [
+                    "artifacts",
+                    "trace-cache",
+                    "bootstrap",
+                    "jobs-state",
+                    "targets-state",
+                    "agent-executions",
+                    "human-action-snapshots",
+                    "control-action-snapshots",
+                    "evolution-workspaces",
+                    "workspace-projects",
+                ]
+                .into_iter()
+                .map(|name| root.join(name))
+                .collect(),
+            )
+            .map_err(|error| unusable(&state, &error))
     }
 
     /// After a complete drain: the owner lock, then the guard, on the thread
