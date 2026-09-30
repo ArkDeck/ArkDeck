@@ -22,7 +22,7 @@
       "feature": "agent.abandon",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -57,7 +57,7 @@
       "feature": "agent.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -75,7 +75,7 @@
       "feature": "agent.resume",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -93,7 +93,7 @@
       "feature": "agent.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -111,7 +111,7 @@
       "feature": "agent.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -231,7 +231,7 @@
       "feature": "analyzer.analyze-trace@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -249,7 +249,7 @@
       "feature": "analyzer.extract-crash-signature@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -267,7 +267,7 @@
       "feature": "analyzer.summarize-hilog@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -285,7 +285,7 @@
       "feature": "analyzer.summarize-trace@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1595,7 +1595,7 @@
       "feature": "artifact.export",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1613,7 +1613,7 @@
       "feature": "artifact.import.abort",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1706,7 +1706,7 @@
       "feature": "artifact.import.inspect",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1743,7 +1743,7 @@
       "feature": "artifact.import.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1761,7 +1761,7 @@
       "feature": "artifact.import.release",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1797,7 +1797,7 @@
       "feature": "artifact.inspect",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1815,7 +1815,7 @@
       "feature": "artifact.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1833,7 +1833,7 @@
       "feature": "artifact.quota",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1851,7 +1851,7 @@
       "feature": "artifact.read",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1869,7 +1869,7 @@
       "feature": "capability.draft",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "capability administration is Runtime-owned",
@@ -1888,7 +1888,7 @@
       "feature": "capability.inspect",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1906,7 +1906,7 @@
       "feature": "capability.install",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "capability administration is Runtime-owned",
@@ -1925,7 +1925,7 @@
       "feature": "capability.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1943,7 +1943,7 @@
       "feature": "capability.revoke",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "capability administration is Runtime-owned",
@@ -1968,7 +1968,7 @@
       "feature": "capture.diagnostics@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -1986,7 +1986,7 @@
       "feature": "capture.screen-sequence@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2006,7 +2006,7 @@
       "feature": "cleanupDebt.continue",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2026,7 +2026,7 @@
       "feature": "cleanupDebt.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2044,7 +2044,7 @@
       "feature": "commands",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2062,7 +2062,7 @@
       "feature": "completion",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2080,7 +2080,7 @@
       "feature": "control-action.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2098,7 +2098,7 @@
       "feature": "control-action.reconcile",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2116,7 +2116,7 @@
       "feature": "control-action.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2136,7 +2136,7 @@
       "feature": "debug.evaluate",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2154,7 +2154,7 @@
       "feature": "debug.hap@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2172,7 +2172,7 @@
       "feature": "debug.probe",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2192,7 +2192,7 @@
       "feature": "debug.start",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2212,7 +2212,7 @@
       "feature": "debug.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2230,7 +2230,7 @@
       "feature": "debug.template.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "deprecated",
       "note": "App direct path; the CLI reaches the same closed template set through Catalog operation debug.template@1",
@@ -2249,7 +2249,7 @@
       "feature": "debug.template@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2267,7 +2267,7 @@
       "feature": "deploy.native-library.app-owned@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2285,7 +2285,7 @@
       "feature": "device.display-name.clear",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2303,7 +2303,7 @@
       "feature": "device.display-name.set",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2323,7 +2323,7 @@
       "feature": "device.observations",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "note": "observation snapshot read by `device wait` and `device list`",
@@ -2359,7 +2359,7 @@
       "feature": "diagnostics.export",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2377,7 +2377,7 @@
       "feature": "doctor",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2395,7 +2395,7 @@
       "feature": "flash.bind-current-loader",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2413,7 +2413,7 @@
       "feature": "flash.bootloader-status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2448,7 +2448,7 @@
       "feature": "flash.dayu200",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "note": "alias of flash.full-restore@1",
@@ -2467,7 +2467,7 @@
       "feature": "flash.device-access",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2502,7 +2502,7 @@
       "feature": "flash.full-restore@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2536,7 +2536,7 @@
       "feature": "flash.lanePlanPreview",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2588,7 +2588,7 @@
       "feature": "flash.prerequisites",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2623,7 +2623,7 @@
       "feature": "flash.reconcile-alias",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2641,7 +2641,7 @@
       "feature": "health",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2659,7 +2659,7 @@
       "feature": "help",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2677,7 +2677,7 @@
       "feature": "history.filter.delete",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2695,7 +2695,7 @@
       "feature": "history.filter.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2713,7 +2713,7 @@
       "feature": "history.filter.save",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2731,7 +2731,7 @@
       "feature": "human-action.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2749,7 +2749,7 @@
       "feature": "human-action.resume",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2767,7 +2767,7 @@
       "feature": "human-action.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2785,7 +2785,7 @@
       "feature": "input.long-press@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2803,7 +2803,7 @@
       "feature": "input.swipe@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2821,7 +2821,7 @@
       "feature": "input.tap@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2839,7 +2839,7 @@
       "feature": "job.cancel",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2857,7 +2857,7 @@
       "feature": "job.events",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2875,7 +2875,7 @@
       "feature": "job.evidence",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2893,7 +2893,7 @@
       "feature": "job.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2911,7 +2911,7 @@
       "feature": "job.plan",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2929,7 +2929,7 @@
       "feature": "job.reconcile",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2947,7 +2947,7 @@
       "feature": "job.result",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2965,7 +2965,7 @@
       "feature": "job.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2983,7 +2983,7 @@
       "feature": "job.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3001,7 +3001,7 @@
       "feature": "job.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3019,7 +3019,7 @@
       "feature": "job.submit",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3037,7 +3037,7 @@
       "feature": "job.timeline",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3055,7 +3055,7 @@
       "feature": "job.wait",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3137,7 +3137,7 @@
       "feature": "observe.device@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3155,7 +3155,7 @@
       "feature": "operation.describe",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3173,7 +3173,7 @@
       "feature": "operation.example",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3191,7 +3191,7 @@
       "feature": "operation.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3209,7 +3209,7 @@
       "feature": "operation.validate",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3227,7 +3227,7 @@
       "feature": "port-forward.create@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3245,7 +3245,7 @@
       "feature": "port-forward.remove@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3263,7 +3263,7 @@
       "feature": "recovery.flash-invocation.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3346,7 +3346,7 @@
       "feature": "runtime.hdc.impact-preview",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3364,7 +3364,7 @@
       "feature": "runtime.hdc.restart",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3382,7 +3382,7 @@
       "feature": "runtime.hdc.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3560,7 +3560,7 @@
       "feature": "runtime.storage.policy",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3578,7 +3578,7 @@
       "feature": "runtime.storage.root",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3596,7 +3596,7 @@
       "feature": "runtime.storage.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3759,7 +3759,7 @@
       "feature": "session.cleanup.apply",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3777,7 +3777,7 @@
       "feature": "session.cleanup.preview",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3795,7 +3795,7 @@
       "feature": "session.export.apply",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3813,7 +3813,7 @@
       "feature": "session.export.preview",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3831,7 +3831,7 @@
       "feature": "session.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3849,7 +3849,7 @@
       "feature": "session.pin",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3867,7 +3867,7 @@
       "feature": "session.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3885,7 +3885,7 @@
       "feature": "session.unpin",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3988,7 +3988,7 @@
       "feature": "target.adopt",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4006,7 +4006,7 @@
       "feature": "target.availability",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4024,7 +4024,7 @@
       "feature": "target.display-name.clear",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4042,7 +4042,7 @@
       "feature": "target.display-name.set",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4060,7 +4060,7 @@
       "feature": "target.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4078,7 +4078,7 @@
       "feature": "target.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4096,7 +4096,7 @@
       "feature": "trace.cache.purge",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4114,7 +4114,7 @@
       "feature": "trace.cache.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4132,7 +4132,7 @@
       "feature": "trace.inspect",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4150,7 +4150,7 @@
       "feature": "trace.probe",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4202,7 +4202,7 @@
       "feature": "workspace.apply-patch@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4220,7 +4220,7 @@
       "feature": "workspace.build-openharmony@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4238,7 +4238,7 @@
       "feature": "workspace.continuation.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4256,7 +4256,7 @@
       "feature": "workspace.continuation.submit",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4274,7 +4274,7 @@
       "feature": "workspace.create-checkpoint@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4292,7 +4292,7 @@
       "feature": "workspace.inspect-diff@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4310,7 +4310,7 @@
       "feature": "workspace.inspect-git-status@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4328,7 +4328,7 @@
       "feature": "workspace.inspect-source@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4346,7 +4346,7 @@
       "feature": "workspace.prepare-isolated-copy@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4364,7 +4364,7 @@
       "feature": "workspace.preset.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4382,7 +4382,7 @@
       "feature": "workspace.preset.register",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4400,7 +4400,7 @@
       "feature": "workspace.preset.remove",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4418,7 +4418,7 @@
       "feature": "workspace.preset.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4436,7 +4436,7 @@
       "feature": "workspace.preset.update",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4454,7 +4454,7 @@
       "feature": "workspace.project.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4472,7 +4472,7 @@
       "feature": "workspace.project.register",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4490,7 +4490,7 @@
       "feature": "workspace.project.remove",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4508,7 +4508,7 @@
       "feature": "workspace.project.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4526,7 +4526,7 @@
       "feature": "workspace.project.update",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4544,7 +4544,7 @@
       "feature": "workspace.read-source-range@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4562,7 +4562,7 @@
       "feature": "workspace.revert-patch@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4580,7 +4580,7 @@
       "feature": "workspace.run-tests@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4598,7 +4598,7 @@
       "feature": "workspace.sign-openharmony-hap@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4616,7 +4616,7 @@
       "feature": "workspace.sweep-isolated-copies@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4634,7 +4634,7 @@
       "feature": "workspace.symbolize-crash@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "notImplemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

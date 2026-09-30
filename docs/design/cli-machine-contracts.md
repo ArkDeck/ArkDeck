@@ -115,8 +115,16 @@ Every leaf must be referenced by at least one entry, every `targetCommand` and
 `equivalentCommands` pattern must resolve to a leaf, feature ids are unique,
 and `classification == targetClassification` unless the entry is `blocked`.
 `implementationStatusByPlatform` follows §14: `implemented` on macOS for a
-closed entry, `partial` for `blocked`, and `notImplemented` for Windows, which
-has no ratified profile. `requiredPlatforms` is `["macos"]` for host-specific
+closed entry, `partial` for `blocked`. On Windows it states what the Rust CLI
+serves there (TASK-XPA-018): `implemented` where every leaf the entry reaches
+answers without the Runtime (the registry's `connectsToRuntime: false`: `help`,
+`commands`, `completion` and the refused stubs), `notImplemented` where a leaf
+it reaches is refused off macOS for a macOS host primitive (the Import upload
+kinds, and the macOS-only families below), and `partial` otherwise: the leaves
+parse, send their frames and render their envelopes on Windows, but the target
+rests on a Runtime owner the Windows daemon does not yet compose or no Windows
+run has measured end to end. `partial` still blocks a Windows claim; the Windows
+profile is not ratified. `requiredPlatforms` is `["macos"]` for host-specific
 families (`legacy`, `agentd`, `signing`, `update-feed`, `maintainer`, `runtime
 service|signing|bundle|tool|update|support-bundle`, legacy command spellings and
 every App surface) and `["macos", "windows"]` otherwise.
