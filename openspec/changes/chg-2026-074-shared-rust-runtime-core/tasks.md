@@ -412,7 +412,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-004 — Windows target adopt with durable binding and human trust stop
 
-- Status:blocked（r12: no longer waits for TASK-XPA-017; waits for the software part of TASK-XPA-002's Windows acceptance — Windows `doctor` / `operation list` / `device candidates` byte-equal to the macOS fixtures and the Windows HDC tuple registered through its own integration change from host samples — and, for the Windows stable-identity census, the DAYU200 USB properties sample; readiness pins are instantiated when it flips to `ready`）
+- Status:in-progress（2026-09-30, Windows phase WM1: the platform pieces are delivered on the isolated Rust daemon slice by slice — the macOS-only gate inventory `evidence/runs/TASK-XPA-004/windows-gate-inventory-20260930.md` (#2331) orders them; the Windows CLI already runs the full read-only matrix over the named pipe against a daemon with a host-trusted development signer (#2330). Portable host text/calendar and the Windows USB census are in flight; the census's field choice waits for the DAYU200 USB properties sample (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`), and the relation proof for the HDC tuple waits for its own integration change from host samples. Real-device adopt is phase A. Under r10 an implementation slice does not wait for `ready`; readiness pins are recorded with the GJ-1 acceptance）
 - Platform:windows
 - Requirements:`device-targeting-auth` (identity before convenience, POL-TARGET-001); ADR-0006 decisions 1–5
 - Acceptance:XPA-AC-1, XPA-AC-2; Windows GJ-1 hops 4–5
@@ -454,7 +454,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-005 — Windows observe.device@1 end to end with restart readback
 
-- Status:blocked（also awaits SPK-5）
+- Status:in-progress（2026-09-30: SPK-5 is go on the Windows 11 x64 reference host — torn-tail matrix passes, append p95 ≈ 1 ms, atomic replace proven with POSIX-semantics `FileRenameInfoEx` and `FILE_SHARE_DELETE` readers, not `MoveFileExW`; `LockFileEx` is mandatory, so locks stay on dedicated lock files (`evidence/runs/TASK-XPA-005/spk-5-20260930-run.md`). The NTFS host store and the Windows SQLite source are in flight; the end-to-end `observe.device@1` with restart readback and the XPA-AC-7 kill matrix remain）
 - Platform:windows
 - Requirements:REQ-JOB-001, REQ-WF-004, POL-WORKFLOW-001, POL-SAFETY-001; `PRODUCT-LOOP.md:556-576` admission order; `:593-631` connect-key binding
 - Acceptance:XPA-AC-1, XPA-AC-2, XPA-AC-4, XPA-AC-7; Windows GJ-1 hops 6, 9, 10
