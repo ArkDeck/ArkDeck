@@ -2,8 +2,8 @@
 //! through `job_index` on the platform's own SQLite, and requires the facts the
 //! oracle recorded of it (schema text, `user_version`, journal mode and every
 //! row, each record by its SHA-256) to read back equal once the owner is
-//! closed: through a read-only connection, and again with the index reopened
-//! for writing (TASK-XPA-005). The recorded order keys are replayed as
+//! closed: through the connection the owner's inspection chooses, and again
+//! with the index reopened as its owner (TASK-XPA-005). The recorded order keys are replayed as
 //! recorded; computing them is the Runtime timestamp owner's, not SQLite's.
 use crate::job_index::{self, Admission, AdmissionVerdict, DATABASE, ROWS};
 use arkdeck_platform::{HostSqlite, SqliteValue as Sql};
@@ -175,16 +175,20 @@ fn recorded_swift_indexes_replay_on_the_linked_sqlite() {
             [[Sql::Integer(2)]],
             "{label}"
         );
-        // After the owner closes: a read-only connection, as the oracle's
-        // own reader (`tests/support::index`) reads a closed store, then the
-        // index reopened for writing, as after a restart.
+        // After the owner closes, the index is inspected through the
+        // connection `job_repository`'s inspection chooses: read-only only
+        // while the log's shared-memory index exists, since a read-only
+        // connection cannot create it; otherwise a write connection that only
+        // reads. Then it is reopened as the owner reopens it after a restart.
         drop(owner);
-        let mut reader = HostSqlite::open(&database, true, false).unwrap();
+        let indexed = root.join(format!("{DATABASE}-shm")).exists();
+        let mut reader = HostSqlite::open(&database, indexed, false).unwrap();
         job_index::current_layout(&mut reader).unwrap();
         assert_eq!(project(&mut reader), expected, "{label}");
         drop(reader);
         let mut reopened = HostSqlite::open(&database, false, false).unwrap();
         job_index::current_layout(&mut reopened).unwrap();
+        job_index::owner_journal(&mut reopened).unwrap();
         assert_eq!(project(&mut reopened), expected, "{label}");
         // The Job list's order: creation order key, then identity bytes.
         let listed: Vec<String> = reopened
