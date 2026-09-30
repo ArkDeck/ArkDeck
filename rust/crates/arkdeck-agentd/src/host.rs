@@ -132,7 +132,7 @@ pub struct Host {
     /// workspace Job plans, admits and runs through.
     #[cfg(target_os = "macos")]
     workspace: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceComposition>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
     #[cfg(target_os = "macos")]
     storage: Option<
@@ -816,7 +816,7 @@ impl Host {
     fn require_artifact_job(&self, _job_id: &str) -> Result<(), WireError> {
         Err(job_owner_not_configured())
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
         self.trace_cache = Some(cache);
         self
@@ -1215,6 +1215,7 @@ impl Host {
         [
             ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
+            ("traceCache", self.trace_cache.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
@@ -1263,7 +1264,7 @@ impl Host {
             workspace_projects: None,
             #[cfg(target_os = "macos")]
             workspace: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             trace_cache: None,
             #[cfg(target_os = "macos")]
             storage: None,
@@ -2376,7 +2377,20 @@ impl HostServices for Host {
         })
         .map_err(|_| refuse())
     }
-    #[cfg(target_os = "macos")]
+    /// The same refusal as the macOS owner without its Job owner: no Job
+    /// owner is composed on Windows yet, so nothing can prove that no Job's
+    /// Session still needs the derived data, and nothing is purged.
+    #[cfg(windows)]
+    fn trace_cache_purge(&self) -> Result<serde_json::Value, WireError> {
+        let unconfigured = || WireError {
+            code: "rejected".into(),
+            message: "Trace cache owner is not configured".into(),
+            details: None,
+        };
+        self.trace_cache.as_ref().ok_or_else(unconfigured)?;
+        Err(unconfigured())
+    }
+    #[cfg(any(target_os = "macos", windows))]
     fn trace_cache_status(&self) -> Result<serde_json::Value, WireError> {
         self.trace_cache
             .as_ref()

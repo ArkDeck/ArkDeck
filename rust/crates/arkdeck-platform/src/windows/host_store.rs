@@ -25,6 +25,9 @@ pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};
 #[path = "host_file_export.rs"]
 mod file_export;
 pub use file_export::FileExportStaging;
+#[path = "host_trace_removal.rs"]
+mod trace_removal;
+pub use trace_removal::PreparedTraceRemoval;
 
 pub struct HostDirectory(pub(super) File, pub(super) Ownership);
 

@@ -637,15 +637,15 @@ mod tests {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod trace;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use trace::trace_inventory;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod trace_maintenance;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod trace_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use trace_owner::TraceCacheStore;
 
 #[cfg(any(target_os = "macos", windows))]
