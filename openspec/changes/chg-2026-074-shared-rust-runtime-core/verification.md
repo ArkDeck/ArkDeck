@@ -1,6 +1,6 @@
 # Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r11
+> Change:CHG-2026-074-shared-rust-runtime-core@r12
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
@@ -44,6 +44,20 @@ never platform or hardware support. XPA-AC-9's "safe final-owner activation" is 
 at milestone M5 (design §G.4 preflight, snapshot digest, facade bundle retained one cycle), not by
 store-by-store installed activation. This interpretation is submitted with the revision for
 maintainer review; the merge is the attestation.
+
+Revision 12 (2026-09-30) opens the Windows phase beside the macOS real-device acceptance and
+changes no acceptance row, method, expected result or evidence directory. It fixes what "Swift"
+means in the rows that name it now that the Swift runtime targets are deleted (#2311, #2312,
+#2316): XPA-005 "decoded by the Swift decoders unchanged", XPA-008 "decoded by Swift",
+XPA-AC-2 "`job.plan` digest equality with Swift", XPA-AC-4 "ledger decodes in Swift" and
+XPA-010 "Swift and Rust compute the same plan digest" are read against the recorded Swift
+oracles and corpora under `rust/tests/fixtures/**` and `spec/**`, together with the T0 bytes the
+Rust writers produce on macOS. A Windows result passes such a row when it is byte-equal to those
+T0 files (or, for plan digests, equal to the recorded digest) — the same comparison the macOS
+chain made against a live Swift build. No row's wording changes; like the r11 tiers, this only
+names the reference. Windows rows keep their evidence directories; fake HDC, fixtures and hosted
+CI remain host evidence, never platform or hardware support, and the Windows real-device rows
+belong to the maintainer's phase A.
 
 ## Environment
 
