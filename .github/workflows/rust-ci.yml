@@ -194,6 +194,12 @@ jobs:
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
+      # Compiler incremental state is scratch in CI: each target is compiled
+      # once per job and `compact` deletes debug/incremental before a save, so
+      # no job ever reads another's. Writing it cost 1.4 to 1.6 GB per Windows
+      # workspace job (4.0 GB on macOS) on 2026-09-30. Same sources, profile
+      # and tests; the value is part of the cache key (ci-workspace.py).
+      CARGO_INCREMENTAL: "0"
       ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}
     steps:
       - name: Checkout exact revision with runner Git
@@ -235,8 +241,16 @@ jobs:
 
       # Cargo fingerprints include source mtimes and absolute paths. Restore
       # both the stable source mirror and its products, then synchronize exact
-      # checkout bytes without retimestamping unchanged files. Toolchain, image,
-      # build flags and dependency manifests must match even for prefix hits.
+      # checkout bytes without retimestamping unchanged files. Protected main
+      # restores only an entry whose toolchain, image, build flags and
+      # dependency manifests all match, so what it saves never carries another
+      # manifest set's products. A run off main, which never saves, may then
+      # fall back to main's newest entry for the same host, image, toolchain,
+      # flags and cache root whatever the manifests; Cargo's fingerprints
+      # rebuild what differs. On 2026-09-30, 30 of 34 Windows workspace misses
+      # were manifest sets main had never saved, and a miss cost the macOS
+      # workspace job, the Swift CI critical path, about 4 minutes (TASK-XPA-002
+      # windows-ci-speed-analysis-20260930.md).
       # The cache root is part of the key, so this job's products and the
       # contract views' (under the `contracts` job's own root) are separate
       # entries; neither job restores, carries or saves the other's.
@@ -256,7 +270,9 @@ jobs:
         with:
           path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
           key: ${{ steps.rust-cache-key.outputs.key }}
-          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}
+          restore-keys: |
+            ${{ steps.rust-cache-key.outputs.prefix }}
+            ${{ github.ref != 'refs/heads/main' && steps.rust-cache-key.outputs.fallback || '' }}
 
       - name: Synchronize exact sources and fresh Git references
         working-directory: .
@@ -269,6 +285,17 @@ jobs:
       - name: Lint the workspace, its tests and its examples
         working-directory: .
         run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings
+
+      # Maintainer ruling 17 (TASK-XPA-002): the WinVerifyTrust-integrated daemon
+      # signer unit test uses the same runner-only development signer as the
+      # contracts job; without it that test reports its signed path as skipped.
+      - name: Temporary development daemon signer (Windows runner only)
+        if: runner.os == 'Windows'
+        working-directory: .
+        shell: pwsh
+        run: |
+          $identity = ./rust/scripts/windows-dev-identity.ps1 create -Machine | ConvertFrom-Json
+          "ARKDECK_DEV_SIGNER_THUMBPRINT=$($identity.thumbprint)" >> $env:GITHUB_ENV
 
       # Wrapped: two `corpus_parity` cases assert the checkout equals its
       # committed manifest. The wrapper names an edited-but-not-regenerated
@@ -365,6 +392,9 @@ jobs:
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
+      # As in `workspace`: incremental state is never reused across jobs, and
+      # compact deletes it from each view's target before a save.
+      CARGO_INCREMENTAL: "0"
       ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}
     steps:
       - name: Checkout exact revision with runner Git
@@ -405,7 +435,8 @@ jobs:
         run: sh ../scripts/ci/arkforge-cargo-fetch.sh
 
       # The views' Cargo targets live under this job's own cache root, keyed
-      # apart from the workspace job's (see there).
+      # apart from the workspace job's; the restore order is the workspace
+      # job's (see there).
       - name: Configure task-owned Rust CI paths
         run: |
           echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"
@@ -422,7 +453,9 @@ jobs:
         with:
           path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
           key: ${{ steps.rust-cache-key.outputs.key }}
-          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}
+          restore-keys: |
+            ${{ steps.rust-cache-key.outputs.prefix }}
+            ${{ github.ref != 'refs/heads/main' && steps.rust-cache-key.outputs.fallback || '' }}
 
       - name: Synchronize exact sources and fresh Git references
         working-directory: .

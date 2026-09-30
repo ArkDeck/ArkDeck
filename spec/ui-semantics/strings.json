@@ -1,0 +1,802 @@
+{
+  "schemaVersion": "arkdeck.ui-semantics.strings/1",
+  "description": "Bilingual strings of the ArkDeck App surfaces the Windows client shows (TASK-XPA-007). An entry with a table is the macOS App's entry of the same key in ArkDeckApp/Resources/<table>.xcstrings, values unchanged; an entry whose table is null exists on Windows only (a Windows surface with no macOS counterpart, such as the daemon-unavailable recovery banner). windows/scripts/generate-ui-strings.py writes the Windows .resw files from this file and keeps the .xcstrings entries equal to it; --check fails on any drift.",
+  "languages": [
+    "en",
+    "zh-Hans"
+  ],
+  "entries": [
+    {
+      "key": "app.shell.title",
+      "table": "Localizable",
+      "en": "ArkDeck",
+      "zh-Hans": "ArkDeck"
+    },
+    {
+      "key": "app.navigation.section.device",
+      "table": "Localizable",
+      "en": "Device",
+      "zh-Hans": "设备"
+    },
+    {
+      "key": "app.navigation.section.records",
+      "table": "Localizable",
+      "en": "Records",
+      "zh-Hans": "记录"
+    },
+    {
+      "key": "app.navigation.overview",
+      "table": "Localizable",
+      "en": "Overview",
+      "zh-Hans": "Overview"
+    },
+    {
+      "key": "app.navigation.device",
+      "table": "Localizable",
+      "en": "Device",
+      "zh-Hans": "Device"
+    },
+    {
+      "key": "app.navigation.history",
+      "table": "Localizable",
+      "en": "History",
+      "zh-Hans": "History"
+    },
+    {
+      "key": "app.devices.unavailable",
+      "table": "Localizable",
+      "en": "Device list unavailable",
+      "zh-Hans": "设备列表不可用"
+    },
+    {
+      "key": "device.action.recheck",
+      "table": "Localizable",
+      "en": "Re-check",
+      "zh-Hans": "重新检测"
+    },
+    {
+      "key": "device.detail.adoptViaCLI",
+      "table": "Localizable",
+      "en": "Adoption (durable binding) is performed from the CLI: arkdeck device adopt. This App does not submit adoption.",
+      "zh-Hans": "接管（建立持久绑定）由 CLI 执行：arkdeck device adopt。本 App 不提交接管操作。"
+    },
+    {
+      "key": "device.state.ready",
+      "table": "Localizable",
+      "en": "Ready",
+      "zh-Hans": "就绪"
+    },
+    {
+      "key": "device.state.authorizedUnadopted",
+      "table": "Localizable",
+      "en": "Authorized · not adopted",
+      "zh-Hans": "已授权 · 未接管"
+    },
+    {
+      "key": "device.state.needsTrust",
+      "table": "Localizable",
+      "en": "Needs trust",
+      "zh-Hans": "需要信任"
+    },
+    {
+      "key": "device.state.offline",
+      "table": "Localizable",
+      "en": "Offline",
+      "zh-Hans": "离线"
+    },
+    {
+      "key": "device.state.needsRecheck",
+      "table": "Localizable",
+      "en": "Status needs re-check",
+      "zh-Hans": "状态待重新确认"
+    },
+    {
+      "key": "device.fact.connectKey",
+      "table": "Localizable",
+      "en": "Connect key",
+      "zh-Hans": "Connect key"
+    },
+    {
+      "key": "device.fact.target",
+      "table": "Localizable",
+      "en": "Adopted target",
+      "zh-Hans": "已接管目标"
+    },
+    {
+      "key": "device.fact.model",
+      "table": "Localizable",
+      "en": "Device name / model",
+      "zh-Hans": "设备名称 / 机型"
+    },
+    {
+      "key": "device.fact.firmware",
+      "table": "Localizable",
+      "en": "System version",
+      "zh-Hans": "系统版本"
+    },
+    {
+      "key": "device.fact.transport",
+      "table": "Localizable",
+      "en": "Transport",
+      "zh-Hans": "传输方式"
+    },
+    {
+      "key": "device.fact.bindingRevision",
+      "table": "Localizable",
+      "en": "Binding revision",
+      "zh-Hans": "Binding revision"
+    },
+    {
+      "key": "hdc.devices.refresh",
+      "table": "Localizable",
+      "en": "Refresh Devices",
+      "zh-Hans": "刷新设备"
+    },
+    {
+      "key": "overview.environment.title",
+      "table": "Localizable",
+      "en": "Environment",
+      "zh-Hans": "运行环境"
+    },
+    {
+      "key": "overview.status.refreshing",
+      "table": "Localizable",
+      "en": "Refreshing…",
+      "zh-Hans": "正在刷新……"
+    },
+    {
+      "key": "overview.section.needsAttention",
+      "table": "Localizable",
+      "en": "Needs Attention",
+      "zh-Hans": "需处理事项"
+    },
+    {
+      "key": "overview.attention.clear",
+      "table": "Localizable",
+      "en": "Nothing needs attention in the current diagnostics.",
+      "zh-Hans": "当前诊断中没有需要处理的事项。"
+    },
+    {
+      "key": "overview.record.recent.title",
+      "table": "Localizable",
+      "en": "Recent Work",
+      "zh-Hans": "最近的工作"
+    },
+    {
+      "key": "overview.record.recent.unavailable.title",
+      "table": "Localizable",
+      "en": "Runtime history could not be read",
+      "zh-Hans": "无法读取 Runtime 记录"
+    },
+    {
+      "key": "overview.record.recent.empty",
+      "table": "Localizable",
+      "en": "No recent runs yet. Start from a workflow in the sidebar.",
+      "zh-Hans": "还没有最近运行，请从左侧工作流开始。"
+    },
+    {
+      "key": "overview.record.state.succeeded",
+      "table": "Localizable",
+      "en": "Succeeded",
+      "zh-Hans": "已成功"
+    },
+    {
+      "key": "overview.record.state.failed",
+      "table": "Localizable",
+      "en": "Failed",
+      "zh-Hans": "已失败"
+    },
+    {
+      "key": "overview.record.state.interrupted",
+      "table": "Localizable",
+      "en": "Interrupted",
+      "zh-Hans": "已中断"
+    },
+    {
+      "key": "overview.record.state.cancelled",
+      "table": "Localizable",
+      "en": "Cancelled",
+      "zh-Hans": "已取消"
+    },
+    {
+      "key": "overview.record.state.inProgress",
+      "table": "Localizable",
+      "en": "In progress",
+      "zh-Hans": "进行中"
+    },
+    {
+      "key": "history.action.refresh",
+      "table": "HistoryLocalizable",
+      "en": "Refresh history",
+      "zh-Hans": "刷新历史"
+    },
+    {
+      "key": "history.loading",
+      "table": "HistoryLocalizable",
+      "en": "Loading Runtime history",
+      "zh-Hans": "正在加载 Runtime 历史"
+    },
+    {
+      "key": "history.unavailable.title",
+      "table": "HistoryLocalizable",
+      "en": "Runtime History Unavailable",
+      "zh-Hans": "无法读取 Runtime 历史"
+    },
+    {
+      "key": "history.unavailable.guidance",
+      "table": "HistoryLocalizable",
+      "en": "Start or reconnect ArkDeck Runtime, then refresh the history.",
+      "zh-Hans": "请启动或重新连接 ArkDeck Runtime，然后刷新历史记录。"
+    },
+    {
+      "key": "history.empty.title",
+      "table": "HistoryLocalizable",
+      "en": "No Runtime Jobs Yet",
+      "zh-Hans": "尚无 Runtime Job"
+    },
+    {
+      "key": "history.empty.description",
+      "table": "HistoryLocalizable",
+      "en": "ArkDeck Runtime has recorded no Jobs on this host.",
+      "zh-Hans": "ArkDeck Runtime 在本机尚未记录任何 Job。"
+    },
+    {
+      "key": "history.readOnlyNote",
+      "table": "HistoryLocalizable",
+      "en": "History only reads Runtime state. Opening a related tool never submits, cancels, or retries this Job.",
+      "zh-Hans": "History 只读取 Runtime 状态。打开相关工具不会提交、取消或重试此 Job。"
+    },
+    {
+      "key": "history.state.outcomeUnknownSuffix",
+      "table": "HistoryLocalizable",
+      "en": " · outcome unknown",
+      "zh-Hans": " · 结果未知"
+    },
+    {
+      "key": "history.state.queued",
+      "table": "HistoryLocalizable",
+      "en": "Queued",
+      "zh-Hans": "已排队"
+    },
+    {
+      "key": "history.state.preflight",
+      "table": "HistoryLocalizable",
+      "en": "Preflight",
+      "zh-Hans": "预检中"
+    },
+    {
+      "key": "history.state.running",
+      "table": "HistoryLocalizable",
+      "en": "Running",
+      "zh-Hans": "运行中"
+    },
+    {
+      "key": "history.state.waitingForDevice",
+      "table": "HistoryLocalizable",
+      "en": "Waiting for device",
+      "zh-Hans": "等待设备"
+    },
+    {
+      "key": "history.state.awaitingRebindConfirmation",
+      "table": "HistoryLocalizable",
+      "en": "Awaiting rebind confirmation",
+      "zh-Hans": "等待重新绑定确认"
+    },
+    {
+      "key": "history.state.planning",
+      "table": "HistoryLocalizable",
+      "en": "Planning",
+      "zh-Hans": "正在生成计划"
+    },
+    {
+      "key": "history.state.cancelRequested",
+      "table": "HistoryLocalizable",
+      "en": "Cancel requested",
+      "zh-Hans": "已请求取消"
+    },
+    {
+      "key": "history.state.cancellingAtSafeBoundary",
+      "table": "HistoryLocalizable",
+      "en": "Cancelling at safe boundary",
+      "zh-Hans": "正在安全边界取消"
+    },
+    {
+      "key": "history.state.waitingForRecovery",
+      "table": "HistoryLocalizable",
+      "en": "Waiting for recovery",
+      "zh-Hans": "等待恢复"
+    },
+    {
+      "key": "history.state.reconciling",
+      "table": "HistoryLocalizable",
+      "en": "Reconciling",
+      "zh-Hans": "正在核对"
+    },
+    {
+      "key": "history.state.resumeAtConfirmedSafeBoundary",
+      "table": "HistoryLocalizable",
+      "en": "Resuming at safe boundary",
+      "zh-Hans": "正从已确认安全边界恢复"
+    },
+    {
+      "key": "history.state.userAbandonRequested",
+      "table": "HistoryLocalizable",
+      "en": "Abandon requested",
+      "zh-Hans": "已请求放弃"
+    },
+    {
+      "key": "history.state.finalizing",
+      "table": "HistoryLocalizable",
+      "en": "Finalizing",
+      "zh-Hans": "正在收尾"
+    },
+    {
+      "key": "history.state.planned",
+      "table": "HistoryLocalizable",
+      "en": "Planned",
+      "zh-Hans": "已生成计划"
+    },
+    {
+      "key": "history.state.succeeded",
+      "table": "HistoryLocalizable",
+      "en": "Succeeded",
+      "zh-Hans": "成功"
+    },
+    {
+      "key": "history.state.failed",
+      "table": "HistoryLocalizable",
+      "en": "Failed",
+      "zh-Hans": "失败"
+    },
+    {
+      "key": "history.state.cancelled",
+      "table": "HistoryLocalizable",
+      "en": "Cancelled",
+      "zh-Hans": "已取消"
+    },
+    {
+      "key": "history.state.interrupted",
+      "table": "HistoryLocalizable",
+      "en": "Interrupted",
+      "zh-Hans": "已中断"
+    },
+    {
+      "key": "jobInspector.action.show",
+      "table": "JobsLocalizable",
+      "en": "Show job inspector",
+      "zh-Hans": "展开 Job 检查器"
+    },
+    {
+      "key": "jobInspector.action.hide",
+      "table": "JobsLocalizable",
+      "en": "Hide job inspector",
+      "zh-Hans": "收起 Job 检查器"
+    },
+    {
+      "key": "jobInspector.action.refresh",
+      "table": "JobsLocalizable",
+      "en": "Refresh jobs",
+      "zh-Hans": "刷新 Job"
+    },
+    {
+      "key": "jobInspector.action.openHistory",
+      "table": "JobsLocalizable",
+      "en": "Open History",
+      "zh-Hans": "打开历史记录"
+    },
+    {
+      "key": "jobInspector.compact.unavailable",
+      "table": "JobsLocalizable",
+      "en": "Runtime status unavailable",
+      "zh-Hans": "Runtime 状态不可用"
+    },
+    {
+      "key": "jobInspector.compact.empty",
+      "table": "JobsLocalizable",
+      "en": "No Runtime jobs",
+      "zh-Hans": "没有 Runtime Job"
+    },
+    {
+      "key": "jobInspector.compact.activeCount",
+      "table": "JobsLocalizable",
+      "en": "%d active",
+      "zh-Hans": "%d 个进行中"
+    },
+    {
+      "key": "jobInspector.refreshing",
+      "table": "JobsLocalizable",
+      "en": "Refreshing jobs",
+      "zh-Hans": "正在刷新 Job"
+    },
+    {
+      "key": "jobInspector.unavailable.title",
+      "table": "JobsLocalizable",
+      "en": "Runtime status unavailable",
+      "zh-Hans": "Runtime 状态不可用"
+    },
+    {
+      "key": "jobInspector.unavailable.guidance",
+      "table": "JobsLocalizable",
+      "en": "Start or reconnect ArkDeck Runtime, then refresh jobs.",
+      "zh-Hans": "启动或重新连接 ArkDeck Runtime，然后刷新 Job。"
+    },
+    {
+      "key": "jobInspector.empty.title",
+      "table": "JobsLocalizable",
+      "en": "No jobs yet",
+      "zh-Hans": "尚无 Job"
+    },
+    {
+      "key": "jobInspector.empty.description",
+      "table": "JobsLocalizable",
+      "en": "Runtime is reachable and has no recorded jobs.",
+      "zh-Hans": "Runtime 可访问，但尚未记录任何 Job。"
+    },
+    {
+      "key": "jobInspector.select",
+      "table": "JobsLocalizable",
+      "en": "Select a Job",
+      "zh-Hans": "选择一个 Job"
+    },
+    {
+      "key": "jobInspector.runtimeFacts",
+      "table": "JobsLocalizable",
+      "en": "Runtime facts",
+      "zh-Hans": "Runtime 事实"
+    },
+    {
+      "key": "jobInspector.fact.job",
+      "table": "JobsLocalizable",
+      "en": "Job",
+      "zh-Hans": "Job"
+    },
+    {
+      "key": "jobInspector.fact.operation",
+      "table": "JobsLocalizable",
+      "en": "Operation",
+      "zh-Hans": "操作"
+    },
+    {
+      "key": "jobInspector.fact.target",
+      "table": "JobsLocalizable",
+      "en": "Target",
+      "zh-Hans": "目标"
+    },
+    {
+      "key": "jobInspector.fact.recordedState",
+      "table": "JobsLocalizable",
+      "en": "Recorded state",
+      "zh-Hans": "原始记录状态"
+    },
+    {
+      "key": "jobInspector.fact.mode",
+      "table": "JobsLocalizable",
+      "en": "Execution mode",
+      "zh-Hans": "执行模式"
+    },
+    {
+      "key": "jobInspector.timeline",
+      "table": "JobsLocalizable",
+      "en": "Observed timeline",
+      "zh-Hans": "已观察时间线"
+    },
+    {
+      "key": "jobInspector.result.outcomeUnknown",
+      "table": "JobsLocalizable",
+      "en": "The device effect is unknown. Do not treat this Job as finished.",
+      "zh-Hans": "设备影响未知。不要把此 Job 视为已经完成。"
+    },
+    {
+      "key": "jobInspector.result.waitingForHuman",
+      "table": "JobsLocalizable",
+      "en": "Runtime stopped at a human-required boundary.",
+      "zh-Hans": "Runtime 已停在需要人工处理的边界。"
+    },
+    {
+      "key": "job.state.queued",
+      "table": "JobsLocalizable",
+      "en": "Queued",
+      "zh-Hans": "已排队"
+    },
+    {
+      "key": "job.state.preflight",
+      "table": "JobsLocalizable",
+      "en": "Preflight",
+      "zh-Hans": "执行前检查"
+    },
+    {
+      "key": "job.state.running",
+      "table": "JobsLocalizable",
+      "en": "Running",
+      "zh-Hans": "正在运行"
+    },
+    {
+      "key": "job.state.waitingForDevice",
+      "table": "JobsLocalizable",
+      "en": "Waiting for device",
+      "zh-Hans": "等待设备"
+    },
+    {
+      "key": "job.state.awaitingRebindConfirmation",
+      "table": "JobsLocalizable",
+      "en": "Awaiting rebind confirmation",
+      "zh-Hans": "等待重新绑定确认"
+    },
+    {
+      "key": "job.state.planning",
+      "table": "JobsLocalizable",
+      "en": "Planning",
+      "zh-Hans": "正在生成计划"
+    },
+    {
+      "key": "job.state.cancelRequested",
+      "table": "JobsLocalizable",
+      "en": "Stop requested",
+      "zh-Hans": "已请求停止"
+    },
+    {
+      "key": "job.state.cancellingAtSafeBoundary",
+      "table": "JobsLocalizable",
+      "en": "Stopping at safe boundary",
+      "zh-Hans": "正在安全边界停止"
+    },
+    {
+      "key": "job.state.waitingForRecovery",
+      "table": "JobsLocalizable",
+      "en": "Waiting for recovery",
+      "zh-Hans": "等待恢复"
+    },
+    {
+      "key": "job.state.reconciling",
+      "table": "JobsLocalizable",
+      "en": "Reconciling",
+      "zh-Hans": "正在核对结果"
+    },
+    {
+      "key": "job.state.resumeAtConfirmedSafeBoundary",
+      "table": "JobsLocalizable",
+      "en": "Safe boundary confirmed",
+      "zh-Hans": "已确认安全恢复边界"
+    },
+    {
+      "key": "job.state.userAbandonRequested",
+      "table": "JobsLocalizable",
+      "en": "Archive requested",
+      "zh-Hans": "已请求结束恢复"
+    },
+    {
+      "key": "job.state.finalizing",
+      "table": "JobsLocalizable",
+      "en": "Finalizing",
+      "zh-Hans": "正在完成记录"
+    },
+    {
+      "key": "job.state.planned",
+      "table": "JobsLocalizable",
+      "en": "Planned",
+      "zh-Hans": "仅计划"
+    },
+    {
+      "key": "job.state.succeeded",
+      "table": "JobsLocalizable",
+      "en": "Succeeded",
+      "zh-Hans": "成功"
+    },
+    {
+      "key": "job.state.failed",
+      "table": "JobsLocalizable",
+      "en": "Failed",
+      "zh-Hans": "失败"
+    },
+    {
+      "key": "job.state.cancelled",
+      "table": "JobsLocalizable",
+      "en": "Stopped",
+      "zh-Hans": "已停止"
+    },
+    {
+      "key": "job.state.interrupted",
+      "table": "JobsLocalizable",
+      "en": "Interrupted",
+      "zh-Hans": "已中断"
+    },
+    {
+      "key": "windows.recovery.title",
+      "table": null,
+      "en": "ArkDeck Runtime unavailable",
+      "zh-Hans": "ArkDeck Runtime 不可用"
+    },
+    {
+      "key": "windows.recovery.message.notRunning",
+      "table": null,
+      "en": "The local ArkDeck Runtime is not running or did not answer.",
+      "zh-Hans": "本机的 ArkDeck Runtime 未运行或没有应答。"
+    },
+    {
+      "key": "windows.recovery.message.impostor",
+      "table": null,
+      "en": "The local endpoint is served by a process that is not the installed ArkDeck Runtime, so nothing was sent to it.",
+      "zh-Hans": "本机端点由一个不是已安装 ArkDeck Runtime 的进程提供，因此没有向它发送任何内容。"
+    },
+    {
+      "key": "windows.recovery.message.contract",
+      "table": null,
+      "en": "The running ArkDeck Runtime speaks another control contract than this app.",
+      "zh-Hans": "正在运行的 ArkDeck Runtime 使用的控制契约与本 App 不同。"
+    },
+    {
+      "key": "windows.recovery.message.notConfigured",
+      "table": null,
+      "en": "This copy of ArkDeck has no installed ArkDeck Runtime identity to verify, so it did not connect.",
+      "zh-Hans": "此 ArkDeck 副本没有可供校验的已安装 ArkDeck Runtime 身份，因此没有连接。"
+    },
+    {
+      "key": "windows.recovery.remedy.notRunning",
+      "table": null,
+      "en": "Start the ArkDeck Runtime, then retry: any arkdeck command that needs it starts it, and arkdeck doctor shows what is wrong.",
+      "zh-Hans": "请启动 ArkDeck Runtime 后重试：任何需要它的 arkdeck 命令都会启动它，arkdeck doctor 会说明问题所在。"
+    },
+    {
+      "key": "windows.recovery.remedy.impostor",
+      "table": null,
+      "en": "Quit whatever holds the endpoint, then start ArkDeck again; arkdeck doctor reports the held name.",
+      "zh-Hans": "请退出占用该端点的程序，然后重新启动 ArkDeck；arkdeck doctor 会报告被占用的名称。"
+    },
+    {
+      "key": "windows.recovery.remedy.contract",
+      "table": null,
+      "en": "Install matching ArkDeck app and Runtime versions, then start ArkDeck again.",
+      "zh-Hans": "请安装版本匹配的 ArkDeck App 与 Runtime，然后重新启动 ArkDeck。"
+    },
+    {
+      "key": "windows.recovery.remedy.notConfigured",
+      "table": null,
+      "en": "Install ArkDeck with its Runtime, or set ARKDECK_DAEMON_PATH with ARKDECK_DAEMON_SIGNER_SHA256 or ARKDECK_DAEMON_PACKAGE_FAMILY, then retry.",
+      "zh-Hans": "请安装带 Runtime 的 ArkDeck，或设置 ARKDECK_DAEMON_PATH 以及 ARKDECK_DAEMON_SIGNER_SHA256 或 ARKDECK_DAEMON_PACKAGE_FAMILY，然后重试。"
+    },
+    {
+      "key": "windows.recovery.reason",
+      "table": null,
+      "en": "Reason: %@",
+      "zh-Hans": "原因：%@"
+    },
+    {
+      "key": "windows.action.retry",
+      "table": null,
+      "en": "Retry",
+      "zh-Hans": "重试"
+    },
+    {
+      "key": "windows.action.refresh",
+      "table": null,
+      "en": "Refresh",
+      "zh-Hans": "刷新"
+    },
+    {
+      "key": "windows.action.copyCli",
+      "table": null,
+      "en": "Copy CLI command",
+      "zh-Hans": "复制 CLI 命令"
+    },
+    {
+      "key": "windows.cli.equivalent",
+      "table": null,
+      "en": "CLI: %@",
+      "zh-Hans": "CLI：%@"
+    },
+    {
+      "key": "windows.unavailable.reason",
+      "table": null,
+      "en": "unavailable(%1$@): %2$@",
+      "zh-Hans": "unavailable(%1$@)：%2$@"
+    },
+    {
+      "key": "windows.overview.doctor.title",
+      "table": null,
+      "en": "Runtime diagnostics",
+      "zh-Hans": "Runtime 诊断"
+    },
+    {
+      "key": "windows.overview.doctor.unavailable",
+      "table": null,
+      "en": "Runtime diagnostics could not be read",
+      "zh-Hans": "无法读取 Runtime 诊断"
+    },
+    {
+      "key": "windows.overview.doctor.overall",
+      "table": null,
+      "en": "Overall: %@",
+      "zh-Hans": "总体：%@"
+    },
+    {
+      "key": "windows.overview.doctor.overall.healthy",
+      "table": null,
+      "en": "Healthy",
+      "zh-Hans": "正常"
+    },
+    {
+      "key": "windows.overview.doctor.overall.degraded",
+      "table": null,
+      "en": "Degraded",
+      "zh-Hans": "降级"
+    },
+    {
+      "key": "windows.overview.doctor.overall.blocked",
+      "table": null,
+      "en": "Blocked",
+      "zh-Hans": "受阻"
+    },
+    {
+      "key": "windows.overview.doctor.counts",
+      "table": null,
+      "en": "%1$lld blockers · %2$lld warnings · %3$lld info",
+      "zh-Hans": "%1$lld 个阻断 · %2$lld 个警告 · %3$lld 条信息"
+    },
+    {
+      "key": "windows.overview.doctor.severity.blocker",
+      "table": null,
+      "en": "Blocker",
+      "zh-Hans": "阻断"
+    },
+    {
+      "key": "windows.overview.doctor.severity.warning",
+      "table": null,
+      "en": "Warning",
+      "zh-Hans": "警告"
+    },
+    {
+      "key": "windows.overview.doctor.severity.info",
+      "table": null,
+      "en": "Info",
+      "zh-Hans": "信息"
+    },
+    {
+      "key": "windows.overview.runtime.protocol",
+      "table": null,
+      "en": "Protocol version",
+      "zh-Hans": "协议版本"
+    },
+    {
+      "key": "windows.overview.runtime.contract",
+      "table": null,
+      "en": "Contract identity",
+      "zh-Hans": "契约标识"
+    },
+    {
+      "key": "windows.overview.runtime.operations",
+      "table": null,
+      "en": "Available operations",
+      "zh-Hans": "可用操作"
+    },
+    {
+      "key": "windows.overview.runtime.operationsValue",
+      "table": null,
+      "en": "%1$lld of %2$lld",
+      "zh-Hans": "%1$lld / %2$lld"
+    },
+    {
+      "key": "windows.device.empty",
+      "table": null,
+      "en": "No device candidates are observed.",
+      "zh-Hans": "没有观测到候选设备。"
+    },
+    {
+      "key": "windows.history.column.created",
+      "table": null,
+      "en": "Created",
+      "zh-Hans": "创建时间"
+    },
+    {
+      "key": "windows.testTransport.title",
+      "table": null,
+      "en": "Test transport",
+      "zh-Hans": "测试传输"
+    },
+    {
+      "key": "windows.testTransport.message",
+      "table": null,
+      "en": "Scripted daemon \"%@\": nothing on this window comes from ArkDeck Runtime.",
+      "zh-Hans": "脚本化 daemon “%@”：此窗口中的内容均不来自 ArkDeck Runtime。"
+    }
+  ]
+}

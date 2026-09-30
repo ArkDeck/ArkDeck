@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ArkDeck for Windows (TASK-XPA-007 walking skeleton): WinUI 3 on Windows App SDK 2.5.1,
+    self-contained, x64 only (r13). Shell and pins from SPK-4 (windows/spikes/spk4); every
+    value on screen is a daemon projection read through ArkDeck.ClientKit by ArkDeck.App.Core.
+    Strings: Strings/*/Resources.resw, generated from spec/ui-semantics
+    (windows/scripts/generate-ui-strings.py). Tokens: Themes/ArkDeckTokens.xaml, generated from
+    docs/design/arkdeck-ds/src/tokens.css (windows/scripts/generate-xaml-tokens.py).
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.22000.0</TargetPlatformMinVersion>
+    <SupportedOSPlatformVersion>10.0.22000.0</SupportedOSPlatformVersion>
+    <RootNamespace>ArkDeck.App</RootNamespace>
+    <AssemblyName>ArkDeck</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <Platform Condition="'$(Platform)' == '' or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- Proposal r12 decision 10: self-contained Windows App SDK and .NET. -->
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <!-- Local packages are unsigned; the development signature (CN=ArkDeck Development,
+         ruling 12) is the maintainer's step. -->
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxBundle>Never</AppxBundle>
+    <!-- The resource languages the shared catalogue provides (AC-I18N-001). -->
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <SatelliteResourceLanguages>en-US;zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\SplashScreen.scale-200.png" />
+    <Content Include="Assets\LockScreenLogo.scale-200.png" />
+    <Content Include="Assets\Square150x150Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.scale-200.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+    <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
+    <Content Include="Assets\StoreLogo.png" />
+    <Content Include="Assets\AppIcon.ico" />
+    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Manifest Include="$(ApplicationManifest)" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <ProjectCapability Include="Msix" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\App.Core\ArkDeck.App.Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+  </PropertyGroup>
+
+  <!-- SPK-4: ship the published ReadyToRun + trimmed bits (an untrimmed build started 5x slower
+       on first launch). Only on publish: `dotnet build` does not run the trimmer, whose IL2104
+       notices about Microsoft.Windows.SDK.NET and WinRT.Runtime (SPK-4 finding 4) would
+       otherwise fail the warnings-as-errors build. -->
+  <PropertyGroup Condition="'$(Configuration)' != 'Debug' and '$(_IsPublishing)' == 'true'">
+    <PublishReadyToRun>True</PublishReadyToRun>
+    <PublishTrimmed>True</PublishTrimmed>
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
+  </PropertyGroup>
+</Project>

@@ -13,9 +13,10 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Target owners and the Job store are composed over
-//!   it (see [`Authority::compose`]); every input that would compose another owner
-//!   on macOS is refused, not ignored, until its store is ported (G01);
+//!   lifecycle only the Job store, the Target owners and the workspace
+//!   project owner are composed over it (see [`Authority::compose`]); every
+//!   input that would compose another owner on macOS is refused, not
+//!   ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
 //!   standalone daemon does (the black-box read-only check runs it).
@@ -109,6 +110,7 @@ impl Authority {
     /// (`targets`) composes them, in a private child of the root created
     /// owner-only when absent (`StateRoot::private_child`):
     ///
+    /// * the Job store (`jobs-state`, [`Self::job_store`]);
     /// * the Target store: `targets.json` and the display names under
     ///   `.targets.lock` and `.target-display-names.lock`, the same bytes
     ///   as on macOS; `target.list`, `target.show`, `target.availability`
@@ -122,12 +124,24 @@ impl Authority {
     ///   yet (its integration change waits for the maintainer's samples),
     ///   so no relation is read, nothing is observed or dispatched, and
     ///   `target.adopt` is refused before admission with zero dispatch;
-    /// * the Job store (`jobs-state`, [`Self::job_store`]).
+    /// * the workspace project owner (`WorkspaceProjectStore`) in
+    ///   `workspace-projects`, the name both macOS compositions give it:
+    ///   `projects.json` under `.projects.lock`, the same document as on
+    ///   macOS, a Windows root pinned by its volume serial and NTFS file
+    ///   reference. `workspace.project.register|list|show` and
+    ///   `workspace.preset.list|show` answer from it, and a restart reads
+    ///   back what it holds. Neither the DevEco toolchain or signing
+    ///   credential owner nor the workspace composition is composed, so a
+    ///   project stays `runtimeRestartRequired`; this composition does not
+    ///   yet ask the Job owner whether a workspace Job names a project or
+    ///   preset, so every project or preset mutation is refused
+    ///   (`recordUnreadable`, no new dispatch).
     ///
     /// Composing opens the stores, which read their documents under their
     /// locks; a store it cannot read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
+        let host = host.with_jobs(self.job_store()?);
         let name = if self.development {
             "targets-state"
         } else {
@@ -145,7 +159,26 @@ impl Authority {
                 path.display()
             )
         })?;
-        let host = host.with_targets(targets).with_jobs(self.job_store()?);
+        let host = host.with_targets(targets);
+        let name = "workspace-projects";
+        let unusable = |path: &Path, error: &dyn std::fmt::Display| {
+            format!(
+                "the workspace project store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let path = self
+            .root
+            .private_child(name)
+            .map_err(|error| unusable(&self.root.path().join(name), &error))?;
+        let projects = arkdeck_hoststore::WorkspaceProjectStore::open(&path)
+            .map_err(|error| unusable(&path, &error))?;
+        // Read now, as the macOS start reads it to compose the registered
+        // projects: a document it cannot read ends the start.
+        projects
+            .startup_records()
+            .map_err(|error| unusable(&path, &error.message))?;
+        let host = host.with_workspace_projects(projects);
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {

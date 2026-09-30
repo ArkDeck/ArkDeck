@@ -526,8 +526,9 @@ def validate_automatic_check_contract(
         '          fi\n',
     )
     # TASK-XPA-007: the Windows client lane. Exact repository bytes (the
-    # generator check, embedded schema digests and corpus wire tests compare
-    # them), the SDK global.json pins, then generator check, build and tests.
+    # generator checks, embedded schema digests and corpus wire tests compare
+    # them), the SDK global.json pins, then the three generator checks (ClientKit
+    # bindings, App strings, App tokens), build and tests.
     required_windows = (
         "    needs: plan\n",
         "    if: needs.plan.outputs.windows == 'true'\n",
@@ -537,6 +538,8 @@ def validate_automatic_check_contract(
         "        with:\n"
         "          global-json-file: windows/global.json\n",
         "        run: python windows/scripts/generate-clientkit.py --check\n",
+        "        run: python windows/scripts/generate-ui-strings.py --check\n",
+        "        run: python windows/scripts/generate-xaml-tokens.py --check\n",
         "        run: dotnet build windows/ArkDeck.Windows.slnx -c Release\n",
         "        run: dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build\n",
     )
@@ -594,13 +597,15 @@ def validate_automatic_check_contract(
             "git config core.autocrlf false",
             "uses: actions/setup-dotnet@",
             "generate-clientkit.py --check",
+            "generate-ui-strings.py --check",
+            "generate-xaml-tokens.py --check",
             "dotnet build windows/ArkDeck.Windows.slnx",
             "dotnet test windows/ArkDeck.Windows.slnx",
         )
     ]
     if windows_order != sorted(windows_order):
         raise WorkflowContractError(
-            "Windows ClientKit job must keep bytes, pin the SDK, check the generator, build, then test"
+            "Windows ClientKit job must keep bytes, pin the SDK, check the generators, build, then test"
         )
     for token in required_aggregate:
         if token not in swift_aggregate_job:
@@ -697,6 +702,9 @@ RUST_NATIVE_JOB_TOKENS = (
     "    runs-on: ${{ matrix.os }}\n",
     "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}\n",
     "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}\n",
+    # Incremental state is never reused across jobs (compact deletes it before
+    # a save), so writing it is pure cost; the value is in the cache key.
+    '      CARGO_INCREMENTAL: "0"\n',
     "run: python rust/scripts/ci-workspace.py key\n",
     "run: python rust/scripts/ci-workspace.py prepare\n",
     "run: python rust/scripts/ci-workspace.py compact\n",
@@ -735,6 +743,15 @@ RUST_CONTRACTS_TOKENS = (
     "          path: rust/target/readonly-check/\n"
     "          if-no-files-found: warn\n"
     "          retention-days: 7\n",
+)
+
+
+# The Rust build cache restore order (ci-workspace.py `key`): the exact
+# compatibility prefix, then, off protected main only, the fallback prefix.
+RUST_BUILD_RESTORE_KEYS = (
+    "          restore-keys: |\n"
+    "            ${{ steps.rust-cache-key.outputs.prefix }}\n"
+    "            ${{ github.ref != 'refs/heads/main' && steps.rust-cache-key.outputs.fallback || '' }}\n"
 )
 
 
@@ -812,12 +829,21 @@ def validate_rust_ci_contract(text: str) -> None:
     if "restore-keys:" in policy:
         raise WorkflowContractError("Policy tool cache must not use prefix fallback")
     cache_key = "          key: ${{ steps.rust-cache-key.outputs.key }}\n"
-    prefix = "          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}\n"
     for block in (workspace, contracts):
         if block.count(cache_key) != 2:
             raise WorkflowContractError("Rust build restore and save must use the same daily compatibility key")
-        if block.count("restore-keys:") != 1 or prefix not in block:
-            raise WorkflowContractError("Rust build cache fallback must retain every compatibility dimension")
+        # Exact compatibility first. The broader fallback (host, toolchain,
+        # image, flags and cache root retained, manifests not) is read only off
+        # protected main, whose runs are the only ones that save, so no saved
+        # archive ever carries another manifest set's products.
+        if (block.count("restore-keys:") != 1 or RUST_BUILD_RESTORE_KEYS not in block
+                or block.count("steps.rust-cache-key.outputs.fallback") != 1):
+            raise WorkflowContractError(
+                "Rust build cache fallback must be PR-only, never saved, and retain host, "
+                "toolchain, image and cache format"
+            )
+        if block.count("actions/cache/save@") != 1 or "actions/cache@" in block:
+            raise WorkflowContractError("Rust build products must have exactly one, main-only, save")
     save_block = (
         "      - name: Save trusted Rust build products\n"
         "        if: >-\n"
@@ -1541,13 +1567,54 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             workspace.replace("    needs: policy\n", ""),
             workspace.replace("github.ref == 'refs/heads/main'", "github.ref != ''"),
             workspace.replace("          success() &&\n", ""),
-            workspace.replace("restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}", "restore-keys: arkdeck-rust-build-"),
+            workspace.replace("            ${{ steps.rust-cache-key.outputs.prefix }}\n", "            arkdeck-rust-build-\n"),
             workspace.replace("run: python rust/scripts/ci-workspace.py prepare", "run: true"),
             workspace.replace(" && '2' || '1'", " && '4' || '1'"),
+            workspace.replace('      CARGO_INCREMENTAL: "0"\n', "", 1),
+            workspace.replace('      CARGO_INCREMENTAL: "0"\n', '      CARGO_INCREMENTAL: "1"\n'),
         ):
             self.assertNotEqual(mutated, workspace)
             with self.assertRaises(WorkflowContractError):
                 validate_rust_ci_contract(policy + mutated)
+
+    def test_rust_build_fallback_is_pr_only_and_prs_never_save(self) -> None:
+        rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
+        self.assertEqual(rust.count(RUST_BUILD_RESTORE_KEYS), 2)
+        guarded = "${{ github.ref != 'refs/heads/main' && steps.rust-cache-key.outputs.fallback || '' }}"
+        exact = "${{ steps.rust-cache-key.outputs.prefix }}"
+        fallback = "${{ steps.rust-cache-key.outputs.fallback }}"
+        save = rust.index("      - name: Save trusted Rust build products\n")
+        save_end = rust.index("      - name: Preserve Rust test timing and queue logs\n")
+        second_save = rust[save:save_end].replace(
+            "          success() &&\n          github.ref == 'refs/heads/main' &&\n", "          success() &&\n")
+        for case, mutated in {
+            # A main run could restore another manifest set's products and
+            # then save them under its own exact key.
+            "main may use the fallback": rust.replace(guarded, fallback, 1),
+            "guard inverted": rust.replace("github.ref != 'refs/heads/main' &&", "github.ref == 'refs/heads/main' &&", 1),
+            "guard on another ref": rust.replace("github.ref != 'refs/heads/main' &&", "github.ref != 'refs/heads/next' &&", 1),
+            "fallback before the exact prefix": rust.replace(
+                f"            {exact}\n            {guarded}\n", f"            {guarded}\n            {exact}\n", 1),
+            "fallback as a second restore line": rust.replace(
+                f"            {guarded}\n", f"            {guarded}\n            {fallback}\n", 1),
+            "fallback as the saved key": rust.replace(
+                "          key: ${{ steps.rust-cache-key.outputs.key }}\n",
+                "          key: ${{ steps.rust-cache-key.outputs.fallback }}\n", 1),
+            # PRs may never publish products, whatever they restored.
+            "PR saves": rust.replace("          github.ref == 'refs/heads/main' &&\n"
+                                     "          steps.rust-build-cache.outputs.cache-hit != 'true'\n",
+                                     "          steps.rust-build-cache.outputs.cache-hit != 'true'\n", 1),
+            "second, unguarded save": rust[:save_end] + second_save + rust[save_end:],
+            "combined restore-and-save action": rust.replace(
+                "uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)\n"
+                "        with:\n          path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}",
+                "uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)\n"
+                "        with:\n          path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}", 1),
+        }.items():
+            with self.subTest(case):
+                self.assertNotEqual(mutated, rust)
+                with self.assertRaises(WorkflowContractError):
+                    validate_rust_ci_contract(mutated)
 
     def test_background_macos_lanes_share_one_slot_without_dropping_pending_jobs(self) -> None:
         expected = (
@@ -1920,6 +1987,24 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift.replace(
                     "        run: python windows/scripts/generate-clientkit.py --check\n",
                     "        run: true # generator unchecked\n",
+                ),
+            ),
+            (
+                "Windows lane skips the App strings check",
+                agent,
+                sdd,
+                swift.replace(
+                    "        run: python windows/scripts/generate-ui-strings.py --check\n",
+                    "        run: true # strings unchecked\n",
+                ),
+            ),
+            (
+                "Windows lane skips the App tokens check",
+                agent,
+                sdd,
+                swift.replace(
+                    "        run: python windows/scripts/generate-xaml-tokens.py --check\n",
+                    "        run: true # tokens unchecked\n",
                 ),
             ),
             (

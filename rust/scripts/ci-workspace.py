@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -166,33 +167,56 @@ def prepare(source: Path, root: Path) -> Path:
     return mirror
 
 
-def key(source: Path, root: str) -> str:
-    identity = {
+def image() -> str:
+    """The runner image build, in clear in the key so retention can group by it."""
+    return re.sub(r"[^A-Za-z0-9.]", "_", os.environ.get("ImageVersion", "") or "unknown")
+
+
+def prefixes(source: Path, root: str) -> tuple[str, str]:
+    """(fallback, exact) key prefixes; fallback is a prefix of exact.
+
+    The fallback prefix binds the host, runner image, compiler, toolchain file,
+    cache root (so the actions/cache format and path) and build flags. The
+    exact prefix adds every dependency manifest and the lockfile. Only a run
+    off protected main may restore through the fallback, and such a run never
+    saves (rust-ci.yml), so no saved archive carries another manifest set's
+    products.
+    """
+    toolchain = {
         "rustc": subprocess.check_output(["rustc", "-vV"], cwd=source / "rust", text=True),
         "cargo": subprocess.check_output(["cargo", "-V"], cwd=source / "rust", text=True),
         "image": os.environ.get("ImageVersion", "unknown"),
         "root": str(Path(root).resolve()),
-        "flags": {k: os.environ.get(k, "") for k in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER")},
-        "inputs": {},
+        "flags": {k: os.environ.get(k, "") for k in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER",
+                                                  "CARGO_INCREMENTAL")},
+        "rust/rust-toolchain.toml": hashlib.sha256((source / "rust/rust-toolchain.toml").read_bytes()).hexdigest(),
     }
+    manifests = {}
     for directory, children, files in os.walk(source / "rust"):
         children[:] = sorted(name for name in children if name not in ("target", ".git"))
         if "Cargo.toml" in files:
             path = Path(directory) / "Cargo.toml"
-            identity["inputs"][path.relative_to(source).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
-    for name in ("rust/Cargo.lock", "rust/rust-toolchain.toml"):
-        identity["inputs"][name] = hashlib.sha256((source / name).read_bytes()).hexdigest()
-    digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+            manifests[path.relative_to(source).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    manifests["rust/Cargo.lock"] = hashlib.sha256((source / "rust/Cargo.lock").read_bytes()).hexdigest()
     host = f"{os.environ.get('RUNNER_OS', sys.platform)}-{os.environ.get('RUNNER_ARCH', 'local')}"
-    return f"arkdeck-rust-build-v2-{host}-{digest}"
+
+    def digest(value: dict) -> str:
+        return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+    fallback = f"arkdeck-rust-build-v3-{host}-image-{image()}-{digest(toolchain)}-"
+    return fallback, f"{fallback}{digest(manifests)}-"
+
+
+def key(source: Path, root: str) -> str:
+    return prefixes(source, root)[1].rstrip("-")
 
 
 def cache_outputs(source: Path, root: str, day: str | None = None) -> dict[str, str]:
     # Immutable entries: refresh once per UTC day and compatibility identity,
     # not once per source commit. prepare() still materializes this exact HEAD.
     day = day or datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    prefix = key(source, root) + "-"
-    return {"key": prefix + day, "prefix": prefix}
+    fallback, prefix = prefixes(source, root)
+    return {"key": prefix + day, "prefix": prefix, "fallback": fallback}
 
 
 def directory_sizes(root: Path) -> dict[Path, int]:

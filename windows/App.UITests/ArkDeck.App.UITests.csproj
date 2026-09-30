@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    UIA semantic tests of the running ArkDeck App (TASK-XPA-007, XPA-AC-8): MSTest driving the
+    built App out of process through UI Automation (UIA3 via FlaUI, the SPK-4 runner). They
+    need a Windows desktop session and the built App, so they run only when
+    ARKDECK_APP_UITESTS=1 and otherwise report themselves skipped (the hosted windows lane
+    builds this project and reports them skipped). The real-daemon test also needs the
+    development signer (ARKDECK_DEV_SIGNER_THUMBPRINT) and a built daemon, as the ClientKit
+    end-to-end test does.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>ArkDeck.App.UITests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+    <PackageReference Include="FlaUI.UIA3" />
+  </ItemGroup>
+</Project>

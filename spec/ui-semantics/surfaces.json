@@ -1,0 +1,131 @@
+{
+  "schemaVersion": "arkdeck.ui-semantics.surfaces/1",
+  "description": "UI semantic snapshots of the ArkDeck App surfaces the TASK-XPA-007 walking skeleton shows: for one page in one daemon state, the elements a screen reader finds by stable identifier, their role and their accessible name. The Windows App's UIA tree must match each snapshot in every catalogue language (windows/App.UITests); an identifier marked \"macos\" is the macOS App's accessibility identifier of the same element, so the two platforms' trees can be compared by identifier. Names are lists of parts joined without separator: \"@key\" is the catalogue string (strings.json) in the snapshot's language, {\"format\": key, \"args\": [...]} formats it (an argument \"@key\" is itself looked up), anything else is literal. \"match\": \"prefix\" compares only the start (the rest is the daemon's or ClientKit's own detail). Scenarios name the Windows App's scripted test transport (windows/App.Core/Testing/ScriptedDaemon.cs); \"foundation\" answers as today's Windows daemon does.",
+  "roles": {
+    "text": "Text",
+    "button": "Button",
+    "list": "List",
+    "listItem": "ListItem",
+    "banner": "StatusBar"
+  },
+  "snapshots": [
+    {
+      "id": "shell.foundation",
+      "scenario": "foundation",
+      "page": "overview",
+      "elements": [
+        { "automationId": "app.navigation.overview", "origin": "macos", "role": "listItem", "name": ["@app.navigation.overview"] },
+        { "automationId": "app.navigation.device", "origin": "macos", "role": "listItem", "name": ["@app.navigation.device"] },
+        { "automationId": "app.navigation.history", "origin": "macos", "role": "listItem", "name": ["@app.navigation.history"] },
+        { "automationId": "jobInspector.toggle", "origin": "macos", "role": "button", "name": ["@jobInspector.action.hide"] },
+        { "automationId": "jobInspector.refresh", "origin": "macos", "role": "button", "name": ["@jobInspector.action.refresh"] },
+        { "automationId": "jobInspector.openHistory", "origin": "macos", "role": "button", "name": ["@jobInspector.action.openHistory"] },
+        { "automationId": "jobInspector.compact.status", "origin": "windows", "role": "text", "name": ["@jobInspector.compact.unavailable"], "live": "polite" },
+        { "automationId": "jobInspector.unavailable", "origin": "macos", "role": "text", "name": ["@jobInspector.unavailable.title"] },
+        { "automationId": "jobInspector.unavailable.reason", "origin": "windows", "role": "text", "name": [{ "format": "windows.unavailable.reason", "args": ["rejected", "The Job owner is not configured"] }] },
+        { "automationId": "jobInspector.unavailable.guidance", "origin": "windows", "role": "text", "name": ["@jobInspector.unavailable.guidance"] },
+        { "automationId": "jobInspector.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"] }
+      ]
+    },
+    {
+      "id": "overview.foundation",
+      "scenario": "foundation",
+      "page": "overview",
+      "elements": [
+        { "automationId": "overview.title", "origin": "windows", "role": "text", "name": ["@app.navigation.overview"] },
+        { "automationId": "overview.refresh", "origin": "windows", "role": "button", "name": ["@windows.action.refresh"] },
+        { "automationId": "overview.environment", "origin": "windows", "role": "text", "name": ["@overview.environment.title"] },
+        { "automationId": "overview.doctor.overall", "origin": "windows", "role": "text", "name": [{ "format": "windows.overview.doctor.overall", "args": ["@windows.overview.doctor.overall.blocked"] }] },
+        { "automationId": "overview.doctor.counts", "origin": "windows", "role": "text", "name": [{ "format": "windows.overview.doctor.counts", "args": ["2", "0", "1"] }] },
+        { "automationId": "overview.section.needsAttention", "origin": "macos", "role": "text", "name": ["@overview.section.needsAttention"] },
+        { "automationId": "overview.doctor.findings", "origin": "windows", "role": "list", "name": ["@windows.overview.doctor.title"] },
+        { "automationId": "overview.doctor.finding.hdc.notConfigured", "origin": "windows", "role": "listItem", "name": ["@windows.overview.doctor.severity.blocker", ": the Runtime has no bounded HDC status observer (hdc.notConfigured)"] },
+        { "automationId": "overview.record.recent.title", "origin": "windows", "role": "text", "name": ["@overview.record.recent.title"] },
+        { "automationId": "overview.record.recent.unavailable", "origin": "macos", "role": "text", "name": ["@overview.record.recent.unavailable.title"] },
+        { "automationId": "overview.record.recent.unavailable.reason", "origin": "windows", "role": "text", "name": [{ "format": "windows.unavailable.reason", "args": ["rejected", "The Job owner is not configured"] }] },
+        { "automationId": "overview.record.recent.unavailable.cli", "origin": "windows", "role": "text", "name": [{ "format": "windows.cli.equivalent", "args": ["arkdeck job list"] }] },
+        { "automationId": "overview.record.recent.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"] }
+      ]
+    },
+    {
+      "id": "device.foundation",
+      "scenario": "foundation",
+      "page": "device",
+      "elements": [
+        { "automationId": "device.title", "origin": "windows", "role": "text", "name": ["@app.navigation.device"] },
+        { "automationId": "hdc.devices.refresh", "origin": "macos", "role": "button", "name": ["@hdc.devices.refresh"] },
+        { "automationId": "app.devices.unavailable", "origin": "macos", "role": "text", "name": ["@app.devices.unavailable"] },
+        { "automationId": "app.devices.unavailable.reason", "origin": "macos", "role": "text", "name": [{ "format": "windows.unavailable.reason", "args": ["rejected", "hdc.notConfigured"] }] },
+        { "automationId": "app.devices.unavailable.cli", "origin": "windows", "role": "text", "name": [{ "format": "windows.cli.equivalent", "args": ["arkdeck device candidates"] }] },
+        { "automationId": "app.devices.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"] },
+        { "automationId": "device.action.recheck", "origin": "macos", "role": "button", "name": ["@device.action.recheck"] },
+        { "automationId": "device.detail.adoptViaCLI", "origin": "macos", "role": "text", "name": ["@device.detail.adoptViaCLI"] }
+      ]
+    },
+    {
+      "id": "history.foundation",
+      "scenario": "foundation",
+      "page": "history",
+      "elements": [
+        { "automationId": "history.title", "origin": "windows", "role": "text", "name": ["@app.navigation.history"] },
+        { "automationId": "history.refresh", "origin": "macos", "role": "button", "name": ["@history.action.refresh"] },
+        { "automationId": "history.unavailable.title", "origin": "macos", "role": "text", "name": ["@history.unavailable.title"] },
+        { "automationId": "history.unavailable.reason", "origin": "macos", "role": "text", "name": [{ "format": "windows.unavailable.reason", "args": ["rejected", "The Job owner is not configured"] }] },
+        { "automationId": "history.unavailable.guidance", "origin": "windows", "role": "text", "name": ["@history.unavailable.guidance"] },
+        { "automationId": "history.unavailable.cli", "origin": "windows", "role": "text", "name": [{ "format": "windows.cli.equivalent", "args": ["arkdeck job list"] }] },
+        { "automationId": "history.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"] },
+        { "automationId": "history.readOnlyNote", "origin": "macos", "role": "text", "name": ["@history.readOnlyNote"] }
+      ]
+    },
+    {
+      "id": "history.daemonUnavailable",
+      "scenario": "unavailable",
+      "page": "history",
+      "elements": [
+        { "automationId": "app.recovery.daemonUnavailable", "origin": "windows", "role": "banner", "name": ["@windows.recovery.title"], "live": "assertive" },
+        { "automationId": "app.recovery.remedy", "origin": "windows", "role": "text", "name": ["@windows.recovery.remedy.notRunning"] },
+        { "automationId": "app.recovery.reason", "origin": "windows", "role": "text", "name": [{ "format": "windows.recovery.reason", "args": ["HealthExchangeFailed: "] }], "match": "prefix" },
+        { "automationId": "app.recovery.cli", "origin": "windows", "role": "text", "name": [{ "format": "windows.cli.equivalent", "args": ["arkdeck doctor"] }] },
+        { "automationId": "app.recovery.retry", "origin": "windows", "role": "button", "name": ["@windows.action.retry"] },
+        { "automationId": "app.recovery.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"] },
+        { "automationId": "history.unavailable.title", "origin": "macos", "role": "text", "name": ["@history.unavailable.title"] },
+        { "automationId": "history.unavailable.reason", "origin": "macos", "role": "text", "name": [{ "format": "windows.unavailable.reason", "args": ["daemonUnavailable", ""] }], "match": "prefix" },
+        { "automationId": "jobInspector.compact.status", "origin": "windows", "role": "text", "name": ["@jobInspector.compact.unavailable"], "live": "polite" }
+      ]
+    },
+    {
+      "id": "overview.contractMismatch",
+      "scenario": "contract-mismatch",
+      "page": "overview",
+      "elements": [
+        { "automationId": "app.recovery.daemonUnavailable", "origin": "windows", "role": "banner", "name": ["@windows.recovery.title"], "live": "assertive" },
+        { "automationId": "app.recovery.remedy", "origin": "windows", "role": "text", "name": ["@windows.recovery.remedy.contract"] },
+        { "automationId": "overview.doctor.unavailable", "origin": "windows", "role": "text", "name": ["@windows.overview.doctor.unavailable"] },
+        { "automationId": "overview.doctor.unavailable.reason", "origin": "windows", "role": "text", "name": [{ "format": "windows.unavailable.reason", "args": ["daemonUnavailable", ""] }], "match": "prefix" }
+      ]
+    },
+    {
+      "id": "device.jobs",
+      "scenario": "jobs",
+      "page": "device",
+      "elements": [
+        { "automationId": "app.devices.list", "origin": "windows", "role": "list", "name": ["@app.navigation.device"] },
+        { "automationId": "device.row.fixture-serial-1", "origin": "macos", "role": "listItem", "name": ["Bench board, ", "@device.state.ready"] },
+        { "automationId": "device.row.fixture-serial-2", "origin": "macos", "role": "listItem", "name": ["fixture-serial-2, ", "@device.state.needsTrust"] },
+        { "automationId": "device.row.fixture-serial-3", "origin": "macos", "role": "listItem", "name": ["fixture-serial-3, ", "@device.state.offline"] }
+      ]
+    },
+    {
+      "id": "history.jobs",
+      "scenario": "jobs",
+      "page": "history",
+      "elements": [
+        { "automationId": "history.table", "origin": "macos", "role": "list", "name": ["@app.navigation.history"] },
+        { "automationId": "history.row.job-0000000000000000000000000000a002", "origin": "windows", "role": "listItem", "name": ["job-0000000000000000000000000000a002, flash.images@1, ", "@history.state.failed"] },
+        { "automationId": "history.row.state.job-0000000000000000000000000000a002", "origin": "macos", "role": "text", "name": ["@history.state.failed"] },
+        { "automationId": "history.row.job-0000000000000000000000000000a003", "origin": "windows", "role": "listItem", "name": ["job-0000000000000000000000000000a003, trace.capture@1, ", "@history.state.succeeded"] },
+        { "automationId": "jobInspector.list", "origin": "macos", "role": "list", "name": ["@jobInspector.runtimeFacts"] }
+      ]
+    }
+  ]
+}

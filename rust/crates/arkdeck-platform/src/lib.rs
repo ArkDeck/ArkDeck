@@ -48,6 +48,14 @@ mod terminal_secret;
 pub use secret::{Secret, wipe};
 #[cfg(target_os = "macos")]
 pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
+// The Windows console reader and Credential Manager store (TASK-XPA-011, G13)
+// with the macOS surface; `trusted_daemon_fingerprint` stays macOS-only until
+// the Authenticode identity (G12) binds a signing receipt on Windows.
+#[cfg(windows)]
+pub use windows::{
+    CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
+    KeychainPresence, TerminalSecretError, read_terminal_secret,
+};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;
@@ -126,14 +134,22 @@ impl LocalEndpoint {
     }
 }
 
-/// Installation-owned daemon identity. Windows requires a trusted signing
-/// certificate SHA256 or an exact MSIX package family, as well as the image path.
-/// These are installation inputs, not values returned by the untrusted pipe.
+/// Installation-owned daemon identity. Windows requires the image path and one
+/// of: an exact MSIX package family (MSIX daemon), a publisher identity (xcopy
+/// daemon signed by Artifact Signing: subject organisation and identity EKU,
+/// both or neither, under the pinned Microsoft root), or a trusted signing
+/// certificate SHA256 (development signer). These are installation inputs,
+/// not values returned by the untrusted pipe.
 #[derive(Clone, Debug)]
 pub struct ServerIdentity {
     pub executable: PathBuf,
     pub authenticode_sha256: Option<String>,
     pub package_family: Option<String>,
+    /// The signer leaf's exact subject `O=` (maintainer ruling 17).
+    pub publisher_organization: Option<String>,
+    /// The Artifact Signing certificate-profile identity EKU,
+    /// `1.3.6.1.4.1.311.97.<profile>` (maintainer ruling 17).
+    pub publisher_eku: Option<String>,
 }
 
 impl ServerIdentity {
@@ -142,6 +158,8 @@ impl ServerIdentity {
             executable: executable.into(),
             authenticode_sha256: None,
             package_family: None,
+            publisher_organization: None,
+            publisher_eku: None,
         }
     }
 }
@@ -221,6 +239,10 @@ pub use windows::host_store::{
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
+// A workspace project root, pinned by the identity it was registered with
+// (TASK-XPA-015).
+#[cfg(windows)]
+pub use windows::InspectedDirectory;
 
 #[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;

@@ -166,7 +166,11 @@ class PathClassificationTests(unittest.TestCase):
         self.assertIn("openspec/contracts/cli-feature-coverage.json", paths)
         for path in paths + ["openspec/contracts/a-future-product.json"]:
             with self.subTest(path=path):
-                self.assert_lanes([path], swift=True, app=False, ds=False, rust=True)
+                # The Windows App's tests also read the CLI coverage commands.
+                self.assert_lanes(
+                    [path], swift=True, app=False, ds=False, rust=True,
+                    windows=path == "openspec/contracts/cli-feature-coverage.json",
+                )
 
     def test_source_only_canonical_control_and_journal_changes_select_rust(self):
         for name in (
@@ -214,19 +218,26 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_every_windows_generator_and_test_input_selects_windows(self):
         root = SCRIPT.resolve().parents[2]
-        spec = importlib.util.spec_from_file_location(
-            "arkdeck_clientkit_generator", root / "windows/scripts/generate-clientkit.py"
-        )
-        assert spec is not None and spec.loader is not None
-        generator = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = generator
-        spec.loader.exec_module(generator)
-        self.assertTrue(generator.INPUTS)
-        # The tests also read the recorded corpus, and the end-to-end test signs
-        # its daemon copy with the development identity script.
-        declared = [
-            *generator.INPUTS,
+        declared = []
+        for script in ("generate-clientkit.py", "generate-ui-strings.py", "generate-xaml-tokens.py"):
+            spec = importlib.util.spec_from_file_location(
+                "arkdeck_windows_" + script.replace("-", "_")[:-3], root / "windows/scripts" / script
+            )
+            assert spec is not None and spec.loader is not None
+            generator = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = generator
+            spec.loader.exec_module(generator)
+            with self.subTest(generator=script):
+                self.assertTrue(generator.INPUTS)
+            declared.extend(generator.INPUTS)
+        # The tests also read the recorded corpus, the UIA semantic snapshots, the
+        # Job state classes and the CLI coverage commands; the end-to-end tests
+        # sign their daemon copy with the development identity script.
+        declared += [
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames",
+            "spec/ui-semantics",
+            "spec/recovery/job-state-preflight.json",
+            "openspec/contracts/cli-feature-coverage.json",
             "rust/scripts/windows-dev-identity.ps1",
         ]
         for path in declared:
@@ -247,6 +258,8 @@ class PathClassificationTests(unittest.TestCase):
             "rust/scripts/check-readonly.py",
             "spec/recovery/README.md",
             "docs/design/cross-platform/windows-phase-agent-prompt.md",
+            "docs/design/arkdeck-ds/src/styles.css",
+            "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
         ):
             with self.subTest(path=path):
@@ -726,10 +739,12 @@ class WindowsLaneTests(unittest.TestCase):
     def test_windows_plan_checks_the_generator_then_builds_and_tests_the_solution(self):
         with tempfile.TemporaryDirectory() as directory:
             commands = [" ".join(c) for c in PLAN.local_commands(pathlib.Path(directory), self.plan(windows=True))]
-        generator = next(i for i, c in enumerate(commands) if c.endswith("windows/scripts/generate-clientkit.py --check"))
         build = commands.index("dotnet build windows/ArkDeck.Windows.slnx -c Release")
         test = commands.index("dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build")
-        self.assertLess(generator, build)
+        for script in ("generate-clientkit.py", "generate-ui-strings.py", "generate-xaml-tokens.py"):
+            with self.subTest(generator=script):
+                generator = next(i for i, c in enumerate(commands) if c.endswith(f"windows/scripts/{script} --check"))
+                self.assertLess(generator, build)
         self.assertLess(build, test)
         flattened = "\n".join(commands)
         self.assertNotIn("cargo", flattened)
