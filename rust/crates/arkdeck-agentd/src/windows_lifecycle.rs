@@ -14,9 +14,11 @@
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
 //!   lifecycle only the Target owners, the Artifact read and export owner
-//!   and the workspace project owner are composed over it (see
-//!   [`Authority::compose`]); every input that would compose another owner
-//!   on macOS is refused, not ignored, until its store is ported (G01);
+//!   lifecycle only the Target owners, the Artifact read and export owner,
+//!   the workspace project owner and (in a development root) the Trace cache
+//!   owner are composed over it (see [`Authority::compose`]); every input
+//!   that would compose another owner on macOS is refused, not ignored,
+//!   until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
 //!   standalone daemon does (the black-box read-only check runs it).
@@ -141,7 +143,17 @@ impl Authority {
     ///   credential owner nor the workspace composition is composed, so a
     ///   project stays `runtimeRestartRequired`; with no Job owner to prove
     ///   that no workspace Job names a project or preset, every project or
-    ///   preset mutation is refused (`recordUnreadable`, no new dispatch).
+    ///   preset mutation is refused (`recordUnreadable`, no new dispatch);
+    /// * in a development root only, the Trace cache owner
+    ///   (`TraceCacheStore`) over `trace-cache\traces`, beside its `staging`,
+    ///   the layout the macOS isolated owner creates: `trace.cache.status`
+    ///   reads the same inventory as on macOS. `trace.cache.purge` is
+    ///   refused before admission (`operationUnavailable`, ruling 18), as the
+    ///   macOS daemon refuses it without its Job owner, which alone proves
+    ///   that no Job's Session still needs the derived data.
+    ///   The account's daemon composes none: on macOS it reads the App's
+    ///   cache in the App's container, and the Windows App's cache location
+    ///   is not decided yet.
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens the
@@ -205,6 +217,32 @@ impl Authority {
             .startup_records()
             .map_err(|error| unusable(&path, &error.message))?;
         let host = host.with_workspace_projects(projects);
+        let host = if self.development {
+            let name = "trace-cache";
+            let unusable = |path: &Path, error: std::io::Error| {
+                format!(
+                    "the Trace cache {} is unusable: {error}; nothing was started",
+                    path.display()
+                )
+            };
+            let parent = self
+                .root
+                .private_child(name)
+                .map_err(|error| unusable(&self.root.path().join(name), error))?;
+            let directory = arkdeck_platform::HostDirectory::open(&parent)
+                .map_err(|error| unusable(&parent, error))?;
+            for child in ["traces", "staging"] {
+                directory
+                    .private_child(child)
+                    .map_err(|error| unusable(&parent.join(child), error))?;
+            }
+            let traces = parent.join("traces");
+            let cache = arkdeck_hoststore::TraceCacheStore::open(&traces)
+                .map_err(|error| unusable(&traces, error))?;
+            host.with_trace_cache(cache)
+        } else {
+            host
+        };
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {

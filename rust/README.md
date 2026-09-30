@@ -599,6 +599,22 @@ The paired native receipt requires ArkTrace with the directory-hinted owner
 target fix (ArkTrace PR #25); the previously pinned `e6e3133d` skips every
 Ready entry, so parity checks against it record that mismatch rather than pass.
 
+On Windows (TASK-XPA-021) the same owner (`TraceCacheStore`, `trace_inventory`,
+`trace_maintenance`) runs on NTFS over `arkdeck_platform::PreparedTraceRemoval`'s
+Windows port: every entry opened relative to its held parent without following
+a reparse point, the quarantine a POSIX rename that never replaces an entry,
+each removal deleting through a handle whose identity was just compared with
+the capture. NTFS refuses to rename a directory while a handle is open inside
+it, so the quarantine lets go of the moved tree's handles for the rename and
+opens them again, each required to be the captured directory; for the same
+reason a prepared tree's ancestors cannot be moved away meanwhile. The Windows
+daemon composes the owner over `trace-cache/traces` in a development root only
+(the account's daemon would read the App's cache, whose Windows location is not
+decided); `trace.cache.status` answers there, and `trace.cache.purge` is refused
+as the macOS daemon refuses it without its Job owner. `trace export` is the
+Artifact export path of TASK-XPA-006 and needs nothing Windows-specific beyond
+it; the daemon refuses it until a Job owner is composed on Windows.
+
 Run `python3 rust/scripts/check-trace-cache-owner.py` after building the binaries
 to check real RPC/CLI status and purge, retention, lease contention, restart,
 namespace refusals and original Artifact preservation.
