@@ -85,11 +85,33 @@ impl Root {
     /// inputs are read by their closed names.
     fn with_running_workspace_job(&self, project: &str, preset: &str) {
         let store = JobStore::open_owner(&self.0.join("jobs-state")).unwrap();
-        let (record, hash) = workspace_job(project, preset, "running");
+        // Admitted as Swift admits it (its initial record in `preflight`),
+        // then running, with its recorded Journal up to that transition
+        // beside it: the daemon's start recovers active Jobs from their
+        // Journals, and an admitted Job without that projection is one a
+        // crash stopped before its first append.
+        let (admitted, hash) = workspace_job(project, preset, "preflight");
         assert_eq!(
-            store.admit(&record, &hash).unwrap(),
+            store.admit(&admitted, &hash).unwrap(),
             AdmissionVerdict::Admitted
         );
+        let (running, _) = workspace_job(project, preset, "running");
+        store.persist(&running, "2026-09-14T00:00:00Z").unwrap();
+        let journal = std::fs::read_to_string(fixture_job().join("journal.jsonl")).unwrap();
+        let running: String = journal
+            .split_inclusive('\n')
+            .take_while(|line| !line.contains("\"stepIntent\""))
+            .collect();
+        assert!(running.contains("\"to\":\"running\""), "{running}");
+        std::fs::write(
+            self.0
+                .join("jobs-state")
+                .join("jobs")
+                .join(WORKSPACE_JOB)
+                .join("journal.jsonl"),
+            running,
+        )
+        .unwrap();
     }
     /// That Job, succeeded.
     fn ending_the_workspace_job(&self, project: &str, preset: &str) {
@@ -101,13 +123,18 @@ impl Root {
 
 const WORKSPACE_JOB: &str = "job-863e9a9bd1d60afe3c33ac9e43a7b7fb";
 
+/// The recorded Swift Job's directory.
+fn fixture_job() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/agent-execution-evidence/store/jobs")
+        .join(WORKSPACE_JOB)
+}
+
 /// The recorded Swift `workspace.prepare-isolated-copy@1` Job with the
 /// project and build preset it names, its state, and a Catalog digest that
 /// is not this build's; its request hash is its request's fingerprint.
 fn workspace_job(project: &str, preset: &str, state: &str) -> (JobRecord, String) {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-        "../../tests/fixtures/agent-execution-evidence/store/jobs/{WORKSPACE_JOB}/job-record.json"
-    ));
+    let path = fixture_job().join("job-record.json");
     let mut record: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
     for request in ["request", "originalSubmissionRequest"] {
         record[request]["inputs"]["projectRef"] = json!(project);
