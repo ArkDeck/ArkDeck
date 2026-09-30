@@ -57,8 +57,8 @@ Newly `implemented`: `doctor`, `operation.list`. macOS statuses and every other 
 
 | Test | What it holds | Runs on Windows |
 | --- | --- | --- |
-| `tests/windows_signed_runtime.rs` (new, `harness = false`) `daemon_answered_leaves_run_end_to_end_through_the_pipe` | the real `arkdeck-agentd` (beside the CLI), copied and signed with the development signer, on a private pipe with every other `ARKDECK_`/`OHOS_HDC_` input removed: `doctor`, `doctor --deep`, `operation list` answer `ok` (exit 0), `device candidates` answers `operationFailed` (exit 1); a wrong signer pin is refused `runtimeUnavailable` (69) | only with `ARKDECK_DEV_SIGNER_THUMBPRINT`; otherwise skipped with a message |
-| same file, `ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope` | a fake Runtime (the test binary itself, signed) serves `job watch` the recorded event page; once it has answered a read the CLI, started with `CREATE_NEW_PROCESS_GROUP`, is sent `CTRL_BREAK_EVENT`. It must exit 130 (not `STATUS_CONTROL_C_EXIT`) with the two rows and the `clientInterrupted` terminal line (`lastCursor`, `jobId`, `afterCursor`), and the Runtime must have seen only `health` and `job.events`. Synchronised on the fake Runtime's own report of the read it answered, never on a sleep | as above |
+| `tests/windows_signed_runtime.rs` (new, `harness = false`) `daemon_answered_leaves_run_end_to_end_through_the_pipe` | the real `arkdeck-agentd` (beside the CLI), copied and signed with the development signer, over an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, a fresh temporary directory; every other `ARKDECK_`/`OHOS_HDC_` input removed), reached on the pipe it announces: `doctor`, `doctor --deep`, `operation list` answer `ok` (exit 0), `device candidates` answers `operationFailed` (exit 1); a wrong signer pin is refused `runtimeUnavailable` (69); the daemon is then stopped by its root's stop request and exits 0 after `arkdeck-agentd stopped` | only with `ARKDECK_DEV_SIGNER_THUMBPRINT`; otherwise skipped with a message |
+| same file, `ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope` | a fake Runtime (the test binary itself, signed) serves `job watch` the recorded event page; once it has answered a read the CLI, started with `CREATE_NEW_PROCESS_GROUP`, is sent `CTRL_BREAK_EVENT`. It must exit 130 (not `STATUS_CONTROL_C_EXIT`) having written a prefix of the page's rows (one or two: which look sees the stop is the host's timing) and the `clientInterrupted` terminal line (`lastCursor` = the last row delivered, `jobId`, `afterCursor` = that row's or the page's cursor), and the Runtime must have seen only `health` and `job.events`. Synchronised on the fake Runtime's own report of the read it answered, never on a sleep | as above |
 | `feature_coverage.rs` `windows_status_follows_what_this_cli_serves_there` | adds `doctor`/`operation.list` `implemented`, `device.observations`/`health` `partial` | yes |
 | `machine_contracts.rs`, `argv_fixtures.rs` | the regenerated coverage is the committed file; argv fixtures replay | yes |
 
@@ -69,16 +69,27 @@ not acted on; stays requested). The Windows test mirrors those assertions at the
 ## Local run and what was not run
 
 - `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`: pass.
-- `cargo test -p arkdeck-cli -p arkdeck-platform`: pass; `windows_signed_runtime` skipped
-  (`ARKDECK_DEV_SIGNER_THUMBPRINT` is set in `HKCU\Environment` but not in this session's
-  environment).
-- With the thumbprint supplied, `windows_signed_runtime` failed at signing: PowerShell refused to
-  run `rust/scripts/windows-dev-identity.ps1 sign` (`AuthorizationManager` check failed, i.e. this
-  host's script execution policy). Relaxing the policy for the call was not done in this slice, so
-  **neither signed test has run on this host**; both are unverified here. In CI only the contracts job creates
-  the signer (for `check-readonly.py`'s signed matrix); the workspace job, which runs this crate's
-  tests, has none, so the new test is expected to skip there. Whether any lane runs it signed is
-  not verified.
+- `cargo test -p arkdeck-cli -p arkdeck-platform`: pass (without the signer in the environment
+  `windows_signed_runtime` skips with its message).
+- **Signed, on this host** (thumbprint `AAC23CA4…B149` read from `HKCU\Environment`):
+  `ARKDECK_DEV_SIGNER_THUMBPRINT=… cargo test -p arkdeck-cli --test windows_signed_runtime`, after
+  `cargo build -p arkdeck-agentd`: both tests pass, three runs in a row.
+  - `doctor`, `doctor --deep`, `operation list`: `ok`, exit 0; `device candidates`:
+    `operationFailed`, exit 1; wrong pin: `runtimeUnavailable`, exit 69; daemon stopped by its stop
+    request, exit 0.
+  - Ctrl+Break: exit 130 and the `clientInterrupted` terminal line. The first run wrote one row
+    before the terminal line (the stop was seen at the per-row look), which is why the test takes
+    either prefix of the page.
+  - Negative control: with `main.rs` of main `84a44be1` (no Windows latch) the same test fails, the
+    CLI ending with `STATUS_CONTROL_C_EXIT` (`0xC000013A`) instead of 130. Restored afterwards.
+- Found and fixed while running it signed (second commit): the test named the signing script by a
+  `canonicalize`d, verbatim (`\\?\`) path, which PowerShell refuses to authorize
+  (`AuthorizationManager` check failed); it now passes the plain drive path, with the inherited
+  environment and no execution-policy change. The daemon in private-endpoint mode announces no
+  line to synchronise on, so the test runs it over a development root, which announces its pipe
+  and stops for its root's stop request.
+- CI: #2352 (open) adds the development signer to the Windows workspace job; until it merges the
+  workspace job has no signer and the new test skips there.
 - `arkdeck maintainer contracts export --contracts-directory openspec/contracts --fixtures-directory
   Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI`: only `cli-feature-coverage.json`
   changed.

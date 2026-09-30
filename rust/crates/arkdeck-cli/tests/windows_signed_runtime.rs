@@ -167,7 +167,7 @@ mod windows {
         fn new() -> Self {
             let path = std::env::temp_dir().join(format!("ad-clisigned-{}", nonce()));
             std::fs::create_dir(&path).unwrap();
-            Self(path.canonicalize().unwrap())
+            Self(path)
         }
     }
     impl Drop for Directory {
@@ -209,10 +209,13 @@ mod windows {
                 source.display()
             )
         });
+        // A plain drive path: PowerShell cannot authorize a script named by
+        // a verbatim (`\\?\`) path, which is what `canonicalize` returns.
         let script = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../scripts/windows-dev-identity.ps1")
-            .canonicalize()
-            .unwrap();
+            .parent()
+            .and_then(Path::parent)
+            .unwrap()
+            .join(r"scripts\windows-dev-identity.ps1");
         let output = Command::new(pwsh())
             .args(["-NoProfile", "-NonInteractive", "-File"])
             .arg(&script)
@@ -244,7 +247,7 @@ mod windows {
             let mut child = command
                 .stdin(Stdio::null())
                 .stdout(Stdio::piped())
-                .stderr(Stdio::null())
+                .stderr(Stdio::inherit())
                 .spawn()
                 .unwrap();
             let stdout = child.stdout.take().unwrap();
@@ -319,11 +322,19 @@ mod windows {
             &directory,
             thumbprint,
         );
-        let pipe = format!(r"\\.\pipe\arkdeck-cli-signed-{}", nonce());
+        // An isolated development root: the daemon announces its pipe once
+        // it is serving, and stops for its root's stop request.
+        let root = directory.0.join("root");
+        std::fs::create_dir(&root).unwrap();
         let mut command = Command::new(&daemon);
-        command.env("ARKDECK_ENDPOINT", &pipe);
-        let server = Server::start(command);
-        server.line_starting("arkdeck-agentd listening on ");
+        command.env("ARKDECK_DEVELOPMENT_STATE_ROOT", &root);
+        let mut server = Server::start(command);
+        let pipe = server
+            .line_starting("arkdeck-agentd listening on ")
+            .pop()
+            .unwrap()
+            .trim_start_matches("arkdeck-agentd listening on ")
+            .to_owned();
         for (argv, code, error) in [
             (&["doctor"][..], 0, None),
             (&["doctor", "--deep"][..], 0, None),
@@ -364,7 +375,15 @@ mod windows {
         assert_eq!(refused.status.code(), Some(69), "{refused:?}");
         let refused: Value = serde_json::from_slice(&refused.stdout).unwrap();
         assert_eq!(refused["error"]["code"], "runtimeUnavailable", "{refused}");
-        drop(server.end());
+        // Stopped by its own stop request, as the restart hop stops it.
+        let scope = arkdeck_platform::StateRoot::development(&root)
+            .unwrap()
+            .scope()
+            .unwrap();
+        scope.request_stop(server.child.id()).unwrap();
+        server.line_starting("arkdeck-agentd stopped");
+        let status = server.child.wait().unwrap();
+        assert!(status.success(), "{status:?}");
     }
 
     fn ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope(thumbprint: &str) {
@@ -424,21 +443,31 @@ mod windows {
             .lines()
             .map(|line| serde_json::from_str(line).expect("one document per line"))
             .collect();
-        assert_eq!(lines.len(), 3, "{lines:?}");
-        assert_eq!(lines[0]["eventId"], "e1");
-        assert_eq!(lines[1]["eventId"], "e2");
-        let terminal = &lines[2];
+        // The stop is seen at the watch's next look: after the first row,
+        // after the second, or at a pause. Which one is the host's timing;
+        // what it wrote before is always a prefix of the page, and the
+        // terminal line names the resume point it actually delivered.
+        let (terminal, rows) = lines.split_last().expect("a terminal line");
+        assert!(!rows.is_empty() && rows.len() <= 2, "{lines:?}");
+        for (row, id) in rows.iter().zip(["e1", "e2"]) {
+            assert_eq!(row["eventId"], id, "{lines:?}");
+        }
         assert_eq!(terminal["type"], "terminal");
         assert_eq!(terminal["ok"], false);
         assert_eq!(terminal["exitCode"], 130);
-        assert_eq!(terminal["lastCursor"], "cursor-e2");
+        assert_eq!(terminal["lastCursor"], rows.last().unwrap()["cursor"]);
         assert_eq!(terminal["error"]["code"], "clientInterrupted");
         assert_eq!(
             terminal["error"]["message"],
             "client observation interrupted; the Job was not cancelled"
         );
         assert_eq!(terminal["error"]["details"]["jobId"], JOB);
-        assert_eq!(terminal["error"]["details"]["afterCursor"], "page-a");
+        // Mid-page, the row's own cursor; after the page, the page's.
+        let after = &terminal["error"]["details"]["afterCursor"];
+        assert!(
+            *after == rows.last().unwrap()["cursor"] || after == "page-a",
+            "{terminal}"
+        );
 
         // Nothing but health and the reads it was already making reached the
         // Runtime: no cancel, no other request.
