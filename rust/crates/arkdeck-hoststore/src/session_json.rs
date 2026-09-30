@@ -229,7 +229,7 @@ pub(super) fn encode(value: &Value) -> Result<Vec<u8>> {
 /// Swift `RuntimeJobRecord.durableData()`: two-space indentation, `" : "`, an
 /// empty container as its open bracket, a blank line and its close, an escaped
 /// solidus and no trailing newline. Keys and numbers are spelled as `encode`.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
     pretty(value, true)
 }
@@ -242,7 +242,7 @@ pub(super) fn encode_canonical_pretty(value: &Value) -> Result<Vec<u8>> {
     pretty(value, false)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn pretty(value: &Value, escape_solidus: bool) -> Result<Vec<u8>> {
     arkdeck_contract::foundation_json::pretty(value, escape_solidus).map_err(|_| DecodeError::Shape)
 }
@@ -250,8 +250,9 @@ fn pretty(value: &Value, escape_solidus: bool) -> Result<Vec<u8>> {
 /// Foundation `JSONValue` decoding of a caller's document, without requiring
 /// its canonical spelling: member names are unique under canonical equivalence
 /// (Swift `StrictJSONDuplicateValidator`) and numbers follow `JSONValue`'s
-/// Int64, UInt64, then Double order. Nothing is re-encoded.
-#[cfg(target_os = "macos")]
+/// Int64, UInt64, then Double order. Nothing is re-encoded. The ArkTrace
+/// analysis judge reads its envelopes this way on Windows too.
+#[cfg(any(target_os = "macos", windows))]
 pub(super) fn parse_foundation(bytes: &[u8]) -> Result<Value> {
     let mut reader = Reader { bytes, position: 0 };
     let value = reader.value(0)?;

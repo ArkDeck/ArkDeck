@@ -709,15 +709,15 @@ use crate::windows::spawn;
 mod macos_process;
 #[cfg(target_os = "macos")]
 use macos_process::{spawn, spawn_canonical, spawn_in};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "shell_channel.rs"]
 mod shell_channel;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use shell_channel::{DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "pty_exchange.rs"]
-mod pty_exchange;
-#[cfg(target_os = "macos")]
+pub(crate) mod pty_exchange;
+#[cfg(any(target_os = "macos", windows))]
 pub use pty_exchange::{PtyError, PtyExecution, PtyFailureCategory, PtyInteraction, PtyRequest};
 
 #[cfg(any(target_os = "macos", windows))]

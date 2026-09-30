@@ -23,5 +23,11 @@ sha2.workspace = true
 unicode-segmentation.workspace = true
 ed25519-dalek = { version = "=2.2.0", default-features = false, features = ["fast"] }
 
+# The fake Runtime of the Windows signed-Runtime test is the test binary
+# itself, so it serves without libtest, whose output would reach its streams.
+[[test]]
+name = "windows_signed_runtime"
+harness = false
+
 [lints]
 workspace = true

@@ -1,12 +1,12 @@
 //! Revalidate the exact current DevEco root and five sealed child roles. No
 //! SDK enumeration, registration, selection, process execution or activation.
-use crate::deveco_registry::{Child, Record, RootIdentity, Trust, identifier, version};
-use arkdeck_contract::{canonical_json, sha256_hex, strict_json};
+use crate::deveco_manifest::{DevEcoLaunchHost, DevEcoManifestError, parse_deveco_manifests};
+use crate::deveco_registry::{Child, Record, RootIdentity, Trust};
+use arkdeck_contract::{canonical_json, sha256_hex};
 use arkdeck_platform::{
     DevEcoRole, DevEcoRoot, inspect_deveco_publisher_signature, inspect_native_code_signature,
     verify_deveco_resource_envelope,
 };
-use serde::Deserialize;
 use serde_json::json;
 use std::{io, path::Path};
 fn unreadable() -> io::Error {
@@ -46,32 +46,6 @@ fn read_child(root: &DevEcoRoot, role: DevEcoRole) -> io::Result<Child> {
         trust,
     })
 }
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ProductInfo {
-    name: String,
-    version: String,
-    build_number: String,
-    product_code: String,
-    product_vendor: String,
-    launch: Vec<Launch>,
-}
-#[derive(Deserialize)]
-struct Launch {
-    os: String,
-    arch: String,
-}
-#[derive(Deserialize)]
-struct SdkPackage {
-    data: SdkData,
-}
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SdkData {
-    api_version: String,
-    platform_version: String,
-    version: String,
-}
 pub(crate) fn inspect_root(path: &Path) -> io::Result<Record> {
     let root = DevEcoRoot::open(path)?;
     let facts = &root.identity;
@@ -105,28 +79,15 @@ pub(crate) fn inspect_root(path: &Path) -> io::Result<Record> {
             arkdeck_platform::DevEcoIdentityChanged,
         ));
     }
-    let product: ProductInfo =
-        serde_json::from_value(strict_json(&product_bytes).map_err(|_| unreadable())?)
-            .map_err(|_| unreadable())?;
-    let sdk: SdkPackage =
-        serde_json::from_value(strict_json(&sdk_bytes).map_err(|_| unreadable())?)
-            .map_err(|_| unreadable())?;
-    if product.name != "DevEco Studio"
-        || product.product_code != "DS"
-        || product.product_vendor != "Huawei"
-        || !version(&product.version)
-        || !identifier(&product.build_number)
-        || !product
-            .launch
-            .iter()
-            .any(|v| v.os == "macOS" && ["aarch64", "x86_64"].contains(&v.arch.as_str()))
-        || !version(&sdk.data.version)
-        || !version(&sdk.data.platform_version)
-        || !identifier(&sdk.data.api_version)
-        || children[2]
-            .trust
-            .as_ref()
-            .is_none_or(|t| t.signature != "verified")
+    let manifests = parse_deveco_manifests(&product_bytes, &sdk_bytes, DevEcoLaunchHost::MacOs)
+        .map_err(|error| match error {
+            DevEcoManifestError::Unreadable => unreadable(),
+            DevEcoManifestError::Unsupported => denied(),
+        })?;
+    if children[2]
+        .trust
+        .as_ref()
+        .is_none_or(|t| t.signature != "verified")
     {
         return Err(denied());
     }
@@ -144,15 +105,15 @@ pub(crate) fn inspect_root(path: &Path) -> io::Result<Record> {
         ],
     )?;
     root.require_linked()?;
-    let digest=sha256_hex(&canonical_json(&json!({"schemaVersion":"arkdeck.deveco-toolchain-content/2","kind":"deveco","productVersion":product.version,"buildNumber":product.build_number,"sdkVersion":sdk.data.version,"apiVersion":sdk.data.api_version,"bundleTrust":bundle_trust.value(),"children":children.iter().map(Child::value).collect::<Vec<_>>()})).map_err(|_|unreadable())?);
+    let digest=sha256_hex(&canonical_json(&json!({"schemaVersion":"arkdeck.deveco-toolchain-content/2","kind":"deveco","productVersion":manifests.product_version,"buildNumber":manifests.build_number,"sdkVersion":manifests.sdk_version,"apiVersion":manifests.api_version,"bundleTrust":bundle_trust.value(),"children":children.iter().map(Child::value).collect::<Vec<_>>()})).map_err(|_|unreadable())?);
     Ok(Record {
         reference: format!("toolchain:sha256:{digest}"),
         content_digest: digest,
         root: root_identity,
-        product_version: product.version,
-        build_number: product.build_number,
-        sdk_version: sdk.data.version,
-        api_version: sdk.data.api_version,
+        product_version: manifests.product_version,
+        build_number: manifests.build_number,
+        sdk_version: manifests.sdk_version,
+        api_version: manifests.api_version,
         registered_at: "1970-01-01T00:00:00Z".into(),
         bundle_trust,
         children,

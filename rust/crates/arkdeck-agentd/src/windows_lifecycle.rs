@@ -9,11 +9,12 @@
 //! * the account's daemon (no input): `%LOCALAPPDATA%\ArkDeck\Agentd`, its
 //!   `instance.lock`, the guard `Local\ArkDeck.Agentd.<user SID>` and the
 //!   logon-scoped pipe `\\.\pipe\arkdeck-agentd-<logon SID>`. This is the
-//!   daemon decision 11's client will start;
+//!   daemon decision 11's client starts (`arkdeck_client::start`);
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
-//!   a guard and a pipe named after the root's file identity. Only the
-//!   lifecycle is composed over it; every input that would compose an owner
+//!   a guard and a pipe named after the root's file identity. Beside the
+//!   lifecycle only the Target owners are composed over it (see
+//!   [`Authority::compose`]); every input that would compose another owner
 //!   on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
@@ -91,6 +92,10 @@ impl Instance {
 /// What a daemon owning a state root holds while it serves.
 pub(crate) struct Authority {
     pub(crate) endpoint: LocalEndpoint,
+    /// An isolated development root, whose owners keep the macOS isolated
+    /// owner's directory names; otherwise the account's root, whose owners
+    /// keep Swift's production layout.
+    development: bool,
     // Dropped in this order: the owner lock, then the guard, then the root's
     // pinned directories.
     owner: OwnerLock,
@@ -99,6 +104,65 @@ pub(crate) struct Authority {
 }
 
 impl Authority {
+    /// The owners a Windows daemon composes over its root, as the macOS
+    /// isolated owner (`targets-state`) or production composition
+    /// (`targets`) composes them, in a private child of the root created
+    /// owner-only when absent (`StateRoot::private_child`):
+    ///
+    /// * the Target store: `targets.json` and the display names under
+    ///   `.targets.lock` and `.target-display-names.lock`, the same bytes
+    ///   as on macOS; `target.list`, `target.show`, `target.availability`
+    ///   and `target.display-name.*` answer from it, and a restart reads
+    ///   back what it holds;
+    /// * the Target observation owner over it, with the USB relations the
+    ///   macOS rule names (`development_usb::relation_source`): the
+    ///   Runtime's own census (`UsbRegistryRelations::system()`, the Windows
+    ///   SetupAPI census) only beside a registered HDC this composition
+    ///   started as its managed server. No Windows HDC tuple is registered
+    ///   yet (its integration change waits for the maintainer's samples),
+    ///   so no relation is read, nothing is observed or dispatched, and
+    ///   `target.adopt` is refused before admission with zero dispatch.
+    ///
+    /// Composing opens the store, which reads both documents under their
+    /// locks; a store it cannot read ends the start, as on macOS.
+    pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
+        use crate::development_usb::{RelationSource, relation_source};
+        let name = if self.development {
+            "targets-state"
+        } else {
+            "targets"
+        };
+        let path = self.root.private_child(name).map_err(|error| {
+            format!(
+                "the Target store {} is unusable: {error}; nothing was started",
+                self.root.path().join(name).display()
+            )
+        })?;
+        let targets = arkdeck_hoststore::TargetStore::open(&path).map_err(|error| {
+            format!(
+                "the Target store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        })?;
+        let host = host.with_targets(targets);
+        // No Windows HDC is registered, so none is managed either.
+        let (registered, managed) = (false, false);
+        let host = match relation_source(registered, managed, false) {
+            RelationSource::Registry => host
+                .with_usb_registry_relations(arkdeck_provider_hdc::UsbRegistryRelations::system()),
+            RelationSource::File | RelationSource::Nothing => host,
+        };
+        report(
+            "arkdeck-agentd composes no HDC: no Windows HDC tuple is registered; device \
+             observation and target adoption are refused before any dispatch",
+        );
+        report(&format!(
+            "arkdeck-agentd owners: {}",
+            host.owner_census().join(", ")
+        ));
+        Ok(host)
+    }
+
     /// After a complete drain: the owner lock, then the guard, on the thread
     /// that took the guard.
     pub(crate) fn release(self) {
@@ -246,6 +310,7 @@ pub(crate) fn start(
         listener,
         authority: Some(Authority {
             endpoint: expected,
+            development: development.is_some(),
             owner,
             guard,
             root,

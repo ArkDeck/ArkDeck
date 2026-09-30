@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
 use windows_sys::Win32::Storage::FileSystem::*;
+use windows_sys::Win32::System::Console::HPCON;
 use windows_sys::Win32::System::JobObjects::*;
 use windows_sys::Win32::System::Pipes::{CreatePipe, PeekNamedPipe};
 use windows_sys::Win32::System::SystemInformation::GetWindowsDirectoryW;
@@ -192,7 +193,37 @@ struct Attributes {
     initialized: bool,
 }
 impl Attributes {
-    fn new(handles: &mut [HANDLE]) -> io::Result<Self> {
+    /// The explicit list of handles a child inherits.
+    fn handles(handles: &mut [HANDLE]) -> io::Result<Self> {
+        let size = std::mem::size_of_val(handles);
+        // SAFETY: the handle slice outlives the list's use by CreateProcessW.
+        unsafe {
+            Self::new(
+                PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
+                handles.as_mut_ptr().cast(),
+                size,
+            )
+        }
+    }
+
+    /// The pseudo console a child is attached to: the handle value itself
+    /// is the attribute, as `CreatePseudoConsole`'s documentation passes it.
+    fn pseudo_console(console: HPCON) -> io::Result<Self> {
+        // SAFETY: the attribute is the handle value, not a pointer to it;
+        // the caller keeps the console open through CreateProcessW.
+        unsafe {
+            Self::new(
+                PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE as usize,
+                console as *mut std::ffi::c_void,
+                size_of::<HPCON>(),
+            )
+        }
+    }
+
+    /// # Safety
+    /// `data` and `size` must describe `attribute` as
+    /// `UpdateProcThreadAttribute` documents it, live through CreateProcessW.
+    unsafe fn new(attribute: usize, data: *mut std::ffi::c_void, size: usize) -> io::Result<Self> {
         let mut length = 0;
         // SAFETY: documented attribute list length query.
         unsafe {
@@ -210,14 +241,14 @@ impl Attributes {
             InitializeProcThreadAttributeList(value.pointer(), 1, 0, &mut length)
         })?;
         value.initialized = true;
-        // SAFETY: handle slice and list remain live through CreateProcessW.
+        // SAFETY: the caller guarantees the attribute value; the list is live.
         bool_result(unsafe {
             UpdateProcThreadAttribute(
                 value.pointer(),
                 0,
-                PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
-                handles.as_mut_ptr().cast(),
-                std::mem::size_of_val(handles),
+                attribute,
+                data,
+                size,
                 null_mut(),
                 null(),
             )
@@ -284,6 +315,32 @@ pub(crate) fn spawn_in(
     environment: &[(OsString, OsString)],
     working_directory: Option<&[u16]>,
 ) -> io::Result<RunningChild> {
+    spawn_with(tool, args, environment, working_directory, None)
+}
+
+/// `spawn_in` with the child attached to a pseudo console instead of pipes
+/// (TASK-XPA-011, G19): its standard handles are the console's, it inherits
+/// no handle at all, and everything else — the suspended start, the image
+/// proof before resume, the kill-on-close Job, the clean environment and the
+/// argv array — is the same. The caller keeps `console` open until the
+/// child's Job has ended.
+pub(crate) fn spawn_attached(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&[u16]>,
+    console: HPCON,
+) -> io::Result<RunningChild> {
+    spawn_with(tool, args, environment, working_directory, Some(console))
+}
+
+fn spawn_with(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&[u16]>,
+    console: Option<HPCON>,
+) -> io::Result<RunningChild> {
     if !tool
         .path
         .extension()
@@ -295,36 +352,56 @@ pub(crate) fn spawn_in(
     }
     let application = wide(tool.path.as_os_str())?;
     let mut command_line = command_line(tool.path.as_os_str(), args)?;
-    let (stdout, out_write) = output_pipe()?;
-    let (stderr, err_write) = output_pipe()?;
-    let inheritable = SECURITY_ATTRIBUTES {
-        nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
-        lpSecurityDescriptor: null_mut(),
-        bInheritHandle: 1,
+    // Pipes: NUL stdin and two output pipes, the only handles inherited.
+    // The list stays live through CreateProcessW.
+    let mut pipes = None;
+    let mut inherited: [HANDLE; 3];
+    let mut attributes = match console {
+        None => {
+            let (stdout, out_write) = output_pipe()?;
+            let (stderr, err_write) = output_pipe()?;
+            let inheritable = SECURITY_ATTRIBUTES {
+                nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+                lpSecurityDescriptor: null_mut(),
+                bInheritHandle: 1,
+            };
+            let null_name = wide(OsStr::new("NUL"))?;
+            // SAFETY: NUL is a fixed host device; read-only and explicitly inherited.
+            let stdin = Handle::new(unsafe {
+                CreateFileW(
+                    null_name.as_ptr(),
+                    GENERIC_READ,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    &inheritable,
+                    OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL,
+                    null_mut(),
+                )
+            })?;
+            let pipes = pipes.insert((stdin, out_write, err_write, stdout, stderr));
+            inherited = [pipes.0.raw(), pipes.1.raw(), pipes.2.raw()];
+            Attributes::handles(&mut inherited)?
+        }
+        Some(console) => Attributes::pseudo_console(console)?,
     };
-    let null_name = wide(OsStr::new("NUL"))?;
-    // SAFETY: NUL is a fixed host device; read-only and explicitly inherited.
-    let stdin = Handle::new(unsafe {
-        CreateFileW(
-            null_name.as_ptr(),
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            &inheritable,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            null_mut(),
-        )
-    })?;
-    let mut inherited = [stdin.raw(), out_write.raw(), err_write.raw()];
-    let mut attributes = Attributes::new(&mut inherited)?;
     let startup = STARTUPINFOEXW {
-        StartupInfo: STARTUPINFOW {
-            cb: size_of::<STARTUPINFOEXW>() as u32,
-            dwFlags: STARTF_USESTDHANDLES,
-            hStdInput: stdin.raw(),
-            hStdOutput: out_write.raw(),
-            hStdError: err_write.raw(),
-            ..Default::default()
+        StartupInfo: match &pipes {
+            Some((stdin, out_write, err_write, _, _)) => STARTUPINFOW {
+                cb: size_of::<STARTUPINFOEXW>() as u32,
+                dwFlags: STARTF_USESTDHANDLES,
+                hStdInput: stdin.raw(),
+                hStdOutput: out_write.raw(),
+                hStdError: err_write.raw(),
+                ..Default::default()
+            },
+            // Null standard handles: with nothing inherited, the child
+            // takes the pseudo console's own input and output, never this
+            // process's (possibly redirected) standard handles.
+            None => STARTUPINFOW {
+                cb: size_of::<STARTUPINFOEXW>() as u32,
+                dwFlags: STARTF_USESTDHANDLES,
+                ..Default::default()
+            },
         },
         lpAttributeList: attributes.pointer(),
     };
@@ -384,6 +461,11 @@ pub(crate) fn spawn_in(
     }
     environment_block.push(0);
     let mut info = PROCESS_INFORMATION::default();
+    // A child on a pseudo console gets that console; one on pipes gets none.
+    let creation = CREATE_SUSPENDED
+        | CREATE_UNICODE_ENVIRONMENT
+        | EXTENDED_STARTUPINFO_PRESENT
+        | if pipes.is_some() { CREATE_NO_WINDOW } else { 0 };
     // SAFETY: all pointers are backed by live arrays; argv is encoded by the
     // Windows C-runtime quoting rules, application name is absolute. Creation is
     // suspended: no tool code runs before identity and job checks below.
@@ -393,11 +475,8 @@ pub(crate) fn spawn_in(
             command_line.as_mut_ptr(),
             null(),
             null(),
-            1,
-            CREATE_SUSPENDED
-                | CREATE_NO_WINDOW
-                | CREATE_UNICODE_ENVIRONMENT
-                | EXTENDED_STARTUPINFO_PRESENT,
+            i32::from(pipes.is_some()),
+            creation,
             environment_block.as_ptr().cast(),
             working_directory.map_or(windows_directory.as_ptr(), <[u16]>::as_ptr),
             &startup.StartupInfo,
@@ -413,9 +492,14 @@ pub(crate) fn spawn_in(
         cleaned: false,
         pid: info.dwProcessId,
         started: 0,
-        stdout: Some(PipeReader(stdout.into_file())),
-        stderr: Some(PipeReader(stderr.into_file())),
+        stdout: None,
+        stderr: None,
     };
+    let mut pipes = pipes.map(|(stdin, out_write, err_write, stdout, stderr)| {
+        child.stdout = Some(PipeReader(stdout.into_file()));
+        child.stderr = Some(PipeReader(stderr.into_file()));
+        (stdin, out_write, err_write)
+    });
     let admitted = (|| {
         // SAFETY: child is suspended and has not had a chance to spawn descendants.
         bool_result(unsafe { AssignProcessToJobObject(child.job.raw(), child.process.raw()) })?;
@@ -447,8 +531,8 @@ pub(crate) fn spawn_in(
         })?;
         return Err(error);
     }
-    drop(out_write);
-    drop(err_write);
+    // The child holds its own copies of the pipe ends it writes.
+    pipes.take();
     Ok(child)
 }
 

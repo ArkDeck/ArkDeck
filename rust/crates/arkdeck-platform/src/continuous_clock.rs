@@ -1,11 +1,14 @@
-//! Darwin continuous elapsed time for overall budgets, not active-work samples.
-//! CLOCK_MONOTONIC advances through system sleep on macOS. Never persist an
-//! instant or compare origins from different process lifetimes.
+//! Continuous elapsed time for overall budgets, not active-work samples.
+//! On macOS CLOCK_MONOTONIC advances through system sleep; on Windows
+//! GetTickCount64 counts the milliseconds since boot, sleep and hibernation
+//! included. Never persist an instant or compare origins from different
+//! process lifetimes.
 use std::{io, time::Duration};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ContinuousInstant(Duration);
 impl ContinuousInstant {
+    #[cfg(target_os = "macos")]
     pub fn now() -> io::Result<Self> {
         let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
         // SAFETY: clock_gettime initializes this writable timespec on success.
@@ -18,6 +21,13 @@ impl ContinuousInstant {
             return Err(io::Error::other("invalid continuous clock reading"));
         }
         Ok(Self(Duration::new(time.tv_sec as u64, time.tv_nsec as u32)))
+    }
+    #[cfg(windows)]
+    pub fn now() -> io::Result<Self> {
+        // SAFETY: no arguments; the call cannot fail.
+        let milliseconds =
+            unsafe { windows_sys::Win32::System::SystemInformation::GetTickCount64() };
+        Ok(Self(Duration::from_millis(milliseconds)))
     }
     pub fn elapsed(self) -> io::Result<Duration> {
         Self::now()?

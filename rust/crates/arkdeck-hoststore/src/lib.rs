@@ -106,9 +106,21 @@ mod analyzer_composition;
 mod arktrace_doctor;
 #[cfg(target_os = "macos")]
 pub use arktrace_doctor::ProductionDoctorProbe;
-#[cfg(target_os = "macos")]
+// The judges of the ArkTrace CLI's answers and the contract they check,
+// which read nothing from the host: the same code decides on Windows, where
+// no reviewed distribution exists yet to answer them (TASK-XPA-021), and the
+// recorded verdicts replay there. The loader, its trust checker and the
+// doctor probe stay macOS-only: the distribution contract they verify is an
+// Apple one (Developer ID, code directory hashes, POSIX modes in the tree
+// digest).
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod arktrace_analysis;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod arktrace_envelope;
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod arktrace_summary;
 #[cfg(target_os = "macos")]
 mod arktrace_trust;
@@ -351,19 +363,25 @@ pub use session_export_manifest::{RedactedSessionManifest, redact_session_manife
 mod session_export_redaction;
 pub use session_export_redaction::SessionExportRedactor;
 
-#[cfg(target_os = "macos")]
+// The Target owners (TASK-XPA-004) on macOS and Windows: the same
+// `targets.json` bytes under the same `.targets.lock` on both. Off macOS
+// only some members of theirs are used; the Job, Import and Rockchip
+// consumers of the rest are composed on macOS only.
+#[cfg(any(target_os = "macos", windows))]
 mod device_lane;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use device_lane::{LaneState, MutationLane};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod target_document;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod target_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use target_owner::{ObservationReference, TargetStore};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod target_observation;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use target_observation::{
     Adopted, Observation, ObservationError, Snapshot, Sources, TargetObservations, adoption_answer,
     parse_reference,
@@ -673,6 +691,13 @@ mod tool_list_owner;
 #[cfg(target_os = "macos")]
 mod tool_retirement;
 
+// Portable: the product and SDK manifest facts, the same format on macOS
+// and Windows (TASK-XPA-011, G15). The registry and its read owner stay
+// macOS-only until the Windows DevEco trust (G12) exists.
+mod deveco_manifest;
+pub use deveco_manifest::{
+    DevEcoLaunchHost, DevEcoManifestError, DevEcoManifestFacts, parse_deveco_manifests,
+};
 #[cfg(target_os = "macos")]
 mod deveco_registry;
 #[cfg(target_os = "macos")]

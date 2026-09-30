@@ -16,6 +16,11 @@ use windows_sys::Win32::Storage::FileSystem::{DELETE, READ_CONTROL, WRITE_DAC};
 #[path = "host_journal.rs"]
 mod journal;
 pub use journal::{HostJournal, HostJournalAppender, JournalAppendError, JournalWritePoint};
+#[path = "host_import_upload.rs"]
+mod import_upload;
+pub use import_upload::{
+    HostImportSource, HostUploadFile, HostUploadReader, UploadChunkCheckpoint, UploadWritePoint,
+};
 
 pub struct HostDirectory(pub(super) File, pub(super) Ownership);
 
@@ -44,7 +49,7 @@ pub struct HostFileIdentity {
 }
 
 impl HostFileIdentity {
-    fn of(stat: &Stat) -> io::Result<Self> {
+    pub(crate) fn of(stat: &Stat) -> io::Result<Self> {
         Ok(Self {
             device: stat.volume,
             inode: stat.inode()?,

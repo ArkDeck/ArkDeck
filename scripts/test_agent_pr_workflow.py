@@ -702,6 +702,9 @@ RUST_NATIVE_JOB_TOKENS = (
     "    runs-on: ${{ matrix.os }}\n",
     "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}\n",
     "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}\n",
+    # Incremental state is never reused across jobs (compact deletes it before
+    # a save), so writing it is pure cost; the value is in the cache key.
+    '      CARGO_INCREMENTAL: "0"\n',
     "run: python rust/scripts/ci-workspace.py key\n",
     "run: python rust/scripts/ci-workspace.py prepare\n",
     "run: python rust/scripts/ci-workspace.py compact\n",
@@ -1549,6 +1552,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             workspace.replace("restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}", "restore-keys: arkdeck-rust-build-"),
             workspace.replace("run: python rust/scripts/ci-workspace.py prepare", "run: true"),
             workspace.replace(" && '2' || '1'", " && '4' || '1'"),
+            workspace.replace('      CARGO_INCREMENTAL: "0"\n', "", 1),
+            workspace.replace('      CARGO_INCREMENTAL: "0"\n', '      CARGO_INCREMENTAL: "1"\n'),
         ):
             self.assertNotEqual(mutated, workspace)
             with self.assertRaises(WorkflowContractError):
