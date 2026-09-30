@@ -22,4 +22,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="ArkDeck.App.Tests" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- The answers the scripted test transport replays (Testing/ScriptedDaemon*.cs). -->
+    <EmbeddedResource Include="Testing\Recorded\*.json" LogicalName="ArkDeck.Recorded.%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

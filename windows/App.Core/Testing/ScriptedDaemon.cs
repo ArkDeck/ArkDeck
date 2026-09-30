@@ -15,7 +15,7 @@ namespace ArkDeck.App.Core.Testing;
 /// so a reply the contract refuses is refused here too. The window shows a banner whenever
 /// it is in use; nothing it answers is presented as Runtime data.
 /// </summary>
-public static class ScriptedDaemon
+public static partial class ScriptedDaemon
 {
     /// <summary>Nothing answers: every connection closes before the health reply.</summary>
     public const string Unavailable = "unavailable";
@@ -113,7 +113,7 @@ public static class ScriptedDaemon
         return new StreamChannel(script.Connect, DaemonConfiguration.CallBudget);
     }
 
-    private sealed class Script(string scenario)
+    private sealed partial class Script(string scenario)
     {
         private readonly object _gate = new();
         private readonly Dictionary<string, (string? Name, long Generation)> _names = new(StringComparer.Ordinal)
@@ -197,11 +197,11 @@ public static class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => method switch
+                _ => Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(Observations)),
-                    "job.list" => Success(request, Parse(JobPage([.. JobsNow().Select(j => JobJson(j, list: true))]))),
+                    "job.list" => Success(request, Parse(JobPage([.. DebugJobRows(), .. JobsNow().Select(j => JobJson(j, list: true))]))),
                     "job.status" => JobStatus(request),
                     "job.events" => JobEvents(request),
                     _ when method.StartsWith("target.", StringComparison.Ordinal) => Target(request, method, [FixtureTargetId]),
@@ -733,8 +733,14 @@ public static class ScriptedDaemon
         ]);
 
         private static JsonObject Receipt(string id, JsonObject metadata, long generation) => (JsonObject)Parse($$"""
-            {"artifactDigest":"{{((JsonString)metadata["sha256"]).Value}}","artifactId":"ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","bindingRevision":"{{((JsonString)metadata["bindingRevision"]).Value}}","byteCount":"{{((JsonString)metadata["byteCount"]).Value}}","generation":"{{generation}}","importId":"{{id}}","importRequestId":"{{((JsonString)metadata["importRequestId"]).Value}}","lease":"lease-v1:{{id}}:ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","mediaType":"{{(((JsonString)metadata["kind"]).Value == "hap" ? "application/vnd.openharmony.hap" : "application/octet-stream")}}","name":"{{((JsonString)metadata["name"]).Value}}","owner":{"id":"{{id}}","kind":"import"},"privacy":"standard","schemaVersion":"arkdeck.import-receipt/1","targetId":"{{((JsonString)metadata["targetId"]).Value}}","validation":{"kind":"{{((JsonString)metadata["kind"]).Value}}"
+            {"artifactDigest":"{{((JsonString)metadata["sha256"]).Value}}","artifactId":"ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","bindingRevision":"{{((JsonString)metadata["bindingRevision"]).Value}}","byteCount":"{{((JsonString)metadata["byteCount"]).Value}}","generation":"{{generation}}","importId":"{{id}}","importRequestId":"{{((JsonString)metadata["importRequestId"]).Value}}","lease":"lease-v1:{{id}}:ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","mediaType":"{{(((JsonString)metadata["kind"]).Value == "hap" ? "application/vnd.openharmony.hap" : "application/octet-stream")}}","name":"{{((JsonString)metadata["name"]).Value}}","owner":{"id":"{{id}}","kind":"import"},"privacy":"standard","schemaVersion":"arkdeck.import-receipt/1","targetId":"{{((JsonString)metadata["targetId"]).Value}}","validation":{"kind":"{{((JsonString)metadata["kind"]).Value}}"{{NativeFacts(metadata)}}
             """ + "}}");
+
+        /// <summary>A native library's ELF facts as the Runtime's Import validation reports them
+        /// (the deploy-native-library oracle's library: arm64-v8a, ELF64, machine 183).</summary>
+        private static string NativeFacts(JsonObject metadata) => ((JsonString)metadata["kind"]).Value == "native-library"
+            ? ",\"abi\":\"arm64-v8a\",\"buildId\":\"00112233445566778899aabbccddeeff10213243\",\"elfClassBits\":64,\"machine\":183"
+            : "";
 
         private JsonObject Get(string id) => _imports[id];
 

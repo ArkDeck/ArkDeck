@@ -41,6 +41,11 @@ public sealed class AccessibilityTests
         ["sessions", "targets", new[] { "sessions.row.session-job-0f77f8c52864d676372962eccb17389c" }],
         ["agents", "jobs", new[] { "agents.humanAction.<har-3>" }],
         ["imports", "jobs", new[] { "imports.row.imp-dcb7943f-d934-43da-b290-65d0066cae35" }],
+        ["debug", "jobs", Array.Empty<string>()],
+        ["debug", "jobs", new[] { "debug.tab.logs" }],
+        ["debug", "jobs", new[] { "debug.tab.apps" }],
+        ["debug", "jobs", new[] { "debug.tab.network" }],
+        ["debug", "jobs", new[] { "debug.tab.commands" }],
         ["overview", "jobs", new[] { "jobInspector.row.job-0000000000000000000000000000a004" }],
     ];
 
@@ -107,6 +112,7 @@ public sealed class AccessibilityTests
             ["sessions"] = ("N", 0),
             ["agents"] = ("A", 0),
             ["imports"] = ("I", 0),
+            ["debug"] = ("B", 0),
             ["history"] = ("H", 0),
             ["device"] = ("D", 0),
             ["settings"] = ("S", 0),
@@ -205,6 +211,11 @@ public sealed class AccessibilityTests
             app.Find("imports.release.confirm");
             EscapeCloses(app, "imports.release.confirm", "Escape closes the release confirmation");
             Assert.AreEqual("", AppSession.Name(app.Find("imports.status")), "nothing was released");
+            app.Navigate("debug");
+            app.Select("debug.artifacts.source.remote");
+            app.Invoke("debug.artifacts.browseRemote");
+            app.Find("debug.artifacts.remoteBrowser");
+            EscapeCloses(app, "debug.artifacts.remoteBrowser", "Escape closes the remote build browser");
         }
         using (var app = AppSession.Launch(exe, ["--test-transport", "jobs", "--language", "en-US", "--page", "history"]))
         {
@@ -242,6 +253,12 @@ public sealed class AccessibilityTests
         ["agents", "foundation", Array.Empty<string>()],
         ["imports", "jobs", new[] { "imports.row.imp-dcb7943f-d934-43da-b290-65d0066cae35" }],
         ["imports", "foundation", Array.Empty<string>()],
+        ["debug", "jobs", Array.Empty<string>()],
+        ["debug", "jobs", new[] { "debug.tab.logs" }],
+        ["debug", "jobs", new[] { "debug.tab.apps" }],
+        ["debug", "jobs", new[] { "debug.tab.network" }],
+        ["debug", "jobs", new[] { "debug.tab.commands" }],
+        ["debug", "foundation", Array.Empty<string>()],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a002" }],
     ];
 

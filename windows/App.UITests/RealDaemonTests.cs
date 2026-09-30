@@ -460,6 +460,66 @@ public sealed class RealDaemonTests
     }
 
     /// <summary>
+    /// The Debug page against the real Runtime over a development root holding the recorded
+    /// adopted Target. No Windows HDC tuple is registered, so the Runtime refuses every Debug
+    /// operation before admission and has no Debug probe; the page shows exactly that — each
+    /// tab's availability with the Runtime's reason, the probe's refusal where the inventory and
+    /// rules would be — and sends nothing an unavailable operation would refuse. A typed request
+    /// sent over the pipe is refused the same way (<c>provider hdc is not registered</c>).
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void TheDebugPageShowsTheRuntimesRefusalWithoutHdc()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-debug-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            (process, _) = StartRootDaemon(signed, root);
+            process.Kill();
+            process.WaitForExit();
+            process.Dispose();
+            CopyTree(RepoPaths.At("rust", "tests", "fixtures", "agent-human-action", "targets-state"), Path.Combine(root, "targets-state"));
+            (process, var endpoint) = StartRootDaemon(signed, root);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "debug"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            Assert.AreEqual(strings.Format("debug.target.binding", ["1", "3.2.0d"]), app.WaitForName("debug.target.binding", n => n.Length > 0));
+            Assert.AreEqual(strings["debug.availability.unavailable"], app.WaitForName("debug.availability.status", n => n.Length > 0));
+            Assert.AreEqual("provider hdc is not registered", app.WaitForName("debug.availability.reason.0", n => n.Length > 0));
+
+            app.Select("debug.tab.logs");
+            app.Invoke("debug.logs.start");
+            Assert.AreEqual(strings["windows.debug.operationUnavailable"], app.WaitForName("debug.logs.status", n => n.Length > 0), "nothing is sent");
+            app.Select("debug.tab.apps");
+            var probe = app.WaitForName("debug.apps.inventory.empty.detail", n => n.StartsWith("unavailable(", StringComparison.Ordinal));
+            TestContext.WriteLine("probe: " + probe);
+            Assert.AreEqual(strings.Format("windows.unavailable.reason", ["internalError", "Debug Runtime probing is not configured"]), probe);
+            Assert.AreEqual(strings["debug.jobs.empty"], AppSession.Name(app.Find("debug.apps.jobs.empty")));
+
+            var refused = Frame(endpoint, "job.submit", $$"""{"requestJson":{{JsonSerializer.Serialize(
+                """{"documentType":"runtime-operation-request","idempotencyKey":"debug-logs-ui-uitest","inputs":{"durationSeconds":5},"operation":{"id":"capture.diagnostics","version":1},"requestId":"debug-logs-ui-uitest","requestedOutputs":["derivedArtifacts"],"schemaVersion":"1.0.0","target":{"expectedBindingRevision":1,"targetId":"TGT-3ba3f5f43b92"}}""")}}}""", expectOk: false);
+            Assert.AreEqual("provider hdc is not registered", refused.GetProperty("error").GetProperty("message").GetString());
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            Stop(process, directory);
+        }
+    }
+
+    /// <summary>
     /// The Imports page against the real Runtime's Import owner (TASK-XPA-008), over a
     /// development root holding the recorded adopted Target: the recorded HAP chosen in the
     /// system file dialog is uploaded in verified chunks and published, then released; a flash

@@ -8,7 +8,13 @@ using ArkDeck.ClientKit.Json;
 namespace ArkDeck.App.Core.Presentation;
 
 /// <summary>The receipt of a committed Import: the Artifact the Runtime published.</summary>
-public sealed record ImportReceipt(string ArtifactId, string ArtifactDigest, string MediaType, string Privacy, string ValidationKind);
+public sealed record ImportReceipt(string ArtifactId, string ArtifactDigest, string MediaType, string Privacy, string ValidationKind,
+    string? Lease = null, JsonObject? Validation = null)
+{
+    /// <summary>A validation fact of the published bytes (a native library's <c>abi</c>,
+    /// <c>elfClassBits</c>, <c>machine</c>, <c>buildId</c>), as the Runtime read them.</summary>
+    public JsonValue? Fact(string key) => Validation is { } v && v.TryGetValue(key, out var value) ? value : null;
+}
 
 /// <summary>One Import (<c>artifact.import.begin|append|commit|abort|list|inspect</c>): its
 /// intent, generation, state, the bytes received so far and, once committed, its receipt.</summary>
@@ -45,7 +51,9 @@ public sealed record ImportRecord(
                 TypedJson.Required(ro, "artifactDigest", TypedJson.String),
                 TypedJson.Required(ro, "mediaType", TypedJson.String),
                 TypedJson.Required(ro, "privacy", TypedJson.String),
-                TypedJson.Required(TypedJson.Required(ro, "validation", v => Json.Object(v, "validation")), "kind", TypedJson.String));
+                TypedJson.Required(TypedJson.Required(ro, "validation", v => Json.Object(v, "validation")), "kind", TypedJson.String),
+                Json.OptionalString(ro, "lease"),
+                TypedJson.Required(ro, "validation", v => Json.Object(v, "validation")));
         }
         long Number(JsonObject from, string key) => long.Parse(TypedJson.Required(from, key, TypedJson.String), System.Globalization.CultureInfo.InvariantCulture);
         return new(

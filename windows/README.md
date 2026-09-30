@@ -127,9 +127,19 @@ first, `ControlResult` back.
   aborts the partial Import; it lists and inspects the Imports (`artifact.import.list|inspect`)
   and releases a committed one after a confirmation (`artifact.import.release`). A flash bundle
   is refused by the Runtime at publication until its validator exists (AF-W1).
+- **Debug (TASK-XPA-020).** The macOS Debug workspace: the Target the page submits against and
+  five tabs — Artifacts (an app-owned native library imported, planned with `job.plan`, reviewed
+  in the plan sheet, then submitted exactly as reviewed), Logs (a bounded HiLog capture and its
+  shards, with export), Apps (one HAP lifecycle, its packages imported for their leases), Network
+  (typed port rules, and the active ones `debug.probe` reads) and Commands (four read-only
+  templates) — each with its operation's availability (`operation.list|describe`) and recent
+  Jobs. Every action is one closed typed Runtime Job (`RuntimeRequest`: fixed operation, typed
+  inputs, the Target and binding revision read, the workspace's client name) submitted with
+  `job.submit`, run with `job.run` and read back with `job.show`; an action that cannot run says
+  why instead of being disabled.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
-  have access keys (Alt+O, D, H, N, A, I, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  have access keys (Alt+O, D, H, N, A, I, B, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
   empty Tab stop.
 
