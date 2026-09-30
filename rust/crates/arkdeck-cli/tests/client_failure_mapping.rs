@@ -476,6 +476,48 @@ fn an_unproven_refusal_of_a_mutation_is_an_unknown_outcome_unless_the_spec_fixes
     assert!(checked > 50 * 36 * 18, "{checked}");
 }
 
+/// A Trace cache purge the Runtime refuses before admission because its Job
+/// and Artifact retention owners are not composed (maintainer ruling 18's
+/// shape, `TraceCacheStore::purge_unavailable`): the published contract
+/// admits the answer, and the CLI reports the refusal (`operationUnavailable`,
+/// exit 69), not an unknown outcome. The `rejected` it answered before, with
+/// no proof, is read as an unknown outcome.
+#[test]
+fn a_trace_cache_purge_refused_before_admission_is_a_refusal() {
+    let details = json!({"phase": "preAdmission", "newDispatchCount": 0,
+        "purgeScope": "inactiveDerivedDatabases"});
+    arkdeck_contract::validate_method_value(
+        "trace.cache.purge",
+        "errorCode",
+        &json!("operationUnavailable"),
+    )
+    .unwrap();
+    arkdeck_contract::validate_method_value("trace.cache.purge", "errorDetails", &details).unwrap();
+    let error = CliError::from_client(
+        refused(
+            "operationUnavailable",
+            "Trace cache purge needs the Job and Artifact retention owners; nothing was purged",
+            Some(details.as_object().unwrap().clone()),
+        ),
+        "trace.cache.purge",
+    );
+    assert_eq!(error.code, "operationUnavailable");
+    assert_eq!(error.exit_code(), 69);
+    assert_eq!(
+        Value::Object(error.details.clone()),
+        refusal_details(
+            "trace.cache.purge",
+            "operationUnavailable",
+            details.as_object()
+        )
+    );
+    let before = CliError::from_client(
+        refused("rejected", "Trace cache owner is not configured", None),
+        "trace.cache.purge",
+    );
+    assert_eq!(before.code, "outcomeUnknown");
+}
+
 /// Before any byte of the request left, nothing was accepted, whatever the
 /// method: every published method is `runtimeUnavailable` and retryable when
 /// the connection never opened (Swift's `connectFailed`).

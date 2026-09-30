@@ -398,4 +398,49 @@ mod cancellation_tests {
             Some(RunClaim::Held(held)) if Arc::ptr_eq(&held, &slot)
         ));
     }
+
+    /// A Trace cache purge without the Job and Artifact retention owners is
+    /// refused before admission with zero dispatch (maintainer ruling 18's
+    /// shape): the published contract admits the answer, and nothing in the
+    /// cache is read, quarantined or removed.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_trace_cache_purge_without_its_retention_owners_is_refused_before_admission() {
+        use arkdeck_contract::{Request, decode_response, encode_frame};
+        use std::{fs, os::unix::fs::DirBuilderExt};
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("trace-purge-preadmission-{}", fresh_id().unwrap()));
+        let traces = root.join("traces");
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .recursive(true)
+            .create(traces.join(".locks"))
+            .unwrap();
+        let control = arkdeck_control::Control::new(
+            Host::from_environment()
+                .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&traces).unwrap()),
+        )
+        .unwrap();
+        let request = Request::new("purge-1", "trace.cache.purge", None);
+        let frame = encode_frame(&request, arkdeck_contract::MAX_REQUEST_BYTES).unwrap();
+        let bytes = control.handle_frame(frame.trim_ascii_end());
+        let error = decode_response(bytes.trim_ascii_end(), "purge-1", "trace.cache.purge")
+            .unwrap()
+            .outcome
+            .unwrap_err();
+        assert_eq!(
+            error,
+            arkdeck_hoststore::TraceCacheStore::purge_unavailable()
+        );
+        assert_eq!(error.code, "operationUnavailable");
+        assert_eq!(
+            serde_json::Value::Object(error.details.unwrap()),
+            serde_json::json!({"phase": "preAdmission", "newDispatchCount": 0,
+                "purgeScope": "inactiveDerivedDatabases"})
+        );
+        assert!(traces.join(".locks").is_dir());
+        fs::remove_dir_all(root).unwrap();
+    }
 }

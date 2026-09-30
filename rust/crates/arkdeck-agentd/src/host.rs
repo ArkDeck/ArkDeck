@@ -2338,8 +2338,12 @@ impl HostServices for Host {
             details: None,
         };
         let cache = self.trace_cache.as_ref().ok_or_else(unconfigured)?;
-        let jobs = self.jobs.as_ref().ok_or_else(unconfigured)?;
-        let artifacts = self.artifacts.as_ref().ok_or_else(unconfigured)?;
+        // Without the retention owners nothing proves the entries inactive:
+        // refused before admission, so a client reads a refusal rather than
+        // an unknown outcome.
+        let unavailable = arkdeck_hoststore::TraceCacheStore::purge_unavailable;
+        let jobs = self.jobs.as_ref().ok_or_else(unavailable)?;
+        let artifacts = self.artifacts.as_ref().ok_or_else(unavailable)?;
         let refuse = || {
             arkdeck_hoststore::TraceCacheStore::purge_refusal(
                 "Trace cache or authoritative Job/Artifact retention owner is unavailable",
