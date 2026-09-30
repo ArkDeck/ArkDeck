@@ -86,8 +86,8 @@
 ### B.2 裁决与假设
 
 - **冲突裁决**：#9 架构文档 header 的 CORE-2.0.0 视为历史记录，行文以 `config.yaml` 的 CORE-3.0.0 为准；#19 以代码为准，entitlements 注释视为文档漂移；#21 以工程文件（macOS 26）为当前事实，Profile 的「macOS 14」为历史，需维护者对齐（§L）；#29 的五代属于此次历史扫描事实；r6 由 SVC-002 先收敛为唯一当前 v1，XPA 只消费其结果（§F）。
-- **假设 A1**：Windows 首发支持格为 Windows 11 x64 + ARM64（Prism x64 仿真只在 Win11，且 Rust `aarch64-pc-windows-msvc` 已 Tier 1）。
-- **假设 A2**：验证硬件沿用 DAYU200 `TGT-958780b2ffb7`（binding r4，固件 7.0.0.37）；新增一台 Windows 11 x64 主机与一台 ARM64 主机是新的硬件前置。
+- **假设 A1**：Windows 首发支持格为 Windows 11 x64 + ARM64（Prism x64 仿真只在 Win11，且 Rust `aarch64-pc-windows-msvc` 已 Tier 1）。（r13：首发只支持 Windows 11 x64；ARM64 延后，见 §L.1 第 9 条。）
+- **假设 A2**：验证硬件沿用 DAYU200 `TGT-958780b2ffb7`（binding r4，固件 7.0.0.37）；新增一台 Windows 11 x64 主机与一台 ARM64 主机是新的硬件前置。（r13：只需 Windows 11 x64 主机。）
 - **假设 A3**：ArkDeck Rust workspace 不继承 ArkForge 的零依赖政策，改为经审查的依赖白名单（`cargo deny`/`cargo vet`），但所有安全相关编码（JCS、CBOR、SHA-256）保留自有实现并以向量钉死。需维护者确认（§L）。
 - **假设 A4**：GJ 四态是「按 digest」记录的；Rust runtime 切换后同一 digest 上必须重新取得 `REAL_DEVICE_PASS`（类比 POL-PLATFORM-002 的 needsReverification）。这是本文引入的规则，需维护者确认（§L）。
 
@@ -814,7 +814,7 @@ flowchart TD
 | SPK-1 | macOS 基线（§I.3） | 13 项指标三次 run 稳定 | 波动 > 30% | 预算定稿（`artifact.open` 零拷贝与 FFI 取舍未解除，见 §I.3） | 本机 |
 | SPK-2 | Rust 进程经 libxpc C API 作为 launchd Mach service `com.arkdeck.agentd` 被沙箱 App 访问；peer code-signing requirement 生效；帧回显 | 现有 entitlements 不变即可连通；非法签名 peer 被拒；1,000 次往返 p95 ≤ 8 ms | 需要新增 entitlement 或 NSXPC 专有语义无法复刻 | XPA-003 可行性；XPC 传输设计 | 本机、Developer ID 签名。**结果（2026-09-05）：通过**——沙箱客户端以现有 entitlements 连通，1,000 次往返 p95 0.013 ms，错签 peer 被拒；记录见 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-003/spk-2-run.md` |
 | SPK-3 | Windows W0（`windows/profile.md:71-81`）+ Rust daemon named pipe + `hdc.exe list targets -v` 解析真机 | 跨账户连接被拒（Win32 error 5）；packaged App 与 unpackaged CLI 都能连 pipe；MotW/SmartScreen 行为记录；DAYU200 在 hdc.exe 可见；Golden fixture 解析一致 | 驱动需要静默提权或 pipe 从 packaged App 不可达 | Windows 最低支持格、打包形态、驱动引导文案 | Windows 11 x64 主机 + DAYU200 |
-| SPK-4 | WinUI 3 门（§H.4 淘汰条件 a–e） | 全部通过 | 任一失败且两周内不可修 | WinUI vs WPF | Windows 主机（x64 + ARM64） |
+| SPK-4 | WinUI 3 门（§H.4 淘汰条件 a–e） | 全部通过 | 任一失败且两周内不可修 | WinUI vs WPF | Windows 主机（x64；r13：ARM64 延后） |
 | SPK-5 | NTFS 上 `FlushFileBuffers`/`MoveFileExW` 写穿原子性、`LockFileEx` 语义、断电/kill 撕裂尾部 | 撕裂尾部穷举通过；append p95 记录 | 原子替换不可证明 | Windows journal/record 写入设计 | Windows 主机 |
 | SPK-6 | Rust HDC 进程执行器：PTY 一次性口令交换（`IdentityBoundPTYExecutor`）、带退出码框架的持久 `hdc shell` 通道（`PersistentDeviceShellChannel`）、libproc supervisor 观测（server identity/generation）、`/.vol/<dev>/<ino>` 启动 | 37 个 Golden/Probe fixture 全回放；fake HDC 子进程见到含 `-t <connectKey>` 的真实 argv；接板时 `hdc list targets -v` + 一次 shell 往返 | 某原语离开 Swift 不可复刻 | XPA-016；M1（r11） | 本机，接板可选 |
 | SPK-7 | `observe.device@1` 在隔离 Rust daemon 上对 `ArkDeckFakeHDCFixture` 端到端：runbook §2 全部命令（不含 §2.1） | journal/record/receipt/index T0 相等；`job result/evidence`、`artifact list` T1 相等 | 引擎设备路径需要 executor sidecar | XPA-014 M1；验证 r11 切法（r11） | 本机 |
@@ -1051,7 +1051,7 @@ flowchart TD
 
 #### TASK-XPA-022 — Windows packaging, signing, update channel and clean-host smoke
 - 依赖：XPA-007、XPA-010/011。
-- AC：MSIX packaged + self-contained Windows App SDK，Azure Artifact Signing + 时间戳，`.appinstaller` 更新源，ARM64 与 x64 包，干净 Windows 11 主机 TRUST 矩阵（DevEco/SDK hdc、MotW、Defender/SmartScreen、驱动权限）全部记录；卸载干净。
+- AC：MSIX packaged + self-contained Windows App SDK，Azure Artifact Signing + 时间戳，`.appinstaller` 更新源，x64 包（r13：ARM64 包延后），干净 Windows 11 主机 TRUST 矩阵（DevEco/SDK hdc、MotW、Defender/SmartScreen、驱动权限）全部记录；卸载干净。
 - 工程落实：§H.5 的开发运行/开发证书与生产发行分开；记录 .NET 和 Windows App SDK 各自部署模式，以同一修订生成的签名包验证安装、IPC、升级、卸载；Store 为可选渠道。
 - 规模：M。
 
@@ -1110,7 +1110,7 @@ flowchart TD
 | Gate | 判据 | 载体 |
 |---|---|---|
 | G1 架构批准 | `CHG-2026-074` approved；`core-portability.md` 决策更新；三 Profile `Core strategy` 更新 | 维护者 PR review |
-| G2 Windows GJ | GJ-1～5 在当前 digest 上 headless `REAL_DEVICE_PASS`（Windows 11 x64 与 ARM64 各一次） | `gj-headless-rerun-<date>-windows.json` |
+| G2 Windows GJ | GJ-1～5 在当前 digest 上 headless `REAL_DEVICE_PASS`（Windows 11 x64；r13：ARM64 延后，支持格加入 ARM64 时再各跑一次） | `gj-headless-rerun-<date>-windows.json` |
 | G3 机器契约 | `cli-feature-coverage.json` 对 windows `fullFunction: true`，无 `blocked/partial/notImplemented`；`deferred` 仅限维护者接受的 platformService 条目 | `CLIMachineContractTests` 双平台 |
 | G4 Core conformance | CORE-CONFORMANCE 当前套件 121 条 AC 在 Windows 通过；`openspec/platforms/windows/conformance-cases.yaml` 与 `verification.md` 建立并全绿 | 平台 lock `verified` 仅限实证 tuple |
 | G5 macOS 不退化 | macOS GJ-1～5 在纯 Rust daemon 上 PASS；`needsReverification` 解除 | 同上 |
@@ -1159,12 +1159,12 @@ flowchart TD
 6. **App XPC 传输换代**：从 `NSXPCConnection` 改为 `xpc_connection` C API（NSXPC 与 Rust 侧线协议不兼容）；确认 entitlements 保持六项 + 一项 mach-lookup 例外不扩集。（SPK-2 已实测：现有 entitlements 不变即可连通；换代时应改为长连接并由 App 钉住 daemon 身份。）
 7. **Swift CLI 退役时点**：双 CLI 期长度与 `--socket` 等 macOS compatibility leaf 的 tombstone 时机（CLI 规格 §12）。（r11 提议并随合入 attestation：随 M5 一起退役，双 CLI 期到 cutover 为止，兼容 leaf 按 §12 tombstone。）
 8. **最低 macOS 冲突**：Profile/ADR-0002 的 macOS 14 与工程的 macOS 26；Rust daemon 可支持更低版本，但 App 已是 26。需对齐 Profile 或接受 26。
-9. **Windows 支持格**：Windows 11 x64 + ARM64（假设 A1）；是否排除 Windows 10 1809+（WinUI 3 支持但 x64 仿真无）。（r12 提议并随合入 attestation：支持 Windows 11 x64 与 ARM64，不支持 Windows 10。）
+9. **Windows 支持格**：Windows 11 x64 + ARM64（假设 A1）；是否排除 Windows 10 1809+（WinUI 3 支持但 x64 仿真无）。（r12 提议并随合入 attestation：支持 Windows 11 x64 与 ARM64，不支持 Windows 10。）**r13 改为（维护者 2026-09-30 裁定，本 revision 合入即为 attestation）：首发只支持 Windows 11 x64；ARM64 延后，不作支持声明；Windows 10 与 32 位 x86 不支持（Windows 11 无 32 位版本）。** ARM64 之后要加入支持格，须另立 revision，届时补跑 G2 与 SPK-4 (d) 的 ARM64 行。
 10. **Windows 打包**：MSIX packaged + self-contained Windows App SDK + Azure Artifact Signing + App Installer 更新（本文推荐）vs unpackaged 自研安装器。（r12 提议并随合入 attestation：App 用 MSIX packaged + self-contained Windows App SDK，Azure Artifact Signing 签名并加时间戳，App Installer 更新；daemon 与 CLI 另提供 xcopy 形态，供 CI 与 headless 使用。）
 11. **Windows daemon 生命周期**：客户端自启动 + 单实例（推荐）vs 登录计划任务 vs 两者。（r12 提议并随合入 attestation：由客户端自启动，daemon 单实例。）
 12. **FFI kernel 是否立项**（XPA-024）：仅当 §I 测量证明需要。
 13. **ADR-0009 悬案（已裁，维护者 lvye 2026-09-19）**：决策 2/4 今日承载点仍未裁决（`0009:3-14`），Rust 移植 recovery 前必须定案，否则 Rust 会固化一个未裁决语义。（r11：决策包 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/adr-0009-decision-package-20260914.md` 逐行点名承载代码并提议原样移植；本条仍待维护者裁决，r11 合入不构成裁决。）**裁决（2026-09-19）**：按决策包点名的承载代码原样移植。决策 2 与 4 继续约束当前 runtime，承载点即决策包 §1、§2 的表；Rust 原样移植这些承载点（durable 格式 T0，迁移与拒绝 T1），不新增 recovery 语义，四个已删符号保持缺席。裁决记录见决策包末尾 Ruling 节与 ADR-0009 头注；移植由 TASK-XPA-014 按该节的顺序逐刀进行。
-14. **硬件与主机**：新增 Windows 11 x64 与 ARM64 验证主机；DAYU200 窗口与 HardwareCampaign 授权（GJ-4）。（r11 提议并随合入 attestation：SPK-7 在 fake HDC 上通过后每天固定 1 小时接板窗口；GJ-4 仍逐次 go。）
+14. **硬件与主机**：新增 Windows 11 x64 与 ARM64 验证主机（r13：只需 x64）；DAYU200 窗口与 HardwareCampaign 授权（GJ-4）。（r11 提议并随合入 attestation：SPK-7 在 fake HDC 上通过后每天固定 1 小时接板窗口；GJ-4 仍逐次 go。）
 15. **idle RSS 上限**（r2 新增，当前证据见 §I.2 注 2）：冷 idle 独立采样与两电平已交付；启动 plateau 73.71 MB、steady 21.53 MB 对拟定 64 MiB 得出不同结果。仍需决定上限约束哪个阶段、是否分别预算，并复测当前单 v1 二进制；本次不提高上限或宣布稳态预算已批准。
 16. **分页投影预算**（r2 新增，当前证据见 §I.2 注 1）：行数已机械记录为 30，尚需多规模测量来分离固定开销与每行成本。当前记录推导的 `≤ 19.5 ms p95` 仅作该规模回归参考，不作发布门。
 17. **同用户信任边界（r5 新增，见 §F.2）**：确认「同用户、同完整性级别的任意代码在信任边界之外；本产品签名的 daemon 二进制按构造可信」这一表述，与 ADR-0005 决策 1 的 MVP 立场一致；若维护者要求把同用户任意代码也纳入边界，Windows 需要 protected-process 级别的方案而 macOS UDS 没有对应物，本文不推荐。
