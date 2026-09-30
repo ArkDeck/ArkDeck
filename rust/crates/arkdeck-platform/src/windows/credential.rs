@@ -33,6 +33,11 @@
 //!   so `outside_data_protection` answers "absent" and "nothing removed"
 //!   without an OS call; `set` and `read` refuse it as on macOS.
 //!
+//! `set` succeeds only when the credential reads back with the value, account
+//! and persistence written; otherwise it refuses ("Credential Manager did not
+//! keep the written credential"), so a session that does not keep credentials
+//! is reported, not silently lost.
+//!
 //! Every error carries the Win32 error code or a fixed refusal, never a value.
 //! An absent credential is `Status(ERROR_NOT_FOUND)` on `read`,
 //! [`KeychainPresence::Absent`] on `presence` and `Ok(false)` on `remove`, as
@@ -170,11 +175,11 @@ impl KeychainItems {
         if value.is_empty() || value.len() > MAX_VALUE_BYTES {
             return Err(KeychainError::Refused("value is empty or unbounded"));
         }
-        let mut target = wide(&target);
+        let mut target_wide = wide(&target);
         let mut user = wide(account);
         let credential = CREDENTIALW {
             Type: CRED_TYPE_GENERIC,
-            TargetName: target.as_mut_ptr(),
+            TargetName: target_wide.as_mut_ptr(),
             CredentialBlobSize: value.len() as u32,
             // CredWriteW only reads the blob; it copies and encrypts it.
             CredentialBlob: value.as_ptr().cast_mut(),
@@ -186,6 +191,18 @@ impl KeychainItems {
         // the call; no flags.
         if unsafe { CredWriteW(&credential, 0) } == 0 {
             return Err(last_status());
+        }
+        // A write is reported only once it reads back as written, so that a
+        // session whose Credential Manager did not keep it, or a writer that
+        // replaced it at once, is a typed refusal and never a silent loss.
+        let lost = KeychainError::Refused("Credential Manager did not keep the written credential");
+        let written = ReadCredential::read(&target).map_err(|error| match error {
+            KeychainError::Status(CREDENTIAL_NOT_FOUND) => lost,
+            error => error,
+        })?;
+        written.check(account)?;
+        if written.blob() != value {
+            return Err(lost);
         }
         Ok(())
     }

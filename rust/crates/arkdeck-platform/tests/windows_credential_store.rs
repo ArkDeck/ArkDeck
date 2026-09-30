@@ -235,15 +235,87 @@ fn neither_the_value_nor_its_errors_print_the_secret() {
     );
 }
 
+/// Writes `value` at `account`'s fixture target with any user name and
+/// persistence, as another program could; the Win32 error on failure.
+fn write_raw(
+    items: &KeychainItems,
+    account: &str,
+    user: &str,
+    persist: u32,
+    value: &[u8],
+) -> Result<(), u32> {
+    let mut target: Vec<u16> = items
+        .target_name(account)
+        .unwrap()
+        .unwrap()
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+    let mut user: Vec<u16> = user.encode_utf16().chain(Some(0)).collect();
+    let credential = CREDENTIALW {
+        Type: CRED_TYPE_GENERIC,
+        TargetName: target.as_mut_ptr(),
+        CredentialBlobSize: value.len() as u32,
+        CredentialBlob: value.as_ptr().cast_mut(),
+        Persist: persist,
+        UserName: user.as_mut_ptr(),
+        ..CREDENTIALW::default()
+    };
+    // SAFETY: every buffer is live for the call.
+    if unsafe { CredWriteW(&credential, 0) } == 0 {
+        // SAFETY: reads this thread's last-error value.
+        return Err(unsafe { windows_sys::Win32::Foundation::GetLastError() });
+    }
+    Ok(())
+}
+
+/// How the churning threads write their own credentials.
+#[derive(Clone, Copy, Debug)]
+enum Churn {
+    /// `KeychainItems::set` with a short value.
+    Short,
+    /// `KeychainItems::set` with the largest value Credential Manager keeps.
+    Largest,
+    /// Another user name, `CRED_PERSIST_LOCAL_MACHINE`.
+    ForeignUser,
+    /// `CRED_PERSIST_SESSION`.
+    Session,
+}
+
 /// Churns `rounds` credentials of its own next to one kept credential and
 /// counts how often the kept one was no longer present.
-fn churn(items: &KeychainItems, keep: &str, prefix: &str, rounds: usize) -> (usize, Vec<String>) {
+fn churn(
+    items: &KeychainItems,
+    keep: &str,
+    prefix: &str,
+    rounds: usize,
+    kind: Churn,
+) -> (usize, Vec<String>) {
     let mut lost = 0;
     let mut errors = Vec::new();
+    let largest = vec![0xA5; BLOB_LIMIT];
     for round in 0..rounds {
         let account = format!("{prefix}-{round}");
-        if let Err(error) = items.set(&account, b"churn") {
-            errors.push(format!("set {error:?}"));
+        let written = match kind {
+            Churn::Short => items
+                .set(&account, b"churn")
+                .map_err(|error| format!("{error:?}")),
+            Churn::Largest => items
+                .set(&account, &largest)
+                .map_err(|error| format!("{error:?}")),
+            Churn::ForeignUser => write_raw(
+                items,
+                &account,
+                "someone-else",
+                CRED_PERSIST_LOCAL_MACHINE,
+                b"churn",
+            )
+            .map_err(|error| format!("{error}")),
+            Churn::Session => write_raw(items, &account, &account, CRED_PERSIST_SESSION, b"churn")
+                .map_err(|error| format!("{error}")),
+        };
+        if let Err(error) = written {
+            errors.push(format!("set {error}"));
         }
         if let Err(error) = items.remove(&account) {
             errors.push(format!("remove {error:?}"));
@@ -258,10 +330,18 @@ fn churn(items: &KeychainItems, keep: &str, prefix: &str, rounds: usize) -> (usi
     (lost, errors)
 }
 
+/// Eight threads each keep one credential while churning their own; every
+/// way of writing is measured on its own, then all of them at once.
 #[test]
 fn concurrent_writers_keep_each_others_credentials() {
     const THREADS: usize = 8;
-    const ROUNDS: usize = 50;
+    const ROUNDS: usize = 40;
+    const KINDS: [Churn; 4] = [
+        Churn::Short,
+        Churn::Largest,
+        Churn::ForeignUser,
+        Churn::Session,
+    ];
     let mut fixture = Fixture::new();
     for thread in 0..THREADS {
         fixture.register(&format!("kept-{thread}"));
@@ -270,32 +350,44 @@ fn concurrent_writers_keep_each_others_credentials() {
         }
     }
     let items = &fixture.items;
-    items.set("kept-0", b"kept").unwrap();
-    let sequential = churn(items, "kept-0", "churn-0", ROUNDS);
-    let concurrent: Vec<(usize, Vec<String>)> = std::thread::scope(|scope| {
-        let handles: Vec<_> = (0..THREADS)
-            .map(|thread| {
-                scope.spawn(move || {
-                    let keep = format!("kept-{thread}");
-                    items.set(&keep, b"kept").unwrap();
-                    churn(items, &keep, &format!("churn-{thread}"), ROUNDS)
+    let mut report = Vec::new();
+    let mut total = 0;
+    let phases: Vec<(String, Vec<Churn>)> = KINDS
+        .iter()
+        .map(|kind| (format!("{kind:?}"), vec![*kind; THREADS]))
+        .chain(Some((
+            "mixed".to_owned(),
+            (0..THREADS)
+                .map(|thread| KINDS[thread % KINDS.len()])
+                .collect(),
+        )))
+        .collect();
+    for (phase, kinds) in phases {
+        let results: Vec<(usize, Vec<String>)> = std::thread::scope(|scope| {
+            let handles: Vec<_> = kinds
+                .iter()
+                .enumerate()
+                .map(|(thread, kind)| {
+                    let kind = *kind;
+                    scope.spawn(move || {
+                        let keep = format!("kept-{thread}");
+                        items.set(&keep, b"kept").unwrap();
+                        churn(items, &keep, &format!("churn-{thread}"), ROUNDS, kind)
+                    })
                 })
-            })
-            .collect();
-        handles
-            .into_iter()
-            .map(|handle| handle.join().unwrap())
-            .collect()
-    });
-    let lost: usize = concurrent.iter().map(|(lost, _)| lost).sum();
-    assert!(
-        sequential.0 == 0 && lost == 0,
-        "credentials lost: sequential {} {:?}; concurrent {lost} {:?}",
-        sequential.0,
-        sequential.1,
-        concurrent
+                .collect();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap())
+                .collect()
+        });
+        let lost: usize = results.iter().map(|(lost, _)| lost).sum();
+        total += lost;
+        let errors: Vec<&String> = results
             .iter()
-            .flat_map(|(_, errors)| errors.iter().take(3))
-            .collect::<Vec<_>>()
-    );
+            .flat_map(|(_, errors)| errors.iter().take(2))
+            .collect();
+        report.push(format!("{phase}: lost {lost} {errors:?}"));
+    }
+    assert!(total == 0, "credentials lost: {report:#?}");
 }
