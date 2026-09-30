@@ -10,7 +10,7 @@ mod app_ingress;
 #[cfg(all(test, target_os = "macos"))]
 #[path = "app_ingress/tests.rs"]
 mod app_ingress_tests;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod arkforge_execution;
 #[cfg(any(target_os = "macos", windows))]
 mod arkforge_lane;
@@ -919,5 +919,5 @@ mod device_access_control;
 mod flash_host_reads_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_plan_control;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod loader_binding_control;

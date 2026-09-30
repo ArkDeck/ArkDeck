@@ -536,17 +536,17 @@ pub use rockchip_executor::{HdcResolver, RockchipExecutor};
 mod rockchip_dispatcher;
 #[cfg(any(target_os = "macos", windows))]
 pub use rockchip_dispatcher::NativeRockchipDispatcher;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod control_performer;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use control_performer::{ArkForgeControlPerformer, ControlBinding};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod rockchip_reactivation;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use rockchip_reactivation::{ReactivationProof, ReactivationProofSource};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod loader_binding;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use loader_binding::LoaderBinding;
 #[cfg(any(target_os = "macos", windows))]
 mod rockchip_startup;

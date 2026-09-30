@@ -6,6 +6,13 @@
 //! Loader observation each exchange's setup names. Every answer must be
 //! Swift's, byte for byte, and so must every file the bind leaves: the
 //! binding and its lock, and the Target document it advanced.
+//!
+//! On Windows (TASK-XPA-010) the same oracle replays over a root below the
+//! temporary directory: an owner-only (0600/0700) file or directory is the
+//! store's private one, and the one shared-mode (0644) binding is given a
+//! read entry for the local Users group, as a mode would open it on macOS.
+//! Every answer and every byte must still be Swift's; each entry's kind and
+//! size too, but not its mode, which Windows does not have.
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION, validate_method_value};
 use arkdeck_control::Control;
 use arkdeck_hoststore::{LoaderBinding, TargetStore};
@@ -14,6 +21,7 @@ use arkdeck_provider_hdc::{LoaderIdentity, LoaderObserver};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -59,6 +67,7 @@ impl LoaderObserver for Observation {
 struct Root(PathBuf);
 
 impl Root {
+    #[cfg(unix)]
     fn new() -> Self {
         let root = PathBuf::from("/tmp").join(format!(
             "arkdeck-loader-binding-{:x}",
@@ -69,6 +78,25 @@ impl Root {
             .mode(0o700)
             .create(root.join("state/targets"))
             .unwrap();
+        Self(root)
+    }
+
+    /// On Windows a plain-spelled root below the temporary directory, every
+    /// level the store's private directory.
+    #[cfg(windows)]
+    fn new() -> Self {
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        let temporary = temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .map_or(temporary.clone(), PathBuf::from);
+        let root = temporary.join(format!(
+            "arkdeck-loader-binding-{:x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        for path in [root.clone(), root.join("state"), root.join("state/targets")] {
+            arkdeck_platform::HostDirectory::open_or_create_private(&path).unwrap();
+        }
         Self(root)
     }
 }
@@ -129,8 +157,30 @@ fn call(control: &Control<crate::host::Host>, id: usize, params: Value) -> Value
     }
 }
 
+#[cfg(unix)]
 fn mode(text: &str) -> u32 {
     u32::from_str_radix(text, 8).unwrap()
+}
+
+/// A file's recorded mode, the Windows way: owner-only is the private DACL
+/// it inherits from its private directory; anything wider gives the local
+/// Users group read access.
+#[cfg(unix)]
+fn set_mode(path: &Path, text: &str) {
+    fs::set_permissions(path, fs::Permissions::from_mode(mode(text))).unwrap();
+}
+
+#[cfg(windows)]
+fn set_mode(path: &Path, text: &str) {
+    if text != "600" && text != "700" {
+        let status = std::process::Command::new("icacls")
+            .arg(path)
+            .args(["/grant", "*S-1-5-32-545:(R)"])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "icacls {}", path.display());
+    }
 }
 
 fn device(value: &Value) -> UsbHostDevice {
@@ -162,20 +212,15 @@ fn perform(
                 fs::read(fixtures.join(action["input"].as_str().unwrap())).unwrap(),
             )
             .unwrap();
-            fs::set_permissions(
-                &target,
-                fs::Permissions::from_mode(mode(action["mode"].as_str().unwrap())),
-            )
-            .unwrap();
+            set_mode(&target, action["mode"].as_str().unwrap());
         }
         "mkdir" => {
             let target = path("path");
+            #[cfg(unix)]
             fs::DirBuilder::new().create(&target).unwrap();
-            fs::set_permissions(
-                &target,
-                fs::Permissions::from_mode(mode(action["mode"].as_str().unwrap())),
-            )
-            .unwrap();
+            #[cfg(windows)]
+            arkdeck_platform::HostDirectory::open_or_create_private(&target).unwrap();
+            set_mode(&target, action["mode"].as_str().unwrap());
         }
         "usb" => {
             *census.lock().unwrap() = action["devices"]
@@ -202,7 +247,12 @@ fn bound_files(root: &Path) -> (Vec<Value>, BTreeMap<String, Vec<u8>>) {
         for entry in fs::read_dir(root.join(relative)).unwrap() {
             let entry = entry.unwrap();
             let path = relative.join(entry.file_name());
-            listing.push(path.to_str().unwrap().to_owned());
+            listing.push(
+                path.components()
+                    .map(|component| component.as_os_str().to_str().unwrap())
+                    .collect::<Vec<_>>()
+                    .join("/"),
+            );
             if entry.file_type().unwrap().is_dir() {
                 walk(root, &path, listing);
             }
@@ -228,9 +278,13 @@ fn bound_files(root: &Path) -> (Vec<Value>, BTreeMap<String, Vec<u8>>) {
         } else {
             "file"
         };
+        #[cfg(unix)]
+        let mode = format!("{:o}", metadata.mode() & 0o777);
+        // Windows has no mode (see the module).
+        #[cfg(windows)]
+        let mode = "-".to_owned();
         listing.push(json!({
-            "path": path, "kind": kind,
-            "mode": format!("{:o}", metadata.mode() & 0o777), "bytes": metadata.len(),
+            "path": path, "kind": kind, "mode": mode, "bytes": metadata.len(),
         }));
         if kind == "file" {
             bytes.insert(path.clone(), fs::read(root.join(&path)).unwrap());
@@ -271,7 +325,17 @@ fn the_rust_daemon_replays_the_swift_loader_binding_oracle() {
         assert!(conforms(&answer), "{index} {name}: {answer}");
         assert_eq!(answer, exchange["answer"], "{index} {name}");
         let (listing, bytes) = bound_files(&root.0);
-        assert_eq!(json!(listing), exchange["files"], "{index} {name}: files");
+        #[cfg(unix)]
+        let recorded = exchange["files"].clone();
+        #[cfg(windows)]
+        let recorded = {
+            let mut recorded = exchange["files"].clone();
+            for entry in recorded.as_array_mut().unwrap() {
+                entry["mode"] = json!("-");
+            }
+            recorded
+        };
+        assert_eq!(json!(listing), recorded, "{index} {name}: files");
         for (path, content) in bytes {
             let expected = fs::read(fixtures.join(format!("steps/{index:02}-{name}/{path}")))
                 .unwrap_or_else(|_| panic!("{index} {name}: {path} was not recorded"));

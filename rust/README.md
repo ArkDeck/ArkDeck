@@ -2761,9 +2761,13 @@ and files, owner-only single-link reads, and no directory `fsync` on NTFS.
 The Swift `flash-plan` oracle, plan digests included, and the `flash-run`
 oracle's eight stories replay on Windows. What a Windows Session names of
 its platform is read back as Swift's wrote it before it is compared. The
-owners that compose only beside a managed HDC stay macOS-only:
-`control_performer`, `rockchip_reactivation` and `loader_binding`. No
-Windows HDC tuple is registered.
+owners that compose beside a managed HDC build on Windows too:
+`control_performer`, `rockchip_reactivation` and `loader_binding`. The
+Loader binding oracle replays 33/33 through the Windows Host, and the
+post-flash alias and start-up oracles replay there too. The daemon composes
+the Loader binding coordinator. It installs the executable lane
+(`arkforge_execution::install`) only with a descriptor-bound HDC, and none
+exists on Windows until the managed HDC is composed.
 
 The Windows daemon composes the lane beside its Job state
 (`Authority::compose_arkforge`): the account root, or a development root's

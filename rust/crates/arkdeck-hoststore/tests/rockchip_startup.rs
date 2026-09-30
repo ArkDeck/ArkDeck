@@ -5,11 +5,20 @@
 //! over a Target store opened afresh. Every start's lines, Loader recovery
 //! proof and stopping error, and the Target document it leaves, must be
 //! Swift's byte for byte.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-010) the roots are rebuilt below the temporary
+//! directory: an owner-only (0600/0700) entry is the host store's private
+//! one, and the one wider (0644) file gives the local Users group read
+//! access, as its mode would on macOS.
+#![cfg(any(target_os = "macos", windows))]
+
+#[path = "fixture_fs/mod.rs"]
+mod fixture_fs;
 
 use arkdeck_hoststore::{TargetStore, reconcile_rockchip_startup};
 use serde_json::{Value, json};
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -22,11 +31,15 @@ struct Base(PathBuf);
 
 impl Base {
     fn new() -> Self {
-        let base = PathBuf::from("/private/tmp").join(format!(
+        #[cfg(unix)]
+        let temporary = PathBuf::from("/private/tmp");
+        #[cfg(windows)]
+        let temporary = fixture_fs::temporary_root();
+        let base = temporary.join(format!(
             "arkdeck-rockchip-startup-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&base).unwrap();
+        fixture_fs::private_dir(&base);
         Self(base)
     }
 }
@@ -37,6 +50,7 @@ impl Drop for Base {
     }
 }
 
+#[cfg(unix)]
 fn directory(path: &Path) {
     fs::DirBuilder::new()
         .recursive(true)
@@ -44,6 +58,32 @@ fn directory(path: &Path) {
         .create(path)
         .unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+/// Every missing level created as the host store's private directory.
+#[cfg(windows)]
+fn directory(path: &Path) {
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
+}
+
+/// A recorded file's mode: on Windows owner-only is the private DACL the
+/// file inherits; a wider mode gives the local Users group read access.
+#[cfg(unix)]
+fn set_mode(file: &Path, mode: u32) {
+    fs::set_permissions(file, fs::Permissions::from_mode(mode)).unwrap();
+}
+
+#[cfg(windows)]
+fn set_mode(file: &Path, mode: u32) {
+    if mode & 0o077 != 0 {
+        let status = std::process::Command::new("icacls")
+            .arg(file)
+            .args(["/grant", "*S-1-5-32-545:(R)"])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "icacls {}", file.display());
+    }
 }
 
 /// The scenario's `ArkDeck` root as Swift's stores left it, below `name`:
@@ -66,7 +106,7 @@ fn rebuild(base: &Base, scenario: &Value, name: &str) -> (PathBuf, PathBuf) {
         )
         .unwrap();
         let mode = u32::from_str_radix(input["mode"].as_str().unwrap(), 8).unwrap();
-        fs::set_permissions(&file, fs::Permissions::from_mode(mode)).unwrap();
+        set_mode(&file, mode);
     }
     (root, state)
 }
@@ -131,16 +171,26 @@ fn a_journal_that_is_a_link_a_directory_or_malformed_keeps_the_alias_closed() {
         .find(|scenario| scenario["name"] == "alias.complete")
         .unwrap();
     let base = Base::new();
-    for (case, damage) in [
+    // A file symbolic link needs a privilege on Windows, so the link case is
+    // macOS's; a directory in the journal's place is refused on both.
+    #[cfg(unix)]
+    let cases = [
         ("link", "a link to its own copy"),
         ("directory", "a directory"),
         ("malformed", "a malformed second record"),
-    ] {
+    ];
+    #[cfg(windows)]
+    let cases = [
+        ("directory", "a directory"),
+        ("malformed", "a malformed second record"),
+    ];
+    for (case, damage) in cases {
         let (_, state) = rebuild(&base, complete, case);
         let journal = state.join("jobs/job-11111111111111111111111111111111/journal.jsonl");
         let bytes = fs::read(&journal).unwrap();
         fs::remove_file(&journal).unwrap();
-        let expected = match case {
+        let expected: String = match case {
+            #[cfg(unix)]
             "link" => {
                 let copy = journal.with_file_name("journal-copy.jsonl");
                 fs::write(&copy, &bytes).unwrap();

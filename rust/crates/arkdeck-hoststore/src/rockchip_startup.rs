@@ -41,6 +41,10 @@ const EIO: i32 = 5;
 /// Win32 `FILE_FLAG_OPEN_REPARSE_POINT`: a reparse point is opened as itself.
 #[cfg(windows)]
 const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+/// Win32 `FILE_FLAG_BACKUP_SEMANTICS`: a directory opens too, as `open(2)`
+/// opens one read-only, so that it is refused as no regular file.
+#[cfg(windows)]
+const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
 
 /// The six steps a Flash must have confirmed before it can prove an alias
 /// (Swift `requiredConfirmedStepIDs`), with the effect each one's intent
@@ -233,12 +237,13 @@ pub(crate) fn journal(directory: &Path) -> Result<(ReplayFacts, Vec<Value>), Str
         .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
         .open(&path)
         .map_err(open_failed)?;
-    // On Windows a reparse point is opened as itself, never followed; the
-    // regular-file check below then refuses it.
+    // On Windows a reparse point is opened as itself, never followed, and a
+    // directory is opened as Darwin's `open` opens one; the regular-file
+    // check below then refuses either.
     #[cfg(windows)]
     let file = std::fs::OpenOptions::new()
         .read(true)
-        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
         .open(&path)
         .map_err(open_failed)?;
     let Some(before) = file.metadata().ok().filter(std::fs::Metadata::is_file) else {

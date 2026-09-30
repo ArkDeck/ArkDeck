@@ -5,12 +5,17 @@
 //! store's root holding exactly the files Swift left — the same names, modes,
 //! sizes and bytes. The root is a scratch directory; nothing touches the
 //! installed Application Support tree.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-010) the same steps replay: the same names, sizes and
+//! bytes, and in place of the modes, the root and every file are what the
+//! host store opens and reads as owner-only.
+#![cfg(any(target_os = "macos", windows))]
 
 use arkdeck_hoststore::{LiveTarget, ObservedHdc, PostFlashAliasStore, PostFlashBinding};
 use arkdeck_platform::random_bytes;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -27,8 +32,13 @@ impl Scratch {
             "arkdeck-post-flash-alias-{:032x}",
             u128::from_le_bytes(random_bytes().unwrap())
         ));
-        fs::create_dir(&root).unwrap();
-        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        #[cfg(unix)]
+        {
+            fs::create_dir(&root).unwrap();
+            fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+        #[cfg(windows)]
+        arkdeck_platform::HostDirectory::open_or_create_private(&root).unwrap();
         Self(root)
     }
 }
@@ -70,7 +80,47 @@ fn plant(root: &Path, name: &str, record: &PostFlashBinding) {
     let path = root.join(name);
     let _ = fs::remove_file(&path);
     fs::write(&path, record.encode().unwrap()).unwrap();
+    #[cfg(unix)]
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+/// The file at `name` of `root` has the recorded mode: on Windows, the owner's
+/// single-link file the owner alone may read and write (every recorded file
+/// is 0600).
+#[cfg(unix)]
+fn assert_mode(root: &Path, name: &str, mode: u32, label: &str) {
+    let actual = fs::metadata(root.join(name)).unwrap();
+    assert_eq!(
+        actual.permissions().mode() & 0o777,
+        mode,
+        "{label}: {name} mode"
+    );
+}
+
+#[cfg(windows)]
+fn assert_mode(root: &Path, name: &str, mode: u32, label: &str) {
+    assert_eq!(mode, 0o600, "{label}: {name} mode");
+    let directory = arkdeck_platform::HostDirectory::open(root).unwrap();
+    assert!(
+        directory.owner_only_document(name).is_ok(),
+        "{label}: {name} is not owner-only"
+    );
+}
+
+/// The root is owner-only: 0700, or on Windows the host store's private
+/// directory.
+fn assert_private_root(root: &Path, label: &str) {
+    #[cfg(unix)]
+    assert_eq!(
+        fs::metadata(root).unwrap().permissions().mode() & 0o777,
+        0o700,
+        "{label}: root mode"
+    );
+    #[cfg(windows)]
+    assert!(
+        arkdeck_platform::HostDirectory::open(root).is_ok(),
+        "{label}: root is not private"
+    );
 }
 
 fn refused<T>(
@@ -174,11 +224,7 @@ fn the_rust_store_replays_the_swift_oracle_byte_for_byte() {
                 .unwrap_or_else(|error| panic!("{label}: {path}: {error}"));
             assert_eq!(kind, "file", "{label}: {path}");
             assert!(actual.is_file(), "{label}: {path} is not a file");
-            assert_eq!(
-                actual.permissions().mode() & 0o777,
-                mode,
-                "{label}: {path} mode"
-            );
+            assert_mode(&root, path, mode, &label);
             assert_eq!(actual.len(), size, "{label}: {path} size");
             assert_eq!(
                 fs::read(root.join(path)).unwrap(),
@@ -192,11 +238,7 @@ fn the_rust_store_replays_the_swift_oracle_byte_for_byte() {
             expected,
             "{label}: files in the root"
         );
-        assert_eq!(
-            fs::metadata(&root).unwrap().permissions().mode() & 0o777,
-            0o700,
-            "{label}: root mode"
-        );
+        assert_private_root(&root, &label);
     }
 }
 
@@ -209,10 +251,7 @@ fn the_root_is_prepared_owner_only_and_a_relative_root_is_refused() {
     let root = scratch.0.join("nested/alias");
     let store = PostFlashAliasStore::new(&root);
     assert_eq!(store.load_if_present().unwrap(), None);
-    assert_eq!(
-        fs::metadata(&root).unwrap().permissions().mode() & 0o777,
-        0o700
-    );
+    assert_private_root(&root, "prepared");
     assert_eq!(entries(&root).unwrap(), BTreeSet::new());
 
     let relative = PostFlashAliasStore::new(Path::new("alias"));
