@@ -145,12 +145,13 @@ impl Drop for Request {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arkdeck_platform::{LocalEndpoint, LocalListener, Readiness, ServerIdentity, random_bytes};
+    use arkdeck_platform::{LocalEndpoint, LocalListener, Readiness, random_bytes};
     use std::io::Read;
-    use std::path::PathBuf;
     use std::time::Duration;
 
-    struct Directory(PathBuf);
+    #[cfg(unix)]
+    struct Directory(std::path::PathBuf);
+    #[cfg(unix)]
     impl Drop for Directory {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
@@ -158,7 +159,9 @@ mod tests {
     }
 
     /// A served connection pair: the daemon's end and the client's.
+    #[cfg(unix)]
     fn pair() -> (Directory, LocalConnection, LocalConnection) {
+        use arkdeck_platform::ServerIdentity;
         let nonce = u64::from_le_bytes(random_bytes().unwrap());
         let directory = Directory(
             std::env::temp_dir()
@@ -174,6 +177,24 @@ mod tests {
             .unwrap();
         let served = listener.accept().unwrap();
         (directory, served, client)
+    }
+
+    /// A served connection pair on a private pipe. The client is a plain
+    /// pipe handle: a Windows `LocalConnection::connect` proves an installed
+    /// daemon identity that no test build has, and the drain is about the
+    /// daemon's end.
+    #[cfg(windows)]
+    fn pair() -> (LocalListener, LocalConnection, std::fs::File) {
+        let nonce = u64::from_le_bytes(random_bytes().unwrap());
+        let endpoint = LocalEndpoint::new(format!(r"\\.\pipe\arkdeck-drain-{nonce:016x}"));
+        let mut listener = LocalListener::bind(&endpoint).unwrap();
+        let client = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(endpoint.as_path())
+            .unwrap();
+        let served = listener.accept().unwrap();
+        (listener, served, client)
     }
 
     #[test]
