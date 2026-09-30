@@ -10,6 +10,8 @@
     <RootNamespace>ArkDeck.App.Core</RootNamespace>
     <AssemblyName>ArkDeck.App.Core</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Published trimmed inside the App: the trim analyzer runs on every build. -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
@@ -19,5 +21,10 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ArkDeck.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The answers the scripted test transport replays (Testing/ScriptedDaemon*.cs). -->
+    <EmbeddedResource Include="Testing\Recorded\*.json" LogicalName="ArkDeck.Recorded.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

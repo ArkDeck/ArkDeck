@@ -75,11 +75,20 @@ public sealed class ShellContractTests
         // (TASK-XPA-020, app.device.rename: host state, generation-guarded, the CLI's
         // `target display-name set|clear`), named only by the loader; no Job, adoption,
         // device or other business write is named anywhere in the App or App.Core.
-        var forbidden = new[] { "job.submit", "job.run", "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "artifact.import.begin", "trace.cache.purge", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.storage.policy", "runtime.storage.root", "runtime.tool.select", "runtime.hdc.restart" };
+        var forbidden = new[] { "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "agent.run", "agent.chat", "trace.cache.purge", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.storage.policy", "runtime.storage.root", "runtime.tool.select", "runtime.hdc.restart" };
         // TASK-XPA-020 (sessions and Job actions): a Job's cancellation request and the Session
         // catalog's pin, unpin, cleanup and export, each preview-then-apply or generation-guarded.
         var allowed = new[] { "target.display-name.set", "target.display-name.clear", "job.cancel", "session.pin", "session.unpin",
-            "session.cleanup.preview", "session.cleanup.apply", "session.export.preview", "session.export.apply" };
+            "session.cleanup.preview", "session.cleanup.apply", "session.export.preview", "session.export.apply",
+            // TASK-XPA-020 (agents and Imports): resuming a human action with a value its
+            // selection schema names, a generation-guarded abandon, and an Import's verified
+            // chunked upload, abort and generation-guarded release. The App starts no execution.
+            "agent.resume", "agent.abandon", "human-action.resume",
+            "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort", "artifact.import.release",
+            // TASK-XPA-020 (Debug; delegated minor decision, pending the next rulings batch): the
+            // macOS workspaces' closed typed Jobs, planned, submitted, run and cancelled through
+            // the one typed request builder; which operations is pinned below.
+            "job.plan", "job.submit", "job.run" };
         var sources = RepoPaths.AppSources("*.cs")
             .Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
                 .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")));
@@ -87,12 +96,58 @@ public sealed class ShellContractTests
         {
             var text = File.ReadAllText(file);
             foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
-            if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "ScriptedDaemon.cs"))
+            if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs"
+                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs"))
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }
             Assert.IsFalse(text.Contains("System.IO.Pipes", StringComparison.Ordinal), $"{Path.GetFileName(file)}: the daemon is reached only through ClientKit");
         }
+    }
+
+    /// <summary>The operations the App submits are exactly the macOS workspaces' fixed
+    /// references (<c>DebugApplicationFacade</c>): every typed request is built by
+    /// <see cref="RuntimeRequest.Build"/> with a literal operation, and no other code builds one.</summary>
+    [TestMethod]
+    public void TheAppSubmitsOnlyTheMacOsWorkspaceOperations()
+    {
+        var published = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "capture.diagnostics", "debug.hap", "debug.template", "deploy.native-library.app-owned", "port-forward.create", "port-forward.remove",
+        };
+        var built = new List<string>();
+        foreach (var file in RepoPaths.AppSources("*.cs").Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
+                     .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !p.Contains("Testing"))))
+        {
+            var text = File.ReadAllText(file);
+            Assert.IsFalse(text.Contains("\"runtime-operation-request\"", StringComparison.Ordinal) && Path.GetFileName(file) != "RuntimeJobs.cs",
+                $"{Path.GetFileName(file)} builds a request outside RuntimeRequest");
+            foreach (System.Text.RegularExpressions.Match call in System.Text.RegularExpressions.Regex.Matches(text, @"RuntimeRequest\.Build\(\s*""[^""]+"",\s*(?<operation>[^,]+),"))
+            {
+                built.Add(call.Groups["operation"].Value.Trim());
+            }
+        }
+        Assert.IsTrue(built.Count >= 5, string.Join(", ", built));
+        foreach (var operation in built)
+        {
+            var literals = System.Text.RegularExpressions.Regex.Matches(operation, "\"([^\"]+)\"").Select(m => m.Groups[1].Value).ToArray();
+            Assert.IsTrue(literals.Length > 0, $"{operation}: the operation is a literal");
+            foreach (var literal in literals) Assert.IsTrue(published.Contains(literal), $"{literal} is not a macOS workspace operation");
+        }
+    }
+
+    [TestMethod]
+    public void EveryBuildRunsTheTrimAnalyzer()
+    {
+        // The release candidate publishes the App trimmed, which PR builds never do: the trim
+        // analyzer runs on every build instead (warnings are errors), so code the trimmer cannot
+        // keep fails the windows lane, not first the RC (IL2026 in FocusWalk.cs, #2404).
+        foreach (var project in new[] { RepoPaths.At("windows", "App", "ArkDeck.App.csproj"), RepoPaths.At("windows", "App.Core", "ArkDeck.App.Core.csproj") })
+        {
+            StringAssert.Contains(File.ReadAllText(project), "<EnableTrimAnalyzer>true</EnableTrimAnalyzer>", project);
+        }
+        StringAssert.Contains(File.ReadAllText(RepoPaths.At("windows", "ClientKit", "ArkDeck.ClientKit.csproj")), "<IsTrimmable>true</IsTrimmable>");
+        StringAssert.Contains(File.ReadAllText(RepoPaths.At("windows", "Directory.Build.props")), "<TreatWarningsAsErrors>true</TreatWarningsAsErrors>");
     }
 
     [TestMethod]
@@ -115,6 +170,10 @@ public sealed class ShellContractTests
                      CliCommands.JobCancel, CliCommands.JobResult, CliCommands.JobEvidence, CliCommands.SessionList, CliCommands.SessionShow,
                      CliCommands.SessionPin, CliCommands.SessionUnpin, CliCommands.SessionCleanupPreview, CliCommands.SessionCleanupApply,
                      CliCommands.SessionExportPreview, CliCommands.SessionExportApply,
+                     CliCommands.AgentList, CliCommands.AgentStatus, CliCommands.AgentResume, CliCommands.AgentAbandon,
+                     CliCommands.HumanActionList, CliCommands.HumanActionShow, CliCommands.HumanActionResume,
+                     CliCommands.ImportList, CliCommands.ImportInspect, CliCommands.ImportRelease, CliCommands.ImportHap,
+                     CliCommands.ImportFlashBundle, CliCommands.ImportWorkspacePatch, CliCommands.ImportNativeLibrary,
                  })
         {
             Assert.IsTrue(commands.Contains(command), command);
@@ -139,7 +198,7 @@ public sealed class ShellContractTests
         foreach (var snapshot in doc.RootElement.GetProperty("snapshots").EnumerateArray())
         {
             Assert.IsTrue(scenarios.Contains(snapshot.GetProperty("scenario").GetString()!));
-            Assert.IsTrue(new[] { "overview", "device", "history", "sessions", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
+            Assert.IsTrue(new[] { "overview", "device", "history", "sessions", "agents", "imports", "debug", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
             if (snapshot.TryGetProperty("steps", out var steps))
             {
                 foreach (var step in steps.EnumerateArray())

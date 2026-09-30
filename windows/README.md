@@ -14,6 +14,7 @@ holds no runtime semantics: everything it shows is a projection read from the lo
 | `App.UITests/` | MSTest + FlaUI (UIA3): UIA semantic snapshots of the running App; needs a desktop session (`ARKDECK_APP_UITESTS=1`), otherwise reported skipped |
 | `scripts/generate-clientkit.py` | Generator of `ClientKit/Generated/ControlContract.g.cs`; `--check` fails on drift |
 | `scripts/generate-ui-strings.py` | Generator of the App's `.resw` from `spec/ui-semantics/strings.json` (values equal to the macOS `.xcstrings`); `--check` fails on drift |
+| `scripts/generate-app-icons.py` | Generator of `App/Assets/AppIcon.ico` (16–256 px) and the MSIX visual assets (scale-100/200, the taskbar target sizes) from the macOS AppIcon (`ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset`), resampled, never drawn; `--check` compares decoded pixels |
 | `scripts/generate-xaml-tokens.py` | Generator of `App/Themes/ArkDeckTokens.xaml` from `docs/design/arkdeck-ds/src/tokens.css` (product accent on controls, ruling 16); `--check` fails on drift |
 | `ArkDeck.Windows.slnx` | The solution the `windows` CI lane builds and tests |
 | `spikes/spk4/` | The SPK-4 WinUI 3 spike (its own solution and pins; not part of the lane) |
@@ -42,7 +43,8 @@ holds no runtime semantics: everything it shows is a projection read from the lo
   `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION`. Layer 1: the pipe object's owner SID must equal
   this process token's owner SID. Layer 2: the connection's server PID is opened and held, its image
   must be the installed daemon (canonical path and file id), signed by the pinned Authenticode
-  signer (SHA-256 of the certificate DER) or running in the installed MSIX package family, and the
+  signer (SHA-256 of the certificate DER) or by the pinned publisher (ruling 17), or running in
+  the installed MSIX package family, and the
   PID must not change; the image file and its ancestor directories are held for the connection.
 - **Failures are typed.** `ControlFailureKind.DaemonUnavailable` (with a `DaemonUnavailableReason`)
   means nothing ran; the UI shows `ControlFailure.Banner`, the daemon-unavailable recovery banner,
@@ -72,9 +74,13 @@ first, `ControlResult` back.
   Trace can be inspected by the Runtime (`trace.inspect`; without a Windows Trace inspector the
   refusal is shown as it came, and the viewer is deferred, decision 5).
 - **Which daemon.** The installation inputs the CLI reads: `ARKDECK_DAEMON_PATH` (default
-  `arkdeck-agentd.exe` beside the App), `ARKDECK_DAEMON_SIGNER_SHA256` or
-  `ARKDECK_DAEMON_PACKAGE_FAMILY`, optional `ARKDECK_ENDPOINT`. Without a pin there is nothing
-  to verify, so the App connects to nothing and shows the recovery banner. The App does not
+  `arkdeck-agentd.exe` beside the App), `ARKDECK_DAEMON_SIGNER_SHA256` (the development
+  signer), `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` with `ARKDECK_DAEMON_PUBLISHER_EKU` (a
+  production daemon, maintainer ruling 17: the chain `WinVerifyTrust` accepted ends at the
+  Microsoft Identity Verification Root 2020, and the leaf has exactly that one `O=` and the
+  Artifact Signing profile EKU; both or neither), or `ARKDECK_DAEMON_PACKAGE_FAMILY`, optional
+  `ARKDECK_ENDPOINT`. Without a pin there is nothing to verify, so the App connects to nothing
+  and shows the recovery banner. The App does not
   start the daemon (the client-started daemon lives in the CLI); the banner names
   `arkdeck doctor`, which starts it and says what is wrong.
 - **Recovery banner.** A daemon-unavailable failure (ClientKit refused or reached nothing)
@@ -109,9 +115,31 @@ first, `ControlResult` back.
   Inspector requests `job.cancel` for a queued or active Job after a confirmation (a request, not
   an outcome: the state is read back), shows a terminal Job's `job.result`, and opens the record
   in History, whose detail now carries the macOS evidence section (`job.evidence`).
+- **Agents and Imports (TASK-XPA-020).** An Agents page lists the agent executions
+  (`agent.list|status`) and the human actions waiting on a person (`human-action.list|show`).
+  A waiting action is resumed after the person did what it asks (`agent.resume` for an
+  execution's action, `human-action.resume` otherwise); a pick-a-device action offers exactly the
+  values of its `selectionSchema` enum as a radio group, and Resume without a choice says so. An
+  execution that is not terminal is abandoned after a confirmation, guarded by its generation
+  (`agent.abandon`); starting one stays in the CLI. An Imports page uploads a file chosen in the
+  system file dialog as an Import of one kind for an adopted Target (`artifact.import.begin`,
+  bounded `append` chunks each with its SHA-256, `commit`), with its progress and a Cancel that
+  aborts the partial Import; it lists and inspects the Imports (`artifact.import.list|inspect`)
+  and releases a committed one after a confirmation (`artifact.import.release`). A flash bundle
+  is refused by the Runtime at publication until its validator exists (AF-W1).
+- **Debug (TASK-XPA-020).** The macOS Debug workspace: the Target the page submits against and
+  five tabs — Artifacts (an app-owned native library imported, planned with `job.plan`, reviewed
+  in the plan sheet, then submitted exactly as reviewed), Logs (a bounded HiLog capture and its
+  shards, with export), Apps (one HAP lifecycle, its packages imported for their leases), Network
+  (typed port rules, and the active ones `debug.probe` reads) and Commands (four read-only
+  templates) — each with its operation's availability (`operation.list|describe`) and recent
+  Jobs. Every action is one closed typed Runtime Job (`RuntimeRequest`: fixed operation, typed
+  inputs, the Target and binding revision read, the workspace's client name) submitted with
+  `job.submit`, run with `job.run` and read back with `job.show`; an action that cannot run says
+  why instead of being disabled.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
-  have access keys (Alt+O, D, H, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  have access keys (Alt+O, D, H, N, A, I, B, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
   empty Tab stop.
 
@@ -124,6 +152,7 @@ host the NuGet cache is `D:\nuget\packages` (`NUGET_PACKAGES`). From the reposit
 python windows/scripts/generate-clientkit.py --check   # --write after a contract input changed
 python windows/scripts/generate-ui-strings.py --check  # --write after spec/ui-semantics/strings.json changed
 python windows/scripts/generate-xaml-tokens.py --check # (no flag) rewrites after tokens.css changed
+python windows/scripts/generate-app-icons.py --check   # (no flag) rewrites after the macOS AppIcon changed
 dotnet build windows/ArkDeck.Windows.slnx -c Release
 dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build
 ```
@@ -150,20 +179,33 @@ whole product from one recorded checkout (r12 decision 10, rulings 8, 12 and 17)
 - the App published unpackaged (`WindowsPackageType=None`; self-contained Windows App SDK and
   .NET, ReadyToRun and trimmed), `ArkDeck.exe` signed like the runtime;
 - the **xcopy form**: `arkdeck-rc-<version>-windows-x64-<revision>\` with the App, `arkdeck.exe`
-  and `arkdeck-agentd.exe` side by side (the layout both clients default to) and
+  and `arkdeck-agentd.exe` side by side (the layout both clients default to), the runtime's
+  code-sign helper bundle (`ArkDeckKit_ArkDeckWorkflows.bundle\`) beside the daemon, and
   `rc-manifest.json` (`arkdeck.windows-rc-package/1`: every file's size and SHA-256, the
   toolchains, the signer pin), zipped, with the manifest beside the zip carrying its SHA-256;
-- the **MSIX form**: the same App with the signed daemon and CLI at the package root
-  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12), write
-  virtualization off (ruling 8), **unsigned**; its SHA-256 and the daemon's and CLI's inside it
-  are in the manifest.
+- the **MSIX form**: the same App with the signed daemon and CLI and the helper bundle at the
+  package root
+  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12) unless
+  `-MsixPublisher` names the signing certificate's subject (the package is then built from a
+  copy of `Package.appxmanifest` under `<out>\msix-manifest`, passed as `ArkDeckPackageManifest`;
+  the tracked manifest is never rewritten), write virtualization off (ruling 8), unsigned unless
+  `-MsixSignCommand` is given; its SHA-256 and the daemon's and CLI's inside it are in the
+  manifest, and the helper inside it must be the runtime package's.
 
 `-SigningMode none` (CI) signs nothing; `development` signs with the host-trusted development
 certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`); `production` calls the maintainer's command
 (`-ProductionSignCommand` / `ARKDECK_PRODUCTION_SIGN_COMMAND`, one call per file) for the daemon,
 the CLI and `ArkDeck.exe`, and requires timestamps, one publisher identity (ruling 17) and a
-clean checkout. `-MsixSignCommand` / `ARKDECK_MSIX_SIGN_COMMAND` signs the MSIX, whose signer's
-subject must be the manifest's `Publisher`. The scripts hold no credential. `-FeedBaseUri
+clean checkout. That identity must be the one the clients pin, given by the maintainer:
+`-ExpectedPublisherOrganization` and `-ExpectedPublisherEku` (else
+`ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` / `ARKDECK_DAEMON_PUBLISHER_EKU`, the CLI's own inputs;
+the EKU is an Artifact Signing certificate profile `1.3.6.1.4.1.311.97.<profile>`, never the
+Public Trust marker). Unless `-SkipMsix`, a production run also signs the MSIX:
+`-MsixSignCommand` and `-MsixPublisher` are required and the publisher's `O=` must be the
+expected organisation. Anything missing is refused before anything is built.
+`-MsixSignCommand` / `ARKDECK_MSIX_SIGN_COMMAND` signs the MSIX, whose signer's subject must be
+the manifest's `Publisher`. The scripts hold no credential; the commands obtain them from the
+maintainer at run time. `-FeedBaseUri
 https://…/` writes the App Installer feed `ArkDeck.appinstaller` from the MSIX this run built
 (name, publisher, version and architecture read from its `AppxManifest.xml`). The package
 version must rise with each published RC.
@@ -174,7 +216,8 @@ pwsh windows/scripts/package-rc.ps1 -OutputDirectory D:\out\rc -SigningMode deve
 
 `-Smoke` installs the zip into a new owner-only directory under the account's local application
 data with a private development state root, checks every file against the manifest and every
-executable's signer against the pin, lets `arkdeck doctor` start the installed daemon (decision
+executable's signer against the pin (a production RC: its timestamped signature against the
+manifest's publisher identity, which then configures the CLI and the App), lets `arkdeck doctor` start the installed daemon (decision
 11), runs the App's UIA smoke (`App.UITests` `InstalledRcTests`: the installed `ArkDeck.exe`
 connects to that daemon and shows its doctor report, no recovery banner), runs doctor again,
 and uninstalls with `uninstall-rc.ps1`: no process may run from the directory, no new entry

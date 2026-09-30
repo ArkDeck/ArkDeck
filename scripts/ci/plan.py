@@ -91,8 +91,8 @@ DS_INTERACTION_INPUT_PREFIXES = (
 )
 DS_PACKAGE_DIR = "docs/design/arkdeck-ds"
 # The Windows client (TASK-XPA-007): windows/** plus every input its generators
-# (INPUTS of windows/scripts/generate-clientkit.py, generate-ui-strings.py and
-# generate-xaml-tokens.py) and its tests read, so a schema, registry, corpus,
+# (INPUTS of windows/scripts/generate-clientkit.py, generate-ui-strings.py,
+# generate-xaml-tokens.py and generate-app-icons.py) and its tests read, so a schema, registry, corpus,
 # pattern, shared string, design token or coverage edit cannot skip the Windows
 # checks. test_plan verifies coverage against the generators' actual INPUTS.
 WINDOWS_DIR = "windows"
@@ -107,6 +107,8 @@ WINDOWS_INPUT_PREFIXES = (
     # Target store (TASK-XPA-020).
     "rust/tests/fixtures/trace-inspect/",
     "rust/tests/fixtures/target-adoption/",
+    # The App's icon and MSIX assets are the macOS AppIcon (generate-app-icons.py).
+    "ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
 )
 WINDOWS_INPUT_FILES = frozenset({
     "Packages/ArkDeckKit/Contracts/control-protocol.json",
@@ -119,6 +121,7 @@ WINDOWS_INPUT_FILES = frozenset({
     "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
     "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
     "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
+    "ArkDeckApp/Resources/DebugLocalizable.xcstrings",
     # The App's theme is generated from the design tokens (generate-xaml-tokens.py).
     "docs/design/arkdeck-ds/src/tokens.css",
     # The App's tests read the Job state classes and the CLI coverage commands.
@@ -634,6 +637,7 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 (python, "windows/scripts/generate-clientkit.py", "--check"),
                 (python, "windows/scripts/generate-ui-strings.py", "--check"),
                 (python, "windows/scripts/generate-xaml-tokens.py", "--check"),
+                (python, "windows/scripts/generate-app-icons.py", "--check"),
                 ("dotnet", "build", WINDOWS_SOLUTION, "-c", "Release"),
                 ("dotnet", "test", WINDOWS_SOLUTION, "-c", "Release", "--no-build"),
             ]

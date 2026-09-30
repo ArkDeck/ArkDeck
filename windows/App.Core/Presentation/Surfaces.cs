@@ -49,6 +49,48 @@ public static class CliCommands
     public const string SessionExportPreview = "arkdeck session export preview --session <session-id> --destination <new-directory>"; // session.export.preview
     public const string SessionExportApply = "arkdeck session export apply --preview-id <id> --preview-digest <sha256>"; // session.export.apply
 
+    public const string AgentList = "arkdeck agent list";                          // agent.list
+    public const string AgentStatus = "arkdeck agent status (--execution-id <id>)"; // agent.status
+    public const string AgentResume = "arkdeck agent resume (--resume-reference <ref> | --resume-token <token>)"; // agent.resume, app.overview.resume
+    public const string AgentAbandon = "arkdeck agent abandon --expected-generation <n> (--execution-id <id>)"; // agent.abandon
+    public const string HumanActionList = "arkdeck human-action list";             // human-action.list, app.shell.recovery
+    public const string HumanActionShow = "arkdeck human-action show --human-action <id>"; // human-action.show
+    public const string HumanActionResume = "arkdeck human-action resume --human-action <id> --resume-reference <ref>"; // human-action.resume
+    public const string ImportList = "arkdeck artifact import list";               // artifact.import.list
+    public const string ImportInspect = "arkdeck artifact import inspect (--import <id> | --import-request-id <id>)"; // artifact.import.inspect
+    public const string ImportRelease = "arkdeck artifact import release --import <id> --generation <generation>"; // artifact.import.release
+    public const string ImportHap = "arkdeck artifact import hap --import-request-id <id> --target <target-id> --file <path>"; // artifact.import.begin|append|commit
+    public const string ImportFlashBundle = "arkdeck artifact import flash-bundle --import-request-id <id> --target <target-id> --file <path>"; // artifact.import.flash-bundle
+    public const string ImportWorkspacePatch = "arkdeck artifact import workspace-patch --import-request-id <id> --target <target-id> --file <path>"; // artifact.import.workspace-patch
+    public const string ImportNativeLibrary = "arkdeck artifact import native-library ..."; // app.debug.artifacts
+    public const string DebugProbe = "arkdeck debug probe --target <target-id>";   // debug.probe
+    public const string DebugLogs = "arkdeck debug logs --inputs-file <path>";     // capture.diagnostics@1 (the Debug logs preset)
+    public const string DebugHap = "arkdeck debug hap --inputs-file <path>";       // debug.hap@1
+    public const string DebugNativeLibrary = "arkdeck debug native deploy --inputs-file <path>"; // deploy.native-library.app-owned@1
+    public const string DebugTemplate = "arkdeck debug template run --inputs-file <path>"; // debug.template@1
+    public const string DebugPortForward = "arkdeck port-forward create --inputs-file <path>"; // port-forward.create|remove@1
+    public const string DebugPortForwardRemove = "arkdeck port-forward remove --inputs-file <path>";
+    public const string JobRun = "arkdeck job run --job <job-id>";                // job.run
+
+    public static string ForExecution(string template, string executionId) =>
+        template.Replace("(--execution-id <id>)", "--execution-id " + executionId, StringComparison.Ordinal);
+
+    public static string ForHumanAction(string template, string actionId) =>
+        template.Replace("--human-action <id>", "--human-action " + actionId, StringComparison.Ordinal);
+
+    public static string ForImportId(string template, string importId) =>
+        template.Replace("(--import <id> | --import-request-id <id>)", "--import " + importId, StringComparison.Ordinal)
+            .Replace("--import <id>", "--import " + importId, StringComparison.Ordinal);
+
+    /// <summary>The CLI command that uploads an Import of <paramref name="kind"/>.</summary>
+    public static string ForImport(string kind) => kind switch
+    {
+        ImportKind.FlashBundle => ImportFlashBundle,
+        ImportKind.WorkspacePatch => ImportWorkspacePatch,
+        ImportKind.NativeLibrary => ImportNativeLibrary,
+        _ => ImportHap,
+    };
+
     public static string ForSession(string template, string sessionId) => template.Replace("<session-id>", sessionId, StringComparison.Ordinal);
 
     public static string ForProject(string template, string projectRef) => template.Replace("<project-ref>", projectRef, StringComparison.Ordinal);

@@ -16,15 +16,20 @@ Build mode (default), from one recorded checkout:
      ReadyToRun and trimmed, x64) unpackaged (`WindowsPackageType=None`), and signs
      `ArkDeck.exe` the same way as the runtime.
   4. Stages the xcopy form: the App with its daemon beside it (`ArkDeck.exe` and
-     `arkdeck-agentd.exe` at the root, the App's default daemon) and the CLI in `bin\` — NTFS
+     `arkdeck-agentd.exe` at the root, the App's default daemon, with the runtime's
+     code-sign helper bundle `ArkDeckKit_ArkDeckWorkflows.bundle\` beside it) and the CLI in
+     `bin\` — NTFS
      names are case-insensitive, so `arkdeck.exe` cannot sit beside `ArkDeck.exe`; the CLI is
      pointed at the root's daemon with ARKDECK_DAEMON_PATH. It writes `rc-manifest.json`
      (every file with its size and SHA-256) inside it, zips it, and writes the manifest beside
      the zip with the zip's SHA-256 added.
-  5. Builds the MSIX form (r12 decision 10) with the same layout (daemon at the package root,
-     CLI in `bin\`), write virtualization off (ruling 8), identity `CN=ArkDeck Development`
-     (ruling 12). It is signed only through -MsixSignCommand (see below); its SHA-256 goes into
-     the manifest.
+  5. Builds the MSIX form (r12 decision 10) with the same layout (daemon and helper bundle at
+     the package root, CLI in `bin\`), write virtualization off (ruling 8), identity
+     `CN=ArkDeck Development`
+     (ruling 12) unless -MsixPublisher names the signing certificate's subject: the package is
+     then built from a copy of windows/App/Package.appxmanifest with that Publisher (the
+     tracked manifest is never rewritten). It is signed only through -MsixSignCommand (see
+     below); its SHA-256 goes into the manifest.
   6. With -FeedBaseUri, writes the App Installer feed `ArkDeck.appinstaller` beside the MSIX,
      from the MSIX this run built (package name, publisher, version and architecture read from
      its AppxManifest.xml), so feed and package always come from one revision.
@@ -38,19 +43,26 @@ Build mode (default), from one recorded checkout:
                ARKDECK_PRODUCTION_SIGN_COMMAND), called once per file with the file's path as its
                only argument, for the daemon and the CLI (through windows-package-xcopy.ps1) and
                for ArkDeck.exe. Each must then verify with a timestamp, and all three must carry
-               one publisher identity (maintainer ruling 17). A clean checkout only. This script
-               holds no credential; an unconfigured command fails before anything is built.
+               one publisher identity (maintainer ruling 17), and that identity must be the one
+               the clients will pin: -ExpectedPublisherOrganization and -ExpectedPublisherEku
+               (else ARKDECK_DAEMON_PUBLISHER_ORGANIZATION / ARKDECK_DAEMON_PUBLISHER_EKU, the
+               CLI's own installation inputs). Unless -SkipMsix, the MSIX must be signed too:
+               -MsixSignCommand and -MsixPublisher are required, and the publisher's O= must be
+               the expected organisation. A clean checkout only. This script holds no
+               credential; anything unconfigured fails before anything is built.
 -MsixSignCommand (else ARKDECK_MSIX_SIGN_COMMAND), in any mode: the maintainer's command that
 signs the MSIX, called with its path. The MSIX must then verify, and its signer's subject must be
 the manifest's Publisher (a package whose publisher is not its certificate's subject does not
 install); with -SigningMode production it must be timestamped. Without it the MSIX stays unsigned
 and is recorded as not installable.
 
--Smoke after a development build (or -SmokeZip <zip> alone, for a package built before) installs the zip into a new private directory under the
+-Smoke after a signed build (or -SmokeZip <zip> alone, for a package built before) installs the zip into a new private directory under the
 account's local application data (owner-only: the user and SYSTEM), with a private development
 state root inside it, and then:
 
-  - checks every file against the manifest and the daemon's signer against the pin;
+  - checks every file against the manifest and each executable's signer against the pin, or for
+    a production RC its timestamped signature against the manifest's publisher identity, which
+    the CLI and the App are then configured with (ruling 17);
   - runs `arkdeck --output json doctor`, which starts the installed daemon (decision 11); the
     started process must be the installed image, and doctor must answer `ok: true`;
   - runs the App's UIA smoke (windows/App.UITests `InstalledRcTests`) against the installed
@@ -73,6 +85,9 @@ param(
     [Parameter(ParameterSetName = 'Build')][string]$Thumbprint,
     [Parameter(ParameterSetName = 'Build')][string]$ProductionSignCommand,
     [Parameter(ParameterSetName = 'Build')][string]$MsixSignCommand,
+    [Parameter(ParameterSetName = 'Build')][string]$MsixPublisher,
+    [Parameter(ParameterSetName = 'Build')][string]$ExpectedPublisherOrganization,
+    [Parameter(ParameterSetName = 'Build')][string]$ExpectedPublisherEku,
     [Parameter(ParameterSetName = 'Build')][string]$FeedBaseUri,
     [Parameter(ParameterSetName = 'Build')][switch]$AllowDirty,
     [Parameter(ParameterSetName = 'Build')][switch]$SkipMsix,
@@ -92,6 +107,9 @@ $ManifestName = 'rc-manifest.json'
 $DaemonName = 'arkdeck-agentd.exe'
 $CliName = 'arkdeck.exe'
 $AppName = 'ArkDeck.exe'
+# The OpenHarmony code-sign helper the runtime package carries beside its daemon (TASK-XPA-009).
+$HelperBundle = 'ArkDeckKit_ArkDeckWorkflows.bundle'
+$HelperPath = "$HelperBundle/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
 $CommandTimeoutMs = 300000
 $DaemonDeadlineMs = 30000
 $FeedName = 'ArkDeck.appinstaller'
@@ -165,6 +183,24 @@ function Resolve-SignCommand([string]$Value, [string]$Variable, [string]$What, [
     return (Resolve-Path -LiteralPath $command).Path
 }
 
+# A package publisher: a distinguished name with a CN= (what makeappx and App Installer compare
+# with the signing certificate's subject), no control character, at most 8192 characters.
+function Test-MsixPublisher([string]$Value) {
+    try { $name = [System.Security.Cryptography.X509Certificates.X500DistinguishedName]::new($Value) } catch { $name = $null }
+    if (-not $name -or $Value.Length -gt 8192 -or $Value -match '[\x00-\x1f]' -or $Value -notmatch '(^|,\s*)CN=') {
+        throw "-MsixPublisher must be the signing certificate's subject as a distinguished name with a CN=: $Value"
+    }
+}
+
+function Get-SubjectOrganization([string]$Subject) {
+    $name = [System.Security.Cryptography.X509Certificates.X500DistinguishedName]::new($Subject)
+    $organizations = @(foreach ($rdn in $name.EnumerateRelativeDistinguishedNames()) {
+            if ($rdn.GetSingleElementType().Value -eq '2.5.4.10') { $rdn.GetSingleElementValue() }
+        })
+    if ($organizations.Count -ne 1) { return $null }
+    return $organizations[0]
+}
+
 # The feed's base URI: absolute https, ending in '/', where the maintainer hosts the feed and the
 # MSIX side by side.
 function Test-FeedBaseUri([string]$Value) {
@@ -234,6 +270,31 @@ function New-RcBuild {
     $msixCommand = Resolve-SignCommand $MsixSignCommand 'ARKDECK_MSIX_SIGN_COMMAND' 'MSIX signing' $false
     if ($msixCommand -and $SkipMsix) { throw '-MsixSignCommand needs the MSIX; drop -SkipMsix.' }
     $feedBase = if ($FeedBaseUri) { Test-FeedBaseUri $FeedBaseUri } else { $null }
+    if ($MsixPublisher) {
+        if ($SkipMsix) { throw '-MsixPublisher needs the MSIX; drop -SkipMsix.' }
+        Test-MsixPublisher $MsixPublisher
+    }
+    $expectedPublisher = $null
+    if ($SigningMode -eq 'production') {
+        # Ruling 17: the identity the CLI and the daemon's clients will pin, given by the
+        # maintainer, never derived from what was signed.
+        $organization = if ($ExpectedPublisherOrganization) { $ExpectedPublisherOrganization } else { [Environment]::GetEnvironmentVariable('ARKDECK_DAEMON_PUBLISHER_ORGANIZATION') }
+        $eku = if ($ExpectedPublisherEku) { $ExpectedPublisherEku } else { [Environment]::GetEnvironmentVariable('ARKDECK_DAEMON_PUBLISHER_EKU') }
+        if (-not $organization -or -not $eku) {
+            throw 'A production release candidate needs the publisher identity the clients pin (maintainer ruling 17): -ExpectedPublisherOrganization and -ExpectedPublisherEku, or ARKDECK_DAEMON_PUBLISHER_ORGANIZATION and ARKDECK_DAEMON_PUBLISHER_EKU. Nothing was built or signed.'
+        }
+        if ($organization -ne $organization.Trim() -or $eku -notmatch '^1\.3\.6\.1\.4\.1\.311\.97\.[0-9]+(\.[0-9]+)*$' -or $eku -eq '1.3.6.1.4.1.311.97.1.0') {
+            throw "The expected publisher identity is malformed: the organisation must have no outer whitespace and the EKU must be an Artifact Signing certificate-profile identity (1.3.6.1.4.1.311.97.<profile>, not the Public Trust marker). Nothing was built or signed."
+        }
+        $expectedPublisher = [ordered]@{ organization = $organization; eku = $eku }
+        if (-not $SkipMsix) {
+            if (-not $msixCommand) { throw 'A production release candidate signs its MSIX: pass -MsixSignCommand or set ARKDECK_MSIX_SIGN_COMMAND (or -SkipMsix). Nothing was built or signed.' }
+            if (-not $MsixPublisher) { throw 'A production MSIX is published under its signing certificate''s subject: pass -MsixPublisher "<subject>" (or -SkipMsix). Nothing was built or signed.' }
+            if ((Get-SubjectOrganization $MsixPublisher) -ne $organization) {
+                throw "-MsixPublisher names O=$(Get-SubjectOrganization $MsixPublisher), not the expected publisher $organization. Nothing was built or signed."
+            }
+        }
+    }
     if ($feedBase -and $SkipMsix) { throw '-FeedBaseUri needs the MSIX; drop -SkipMsix.' }
     $dotnet = Get-Dotnet
     $releaseVersion = Get-Content -LiteralPath (Join-Path $repository 'scripts/release/release-version.json') -Raw | ConvertFrom-Json
@@ -253,6 +314,12 @@ function New-RcBuild {
     if ($runtimeStage.Count -ne 1) { throw 'The runtime build left more than one package directory.' }
     $runtimeStage = $runtimeStage[0].FullName
     if ($runtimeManifest.sourceRevision -ne $revision) { throw 'The runtime was built from another revision.' }
+    if ($expectedPublisher) {
+        $runtimePublisher = $runtimeManifest.signing.publisher
+        if ($runtimePublisher.organization -ne $expectedPublisher.organization -or $runtimePublisher.eku -ne $expectedPublisher.eku) {
+            throw "The runtime is signed by $($runtimePublisher.organization) / $($runtimePublisher.eku), not the expected publisher $($expectedPublisher.organization) / $($expectedPublisher.eku)."
+        }
+    }
 
     # 2. The App, unpackaged, self-contained, published (ReadyToRun + trimmed).
     $appProject = Join-Path $repository 'windows/App/ArkDeck.App.csproj'
@@ -262,7 +329,7 @@ function New-RcBuild {
     Write-Host "dotnet $($publish -join ' ')"
     & $dotnet @publish | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish (unpackaged App) exited $LASTEXITCODE" }
-    foreach ($name in @($DaemonName, 'bin')) {
+    foreach ($name in @($DaemonName, $HelperBundle, 'bin')) {
         if (Test-Path -LiteralPath (Join-Path $appPublish $name)) { throw "The App's publish output already holds $name." }
     }
     $appPin = $null
@@ -285,6 +352,7 @@ function New-RcBuild {
     $stage = Join-Path $output $name
     Copy-Item -LiteralPath $appPublish -Destination $stage -Recurse
     Copy-Item -LiteralPath (Join-Path $runtimeStage $DaemonName) -Destination $stage
+    Copy-Item -LiteralPath (Join-Path $runtimeStage $HelperBundle) -Destination $stage -Recurse
     [void](New-Item -ItemType Directory -Path (Join-Path $stage 'bin'))
     Copy-Item -LiteralPath (Join-Path $runtimeStage $CliName) -Destination (Join-Path $stage 'bin')
 
@@ -294,6 +362,16 @@ function New-RcBuild {
         $msixDirectory = Join-Path $output 'msix'
         $package = @('publish', $appProject, '-c', 'Release', '-p:Platform=x64', '-p:GenerateAppxPackageOnBuild=true',
             "-p:AppxPackageDir=$msixDirectory\", "-p:ArkDeckRuntimeDirectory=$runtimeStage", '--nologo')
+        if ($MsixPublisher) {
+            # The signing certificate's subject as the package publisher, in a copy of the
+            # tracked manifest: nothing in the checkout changes.
+            $manifestCopy = Join-Path $output 'msix-manifest\Package.appxmanifest'
+            [void](New-Item -ItemType Directory -Path (Split-Path -Parent $manifestCopy))
+            [xml]$source = Get-Content -LiteralPath (Join-Path $repository 'windows/App/Package.appxmanifest') -Raw
+            $source.Package.Identity.SetAttribute('Publisher', $MsixPublisher)
+            $source.Save($manifestCopy)
+            $package += "-p:ArkDeckPackageManifest=$manifestCopy"
+        }
         Write-Host "dotnet $($package -join ' ')"
         & $dotnet @package | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "dotnet publish (MSIX) exited $LASTEXITCODE" }
@@ -302,11 +380,11 @@ function New-RcBuild {
         $archive = [System.IO.Compression.ZipFile]::OpenRead($packages[0].FullName)
         try {
             $entries = @($archive.Entries | ForEach-Object { $_.FullName })
-            foreach ($required in @($AppName, $DaemonName, "bin/$CliName", 'AppxManifest.xml')) {
+            foreach ($required in @($AppName, $DaemonName, "bin/$CliName", $HelperPath, 'AppxManifest.xml')) {
                 if ($entries -notcontains $required) { throw "The MSIX has no $required." }
             }
             $inside = @{}
-            foreach ($file in @($DaemonName, "bin/$CliName")) {
+            foreach ($file in @($DaemonName, "bin/$CliName", $HelperPath)) {
                 $stream = $archive.GetEntry($file).Open()
                 try { $inside[(Split-Path -Leaf $file)] = ([System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($stream))).ToLowerInvariant() } finally { $stream.Dispose() }
             }
@@ -318,12 +396,16 @@ function New-RcBuild {
         foreach ($file in @($DaemonName, $CliName)) {
             if ($inside[$file] -ne (Get-Sha256 (Join-Path $runtimeStage $file))) { throw "The MSIX's $file is not the runtime build's." }
         }
+        if ($inside[(Split-Path -Leaf $HelperPath)] -ne (Get-Sha256 (Join-Path $runtimeStage $HelperPath))) { throw "The MSIX's code-sign helper is not the runtime package's." }
         $identity = $appx.Package.Identity
         # The signing hook: the maintainer's command signs the package in place.
         $msixSigning = [ordered]@{ signed = $false; installable = $false; note = 'Unsigned: Windows installs only a signed MSIX (the development certificate of ruling 12, or the production publisher).' }
         if ($msixCommand) {
             [void](Invoke-ProductionSigning @($packages[0].FullName) $msixCommand)
             $signer = Get-VerifiedSigner $packages[0].FullName ($SigningMode -eq 'production')
+            if ($MsixPublisher -and $identity.Publisher -ne $MsixPublisher) {
+                throw "The MSIX was built with publisher $($identity.Publisher), not -MsixPublisher $MsixPublisher."
+            }
             if ($signer.subject -ne $identity.Publisher) {
                 throw "The MSIX is signed by $($signer.subject), but its manifest names the publisher $($identity.Publisher); Windows would refuse to install it."
             }
@@ -387,6 +469,7 @@ function New-RcBuild {
             mode         = $SigningMode
             signerSha256 = $runtimeManifest.signing.signerSha256
             publisher    = if ($SigningMode -eq 'production') { $runtimeManifest.signing.publisher } else { $null }
+            expectedPublisher = $expectedPublisher
             signed       = if ($SigningMode -ne 'none') { @($AppName, "bin/$CliName", $DaemonName) } else { @() }
             note         = switch ($SigningMode) {
                 'development' { 'Host-trusted development signer (design L.1 item 22); not an installation identity.' }
@@ -405,8 +488,8 @@ function New-RcBuild {
             [ordered]@{
                 ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = $runtimeManifest.signing.publisher.organization
                 ARKDECK_DAEMON_PUBLISHER_EKU          = $runtimeManifest.signing.publisher.eku
-                ARKDECK_DAEMON_PATH                   = "the CLI: <install>\$DaemonName"
-                note                                  = 'The App reads only ARKDECK_DAEMON_SIGNER_SHA256 or ARKDECK_DAEMON_PACKAGE_FAMILY today: its publisher-identity pin (ruling 17) is not implemented yet.'
+                ARKDECK_DAEMON_PATH                   = "the App: unset ($DaemonName beside ArkDeck.exe); the CLI: <install>\$DaemonName"
+                note                                  = 'The CLI and the App read the same publisher inputs (ruling 17); no certificate hash is pinned in production.'
             }
         } else {
             [ordered]@{
@@ -503,17 +586,21 @@ function Invoke-RcSmoke($Built) {
             if ((Get-Sha256 (Join-Path $install $file.path)) -ne $file.sha256) { throw "$($file.path) differs from the package manifest." }
         }
         $record.files = $installed.Count
-        $pin = $manifest.signing.signerSha256
-        if ($manifest.signing.mode -eq 'production') {
-            throw 'A production RC cannot be smoked by this script yet: the App pins its daemon only by a certificate SHA-256 or a package family, not by the publisher identity (ruling 17). Follow evidence/runs/TASK-XPA-022/windows-clean-host-smoke-runbook.md.'
-        }
-        if (-not $pin) { throw 'The package is unsigned; the CLI and the App refuse an unsigned daemon, so there is nothing to smoke.' }
+        # A production RC is pinned by its publisher identity (ruling 17): the leaf renews
+        # daily, so no certificate hash is pinned. A development RC keeps its signer pin.
+        $publisher = if ($manifest.signing.mode -eq 'production') { $manifest.signing.publisher } else { $null }
+        $pin = if ($publisher) { $null } else { $manifest.signing.signerSha256 }
+        if (-not $pin -and -not $publisher) { throw 'The package is unsigned; the CLI and the App refuse an unsigned daemon, so there is nothing to smoke.' }
         foreach ($name in @($AppName, "bin\$CliName", $DaemonName)) {
-            $signature = Get-AuthenticodeSignature -LiteralPath (Join-Path $install $name)
-            $actual = ([System.Convert]::ToHexString([System.Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData))).ToLowerInvariant()
-            if ($signature.Status -ne 'Valid' -or $actual -ne $pin) { throw "$name does not carry the manifest's signer." }
+            $signer = Get-VerifiedSigner (Join-Path $install $name) ([bool]$publisher)
+            if ($publisher) {
+                $identity = Get-PublisherIdentity $signer.certificate
+                if ($identity.organization -ne $publisher.organization -or $identity.eku -ne $publisher.eku) { throw "$name does not carry the manifest's publisher." }
+            } elseif ($signer.pin -ne $pin) {
+                throw "$name does not carry the manifest's signer."
+            }
         }
-        $record.signerSha256 = $pin
+        if ($publisher) { $record.publisher = [ordered]@{ organization = $publisher.organization; eku = $publisher.eku } } else { $record.signerSha256 = $pin }
 
         $state = Join-Path $work 'state'
         New-PrivateDirectory $state
@@ -521,7 +608,12 @@ function Invoke-RcSmoke($Built) {
         foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
             if ($entry.Key -notmatch '^(ARKDECK_|OHOS_HDC_)') { $environment[$entry.Key] = $entry.Value }
         }
-        $environment['ARKDECK_DAEMON_SIGNER_SHA256'] = $pin
+        if ($publisher) {
+            $environment['ARKDECK_DAEMON_PUBLISHER_ORGANIZATION'] = $publisher.organization
+            $environment['ARKDECK_DAEMON_PUBLISHER_EKU'] = $publisher.eku
+        } else {
+            $environment['ARKDECK_DAEMON_SIGNER_SHA256'] = $pin
+        }
         $environment['ARKDECK_DEVELOPMENT_STATE_ROOT'] = $state
         $environment['ARKDECK_DAEMON_PATH'] = Join-Path $install $DaemonName
         $cli = Join-Path $install "bin\$CliName"
@@ -547,13 +639,18 @@ function Invoke-RcSmoke($Built) {
         $build = Invoke-Process $dotnet @('build', $uitests, '-c', 'Release', '--nologo') $environment $Built.Repository
         if ($build.exitCode -ne 0) { throw "Building the UIA tests failed: $($build.stdout) $($build.stderr)" }
         $uiEnvironment = $environment.Clone()
-        $uiEnvironment.Remove('ARKDECK_DAEMON_SIGNER_SHA256')
-        $uiEnvironment.Remove('ARKDECK_DEVELOPMENT_STATE_ROOT')
-        $uiEnvironment.Remove('ARKDECK_DAEMON_PATH')
+        foreach ($key in @('ARKDECK_DAEMON_SIGNER_SHA256', 'ARKDECK_DAEMON_PUBLISHER_ORGANIZATION', 'ARKDECK_DAEMON_PUBLISHER_EKU', 'ARKDECK_DEVELOPMENT_STATE_ROOT', 'ARKDECK_DAEMON_PATH')) {
+            $uiEnvironment.Remove($key)
+        }
         $uiEnvironment['ARKDECK_APP_UITESTS'] = '1'
         $uiEnvironment['ARKDECK_RC_APP'] = Join-Path $install $AppName
         $uiEnvironment['ARKDECK_RC_ENDPOINT'] = $instance.socketPath
-        $uiEnvironment['ARKDECK_RC_SIGNER_SHA256'] = $pin
+        if ($publisher) {
+            $uiEnvironment['ARKDECK_RC_PUBLISHER_ORGANIZATION'] = $publisher.organization
+            $uiEnvironment['ARKDECK_RC_PUBLISHER_EKU'] = $publisher.eku
+        } else {
+            $uiEnvironment['ARKDECK_RC_SIGNER_SHA256'] = $pin
+        }
         # The outcome is read from the TRX, not the (localised) console: exactly one test, passed.
         $results = Join-Path $work 'uitest'
         $ui = Invoke-Process $dotnet @('test', $uitests, '-c', 'Release', '--no-build', '--nologo', '--filter', 'FullyQualifiedName~InstalledRcTests',
@@ -622,8 +719,8 @@ if ($PSCmdlet.ParameterSetName -eq 'SmokeOnly') {
     Invoke-RcSmoke ([pscustomobject]@{ Zip = $zip; Output = (Split-Path -Parent $zip); Repository = (Invoke-Checked git @('-C', $PSScriptRoot, 'rev-parse', '--show-toplevel')).Trim() })
     return
 }
-if ($Smoke -and $SigningMode -ne 'development') {
-    throw '-Smoke needs -SigningMode development: the clients refuse an unsigned daemon, and the App cannot pin a production daemon by publisher identity yet.'
+if ($Smoke -and $SigningMode -eq 'none') {
+    throw '-Smoke needs a signed release candidate: the clients refuse an unsigned daemon.'
 }
 $outputExisted = Test-Path -LiteralPath $OutputDirectory
 try {

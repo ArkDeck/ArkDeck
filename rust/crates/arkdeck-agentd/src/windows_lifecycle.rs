@@ -18,7 +18,9 @@
 //!   workspace project owner, the Job planner and admitter and the Trace
 //!   cache owner are composed over it (see
 //!   [`Authority::compose`]); every input that would compose another
-//!   owner on macOS is refused, not ignored, until its store is ported (G01);
+//!   owner on macOS is refused, not ignored, until its store is ported (G01),
+//!   and a development HDC is admitted only by a registered Windows HDC
+//!   tuple (`windows_hdc_gate`, CHG-2026-078), of which there is none yet;
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
 //!   standalone daemon does (the black-box read-only check runs it).
@@ -44,7 +46,7 @@ use arkdeck_platform::{
     GuardAcquisition, LocalEndpoint, LocalListener, OwnerLock, SingleInstanceGuard, StateRoot,
     StopSignal,
 };
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
@@ -70,10 +72,9 @@ const INSTANCE_DOCUMENT: &str = "instance.json";
 const DOCUMENT_LIMIT: u64 = 64 * 1024;
 
 /// Inputs from which the isolated macOS owner composes an owner that this
-/// composition does not compose yet: each one set refuses the start.
-const NOT_COMPOSED: [&str; 10] = [
-    "ARKDECK_DEVELOPMENT_HDC_PATH",
-    "ARKDECK_DEVELOPMENT_HDC_SERVER",
+/// composition does not compose yet: each one set refuses the start. The
+/// development HDC is decided by the tuple gate instead (`windows_hdc_gate`).
+const NOT_COMPOSED: [&str; 8] = [
     "ARKDECK_DEVELOPMENT_USB_RELATIONS",
     "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC",
     "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER",
@@ -235,7 +236,16 @@ impl Authority {
                 path.display()
             )
         })?;
-        let host = host.with_artifacts(artifacts);
+        // The Import owner over the same Artifact root, in its private
+        // `.imports-v1`, as both macOS compositions give it: `artifact.import.*`,
+        // an Import's Artifacts and a Job's Import inputs.
+        let imports = arkdeck_hoststore::ImportUploadStore::open(&path).map_err(|error| {
+            format!(
+                "the Import store {} is unusable: {error}; nothing was started",
+                path.join(".imports-v1").display()
+            )
+        })?;
+        let host = host.with_artifacts(artifacts).with_imports(imports);
         let host = host.with_storage(self.session_store()?, {
             // The Artifact read owner's directory, as it opened it.
             let path = self.root.private_child("artifacts").map_err(|error| {
@@ -651,7 +661,7 @@ pub(crate) fn start(
     development: Option<&OsStr>,
     endpoint: Option<&OsStr>,
     started_at_utc: &str,
-    is_set: &dyn Fn(&str) -> bool,
+    variable: &dyn Fn(&str) -> Option<OsString>,
 ) -> Result<Start, String> {
     if let (None, Some(endpoint)) = (development, endpoint) {
         let stop = StopSignal::install(None).map_err(|error| error.to_string())?;
@@ -664,10 +674,22 @@ pub(crate) fn start(
         }));
     }
     if development.is_some()
-        && let Some(input) = NOT_COMPOSED.iter().find(|name| is_set(name))
+        && let Some(input) = NOT_COMPOSED.iter().find(|name| variable(name).is_some())
     {
         return Err(format!(
             "{input} is not composed by the Windows development root yet; nothing was started"
+        ));
+    }
+    // Only a registered Windows HDC tuple (CHG-2026-078) admits a development
+    // HDC, and it is decided before the root is opened.
+    if development.is_some()
+        && let Some(hdc) =
+            crate::windows_hdc_gate::admit(variable, arkdeck_provider_hdc::WINDOWS_HDC_TUPLES)?
+    {
+        return Err(format!(
+            "the registered Windows HDC {} (SHA-256 {}) is admitted, but its managed server is \
+             not composed by the Windows development root yet; nothing was started",
+            hdc.tuple.candidate, hdc.sha256
         ));
     }
     let root = match development {
@@ -797,7 +819,7 @@ mod tests {
     fn a_development_root_refuses_an_input_it_does_not_compose() {
         for input in NOT_COMPOSED {
             let refused = start(Some(OsStr::new(r"C:\unused")), None, "t", &|name| {
-                name == input
+                (name == input).then(|| OsString::from("x"))
             });
             assert!(
                 matches!(&refused, Err(message) if message.starts_with(input)),

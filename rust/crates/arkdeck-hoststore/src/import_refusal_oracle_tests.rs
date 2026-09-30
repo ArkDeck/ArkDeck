@@ -8,10 +8,10 @@
 //! Each answer's code, message and details are Swift's, byte for byte.
 use super::*;
 use crate::job_owner::import_references::ImportReference;
+use crate::test_private::create_private_directory;
 use crate::{ArtifactReadStore, JobRecord, JobStore, OperationRequest, TargetStore};
 use arkdeck_contract::encode_import_chunk;
 use std::fs;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 
 const NOW: &str = "2026-09-12T00:00:00Z";
 /// The one Target of `tests/fixtures/import-target-current/direct`, at binding
@@ -24,32 +24,55 @@ struct Fixture {
     artifacts: ArtifactReadStore,
     jobs: JobStore,
     targets: TargetStore,
+    // Last, so the owners above have let go of their handles when it removes
+    // the root: NTFS keeps a directory with an open handle below it.
+    _removal: Removal,
+}
+/// Removes the fixture's root when dropped.
+struct Removal(PathBuf);
+impl Drop for Removal {
+    fn drop(&mut self) {
+        fs::remove_dir_all(&self.0).unwrap();
+    }
 }
 impl Fixture {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        // A local drive's plain spelling on Windows, as the owners compare.
+        #[cfg(windows)]
+        let temporary = match temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+        {
+            Some(plain) => PathBuf::from(plain),
+            None => temporary,
+        };
+        let root = temporary.join(format!(
             "import-refusal-oracle-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        create_private_directory(&root);
         for name in ["artifacts", "targets", "jobs-state"] {
-            fs::DirBuilder::new()
-                .mode(0o700)
-                .create(root.join(name))
-                .unwrap();
+            create_private_directory(&root.join(name));
         }
         let source = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/fixtures/import-target-current/direct");
         for name in ["targets.json", "target-display-names.json"] {
             let path = root.join("targets").join(name);
             fs::copy(source.join(name), &path).unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            // On Windows the copy inherits the owner-only directory's DACL.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            }
         }
         Self {
             store: ImportUploadStore::open(&root.join("artifacts")).unwrap(),
             artifacts: ArtifactReadStore::open(&root.join("artifacts")).unwrap(),
             jobs: JobStore::open_owner(&root.join("jobs-state")).unwrap(),
             targets: TargetStore::open(&root.join("targets")).unwrap(),
+            _removal: Removal(root.clone()),
             root,
         }
     }
@@ -82,11 +105,6 @@ impl Fixture {
         let value = json!({"jobID":format!("job-oracle-reference-{index}"),"request":request.canonical_value(),"originalSubmissionRequest":request.canonical_value(),"operationReference":"analyzer.extract-crash-signature@1","catalogDigest":arkdeck_contract::CATALOG_DIGEST,"providerID":"analyzer","createdAtUTC":NOW,"state":"queued","outcomeUnknown":false,"timeline":[],"actualStepKinds":[],"skipReasons":{}});
         let record = JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
         self.jobs.admit(&record, &request.fingerprint()).unwrap();
-    }
-}
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        fs::remove_dir_all(&self.root).unwrap();
     }
 }
 

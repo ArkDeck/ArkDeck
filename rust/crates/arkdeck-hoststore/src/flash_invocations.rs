@@ -14,6 +14,11 @@
 //! unreadable. The file must be the Runtime user's private single-link
 //! regular file, opened through no link, in a private directory.
 //!
+//! On Windows (TASK-XPA-010) the same checks are the platform's: the
+//! directories are created and judged as `HostDirectory` creates and opens a
+//! private one, and a document is read as it reads an owner-only single-link
+//! document.
+//!
 //! A read never writes except the list's immutable snapshot. Starting,
 //! evaluating and expiring an invocation are the broker's own
 //! (`debug.start`, `debug.evaluate`; `flash_invocation_broker.rs`).
@@ -23,7 +28,10 @@ use crate::strict_json::{self, swift_quoted};
 use crate::swift_decoding::{swift_integer, swift_value};
 use arkdeck_contract::WireError;
 use serde_json::{Map, Value, json};
-use std::io::{self, Read};
+use std::io;
+#[cfg(unix)]
+use std::io::Read;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -134,10 +142,13 @@ impl FlashInvocations {
         let snapshots = state.join(SNAPSHOTS);
         let directory = state.join(DIRECTORY);
         for path in [&snapshots, &directory] {
+            #[cfg(unix)]
             std::fs::DirBuilder::new()
                 .recursive(true)
                 .mode(0o700)
                 .create(path)?;
+            #[cfg(windows)]
+            arkdeck_platform::HostDirectory::open_or_create_private(path)?;
         }
         if !private_directory(&directory) {
             return Err(io::Error::other(
@@ -298,7 +309,38 @@ impl FlashInvocations {
         Ok(document)
     }
 
+    /// Swift `readInvocation(_:)` on Windows: the same refusals, the
+    /// document read as `HostDirectory` reads an owner-only one.
+    #[cfg(windows)]
+    fn read(&self, identity: &str) -> Result<Vec<u8>, ReadError> {
+        use arkdeck_platform::{HostDirectory, OwnerOnlyReadFailure};
+        let unavailable =
+            || ReadError::Persistence("Flash invocation store is not a private Runtime directory");
+        if !private_directory(&self.directory) {
+            return Err(unavailable());
+        }
+        let directory = HostDirectory::open(&self.directory).map_err(|_| unavailable())?;
+        match directory
+            .read_owner_only_detailed(&format!("{identity}.json"), MAXIMUM_DOCUMENT_BYTES as usize)
+        {
+            Ok(Some(bytes)) => Ok(bytes),
+            Ok(None) => Err(ReadError::NotFound(identity.to_owned())),
+            Err(OwnerOnlyReadFailure::Open(_)) => Err(ReadError::Persistence(
+                "Flash invocation document cannot be opened",
+            )),
+            Err(OwnerOnlyReadFailure::Identity | OwnerOnlyReadFailure::Size) => {
+                Err(ReadError::Persistence(
+                    "Flash invocation document failed identity or size validation",
+                ))
+            }
+            Err(OwnerOnlyReadFailure::Truncated) => Err(ReadError::Persistence(
+                "Flash invocation document changed while it was read",
+            )),
+        }
+    }
+
     /// Swift `readInvocation(_:)`.
+    #[cfg(unix)]
     fn read(&self, identity: &str) -> Result<Vec<u8>, ReadError> {
         if !private_directory(&self.directory) {
             return Err(ReadError::Persistence(
@@ -405,8 +447,18 @@ fn valid_identity(identity: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'.' || *byte == b'-')
 }
 
+/// Swift `validateInvocationDirectory(_:)` on Windows: a directory reached
+/// through no link that `HostDirectory` opens as a private one (the user's,
+/// closed to everyone else).
+#[cfg(windows)]
+fn private_directory(directory: &Path) -> bool {
+    std::fs::symlink_metadata(directory).is_ok_and(|metadata| metadata.is_dir())
+        && arkdeck_platform::HostDirectory::open(directory).is_ok()
+}
+
 /// Swift `validateInvocationDirectory(_:)`: a directory reached through no
 /// link, the effective user's, closed to group and others.
+#[cfg(unix)]
 fn private_directory(directory: &Path) -> bool {
     std::fs::symlink_metadata(directory).is_ok_and(|metadata| {
         metadata.is_dir()

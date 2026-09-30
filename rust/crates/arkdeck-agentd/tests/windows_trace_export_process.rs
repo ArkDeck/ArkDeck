@@ -539,7 +539,7 @@ fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() 
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
                 .to_owned()
         ),
         "{:?}",
@@ -672,7 +672,14 @@ fn trace_commands_run_through_the_cli_against_a_dev_signed_daemon() {
         "{envelope}"
     );
     running.stop(&root.0);
-    assert_eq!(Root::tree(&root.artifacts()), before);
+    // The daemon's Import owner keeps its private `.imports-v1` in the
+    // Artifact root, created as it opens; every recorded entry is unchanged.
+    let imports = root.artifacts().join(".imports-v1");
+    let after: Vec<_> = Root::tree(&root.artifacts())
+        .into_iter()
+        .filter(|(path, _)| !path.starts_with(&imports))
+        .collect();
+    assert_eq!(after, before);
     assert_eq!(
         std::fs::read_dir(&exports).unwrap().count(),
         0,

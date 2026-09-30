@@ -118,6 +118,24 @@ pub(crate) fn chain_matches(
         && usages.contains(&publisher.eku)
 }
 
+/// The name a signer is known by in a tool registration (TASK-XPA-011): the
+/// leaf's single subject `O=`, or, with no `O=`, its single `CN=`. Anything
+/// else is not one name and is an error.
+pub(crate) fn signer_name(der: &[u8]) -> io::Result<String> {
+    let certificate = Certificate::decode(der)?;
+    let organizations = certificate.subject_organizations()?;
+    match organizations.as_slice() {
+        [only] => Ok(only.clone()),
+        [] => match certificate.subject_values(b"2.5.4.3")?.as_slice() {
+            [only] => Ok(only.clone()),
+            _ => Err(invalid("the signer certificate names no single subject")),
+        },
+        _ => Err(invalid(
+            "the signer certificate names more than one organisation",
+        )),
+    }
+}
+
 struct Certificate(*const CERT_CONTEXT);
 
 impl Drop for Certificate {
@@ -160,6 +178,11 @@ impl Certificate {
     }
 
     fn subject_organizations(&self) -> io::Result<Vec<String>> {
+        self.subject_values(b"2.5.4.10")
+    }
+
+    /// Every value of the subject attribute `oid` (dotted, as ASCII bytes).
+    fn subject_values(&self, oid: &[u8]) -> io::Result<Vec<String>> {
         // SAFETY: live context; its CERT_INFO and subject blob belong to it.
         let subject = unsafe { (*(*self.0).pCertInfo).Subject };
         let mut decoded = Decoded(null_mut());
@@ -186,8 +209,7 @@ impl Certificate {
             for rdn in slice(name.rgRDN, name.cRDN) {
                 for attribute in slice(rdn.rgRDNAttr, rdn.cRDNAttr) {
                     if attribute.pszObjId.is_null()
-                        || std::ffi::CStr::from_ptr(attribute.pszObjId.cast()).to_bytes()
-                            != b"2.5.4.10"
+                        || std::ffi::CStr::from_ptr(attribute.pszObjId.cast()).to_bytes() != oid
                     {
                         continue;
                     }
@@ -201,10 +223,10 @@ impl Certificate {
                         text.len() as u32,
                     );
                     let end = (written as usize).saturating_sub(1).min(text.len());
-                    organizations
-                        .push(String::from_utf16(&text[..end]).map_err(|_| {
-                            invalid("certificate organisation is not valid UTF-16")
-                        })?);
+                    organizations.push(
+                        String::from_utf16(&text[..end])
+                            .map_err(|_| invalid("certificate subject is not valid UTF-16"))?,
+                    );
                 }
             }
         }

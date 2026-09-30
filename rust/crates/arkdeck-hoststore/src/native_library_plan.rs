@@ -56,36 +56,11 @@ impl<'a> JobPlanner<'a> {
             helper: hdc.code_sign_helper,
         };
         let now = (hdc.now)().ok_or_else(internal_failure)?;
-        let reference = descriptor.reference();
-        let mut steps = Vec::new();
-        for step in descriptor
-            .steps
-            .iter()
-            .filter(|step| descriptor.step_is_selected(step, &request.inputs))
-        {
-            steps.push(materialize_step(
-                step, &reference, request, facts, &context, &now,
-            )?);
-        }
-        // The rollback a failure past the publish applies, after every
-        // selected step.
-        steps.push(materialize_step(
-            &device_steps::native_rollback(),
-            &reference,
-            request,
-            facts,
-            &context,
-            &now,
-        )?);
-        let document = json!({"operationReference": reference, "catalogDigest": CATALOG_DIGEST,
-            "inputs": request.inputs, "targetID": request.target_id,
-            "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
-            "providerID": descriptor.provider, "steps": steps});
         Ok(Materialized {
             _import_use: None,
             _workspace_use: None,
             artifact_facts,
-            digest: sha256_hex(&session_json::encode(&document).map_err(|_| internal_failure())?),
+            digest: native_plan_digest(request, descriptor, facts, &context, &now)?,
             identity: Some(facts.identity.clone()),
             binding_revision: Some(facts.binding_revision),
         })
@@ -124,6 +99,48 @@ impl<'a> JobPlanner<'a> {
             .ok_or_else(internal_failure)?;
         Ok((resolved_input(leased)?, artifact_facts, byte_count))
     }
+}
+
+/// Swift `materializeTypedPlanBeforeAuthorization`'s digest of a native
+/// deployment: every selected step, then the rollback a failure past the
+/// publish applies, over the library and the code-sign helper as `context`
+/// names them. Its sends name both files' host paths, so the digest is
+/// Swift's for the same request, facts, bytes and paths.
+fn native_plan_digest(
+    request: &OperationRequest,
+    descriptor: &CatalogOperation,
+    facts: &DeviceFacts,
+    context: &StepContext<'_>,
+    now: &str,
+) -> Result<String, PlanRefusal> {
+    let reference = descriptor.reference();
+    let mut steps = Vec::new();
+    for step in descriptor
+        .steps
+        .iter()
+        .filter(|step| descriptor.step_is_selected(step, &request.inputs))
+    {
+        steps.push(materialize_step(
+            step, &reference, request, facts, context, now,
+        )?);
+    }
+    // The rollback a failure past the publish applies, after every selected
+    // step.
+    steps.push(materialize_step(
+        &device_steps::native_rollback(),
+        &reference,
+        request,
+        facts,
+        context,
+        now,
+    )?);
+    let document = json!({"operationReference": reference, "catalogDigest": CATALOG_DIGEST,
+        "inputs": request.inputs, "targetID": request.target_id,
+        "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
+        "providerID": descriptor.provider, "steps": steps});
+    Ok(sha256_hex(
+        &session_json::encode(&document).map_err(|_| internal_failure())?,
+    ))
 }
 
 /// A resolved input as its provider is given it: its identity, its digest
@@ -198,4 +215,114 @@ fn materialize_step(
         })
         .collect();
     Ok(document)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arkdeck_provider_hdc::{CodeSignHelper, CodeSignHelperFacts, NativeAbi};
+    use std::path::PathBuf;
+
+    /// Every native deployment the Swift oracle planned, materialized again
+    /// from its request over the oracle's library and code-sign helper at the
+    /// paths Swift named them (`HDCOracleFake`'s root, which the sends name):
+    /// the digest is Swift's byte for byte on every host. The library is
+    /// verified as its ABI's code-signed ELF and the helper's facts carried
+    /// as they are. A host whose paths are spelled otherwise (a Windows root)
+    /// digests the same document with its own paths in the sends.
+    #[test]
+    fn the_recorded_plans_digest_as_swift_s_over_the_oracle_s_paths() {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/deploy-native-library");
+        let read = |path: PathBuf| -> Value {
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+        };
+        let cases = read(fixture.join("cases.json"));
+        let descriptor =
+            CatalogOperation::lookup("deploy.native-library.app-owned", Some(1)).unwrap();
+        let (job, artifact) = cases["lease"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("lease-v1:")
+            .and_then(|rest| rest.split_once(':'))
+            .unwrap();
+        let row = read(fixture.join("artifacts").join(job).join("index.json"))["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["artifactID"] == artifact)
+            .unwrap()
+            .clone();
+        let library = LeasedLibrary {
+            bytes: std::fs::read(fixture.join("artifacts").join(job).join(artifact)).unwrap(),
+            byte_count: row["byteCount"].as_i64().unwrap(),
+        };
+        let resolved = [ResolvedArtifact {
+            artifact_id: artifact.into(),
+            sha256: row["sha256"].as_str().unwrap().into(),
+            path: PathBuf::from(format!(
+                "/private/tmp/arkdeck-hdc-oracle/artifacts/{job}/{artifact}"
+            )),
+        }];
+        let recorded = &cases["codeSignHelper"];
+        let helper = CodeSignHelper {
+            facts: CodeSignHelperFacts {
+                abi: NativeAbi::Arm64,
+                build_id: recorded["buildId"].as_str().unwrap().into(),
+                sha256: recorded["sha256"].as_str().unwrap().into(),
+                byte_count: recorded["byteCount"].as_i64().unwrap(),
+            },
+            host_path: PathBuf::from(recorded["path"].as_str().unwrap()),
+        };
+        let context = StepContext {
+            job_id: AUTHORIZATION_JOB,
+            resolved: &resolved,
+            library: Some(&library),
+            helper: Some(&helper),
+        };
+        let target = &cases["target"];
+        let facts = DeviceFacts {
+            target_id: target["targetId"].as_str().unwrap().into(),
+            binding_revision: target["bindingRevision"].as_i64().unwrap(),
+            tool_version: target["toolVersion"].as_str().unwrap().into(),
+            tool_sha256: String::new(),
+            connect_key: target["connectKey"].as_str().unwrap().into(),
+            identity: row["bindingSnapshot"]["stableIdentitySHA256"]
+                .as_str()
+                .unwrap()
+                .into(),
+        };
+        let mut replayed = 0;
+        for exchange in cases["exchanges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row["method"] == "job.plan" && row["answer"]["ok"] == true)
+        {
+            let request = OperationRequest::decode(
+                exchange["params"]["requestJson"]
+                    .as_str()
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
+            assert_eq!(
+                native_plan_digest(
+                    &request,
+                    descriptor,
+                    &facts,
+                    &context,
+                    "2026-09-14T00:00:00Z"
+                )
+                .unwrap(),
+                exchange["answer"]["result"]["materializedPlanDigest"]
+                    .as_str()
+                    .unwrap(),
+                "{}",
+                exchange["name"]
+            );
+            replayed += 1;
+        }
+        assert_eq!(replayed, 5);
+    }
 }

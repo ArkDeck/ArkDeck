@@ -5,7 +5,8 @@
 //! drain, the deadline and the cancellation that terminate the whole Job
 //! object (a live child tree included), and the commandless proof that one
 //! process of the verified file owns the exact loopback listener, with each
-//! of its refusals.
+//! of its refusals; and the paired server (TASK-XPA-010), handed its secret
+//! on stdin and ended by its end of input before its Job.
 //!
 //! The fake tool is this binary itself. It is a `harness = false` target, so
 //! that when it runs as `<exe> --fake-tool <role> …` nothing but the role's
@@ -33,8 +34,9 @@ mod loopback_ports {
 mod windows {
     use super::loopback_ports::free_port;
     use arkdeck_platform::{
-        LoopbackServerLease, ManagedServer, ServerExit, ServerIdentityReceipt, ToolExecution,
-        ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool, random_bytes,
+        LoopbackServerLease, ManagedServer, ProvedProcessEnd, ServerExit, ServerIdentityReceipt,
+        ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool,
+        end_proved_process, random_bytes,
     };
     use sha2::{Digest, Sha256};
     use std::cell::{Cell, RefCell};
@@ -143,6 +145,25 @@ mod windows {
                 fs::rename(&partial, &ready).unwrap();
                 park();
             }
+            // `paired <mode>`: the working directory as `cwd`, the first 32
+            // bytes of stdin as `secret`, then — `ends-at-eof` — the rest as
+            // `rest` and exit 11 at the end of input; or — `outlasts-eof` —
+            // `eof` at the end of input, and never an end of its own.
+            "paired" => {
+                let mut secret = [0u8; 32];
+                std::io::stdin().read_exact(&mut secret).unwrap();
+                fs::write("cwd", std::env::current_dir().unwrap().to_str().unwrap()).unwrap();
+                fs::write("secret.partial", secret).unwrap();
+                fs::rename("secret.partial", "secret").unwrap();
+                let mut input = Vec::new();
+                let _ = std::io::stdin().read_to_end(&mut input);
+                if rest[0] == "ends-at-eof" {
+                    fs::write("rest", input).unwrap();
+                    std::process::exit(11);
+                }
+                fs::write("eof", input).unwrap();
+                park();
+            }
             _ => std::process::exit(64),
         }
         stdout.flush().unwrap();
@@ -217,6 +238,10 @@ mod windows {
             a_dropped_server_takes_its_child_tree_with_it,
         ),
         (
+            "a_proved_server_outside_the_job_is_ended_and_no_other_birth_ever_is",
+            a_proved_server_outside_the_job_is_ended_and_no_other_birth_ever_is,
+        ),
+        (
             "the_listener_owner_is_proved_by_image_birth_and_exact_listener_without_argv",
             the_listener_owner_is_proved_by_image_birth_and_exact_listener_without_argv,
         ),
@@ -243,6 +268,22 @@ mod windows {
         (
             "the_endpoint_must_be_the_exact_ipv4_loopback",
             the_endpoint_must_be_the_exact_ipv4_loopback,
+        ),
+        (
+            "a_paired_server_reads_its_secret_and_ends_when_its_owner_lets_go",
+            a_paired_server_reads_its_secret_and_ends_when_its_owner_lets_go,
+        ),
+        (
+            "a_paired_server_that_outlives_its_input_is_terminated_after_its_grace",
+            a_paired_server_that_outlives_its_input_is_terminated_after_its_grace,
+        ),
+        (
+            "a_dropped_paired_server_gets_its_end_of_input_before_its_job_ends",
+            a_dropped_paired_server_gets_its_end_of_input_before_its_job_ends,
+        ),
+        (
+            "a_paired_launch_needs_a_canonical_existing_working_directory",
+            a_paired_launch_needs_a_canonical_existing_working_directory,
         ),
     ];
 
@@ -740,6 +781,132 @@ mod windows {
         }
     }
 
+    // ---- the paired server ---------------------------------------------------
+
+    /// The secret the paired cases hand over.
+    fn secret() -> Vec<u8> {
+        (0u8..32).map(|byte| byte.wrapping_mul(7)).collect()
+    }
+
+    /// Waits until the paired fake has read its whole secret.
+    fn wait_for_secret(server: &mut ManagedServer, run: &Path) {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !run.join("secret").exists() {
+            assert!(Instant::now() < deadline, "the secret never arrived");
+            assert_eq!(server.exit().unwrap(), None, "the server ended unpaired");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    /// Swift `IdentityBoundDaemonLauncher`: the secret arrives on stdin, whole
+    /// and nowhere else, in the named working directory; the write end is the
+    /// owner's alone, so closing it is the server's end of input. The fake
+    /// exits 11 at that end, so its exit proves the owner closed its liveness
+    /// before it terminated the Job.
+    fn a_paired_server_reads_its_secret_and_ends_when_its_owner_lets_go() {
+        let tool = this_tool();
+        let scratch = Scratch::new("paired");
+        let run = scratch.directory("run");
+        let arguments = args(&["paired", "ends-at-eof"]);
+        let mut server =
+            ManagedServer::launch_paired(&tool, &arguments, &[], &run, &secret(), 4096).unwrap();
+        assert_eq!(server.launch_record().arguments, arguments);
+        wait_for_secret(&mut server, &run);
+        // It keeps running while its owner holds on.
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(server.exit().unwrap(), None);
+        assert_eq!(fs::read(run.join("secret")).unwrap(), secret());
+        assert_eq!(
+            fs::read_to_string(run.join("cwd")).unwrap(),
+            run.to_str().unwrap()
+        );
+        let child = Observed::open(server.launch_record().pid as u32);
+        let started = Instant::now();
+        let stopped = server.stop().unwrap();
+        assert_eq!(stopped.exit, ServerExit::Exited(11));
+        assert!(started.elapsed() < Duration::from_millis(500));
+        assert!(child.ended_within(Duration::ZERO));
+        // Nothing but the secret ever crossed the pipe.
+        assert!(fs::read(run.join("rest")).unwrap().is_empty());
+    }
+
+    /// Windows has no TERM: a paired server that does not end at its end of
+    /// input has half a second to, then its whole Job is terminated.
+    fn a_paired_server_that_outlives_its_input_is_terminated_after_its_grace() {
+        let tool = this_tool();
+        let scratch = Scratch::new("paired-outlasts");
+        let run = scratch.directory("run");
+        let mut server = ManagedServer::launch_paired(
+            &tool,
+            &args(&["paired", "outlasts-eof"]),
+            &[],
+            &run,
+            &secret(),
+            4096,
+        )
+        .unwrap();
+        wait_for_secret(&mut server, &run);
+        let child = Observed::open(server.launch_record().pid as u32);
+        let started = Instant::now();
+        let stopped = server.stop().unwrap();
+        let took = started.elapsed();
+        // Terminated by its owner, once its input had ended.
+        assert_eq!(stopped.exit, ServerExit::Exited(1));
+        assert!(run.join("eof").exists(), "the input never ended");
+        assert!(
+            took >= Duration::from_millis(500),
+            "terminated after {took:?}"
+        );
+        assert!(child.ended_within(Duration::ZERO));
+    }
+
+    /// A paired server its owner drops without its stop is ended as the stop
+    /// ends it: its end of input first, so it sees its owner go.
+    fn a_dropped_paired_server_gets_its_end_of_input_before_its_job_ends() {
+        let tool = this_tool();
+        let scratch = Scratch::new("paired-drop");
+        let run = scratch.directory("run");
+        let mut server = ManagedServer::launch_paired(
+            &tool,
+            &args(&["paired", "outlasts-eof"]),
+            &[],
+            &run,
+            &secret(),
+            4096,
+        )
+        .unwrap();
+        wait_for_secret(&mut server, &run);
+        let child = Observed::open(server.launch_record().pid as u32);
+        drop(server);
+        assert!(run.join("eof").exists(), "dropped before its end of input");
+        assert!(child.ended_within(Duration::ZERO));
+    }
+
+    /// The working directory is a tool request's: absolute, canonical and
+    /// existing; any other launches nothing.
+    fn a_paired_launch_needs_a_canonical_existing_working_directory() {
+        let tool = this_tool();
+        let scratch = Scratch::new("paired-refused");
+        let run = scratch.directory("run");
+        let arguments = args(&["paired", "ends-at-eof"]);
+        for directory in [
+            PathBuf::from("run"),
+            scratch.0.join("missing"),
+            // The same directory, not in its canonical (`\\?\`) spelling.
+            PathBuf::from(run.to_str().unwrap().strip_prefix(r"\\?\").unwrap()),
+        ] {
+            let error =
+                ManagedServer::launch_paired(&tool, &arguments, &[], &directory, &secret(), 4096)
+                    .err()
+                    .expect("refused");
+            assert_eq!(error.kind(), ErrorKind::InvalidInput, "{directory:?}");
+        }
+        assert!(
+            !run.join("secret").exists(),
+            "a refused launch ran the tool"
+        );
+    }
+
     // ---- the managed server ------------------------------------------------
 
     fn a_launched_server_is_recorded_kept_and_stopped_with_its_output() {
@@ -844,6 +1011,92 @@ mod windows {
         let mut server = ManagedServer::launch(tool, &arguments, &[], 4096).unwrap();
         wait_until_listening(&mut server, &ready);
         server
+    }
+
+    /// A child the test spawned itself, outside any Job, as `kill -r` leaves
+    /// the replacement server; killed on drop if a check failed first.
+    struct Detached(std::process::Child);
+
+    impl Drop for Detached {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    /// The daemon's stop ends the replacement a confirmed restart proved
+    /// (TASK-XPA-014 on macOS; `end_proved_process`): a server of the
+    /// verified tool that no Job of this process holds, found on the
+    /// endpoint by the commandless proof. A receipt of another birth, or of
+    /// no PID of its own, ends nothing; the proved one is terminated, its
+    /// exit finished and its listener gone, and asking again finds it
+    /// already ended.
+    fn a_proved_server_outside_the_job_is_ended_and_no_other_birth_ever_is() {
+        let tool = this_tool();
+        let endpoint = loopback(free_port());
+        let scratch = Scratch::new("replacement");
+        let ready = scratch.0.join("ready");
+        let child = std::process::Command::new(tool.path())
+            .args(args(&[
+                "listen",
+                ready.to_str().unwrap(),
+                &endpoint.to_string(),
+            ]))
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let replacement = Detached(child);
+        let observed = Observed::open(replacement.0.id());
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !ready.exists() {
+            assert!(Instant::now() < deadline, "the replacement never listened");
+            assert!(!observed.ended_within(Duration::from_millis(10)));
+        }
+        let lease = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+        let receipt = lease.identity().clone();
+        assert_eq!(receipt.pid as u32, replacement.0.id());
+
+        // Another birth at the same PID, or no PID of its own: nothing ends.
+        let mut other = receipt.clone();
+        other.start_microseconds += 1;
+        assert_eq!(
+            end_proved_process(&other, Duration::from_millis(250), Duration::from_secs(1)).unwrap(),
+            ProvedProcessEnd::AlreadyEnded
+        );
+        for pid in [0, 4, -1] {
+            let mut system = receipt.clone();
+            system.pid = pid;
+            assert_eq!(
+                end_proved_process(&system, Duration::from_millis(250), Duration::from_secs(1))
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::InvalidInput
+            );
+        }
+        assert!(!observed.ended_within(Duration::ZERO));
+        lease.revalidate().unwrap();
+
+        // The proved one is ended, its exit finished: no listener remains.
+        assert_eq!(
+            end_proved_process(&receipt, Duration::from_millis(250), Duration::from_secs(5))
+                .unwrap(),
+            ProvedProcessEnd::Killed
+        );
+        assert!(observed.ended_within(Duration::ZERO));
+        assert_eq!(
+            LoopbackServerLease::acquire(&tool, endpoint)
+                .unwrap_err()
+                .kind(),
+            ErrorKind::NotFound
+        );
+        assert_eq!(
+            end_proved_process(&receipt, Duration::from_millis(250), Duration::from_secs(1))
+                .unwrap(),
+            ProvedProcessEnd::AlreadyEnded
+        );
+        drop(lease);
     }
 
     fn the_listener_owner_is_proved_by_image_birth_and_exact_listener_without_argv() {

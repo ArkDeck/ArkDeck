@@ -82,18 +82,15 @@ use arkdeck_contract::WireError;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "flash_reconcile.rs"]
 mod flash_reconcile;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_reconcile::FlashReconciler;
 
 /// The ArkForge Flash lane a delegated Flash's reconcile reads its daemon's
-/// receipt through; none is built on Windows (AF-W1).
-#[cfg(target_os = "macos")]
+/// receipt through (macOS and Windows, TASK-XPA-010).
 type Lane<'a> = &'a dyn arkdeck_provider_arkforge::FlashLane;
-#[cfg(windows)]
-type Lane<'a> = &'a std::convert::Infallible;
 
 #[path = "job_reconcile_device.rs"]
 mod device;
@@ -908,13 +905,9 @@ impl JobReconciler<'_> {
             // A delegated Flash has one durable intent and its daemon
             // correlation: only that daemon job's canonical completed-plan
             // receipt can settle it.
-            #[cfg(target_os = "macos")]
             if flash_reconcile::ARKFORGE.contains(&record.operation()) {
                 return self.reconcile_lane(held, lane);
             }
-            // No Flash lane is built on Windows (AF-W1).
-            #[cfg(windows)]
-            let _ = lane;
             return Err(engine(
                 "internalFailure",
                 &format!("unknown outcome has no persisted exact typed action for {id}"),

@@ -1,7 +1,7 @@
 //! Exact replay of native DebugHapOracleContractTests plans. Fixture data
 //! is isolated host evidence, never a real-device acceptance result. The
 //! submissions of the same oracle are replayed by `debug_hap_submit.rs`.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 mod support;
 use arkdeck_contract::sha256_hex;
 use arkdeck_hoststore::{ArtifactReadStore, HdcComposition, JobPlanner, JobStore, TargetStore};
@@ -37,6 +37,7 @@ fn native_swift_plans_match_with_nothing_admitted_or_dispatched() {
     };
     let mut count = 0;
     let mut positive = 0;
+    let mut labels = debug_hap::HostLabels::default();
     for exchange in cases["exchanges"]
         .as_array()
         .unwrap()
@@ -56,8 +57,24 @@ fn native_swift_plans_match_with_nothing_admitted_or_dispatched() {
             }
         };
         let actual = support::legacy_plan_answer(actual);
-        assert_eq!(actual, exchange["answer"], "{}", exchange["name"]);
+        labels.learn(
+            &actual,
+            &exchange["answer"],
+            "/result/materializedPlanDigest",
+        );
+        assert_eq!(
+            labels.swift(&actual),
+            exchange["answer"],
+            "{}",
+            exchange["name"]
+        );
     }
+    // Every positive plan's digest names its host's package paths: Swift's
+    // as they are on macOS; on Windows one distinct digest per distinct plan.
+    #[cfg(windows)]
+    assert!(labels.len() > 0);
+    #[cfg(not(windows))]
+    assert_eq!(labels.len(), 0);
     let valid = cases["exchanges"]
         .as_array()
         .unwrap()

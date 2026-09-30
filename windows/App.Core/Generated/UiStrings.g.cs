@@ -194,6 +194,247 @@ public static class UiStrings
     public const string HistoryEvidenceEffect = "history.evidence.effect";
     public const string HistoryEvidenceFirstEvidence = "history.evidence.firstEvidence";
     public const string SettingsCommonCancel = "settings.common.cancel";
+    public const string JobRecoveryHumanRequiredTitle = "jobRecovery.humanRequired.title";
+    public const string JobRecoveryHumanRequiredGuidance = "jobRecovery.humanRequired.guidance";
+    public const string DebugActionCancel = "debug.action.cancel";
+    public const string DebugActionRefresh = "debug.action.refresh";
+    public const string DebugAppsAbility = "debug.apps.ability";
+    public const string DebugAppsActionStart = "debug.apps.action.start";
+    public const string DebugAppsActionStop = "debug.apps.action.stop";
+    public const string DebugAppsActionUninstall = "debug.apps.action.uninstall";
+    public const string DebugAppsAdditionalAdd = "debug.apps.additional.add";
+    public const string DebugAppsAdditionalNote = "debug.apps.additional.note";
+    public const string DebugAppsAdditionalRemove = "debug.apps.additional.remove";
+    public const string DebugAppsAdditionalRemoveNamed = "debug.apps.additional.removeNamed";
+    public const string DebugAppsAdditionalTitle = "debug.apps.additional.title";
+    public const string DebugAppsArtifactsTitle = "debug.apps.artifacts.title";
+    public const string DebugAppsBundle = "debug.apps.bundle";
+    public const string DebugAppsCaptureDiagnostics = "debug.apps.captureDiagnostics";
+    public const string DebugAppsChooseHAP = "debug.apps.chooseHAP";
+    public const string DebugAppsCleanupRetain = "debug.apps.cleanup.retain";
+    public const string DebugAppsCleanupUninstall = "debug.apps.cleanup.uninstall";
+    public const string DebugAppsCleanupPolicy = "debug.apps.cleanupPolicy";
+    public const string DebugAppsClearSelection = "debug.apps.clearSelection";
+    public const string DebugAppsDiagnosticsDuration = "debug.apps.diagnosticsDuration";
+    public const string DebugAppsIdentityNote = "debug.apps.identity.note";
+    public const string DebugAppsIdentityTitle = "debug.apps.identity.title";
+    public const string DebugAppsImporting = "debug.apps.importing";
+    public const string DebugAppsInstallReplace = "debug.apps.install.replace";
+    public const string DebugAppsInstallPolicy = "debug.apps.installPolicy";
+    public const string DebugAppsInventoryDebuggable = "debug.apps.inventory.debuggable";
+    public const string DebugAppsInventoryEmpty = "debug.apps.inventory.empty";
+    public const string DebugAppsInventoryEmptyDetail = "debug.apps.inventory.empty.detail";
+    public const string DebugAppsInventoryPackage = "debug.apps.inventory.package";
+    public const string DebugAppsInventoryPid = "debug.apps.inventory.pid";
+    public const string DebugAppsInventoryTitle = "debug.apps.inventory.title";
+    public const string DebugAppsLifecycleTitle = "debug.apps.lifecycle.title";
+    public const string DebugAppsLocalOnly = "debug.apps.localOnly";
+    public const string DebugAppsMutationDetail = "debug.apps.mutationDetail";
+    public const string DebugAppsMutationScope = "debug.apps.mutationScope";
+    public const string DebugAppsNoHAP = "debug.apps.noHAP";
+    public const string DebugAppsPackageTitle = "debug.apps.package.title";
+    public const string DebugAppsPlanTitle = "debug.apps.plan.title";
+    public const string DebugAppsPostRun = "debug.apps.postRun";
+    public const string DebugAppsPostRunRunning = "debug.apps.postRun.running";
+    public const string DebugAppsPostRunStopped = "debug.apps.postRun.stopped";
+    public const string DebugAppsRun = "debug.apps.run";
+    public const string DebugAppsRunning = "debug.apps.running";
+    public const string DebugAppsRunningCleanupHint = "debug.apps.runningCleanupHint";
+    public const string DebugAppsSelectionDuplicatePackage = "debug.apps.selection.duplicatePackage";
+    public const string DebugAppsSelectionFailed = "debug.apps.selection.failed";
+    public const string DebugAppsSelectionInvalid = "debug.apps.selection.invalid";
+    public const string DebugAppsSelectionInvalidAdditional = "debug.apps.selection.invalidAdditional";
+    public const string DebugAppsSelectionInvalidEntry = "debug.apps.selection.invalidEntry";
+    public const string DebugAppsSelectionTooManyPackages = "debug.apps.selection.tooManyPackages";
+    public const string DebugAppsTarget = "debug.apps.target";
+    public const string DebugArtifactsAbi = "debug.artifacts.abi";
+    public const string DebugArtifactsAbiObserved = "debug.artifacts.abi.observed";
+    public const string DebugArtifactsAdvanced = "debug.artifacts.advanced";
+    public const string DebugArtifactsBrowseRemote = "debug.artifacts.browseRemote";
+    public const string DebugArtifactsBundle = "debug.artifacts.bundle";
+    public const string DebugArtifactsBundleInvalid = "debug.artifacts.bundleInvalid";
+    public const string DebugArtifactsChooseLibrary = "debug.artifacts.chooseLibrary";
+    public const string DebugArtifactsDestinationDetail = "debug.artifacts.destination.detail";
+    public const string DebugArtifactsDestinationTitle = "debug.artifacts.destination.title";
+    public const string DebugArtifactsLogicalName = "debug.artifacts.logicalName";
+    public const string DebugArtifactsLogicalNameInvalid = "debug.artifacts.logicalNameInvalid";
+    public const string DebugArtifactsNoLibrary = "debug.artifacts.noLibrary";
+    public const string DebugArtifactsNotVerified = "debug.artifacts.notVerified";
+    public const string DebugArtifactsOpenLogs = "debug.artifacts.openLogs";
+    public const string DebugArtifactsPlanReady = "debug.artifacts.planReady";
+    public const string DebugArtifactsPolicyRequired = "debug.artifacts.policy.required";
+    public const string DebugArtifactsPreparing = "debug.artifacts.preparing";
+    public const string DebugArtifactsPreview = "debug.artifacts.preview";
+    public const string DebugArtifactsProductionBoundary = "debug.artifacts.productionBoundary";
+    public const string DebugArtifactsRemoteBindingFailed = "debug.artifacts.remoteBindingFailed";
+    public const string DebugArtifactsRemoteBrowserCancel = "debug.artifacts.remoteBrowser.cancel";
+    public const string DebugArtifactsRemoteBrowserChoose = "debug.artifacts.remoteBrowser.choose";
+    public const string DebugArtifactsRemoteBrowserDetail = "debug.artifacts.remoteBrowser.detail";
+    public const string DebugArtifactsRemoteBrowserDirectory = "debug.artifacts.remoteBrowser.directory";
+    public const string DebugArtifactsRemoteBrowserEmptyDetail = "debug.artifacts.remoteBrowser.empty.detail";
+    public const string DebugArtifactsRemoteBrowserEmptyTitle = "debug.artifacts.remoteBrowser.empty.title";
+    public const string DebugArtifactsRemoteBrowserLibrary = "debug.artifacts.remoteBrowser.library";
+    public const string DebugArtifactsRemoteBrowserNoArtifacts = "debug.artifacts.remoteBrowser.noArtifacts";
+    public const string DebugArtifactsRemoteBrowserOpenSettings = "debug.artifacts.remoteBrowser.openSettings";
+    public const string DebugArtifactsRemoteBrowserRefresh = "debug.artifacts.remoteBrowser.refresh";
+    public const string DebugArtifactsRemoteBrowserRoot = "debug.artifacts.remoteBrowser.root";
+    public const string DebugArtifactsRemoteBrowserServer = "debug.artifacts.remoteBrowser.server";
+    public const string DebugArtifactsRemoteBrowserTitle = "debug.artifacts.remoteBrowser.title";
+    public const string DebugArtifactsRemoteBrowserUp = "debug.artifacts.remoteBrowser.up";
+    public const string DebugArtifactsReopenPlan = "debug.artifacts.reopenPlan";
+    public const string DebugArtifactsResultsTitle = "debug.artifacts.results.title";
+    public const string DebugArtifactsReviewDetail = "debug.artifacts.review.detail";
+    public const string DebugArtifactsReviewTitle = "debug.artifacts.review.title";
+    public const string DebugArtifactsRollback = "debug.artifacts.rollback";
+    public const string DebugArtifactsRollbackAuto = "debug.artifacts.rollback.auto";
+    public const string DebugArtifactsRunning = "debug.artifacts.running";
+    public const string DebugArtifactsRunningDetail = "debug.artifacts.running.detail";
+    public const string DebugArtifactsSelectedLibrary = "debug.artifacts.selectedLibrary";
+    public const string DebugArtifactsSheetBack = "debug.artifacts.sheet.back";
+    public const string DebugArtifactsSheetBundle = "debug.artifacts.sheet.bundle";
+    public const string DebugArtifactsSheetDigest = "debug.artifacts.sheet.digest";
+    public const string DebugArtifactsSheetLibrary = "debug.artifacts.sheet.library";
+    public const string DebugArtifactsSheetRollback = "debug.artifacts.sheet.rollback";
+    public const string DebugArtifactsSheetRun = "debug.artifacts.sheet.run";
+    public const string DebugArtifactsSheetSteps = "debug.artifacts.sheet.steps";
+    public const string DebugArtifactsSheetTarget = "debug.artifacts.sheet.target";
+    public const string DebugArtifactsSheetTitle = "debug.artifacts.sheet.title";
+    public const string DebugArtifactsSheetVerification = "debug.artifacts.sheet.verification";
+    public const string DebugArtifactsSheetWarning = "debug.artifacts.sheet.warning";
+    public const string DebugArtifactsSourceDetail = "debug.artifacts.source.detail";
+    public const string DebugArtifactsSourceKind = "debug.artifacts.source.kind";
+    public const string DebugArtifactsSourceLocal = "debug.artifacts.source.local";
+    public const string DebugArtifactsSourceRemote = "debug.artifacts.source.remote";
+    public const string DebugArtifactsSourceTitle = "debug.artifacts.source.title";
+    public const string DebugArtifactsSourceBoundary = "debug.artifacts.sourceBoundary";
+    public const string DebugArtifactsTarget = "debug.artifacts.target";
+    public const string DebugArtifactsTargetConfirmed = "debug.artifacts.targetConfirmed";
+    public const string DebugArtifactsVerification = "debug.artifacts.verification";
+    public const string DebugArtifactsVerified = "debug.artifacts.verified";
+    public const string DebugArtifactsVerifyMaps = "debug.artifacts.verify.maps";
+    public const string DebugAvailabilityAvailable = "debug.availability.available";
+    public const string DebugAvailabilityChecking = "debug.availability.checking";
+    public const string DebugAvailabilityEffect = "debug.availability.effect";
+    public const string DebugAvailabilityMissing = "debug.availability.missing";
+    public const string DebugAvailabilityOperation = "debug.availability.operation";
+    public const string DebugAvailabilityUnavailable = "debug.availability.unavailable";
+    public const string DebugBlockedBufferOperation = "debug.blocked.bufferOperation";
+    public const string DebugBlockedPackageLifecycle = "debug.blocked.packageLifecycle";
+    public const string DebugCommandsArgvNote = "debug.commands.argv.note";
+    public const string DebugCommandsArgvTitle = "debug.commands.argv.title";
+    public const string DebugCommandsArtifactsEmpty = "debug.commands.artifacts.empty";
+    public const string DebugCommandsArtifactsEmptyDetail = "debug.commands.artifacts.empty.detail";
+    public const string DebugCommandsArtifactsTitle = "debug.commands.artifacts.title";
+    public const string DebugCommandsCalloutTyped = "debug.commands.calloutTyped";
+    public const string DebugCommandsEffect = "debug.commands.effect";
+    public const string DebugCommandsFooterNoFreeText = "debug.commands.footerNoFreeText";
+    public const string DebugCommandsJobId = "debug.commands.job.id";
+    public const string DebugCommandsJobKnown = "debug.commands.job.known";
+    public const string DebugCommandsJobLatest = "debug.commands.job.latest";
+    public const string DebugCommandsJobOutcome = "debug.commands.job.outcome";
+    public const string DebugCommandsJobRunning = "debug.commands.job.running";
+    public const string DebugCommandsJobState = "debug.commands.job.state";
+    public const string DebugCommandsJobUnknown = "debug.commands.job.unknown";
+    public const string DebugCommandsNoPTY = "debug.commands.noPTY";
+    public const string DebugCommandsNoParameters = "debug.commands.noParameters";
+    public const string DebugCommandsResultNone = "debug.commands.result.none";
+    public const string DebugCommandsResultTitle = "debug.commands.result.title";
+    public const string DebugCommandsRun = "debug.commands.run";
+    public const string DebugCommandsSelect = "debug.commands.select";
+    public const string DebugCommandsTarget = "debug.commands.target";
+    public const string DebugFailureArtifactFinalizationFailed = "debug.failure.artifactFinalizationFailed";
+    public const string DebugFailureArtifactPublicationFailed = "debug.failure.artifactPublicationFailed";
+    public const string DebugFailureCancelled = "debug.failure.cancelled";
+    public const string DebugFailureExecutionConfirmedNotPerformed = "debug.failure.executionConfirmedNotPerformed";
+    public const string DebugFailureExecutionFailed = "debug.failure.executionFailed";
+    public const string DebugFailureInterrupted = "debug.failure.interrupted";
+    public const string DebugFailureLegacyFailure = "debug.failure.legacyFailure";
+    public const string DebugFailureOutcomeUnknown = "debug.failure.outcomeUnknown";
+    public const string DebugFailureReconciliationConfirmedNotPerformed = "debug.failure.reconciliationConfirmedNotPerformed";
+    public const string DebugJobsActive = "debug.jobs.active";
+    public const string DebugJobsEmpty = "debug.jobs.empty";
+    public const string DebugJobsTitle = "debug.jobs.title";
+    public const string DebugLogsCaptureTitle = "debug.logs.capture.title";
+    public const string DebugLogsDestructiveClear = "debug.logs.destructive.clear";
+    public const string DebugLogsDestructiveMenu = "debug.logs.destructive.menu";
+    public const string DebugLogsDestructiveScope = "debug.logs.destructive.scope";
+    public const string DebugLogsDestructiveTitle = "debug.logs.destructive.title";
+    public const string DebugLogsDomain = "debug.logs.domain";
+    public const string DebugLogsDuration = "debug.logs.duration";
+    public const string DebugLogsExport = "debug.logs.export";
+    public const string DebugLogsExportBoundary = "debug.logs.exportBoundary";
+    public const string DebugLogsExportCancel = "debug.logs.exportCancel";
+    public const string DebugLogsExportConfirm = "debug.logs.exportConfirm";
+    public const string DebugLogsExportPreviewMessage = "debug.logs.exportPreview.message";
+    public const string DebugLogsExportPreviewTitle = "debug.logs.exportPreview.title";
+    public const string DebugLogsExportSensitive = "debug.logs.exportSensitive";
+    public const string DebugLogsExporting = "debug.logs.exporting";
+    public const string DebugLogsFiltersInvalid = "debug.logs.filters.invalid";
+    public const string DebugLogsFiltersNote = "debug.logs.filters.note";
+    public const string DebugLogsKeyword = "debug.logs.keyword";
+    public const string DebugLogsLevel = "debug.logs.level";
+    public const string DebugLogsLiveEmpty = "debug.logs.live.empty";
+    public const string DebugLogsLiveEmptyDetail = "debug.logs.live.empty.detail";
+    public const string DebugLogsLiveTitle = "debug.logs.live.title";
+    public const string DebugLogsMarker = "debug.logs.marker";
+    public const string DebugLogsPause = "debug.logs.pause";
+    public const string DebugLogsPauseRequiresCapture = "debug.logs.pause.requiresCapture";
+    public const string DebugLogsPid = "debug.logs.pid";
+    public const string DebugLogsRawSave = "debug.logs.rawSave";
+    public const string DebugLogsRequestTitle = "debug.logs.request.title";
+    public const string DebugLogsResume = "debug.logs.resume";
+    public const string DebugLogsShardsEmpty = "debug.logs.shards.empty";
+    public const string DebugLogsShardsEmptyDetail = "debug.logs.shards.empty.detail";
+    public const string DebugLogsShardsHash = "debug.logs.shards.hash";
+    public const string DebugLogsShardsSequence = "debug.logs.shards.sequence";
+    public const string DebugLogsShardsSize = "debug.logs.shards.size";
+    public const string DebugLogsShardsTitle = "debug.logs.shards.title";
+    public const string DebugLogsShowInFinder = "debug.logs.showInFinder";
+    public const string DebugLogsStart = "debug.logs.start";
+    public const string DebugLogsStorageTotalBudget = "debug.logs.storage.totalBudget";
+    public const string DebugLogsTag = "debug.logs.tag";
+    public const string DebugLogsTarget = "debug.logs.target";
+    public const string DebugLogsViewportBounded = "debug.logs.viewport.bounded";
+    public const string DebugNetworkAdd = "debug.network.add";
+    public const string DebugNetworkDelete = "debug.network.delete";
+    public const string DebugNetworkDeleteScope = "debug.network.delete.scope";
+    public const string DebugNetworkDirection = "debug.network.direction";
+    public const string DebugNetworkEditorTitle = "debug.network.editor.title";
+    public const string DebugNetworkForward = "debug.network.forward";
+    public const string DebugNetworkLocalPort = "debug.network.localPort";
+    public const string DebugNetworkRemotePort = "debug.network.remotePort";
+    public const string DebugNetworkReverse = "debug.network.reverse";
+    public const string DebugNetworkRulesAction = "debug.network.rules.action";
+    public const string DebugNetworkRulesDirection = "debug.network.rules.direction";
+    public const string DebugNetworkRulesEmpty = "debug.network.rules.empty";
+    public const string DebugNetworkRulesEmptyDetail = "debug.network.rules.empty.detail";
+    public const string DebugNetworkRulesLocal = "debug.network.rules.local";
+    public const string DebugNetworkRulesRemote = "debug.network.rules.remote";
+    public const string DebugNetworkRulesState = "debug.network.rules.state";
+    public const string DebugNetworkRulesTitle = "debug.network.rules.title";
+    public const string DebugNetworkSafetyBinding = "debug.network.safety.binding";
+    public const string DebugNetworkSafetyNoShell = "debug.network.safety.noShell";
+    public const string DebugNetworkSafetyTitle = "debug.network.safety.title";
+    public const string DebugNetworkSafetyTyped = "debug.network.safety.typed";
+    public const string DebugNetworkTarget = "debug.network.target";
+    public const string DebugNetworkTypedRule = "debug.network.typedRule";
+    public const string DebugNetworkValidationLocalPortNotNumeric = "debug.network.validation.localPortNotNumeric";
+    public const string DebugNetworkValidationLocalPortOutOfRange = "debug.network.validation.localPortOutOfRange";
+    public const string DebugNetworkValidationRemotePortNotNumeric = "debug.network.validation.remotePortNotNumeric";
+    public const string DebugNetworkValidationRemotePortOutOfRange = "debug.network.validation.remotePortOutOfRange";
+    public const string DebugNetworkValidationValid = "debug.network.validation.valid";
+    public const string DebugOptional = "debug.optional";
+    public const string DebugScope = "debug.scope";
+    public const string DebugTabApps = "debug.tab.apps";
+    public const string DebugTabArtifacts = "debug.tab.artifacts";
+    public const string DebugTabCommands = "debug.tab.commands";
+    public const string DebugTabLogs = "debug.tab.logs";
+    public const string DebugTabNetwork = "debug.tab.network";
+    public const string DebugTabsLabel = "debug.tabs.label";
+    public const string DebugTargetBinding = "debug.target.binding";
+    public const string DebugTargetLabel = "debug.target.label";
+    public const string DebugTargetNone = "debug.target.none";
+    public const string DebugTypedInvalidIdentifier = "debug.typed.invalidIdentifier";
     public const string WindowsRecoveryTitle = "windows.recovery.title";
     public const string WindowsRecoveryMessageNotRunning = "windows.recovery.message.notRunning";
     public const string WindowsRecoveryMessageImpostor = "windows.recovery.message.impostor";
@@ -348,6 +589,96 @@ public static class UiStrings
     public const string WindowsHistoryEvidenceStatus = "windows.history.evidence.status";
     public const string WindowsSessionsPinnedYes = "windows.sessions.pinnedYes";
     public const string WindowsSessionsPinnedNo = "windows.sessions.pinnedNo";
+    public const string WindowsNavigationAgents = "windows.navigation.agents";
+    public const string WindowsAgentsSubtitle = "windows.agents.subtitle";
+    public const string WindowsAgentsUnavailable = "windows.agents.unavailable";
+    public const string WindowsAgentsHumanActionsUnavailable = "windows.agents.humanActions.unavailable";
+    public const string WindowsAgentsExecutions = "windows.agents.executions";
+    public const string WindowsAgentsHumanActions = "windows.agents.humanActions";
+    public const string WindowsAgentsHumanActionsEmpty = "windows.agents.humanActions.empty";
+    public const string WindowsAgentsEmpty = "windows.agents.empty";
+    public const string WindowsAgentsSelect = "windows.agents.select";
+    public const string WindowsAgentsOperation = "windows.agents.operation";
+    public const string WindowsAgentsState = "windows.agents.state";
+    public const string WindowsAgentsGeneration = "windows.agents.generation";
+    public const string WindowsAgentsJob = "windows.agents.job";
+    public const string WindowsAgentsTarget = "windows.agents.target";
+    public const string WindowsAgentsDeadline = "windows.agents.deadline";
+    public const string WindowsAgentsObserved = "windows.agents.observed";
+    public const string WindowsAgentsNext = "windows.agents.next";
+    public const string WindowsAgentsFailure = "windows.agents.failure";
+    public const string WindowsAgentsOutcomeUnknown = "windows.agents.outcomeUnknown";
+    public const string WindowsAgentsRow = "windows.agents.row";
+    public const string WindowsAgentsActionCategory = "windows.agents.action.category";
+    public const string WindowsAgentsActionMinimum = "windows.agents.action.minimum";
+    public const string WindowsAgentsActionExpires = "windows.agents.action.expires";
+    public const string WindowsAgentsActionRow = "windows.agents.action.row";
+    public const string WindowsAgentsActionChoose = "windows.agents.action.choose";
+    public const string WindowsAgentsActionChooseFirst = "windows.agents.action.chooseFirst";
+    public const string WindowsAgentsActionResume = "windows.agents.action.resume";
+    public const string WindowsAgentsActionResumed = "windows.agents.action.resumed";
+    public const string WindowsAgentsActionRefused = "windows.agents.action.refused";
+    public const string WindowsAgentsAbandon = "windows.agents.abandon";
+    public const string WindowsAgentsAbandonTitle = "windows.agents.abandon.title";
+    public const string WindowsAgentsAbandonMessage = "windows.agents.abandon.message";
+    public const string WindowsAgentsAbandonConfirm = "windows.agents.abandon.confirm";
+    public const string WindowsAgentsAbandonDone = "windows.agents.abandon.done";
+    public const string WindowsAgentsAbandonFailed = "windows.agents.abandon.failed";
+    public const string WindowsNavigationImports = "windows.navigation.imports";
+    public const string WindowsImportsSubtitle = "windows.imports.subtitle";
+    public const string WindowsImportsUnavailable = "windows.imports.unavailable";
+    public const string WindowsImportsTargetsUnavailable = "windows.imports.targets.unavailable";
+    public const string WindowsImportsNew = "windows.imports.new";
+    public const string WindowsImportsKind = "windows.imports.kind";
+    public const string WindowsImportsKindHap = "windows.imports.kind.hap";
+    public const string WindowsImportsKindNativeLibrary = "windows.imports.kind.nativeLibrary";
+    public const string WindowsImportsKindWorkspacePatch = "windows.imports.kind.workspacePatch";
+    public const string WindowsImportsKindFlashBundle = "windows.imports.kind.flashBundle";
+    public const string WindowsImportsTarget = "windows.imports.target";
+    public const string WindowsImportsNoTargets = "windows.imports.noTargets";
+    public const string WindowsImportsFile = "windows.imports.file";
+    public const string WindowsImportsNoFile = "windows.imports.noFile";
+    public const string WindowsImportsChooseFile = "windows.imports.chooseFile";
+    public const string WindowsImportsChooseFileFirst = "windows.imports.chooseFileFirst";
+    public const string WindowsImportsStart = "windows.imports.start";
+    public const string WindowsImportsProgress = "windows.imports.progress";
+    public const string WindowsImportsProgressValue = "windows.imports.progress.value";
+    public const string WindowsImportsCancel = "windows.imports.cancel";
+    public const string WindowsImportsBusy = "windows.imports.busy";
+    public const string WindowsImportsDone = "windows.imports.done";
+    public const string WindowsImportsFailed = "windows.imports.failed";
+    public const string WindowsImportsCancelled = "windows.imports.cancelled";
+    public const string WindowsImportsList = "windows.imports.list";
+    public const string WindowsImportsEmpty = "windows.imports.empty";
+    public const string WindowsImportsSelect = "windows.imports.select";
+    public const string WindowsImportsRow = "windows.imports.row";
+    public const string WindowsImportsName = "windows.imports.name";
+    public const string WindowsImportsSize = "windows.imports.size";
+    public const string WindowsImportsState = "windows.imports.state";
+    public const string WindowsImportsGeneration = "windows.imports.generation";
+    public const string WindowsImportsCreated = "windows.imports.created";
+    public const string WindowsImportsArtifact = "windows.imports.artifact";
+    public const string WindowsImportsDigest = "windows.imports.digest";
+    public const string WindowsImportsMediaType = "windows.imports.mediaType";
+    public const string WindowsImportsPrivacy = "windows.imports.privacy";
+    public const string WindowsImportsRelease = "windows.imports.release";
+    public const string WindowsImportsReleaseTitle = "windows.imports.release.title";
+    public const string WindowsImportsReleaseMessage = "windows.imports.release.message";
+    public const string WindowsImportsReleaseConfirm = "windows.imports.release.confirm";
+    public const string WindowsImportsReleaseDone = "windows.imports.release.done";
+    public const string WindowsImportsReleaseFailed = "windows.imports.release.failed";
+    public const string WindowsAgentsActionId = "windows.agents.action.id";
+    public const string WindowsImportsId = "windows.imports.id";
+    public const string WindowsImportsSha256 = "windows.imports.sha256";
+    public const string WindowsNavigationDebug = "windows.navigation.debug";
+    public const string WindowsDebugRemoteUnavailable = "windows.debug.remote.unavailable";
+    public const string WindowsDebugJobsCancelFailed = "windows.debug.jobs.cancelFailed";
+    public const string WindowsDebugNeedsTarget = "windows.debug.needsTarget";
+    public const string WindowsDebugNeedsInputs = "windows.debug.needsInputs";
+    public const string WindowsDebugOperationUnavailable = "windows.debug.operationUnavailable";
+    public const string WindowsDebugBusy = "windows.debug.busy";
+    public const string WindowsDebugRunning = "windows.debug.running";
+    public const string WindowsDebugSelectedTab = "windows.debug.selectedTab";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -538,6 +869,247 @@ public static class UiStrings
         HistoryEvidenceEffect,
         HistoryEvidenceFirstEvidence,
         SettingsCommonCancel,
+        JobRecoveryHumanRequiredTitle,
+        JobRecoveryHumanRequiredGuidance,
+        DebugActionCancel,
+        DebugActionRefresh,
+        DebugAppsAbility,
+        DebugAppsActionStart,
+        DebugAppsActionStop,
+        DebugAppsActionUninstall,
+        DebugAppsAdditionalAdd,
+        DebugAppsAdditionalNote,
+        DebugAppsAdditionalRemove,
+        DebugAppsAdditionalRemoveNamed,
+        DebugAppsAdditionalTitle,
+        DebugAppsArtifactsTitle,
+        DebugAppsBundle,
+        DebugAppsCaptureDiagnostics,
+        DebugAppsChooseHAP,
+        DebugAppsCleanupRetain,
+        DebugAppsCleanupUninstall,
+        DebugAppsCleanupPolicy,
+        DebugAppsClearSelection,
+        DebugAppsDiagnosticsDuration,
+        DebugAppsIdentityNote,
+        DebugAppsIdentityTitle,
+        DebugAppsImporting,
+        DebugAppsInstallReplace,
+        DebugAppsInstallPolicy,
+        DebugAppsInventoryDebuggable,
+        DebugAppsInventoryEmpty,
+        DebugAppsInventoryEmptyDetail,
+        DebugAppsInventoryPackage,
+        DebugAppsInventoryPid,
+        DebugAppsInventoryTitle,
+        DebugAppsLifecycleTitle,
+        DebugAppsLocalOnly,
+        DebugAppsMutationDetail,
+        DebugAppsMutationScope,
+        DebugAppsNoHAP,
+        DebugAppsPackageTitle,
+        DebugAppsPlanTitle,
+        DebugAppsPostRun,
+        DebugAppsPostRunRunning,
+        DebugAppsPostRunStopped,
+        DebugAppsRun,
+        DebugAppsRunning,
+        DebugAppsRunningCleanupHint,
+        DebugAppsSelectionDuplicatePackage,
+        DebugAppsSelectionFailed,
+        DebugAppsSelectionInvalid,
+        DebugAppsSelectionInvalidAdditional,
+        DebugAppsSelectionInvalidEntry,
+        DebugAppsSelectionTooManyPackages,
+        DebugAppsTarget,
+        DebugArtifactsAbi,
+        DebugArtifactsAbiObserved,
+        DebugArtifactsAdvanced,
+        DebugArtifactsBrowseRemote,
+        DebugArtifactsBundle,
+        DebugArtifactsBundleInvalid,
+        DebugArtifactsChooseLibrary,
+        DebugArtifactsDestinationDetail,
+        DebugArtifactsDestinationTitle,
+        DebugArtifactsLogicalName,
+        DebugArtifactsLogicalNameInvalid,
+        DebugArtifactsNoLibrary,
+        DebugArtifactsNotVerified,
+        DebugArtifactsOpenLogs,
+        DebugArtifactsPlanReady,
+        DebugArtifactsPolicyRequired,
+        DebugArtifactsPreparing,
+        DebugArtifactsPreview,
+        DebugArtifactsProductionBoundary,
+        DebugArtifactsRemoteBindingFailed,
+        DebugArtifactsRemoteBrowserCancel,
+        DebugArtifactsRemoteBrowserChoose,
+        DebugArtifactsRemoteBrowserDetail,
+        DebugArtifactsRemoteBrowserDirectory,
+        DebugArtifactsRemoteBrowserEmptyDetail,
+        DebugArtifactsRemoteBrowserEmptyTitle,
+        DebugArtifactsRemoteBrowserLibrary,
+        DebugArtifactsRemoteBrowserNoArtifacts,
+        DebugArtifactsRemoteBrowserOpenSettings,
+        DebugArtifactsRemoteBrowserRefresh,
+        DebugArtifactsRemoteBrowserRoot,
+        DebugArtifactsRemoteBrowserServer,
+        DebugArtifactsRemoteBrowserTitle,
+        DebugArtifactsRemoteBrowserUp,
+        DebugArtifactsReopenPlan,
+        DebugArtifactsResultsTitle,
+        DebugArtifactsReviewDetail,
+        DebugArtifactsReviewTitle,
+        DebugArtifactsRollback,
+        DebugArtifactsRollbackAuto,
+        DebugArtifactsRunning,
+        DebugArtifactsRunningDetail,
+        DebugArtifactsSelectedLibrary,
+        DebugArtifactsSheetBack,
+        DebugArtifactsSheetBundle,
+        DebugArtifactsSheetDigest,
+        DebugArtifactsSheetLibrary,
+        DebugArtifactsSheetRollback,
+        DebugArtifactsSheetRun,
+        DebugArtifactsSheetSteps,
+        DebugArtifactsSheetTarget,
+        DebugArtifactsSheetTitle,
+        DebugArtifactsSheetVerification,
+        DebugArtifactsSheetWarning,
+        DebugArtifactsSourceDetail,
+        DebugArtifactsSourceKind,
+        DebugArtifactsSourceLocal,
+        DebugArtifactsSourceRemote,
+        DebugArtifactsSourceTitle,
+        DebugArtifactsSourceBoundary,
+        DebugArtifactsTarget,
+        DebugArtifactsTargetConfirmed,
+        DebugArtifactsVerification,
+        DebugArtifactsVerified,
+        DebugArtifactsVerifyMaps,
+        DebugAvailabilityAvailable,
+        DebugAvailabilityChecking,
+        DebugAvailabilityEffect,
+        DebugAvailabilityMissing,
+        DebugAvailabilityOperation,
+        DebugAvailabilityUnavailable,
+        DebugBlockedBufferOperation,
+        DebugBlockedPackageLifecycle,
+        DebugCommandsArgvNote,
+        DebugCommandsArgvTitle,
+        DebugCommandsArtifactsEmpty,
+        DebugCommandsArtifactsEmptyDetail,
+        DebugCommandsArtifactsTitle,
+        DebugCommandsCalloutTyped,
+        DebugCommandsEffect,
+        DebugCommandsFooterNoFreeText,
+        DebugCommandsJobId,
+        DebugCommandsJobKnown,
+        DebugCommandsJobLatest,
+        DebugCommandsJobOutcome,
+        DebugCommandsJobRunning,
+        DebugCommandsJobState,
+        DebugCommandsJobUnknown,
+        DebugCommandsNoPTY,
+        DebugCommandsNoParameters,
+        DebugCommandsResultNone,
+        DebugCommandsResultTitle,
+        DebugCommandsRun,
+        DebugCommandsSelect,
+        DebugCommandsTarget,
+        DebugFailureArtifactFinalizationFailed,
+        DebugFailureArtifactPublicationFailed,
+        DebugFailureCancelled,
+        DebugFailureExecutionConfirmedNotPerformed,
+        DebugFailureExecutionFailed,
+        DebugFailureInterrupted,
+        DebugFailureLegacyFailure,
+        DebugFailureOutcomeUnknown,
+        DebugFailureReconciliationConfirmedNotPerformed,
+        DebugJobsActive,
+        DebugJobsEmpty,
+        DebugJobsTitle,
+        DebugLogsCaptureTitle,
+        DebugLogsDestructiveClear,
+        DebugLogsDestructiveMenu,
+        DebugLogsDestructiveScope,
+        DebugLogsDestructiveTitle,
+        DebugLogsDomain,
+        DebugLogsDuration,
+        DebugLogsExport,
+        DebugLogsExportBoundary,
+        DebugLogsExportCancel,
+        DebugLogsExportConfirm,
+        DebugLogsExportPreviewMessage,
+        DebugLogsExportPreviewTitle,
+        DebugLogsExportSensitive,
+        DebugLogsExporting,
+        DebugLogsFiltersInvalid,
+        DebugLogsFiltersNote,
+        DebugLogsKeyword,
+        DebugLogsLevel,
+        DebugLogsLiveEmpty,
+        DebugLogsLiveEmptyDetail,
+        DebugLogsLiveTitle,
+        DebugLogsMarker,
+        DebugLogsPause,
+        DebugLogsPauseRequiresCapture,
+        DebugLogsPid,
+        DebugLogsRawSave,
+        DebugLogsRequestTitle,
+        DebugLogsResume,
+        DebugLogsShardsEmpty,
+        DebugLogsShardsEmptyDetail,
+        DebugLogsShardsHash,
+        DebugLogsShardsSequence,
+        DebugLogsShardsSize,
+        DebugLogsShardsTitle,
+        DebugLogsShowInFinder,
+        DebugLogsStart,
+        DebugLogsStorageTotalBudget,
+        DebugLogsTag,
+        DebugLogsTarget,
+        DebugLogsViewportBounded,
+        DebugNetworkAdd,
+        DebugNetworkDelete,
+        DebugNetworkDeleteScope,
+        DebugNetworkDirection,
+        DebugNetworkEditorTitle,
+        DebugNetworkForward,
+        DebugNetworkLocalPort,
+        DebugNetworkRemotePort,
+        DebugNetworkReverse,
+        DebugNetworkRulesAction,
+        DebugNetworkRulesDirection,
+        DebugNetworkRulesEmpty,
+        DebugNetworkRulesEmptyDetail,
+        DebugNetworkRulesLocal,
+        DebugNetworkRulesRemote,
+        DebugNetworkRulesState,
+        DebugNetworkRulesTitle,
+        DebugNetworkSafetyBinding,
+        DebugNetworkSafetyNoShell,
+        DebugNetworkSafetyTitle,
+        DebugNetworkSafetyTyped,
+        DebugNetworkTarget,
+        DebugNetworkTypedRule,
+        DebugNetworkValidationLocalPortNotNumeric,
+        DebugNetworkValidationLocalPortOutOfRange,
+        DebugNetworkValidationRemotePortNotNumeric,
+        DebugNetworkValidationRemotePortOutOfRange,
+        DebugNetworkValidationValid,
+        DebugOptional,
+        DebugScope,
+        DebugTabApps,
+        DebugTabArtifacts,
+        DebugTabCommands,
+        DebugTabLogs,
+        DebugTabNetwork,
+        DebugTabsLabel,
+        DebugTargetBinding,
+        DebugTargetLabel,
+        DebugTargetNone,
+        DebugTypedInvalidIdentifier,
         WindowsRecoveryTitle,
         WindowsRecoveryMessageNotRunning,
         WindowsRecoveryMessageImpostor,
@@ -692,5 +1264,95 @@ public static class UiStrings
         WindowsHistoryEvidenceStatus,
         WindowsSessionsPinnedYes,
         WindowsSessionsPinnedNo,
+        WindowsNavigationAgents,
+        WindowsAgentsSubtitle,
+        WindowsAgentsUnavailable,
+        WindowsAgentsHumanActionsUnavailable,
+        WindowsAgentsExecutions,
+        WindowsAgentsHumanActions,
+        WindowsAgentsHumanActionsEmpty,
+        WindowsAgentsEmpty,
+        WindowsAgentsSelect,
+        WindowsAgentsOperation,
+        WindowsAgentsState,
+        WindowsAgentsGeneration,
+        WindowsAgentsJob,
+        WindowsAgentsTarget,
+        WindowsAgentsDeadline,
+        WindowsAgentsObserved,
+        WindowsAgentsNext,
+        WindowsAgentsFailure,
+        WindowsAgentsOutcomeUnknown,
+        WindowsAgentsRow,
+        WindowsAgentsActionCategory,
+        WindowsAgentsActionMinimum,
+        WindowsAgentsActionExpires,
+        WindowsAgentsActionRow,
+        WindowsAgentsActionChoose,
+        WindowsAgentsActionChooseFirst,
+        WindowsAgentsActionResume,
+        WindowsAgentsActionResumed,
+        WindowsAgentsActionRefused,
+        WindowsAgentsAbandon,
+        WindowsAgentsAbandonTitle,
+        WindowsAgentsAbandonMessage,
+        WindowsAgentsAbandonConfirm,
+        WindowsAgentsAbandonDone,
+        WindowsAgentsAbandonFailed,
+        WindowsNavigationImports,
+        WindowsImportsSubtitle,
+        WindowsImportsUnavailable,
+        WindowsImportsTargetsUnavailable,
+        WindowsImportsNew,
+        WindowsImportsKind,
+        WindowsImportsKindHap,
+        WindowsImportsKindNativeLibrary,
+        WindowsImportsKindWorkspacePatch,
+        WindowsImportsKindFlashBundle,
+        WindowsImportsTarget,
+        WindowsImportsNoTargets,
+        WindowsImportsFile,
+        WindowsImportsNoFile,
+        WindowsImportsChooseFile,
+        WindowsImportsChooseFileFirst,
+        WindowsImportsStart,
+        WindowsImportsProgress,
+        WindowsImportsProgressValue,
+        WindowsImportsCancel,
+        WindowsImportsBusy,
+        WindowsImportsDone,
+        WindowsImportsFailed,
+        WindowsImportsCancelled,
+        WindowsImportsList,
+        WindowsImportsEmpty,
+        WindowsImportsSelect,
+        WindowsImportsRow,
+        WindowsImportsName,
+        WindowsImportsSize,
+        WindowsImportsState,
+        WindowsImportsGeneration,
+        WindowsImportsCreated,
+        WindowsImportsArtifact,
+        WindowsImportsDigest,
+        WindowsImportsMediaType,
+        WindowsImportsPrivacy,
+        WindowsImportsRelease,
+        WindowsImportsReleaseTitle,
+        WindowsImportsReleaseMessage,
+        WindowsImportsReleaseConfirm,
+        WindowsImportsReleaseDone,
+        WindowsImportsReleaseFailed,
+        WindowsAgentsActionId,
+        WindowsImportsId,
+        WindowsImportsSha256,
+        WindowsNavigationDebug,
+        WindowsDebugRemoteUnavailable,
+        WindowsDebugJobsCancelFailed,
+        WindowsDebugNeedsTarget,
+        WindowsDebugNeedsInputs,
+        WindowsDebugOperationUnavailable,
+        WindowsDebugBusy,
+        WindowsDebugRunning,
+        WindowsDebugSelectedTab,
     ];
 }

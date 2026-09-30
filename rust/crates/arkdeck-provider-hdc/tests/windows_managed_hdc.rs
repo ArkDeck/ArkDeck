@@ -9,8 +9,10 @@
 //! variant is chosen by the copy's file name, since the host names the
 //! child's environment: `hdc-early.exe` ends before it binds (status 3),
 //! `hdc-mismatch.exe` answers a disagreeing server version, `hdc-nobind.exe`
-//! runs as a server without ever binding. Every invocation appends its
-//! arguments to `calls` beside the copy. No real HDC is launched.
+//! runs as a server without ever binding. Run as `<exe> -t <connectKey> …`
+//! it is the fake device face: it answers the product-name read of the
+//! connect key it was given. Every invocation appends its arguments to
+//! `calls` beside the copy. No real HDC is launched.
 
 #[cfg(not(windows))]
 fn main() {}
@@ -20,6 +22,9 @@ fn main() {
     let arguments: Vec<String> = std::env::args().collect();
     if arguments.get(1).is_some_and(|flag| flag == "-s") {
         windows::fake_hdc(&arguments[1..]);
+    }
+    if arguments.get(1).is_some_and(|flag| flag == "-t") {
+        windows::fake_device(&arguments[1..]);
     }
     windows::run_tests(&arguments[1..]);
 }
@@ -32,9 +37,13 @@ mod loopback_ports {
 #[cfg(windows)]
 mod windows {
     use super::loopback_ports::free_endpoint;
-    use arkdeck_platform::{ServerExit, VerifiedTool, random_bytes};
+    use arkdeck_platform::{
+        LoopbackServerLease, ProvedProcessEnd, ServerExit, VerifiedTool, end_proved_process,
+        random_bytes,
+    };
     use arkdeck_provider_hdc::{
-        HdcDispatch, ManagedHdcServer, ProcessDispatch, ProcessPlan, StartBudget, StartFailure,
+        Action, HdcDispatch, ManagedHdcServer, ProcessDispatch, ProcessPlan, Property, StartBudget,
+        StartFailure,
     };
     use sha2::{Digest, Sha256};
     use std::fs;
@@ -101,6 +110,28 @@ mod windows {
         std::process::exit(0);
     }
 
+    /// `-t <connectKey> shell param get const.product.name` answers the
+    /// product name; any other device command is unregistered (status 64).
+    pub fn fake_device(arguments: &[String]) -> ! {
+        let executable = std::env::current_exe().unwrap();
+        let mut calls = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(executable.with_file_name("calls"))
+            .unwrap();
+        calls
+            .write_all(format!("{}\n", arguments.join("|")).as_bytes())
+            .unwrap();
+        drop(calls);
+        if arguments[2..] == ["shell", "param", "get", "const.product.name"] {
+            let mut stdout = std::io::stdout().lock();
+            writeln!(stdout, "OpenHarmony Reference Device").unwrap();
+            stdout.flush().unwrap();
+            std::process::exit(0);
+        }
+        std::process::exit(64);
+    }
+
     // ---- the runner -----------------------------------------------------
 
     type Test = (&'static str, fn());
@@ -123,12 +154,20 @@ mod windows {
             an_occupied_endpoint_launches_nothing,
         ),
         (
+            "a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start",
+            a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start,
+        ),
+        (
             "a_listener_of_another_process_never_binds_the_launch",
             a_listener_of_another_process_never_binds_the_launch,
         ),
         (
             "a_dispatch_runs_the_plan_argv_with_the_server_port_and_grants_no_mutation",
             a_dispatch_runs_the_plan_argv_with_the_server_port_and_grants_no_mutation,
+        ),
+        (
+            "a_device_plan_reaches_the_child_with_its_connect_key_first",
+            a_device_plan_reaches_the_child_with_its_connect_key_first,
         ),
     ];
 
@@ -184,7 +223,13 @@ mod windows {
     struct FakeHdc {
         directory: PathBuf,
         tool: VerifiedTool,
+        /// Dropped last, once the tool's handle on the copy has closed:
+        /// NTFS removes no directory holding a file still open.
+        _removed: Removed,
     }
+
+    /// The fake's scratch directory, removed when dropped.
+    struct Removed(PathBuf);
 
     impl FakeHdc {
         fn new(variant: &str) -> Self {
@@ -197,7 +242,11 @@ mod windows {
             fs::copy(std::env::current_exe().unwrap(), &path).unwrap();
             let digest = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
             let tool = VerifiedTool::open(&path, &digest).unwrap();
-            Self { directory, tool }
+            Self {
+                _removed: Removed(directory.clone()),
+                directory,
+                tool,
+            }
         }
 
         /// Every invocation's arguments, one line each.
@@ -210,9 +259,9 @@ mod windows {
         }
     }
 
-    impl Drop for FakeHdc {
+    impl Drop for Removed {
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.directory);
+            let _ = fs::remove_dir_all(&self.0);
         }
     }
 
@@ -329,6 +378,79 @@ mod windows {
         assert!(fake.calls().is_empty(), "{:?}", fake.calls());
     }
 
+    /// TASK-XPA-014's replacement lifetime (#2131) on Windows: a confirmed
+    /// restart leaves a replacement server that no Job of this process holds.
+    /// While it listens, a start launches nothing and names it by PID, never
+    /// adopting or stopping it. Once the daemon's stop ends the proved
+    /// replacement (`end_proved_process` over the commandless proof), the
+    /// next start owns the endpoint.
+    fn a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start() {
+        let fake = FakeHdc::new("hdc");
+        let endpoint = free_endpoint();
+        let spelled = endpoint.to_string();
+        let mut replacement = std::process::Command::new(fake.tool.path())
+            .args(["-s", spelled.as_str(), "-m"])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let lease = loop {
+            match LoopbackServerLease::acquire(&fake.tool, endpoint) {
+                Ok(lease) => break lease,
+                Err(_) => {
+                    assert!(Instant::now() < deadline, "the replacement never listened");
+                    assert!(replacement.try_wait().unwrap().is_none());
+                    std::thread::yield_now();
+                }
+            }
+        };
+        assert_eq!(lease.identity().pid as u32, replacement.id());
+        let launched = fake.calls().len();
+
+        // While it listens, nothing is launched; the holder is named.
+        let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(5)))
+            .err()
+            .expect("an endpoint the replacement holds is refused");
+        let StartFailure::Occupied(reason) = error else {
+            panic!("expected the occupant, got {error:?}");
+        };
+        assert!(
+            reason.contains(&format!(
+                "a server of the configured HDC executable that this launch did not start \
+                 listens there (pid {}",
+                replacement.id()
+            )),
+            "{reason}"
+        );
+        assert_eq!(fake.calls().len(), launched, "{:?}", fake.calls());
+        assert!(replacement.try_wait().unwrap().is_none());
+
+        // The stop ends the proved replacement, and its listener with it.
+        lease.revalidate().unwrap();
+        assert_eq!(
+            end_proved_process(
+                lease.identity(),
+                Duration::from_millis(250),
+                Duration::from_secs(5)
+            )
+            .unwrap(),
+            ProvedProcessEnd::Killed
+        );
+        assert!(replacement.try_wait().unwrap().is_some());
+        assert!(!reachable(endpoint));
+        drop(lease);
+
+        // The next start owns the endpoint.
+        let server =
+            ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(15))).unwrap();
+        assert_eq!(server.endpoint(), endpoint);
+        assert_ne!(server.identity().pid as u32, replacement.id());
+        server.stop().unwrap();
+        let _ = replacement.wait();
+    }
+
     /// A listener that appears only after the launch — once the fake has run
     /// as a server that never binds — answers the endpoint, but it is not the
     /// launched process: the launch is never bound to it.
@@ -403,5 +525,36 @@ mod windows {
             fallback.dispatch(&plan).unwrap().stdout,
             b"port= args=a b|&|$x|\n"
         );
+    }
+
+    /// XPA-AC-2 on Windows: the fake process face receives the real argv of a
+    /// lowered device plan, verbatim and without a shell, its target named by
+    /// `-t <connectKey>` first (`device_arguments`, the single injection
+    /// point), and the answer reaches the plan's judge.
+    fn a_device_plan_reaches_the_child_with_its_connect_key_first() {
+        const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let fake = FakeHdc::new("hdc");
+        let tool = {
+            let digest = fake.tool.sha256().to_owned();
+            VerifiedTool::open(fake.tool.path(), &digest).unwrap()
+        };
+        let dispatch = ProcessDispatch::new(tool, Some("8711"));
+        let action = Action::QueryProperty(Property::ProductName);
+        let plan = action.lower("probe", Some(KEY)).unwrap();
+        assert_eq!(
+            plan.arguments,
+            ["-t", KEY, "shell", "param", "get", "const.product.name"]
+        );
+        let receipt = dispatch.dispatch(&plan).unwrap();
+        assert_eq!(receipt.exit_status, 0);
+        assert_eq!(receipt.stdout, b"OpenHarmony Reference Device\n");
+        assert_eq!(
+            fake.calls(),
+            [format!("-t|{KEY}|shell|param|get|const.product.name")]
+        );
+        // Without a connect key there is no device plan, and nothing runs.
+        assert!(action.lower("probe", None).is_err());
+        assert!(action.lower("probe", Some("")).is_err());
+        assert_eq!(fake.calls().len(), 1);
     }
 }

@@ -363,14 +363,70 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] =
 /// end to end on Windows: the CLI authenticates a daemon signed with a
 /// host-trusted development signer over the named pipe and renders its
 /// answer (`check-readonly.py` `signed_windows_matrix`, `tests/
-/// windows_signed_runtime.rs`; TASK-XPA-018). `device candidates` is not one:
-/// without a registered Windows HDC tuple its method answers a structured
-/// refusal, not the live candidates its target contract names, and the entry
-/// for that method reaches `device wait` and `device list`, which no Windows
-/// run has measured.
+/// windows_signed_runtime.rs`, and the owners' `arkdeck-agentd/tests/
+/// windows_*_process.rs` signed-CLI tests, each of which checks that what it
+/// measured is `implemented` here; TASK-XPA-018). `device candidates` is not
+/// one: without a registered Windows HDC tuple its method answers a
+/// structured refusal, not the live candidates its target contract names,
+/// and the entry for that method reaches `device wait` and `device list`,
+/// which no Windows run has measured.
 const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "doctor",
+    "runtime.health",
     "operation.list",
+    // The Catalog reads of one operation (`observe.device@1`); they dispatch
+    // nothing.
+    "operation.describe",
+    "operation.example",
+    "operation.validate",
+    // The Job store, runner and reconciler over recorded Swift Jobs
+    // (TASK-XPA-005; `windows_job_store_process.rs`,
+    // `windows_job_runner_process.rs`, `windows_reconcile_agent_process.rs`).
+    // Not `job plan`, `job submit` or `job run`: without a registered HDC
+    // a new device Job is refused before admission or before its run.
+    "job.list",
+    "job.show",
+    "job.status",
+    "job.events",
+    "job.timeline",
+    "job.result",
+    "job.evidence",
+    "job.wait",
+    "job.cancel",
+    "job.reconcile",
+    // The agent execution and human-action owners over Swift's
+    // physical-assistance records (TASK-XPA-005). Not `agent run`, `resume`
+    // or `abandon`, nor `human-action resume`: each reaches a Target, which
+    // needs a registered HDC.
+    "agent.list",
+    "agent.status",
+    "human-action.list",
+    "human-action.show",
+    // The Artifact owner over a recorded Job's Artifacts (TASK-XPA-006;
+    // `windows_artifact_owner_process.rs`).
+    "artifact.list",
+    "artifact.inspect",
+    "artifact.read",
+    "artifact.export",
+    "artifact.quota",
+    // The capability store's reads (`windows_mutation_retention_process.rs`,
+    // and Swift's capability-read oracle store in
+    // `windows_reconcile_agent_process.rs`).
+    "capability.list",
+    "capability.inspect",
+    // The Session and storage owners over recorded Swift Sessions
+    // (TASK-XPA-005/014; `windows_session_owner_process.rs`).
+    "runtime.storage.status",
+    "runtime.storage.policy",
+    "runtime.storage.root",
+    "session.list",
+    "session.show",
+    "session.pin",
+    "session.unpin",
+    "session.export.preview",
+    "session.export.apply",
+    "session.cleanup.preview",
+    "session.cleanup.apply",
     // The Target store (TASK-XPA-004): its reads and display names. Not
     // `target availability` (presence stays unresolved without a registered
     // HDC) nor `target adopt` (refused before admission without one).
@@ -378,14 +434,20 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "target.show",
     "target.display-name.set",
     "target.display-name.clear",
-    // The workspace registration owner (TASK-XPA-015): registration and the
-    // reads. Not the updates and removals, nor preset registration, which
-    // the Windows daemon refuses without its Job and DevEco owners.
+    // The workspace registration owner (TASK-XPA-015): registration, the
+    // reads, and the updates and removals the Job owner's workspace census
+    // admits (`windows_workspace_projects_process.rs`). Not preset
+    // registration: a build, test or signing preset pins a DevEco toolchain
+    // or credential the Windows daemon does not yet register.
     "workspace.project.register",
     "workspace.project.list",
     "workspace.project.show",
+    "workspace.project.update",
+    "workspace.project.remove",
     "workspace.preset.list",
     "workspace.preset.show",
+    "workspace.preset.update",
+    "workspace.preset.remove",
     // The Trace cache owner's inventory (TASK-XPA-021); not its purge.
     "trace.cache.status",
     // The client-started service (TASK-XPA-002, decision 11), through the
@@ -396,15 +458,32 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "runtime.service.verify",
     "runtime.service.restart",
     "runtime.service.uninstall",
+    // The Import owner (TASK-XPA-008; `windows_import_owner_process.rs`):
+    // the HAP, native-library and workspace-patch uploads committed with
+    // their exact bytes, and the Import reads, release and abort. Not
+    // `artifact import flash-bundle`: its publication is refused on Windows
+    // while the owner's flash-bundle validator is macOS-only.
+    "artifact.import.hap",
+    "artifact.import.native-library",
+    "artifact.import.workspace-patch",
+    "artifact.import.inspect",
+    "artifact.import.list",
+    "artifact.import.release",
+    "artifact.import.abort",
+    // The cleanup debt ledger over Swift's recorded debug HAP debts
+    // (`windows_cleanup_debt_process.rs`). Not `recovery cleanup continue`:
+    // without a registered HDC a debt is refused before its readback.
+    "recovery.cleanup.list",
+    "cleanup-debt.list",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
 /// support bundle's service is `operationUnavailable`), each for the macOS
 /// host primitive it needs and Windows does not have yet: the LaunchAgent
 /// (`launchctl`), DevEco's password material, the App container's update lifecycle, the
-/// diagnostic-bundle publisher, the update-feed artifact measure, the I/O
-/// Registry USB census, and the host store's no-follow Import source reader
-/// (TASK-XPA-018).
+/// diagnostic-bundle publisher, the update-feed artifact measure and the I/O
+/// Registry USB census (TASK-XPA-018). The Import uploads are served on
+/// Windows through the host store's `HostImportSource` (TASK-XPA-008).
 const MACOS_HOST_LEAVES: &[&str] = &[
     // The LaunchAgent's own installation; the client-started daemon has none.
     "runtime.service.install",
@@ -432,10 +511,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "update-feed.prepare",
     "update-feed.assemble",
     "flash.install-binding",
-    "artifact.import.hap",
-    "artifact.import.workspace-patch",
-    "artifact.import.flash-bundle",
-    "artifact.import.native-library",
 ];
 
 /// The App's capability table as published, read once.
@@ -1088,23 +1163,29 @@ mod tests {
             ("target.show", "implemented"),
             ("workspace.project.register", "implemented"),
             ("trace.cache.status", "implemented"),
+            ("health", "implemented"),
+            ("job.status", "implemented"),
+            ("session.cleanup.apply", "implemented"),
             // Refused by the Windows daemon without an HDC or a Job owner.
             ("target.availability", "partial"),
             ("target.adopt", "partial"),
-            ("workspace.project.update", "partial"),
+            ("workspace.project.update", "implemented"),
+            ("workspace.preset.register", "partial"),
             ("trace.cache.purge", "partial"),
             ("device.observations", "partial"),
-            ("health", "partial"),
+            ("job.submit", "partial"),
+            ("agent.run", "partial"),
+            ("runtime.storage.root", "implemented"),
             ("help", "implemented"),
             ("completion", "implemented"),
             ("capability.install", "implemented"),
-            ("job.status", "partial"),
-            ("artifact.import.list", "partial"),
-            ("artifact.import.release", "partial"),
+            ("artifact.import.list", "implemented"),
+            ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
             ("flash.dayu200", "partial"),
-            ("artifact.import.begin", "notImplemented"),
-            ("artifact.import.workspace-patch", "notImplemented"),
+            ("artifact.import.begin", "implemented"),
+            ("artifact.import.workspace-patch", "implemented"),
+            ("artifact.import.flash-bundle", "partial"),
         ] {
             assert_eq!(windows(&document, feature), status, "{feature}");
         }

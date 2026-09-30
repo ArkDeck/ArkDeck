@@ -54,8 +54,8 @@ pub struct TargetStore {
     lanes: crate::device_lane::DeviceMutationLanes,
 }
 /// The Target a binding lineage advance left, and whether it moved.
-/// (Rockchip binding lineage, GJ-4: composed on macOS only.)
-#[cfg(target_os = "macos")]
+/// (Rockchip binding lineage, GJ-4: macOS and Windows, TASK-XPA-010.)
+#[cfg(any(target_os = "macos", windows))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AdvancedTarget {
     pub(crate) target_id: String,
@@ -460,8 +460,7 @@ impl TargetStore {
     }
     /// Resolve only existing durable Target authority for a new Import intent.
     /// No wire input supplies a binding, route, observation or inspected fact.
-    /// Its one consumer, the Import owner, is composed on macOS only.
-    #[cfg(target_os = "macos")]
+    /// Its one consumer is the Import owner.
     pub fn resolve_import_binding(
         &self,
         intent: &arkdeck_contract::ImportIntent,
@@ -778,7 +777,7 @@ impl TargetStore {
     /// document under both locks and published only when it changed it. A
     /// refusal is Swift's rendered `storeFailure`; a document this store cannot
     /// read or publish is refused in the same case, with this store's detail.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn advance_binding_lineage(
         &self,
         advance: &crate::rockchip_binding::LineageAdvance,

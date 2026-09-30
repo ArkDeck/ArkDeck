@@ -7,6 +7,23 @@ use std::ffi::OsString;
 use std::net::SocketAddrV4;
 use std::path::PathBuf;
 
+/// How `end_proved_process` left the process a receipt names. Every answer
+/// means that process's exit has finished: the kernel has closed its
+/// descriptors (its handles, on Windows), so no listener of its own accepts
+/// any more.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProvedProcessEnd {
+    /// Its exit had begun, or finished, before the call (the kernel no longer
+    /// reported its birth): nothing was signalled.
+    AlreadyEnded,
+    /// SIGTERM ended it: within the grace, or its exit was under way when the
+    /// grace ran out. (Windows has no TERM, so never there.)
+    Terminated,
+    /// It outlived the grace, and SIGKILL ended it; on Windows,
+    /// `TerminateProcess` ended it.
+    Killed,
+}
+
 /// Swift `HDCServerProcessIdentityReceipt`: the birth identity of the one
 /// process that owns the registered endpoint with the verified executable.
 #[derive(Clone, Debug, PartialEq, Eq)]

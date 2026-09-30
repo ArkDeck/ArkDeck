@@ -16,9 +16,9 @@ mod arkforge_execution;
 mod arkforge_lane;
 #[cfg(target_os = "macos")]
 mod bootstrap_readers;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod cleanup_debt_control;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod code_sign_helper;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_control;
@@ -56,6 +56,8 @@ mod production;
 mod tool_selection_startup;
 #[cfg(all(test, target_os = "macos"))]
 mod tool_selection_startup_tests;
+#[cfg(windows)]
+mod windows_hdc_gate;
 #[cfg(windows)]
 mod windows_lifecycle;
 #[cfg(all(test, target_os = "macos"))]
@@ -242,7 +244,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     }
     // The standalone and production daemons compose the helper their own
     // bundle holds, never one a caller names.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     if development.is_none() && std::env::var_os(code_sign_helper::DEVELOPMENT_HELPER).is_some() {
         return Err(
             "a development code-sign helper is named only for an isolated development root".into(),
@@ -290,7 +292,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         development.as_deref(),
         std::env::var_os("ARKDECK_ENDPOINT").as_deref(),
         &host::utc_now(),
-        &|name| std::env::var_os(name).is_some(),
+        &|name| std::env::var_os(name),
     )? {
         windows_lifecycle::Start::Serve(serving) => serving,
         // As Swift's second instance: the Runtime serving keeps serving.
@@ -318,19 +320,16 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         None => default_user_endpoint()?,
     };
     let host = host::Host::from_environment();
-    // The owners a Windows daemon of a state root composes over it
-    // (`windows_lifecycle::Authority::compose`); the private-endpoint
-    // foundation owns no root and composes none.
-    #[cfg(windows)]
-    let host = match &authority {
-        Some(authority) => authority.compose(host)?,
-        None => host,
-    };
     // Swift's `HDCNativeCodeSignHelperArtifact.bundled()`: the helper this
     // bundle holds, verified. Without one, a native deployment stays
     // unavailable with the reason the availability answer carries; a helper
     // that is there and does not verify is reported and the daemon serves.
-    #[cfg(target_os = "macos")]
+    // The Windows packages carry it beside the daemon (the xcopy and RC
+    // scripts), and it is composed before the owners, so the census the
+    // composition reports names it: no Windows HDC tuple is registered yet,
+    // so there it only stands ready for the native deployment the tuple
+    // will make available.
+    #[cfg(any(target_os = "macos", windows))]
     let host = match code_sign_helper::bundled() {
         Ok(Some(helper)) => host.with_code_sign_helper(helper),
         Ok(None) => host,
@@ -339,6 +338,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             let _ = io::stdout().flush();
             host
         }
+    };
+    // The owners a Windows daemon of a state root composes over it
+    // (`windows_lifecycle::Authority::compose`); the private-endpoint
+    // foundation owns no root and composes none.
+    #[cfg(windows)]
+    let host = match &authority {
+        Some(authority) => authority.compose(host)?,
+        None => host,
     };
     #[cfg(target_os = "macos")]
     let host = if let Some((root, admission)) = isolated {

@@ -30,7 +30,9 @@ pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(any(target_os = "macos", windows))]
 mod server_identity;
 #[cfg(any(target_os = "macos", windows))]
-pub use server_identity::{ServerExit, ServerIdentityReceipt, ServerLaunch, ServerStop};
+pub use server_identity::{
+    ProvedProcessEnd, ServerExit, ServerIdentityReceipt, ServerLaunch, ServerStop,
+};
 #[cfg(unix)]
 mod account;
 #[cfg(unix)]
@@ -112,16 +114,16 @@ pub use stop_signal::{Latch, StopSignal};
 mod macos_server;
 #[cfg(target_os = "macos")]
 pub use macos_server::{
-    LoopbackServerLease, ProvedProcessEnd, end_proved_process, process_argument_record,
-    process_arguments, verifies_managed_process,
+    LoopbackServerLease, end_proved_process, process_argument_record, process_arguments,
+    verifies_managed_process,
 };
 #[cfg(windows)]
 pub use windows::{
     ConnectionCloser, DetachedDaemon, GuardAcquisition, GuardObject, ImagePin, InstanceScope,
     Latch, ListenerLock, LocalConnection, LocalListener, LoopbackServerLease, ManagedServer,
     OWNER_ONLY_REMEDY, OwnerLock, Readiness, SingleInstanceGuard, StarterLock, StateRoot,
-    StopSignal, await_pipe_instance, default_user_endpoint, pipe_present, send_console_break,
-    verify_daemon_image,
+    StopSignal, await_pipe_instance, default_user_endpoint, end_proved_process, pipe_present,
+    send_console_break, verify_daemon_image,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
@@ -273,6 +275,10 @@ pub use host_url_properties::{EntryPresentation, host_entry_presentation};
 mod host_inflate;
 #[cfg(target_os = "macos")]
 pub use host_inflate::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
+// Windows has no raw DEFLATE decoder of its own; the platform's decoder
+// gives the same answers (TASK-XPA-010).
+#[cfg(windows)]
+pub use windows::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
 
 // Portable: Foundation's Julian/Gregorian UTC calendar and the legacy
 // ISO8601DateFormatter's written shape, with the Foundation originals as the
@@ -396,6 +402,13 @@ pub use windows::{
 // and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
 #[cfg(windows)]
 pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
+// The Authenticode signature of a registered DevEco tool and the DevEco
+// launcher's publisher, with the macOS answer type (TASK-XPA-011, G12).
+#[cfg(windows)]
+pub use windows::{
+    DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,
+    inspect_native_code_signature, inspect_publisher,
+};
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]
@@ -422,6 +435,9 @@ pub use usb_registry::{RegistryEntry, RegistryUnavailable, RegistryValue, UsbHos
 pub use usb_registry::{registry_census, usb_host_devices};
 
 mod usb_device_nodes;
+pub use usb_device_nodes::{
+    CENSUS_MAPPING, CensusField, CensusSample, DeviceNode, NodeProperty, NodeValue,
+    unconfirmed_census_fields,
+};
 #[cfg(windows)]
-pub use usb_device_nodes::usb_host_devices;
-pub use usb_device_nodes::{DeviceNode, NodeProperty, NodeValue};
+pub use usb_device_nodes::{usb_device_node_census, usb_host_devices};

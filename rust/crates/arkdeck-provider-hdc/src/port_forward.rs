@@ -9,7 +9,7 @@
 
 use crate::capture_files::{FileActionError, FilePlan};
 use crate::native_library::Reconcile;
-use crate::operation::{Outcome, ProcessPlan, Receipt, RequestError};
+use crate::operation::{Outcome, ProcessPlan, Receipt, RequestError, device_arguments};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -216,7 +216,7 @@ impl PortAction {
                 ));
             }
         };
-        let mut arguments = vec!["-t".to_owned(), key.to_owned()];
+        let mut arguments = device_arguments(key, []);
         match self {
             Self::Create(rule) => {
                 arguments.push(

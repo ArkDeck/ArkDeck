@@ -131,9 +131,10 @@ mod job_plan;
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod operation_availability;
 #[cfg(target_os = "macos")]
-pub use job_plan::{
-    AnalyzerProfile, FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable,
-};
+pub use job_plan::AnalyzerProfile;
+// The Flash planner on macOS and Windows (TASK-XPA-010).
+#[cfg(any(target_os = "macos", windows))]
+pub use job_plan::{FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable};
 #[cfg(any(target_os = "macos", windows))]
 pub use job_plan::{JobPlanner, PlanRefusal};
 // The analyzer operations' fixed facts, read on every host.
@@ -205,7 +206,7 @@ mod capture_documents;
 mod cleanup_debt;
 #[cfg(any(target_os = "macos", windows))]
 pub use cleanup_debt::list_cleanup_debt;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod cleanup_debt_continue;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -215,7 +216,7 @@ mod device_run;
 mod device_steps;
 #[cfg(any(target_os = "macos", windows))]
 mod job_admission;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_admission::FlashAdmitter;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_admission::{AdmissionRefusal, JobAdmitter, MutationAuthority, runtime_now};
@@ -286,7 +287,7 @@ pub use artifact_publication::collect_expired_artifacts;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_run;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_run::{FlashExecution, FlashRunner};
 #[cfg(any(target_os = "macos", windows))]
 pub use job_run::{JobRunner, RunRefusal, runtime_precise_now};
@@ -310,7 +311,7 @@ pub use job_recovery::{RecoveredJobs, RecoveryError, recover_active_jobs, recove
 mod job_lineage_repair;
 #[cfg(any(target_os = "macos", windows))]
 mod job_reconcile;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_reconcile::FlashReconciler;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_reconcile::JobReconciler;
@@ -483,56 +484,56 @@ pub use target_observation::{
     Adopted, Observation, ObservationError, Snapshot, Sources, TargetObservations, adoption_answer,
     parse_reference,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod post_flash_alias;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod post_flash_alias_store;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use post_flash_alias::{
     LiveTarget, ObservedHdc, PostFlashAliasError, PostFlashBinding, Publication, Reconciliation,
     SCHEMA_VERSION as POST_FLASH_ALIAS_SCHEMA_VERSION, admit as admit_post_flash_alias, is_sha256,
     reissue as reissue_post_flash_alias, resolve as resolve_post_flash_alias,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use post_flash_alias_store::PostFlashAliasStore;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod flash_alias_reconcile;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_alias_reconcile::{FlashAliasReconciler, UsbCensus};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod debug_attempt_permit;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod flash_invocations;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_invocations::{
     DriverResult, FlashInvocations, InvocationBroker, MAXIMUM_DESTRUCTIVE_EPOCHS,
     debug_execution_outcome,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod rockchip_binding;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use rockchip_binding::{
     BindingError, BindingEvidence, BindingInstallation, BindingSnapshot, BoundTarget,
     LineageAdvance, RecoveryProof, RockchipBindingStore, install_current_target,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod rockchip_action;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use rockchip_action::{CaptureRequest, Expectation, RockchipAction};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod rockchip_records;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use rockchip_records::{
     DurableRockchipHost, ExecutionResult, RefusingRockchipHost, RockchipActionExecutor,
     RockchipActionHosting, RockchipRecordStore,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod rockchip_executor;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use rockchip_executor::{HdcResolver, RockchipExecutor};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod rockchip_dispatcher;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use rockchip_dispatcher::NativeRockchipDispatcher;
 #[cfg(target_os = "macos")]
 mod control_performer;
@@ -546,15 +547,17 @@ pub use rockchip_reactivation::{ReactivationProof, ReactivationProofSource};
 mod loader_binding;
 #[cfg(target_os = "macos")]
 pub use loader_binding::LoaderBinding;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod rockchip_startup;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use rockchip_startup::{RockchipStartup, reconcile_rockchip_startup};
-#[cfg(target_os = "macos")]
+// The Flash archive reader, which the Flash planner and the flash-bundle
+// Import validator read a bundle through (macOS and Windows, TASK-XPA-010).
+#[cfg(any(target_os = "macos", windows))]
 mod flash_archive;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod flash_facts;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_facts::{
     ArkForgeLoader, FlashHostFacts, LanePreview, NATIVE_ROCKUSB_TOOLCHAIN, NativeRockUsbIdentity,
     NoArkForgeLane, RockchipFacts, RockchipUsbProbe, lane_plan_preview, preview_before_lane,
@@ -751,6 +754,10 @@ pub use trace_owner::TraceCacheStore;
 #[cfg(any(target_os = "macos", windows))]
 mod recovery_manifest;
 mod session_graphemes;
+// Its readers, the ArkTrace profile and the Rockchip records, are built on
+// macOS and Windows.
+#[cfg(any(target_os = "macos", windows))]
+mod swift_hex;
 // The Session census and retention catalog the storage owner and the
 // publication writer read and register in, on macOS and Windows.
 #[cfg(any(target_os = "macos", windows))]
@@ -792,21 +799,24 @@ mod tool_list_owner;
 mod tool_retirement;
 
 // Portable: the product and SDK manifest facts, the same format on macOS
-// and Windows (TASK-XPA-011, G15). The registry and its read owner stay
-// macOS-only until the Windows DevEco trust (G12) exists.
+// and Windows (TASK-XPA-011, G15). The DevEco registry and its owner are
+// built on macOS and Windows: on Windows node and hvigor register as the
+// child roles of one content-addressed toolchain, node's Authenticode
+// signature and the DevEco launcher's publisher (G12) in place of the macOS
+// bundle signature and resource envelope.
 mod deveco_manifest;
 pub use deveco_manifest::{
     DevEcoLaunchHost, DevEcoManifestError, DevEcoManifestFacts, parse_deveco_manifests,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_registry;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use deveco_registry::decode_deveco_toolchains;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_content;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_registry_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use deveco_registry_owner::DevEcoRegistryStore;
 
 // The Artifact read, inspect, list and export owners (TASK-XPA-006), on the
@@ -829,18 +839,13 @@ pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
 #[cfg(any(target_os = "macos", windows))]
 mod artifact_resources;
 
-#[cfg(target_os = "macos")]
+// The Import owner (`artifact.import.*`) on macOS and Windows, a flash
+// bundle validated at publication through the Flash archive reader on both
+// (TASK-XPA-010).
+#[cfg(any(target_os = "macos", windows))]
 mod import_upload;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
-// The Import owner has no value on Windows yet (its publication needs the
-// Artifact publication and Flash archive owners); the Job planner is the
-// same code with none.
-#[cfg(windows)]
-#[path = "absent_import_upload.rs"]
-mod import_upload;
-#[cfg(windows)]
-pub use import_upload::ImportUploadStore;
 
 #[cfg(any(target_os = "macos", windows))]
 mod artifact_export;

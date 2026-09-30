@@ -6,11 +6,15 @@ namespace ArkDeck.ClientKit.Transport;
 
 /// <summary>
 /// The installed daemon this client may talk to: installation inputs, never values read
-/// from the pipe (the Rust <c>ServerIdentity</c>). Windows requires the image path and
-/// either the Authenticode signer certificate's SHA-256 (lowercase hex of its DER) or the
-/// exact MSIX package family.
+/// from the pipe (the Rust <c>ServerIdentity</c>). Windows requires the image path and at
+/// least one of: the development signer certificate's SHA-256 (lowercase hex of its DER),
+/// the production publisher identity (maintainer ruling 17: the leaf's subject
+/// <c>O=</c> and its Artifact Signing certificate-profile EKU
+/// <c>1.3.6.1.4.1.311.97.&lt;profile&gt;</c>, both or neither), or the exact MSIX package
+/// family.
 /// </summary>
-public sealed record DaemonIdentity(string ExecutablePath, string? AuthenticodeSha256 = null, string? PackageFamily = null);
+public sealed record DaemonIdentity(string ExecutablePath, string? AuthenticodeSha256 = null, string? PackageFamily = null,
+    string? PublisherOrganization = null, string? PublisherEku = null);
 
 /// <summary>A local ArkDeck named pipe: <c>\\.\pipe\arkdeck-*</c>, at most 240 characters,
 /// no further separators (the Rust <c>endpoint_name</c>).</summary>

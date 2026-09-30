@@ -427,10 +427,8 @@ impl<'a> RockchipHdcObserver<'a> {
         duration: Duration,
         byte_budget: usize,
     ) -> Result<Receipt, RockchipHdcFailure> {
-        let mut arguments: Vec<String> = ["-t", connect_key, "shell", "hilog", "-x"]
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect();
+        let mut arguments =
+            crate::device_arguments(connect_key, ["shell", "hilog", "-x"].map(str::to_owned));
         arguments.extend(filters.iter().cloned());
         let receipt = self.read(ProcessPlan {
             arguments,
@@ -572,15 +570,10 @@ fn target_list_plan(command_timeout: Duration) -> ProcessPlan {
 
 fn build_properties_plan(connect_key: &str) -> ProcessPlan {
     ProcessPlan {
-        arguments: [
-            "-t",
+        arguments: crate::device_arguments(
             connect_key,
-            "shell",
-            POST_FLASH_BUILD_PROPERTIES_COMMAND,
-        ]
-        .iter()
-        .map(|value| (*value).to_owned())
-        .collect(),
+            ["shell", POST_FLASH_BUILD_PROPERTIES_COMMAND].map(str::to_owned),
+        ),
         timeout: PROPERTIES_READ_TIMEOUT,
         capture_bytes: READ_CAPTURE_BYTES,
     }

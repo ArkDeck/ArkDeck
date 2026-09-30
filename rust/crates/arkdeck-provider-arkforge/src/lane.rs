@@ -11,6 +11,15 @@
 //!
 //! This composes and proves the lane; plans, permits and execution through it
 //! are later slices.
+//!
+//! On Windows (TASK-XPA-010) the same lane launches `arkforged.exe` in its
+//! own Job object and pairs it over stdin. ArkForge serves its sessions on
+//! named pipes derived from the canonical runtime directory rather than on
+//! socket files, so there is no stale file to remove: a pipe name a live
+//! process still serves cannot be taken from it, and a lane whose runtime
+//! directory is already served refuses before it launches anything. The
+//! controller pipe is awaited by connecting to it, since a pipe has no file
+//! to look for.
 
 use arkdeck_contract::{arkforge_bundle, sha256_hex};
 use arkdeck_platform::{ManagedServer, ServerStop, VerifiedTool};
@@ -271,6 +280,17 @@ impl Lane {
         managed_control_tool_sha256: &str,
     ) -> Result<Self, Absence> {
         let unavailable = |detail: String| Absence::DaemonUnavailable(detail);
+        // A child's working directory is its canonical spelling on Windows,
+        // the one ArkForge derives the lane's pipe names from.
+        #[cfg(windows)]
+        let canonical_runtime = std::fs::canonicalize(runtime_directory).map_err(|error| {
+            unavailable(format!(
+                "cannot resolve the ArkForge runtime directory {}: {error}",
+                runtime_directory.display()
+            ))
+        })?;
+        #[cfg(windows)]
+        let runtime_directory = canonical_runtime.as_path();
         let source = std::fs::read_to_string(&inputs.device_profile_path).map_err(|_| {
             unavailable(format!(
                 "cannot read the DeviceProfile at {}",
@@ -308,8 +328,20 @@ impl Lane {
         // A leftover socket exists at once, so the wait below would reach the
         // previous generation's daemon; without them, only the one launched
         // here can bind.
+        #[cfg(unix)]
         for name in ["controller.sock", "public.sock"] {
             let _ = std::fs::remove_file(runtime_directory.join(name));
+        }
+        // A pipe name is not a file: while any process serves it, the wait
+        // below would reach that process, and the daemon launched here could
+        // not bind it. Nothing is launched then.
+        #[cfg(windows)]
+        if already_served(runtime_directory) {
+            return Err(unavailable(format!(
+                "another process already serves the ArkForge runtime directory {}; this lane \
+                 launched nothing rather than pair with a daemon it did not start",
+                runtime_directory.display()
+            )));
         }
         let started = VerifiedTool::open(&inputs.daemon_path, &inputs.daemon_sha256.to_lowercase())
             .and_then(|tool| {
@@ -343,19 +375,22 @@ impl Lane {
             lane.stop();
             Err(unavailable(detail))
         };
-        if !lane.await_controller_socket() {
-            return refuse(
-                lane,
-                "arkforged started but never opened its controller socket; the owned process \
-                 generation was stopped before returning the failure"
-                    .into(),
-            );
-        }
-        if let Err(error) = ControllerClient::connect(runtime_directory) {
-            return refuse(
-                lane,
-                format!("could not open a controller session: {}", error.message),
-            );
+        match lane.open_controller_session() {
+            Opened::Session => {}
+            Opened::Never => {
+                return refuse(
+                    lane,
+                    "arkforged started but never opened its controller socket; the owned \
+                     process generation was stopped before returning the failure"
+                        .into(),
+                );
+            }
+            Opened::Refused(message) => {
+                return refuse(
+                    lane,
+                    format!("could not open a controller session: {message}"),
+                );
+            }
         }
         // ArkForge's Rust controller client keeps no acknowledgement; the
         // daemon publishes the same standing readiness on every session.
@@ -368,6 +403,57 @@ impl Lane {
         Ok(lane)
     }
 
+    /// Awaits the controller socket, then opens one controller session.
+    #[cfg(unix)]
+    fn open_controller_session(&self) -> Opened {
+        if !self.await_controller_socket() {
+            return Opened::Never;
+        }
+        match ControllerClient::connect(&self.runtime_directory) {
+            Ok(_) => Opened::Session,
+            Err(error) => Opened::Refused(error.message),
+        }
+    }
+
+    /// Connects to the controller pipe until a session opens, within the
+    /// same ten seconds, looking every 50 ms. Only an absent pipe (or one
+    /// that closed during its handshake) is waited for; any other refusal is
+    /// the daemon's answer. A daemon that already ended will never open it,
+    /// and a session answered while the daemon launched here is no longer
+    /// running was answered by another process.
+    #[cfg(windows)]
+    fn open_controller_session(&self) -> Opened {
+        let deadline = Instant::now() + SOCKET_DEADLINE;
+        loop {
+            if self.daemon_ended() {
+                return Opened::Never;
+            }
+            match ControllerClient::connect(&self.runtime_directory) {
+                Ok(_) if self.daemon_ended() => return Opened::Never,
+                Ok(_) => return Opened::Session,
+                Err(error) if error.code != "CONTROLLER_UNAVAILABLE" => {
+                    return Opened::Refused(error.message);
+                }
+                Err(_) => {}
+            }
+            if Instant::now() >= deadline {
+                return Opened::Never;
+            }
+            std::thread::sleep(SOCKET_POLL);
+        }
+    }
+
+    /// Whether the generation this lane launched has already ended.
+    #[cfg(windows)]
+    fn daemon_ended(&self) -> bool {
+        self.daemon
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .as_mut()
+            .is_none_or(|daemon| !matches!(daemon.exit(), Ok(None)))
+    }
+
+    #[cfg(unix)]
     fn await_controller_socket(&self) -> bool {
         let socket = self.runtime_directory.join("controller.sock");
         let deadline = Instant::now() + SOCKET_DEADLINE;
@@ -440,7 +526,9 @@ impl Lane {
     }
 
     /// Stops the owned generation, once: its end of input, then TERM to its
-    /// group, then KILL. What it wrote comes back the first time.
+    /// group, then KILL (on Windows, its Job terminated once the end of
+    /// input has had its half second). What it wrote comes back the first
+    /// time.
     pub fn stop(&self) -> Option<ServerStop> {
         self.stop_daemon()?.stopped.ok()
     }
@@ -461,6 +549,29 @@ impl Lane {
             stopped: daemon.stop(),
         })
     }
+}
+
+/// How the lane's first controller session went.
+enum Opened {
+    Session,
+    Never,
+    Refused(String),
+}
+
+/// Whether any process already answers on the lane's public or controller
+/// pipe for `runtime_directory`: a pipe that exists but refused or closed
+/// the handshake is still served.
+#[cfg(windows)]
+fn already_served(runtime_directory: &Path) -> bool {
+    let public = match PublicClient::connect(runtime_directory) {
+        Ok(_) => true,
+        Err(error) => error.code != "DAEMON_UNAVAILABLE",
+    };
+    public
+        || match ControllerClient::connect(runtime_directory) {
+            Ok(_) => true,
+            Err(error) => error.code != "CONTROLLER_UNAVAILABLE",
+        }
 }
 
 /// What stopping a lane's daemon left: the process its launch recorded, and

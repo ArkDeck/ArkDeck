@@ -43,6 +43,9 @@ public sealed partial class MainWindow : Window
                      (NavDevice, UiStrings.AppNavigationDevice),
                      (NavHistory, UiStrings.AppNavigationHistory),
                      (NavSessions, UiStrings.WindowsNavigationSessions),
+                     (NavAgents, UiStrings.WindowsNavigationAgents),
+                     (NavImports, UiStrings.WindowsNavigationImports),
+                     (NavDebug, UiStrings.WindowsNavigationDebug),
                      (NavSettings, UiStrings.WindowsNavigationSettings),
                  })
         {
@@ -152,6 +155,9 @@ public sealed partial class MainWindow : Window
                 "history" => new HistoryPage(),
                 "settings" => new SettingsPage(),
                 "sessions" => new SessionsPage(),
+                "agents" => new AgentsPage(),
+                "imports" => new ImportsPage(),
+                "debug" => new DebugPage(),
                 _ => new OverviewPage(),
             };
             _pages[tag] = page;

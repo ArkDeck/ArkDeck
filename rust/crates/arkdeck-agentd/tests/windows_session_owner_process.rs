@@ -17,7 +17,14 @@
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
 //!   `runtime storage status`, `session list`, `show`, `export preview` and
-//!   `apply`. Without that variable this test says so and checks nothing.
+//!   `apply`; then `session pin`, `runtime storage policy`, `session cleanup
+//!   preview` and `apply` reclaim the unpinned Session as over the pipe, and
+//!   `session unpin` releases the kept one; `runtime storage root` moves the
+//!   Sessions root inside the development root and back to its default. The
+//!   measured leaves are Windows
+//!   `implemented` in the coverage manifest the CLI renders
+//!   (`WINDOWS_MEASURED_LEAVES`). Without that variable this test says so and
+//!   checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -284,7 +291,7 @@ fn recorded_sessions_are_served_exported_and_cleaned_up_across_a_restart() {
     let pipe = daemon.serving();
     assert!(
         daemon.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
                 .to_owned()
         ),
         "{:?}",
@@ -523,5 +530,142 @@ fn gj1_session_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     ]);
     assert_eq!(exported["exportedPath"], destination_text.as_str());
     assert!(destination.join("manifest.json").is_file());
+
+    // Pinned, a policy the two Sessions exceed, and the cleanup that
+    // reclaims the unpinned one and keeps the pinned one; then unpinned.
+    let pinned = run(&[
+        "session",
+        "pin",
+        "--session",
+        OBSERVED,
+        "--expected-generation",
+        shown["generation"].as_str().unwrap(),
+    ]);
+    assert_eq!(pinned["pinned"], true, "{pinned}");
+    let policy = run(&[
+        "runtime",
+        "storage",
+        "policy",
+        "--expected-generation",
+        "1",
+        "--total-quota-bytes",
+        "2",
+        "--safety-margin-bytes",
+        "1",
+        "--retention-days",
+        "1",
+    ]);
+    assert_eq!(policy["sessionDomain"]["generation"], "2", "{policy}");
+    let cleanup = run(&["session", "cleanup", "preview"]);
+    let reclaimed: Vec<&str> = cleanup["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|session| session["disposition"] == "reclaim")
+        .map(|session| session["sessionId"].as_str().unwrap())
+        .collect();
+    assert_eq!(reclaimed, [FAILED], "{cleanup}");
+    let applied = run(&[
+        "session",
+        "cleanup",
+        "apply",
+        "--preview-id",
+        cleanup["previewId"].as_str().unwrap(),
+        "--preview-digest",
+        cleanup["previewDigest"].as_str().unwrap(),
+    ]);
+    assert_eq!(applied["removedSessionIds"], json!([FAILED]), "{applied}");
+    assert!(!root.session(FAILED).exists());
+    // The cleanup moved the catalog on: the kept Session is read again.
+    let kept = run(&["session", "show", "--session", OBSERVED]);
+    assert_eq!(kept["pinned"], true, "{kept}");
+    let unpinned = run(&[
+        "session",
+        "unpin",
+        "--session",
+        OBSERVED,
+        "--expected-generation",
+        kept["generation"].as_str().unwrap(),
+    ]);
+    assert_eq!(unpinned["pinned"], false, "{unpinned}");
+    assert!(root.session(OBSERVED).join("manifest.json").is_file());
+
+    // The Sessions root moved to an existing owner-only directory inside the
+    // isolated development root, and back to its default.
+    let custom = root.0.join("custom-sessions");
+    HostDirectory::open_or_create_private(&custom).unwrap();
+    let custom_text = custom.to_str().unwrap().to_owned();
+    let status = run(&["runtime", "storage", "status"]);
+    let moved = run(&[
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        status["sessionDomain"]["generation"].as_str().unwrap(),
+        "--root",
+        &custom_text,
+    ]);
+    assert_eq!(
+        moved["sessionDomain"]["rootPath"],
+        custom_text.as_str(),
+        "{moved}"
+    );
+    assert_ne!(moved["sessionDomain"]["rootKind"], "default", "{moved}");
+    let restored = run(&[
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        moved["sessionDomain"]["generation"].as_str().unwrap(),
+        "--default",
+    ]);
+    assert_eq!(
+        restored["sessionDomain"]["rootKind"], "default",
+        "{restored}"
+    );
+    assert_eq!(
+        restored["sessionDomain"]["rootPath"],
+        root.sessions().to_str().unwrap(),
+        "{restored}"
+    );
+    assert!(root.session(OBSERVED).join("manifest.json").is_file());
     running.stop(&root.0);
+    assert_measured(&[
+        "runtime.storage.status",
+        "runtime.storage.policy",
+        "runtime.storage.root",
+        "session.list",
+        "session.show",
+        "session.pin",
+        "session.unpin",
+        "session.export.preview",
+        "session.export.apply",
+        "session.cleanup.preview",
+        "session.cleanup.apply",
+    ]);
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }

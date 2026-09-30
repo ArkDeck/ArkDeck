@@ -33,6 +33,7 @@ mod semantic;
 mod status;
 mod target_observation;
 mod trace_probe;
+mod windows_registry;
 
 pub use capture_files::{
     DirectoryPurpose, FaultLogName, FileAction, FileActionError, FilePlan, FileReceipt,
@@ -79,7 +80,9 @@ pub use operation::{
     Action, DispatchFailure, Expected, HdcDispatch, Outcome, ProcessPlan, Property, Receipt,
     property_value, stable_identity_sha256,
 };
-pub use operation::{DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT};
+pub use operation::{
+    DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT, device_arguments,
+};
 pub use pointer_input::{
     DEFAULT_LONG_PRESS_MS, DISPLAY_MAXIMUM, DURATION_MAXIMUM_MS, DURATION_MINIMUM_MS,
     FRAME_FRESHNESS_BUDGET_MS, Gesture, PointerAction, PointerInput,
@@ -120,4 +123,8 @@ pub use trace_probe::{
     BYTRACE_HELP_FAMILY, HITRACE_HELP_FAMILY, TRACE_PARAMETERS, TraceParameterObservation,
     TraceProbe, TraceSelection, TraceTool, TraceToolObservation, evaluate_help, evaluate_tag_list,
     trace_probe,
+};
+pub use windows_registry::{
+    WINDOWS_HDC_TUPLES, WindowsHdcTuple, malformed as malformed_windows_tuple, tuple_in,
+    windows_tuple,
 };

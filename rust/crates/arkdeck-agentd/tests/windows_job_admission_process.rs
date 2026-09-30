@@ -4,9 +4,8 @@
 //!
 //! No Windows HDC tuple is registered (its integration change waits for the
 //! maintainer's samples), so the daemon composes no HDC provider, and no
-//! workspace or analyzer provider, Artifact or Import owner or capability
-//! authority either. The planner and the admitter are the macOS code with
-//! those owners absent, so:
+//! workspace or analyzer provider either. The planner and the admitter are
+//! the macOS code with those owners absent, so:
 //!
 //! * a plan or a new submission of `observe.device@1` is refused before
 //!   admission with zero dispatch, as macOS refuses it without an HDC
@@ -415,7 +414,7 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     let before = root.snapshot();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
                 .to_owned()
         ),
         "{:?}",
@@ -474,6 +473,76 @@ fn a_fresh_root_admits_nothing_and_lists_no_job() {
     let listed = request(&pipe, "job.list", json!({}));
     assert_eq!(listed["result"]["items"], json!([]), "{listed}");
     daemon.stop(&root.0);
+}
+
+/// The Swift debug-hap oracle's recorded `debug.hap@1` submissions
+/// (`rust/tests/fixtures/debug-hap`), by case: each one's request.
+fn recorded_hap_requests() -> Vec<(String, Value)> {
+    let cases: Value = serde_json::from_slice(
+        &std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/debug-hap/cases.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|exchange| exchange["method"] == "job.submit")
+        .map(|exchange| {
+            (
+                exchange["name"].as_str().unwrap().to_owned(),
+                serde_json::from_str(exchange["params"]["requestJson"].as_str().unwrap()).unwrap(),
+            )
+        })
+        .collect()
+}
+
+/// `debug.hap@1` is a device mutation whose HDC composition is the tuple's
+/// (TASK-XPA-008): every recorded Swift submission, planned and submitted, is
+/// refused before admission with zero dispatch, as macOS refuses it without
+/// an HDC provider. Nothing is admitted and no Runtime capability is issued
+/// (the Job and capability store are as they were), across a restart too.
+#[test]
+fn debug_hap_is_refused_before_admission_or_issuance_without_a_registered_hdc() {
+    let _turn = turn();
+    let root = Root::new();
+    let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
+    let requests = recorded_hap_requests();
+    assert_eq!(requests.len(), 8);
+    let mut first = None;
+    for _ in 0..2 {
+        let mut daemon = Daemon::start(executable, &root.0);
+        let pipe = daemon.serving();
+        let before = root.snapshot();
+        for (name, submission) in &requests {
+            for method in ["job.plan", "job.submit"] {
+                let reply = request(&pipe, method, request_json(submission));
+                assert_eq!(
+                    reply["error"]["message"], "provider hdc is not registered",
+                    "{name} {method}: {reply}"
+                );
+                assert_refused(&reply, "invalidInput", "provider hdc is not registered");
+            }
+        }
+        let listed = request(&pipe, "job.list", json!({}));
+        assert_eq!(listed["result"]["items"], json!([]), "{listed}");
+        daemon.stop(&root.0);
+        assert_unchanged(&before, &root.snapshot());
+        assert_unchanged(first.get_or_insert(before), &root.snapshot());
+    }
+    // No capability was issued.
+    let checkpoint = root
+        .jobs_state()
+        .join("capabilities")
+        .join("runtime-capabilities.json");
+    assert!(
+        !checkpoint.exists()
+            || serde_json::from_slice::<Value>(&std::fs::read(&checkpoint).unwrap()).unwrap()["records"]
+                == json!([]),
+        "a capability was issued"
+    );
 }
 
 /// PowerShell 7, which signs the development daemon.

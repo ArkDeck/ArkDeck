@@ -124,6 +124,33 @@ public sealed class SurfaceTests
     }
 
     [TestMethod]
+    public async Task ThePublisherIdentityIsReadAsTheCliReadsIt()
+    {
+        const string eku = "1.3.6.1.4.1.311.97.990309390.766961637.194916062.941502583";
+        var endpoint = $@"\\.\pipe\arkdeck-app-test-{Guid.NewGuid():N}";
+        IControlChannel Create(string? organization, string? profile) => DaemonConfiguration.Create(new LaunchOptions(null, null, null),
+            name => name switch
+            {
+                "ARKDECK_DAEMON_PUBLISHER_ORGANIZATION" => organization,
+                "ARKDECK_DAEMON_PUBLISHER_EKU" => profile,
+                "ARKDECK_ENDPOINT" => endpoint,
+                _ => null,
+            }, Path.GetTempPath());
+
+        // A production installation is configured by its publisher alone (maintainer ruling 17).
+        var production = Create("Contoso Ltd", eku);
+        Assert.IsInstanceOfType<SessionChannel>(production);
+        Assert.AreEqual(DaemonUnavailableReason.EndpointUnavailable, (await production.HealthAsync()).Failure!.Reason);
+
+        // Half of it is refused before the pipe is opened, as the CLI refuses it.
+        foreach (var partial in new[] { Create("Contoso Ltd", null), Create(null, eku), Create("Contoso Ltd", "1.3.6.1.4.1.311.97.1.0") })
+        {
+            var failure = (await partial.HealthAsync()).Failure!;
+            Assert.AreEqual(DaemonUnavailableReason.InstanceMismatch, failure.Reason, failure.Message);
+        }
+    }
+
+    [TestMethod]
     public void LaunchOptionsAndTheScenarioListAgree()
     {
         var options = LaunchOptions.Parse(["--language", "zh-Hans", "--page", "history", "--test-transport", "jobs"]);

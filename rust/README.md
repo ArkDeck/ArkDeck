@@ -146,6 +146,11 @@ checkout's inputs are byte-identical to the published pin, the published view
 is recorded as covered by the candidate view (`publishedView` in
 `summary.json`) and the native checks run once; any drift runs both views. On Unix it
 records every current method, malformed frames and the three CLI leaves. On
+Unix and, through a daemon signed with the host-trusted development signer, on Windows,
+the machine output of `doctor` (plain, `--deep`, `--require-healthy`), `operation list`
+and `device candidates` must equal `tests/fixtures/readonly-machine-output` (recorded
+on the macOS lane) byte for byte once `observedAt` reads as its label; rewrite it with
+`--write-machine-output`. On
 Windows an unsigned build must refuse the actual daemon identity before sending
 frames. Positive installed-daemon authentication and DAYU200 acceptance require
 the [Windows SPK-3 harness](scripts/windows-spk3.ps1) and its real host conditions.
@@ -961,9 +966,7 @@ capture), the capability store and policy (`capability_store`,
 `capability_policy`; the store directory is the host store's owner-only
 directory on Windows) and `catalog_review`; the Artifact read owner comes
 from #2356. Members whose owner is not built on Windows yet are types with
-no value there, so they are always `None`: `ImportUploadStore` (its
-publication needs the Artifact publication and Flash archive owners),
-`WorkspaceComposition` (the workspace provider crate and the DevEco owners),
+no value there, so they are always `None`: `WorkspaceComposition` (the workspace provider crate and the DevEco owners),
 `AnalyzerComposition` (a trait nothing implements: the ArkTrace profiles pin
 a trace_streamer Windows does not have) and `MutationAuthority` (the Session
 root owner and the Job owner's continuity census). Still `cfg(target_os =
@@ -1177,6 +1180,32 @@ recorded store), the host's mutation-root test (`host_tests.rs`), and
 the authority's census through the real daemon across a restart, and with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` through `arkdeck artifact list|quota` and
 `arkdeck capability list` against a dev-signed daemon).
+
+## XPA-AC-7 kill matrix on Windows (TASK-XPA-005)
+
+Three test binaries measure the matrix on NTFS; no product code differs from
+macOS for it:
+- `arkdeck-hoststore/tests/windows_crash_window.rs` replays the Swift
+  crash-window oracle (`rust/tests/fixtures/crash-window`) as
+  `crash_window.rs` does on macOS. The Rust runner, in a child process, is
+  killed at the four windows (before or after an intent, before or after the
+  capability consume). The store it leaves is Swift's `crash/` byte for byte.
+  Two starts, two reconciles, a new tap and every read then answer and leave
+  what Swift's did, and nothing is dispatched after the death. The fake HDC
+  is the oracle's table answered in process; it reports the tool identity
+  current, as the macOS dispatch over the fake's verified script does.
+- `tests/windows_artifact_publication_death.rs`: a Job product's publication
+  killed after its payload, its seal and its index entry leaves no half-record
+  (the macOS test's cases, over an `observe.device@1` Job). The quota counts
+  what the indexes name, the sweep keeps the unfinished Job's products, and a
+  start recovers the Job without changing an Artifact.
+- `arkdeck-agentd/tests/windows_kill_matrix_process.rs`: the real daemon over
+  each window's crash store. Its first start is Swift's first start. The test
+  then terminates it with no drain; the next start is Swift's second, and the
+  third changes nothing. The requests after the death answer as Swift's did,
+  or, where they need the Windows HDC tuple, are refused with nothing written
+  or dispatched: a device Job's reconcile, and a new tap's admission.
+
 ## Job reconciler and agent executions on Windows (TASK-XPA-005)
 
 `JobReconciler` (`job_reconcile.rs` with `job_reconcile_device.rs`), the agent
@@ -1210,6 +1239,25 @@ through the real daemon across a restart, on the daemon's own clock, and with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` through
 `arkdeck job reconcile|agent status|human-action show` against a dev-signed
 daemon).
+
+HAR crash-resume (TASK-XPA-006, without the Windows HDC tuple):
+`tests/windows_agent_human_action_resume.rs` runs `agent_human_action_raise.rs`'s
+adoption and resume cases on NTFS, over the oracle's fake HDC answered in
+process.
+- A run that names no Target adopts the one proved device and owns one Job,
+  which the runner completes. A budget expiring during the identity readback
+  or at the Target commit, or a USB identity that changes during adoption,
+  commits no Target and no Job.
+- A process that crashes between the Target commit and the execution's own
+  commit is resumed by a new one with every owner reopened. It keeps the
+  original budget and adopts nothing twice.
+- `physicalConnection`, `deviceTrustPrompt` and `ambiguousIdentity` actions
+  are resumed only by their durable references. The original intent is
+  kept, and concurrent resumes own one Job. A changed selection is an
+  idempotency conflict, and an expired action or untrusted clock is refused
+  with no HDC call. The action ends `resolvedByFreshProbe`.
+- A process that crashes after the resume and before the Job is admitted
+  continues to one Job, or is refused once the budget has passed.
 
 The contract publishes an agent execution's `failureCode`, an agent human
 action's `selectionSchema` and `agent.run`'s orchestration refusals as Swift
@@ -1418,7 +1466,14 @@ verified the same way, so the facts a deployment carries are that file's; the
 standalone and production daemons refuse that variable at startup, as they refuse
 every other development one, and a named helper that does not verify fails
 startup. With no helper anywhere the operation stays unavailable with
-`provider_tool_unavailable`, as before. Once the Target's facts hold, the library's lease (a Job Artifact or an
+`provider_tool_unavailable`, as before. The Windows daemon composes the
+bundled helper the same way (TASK-XPA-009): the xcopy and RC packages carry the
+checked-in resource beside `arkdeck-agentd.exe` in the same bundle layout, and
+the census names `codeSignHelper` in its macOS position. No Windows HDC tuple
+is registered, so there the helper waits behind that gate (the operation
+answers `provider_not_registered`), and a named development helper is refused
+at startup, since on macOS only a development HDC's admission names one.
+`tests/windows_code_sign_helper_process.rs` measures it. Once the Target's facts hold, the library's lease (a Job Artifact or an
 Import) is resolved and bound to them, its bytes are read, and each step's
 action is named from them (`StepAction::Native`, claimed by the operation before
 any step kind): the provider verifies them as the expected ABI's code-signed ELF,
@@ -1428,6 +1483,27 @@ rollback a failure past the publish applies. The library's facts name its
 capability. `tests/native_library_plan.rs` and `tests/native_library_submit.rs`
 replay the native-library oracle's plans and submissions; `job.run` runs the
 admitted Job (below), and `agent.run` admits the deployment it starts at once.
+
+On Windows (TASK-XPA-008 and XPA-009) the same four replays run over the
+oracle's layout below the temporary directory, owner-only as the store makes it
+and each published payload sealed by the store. A plan's digest covers its
+sends' arguments, which name the package's, the library's and the helper's host
+paths, so a Windows root digests the same plan document with its own paths.
+`hap_plan_digest` and `native_plan_digest` (the documents split out of
+`materialize_hap` and `materialize_native`) reproduce every Swift plan digest of
+both oracles over the paths Swift named, on every host. The replays read the
+plan digests and whatever they derive (the Runtime capability's ID, a use's
+query and scope fingerprints, its receipt and outcome hashes) as Swift's
+through a one-to-one relabelling (`support::debug_hap::HostLabels`); every other
+byte of the answers, the capability store and ledger, the Job records, the
+admission journals and the index rows must be Swift's, and on macOS nothing is
+relabelled. With no HDC composition (the Windows daemon's until the Windows HDC
+tuple is registered) an admitted HAP or deployment is refused before its first
+step with zero dispatch and no use consumed, and the daemon refuses every
+recorded `debug.hap@1` plan and submission before admission
+(`windows_job_admission_process.rs`). The runs themselves (`debug_hap_run.rs`,
+`native_library_run.rs`) stay macOS-only: they dispatch to the shared fake HDC,
+a POSIX shell script.
 
 ## Job run (TASK-XPA-014)
 
@@ -1683,6 +1759,20 @@ journal is not written. The daemon answers both methods from its Artifact and
 Job owners. The device oracles' lists and continuations and the committed
 corpus are replayed through them, and `tests/cleanup_debt_continue.rs` covers
 what no oracle records.
+
+On Windows (TASK-XPA-012) the same code builds and the daemon answers both
+methods from its Artifact and Job owners, through the runner `job.run` uses
+there (`windows_runner`), with no HDC composition: a continuation of a debt the
+ledger owes reads the ledger and loads the Job, then is refused (`rejected`,
+`internalFailure("provider hdc is unavailable")`) before any readback or retry,
+and the ledger is not written. The control-layer corpus replay
+(`cleanup_debt_control.rs`) runs on both hosts;
+`arkdeck-agentd/tests/windows_cleanup_debt_process.rs` lists Swift's recorded
+debug HAP ledger exactly as the corpus records it across a restart, proves the
+refusal for both owed debts with the ledger's bytes unchanged, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `recovery cleanup list`, `cleanup-debt
+list` and `recovery cleanup continue` through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-cleanup-debt-owner-run.md`.
 
 `rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests` records with the real descriptor-bound
@@ -2456,6 +2546,35 @@ them on Windows, since no Windows HDC tuple is registered.
 test binary itself; no real HDC is launched. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
 
+The managed server's start and stop follow #2131's semantics on Windows as
+well.
+- A start refuses an endpoint something already listens on before launching
+  anything, and names the holder.
+- The stop's `end_proved_process` (the macOS one's Windows counterpart) ends
+  only the process a proof names: a replacement server a confirmed restart
+  left outside the Runtime's Job. It opens the PID once, which pins it, and
+  checks the receipt's birth and this user on that handle before
+  `TerminateProcess`. Another birth, or a PID of 4 or less, ends nothing.
+  Windows has no TERM, so the grace is not waited.
+- `windows_tool_dispatch.rs` proves the end, and that no other birth is ever
+  ended. `windows_managed_hdc.rs` runs restart, then stop, then start: the
+  replacement blocks the start, and once the proved replacement is ended,
+  the next start owns the endpoint.
+- The daemon's own managed-HDC owner (`managed_hdc.rs`, with its restart
+  lifecycle) stays macOS-only. It needs a registered HDC, and a Windows
+  development root refuses `ARKDECK_DEVELOPMENT_HDC_PATH` and
+  `ARKDECK_DEVELOPMENT_HDC_SERVER` before starting anything.
+A device command names its target in one place:
+`arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
+`-t <connectKey>` before the command's own arguments. Every plan the provider
+lowers goes through it: observation, capture, Debug HAP and reads, native
+library, port forward, pointer input, trace probe, live mode, and the Rockchip
+reads and Loader entry. `operation::tests::every_target_flag_is_added_here`
+fails if any other non-test code writes `-t` before a connect key. On Windows,
+`windows_managed_hdc.rs` runs a lowered device plan through `ProcessDispatch`:
+the fake process face receives exactly `-t <key> shell param get
+const.product.name`. A plan with no connect key runs nothing.
+
 ## Windows xcopy package (TASK-XPA-022)
 
 The daemon and the CLI also ship as an xcopy package for CI and headless use
@@ -2477,7 +2596,13 @@ the entries it found; a production package is never built from a dirty
 checkout. It runs `cargo build --release --locked -p arkdeck-agentd -p
 arkdeck-cli --target x86_64-pc-windows-msvc` and stages `arkdeck.exe` and
 `arkdeck-agentd.exe` side by side, because the CLI's default daemon is its
-sibling. It then signs both (`-SigningMode`):
+sibling. Beside them it stages the OpenHarmony code-sign helper a native
+deployment sends to the device (TASK-XPA-009): the checked-in
+`arkdeck-code-sign-enable` at the recorded revision, at
+`ArkDeckKit_ArkDeckWorkflows.bundle/OpenHarmonyNativeCodeSign/` where the
+daemon looks beside itself. It is an arm64 ELF, data on the host, so it is
+never Authenticode-signed; the manifest pins its bytes as it pins the
+executables'. It then signs both executables (`-SigningMode`):
 
 | Mode | Signer |
 | --- | --- |
@@ -2535,8 +2660,8 @@ The Artifact read, inspect, list and export owner (`ArtifactReadStore`,
 `ArtifactReadRequest`, `ArtifactInspectRequest`, `ArtifactExportRequest`) is
 built on Windows over the host store's NTFS export, file-export and
 payload-cache primitives (`crates/arkdeck-platform/README.md`), with the same
-Job index documents, payloads and snapshot pages as macOS; its Import owner
-and quota answer stay macOS-only (the usage owner is on Windows, H3b). An export destination on Windows is a
+Job index documents, payloads and snapshot pages as macOS; its quota answer
+stays macOS-only (the usage owner is on Windows, H3b; the Import owner below). An export destination on Windows is a
 local drive's absolute path (`C:\…`), `.` and `..` resolved and the drive
 letter upper-case, which must be the directory's own spelling (no junction,
 link, short name or other case); the receipt's `exportedPath` joins the file
@@ -2561,6 +2686,64 @@ restart and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
+
+## Windows Import owner (TASK-XPA-008)
+
+`arkdeck-hoststore` builds the Import owner (`ImportUploadStore`: begin,
+append, abort, commit, inspect, list, release, an Import's Artifacts, and a
+Job's Import inputs) on Windows, over the host store's NTFS import upload
+(#2357) and the Artifact publication and read owners. The code is the macOS
+code, and `TargetStore::resolve_import_binding` with it. One kind waits: a
+`flash-bundle` Import is refused at publication as a kind whose validator is
+not configured ("This Import kind's publication validator is not
+configured"), before anything is published, until the Flash archive reader
+is on Windows (AF-W1); its begin and upload are the macOS ones. The Windows
+daemon composes the owner over its Artifact root's private `.imports-v1`,
+right after the Artifact owner (census `…, artifacts, imports, storage, …`),
+and hands it to the Job planner and runner. The CLI's `artifact import
+<kind>` uploads on Windows through the host store's `HostImportSource`,
+which holds the source open without write sharing, so it cannot change
+while it is sent; other hosts keep refusing the upload.
+
+Tests on Windows: `tests/import_upload.rs` (31 of its tests; the analyzer
+and child-kill ones stay macOS-only), `tests/import_target.rs` and the
+Swift Import refusal oracle (`import_refusal_oracle_tests.rs`), with
+fixtures made owner-only by `tests/fixture_fs`; the CLI's upload tests;
+and `arkdeck-agentd/tests/windows_import_owner_process.rs`: over the real
+daemon a HAP is uploaded, committed with its exact bytes, read through the
+Import owner, listed, inspected and released across a restart, a flash
+bundle is refused with nothing published, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, the real CLI imports, inspects, lists and
+releases. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
+
+## Windows Flash lane (TASK-XPA-010)
+
+The software part of GJ-4 on Windows. `ManagedServer::launch_paired` starts
+the bundle's `bin/arkforged.exe` in its own kill-on-close Job and hands it
+the pairing secret on stdin. Its stop is the end of input, half a second,
+then `TerminateJobObject`. `arkdeck-provider-arkforge`'s `Lane` composes
+over ArkForge's named pipes (#2403). The Flash archive reader reads a
+bundle through the platform's raw DEFLATE decoder (#2410).
+
+`arkdeck-hoststore` builds the Runtime's Flash owners on Windows:
+
+- the planner, the admitter, the run, the recovery and the reconcile
+  (`flash_plan`, `flash_admission`, `flash_run`, `flash_recovery`,
+  `flash_reconcile`), including the delegated Flash's lane receipt;
+- the Rockchip host's dispatcher, durable records, executor and startup
+  reconcile;
+- the Flash facts, the post-flash alias, and the flash-bundle Import
+  validator.
+
+The records keep the platform's owner-only boundary: private directories
+and files, owner-only single-link reads, and no directory `fsync` on NTFS.
+The Swift `flash-plan` oracle, plan digests included, and the `flash-run`
+oracle's eight stories replay on Windows. What a Windows Session names of
+its platform is read back as Swift's wrote it before it is compared. The
+owners that compose only beside a managed HDC stay macOS-only:
+`control_performer`, `rockchip_reactivation` and `loader_binding`. No
+Windows HDC tuple is registered.
 
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
@@ -2623,6 +2806,32 @@ signing dispatch (the workspace composition) stays macOS-only, and Windows
 attempts go under `SigningPresetStore::attempts_root` (`<preset root>\Attempts`).
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-leaves-run.md`.
+
+## Windows DevEco toolchain registration (TASK-XPA-011)
+
+`arkdeck-hoststore`'s DevEco registry (`DevEcoRegistryStore`: `register`, `inspect`, `list`) is
+built on Windows. node and hvigor register there as the child roles of one content-addressed
+toolchain (`toolchain:sha256:<digest>`); a build uses them through that reference, never
+through PATH.
+- **Source.** The DevEco Studio directory, as a standard `X:\…` path, read by D2's no-follow
+  reader.
+- **Roles.** Four: the product and SDK manifests, `tools\node\node.exe` and
+  `tools\hvigor\bin\hvigorw.js`. There is no signed resource envelope.
+- **Trust.** node's own Authenticode signature must verify
+  (`arkdeck_platform::inspect_native_code_signature` on Windows: `verified` with the signer's
+  name and leaf SHA-256, or `unsigned`, or refused). The launcher `bin\devecostudio64.exe` must
+  be signed by `Huawei Technologies Co., Ltd.` (`inspect_deveco_publisher_signature`).
+- **Pinning.** Children are pinned by the host store's file identity and SHA-256, and every
+  inspect re-measures them.
+- **Index.** The same `arkdeck.bootstrap-deveco-toolchains/1` document. Each host accepts only
+  its own record form (Windows: an `X:\…` root, four roles, `"platform":"windows"`, which is
+  also in the content digest).
+- **Not yet on Windows.** The daemon's Bootstrap readers, which compose this registry with the
+  macOS-only HDC tool and bundle registries, and retirement. So no CLI leaf serves it on
+  Windows yet.
+
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-deveco-registration-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 

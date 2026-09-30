@@ -8,23 +8,36 @@
 #![allow(dead_code)]
 
 pub mod debug_hap;
-#[cfg(target_os = "macos")]
+#[path = "../fixture_fs/mod.rs"]
+pub mod fixture_fs;
+// The Flash lane's fakes, which its replays use on Windows too
+// (TASK-XPA-010).
+#[cfg(any(target_os = "macos", windows))]
 pub mod flash_lane;
 pub mod hdc_oracle;
 pub mod native_library;
+// The device reconcilers these replays drive are macOS-only, and the shared
+// fake HDC they dispatch to is a POSIX shell script.
+#[cfg(target_os = "macos")]
 pub mod reconcile;
 
 use arkdeck_hoststore::{StorageProbe, StorageSnapshot};
 use arkdeck_platform::{HostDirectory, HostSqlite, SqliteValue as Sql};
 use serde_json::{Value, json};
+#[cfg(unix)]
 use std::collections::BTreeMap;
-use std::fs::{self, File, OpenOptions};
+use std::fs;
+#[cfg(unix)]
+use std::fs::{File, OpenOptions};
 use std::io;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
+#[cfg(unix)]
 const ROOT: &str = "/private/tmp/arkdeck-job-plan-oracle";
+#[cfg(unix)]
 const LOCK: &str = "/private/tmp/arkdeck-job-plan-oracle.lock";
 const MACHINE_FACTS: [&str; 4] = ["device", "inode", "volumeIdentity", "admissionGeneration"];
 
@@ -39,6 +52,7 @@ pub fn document(fixture: &Path, name: &str) -> Value {
     serde_json::from_slice(&fs::read(fixture.join(name)).unwrap()).unwrap()
 }
 
+#[cfg(unix)]
 pub fn chmod(path: &Path, mode: u32) {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
 }
@@ -51,6 +65,7 @@ pub fn fixed_precise_now() -> Option<String> {
     Some("2026-09-14T00:00:00.000Z".into())
 }
 
+#[cfg(unix)]
 /// Serializes every user of the fixed root, Swift producers included.
 pub fn exclusive() -> File {
     let lock = OpenOptions::new()
@@ -94,6 +109,7 @@ impl StorageProbe for OracleProbe {
     }
 }
 
+#[cfg(unix)]
 /// The given source Jobs as Swift published them before any run, the one a
 /// case later removes rebuilt from its mode, and the empty owner and
 /// Sessions roots.
@@ -228,6 +244,7 @@ pub fn index_normalized(path: &Path, normalize: impl Fn(&[u8]) -> Vec<u8>) -> Va
     json!({"userVersion": version, "journalMode": mode, "schema": schema, "rows": rows})
 }
 
+#[cfg(unix)]
 /// A Job store snapshot the Swift oracle recorded under `prefix` (its
 /// `storeSnapshot`: the Job index and every file below the Job directories,
 /// each Job record read machine-independently) against the store at `jobs`,
@@ -260,6 +277,7 @@ pub fn assert_store(fixture: &Path, prefix: &str, jobs: &Path) {
     }
 }
 
+#[cfg(unix)]
 /// As [`assert_store`], for every Job but `except`, whose files and index row
 /// a declared difference changes and the caller checks: the other Jobs'
 /// files byte for byte, the same file names below `except`, and every index
@@ -317,6 +335,20 @@ pub fn assert_store_except(
     (actual_row, recorded_row)
 }
 
+/// An entry's permission bits as the oracle records them. Windows has none:
+/// its owner-only boundary is a DACL, which the owners check themselves, so
+/// the replays there compare kinds and bytes and leave modes out.
+#[cfg(unix)]
+pub fn mode(metadata: &fs::Metadata) -> String {
+    format!("{:o}", metadata.permissions().mode() & 0o777)
+}
+
+#[cfg(windows)]
+pub fn mode(_metadata: &fs::Metadata) -> String {
+    "-".into()
+}
+
+#[cfg(unix)]
 /// Every entry below `base` as `prefix/<relative path>`: each file's bytes
 /// (a Job record's read machine-independently) and each entry's kind and mode.
 fn walk(
@@ -393,6 +425,7 @@ fn pager_snapshot(relative: &Path) -> bool {
         })
 }
 
+#[cfg(unix)]
 /// Every Artifact index and payload, and the root's own documents (the
 /// cleanup debt ledger), the verification cache aside.
 fn artifacts(base: &Path) -> BTreeMap<String, Vec<u8>> {
@@ -418,6 +451,7 @@ fn artifacts(base: &Path) -> BTreeMap<String, Vec<u8>> {
     files
 }
 
+#[cfg(unix)]
 /// Everything the replay left below `root` against what the Swift oracle
 /// recorded: the Job index, every entry's kind and mode, and every file. An
 /// agent execution directory beside the Job state is read as well. The Job
@@ -426,10 +460,12 @@ pub fn assert_leftovers(fixture: &Path, root: &Path) {
     assert_leftovers_at(fixture, root, &root.join("jobs-state"));
 }
 
+#[cfg(unix)]
 pub fn assert_leftovers_at(fixture: &Path, root: &Path, jobs: &Path) {
     assert_leftovers_with(fixture, root, jobs, |_, bytes| bytes, |_| ());
 }
 
+#[cfg(unix)]
 /// As [`assert_leftovers_at`], against what the oracle recorded as `expected`
 /// reads each recorded file (by its fixture path) and `index` reads the
 /// recorded index: for the files and rows a later exchange the replay does

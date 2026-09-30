@@ -910,8 +910,13 @@ mod tests {
             .unwrap()
     }
 
+    /// The answer to a refusal, with the archives' directory in Swift's
+    /// placeholder; on Windows it is also spelled with the backslashes
+    /// Swift's quoting doubles.
     fn failure(error: &str, archives: &str) -> Value {
-        json!({"error": error.replace(archives, "<archives>")})
+        json!({"error": error
+            .replace(&archives.replace('\\', "\\\\"), "<archives>")
+            .replace(archives, "<archives>")})
     }
 
     fn summary_value(summary: &Summary) -> Value {
@@ -957,7 +962,9 @@ mod tests {
         for case in cases {
             let name = case["archive"].as_str().unwrap();
             let path = archives.join(name);
-            let path_text = path.to_str().unwrap();
+            // The name an error quotes: the path itself on macOS, and
+            // `/`-joined on Windows too, as the oracle records it.
+            let path_text = &format!("{archives_path}/{name}");
             let open = || std::fs::File::open(&path).unwrap();
             let summary = summarize(&mut open(), path_text);
             let summary_answer = match &summary {

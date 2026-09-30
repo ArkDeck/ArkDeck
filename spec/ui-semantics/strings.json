@@ -1123,6 +1123,1452 @@
       "zh-Hans": "取消"
     },
     {
+      "key": "jobRecovery.humanRequired.title",
+      "table": "JobsLocalizable",
+      "en": "Human action is required",
+      "zh-Hans": "需要人工处理"
+    },
+    {
+      "key": "jobRecovery.humanRequired.guidance",
+      "table": "JobsLocalizable",
+      "en": "Review the recorded reason and evidence before continuing through an approved Runtime path.",
+      "zh-Hans": "请先检查已记录的原因和证据，再通过已批准的 Runtime 路径继续。"
+    },
+    {
+      "key": "debug.action.cancel",
+      "table": "DebugLocalizable",
+      "en": "Stop after the current step",
+      "zh-Hans": "当前步骤后停止"
+    },
+    {
+      "key": "debug.action.refresh",
+      "table": "DebugLocalizable",
+      "en": "Refresh Debug facts",
+      "zh-Hans": "刷新调试信息"
+    },
+    {
+      "key": "debug.apps.ability",
+      "table": "DebugLocalizable",
+      "en": "Ability name",
+      "zh-Hans": "Ability 名称"
+    },
+    {
+      "key": "debug.apps.action.start",
+      "table": "DebugLocalizable",
+      "en": "Start Ability",
+      "zh-Hans": "启动 Ability"
+    },
+    {
+      "key": "debug.apps.action.stop",
+      "table": "DebugLocalizable",
+      "en": "Stop process",
+      "zh-Hans": "停止进程"
+    },
+    {
+      "key": "debug.apps.action.uninstall",
+      "table": "DebugLocalizable",
+      "en": "Uninstall…",
+      "zh-Hans": "卸载…"
+    },
+    {
+      "key": "debug.apps.additional.add",
+      "table": "DebugLocalizable",
+      "en": "Add HAP / HSP…",
+      "zh-Hans": "添加 HAP / HSP…"
+    },
+    {
+      "key": "debug.apps.additional.note",
+      "table": "DebugLocalizable",
+      "en": "Choose the entry HAP first. Add up to 16 feature HAPs or HSPs from the same bundle; all packages are installed together. Each file must be 1 byte–64 MiB.",
+      "zh-Hans": "先选择入口 HAP，再添加同一 Bundle 的 feature HAP 或 HSP，最多 16 个，所有包一起安装。每个文件为 1 字节至 64 MiB。"
+    },
+    {
+      "key": "debug.apps.additional.remove",
+      "table": "DebugLocalizable",
+      "en": "Remove",
+      "zh-Hans": "移除"
+    },
+    {
+      "key": "debug.apps.additional.removeNamed",
+      "table": "DebugLocalizable",
+      "en": "Remove %@",
+      "zh-Hans": "移除 %@"
+    },
+    {
+      "key": "debug.apps.additional.title",
+      "table": "DebugLocalizable",
+      "en": "Additional packages (optional)",
+      "zh-Hans": "附加安装包（可选）"
+    },
+    {
+      "key": "debug.apps.artifacts.title",
+      "table": "DebugLocalizable",
+      "en": "HAP run Artifacts",
+      "zh-Hans": "HAP 运行 Artifact"
+    },
+    {
+      "key": "debug.apps.bundle",
+      "table": "DebugLocalizable",
+      "en": "Bundle name",
+      "zh-Hans": "Bundle 名称"
+    },
+    {
+      "key": "debug.apps.captureDiagnostics",
+      "table": "DebugLocalizable",
+      "en": "Capture bounded HiLog while the app runs",
+      "zh-Hans": "应用运行时采集有界 HiLog"
+    },
+    {
+      "key": "debug.apps.chooseHAP",
+      "table": "DebugLocalizable",
+      "en": "Choose entry HAP…",
+      "zh-Hans": "选择入口 HAP…"
+    },
+    {
+      "key": "debug.apps.cleanup.retain",
+      "table": "DebugLocalizable",
+      "en": "Retain installed app",
+      "zh-Hans": "保留已安装应用"
+    },
+    {
+      "key": "debug.apps.cleanup.uninstall",
+      "table": "DebugLocalizable",
+      "en": "Uninstall after run",
+      "zh-Hans": "运行后卸载"
+    },
+    {
+      "key": "debug.apps.cleanupPolicy",
+      "table": "DebugLocalizable",
+      "en": "Cleanup policy",
+      "zh-Hans": "清理策略"
+    },
+    {
+      "key": "debug.apps.clearSelection",
+      "table": "DebugLocalizable",
+      "en": "Clear package selection",
+      "zh-Hans": "清空安装包选择"
+    },
+    {
+      "key": "debug.apps.diagnosticsDuration",
+      "table": "DebugLocalizable",
+      "en": "Diagnostics duration: %d seconds",
+      "zh-Hans": "诊断时长：%d 秒"
+    },
+    {
+      "key": "debug.apps.identity.note",
+      "table": "DebugLocalizable",
+      "en": "Names are validated against the Catalog schema; they are never interpreted as arguments.",
+      "zh-Hans": "名称按 Catalog schema 校验，绝不会被解释为命令参数。"
+    },
+    {
+      "key": "debug.apps.identity.title",
+      "table": "DebugLocalizable",
+      "en": "Application identity",
+      "zh-Hans": "应用身份"
+    },
+    {
+      "key": "debug.apps.importing",
+      "table": "DebugLocalizable",
+      "en": "Checking and importing packages…",
+      "zh-Hans": "正在校验并导入安装包…"
+    },
+    {
+      "key": "debug.apps.install.replace",
+      "table": "DebugLocalizable",
+      "en": "Install or replace",
+      "zh-Hans": "安装或替换"
+    },
+    {
+      "key": "debug.apps.installPolicy",
+      "table": "DebugLocalizable",
+      "en": "Install policy",
+      "zh-Hans": "安装策略"
+    },
+    {
+      "key": "debug.apps.inventory.debuggable",
+      "table": "DebugLocalizable",
+      "en": "Debuggable",
+      "zh-Hans": "可调试"
+    },
+    {
+      "key": "debug.apps.inventory.empty",
+      "table": "DebugLocalizable",
+      "en": "No package inventory",
+      "zh-Hans": "没有应用清单"
+    },
+    {
+      "key": "debug.apps.inventory.empty.detail",
+      "table": "DebugLocalizable",
+      "en": "The current target probe returned no package names.",
+      "zh-Hans": "当前目标探测未返回应用包名。"
+    },
+    {
+      "key": "debug.apps.inventory.package",
+      "table": "DebugLocalizable",
+      "en": "Package / process",
+      "zh-Hans": "应用 / 进程"
+    },
+    {
+      "key": "debug.apps.inventory.pid",
+      "table": "DebugLocalizable",
+      "en": "PID",
+      "zh-Hans": "PID"
+    },
+    {
+      "key": "debug.apps.inventory.title",
+      "table": "DebugLocalizable",
+      "en": "Packages and debuggable processes",
+      "zh-Hans": "应用与可调试进程"
+    },
+    {
+      "key": "debug.apps.lifecycle.title",
+      "table": "DebugLocalizable",
+      "en": "Lifecycle request",
+      "zh-Hans": "生命周期请求"
+    },
+    {
+      "key": "debug.apps.localOnly",
+      "table": "DebugLocalizable",
+      "en": "The App checks and imports every package in bounded chunks before submitting one Job. Local paths never cross into Runtime.",
+      "zh-Hans": "App 会先逐个校验并分块导入所有安装包，再提交一个 Job。本地路径不会进入 Runtime。"
+    },
+    {
+      "key": "debug.apps.mutationDetail",
+      "table": "DebugLocalizable",
+      "en": "Install, start, stop, uninstall, and remote staging are device mutations. Every dispatch must bind the durable target revision and consume matching authority.",
+      "zh-Hans": "安装、启动、停止、卸载与远端暂存均为设备变更。每次 dispatch 必须绑定持久设备 revision 并消费匹配授权。"
+    },
+    {
+      "key": "debug.apps.mutationScope",
+      "table": "DebugLocalizable",
+      "en": "Device mutation scope is explicit",
+      "zh-Hans": "设备变更影响范围明确可见"
+    },
+    {
+      "key": "debug.apps.noHAP",
+      "table": "DebugLocalizable",
+      "en": "No local HAP selected",
+      "zh-Hans": "尚未选择本地 HAP"
+    },
+    {
+      "key": "debug.apps.package.title",
+      "table": "DebugLocalizable",
+      "en": "HAP package",
+      "zh-Hans": "HAP 安装包"
+    },
+    {
+      "key": "debug.apps.plan.title",
+      "table": "DebugLocalizable",
+      "en": "Published operation plan",
+      "zh-Hans": "已发布 operation 计划"
+    },
+    {
+      "key": "debug.apps.postRun",
+      "table": "DebugLocalizable",
+      "en": "After the run",
+      "zh-Hans": "运行结束后"
+    },
+    {
+      "key": "debug.apps.postRun.running",
+      "table": "DebugLocalizable",
+      "en": "Leave running",
+      "zh-Hans": "保持运行"
+    },
+    {
+      "key": "debug.apps.postRun.stopped",
+      "table": "DebugLocalizable",
+      "en": "Stop Ability",
+      "zh-Hans": "停止 Ability"
+    },
+    {
+      "key": "debug.apps.run",
+      "table": "DebugLocalizable",
+      "en": "Import and run",
+      "zh-Hans": "导入并运行"
+    },
+    {
+      "key": "debug.apps.running",
+      "table": "DebugLocalizable",
+      "en": "Runtime is executing the typed HAP lifecycle…",
+      "zh-Hans": "Runtime 正在执行 typed HAP 生命周期…"
+    },
+    {
+      "key": "debug.apps.runningCleanupHint",
+      "table": "DebugLocalizable",
+      "en": "Uninstall after run removes the app, so it cannot stay running. Choose Retain installed app to keep observing it.",
+      "zh-Hans": "运行后卸载会移除应用，无法保持运行。要继续观察应用，请选择“保留已安装应用”。"
+    },
+    {
+      "key": "debug.apps.selection.duplicatePackage",
+      "table": "DebugLocalizable",
+      "en": "Each package can be selected only once. Remove the duplicate selection.",
+      "zh-Hans": "同一个安装包只能选择一次，请移除重复选择。"
+    },
+    {
+      "key": "debug.apps.selection.failed",
+      "table": "DebugLocalizable",
+      "en": "The selected file could not be read.",
+      "zh-Hans": "无法读取所选文件。"
+    },
+    {
+      "key": "debug.apps.selection.invalid",
+      "table": "DebugLocalizable",
+      "en": "Choose one .hap entry package.",
+      "zh-Hans": "请选择一个 .hap 入口包。"
+    },
+    {
+      "key": "debug.apps.selection.invalidAdditional",
+      "table": "DebugLocalizable",
+      "en": "Choose .hap or .hsp files with basenames containing letters, numbers, dots, underscores or hyphens.",
+      "zh-Hans": "请选择 .hap 或 .hsp 文件，文件名仅含字母、数字、点、下划线或连字符。"
+    },
+    {
+      "key": "debug.apps.selection.invalidEntry",
+      "table": "DebugLocalizable",
+      "en": "Choose one entry .hap. Use a basename with letters, numbers, dots, underscores or hyphens.",
+      "zh-Hans": "请选择一个 .hap 入口包，文件名仅含字母、数字、点、下划线或连字符。"
+    },
+    {
+      "key": "debug.apps.selection.tooManyPackages",
+      "table": "DebugLocalizable",
+      "en": "Choose at most 16 additional packages.",
+      "zh-Hans": "附加安装包最多可选 16 个。"
+    },
+    {
+      "key": "debug.apps.target",
+      "table": "DebugLocalizable",
+      "en": "Exact target",
+      "zh-Hans": "精确目标设备"
+    },
+    {
+      "key": "debug.artifacts.abi",
+      "table": "DebugLocalizable",
+      "en": "Artifact ABI",
+      "zh-Hans": "产物 ABI"
+    },
+    {
+      "key": "debug.artifacts.abi.observed",
+      "table": "DebugLocalizable",
+      "en": "Read from the signed ELF during validation",
+      "zh-Hans": "校验时从已签名 ELF 自动读取"
+    },
+    {
+      "key": "debug.artifacts.advanced",
+      "table": "DebugLocalizable",
+      "en": "Required verification and rollback",
+      "zh-Hans": "必需的验证与回滚"
+    },
+    {
+      "key": "debug.artifacts.browseRemote",
+      "table": "DebugLocalizable",
+      "en": "Browse remote .so…",
+      "zh-Hans": "浏览远端 .so…"
+    },
+    {
+      "key": "debug.artifacts.bundle",
+      "table": "DebugLocalizable",
+      "en": "Target bundle",
+      "zh-Hans": "目标 Bundle"
+    },
+    {
+      "key": "debug.artifacts.bundleInvalid",
+      "table": "DebugLocalizable",
+      "en": "Use a dotted bundle name such as com.example.app.",
+      "zh-Hans": "请输入 com.example.app 形式的 Bundle 名称。"
+    },
+    {
+      "key": "debug.artifacts.chooseLibrary",
+      "table": "DebugLocalizable",
+      "en": "Choose local .so…",
+      "zh-Hans": "选择本地 .so…"
+    },
+    {
+      "key": "debug.artifacts.destination.detail",
+      "table": "DebugLocalizable",
+      "en": "Name the owning app and library. Runtime derives the app-owned device destination from the published profile; this page never accepts a remote path.",
+      "zh-Hans": "填写所属应用与动态库名称。Runtime 根据已发布 profile 推导 app-owned 设备目标位置；此页面不接受远端路径。"
+    },
+    {
+      "key": "debug.artifacts.destination.title",
+      "table": "DebugLocalizable",
+      "en": "Deployment target",
+      "zh-Hans": "部署目标"
+    },
+    {
+      "key": "debug.artifacts.logicalName",
+      "table": "DebugLocalizable",
+      "en": "Library name",
+      "zh-Hans": "动态库名称"
+    },
+    {
+      "key": "debug.artifacts.logicalNameInvalid",
+      "table": "DebugLocalizable",
+      "en": "Use a lib<name>.so filename with no directory components.",
+      "zh-Hans": "请输入不含目录的 lib<name>.so 文件名。"
+    },
+    {
+      "key": "debug.artifacts.noLibrary",
+      "table": "DebugLocalizable",
+      "en": "No local library selected",
+      "zh-Hans": "尚未选择本地动态库"
+    },
+    {
+      "key": "debug.artifacts.notVerified",
+      "table": "DebugLocalizable",
+      "en": "Deployment did not reach verified completion",
+      "zh-Hans": "部署未达到验证完成状态"
+    },
+    {
+      "key": "debug.artifacts.openLogs",
+      "table": "DebugLocalizable",
+      "en": "Capture logs to verify",
+      "zh-Hans": "获取日志并验证"
+    },
+    {
+      "key": "debug.artifacts.planReady",
+      "table": "DebugLocalizable",
+      "en": "Runtime plan is ready for review",
+      "zh-Hans": "Runtime 计划已可检查"
+    },
+    {
+      "key": "debug.artifacts.policy.required",
+      "table": "DebugLocalizable",
+      "en": "The Native Debug path always verifies the published hash, restarted process, and loaded-library maps. Any failed verification automatically restores and re-verifies the previous library.",
+      "zh-Hans": "Native Debug 路径始终验证发布 hash、重启后的进程与动态库加载 maps；任一验证失败都会自动恢复并复验旧动态库。"
+    },
+    {
+      "key": "debug.artifacts.preparing",
+      "table": "DebugLocalizable",
+      "en": "Validating the signed ELF and materializing the Runtime plan…",
+      "zh-Hans": "正在校验已签名 ELF 并生成 Runtime 计划…"
+    },
+    {
+      "key": "debug.artifacts.preview",
+      "table": "DebugLocalizable",
+      "en": "Validate and review plan",
+      "zh-Hans": "校验并检查替换计划"
+    },
+    {
+      "key": "debug.artifacts.productionBoundary",
+      "table": "DebugLocalizable",
+      "en": "Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.",
+      "zh-Hans": "当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。"
+    },
+    {
+      "key": "debug.artifacts.remoteBindingFailed",
+      "table": "DebugLocalizable",
+      "en": "The artifact was selected, but its server could not be bound to this target.",
+      "zh-Hans": "远端产物已选择，但无法把该服务器绑定到当前目标。"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.cancel",
+      "table": "DebugLocalizable",
+      "en": "Cancel",
+      "zh-Hans": "取消"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.choose",
+      "table": "DebugLocalizable",
+      "en": "Use selected library",
+      "zh-Hans": "使用所选动态库"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.detail",
+      "table": "DebugLocalizable",
+      "en": "Browse folders below the verified build root. Only lib*.so files are shown.",
+      "zh-Hans": "浏览已验证编译根目录以内的文件夹；这里只显示 lib*.so 文件。"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.directory",
+      "table": "DebugLocalizable",
+      "en": "Directory",
+      "zh-Hans": "目录"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.empty.detail",
+      "table": "DebugLocalizable",
+      "en": "Add and verify an SSH server in Settings > Servers first.",
+      "zh-Hans": "请先在“设置 > 服务器”中添加并验证 SSH 服务器。"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.empty.title",
+      "table": "DebugLocalizable",
+      "en": "No remote servers",
+      "zh-Hans": "尚未配置远端服务器"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.library",
+      "table": "DebugLocalizable",
+      "en": "Native library",
+      "zh-Hans": "动态库"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.noArtifacts",
+      "table": "DebugLocalizable",
+      "en": "No folders or native libraries here",
+      "zh-Hans": "此处没有文件夹或动态库"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.openSettings",
+      "table": "DebugLocalizable",
+      "en": "Open Server Settings",
+      "zh-Hans": "打开服务器设置"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.refresh",
+      "table": "DebugLocalizable",
+      "en": "Refresh directory",
+      "zh-Hans": "刷新目录"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.root",
+      "table": "DebugLocalizable",
+      "en": "Build root",
+      "zh-Hans": "编译根目录"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.server",
+      "table": "DebugLocalizable",
+      "en": "Server",
+      "zh-Hans": "服务器"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.title",
+      "table": "DebugLocalizable",
+      "en": "Remote build artifacts",
+      "zh-Hans": "远端编译产物"
+    },
+    {
+      "key": "debug.artifacts.remoteBrowser.up",
+      "table": "DebugLocalizable",
+      "en": "Up",
+      "zh-Hans": "上一级"
+    },
+    {
+      "key": "debug.artifacts.reopenPlan",
+      "table": "DebugLocalizable",
+      "en": "Review prepared plan",
+      "zh-Hans": "检查已准备计划"
+    },
+    {
+      "key": "debug.artifacts.results.title",
+      "table": "DebugLocalizable",
+      "en": "Publish and verification Artifacts",
+      "zh-Hans": "发布与验证 Artifact"
+    },
+    {
+      "key": "debug.artifacts.review.detail",
+      "table": "DebugLocalizable",
+      "en": "Validation must complete before the plan can be submitted. The reviewed plan digest pins the exact target, binding, Artifact lease, inputs, and step sequence.",
+      "zh-Hans": "校验完成后才能提交计划。已检查的 plan digest 会固定精确 target、binding、Artifact lease、输入和步骤序列。"
+    },
+    {
+      "key": "debug.artifacts.review.title",
+      "table": "DebugLocalizable",
+      "en": "Review and run",
+      "zh-Hans": "检查并运行"
+    },
+    {
+      "key": "debug.artifacts.rollback",
+      "table": "DebugLocalizable",
+      "en": "Rollback policy",
+      "zh-Hans": "回滚策略"
+    },
+    {
+      "key": "debug.artifacts.rollback.auto",
+      "table": "DebugLocalizable",
+      "en": "Restore and verify the previous library on failure",
+      "zh-Hans": "失败时恢复并复验旧动态库"
+    },
+    {
+      "key": "debug.artifacts.running",
+      "table": "DebugLocalizable",
+      "en": "Runtime is deploying and verifying the library",
+      "zh-Hans": "Runtime 正在部署并验证动态库"
+    },
+    {
+      "key": "debug.artifacts.running.detail",
+      "table": "DebugLocalizable",
+      "en": "Waiting for the next durable Runtime stage.",
+      "zh-Hans": "正在等待下一个持久化 Runtime 阶段。"
+    },
+    {
+      "key": "debug.artifacts.selectedLibrary",
+      "table": "DebugLocalizable",
+      "en": "Selected library",
+      "zh-Hans": "已选动态库"
+    },
+    {
+      "key": "debug.artifacts.sheet.back",
+      "table": "DebugLocalizable",
+      "en": "Back to selection",
+      "zh-Hans": "返回选择"
+    },
+    {
+      "key": "debug.artifacts.sheet.bundle",
+      "table": "DebugLocalizable",
+      "en": "Owning bundle",
+      "zh-Hans": "所属 Bundle"
+    },
+    {
+      "key": "debug.artifacts.sheet.digest",
+      "table": "DebugLocalizable",
+      "en": "Plan digest",
+      "zh-Hans": "Plan digest"
+    },
+    {
+      "key": "debug.artifacts.sheet.library",
+      "table": "DebugLocalizable",
+      "en": "Library",
+      "zh-Hans": "动态库"
+    },
+    {
+      "key": "debug.artifacts.sheet.rollback",
+      "table": "DebugLocalizable",
+      "en": "Failure handling",
+      "zh-Hans": "失败处理"
+    },
+    {
+      "key": "debug.artifacts.sheet.run",
+      "table": "DebugLocalizable",
+      "en": "Back up, replace, restart, and verify",
+      "zh-Hans": "备份、替换、重启并验证"
+    },
+    {
+      "key": "debug.artifacts.sheet.steps",
+      "table": "DebugLocalizable",
+      "en": "Materialized steps",
+      "zh-Hans": "已生成步骤"
+    },
+    {
+      "key": "debug.artifacts.sheet.target",
+      "table": "DebugLocalizable",
+      "en": "Exact target",
+      "zh-Hans": "精确目标设备"
+    },
+    {
+      "key": "debug.artifacts.sheet.title",
+      "table": "DebugLocalizable",
+      "en": "Review replacement plan",
+      "zh-Hans": "检查替换计划"
+    },
+    {
+      "key": "debug.artifacts.sheet.verification",
+      "table": "DebugLocalizable",
+      "en": "Required verification",
+      "zh-Hans": "必需验证"
+    },
+    {
+      "key": "debug.artifacts.sheet.warning",
+      "table": "DebugLocalizable",
+      "en": "ABI and signature validation block incompatible input before device writes. Runtime backs up the current library, publishes atomically, restarts the owning Ability, and requires loaded-library maps. Any failed verification automatically restores and re-verifies the previous library.",
+      "zh-Hans": "ABI 与签名校验会在设备写入前阻止不兼容输入。Runtime 随后备份当前动态库、原子发布、重启所属 Ability，并要求动态库加载 maps；任一验证失败都会自动恢复并复验旧动态库。"
+    },
+    {
+      "key": "debug.artifacts.source.detail",
+      "table": "DebugLocalizable",
+      "en": "Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.",
+      "zh-Hans": "从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。"
+    },
+    {
+      "key": "debug.artifacts.source.kind",
+      "table": "DebugLocalizable",
+      "en": "Build source",
+      "zh-Hans": "构建来源"
+    },
+    {
+      "key": "debug.artifacts.source.local",
+      "table": "DebugLocalizable",
+      "en": "Local file",
+      "zh-Hans": "本地文件"
+    },
+    {
+      "key": "debug.artifacts.source.remote",
+      "table": "DebugLocalizable",
+      "en": "Remote server",
+      "zh-Hans": "远端服务器"
+    },
+    {
+      "key": "debug.artifacts.source.title",
+      "table": "DebugLocalizable",
+      "en": "Build Artifact",
+      "zh-Hans": "编译产物"
+    },
+    {
+      "key": "debug.artifacts.sourceBoundary",
+      "table": "DebugLocalizable",
+      "en": "SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.",
+      "zh-Hans": "SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。"
+    },
+    {
+      "key": "debug.artifacts.target",
+      "table": "DebugLocalizable",
+      "en": "Target device",
+      "zh-Hans": "目标设备"
+    },
+    {
+      "key": "debug.artifacts.targetConfirmed",
+      "table": "DebugLocalizable",
+      "en": "Binding confirmed",
+      "zh-Hans": "Binding 已确认"
+    },
+    {
+      "key": "debug.artifacts.verification",
+      "table": "DebugLocalizable",
+      "en": "Post-publish verification",
+      "zh-Hans": "发布后验证"
+    },
+    {
+      "key": "debug.artifacts.verified",
+      "table": "DebugLocalizable",
+      "en": "Library published, Ability restarted, and loaded state verified",
+      "zh-Hans": "动态库已发布，Ability 已重启，加载状态已验证"
+    },
+    {
+      "key": "debug.artifacts.verify.maps",
+      "table": "DebugLocalizable",
+      "en": "Verify hash, process, and loaded maps",
+      "zh-Hans": "验证 hash、进程与已加载 maps"
+    },
+    {
+      "key": "debug.availability.available",
+      "table": "DebugLocalizable",
+      "en": "Provider reports available",
+      "zh-Hans": "Provider 报告可用"
+    },
+    {
+      "key": "debug.availability.checking",
+      "table": "DebugLocalizable",
+      "en": "Checking Runtime availability…",
+      "zh-Hans": "正在检查 Runtime 可用性…"
+    },
+    {
+      "key": "debug.availability.effect",
+      "table": "DebugLocalizable",
+      "en": "Minimum effect: %@",
+      "zh-Hans": "最低 effect：%@"
+    },
+    {
+      "key": "debug.availability.missing",
+      "table": "DebugLocalizable",
+      "en": "The operation descriptor is missing from this build. Nothing can be prepared.",
+      "zh-Hans": "此构建缺少 operation descriptor，无法准备任何请求。"
+    },
+    {
+      "key": "debug.availability.operation",
+      "table": "DebugLocalizable",
+      "en": "Operation",
+      "zh-Hans": "Operation"
+    },
+    {
+      "key": "debug.availability.unavailable",
+      "table": "DebugLocalizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "debug.blocked.bufferOperation",
+      "table": "DebugLocalizable",
+      "en": "No published Runtime operation exposes device buffer mutation. Normal capture never clears, resizes, or flushes it.",
+      "zh-Hans": "当前没有已发布 Runtime operation 提供设备 buffer 变更；普通采集绝不会清空、扩容或 flush。"
+    },
+    {
+      "key": "debug.blocked.packageLifecycle",
+      "table": "DebugLocalizable",
+      "en": "No published Runtime operation starts, stops, or uninstalls an individual package. Use the typed HAP lifecycle above.",
+      "zh-Hans": "当前没有已发布 Runtime operation 可以启动、停止或卸载单个应用；请使用上方的 typed HAP 生命周期。"
+    },
+    {
+      "key": "debug.commands.argv.note",
+      "table": "DebugLocalizable",
+      "en": "Only the provider may lower this typed input into executable + argv after Runtime admission. The Job's derived report discloses that lowering; the UI never guesses or concatenates a shell command.",
+      "zh-Hans": "只有 provider 可在 Runtime 准入后将此 typed input 降级为 executable + argv。Job 的派生报告会披露 lowering；UI 不猜测也不拼接 shell 命令。"
+    },
+    {
+      "key": "debug.commands.argv.title",
+      "table": "DebugLocalizable",
+      "en": "Typed Runtime request",
+      "zh-Hans": "Typed Runtime 请求"
+    },
+    {
+      "key": "debug.commands.artifacts.empty",
+      "table": "DebugLocalizable",
+      "en": "No published template Artifacts",
+      "zh-Hans": "没有已发布的模板 Artifact"
+    },
+    {
+      "key": "debug.commands.artifacts.empty.detail",
+      "table": "DebugLocalizable",
+      "en": "Run an approved template to publish its bounded output and report.",
+      "zh-Hans": "运行 approved 模板后，Runtime 会发布有界输出与报告。"
+    },
+    {
+      "key": "debug.commands.artifacts.title",
+      "table": "DebugLocalizable",
+      "en": "Runtime Job Artifacts",
+      "zh-Hans": "Runtime Job Artifact"
+    },
+    {
+      "key": "debug.commands.calloutTyped",
+      "table": "DebugLocalizable",
+      "en": "The App submits approved typed templates only through debug.template@1. Runtime records the request as a durable Job and publishes bounded Artifacts.",
+      "zh-Hans": "App 只通过 debug.template@1 提交 approved typed template。Runtime 会把请求记录为持久 Job，并发布有界 Artifact。"
+    },
+    {
+      "key": "debug.commands.effect",
+      "table": "DebugLocalizable",
+      "en": "Effect",
+      "zh-Hans": "Effect"
+    },
+    {
+      "key": "debug.commands.footerNoFreeText",
+      "table": "DebugLocalizable",
+      "en": "There is no free-text command, argv or path field; PTY and raw shell do not belong to this surface.",
+      "zh-Hans": "不存在自由文本 command / argv / path 字段；PTY 与 raw shell 不属于此界面。"
+    },
+    {
+      "key": "debug.commands.job.id",
+      "table": "DebugLocalizable",
+      "en": "Job",
+      "zh-Hans": "Job"
+    },
+    {
+      "key": "debug.commands.job.known",
+      "table": "DebugLocalizable",
+      "en": "Known",
+      "zh-Hans": "已知"
+    },
+    {
+      "key": "debug.commands.job.latest",
+      "table": "DebugLocalizable",
+      "en": "Latest event",
+      "zh-Hans": "最新事件"
+    },
+    {
+      "key": "debug.commands.job.outcome",
+      "table": "DebugLocalizable",
+      "en": "Outcome",
+      "zh-Hans": "结果确定性"
+    },
+    {
+      "key": "debug.commands.job.running",
+      "table": "DebugLocalizable",
+      "en": "Debug template Job running",
+      "zh-Hans": "Debug 模板 Job 正在运行"
+    },
+    {
+      "key": "debug.commands.job.state",
+      "table": "DebugLocalizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "debug.commands.job.unknown",
+      "table": "DebugLocalizable",
+      "en": "Unknown — inspect Runtime recovery",
+      "zh-Hans": "未知——检查 Runtime recovery"
+    },
+    {
+      "key": "debug.commands.noPTY",
+      "table": "DebugLocalizable",
+      "en": "No PTY, password prompt, sudo, or interactive session",
+      "zh-Hans": "不提供 PTY、密码提示、sudo 或交互会话"
+    },
+    {
+      "key": "debug.commands.noParameters",
+      "table": "DebugLocalizable",
+      "en": "This template declares no user parameters.",
+      "zh-Hans": "此模板没有用户参数。"
+    },
+    {
+      "key": "debug.commands.result.none",
+      "table": "DebugLocalizable",
+      "en": "No result",
+      "zh-Hans": "没有结果"
+    },
+    {
+      "key": "debug.commands.result.title",
+      "table": "DebugLocalizable",
+      "en": "Runtime Job result",
+      "zh-Hans": "Runtime Job 结果"
+    },
+    {
+      "key": "debug.commands.run",
+      "table": "DebugLocalizable",
+      "en": "Run once",
+      "zh-Hans": "运行一次"
+    },
+    {
+      "key": "debug.commands.select",
+      "table": "DebugLocalizable",
+      "en": "Select an approved template",
+      "zh-Hans": "选择 approved 模板"
+    },
+    {
+      "key": "debug.commands.target",
+      "table": "DebugLocalizable",
+      "en": "Exact target",
+      "zh-Hans": "精确目标设备"
+    },
+    {
+      "key": "debug.failure.artifactFinalizationFailed",
+      "table": "DebugLocalizable",
+      "en": "Runtime could not finalize all artifacts. Review the Job details.",
+      "zh-Hans": "Runtime 无法完成全部 Artifact。请检查 Job 详情。"
+    },
+    {
+      "key": "debug.failure.artifactPublicationFailed",
+      "table": "DebugLocalizable",
+      "en": "Runtime could not publish an execution artifact. Review the Job details.",
+      "zh-Hans": "Runtime 无法发布执行 Artifact。请检查 Job 详情。"
+    },
+    {
+      "key": "debug.failure.cancelled",
+      "table": "DebugLocalizable",
+      "en": "The operation stopped at a safe boundary.",
+      "zh-Hans": "操作已在安全边界停止。"
+    },
+    {
+      "key": "debug.failure.executionConfirmedNotPerformed",
+      "table": "DebugLocalizable",
+      "en": "The operation did not run. Runtime proof is required before another request.",
+      "zh-Hans": "操作未执行。提交另一个请求前必须取得 Runtime 证明。"
+    },
+    {
+      "key": "debug.failure.executionFailed",
+      "table": "DebugLocalizable",
+      "en": "Execution failed. Review this Job’s artifacts and diagnostics.",
+      "zh-Hans": "执行失败。请检查此 Job 的 Artifact 和诊断信息。"
+    },
+    {
+      "key": "debug.failure.interrupted",
+      "table": "DebugLocalizable",
+      "en": "Runtime was interrupted. Review the Job before continuing.",
+      "zh-Hans": "Runtime 已中断。继续前请检查此 Job。"
+    },
+    {
+      "key": "debug.failure.legacyFailure",
+      "table": "DebugLocalizable",
+      "en": "The operation failed. Review the Job timeline and artifacts.",
+      "zh-Hans": "操作失败。请检查 Job timeline 和 Artifact。"
+    },
+    {
+      "key": "debug.failure.outcomeUnknown",
+      "table": "DebugLocalizable",
+      "en": "The device effect is unknown. Keep the device unchanged while Runtime reconciles it.",
+      "zh-Hans": "设备影响未知。Runtime 核对期间请保持设备状态不变。"
+    },
+    {
+      "key": "debug.failure.reconciliationConfirmedNotPerformed",
+      "table": "DebugLocalizable",
+      "en": "Runtime confirmed that the operation did not complete. Submit another typed request only after Runtime permits it.",
+      "zh-Hans": "Runtime 已确认操作未完成。仅在 Runtime 允许后提交新的 typed 请求。"
+    },
+    {
+      "key": "debug.jobs.active",
+      "table": "DebugLocalizable",
+      "en": "%d active Debug jobs",
+      "zh-Hans": "%d 个活动 Debug Job"
+    },
+    {
+      "key": "debug.jobs.empty",
+      "table": "DebugLocalizable",
+      "en": "Runtime reports no related jobs.",
+      "zh-Hans": "Runtime 未报告相关 Job。"
+    },
+    {
+      "key": "debug.jobs.title",
+      "table": "DebugLocalizable",
+      "en": "Recent Runtime jobs",
+      "zh-Hans": "最近的 Runtime Job"
+    },
+    {
+      "key": "debug.logs.capture.title",
+      "table": "DebugLocalizable",
+      "en": "Bounded HiLog capture",
+      "zh-Hans": "有界 HiLog 采集"
+    },
+    {
+      "key": "debug.logs.destructive.clear",
+      "table": "DebugLocalizable",
+      "en": "Clear device buffer…",
+      "zh-Hans": "清空设备 buffer…"
+    },
+    {
+      "key": "debug.logs.destructive.menu",
+      "table": "DebugLocalizable",
+      "en": "Device buffer actions",
+      "zh-Hans": "设备 buffer 操作"
+    },
+    {
+      "key": "debug.logs.destructive.scope",
+      "table": "DebugLocalizable",
+      "en": "These actions modify global device logging state and require separate capability checks, confirmation, and audit.",
+      "zh-Hans": "这些操作会修改设备全局日志状态，必须单独进行能力检查、确认与审计。"
+    },
+    {
+      "key": "debug.logs.destructive.title",
+      "table": "DebugLocalizable",
+      "en": "Separate destructive actions",
+      "zh-Hans": "独立危险操作"
+    },
+    {
+      "key": "debug.logs.domain",
+      "table": "DebugLocalizable",
+      "en": "Domain filter",
+      "zh-Hans": "Domain 筛选"
+    },
+    {
+      "key": "debug.logs.duration",
+      "table": "DebugLocalizable",
+      "en": "Duration: %d seconds",
+      "zh-Hans": "时长：%d 秒"
+    },
+    {
+      "key": "debug.logs.export",
+      "table": "DebugLocalizable",
+      "en": "Export…",
+      "zh-Hans": "导出…"
+    },
+    {
+      "key": "debug.logs.exportBoundary",
+      "table": "DebugLocalizable",
+      "en": "Artifact bytes are read in bounded verified chunks; the save location is handled only by the App and is never sent to Runtime.",
+      "zh-Hans": "Artifact 字节通过有界分块读取并校验；保存位置只由 App 处理，不会发送给 Runtime。"
+    },
+    {
+      "key": "debug.logs.exportCancel",
+      "table": "DebugLocalizable",
+      "en": "Cancel",
+      "zh-Hans": "取消"
+    },
+    {
+      "key": "debug.logs.exportConfirm",
+      "table": "DebugLocalizable",
+      "en": "Choose save location…",
+      "zh-Hans": "选择保存位置…"
+    },
+    {
+      "key": "debug.logs.exportPreview.message",
+      "table": "DebugLocalizable",
+      "en": "Name: %1$@\nSize: %2$@\nPrivacy: %3$@\nSHA-256: %4$@",
+      "zh-Hans": "名称：%1$@\n大小：%2$@\n隐私级别：%3$@\nSHA-256：%4$@"
+    },
+    {
+      "key": "debug.logs.exportPreview.title",
+      "table": "DebugLocalizable",
+      "en": "Review Artifact export",
+      "zh-Hans": "检查 Artifact 导出信息"
+    },
+    {
+      "key": "debug.logs.exportSensitive",
+      "table": "DebugLocalizable",
+      "en": "Export sensitive Artifact…",
+      "zh-Hans": "导出敏感 Artifact…"
+    },
+    {
+      "key": "debug.logs.exporting",
+      "table": "DebugLocalizable",
+      "en": "Exporting Artifact",
+      "zh-Hans": "正在导出 Artifact"
+    },
+    {
+      "key": "debug.logs.filters.invalid",
+      "table": "DebugLocalizable",
+      "en": "Invalid typed value in: %@. Use letters, numbers, dot, underscore, colon, or hyphen only.",
+      "zh-Hans": "以下 typed 值无效：%@。仅可使用字母、数字、点、下划线、冒号或连字符。"
+    },
+    {
+      "key": "debug.logs.filters.note",
+      "table": "DebugLocalizable",
+      "en": "Every filter is a bounded typed token. Free shell fragments are never accepted.",
+      "zh-Hans": "每项筛选都是有界 typed token，不接受任何自由 shell 片段。"
+    },
+    {
+      "key": "debug.logs.keyword",
+      "table": "DebugLocalizable",
+      "en": "Keyword",
+      "zh-Hans": "关键字"
+    },
+    {
+      "key": "debug.logs.level",
+      "table": "DebugLocalizable",
+      "en": "Minimum level",
+      "zh-Hans": "最低等级"
+    },
+    {
+      "key": "debug.logs.live.empty",
+      "table": "DebugLocalizable",
+      "en": "No live stream is attached",
+      "zh-Hans": "尚未连接实时日志流"
+    },
+    {
+      "key": "debug.logs.live.empty.detail",
+      "table": "DebugLocalizable",
+      "en": "A Runtime capture can publish bounded shards and a manifest. Pausing this viewport would never stop host capture.",
+      "zh-Hans": "Runtime 采集可发布有界分片与 manifest；暂停此视图绝不会停止 host 采集。"
+    },
+    {
+      "key": "debug.logs.live.title",
+      "table": "DebugLocalizable",
+      "en": "Live viewport",
+      "zh-Hans": "实时视图"
+    },
+    {
+      "key": "debug.logs.marker",
+      "table": "DebugLocalizable",
+      "en": "Marker",
+      "zh-Hans": "标记"
+    },
+    {
+      "key": "debug.logs.pause",
+      "table": "DebugLocalizable",
+      "en": "Pause viewport",
+      "zh-Hans": "暂停界面"
+    },
+    {
+      "key": "debug.logs.pause.requiresCapture",
+      "table": "DebugLocalizable",
+      "en": "The viewport can pause only while a capture is running; pausing never stops host capture.",
+      "zh-Hans": "仅在采集进行中才能暂停界面；暂停绝不停止 host 采集。"
+    },
+    {
+      "key": "debug.logs.pid",
+      "table": "DebugLocalizable",
+      "en": "PID filter",
+      "zh-Hans": "PID 筛选"
+    },
+    {
+      "key": "debug.logs.rawSave",
+      "table": "DebugLocalizable",
+      "en": "Save raw HiLog artifact (required)",
+      "zh-Hans": "保存 raw HiLog Artifact（必需）"
+    },
+    {
+      "key": "debug.logs.request.title",
+      "table": "DebugLocalizable",
+      "en": "Typed request preview",
+      "zh-Hans": "Typed 请求预览"
+    },
+    {
+      "key": "debug.logs.resume",
+      "table": "DebugLocalizable",
+      "en": "Resume viewport",
+      "zh-Hans": "恢复界面"
+    },
+    {
+      "key": "debug.logs.shards.empty",
+      "table": "DebugLocalizable",
+      "en": "No host shards",
+      "zh-Hans": "没有 host 分片"
+    },
+    {
+      "key": "debug.logs.shards.empty.detail",
+      "table": "DebugLocalizable",
+      "en": "Completed shards appear here in manifest order with exact size and hash.",
+      "zh-Hans": "已完成分片将按 manifest 顺序显示精确大小与 hash。"
+    },
+    {
+      "key": "debug.logs.shards.hash",
+      "table": "DebugLocalizable",
+      "en": "SHA-256",
+      "zh-Hans": "SHA-256"
+    },
+    {
+      "key": "debug.logs.shards.sequence",
+      "table": "DebugLocalizable",
+      "en": "Sequence / shard",
+      "zh-Hans": "顺序 / 分片"
+    },
+    {
+      "key": "debug.logs.shards.size",
+      "table": "DebugLocalizable",
+      "en": "Size",
+      "zh-Hans": "大小"
+    },
+    {
+      "key": "debug.logs.shards.title",
+      "table": "DebugLocalizable",
+      "en": "Host shards and retention",
+      "zh-Hans": "Host 分片与保留策略"
+    },
+    {
+      "key": "debug.logs.showInFinder",
+      "table": "DebugLocalizable",
+      "en": "Show in Finder",
+      "zh-Hans": "在 Finder 中显示"
+    },
+    {
+      "key": "debug.logs.start",
+      "table": "DebugLocalizable",
+      "en": "Start capture",
+      "zh-Hans": "开始采集"
+    },
+    {
+      "key": "debug.logs.storage.totalBudget",
+      "table": "DebugLocalizable",
+      "en": "Published operation total output budget: %@",
+      "zh-Hans": "已发布 operation 总输出预算：%@"
+    },
+    {
+      "key": "debug.logs.tag",
+      "table": "DebugLocalizable",
+      "en": "Tag filter",
+      "zh-Hans": "Tag 筛选"
+    },
+    {
+      "key": "debug.logs.target",
+      "table": "DebugLocalizable",
+      "en": "Exact target",
+      "zh-Hans": "精确目标设备"
+    },
+    {
+      "key": "debug.logs.viewport.bounded",
+      "table": "DebugLocalizable",
+      "en": "Bounded memory window",
+      "zh-Hans": "有界内存窗口"
+    },
+    {
+      "key": "debug.network.add",
+      "table": "DebugLocalizable",
+      "en": "Add rule",
+      "zh-Hans": "添加规则"
+    },
+    {
+      "key": "debug.network.delete",
+      "table": "DebugLocalizable",
+      "en": "Delete selected…",
+      "zh-Hans": "删除所选规则…"
+    },
+    {
+      "key": "debug.network.delete.scope",
+      "table": "DebugLocalizable",
+      "en": "Deletion must name the exact rule and durable target binding",
+      "zh-Hans": "删除必须明确指定规则与持久目标设备 binding"
+    },
+    {
+      "key": "debug.network.direction",
+      "table": "DebugLocalizable",
+      "en": "Direction",
+      "zh-Hans": "方向"
+    },
+    {
+      "key": "debug.network.editor.title",
+      "table": "DebugLocalizable",
+      "en": "Typed port rule",
+      "zh-Hans": "Typed 端口规则"
+    },
+    {
+      "key": "debug.network.forward",
+      "table": "DebugLocalizable",
+      "en": "Forward",
+      "zh-Hans": "Forward"
+    },
+    {
+      "key": "debug.network.localPort",
+      "table": "DebugLocalizable",
+      "en": "Host port (1024–65535)",
+      "zh-Hans": "Host 端口（1024–65535）"
+    },
+    {
+      "key": "debug.network.remotePort",
+      "table": "DebugLocalizable",
+      "en": "Device port (1024–65535)",
+      "zh-Hans": "设备端口（1024–65535）"
+    },
+    {
+      "key": "debug.network.reverse",
+      "table": "DebugLocalizable",
+      "en": "Reverse",
+      "zh-Hans": "Reverse"
+    },
+    {
+      "key": "debug.network.rules.action",
+      "table": "DebugLocalizable",
+      "en": "Action",
+      "zh-Hans": "操作"
+    },
+    {
+      "key": "debug.network.rules.direction",
+      "table": "DebugLocalizable",
+      "en": "Direction",
+      "zh-Hans": "方向"
+    },
+    {
+      "key": "debug.network.rules.empty",
+      "table": "DebugLocalizable",
+      "en": "No forwarding inventory",
+      "zh-Hans": "没有端口转发清单"
+    },
+    {
+      "key": "debug.network.rules.empty.detail",
+      "table": "DebugLocalizable",
+      "en": "The current Runtime publishes no operation for reading forward/reverse rules.",
+      "zh-Hans": "当前 Runtime 未发布读取 forward/reverse 规则的 operation。"
+    },
+    {
+      "key": "debug.network.rules.local",
+      "table": "DebugLocalizable",
+      "en": "Host endpoint",
+      "zh-Hans": "Host 端点"
+    },
+    {
+      "key": "debug.network.rules.remote",
+      "table": "DebugLocalizable",
+      "en": "Device endpoint",
+      "zh-Hans": "设备端点"
+    },
+    {
+      "key": "debug.network.rules.state",
+      "table": "DebugLocalizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "debug.network.rules.title",
+      "table": "DebugLocalizable",
+      "en": "Forward / reverse rules",
+      "zh-Hans": "Forward / reverse 规则"
+    },
+    {
+      "key": "debug.network.safety.binding",
+      "table": "DebugLocalizable",
+      "en": "Every create/delete operation binds one durable target revision",
+      "zh-Hans": "每个新建/删除操作绑定一个持久目标设备 revision"
+    },
+    {
+      "key": "debug.network.safety.noShell",
+      "table": "DebugLocalizable",
+      "en": "No shell fragments, schemes, hosts, or flags are accepted",
+      "zh-Hans": "不接受 shell 片段、scheme、host 或 flag"
+    },
+    {
+      "key": "debug.network.safety.title",
+      "table": "DebugLocalizable",
+      "en": "Validation and scope",
+      "zh-Hans": "校验与影响范围"
+    },
+    {
+      "key": "debug.network.safety.typed",
+      "table": "DebugLocalizable",
+      "en": "Only decimal TCP ports from 1024 through 65535 are accepted",
+      "zh-Hans": "仅接受 1024 到 65535 的十进制 TCP 端口"
+    },
+    {
+      "key": "debug.network.target",
+      "table": "DebugLocalizable",
+      "en": "Exact target",
+      "zh-Hans": "精确目标设备"
+    },
+    {
+      "key": "debug.network.typedRule",
+      "table": "DebugLocalizable",
+      "en": "Typed rule",
+      "zh-Hans": "Typed 规则"
+    },
+    {
+      "key": "debug.network.validation.localPortNotNumeric",
+      "table": "DebugLocalizable",
+      "en": "Enter a decimal host port.",
+      "zh-Hans": "请输入十进制 Host 端口。"
+    },
+    {
+      "key": "debug.network.validation.localPortOutOfRange",
+      "table": "DebugLocalizable",
+      "en": "Host port must be from 1024 through 65535.",
+      "zh-Hans": "Host 端口必须在 1024 到 65535 之间。"
+    },
+    {
+      "key": "debug.network.validation.remotePortNotNumeric",
+      "table": "DebugLocalizable",
+      "en": "Enter a decimal device port.",
+      "zh-Hans": "请输入十进制设备端口。"
+    },
+    {
+      "key": "debug.network.validation.remotePortOutOfRange",
+      "table": "DebugLocalizable",
+      "en": "Device port must be from 1024 through 65535.",
+      "zh-Hans": "设备端口必须在 1024 到 65535 之间。"
+    },
+    {
+      "key": "debug.network.validation.valid",
+      "table": "DebugLocalizable",
+      "en": "Both ports are valid typed values.",
+      "zh-Hans": "两个端口均为有效 typed 值。"
+    },
+    {
+      "key": "debug.optional",
+      "table": "DebugLocalizable",
+      "en": "Optional",
+      "zh-Hans": "可选"
+    },
+    {
+      "key": "debug.scope",
+      "table": "DebugLocalizable",
+      "en": "Typed Artifact deployment, logs, app lifecycle, network rules, and approved read-only tools — never a raw terminal.",
+      "zh-Hans": "Typed 产物部署、日志、应用生命周期、网络规则和 approved 只读工具——绝非 raw terminal。"
+    },
+    {
+      "key": "debug.tab.apps",
+      "table": "DebugLocalizable",
+      "en": "Apps",
+      "zh-Hans": "应用"
+    },
+    {
+      "key": "debug.tab.artifacts",
+      "table": "DebugLocalizable",
+      "en": "Artifacts",
+      "zh-Hans": "产物替换"
+    },
+    {
+      "key": "debug.tab.commands",
+      "table": "DebugLocalizable",
+      "en": "Commands",
+      "zh-Hans": "只读工具"
+    },
+    {
+      "key": "debug.tab.logs",
+      "table": "DebugLocalizable",
+      "en": "Logs",
+      "zh-Hans": "获取日志"
+    },
+    {
+      "key": "debug.tab.network",
+      "table": "DebugLocalizable",
+      "en": "Network",
+      "zh-Hans": "网络"
+    },
+    {
+      "key": "debug.tabs.label",
+      "table": "DebugLocalizable",
+      "en": "Debug workspace",
+      "zh-Hans": "Debug 工作区"
+    },
+    {
+      "key": "debug.target.binding",
+      "table": "DebugLocalizable",
+      "en": "Binding r%d · HDC %@",
+      "zh-Hans": "Binding r%d · HDC %@"
+    },
+    {
+      "key": "debug.target.label",
+      "table": "DebugLocalizable",
+      "en": "Target device",
+      "zh-Hans": "目标设备"
+    },
+    {
+      "key": "debug.target.none",
+      "table": "DebugLocalizable",
+      "en": "No adopted target",
+      "zh-Hans": "没有已接管目标设备"
+    },
+    {
+      "key": "debug.typed.invalidIdentifier",
+      "table": "DebugLocalizable",
+      "en": "%@ accepts only letters, digits and . _ : - — the value never reaches a shell.",
+      "zh-Hans": "%@ 只接受字母、数字和 . _ : -；该值绝不会进入 shell。"
+    },
+    {
       "key": "windows.recovery.title",
       "table": null,
       "en": "ArkDeck Runtime unavailable",
@@ -2045,6 +3491,546 @@
       "table": null,
       "en": "No",
       "zh-Hans": "否"
+    },
+    {
+      "key": "windows.navigation.agents",
+      "table": null,
+      "en": "Agents",
+      "zh-Hans": "Agent"
+    },
+    {
+      "key": "windows.agents.subtitle",
+      "table": null,
+      "en": "The agent executions the Runtime runs and the human actions they wait on. Starting an agent stays in the CLI.",
+      "zh-Hans": "Runtime 运行的 Agent 执行，以及它们正在等待的人工操作。启动 Agent 仍在 CLI 中进行。"
+    },
+    {
+      "key": "windows.agents.unavailable",
+      "table": null,
+      "en": "Agent executions unavailable",
+      "zh-Hans": "无法读取 Agent 执行"
+    },
+    {
+      "key": "windows.agents.humanActions.unavailable",
+      "table": null,
+      "en": "Human actions unavailable",
+      "zh-Hans": "无法读取人工操作"
+    },
+    {
+      "key": "windows.agents.executions",
+      "table": null,
+      "en": "Agent executions",
+      "zh-Hans": "Agent 执行"
+    },
+    {
+      "key": "windows.agents.humanActions",
+      "table": null,
+      "en": "Waiting for you",
+      "zh-Hans": "等待你处理"
+    },
+    {
+      "key": "windows.agents.humanActions.empty",
+      "table": null,
+      "en": "No human action is waiting.",
+      "zh-Hans": "当前没有等待中的人工操作。"
+    },
+    {
+      "key": "windows.agents.empty",
+      "table": null,
+      "en": "No agent execution is recorded.",
+      "zh-Hans": "当前没有 Agent 执行记录。"
+    },
+    {
+      "key": "windows.agents.select",
+      "table": null,
+      "en": "Select an agent execution to see it.",
+      "zh-Hans": "选择一个 Agent 执行以查看详情。"
+    },
+    {
+      "key": "windows.agents.operation",
+      "table": null,
+      "en": "Operation",
+      "zh-Hans": "操作"
+    },
+    {
+      "key": "windows.agents.state",
+      "table": null,
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "windows.agents.generation",
+      "table": null,
+      "en": "Generation",
+      "zh-Hans": "代次"
+    },
+    {
+      "key": "windows.agents.job",
+      "table": null,
+      "en": "Job",
+      "zh-Hans": "Job"
+    },
+    {
+      "key": "windows.agents.target",
+      "table": null,
+      "en": "Target",
+      "zh-Hans": "Target"
+    },
+    {
+      "key": "windows.agents.deadline",
+      "table": null,
+      "en": "Deadline",
+      "zh-Hans": "截止时间"
+    },
+    {
+      "key": "windows.agents.observed",
+      "table": null,
+      "en": "Last observed",
+      "zh-Hans": "最近观察"
+    },
+    {
+      "key": "windows.agents.next",
+      "table": null,
+      "en": "Next",
+      "zh-Hans": "下一步"
+    },
+    {
+      "key": "windows.agents.failure",
+      "table": null,
+      "en": "Failure",
+      "zh-Hans": "失败原因"
+    },
+    {
+      "key": "windows.agents.outcomeUnknown",
+      "table": null,
+      "en": "The outcome is unknown: check the device before running it again.",
+      "zh-Hans": "结果未知：再次运行前请先检查设备。"
+    },
+    {
+      "key": "windows.agents.row",
+      "table": null,
+      "en": "%1$@ · %2$@",
+      "zh-Hans": "%1$@ · %2$@"
+    },
+    {
+      "key": "windows.agents.action.category",
+      "table": null,
+      "en": "Category",
+      "zh-Hans": "类别"
+    },
+    {
+      "key": "windows.agents.action.minimum",
+      "table": null,
+      "en": "What to do",
+      "zh-Hans": "需要执行的操作"
+    },
+    {
+      "key": "windows.agents.action.expires",
+      "table": null,
+      "en": "Expires",
+      "zh-Hans": "到期时间"
+    },
+    {
+      "key": "windows.agents.action.row",
+      "table": null,
+      "en": "%1$@ · %2$@ · expires %3$@",
+      "zh-Hans": "%1$@ · %2$@ · %3$@ 到期"
+    },
+    {
+      "key": "windows.agents.action.choose",
+      "table": null,
+      "en": "Choose one",
+      "zh-Hans": "请选择一项"
+    },
+    {
+      "key": "windows.agents.action.chooseFirst",
+      "table": null,
+      "en": "Choose one of the listed values first.",
+      "zh-Hans": "请先选择列出的一项。"
+    },
+    {
+      "key": "windows.agents.action.resume",
+      "table": null,
+      "en": "Resume",
+      "zh-Hans": "继续"
+    },
+    {
+      "key": "windows.agents.action.resumed",
+      "table": null,
+      "en": "Resumed: the Runtime continues.",
+      "zh-Hans": "已继续：Runtime 会接着执行。"
+    },
+    {
+      "key": "windows.agents.action.refused",
+      "table": null,
+      "en": "The Runtime did not resume",
+      "zh-Hans": "Runtime 未继续"
+    },
+    {
+      "key": "windows.agents.abandon",
+      "table": null,
+      "en": "Abandon…",
+      "zh-Hans": "放弃…"
+    },
+    {
+      "key": "windows.agents.abandon.title",
+      "table": null,
+      "en": "Abandon this agent execution?",
+      "zh-Hans": "放弃这个 Agent 执行？"
+    },
+    {
+      "key": "windows.agents.abandon.message",
+      "table": null,
+      "en": "The Runtime stops agent execution %1$@ (generation %2$@). It cannot be resumed afterwards.",
+      "zh-Hans": "Runtime 会停止 Agent 执行 %1$@（代次 %2$@），之后不能再继续。"
+    },
+    {
+      "key": "windows.agents.abandon.confirm",
+      "table": null,
+      "en": "Abandon",
+      "zh-Hans": "放弃"
+    },
+    {
+      "key": "windows.agents.abandon.done",
+      "table": null,
+      "en": "Abandoned.",
+      "zh-Hans": "已放弃。"
+    },
+    {
+      "key": "windows.agents.abandon.failed",
+      "table": null,
+      "en": "The agent execution was not abandoned",
+      "zh-Hans": "Agent 执行未放弃"
+    },
+    {
+      "key": "windows.navigation.imports",
+      "table": null,
+      "en": "Imports",
+      "zh-Hans": "导入"
+    },
+    {
+      "key": "windows.imports.subtitle",
+      "table": null,
+      "en": "Files uploaded to the Runtime and published as Artifacts for an adopted Target. Each file is checked, sent in verified chunks and published by the Runtime.",
+      "zh-Hans": "上传到 Runtime、并作为某个已接管 Target 的 Artifact 发布的文件。每个文件都会先检查，再分块校验发送，最后由 Runtime 发布。"
+    },
+    {
+      "key": "windows.imports.unavailable",
+      "table": null,
+      "en": "Imports unavailable",
+      "zh-Hans": "无法读取导入"
+    },
+    {
+      "key": "windows.imports.targets.unavailable",
+      "table": null,
+      "en": "Targets unavailable",
+      "zh-Hans": "无法读取 Target"
+    },
+    {
+      "key": "windows.imports.new",
+      "table": null,
+      "en": "New Import",
+      "zh-Hans": "新建导入"
+    },
+    {
+      "key": "windows.imports.kind",
+      "table": null,
+      "en": "Kind",
+      "zh-Hans": "类型"
+    },
+    {
+      "key": "windows.imports.kind.hap",
+      "table": null,
+      "en": "HAP (.hap, .hsp)",
+      "zh-Hans": "HAP（.hap、.hsp）"
+    },
+    {
+      "key": "windows.imports.kind.nativeLibrary",
+      "table": null,
+      "en": "Native library (lib….so)",
+      "zh-Hans": "原生库（lib….so）"
+    },
+    {
+      "key": "windows.imports.kind.workspacePatch",
+      "table": null,
+      "en": "Workspace patch (.patch, .diff)",
+      "zh-Hans": "工作区补丁（.patch、.diff）"
+    },
+    {
+      "key": "windows.imports.kind.flashBundle",
+      "table": null,
+      "en": "Flash bundle (images.tar.gz)",
+      "zh-Hans": "刷机包（images.tar.gz）"
+    },
+    {
+      "key": "windows.imports.target",
+      "table": null,
+      "en": "Target",
+      "zh-Hans": "Target"
+    },
+    {
+      "key": "windows.imports.noTargets",
+      "table": null,
+      "en": "No Target is adopted: adopt one in the CLI first.",
+      "zh-Hans": "尚未接管任何 Target：请先在 CLI 中接管。"
+    },
+    {
+      "key": "windows.imports.file",
+      "table": null,
+      "en": "File",
+      "zh-Hans": "文件"
+    },
+    {
+      "key": "windows.imports.noFile",
+      "table": null,
+      "en": "No file chosen.",
+      "zh-Hans": "未选择文件。"
+    },
+    {
+      "key": "windows.imports.chooseFile",
+      "table": null,
+      "en": "Choose file…",
+      "zh-Hans": "选择文件…"
+    },
+    {
+      "key": "windows.imports.chooseFileFirst",
+      "table": null,
+      "en": "Choose a file first.",
+      "zh-Hans": "请先选择文件。"
+    },
+    {
+      "key": "windows.imports.start",
+      "table": null,
+      "en": "Import",
+      "zh-Hans": "导入"
+    },
+    {
+      "key": "windows.imports.progress",
+      "table": null,
+      "en": "Upload progress",
+      "zh-Hans": "上传进度"
+    },
+    {
+      "key": "windows.imports.progress.value",
+      "table": null,
+      "en": "Sent %1$@ of %2$@",
+      "zh-Hans": "已发送 %1$@，共 %2$@"
+    },
+    {
+      "key": "windows.imports.cancel",
+      "table": null,
+      "en": "Cancel upload",
+      "zh-Hans": "取消上传"
+    },
+    {
+      "key": "windows.imports.busy",
+      "table": null,
+      "en": "An upload is in progress.",
+      "zh-Hans": "正在上传。"
+    },
+    {
+      "key": "windows.imports.done",
+      "table": null,
+      "en": "Imported %1$@ as Artifact %2$@.",
+      "zh-Hans": "已导入 %1$@，Artifact 为 %2$@。"
+    },
+    {
+      "key": "windows.imports.failed",
+      "table": null,
+      "en": "Import failed",
+      "zh-Hans": "导入失败"
+    },
+    {
+      "key": "windows.imports.cancelled",
+      "table": null,
+      "en": "Upload cancelled; the partial Import was aborted.",
+      "zh-Hans": "已取消上传；未完成的导入已中止。"
+    },
+    {
+      "key": "windows.imports.list",
+      "table": null,
+      "en": "Imports",
+      "zh-Hans": "导入"
+    },
+    {
+      "key": "windows.imports.empty",
+      "table": null,
+      "en": "No Import is recorded.",
+      "zh-Hans": "当前没有导入记录。"
+    },
+    {
+      "key": "windows.imports.select",
+      "table": null,
+      "en": "Select an Import to see it.",
+      "zh-Hans": "选择一个导入以查看详情。"
+    },
+    {
+      "key": "windows.imports.row",
+      "table": null,
+      "en": "%1$@ · %2$@ · %3$@",
+      "zh-Hans": "%1$@ · %2$@ · %3$@"
+    },
+    {
+      "key": "windows.imports.name",
+      "table": null,
+      "en": "Name",
+      "zh-Hans": "名称"
+    },
+    {
+      "key": "windows.imports.size",
+      "table": null,
+      "en": "Size",
+      "zh-Hans": "大小"
+    },
+    {
+      "key": "windows.imports.state",
+      "table": null,
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "windows.imports.generation",
+      "table": null,
+      "en": "Generation",
+      "zh-Hans": "代次"
+    },
+    {
+      "key": "windows.imports.created",
+      "table": null,
+      "en": "Created",
+      "zh-Hans": "创建时间"
+    },
+    {
+      "key": "windows.imports.artifact",
+      "table": null,
+      "en": "Artifact",
+      "zh-Hans": "Artifact"
+    },
+    {
+      "key": "windows.imports.digest",
+      "table": null,
+      "en": "Artifact digest",
+      "zh-Hans": "Artifact 摘要"
+    },
+    {
+      "key": "windows.imports.mediaType",
+      "table": null,
+      "en": "Media type",
+      "zh-Hans": "媒体类型"
+    },
+    {
+      "key": "windows.imports.privacy",
+      "table": null,
+      "en": "Privacy",
+      "zh-Hans": "隐私级别"
+    },
+    {
+      "key": "windows.imports.release",
+      "table": null,
+      "en": "Release…",
+      "zh-Hans": "释放…"
+    },
+    {
+      "key": "windows.imports.release.title",
+      "table": null,
+      "en": "Release this Import?",
+      "zh-Hans": "释放这个导入？"
+    },
+    {
+      "key": "windows.imports.release.message",
+      "table": null,
+      "en": "The Runtime releases Import %1$@ (generation %2$@). A Job can no longer use its Artifact.",
+      "zh-Hans": "Runtime 会释放导入 %1$@（代次 %2$@），之后 Job 不能再使用它的 Artifact。"
+    },
+    {
+      "key": "windows.imports.release.confirm",
+      "table": null,
+      "en": "Release",
+      "zh-Hans": "释放"
+    },
+    {
+      "key": "windows.imports.release.done",
+      "table": null,
+      "en": "Released.",
+      "zh-Hans": "已释放。"
+    },
+    {
+      "key": "windows.imports.release.failed",
+      "table": null,
+      "en": "The Import was not released",
+      "zh-Hans": "导入未释放"
+    },
+    {
+      "key": "windows.agents.action.id",
+      "table": null,
+      "en": "Human action",
+      "zh-Hans": "人工操作"
+    },
+    {
+      "key": "windows.imports.id",
+      "table": null,
+      "en": "Import",
+      "zh-Hans": "导入"
+    },
+    {
+      "key": "windows.imports.sha256",
+      "table": null,
+      "en": "SHA-256",
+      "zh-Hans": "SHA-256"
+    },
+    {
+      "key": "windows.navigation.debug",
+      "table": null,
+      "en": "Debug",
+      "zh-Hans": "调试"
+    },
+    {
+      "key": "windows.debug.remote.unavailable",
+      "table": null,
+      "en": "Remote build servers are configured in the macOS App's Settings; the Windows App has none yet. Choose a local library.",
+      "zh-Hans": "远程构建服务器在 macOS App 的设置中配置；Windows App 暂无。请选择本地库。"
+    },
+    {
+      "key": "windows.debug.jobs.cancelFailed",
+      "table": null,
+      "en": "Runtime refused the cancellation request",
+      "zh-Hans": "Runtime 拒绝了取消请求"
+    },
+    {
+      "key": "windows.debug.needsTarget",
+      "table": null,
+      "en": "Choose an adopted Target first.",
+      "zh-Hans": "请先选择一个已接管的 Target。"
+    },
+    {
+      "key": "windows.debug.needsInputs",
+      "table": null,
+      "en": "Complete the fields above with valid values first.",
+      "zh-Hans": "请先用有效值填写上面的字段。"
+    },
+    {
+      "key": "windows.debug.operationUnavailable",
+      "table": null,
+      "en": "The Runtime cannot run this operation now; the reasons are shown above.",
+      "zh-Hans": "Runtime 当前无法运行此操作，原因见上方。"
+    },
+    {
+      "key": "windows.debug.busy",
+      "table": null,
+      "en": "A Job of this tab is running; wait for it or stop it first.",
+      "zh-Hans": "此标签页有 Job 正在运行；请等待其结束或先停止它。"
+    },
+    {
+      "key": "windows.debug.running",
+      "table": null,
+      "en": "Running %@",
+      "zh-Hans": "正在运行 %@"
+    },
+    {
+      "key": "windows.debug.selectedTab",
+      "table": null,
+      "en": "%@ tab",
+      "zh-Hans": "%@ 标签页"
     }
   ]
 }

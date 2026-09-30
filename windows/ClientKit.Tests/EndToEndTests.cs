@@ -11,7 +11,8 @@ namespace ArkDeck.ClientKit.Tests;
 /// the host-trusted development certificate (<c>rust/scripts/windows-dev-identity.ps1</c>,
 /// design §L.1 item 22) exactly as <c>rust/scripts/check-readonly.py</c>'s
 /// <c>signed_windows_matrix</c> signs its copy: the client checks the pinned image path and
-/// the pinned signer; nothing skips the check. Needs <c>ARKDECK_DEV_SIGNER_THUMBPRINT</c>
+/// the pinned signer; nothing skips the check. The same daemon is refused under a production
+/// publisher pin (maintainer ruling 17) and accepted under the development pin. Needs <c>ARKDECK_DEV_SIGNER_THUMBPRINT</c>
 /// (process environment or HKCU\Environment), PowerShell 7 and a built daemon
 /// (<c>ARKDECK_CLIENTKIT_DAEMON</c>, else <c>rust/target/debug/arkdeck-agentd.exe</c>);
 /// otherwise it is reported as skipped (inconclusive) with the missing input.
@@ -76,6 +77,29 @@ public sealed class EndToEndTests
                 Assert.AreEqual(DaemonUnavailableReason.InstanceMismatch, refused.Failure?.Reason, wrong.ToString());
                 Assert.IsNull(refused.Value);
             }
+
+            // Maintainer ruling 17. The development chain is trusted but does not end at the
+            // Artifact Signing root, so a production publisher pin alone refuses it, whatever
+            // organisation it names; a partial publisher identity refuses even beside the
+            // right development pin.
+            const string profileEku = "1.3.6.1.4.1.311.97.990309390.766961637.194916062.941502583";
+            foreach (var production in new[]
+            {
+                new DaemonIdentity(signed, PublisherOrganization: "ArkDeck Development Daemon (host-trusted only)", PublisherEku: profileEku),
+                new DaemonIdentity(signed, PublisherOrganization: "Contoso Ltd", PublisherEku: profileEku),
+                new DaemonIdentity(signed, pin, PublisherOrganization: "Contoso Ltd"),
+                new DaemonIdentity(signed, pin, PublisherEku: profileEku),
+            })
+            {
+                var refused = await new ControlSession(endpoint, production, TimeSpan.FromSeconds(10)).HealthAsync();
+                Assert.AreEqual(DaemonUnavailableReason.InstanceMismatch, refused.Failure?.Reason, production.ToString());
+                Assert.IsNull(refused.Value);
+            }
+            // A publisher identity configured beside the development pin changes nothing for
+            // the development signer.
+            var both = await new ControlSession(endpoint, new DaemonIdentity(signed, pin, PublisherOrganization: "Contoso Ltd", PublisherEku: profileEku),
+                TimeSpan.FromSeconds(10)).HealthAsync();
+            Assert.IsTrue(both.Succeeded, both.Failure?.Message);
         }
         finally
         {
