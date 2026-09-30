@@ -2865,7 +2865,10 @@ impl HostServices for Host {
             })?
             .register_hdc(std::path::Path::new(source), &utc_now())
     }
-    #[cfg(target_os = "macos")]
+    /// On macOS and Windows: the Trace cache owner purges inactive derived
+    /// databases while the Job owner holds its active-Session census and the
+    /// Artifact owner its Trace retention census.
+    #[cfg(any(target_os = "macos", windows))]
     fn trace_cache_purge(&self) -> Result<serde_json::Value, WireError> {
         // An unconfigured owner is a deterministic refusal with zero dispatch,
         // the same answer `trace.cache.status` gives; `outcomeUnknown` is
@@ -2895,21 +2898,6 @@ impl HostServices for Host {
                 .map_err(|_| refuse())?
         })
         .map_err(|_| refuse())
-    }
-    /// The macOS owner's answers without its retention owners: the Job
-    /// owner's active-Session census and the Artifact owner's Trace retention
-    /// are not asked on Windows yet, so nothing can prove that no Job's
-    /// Session still needs the derived data. The purge is refused before admission,
-    /// with zero dispatch (ruling 18), and nothing is purged. Without the
-    /// Trace cache owner itself it is `rejected`, as `trace.cache.status` is.
-    #[cfg(windows)]
-    fn trace_cache_purge(&self) -> Result<serde_json::Value, WireError> {
-        self.trace_cache.as_ref().ok_or_else(|| WireError {
-            code: "rejected".into(),
-            message: "Trace cache owner is not configured".into(),
-            details: None,
-        })?;
-        Err(arkdeck_hoststore::TraceCacheStore::purge_unavailable())
     }
     #[cfg(any(target_os = "macos", windows))]
     fn trace_cache_status(&self) -> Result<serde_json::Value, WireError> {
