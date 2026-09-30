@@ -6,6 +6,8 @@
     "button": "Button",
     "list": "List",
     "listItem": "ListItem",
+    "radioButton": "RadioButton",
+    "comboBox": "ComboBox",
     "banner": "StatusBar"
   },
   "snapshots": [
@@ -419,6 +421,88 @@
         {"automationId": "history.evidence.authority", "origin": "macos", "role": "text", "name": ["defaultReadOnlyPolicy"]},
         {"automationId": "history.evidence.terminalState", "origin": "macos", "role": "text", "name": ["@history.state.succeeded"]},
         {"automationId": "history.evidence.steps", "origin": "macos", "role": "text", "name": ["probeHostTool · probeHDCServer · probeDevice"]}
+      ]
+    },
+    {
+      "id": "agents.jobs",
+      "scenario": "jobs",
+      "page": "agents",
+      "steps": [{"select": "agents.humanAction.<har-3>"}],
+      "elements": [
+        {"automationId": "agents.title", "origin": "windows", "role": "text", "name": ["@windows.navigation.agents"]},
+        {"automationId": "agents.refresh", "origin": "windows", "role": "button", "name": ["@settings.common.refresh"]},
+        {"automationId": "agents.subtitle", "origin": "windows", "role": "text", "name": ["@windows.agents.subtitle"]},
+        {"automationId": "agents.humanActions.title", "origin": "windows", "role": "text", "name": ["@windows.agents.humanActions"]},
+        {"automationId": "agents.humanActions", "origin": "windows", "role": "list", "name": ["@windows.agents.humanActions"]},
+        {"automationId": "agents.humanAction.<har-1>", "origin": "windows", "role": "listItem", "name": ["<har-1>, "], "match": "prefix"},
+        {"automationId": "agents.humanAction.<har-3>", "origin": "windows", "role": "listItem", "name": ["<har-3>, "], "match": "prefix"},
+        {"automationId": "agents.executions.title", "origin": "windows", "role": "text", "name": ["@windows.agents.executions"]},
+        {"automationId": "agents.list", "origin": "windows", "role": "list", "name": ["@windows.agents.executions"]},
+        {"automationId": "agents.row.har-ambiguous", "origin": "windows", "role": "listItem", "name": ["har-ambiguous, ", {"format": "windows.agents.row", "args": ["observe.device@1", "waitingForHuman"]}]},
+        {"automationId": "agents.row.har-completed", "origin": "windows", "role": "listItem", "name": ["har-completed, ", {"format": "windows.agents.row", "args": ["observe.device@1", "completed"]}]},
+        {"automationId": "agents.detail.title", "origin": "windows", "role": "text", "name": ["har-ambiguous"]},
+        {"automationId": "agents.detail.state", "origin": "windows", "role": "text", "name": ["waitingForHuman"]},
+        {"automationId": "agents.action.title", "origin": "macos", "role": "text", "name": ["@jobRecovery.humanRequired.title"]},
+        {"automationId": "agents.action.id", "origin": "windows", "role": "text", "name": ["<har-3>"]},
+        {"automationId": "agents.action.category", "origin": "windows", "role": "text", "name": ["ambiguousIdentity"]},
+        {"automationId": "agents.action.choice.<candidate-1>", "origin": "windows", "role": "radioButton", "name": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]},
+        {"automationId": "agents.action.choice.<candidate-2>", "origin": "windows", "role": "radioButton", "name": ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]},
+        {"automationId": "agents.action.resume", "origin": "windows", "role": "button", "name": ["@windows.agents.action.resume"]},
+        {"automationId": "agents.abandon", "origin": "windows", "role": "button", "name": ["@windows.agents.abandon"]},
+        {"automationId": "agents.status", "origin": "windows", "role": "text", "name": [""], "live": "polite"}
+      ]
+    },
+    {
+      "id": "agents.foundation",
+      "scenario": "foundation",
+      "page": "agents",
+      "elements": [
+        {"automationId": "agents.humanActions.unavailable", "origin": "windows", "role": "text", "name": ["@windows.agents.humanActions.unavailable"]},
+        {"automationId": "agents.humanActions.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["operationUnavailable", "AgentExecution owner is unavailable"]}]},
+        {"automationId": "agents.humanActions.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck human-action list"]}]},
+        {"automationId": "agents.unavailable", "origin": "windows", "role": "text", "name": ["@windows.agents.unavailable"]},
+        {"automationId": "agents.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["operationUnavailable", "AgentExecution owner is unavailable"]}]},
+        {"automationId": "agents.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck agent list"]}]},
+        {"automationId": "agents.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"]}
+      ]
+    },
+    {
+      "id": "imports.jobs",
+      "scenario": "jobs",
+      "page": "imports",
+      "steps": [{"select": "imports.row.imp-dcb7943f-d934-43da-b290-65d0066cae35"}],
+      "elements": [
+        {"automationId": "imports.title", "origin": "windows", "role": "text", "name": ["@windows.navigation.imports"]},
+        {"automationId": "imports.refresh", "origin": "windows", "role": "button", "name": ["@settings.common.refresh"]},
+        {"automationId": "imports.subtitle", "origin": "windows", "role": "text", "name": ["@windows.imports.subtitle"]},
+        {"automationId": "imports.new.title", "origin": "windows", "role": "text", "name": ["@windows.imports.new"]},
+        {"automationId": "imports.kind", "origin": "windows", "role": "comboBox", "name": ["@windows.imports.kind"]},
+        {"automationId": "imports.target", "origin": "windows", "role": "comboBox", "name": ["@windows.imports.target"]},
+        {"automationId": "imports.file.label", "origin": "windows", "role": "text", "name": ["@windows.imports.file"]},
+        {"automationId": "imports.file", "origin": "windows", "role": "text", "name": ["@windows.imports.noFile"]},
+        {"automationId": "imports.chooseFile", "origin": "windows", "role": "button", "name": ["@windows.imports.chooseFile"]},
+        {"automationId": "imports.start", "origin": "windows", "role": "button", "name": ["@windows.imports.start"]},
+        {"automationId": "imports.status", "origin": "windows", "role": "text", "name": [""], "live": "polite"},
+        {"automationId": "imports.list", "origin": "windows", "role": "list", "name": ["@windows.imports.list"]},
+        {"automationId": "imports.row.imp-dcb7943f-d934-43da-b290-65d0066cae35", "origin": "windows", "role": "listItem", "name": ["fixture.hap, hap · committed · ", {"format": "windows.bytes", "args": ["4096"]}]},
+        {"automationId": "imports.detail.title", "origin": "windows", "role": "text", "name": ["fixture.hap"]},
+        {"automationId": "imports.detail.state", "origin": "windows", "role": "text", "name": ["committed"]},
+        {"automationId": "imports.detail.size", "origin": "windows", "role": "text", "name": [{"format": "windows.bytes", "args": ["4096"]}]},
+        {"automationId": "imports.detail.sha256", "origin": "windows", "role": "text", "name": ["399a301718f951e835b8630ac1666120b96eefb28da9e37f568596a227a9b67a"]},
+        {"automationId": "imports.detail.artifact", "origin": "windows", "role": "text", "name": ["ART-"], "match": "prefix"},
+        {"automationId": "imports.detail.privacy", "origin": "windows", "role": "text", "name": ["standard"]},
+        {"automationId": "imports.release", "origin": "windows", "role": "button", "name": ["@windows.imports.release"]}
+      ]
+    },
+    {
+      "id": "imports.foundation",
+      "scenario": "foundation",
+      "page": "imports",
+      "elements": [
+        {"automationId": "imports.unavailable", "origin": "windows", "role": "text", "name": ["@windows.imports.unavailable"]},
+        {"automationId": "imports.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["operationUnavailable", "Import owner services are unavailable"]}]},
+        {"automationId": "imports.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck artifact import list"]}]},
+        {"automationId": "imports.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"]}
       ]
     }
   ]
