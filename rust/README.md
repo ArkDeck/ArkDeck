@@ -626,9 +626,10 @@ for the account, over `%LOCALAPPDATA%\ArkDeck\Trace	races` (beside its
 the daemon creates owner-only because the App, the daemon and the CLI share
 one physical `%LOCALAPPDATA%` (ruling 8; the account-location decision in
 `runs/TASK-XPA-005/windows-account-locations-run.md`); `trace.cache.status`
-answers there, and `trace.cache.purge` is refused
-as the macOS daemon refuses it without its retention owners: the Job owner's
-active-Session census is not asked on Windows yet. `trace export` is the
+answers there, and `trace.cache.purge` purges as on macOS, while the Job
+owner holds its active-Session census and the Artifact owner its Trace
+retention census (TASK-XPA-018, `runs/TASK-XPA-018/windows-non-hdc-leaves-run.md`).
+`trace export` is the
 Artifact export path of TASK-XPA-006 and needs nothing Windows-specific beyond
 it; the daemon's Job store proves the Trace's Job first, and refuses a Job it
 does not hold (`resourceNotFound`).
