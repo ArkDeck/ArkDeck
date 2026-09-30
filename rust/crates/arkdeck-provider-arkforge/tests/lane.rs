@@ -15,8 +15,17 @@
 //! No daemon, board or USB host is involved; nothing here is device evidence.
 //! A custom harness (`harness = false`), because the daemon role must run
 //! before any test framework reads the arguments.
+//!
+//! On Windows (TASK-XPA-010) the stand-in is `bin/arkforged.exe` of the
+//! bundle, and it serves ArkForge's own named pipes (`arkforge-platform`'s
+//! listener, the transport `arkforged.exe` serves) instead of socket files.
+//! Windows has no TERM: the owner's stop is the end of input, then the
+//! stand-in's Job terminated half a second later, so the stop-order
+//! stand-ins are the two that end, or not, at their end of input. A pipe a
+//! live process already serves stands where the stale socket stands on
+//! macOS: the lane launches nothing rather than reach that process.
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod lane {
     use arkdeck_contract::sha256_hex;
     use arkdeck_provider_arkforge::{
@@ -25,10 +34,15 @@ mod lane {
     use arkforge_ipc::framing::{read_frame, write_frame};
     use arkforge_ipc::messages::{ErrorBody, Hello, HelloAck, Request, Response};
     use arkforge_ipc::{Api, PROTOCOL_MAJOR, PROTOCOL_MINOR, SessionKind, Status};
+    #[cfg(windows)]
+    use arkforge_platform::{LocalChannel, LocalEndpoint, LocalListener, LocalStream};
     use serde_json::json;
     use std::io::{Read, Write};
+    #[cfg(unix)]
     use std::os::fd::AsFd;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+    #[cfg(unix)]
     use std::os::unix::net::{UnixListener, UnixStream};
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -38,10 +52,24 @@ mod lane {
     const AGENTD: &str = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
     const HDC: &str = "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2";
     /// The stand-ins of the owner's stop (`stop_order`).
+    #[cfg(unix)]
     const STOP_ORDER: [&str; 3] = ["ends-at-eof", "outlasts-eof", "ignores-term"];
+    /// On Windows, the stand-ins of the owner's stop (`stop_order`).
+    #[cfg(windows)]
+    const STOP_ORDER: [&str; 2] = ["ends-at-eof", "outlasts-eof"];
     /// The half second the owner's stop gives TERM before KILL, as Swift's
-    /// `stopDaemonProcessGroup` does.
+    /// `stopDaemonProcessGroup` does; on Windows, the half second the end of
+    /// input has before the Job is terminated.
     const TERM_GRACE: Duration = Duration::from_millis(500);
+    /// Where the bundle holds the stand-in daemon and the CLI.
+    #[cfg(unix)]
+    const DAEMON_MEMBER: &str = "Contents/MacOS/arkforged";
+    #[cfg(unix)]
+    const CLI_MEMBER: &str = "Contents/MacOS/arkforge";
+    #[cfg(windows)]
+    const DAEMON_MEMBER: &str = "bin/arkforged.exe";
+    #[cfg(windows)]
+    const CLI_MEMBER: &str = "bin/arkforge.exe";
 
     // MARK: the stand-in daemon
 
@@ -63,6 +91,7 @@ mod lane {
             .to_owned();
         // Caught from the start, so that a stop-order stand-in notes TERM;
         // every other one keeps the ignore its launch gave it.
+        #[cfg(unix)]
         let stop = STOP_ORDER
             .contains(&mode.as_str())
             .then(|| arkdeck_platform::StopSignal::install().unwrap());
@@ -81,6 +110,7 @@ mod lane {
             std::process::exit(3);
         }
         let digest = sha256_hex(&std::fs::read(std::env::current_exe().unwrap()).unwrap());
+        #[cfg(unix)]
         for (name, kind) in [
             ("public.sock", SessionKind::Public),
             ("controller.sock", SessionKind::Controller),
@@ -94,8 +124,29 @@ mod lane {
                 }
             });
         }
+        // ArkForge's own pipes for this runtime directory, public first.
+        #[cfg(windows)]
+        for (channel, kind) in [
+            (LocalChannel::Public, SessionKind::Public),
+            (LocalChannel::Controller, SessionKind::Controller),
+        ] {
+            let mut listener =
+                LocalListener::bind(&LocalEndpoint::for_runtime(&runtime, channel)).unwrap();
+            let (mode, digest) = (mode.clone(), digest.clone());
+            std::thread::spawn(move || {
+                while let Ok(stream) = listener.accept() {
+                    let (mode, digest) = (mode.clone(), digest.clone());
+                    std::thread::spawn(move || serve(stream, kind, &mode, &digest));
+                }
+            });
+        }
+        #[cfg(unix)]
         if let Some(stop) = stop {
             stop_order(&runtime.join("events"), &mode, &stop);
+        }
+        #[cfg(windows)]
+        if STOP_ORDER.contains(&mode.as_str()) {
+            stop_order(&runtime.join("events"), &mode);
         }
         // Its owner's end of input, and nothing else, ends it.
         let mut rest = Vec::new();
@@ -114,6 +165,7 @@ mod lane {
     ///   that input had already ended, then exits 21.
     /// - `ignores-term` records the same at TERM and keeps running, so only
     ///   KILL can end it.
+    #[cfg(unix)]
     fn stop_order(events: &Path, mode: &str, stop: &arkdeck_platform::StopSignal) -> ! {
         if mode == "ends-at-eof" {
             let mut rest = Vec::new();
@@ -149,10 +201,31 @@ mod lane {
     /// The pipe is made nonblocking through std's socket door, whose
     /// `set_nonblocking` sets `O_NONBLOCK` on any descriptor; this crate
     /// forbids the unsafe `fcntl`.
+    #[cfg(unix)]
     fn input_ended() -> bool {
         let duplicate = || std::io::stdin().as_fd().try_clone_to_owned().unwrap();
         UnixStream::from(duplicate()).set_nonblocking(true).unwrap();
         matches!(std::fs::File::from(duplicate()).read(&mut [0u8; 1]), Ok(0))
+    }
+
+    /// The owner's stop as a Windows stand-in meets it, which has no TERM:
+    ///
+    /// - `ends-at-eof` watches its input, as `arkforged` does, and exits 11 at
+    ///   its end.
+    /// - `outlasts-eof` records its end of input and keeps running, so only
+    ///   the termination of its Job, half a second later, ends it.
+    #[cfg(windows)]
+    fn stop_order(events: &Path, mode: &str) -> ! {
+        let mut rest = Vec::new();
+        let _ = std::io::stdin().read_to_end(&mut rest);
+        record(events, "eof", "");
+        if mode == "ends-at-eof" {
+            record(events, "exit", "11");
+            std::process::exit(11);
+        }
+        loop {
+            std::thread::park();
+        }
     }
 
     fn record(events: &Path, event: &str, detail: &str) {
@@ -169,7 +242,7 @@ mod lane {
             .unwrap();
     }
 
-    fn serve(mut stream: UnixStream, kind: SessionKind, mode: &str, digest: &str) {
+    fn serve(mut stream: impl Read + Write, kind: SessionKind, mode: &str, digest: &str) {
         let Ok(Some(frame)) = read_frame(&mut stream) else {
             return;
         };
@@ -243,7 +316,13 @@ mod lane {
         /// DeviceProfile declaring `profile_id` and naming `mode`.
         fn new(profile_id: &str, mode: &str) -> Self {
             static NEXT: AtomicUsize = AtomicUsize::new(0);
-            let root = PathBuf::from("/private/tmp").join(format!(
+            #[cfg(unix)]
+            let temporary = PathBuf::from("/private/tmp");
+            // Canonical (`\\?\` spelled), as the lane's child's working
+            // directory is.
+            #[cfg(windows)]
+            let temporary = std::env::temp_dir().canonicalize().unwrap();
+            let root = temporary.join(format!(
                 "adln-{}-{}",
                 std::process::id(),
                 NEXT.fetch_add(1, Ordering::Relaxed)
@@ -251,22 +330,18 @@ mod lane {
             let bundle = root.join("ArkForge.bundle");
             let runtime = root.join("run");
             for directory in [
-                bundle.join("Contents/MacOS"),
+                bundle.join(Path::new(DAEMON_MEMBER).parent().unwrap()),
                 bundle.join("Contents/Resources/profiles"),
                 runtime.clone(),
             ] {
                 std::fs::create_dir_all(directory).unwrap();
             }
+            #[cfg(unix)]
             std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
             let members = [
+                (CLI_MEMBER, b"#!/bin/sh\nexit 0\n".to_vec(), "cli", None),
                 (
-                    "Contents/MacOS/arkforge",
-                    b"#!/bin/sh\nexit 0\n".to_vec(),
-                    "cli",
-                    None,
-                ),
-                (
-                    "Contents/MacOS/arkforged",
+                    DAEMON_MEMBER,
                     std::fs::read(std::env::current_exe().unwrap()).unwrap(),
                     "daemon",
                     None,
@@ -285,6 +360,7 @@ mod lane {
             let mut manifest = Vec::new();
             for (path, bytes, role, profile) in &members {
                 std::fs::write(bundle.join(path), bytes).unwrap();
+                #[cfg(unix)]
                 std::fs::set_permissions(bundle.join(path), std::fs::Permissions::from_mode(0o755))
                     .unwrap();
                 manifest.push(json!({"path": path, "sha256": sha256_hex(bytes),
@@ -321,8 +397,19 @@ mod lane {
         }
 
         /// Whether anything still serves this socket.
+        #[cfg(unix)]
         fn serving(&self, name: &str) -> bool {
             UnixStream::connect(self.runtime.join(name)).is_ok()
+        }
+
+        /// Whether anything still serves the pipe of this socket's channel.
+        #[cfg(windows)]
+        fn serving(&self, name: &str) -> bool {
+            let channel = match name {
+                "public.sock" => LocalChannel::Public,
+                _ => LocalChannel::Controller,
+            };
+            LocalStream::connect(&LocalEndpoint::for_runtime(&self.runtime, channel)).is_ok()
         }
 
         /// Whether the stand-in this scene launched has ended: the lock it
@@ -334,6 +421,7 @@ mod lane {
         }
 
         /// The stand-in's own PID, as it recorded it.
+        #[cfg(unix)]
         fn pid(&self) -> i32 {
             std::fs::read_to_string(self.runtime.join("pid"))
                 .unwrap()
@@ -370,6 +458,7 @@ mod lane {
         /// Nothing of the stand-in is left: its PID names no process, no
         /// process runs with this scene's runtime directory among its
         /// arguments, and its lifelong lock is free.
+        #[cfg(unix)]
         fn nothing_left(&self, pid: i32) {
             assert!(
                 arkdeck_platform::process_argument_record(pid).is_none(),
@@ -385,6 +474,19 @@ mod lane {
                 String::from_utf8_lossy(&running.stdout)
             );
             assert!(self.ended(), "the stand-in's lock is still held");
+        }
+
+        /// Nothing of the stand-in is left: its lifelong lock is free, which
+        /// the kernel lets go of only when the process has ended, and no
+        /// process serves either of its pipes.
+        #[cfg(windows)]
+        fn nothing_left(&self) {
+            assert!(self.ended(), "the stand-in's lock is still held");
+            assert!(!self.serving("public.sock"), "its public pipe is served");
+            assert!(
+                !self.serving("controller.sock"),
+                "its controller pipe is served"
+            );
         }
     }
 
@@ -467,6 +569,7 @@ mod lane {
         assert!(lane.stop().is_none(), "one generation stops once");
     }
 
+    #[cfg(unix)]
     fn a_stale_socket_is_never_taken_for_the_new_daemon() {
         let scene = Scene::new("org.openharmony.dayu200", "ready");
         // A previous generation's socket file, which nothing serves.
@@ -475,6 +578,29 @@ mod lane {
         let lane = scene.compose().unwrap();
         assert!(scene.serving("controller.sock"));
         lane.stop();
+    }
+
+    /// A pipe another process still serves — a previous generation left
+    /// running — is never taken for the new daemon's: nothing is launched,
+    /// and nothing of the new daemon's pairing exists.
+    #[cfg(windows)]
+    fn a_served_runtime_directory_is_never_taken_for_the_new_daemon() {
+        let scene = Scene::new("org.openharmony.dayu200", "ready");
+        let mut listener = LocalListener::bind(&LocalEndpoint::for_runtime(
+            &scene.runtime,
+            LocalChannel::Public,
+        ))
+        .unwrap();
+        // It accepts each session and closes it during the handshake.
+        std::thread::spawn(move || while listener.accept().is_ok() {});
+        assert!(
+            unavailable(scene.compose())
+                .starts_with("another process already serves the ArkForge runtime directory ")
+        );
+        for name in ["paired", "pid", "alive"] {
+            assert!(!scene.runtime.join(name).exists(), "{name}");
+        }
+        assert!(!scene.serving("controller.sock"));
     }
 
     fn a_daemon_that_is_not_ready_is_stopped_and_refused() {
@@ -541,7 +667,7 @@ mod lane {
              or malformed"
         );
         // A daemon whose bytes changed after they were measured never runs.
-        let daemon = scene.bundle.join("Contents/MacOS/arkforged");
+        let daemon = scene.bundle.join(DAEMON_MEMBER);
         let mut bytes = std::fs::read(&daemon).unwrap();
         bytes.extend_from_slice(b"changed");
         std::fs::write(&daemon, bytes).unwrap();
@@ -559,6 +685,7 @@ mod lane {
         for name in ["paired", "public.sock", "controller.sock"] {
             assert!(!scene.runtime.join(name).exists(), "{name}");
         }
+        assert!(!scene.serving("controller.sock"));
     }
 
     // A lane dropped without its stop — as a daemon that ends without its
@@ -569,6 +696,7 @@ mod lane {
 
     /// A daemon that ends at its end of input, as `arkforged` does, ends
     /// there with its own status, whatever the TERM that follows does.
+    #[cfg(unix)]
     fn a_dropped_lane_ends_a_daemon_at_its_end_of_input() {
         let scene = Scene::new("org.openharmony.dayu200", "ends-at-eof");
         let lane = scene.compose().unwrap();
@@ -583,6 +711,7 @@ mod lane {
 
     /// A daemon that does not watch its input finds, at its TERM, that the
     /// input has already ended: the end of input comes first.
+    #[cfg(unix)]
     fn a_dropped_lane_sends_term_only_once_the_input_has_ended() {
         let scene = Scene::new("org.openharmony.dayu200", "outlasts-eof");
         let lane = scene.compose().unwrap();
@@ -597,6 +726,7 @@ mod lane {
 
     /// A daemon that outlives its TERM is killed once TERM's half second has
     /// passed, and reaped.
+    #[cfg(unix)]
     fn a_dropped_lane_kills_a_daemon_that_outlives_term_after_its_grace() {
         let scene = Scene::new("org.openharmony.dayu200", "ignores-term");
         let lane = scene.compose().unwrap();
@@ -613,6 +743,44 @@ mod lane {
         scene.nothing_left(pid);
     }
 
+    /// A daemon that ends at its end of input, as `arkforged` does, ends
+    /// there with its own status, before its Job is terminated.
+    #[cfg(windows)]
+    fn a_dropped_lane_ends_a_daemon_at_its_end_of_input() {
+        let scene = Scene::new("org.openharmony.dayu200", "ends-at-eof");
+        let lane = scene.compose().unwrap();
+        let (took, events) = scene.dropped(lane);
+        assert_eq!(
+            seen("ends-at-eof", took, &events),
+            expected(&[("eof", ""), ("exit", "11")])
+        );
+        assert!(
+            took < TERM_GRACE,
+            "the drop waited {took:?} for a daemon that had ended"
+        );
+        scene.nothing_left();
+    }
+
+    /// A daemon that outlives its end of input has its Job terminated once
+    /// that end has had its half second, and nothing of it is left.
+    #[cfg(windows)]
+    fn a_dropped_lane_terminates_a_daemon_that_outlives_its_input_after_its_grace() {
+        let scene = Scene::new("org.openharmony.dayu200", "outlasts-eof");
+        let lane = scene.compose().unwrap();
+        let (took, events) = scene.dropped(lane);
+        assert_eq!(
+            seen("outlasts-eof", took, &events),
+            expected(&[("eof", "")])
+        );
+        assert!(
+            took >= TERM_GRACE,
+            "the drop ended {took:?} after it began, within the input's grace: the Job was \
+             terminated early"
+        );
+        scene.nothing_left();
+    }
+
+    #[cfg(unix)]
     pub fn run() {
         let cases: [(&str, fn()); 8] = [
             (
@@ -648,8 +816,47 @@ mod lane {
                 a_dropped_lane_kills_a_daemon_that_outlives_term_after_its_grace,
             ),
         ];
+        report(&cases);
+    }
+
+    #[cfg(windows)]
+    pub fn run() {
+        let cases: [(&str, fn()); 7] = [
+            (
+                "a_bundle_composes_one_paired_ready_daemon_that_ends_with_its_owner",
+                a_bundle_composes_one_paired_ready_daemon_that_ends_with_its_owner,
+            ),
+            (
+                "a_served_runtime_directory_is_never_taken_for_the_new_daemon",
+                a_served_runtime_directory_is_never_taken_for_the_new_daemon,
+            ),
+            (
+                "a_daemon_that_is_not_ready_is_stopped_and_refused",
+                a_daemon_that_is_not_ready_is_stopped_and_refused,
+            ),
+            (
+                "a_daemon_that_never_opens_its_socket_is_stopped_and_refused",
+                a_daemon_that_never_opens_its_socket_is_stopped_and_refused,
+            ),
+            (
+                "nothing_is_launched_before_the_profile_and_the_authority_are_proved",
+                nothing_is_launched_before_the_profile_and_the_authority_are_proved,
+            ),
+            (
+                "a_dropped_lane_ends_a_daemon_at_its_end_of_input",
+                a_dropped_lane_ends_a_daemon_at_its_end_of_input,
+            ),
+            (
+                "a_dropped_lane_terminates_a_daemon_that_outlives_its_input_after_its_grace",
+                a_dropped_lane_terminates_a_daemon_that_outlives_its_input_after_its_grace,
+            ),
+        ];
+        report(&cases);
+    }
+
+    fn report(cases: &[(&str, fn())]) {
         let mut failed = 0;
-        for (name, case) in cases {
+        for &(name, case) in cases {
             match std::panic::catch_unwind(case) {
                 Ok(()) => println!("test {name} ... ok"),
                 Err(_) => {
@@ -673,7 +880,7 @@ mod lane {
 }
 
 fn main() {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     {
         let arguments: Vec<String> = std::env::args().collect();
         if arguments

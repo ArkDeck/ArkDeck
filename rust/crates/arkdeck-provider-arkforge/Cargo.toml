@@ -20,6 +20,12 @@ arkforge-ipc.workspace = true
 [dev-dependencies]
 serde_json.workspace = true
 
+# The Windows stand-in `arkforged` serves ArkForge's own named pipes, as
+# `arkforged.exe` does (TASK-XPA-010). A test-only edge: the lane itself
+# reaches ArkForge only through its client crate.
+[target.'cfg(windows)'.dev-dependencies]
+arkforge-platform.workspace = true
+
 # The lane launches this test binary as its stand-in `arkforged`, which must
 # take the daemon role before any test framework reads the arguments.
 [[test]]
