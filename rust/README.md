@@ -76,7 +76,13 @@ New targets default to that queue. Custom harnesses and doctests still run;
 either queue or doctest failure fails the lane. The `rust-test-timings-xcode-27`
 artifact records compilation, queue and doctest durations and complete logs for
 the checkout, and `rust-contract-test-timings-xcode-27` for the published and
-candidate views. Run `python scripts/test_ci_execution.py` to verify
+candidate views. With one worker (Windows and Linux CI, and local runs) the
+same script asks Cargo for every default target except the integration tests
+whose crate-level `#![cfg(...)]` is false on this host (`rustc --print cfg`),
+which would build to harnesses that run nothing; a cfg it cannot decide fails
+the run, and every kept target must appear in Cargo's `Running` lines. Clippy
+`--all-targets` still checks every target on every host. Run
+`python scripts/test_ci_execution.py` to verify
 the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
 
 The two added CLI targets (`domain_leaves` and `runtime_service`) use random
