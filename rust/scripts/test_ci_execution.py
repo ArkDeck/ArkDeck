@@ -159,7 +159,8 @@ class WorkspaceCacheTests(unittest.TestCase):
             self.write("rust/src/lib.rs", "// source-only edit\n")
             self.assertEqual(cache.key(self.source, str(self.root)), original)
             self.assertNotEqual(cache.key(self.source, str(self.root / "other")), original)
-            for variable, value in (("ImageVersion", "image-v2"), ("RUSTFLAGS", "-C debuginfo=0")):
+            for variable, value in (("ImageVersion", "image-v2"), ("RUSTFLAGS", "-C debuginfo=0"),
+                                    ("CARGO_INCREMENTAL", "0")):
                 with patch.dict(os.environ, {variable: value}):
                     self.assertNotEqual(cache.key(self.source, str(self.root)), original)
             with patch.object(cache.subprocess, "check_output", return_value="compiler-v2"):

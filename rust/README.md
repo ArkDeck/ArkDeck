@@ -50,7 +50,11 @@ those two.
 Hosted CI waits for the inexpensive Rust policy job before allocating native
 hosts. `scripts/ci-workspace.py` synchronizes the exact checkout into a stable,
 job-owned source path, preserving mtimes only for identical bytes. The cache
-key includes the compiler, runner image, dependency manifests and build flags;
+key includes the compiler, runner image, dependency manifests and build flags,
+among them `CARGO_INCREMENTAL`: both native jobs set it to `0`, because each
+compiles a target once and compiler incremental state never survives to
+another job (the 2026-09-30 analysis under TASK-XPA-002 measured 1.4 to 1.6 GB
+of it written per Windows workspace job and 4.0 GB on macOS);
 only successful protected-main runs save it, at most once per UTC day for the
 same compatibility key. Before saving, CI removes compiler incremental scratch
 state (not linked products, debug symbols or fingerprints) and records per-view
@@ -2221,6 +2225,27 @@ The development-signed package passes `Get-AuthenticodeSignature` only on a host
 that trusts the development certificate. A clean host needs the production
 signature. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/xcopy-package-run.md`.
+## Windows credential store and console secret entry (TASK-XPA-011)
+
+Gate-inventory group G13's platform layer has Windows implementations in
+`arkdeck-platform` with the macOS names and answers. `KeychainItems` keeps one
+generic credential per item in this user's Credential Manager (`CredWriteW`/
+`CredReadW`/`CredDeleteW`, DPAPI-protected, `CRED_PERSIST_LOCAL_MACHINE`: per
+user, surviving logoff, never roaming) under the target name
+`ArkDeck/<access group>/<service>/<account>`, the macOS item identity; the
+account is also the user name every read checks. An absent credential is
+`Status(CREDENTIAL_NOT_FOUND)` / `Absent` / `Ok(false)` as macOS answers
+`errSecItemNotFound`; values are bounded by Credential Manager's 2560 bytes;
+`presence` has to read the blob (no attribute-only query exists) and wipes it
+in place. `read_terminal_secret` requires a console on stdin, clears echo and
+line input, reads UTF-16 with `ReadConsoleW` into a wiped buffer, and restores
+the mode on every return and, through a console control handler, on Ctrl-C.
+`tests/windows_credential_store.rs` works in a per-run fixture namespace and
+deletes every credential it may have created; `tests/windows_console_secret.rs`
+(`harness = false`) drives the reader in a child on a pseudo console and checks
+that nothing typed is rendered. The signing leaves stay macOS-only (daemon
+identity, file identity, PTY signer). The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-credential-store-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 
