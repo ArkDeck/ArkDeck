@@ -72,6 +72,13 @@ pub use recovery_epoch::{
 mod job_record;
 #[cfg(target_os = "macos")]
 mod job_record_fields;
+// The Job index's SQL. Windows builds it for its tests until the durable
+// host-store primitives the owner needs (G01) and the timestamp order key
+// (G04) reach Windows; macOS composes it through `job_repository`.
+#[cfg(any(target_os = "macos", all(windows, test)))]
+mod job_index;
+#[cfg(all(test, any(target_os = "macos", windows)))]
+mod job_index_tests;
 #[cfg(target_os = "macos")]
 mod job_repository;
 #[cfg(target_os = "macos")]
