@@ -19,10 +19,12 @@ use windows_sys::Win32::System::Threading::*;
 
 mod account;
 mod daemon_start;
+mod deveco_files;
 mod host_fs;
 pub(crate) mod host_store;
 mod identity;
 mod managed;
+mod pinned_file;
 mod process;
 mod pty;
 mod server;
@@ -33,10 +35,17 @@ pub use account::{application_support_directory, arkdeck_application_support_roo
 pub use daemon_start::{
     DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
 };
+pub use deveco_files::{
+    DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
+    DevEcoRoot,
+};
 pub use identity::ImagePin;
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
 pub use managed::ManagedServer;
+pub use pinned_file::{
+    HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file,
+};
 pub(crate) use process::spawn;
 pub use server::LoopbackServerLease;
 pub use state::{
