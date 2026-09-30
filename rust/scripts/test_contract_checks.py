@@ -286,6 +286,17 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual(workspace.main(run=run, generator=contract), 7)
         self.assertEqual(len(calls), 1)
 
+    def test_views_carry_the_code_sign_helper_resource_when_the_checkout_has_it(self):
+        current = contract.working_inputs()
+        candidate = contract.candidate(current, self.commit, self.commit)
+        absent = self.root / "view-without-helper"
+        runner.materialize(absent, current, candidate, self.published_info)
+        self.assertFalse((absent / runner.CODE_SIGN_HELPER).exists())
+        self.write(runner.CODE_SIGN_HELPER, b"\x7fELF helper bytes")
+        view = self.root / "view-with-helper"
+        runner.materialize(view, current, candidate, self.published_info)
+        self.assertEqual((view / runner.CODE_SIGN_HELPER).read_bytes(), b"\x7fELF helper bytes")
+
     def test_candidate_new_keywords_stay_isolated_from_the_published_baseline(self):
         before_pin = contract.BASELINE.read_bytes()
         before_generated = contract.GENERATED.read_bytes()
