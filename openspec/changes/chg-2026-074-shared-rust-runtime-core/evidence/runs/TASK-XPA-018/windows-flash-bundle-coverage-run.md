@@ -7,6 +7,8 @@
 - **Rebase:** rebased onto `e903da6c`, after A1's #2431 (trace cache purge, diagnostics export)
   and #2432. The coverage file was regenerated and the pins substituted on the merged tree, and
   the tests were rerun.
+- **Merge of main:** after #2411 (runtime service coverage), main was merged into the branch. The
+  coverage file was regenerated and the pins substituted again: Windows `implemented` 74 → 75.
 
 ## What was measured
 

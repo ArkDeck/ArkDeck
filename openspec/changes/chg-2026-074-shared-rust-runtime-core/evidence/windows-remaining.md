@@ -1,6 +1,6 @@
 # Remaining Windows work
 
-Updated 2026-10-01 against protected main `e903da6c` (#2432), with this PR's flash-bundle
+Updated 2026-10-01 against protected main `f41eb0c9` (#2411), with this PR's flash-bundle
 coverage (TASK-XPA-018, `runs/TASK-XPA-018/windows-flash-bundle-coverage-run.md`). Phase S is the software;
 phase A is the maintainer's real-host and DAYU200 acceptance (proposal r12, r13: Windows 11 x64
 only), written out in order in `docs/design/cross-platform/windows-phase-a-runbook.md`. The table
@@ -8,7 +8,7 @@ is refreshed once per milestone, in its own docs commit, not in every slice.
 
 | Operations executable on Windows (/30) | Methods the Windows daemon answers (/105) | GJ software-ready on Windows (/5) | GJ real device on Windows (/5, phase A) | CLI coverage `windows: implemented` (/256) | Client pages (/6 + 1 skeleton) | SPK-3 / SPK-4 / SPK-5 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 (`operation.list` names all 30, none `available`) | 73 answered by a composed owner (13 results, 60 owner refusals); 0 non-conforming; 32 no owner | 0 | 0 (rows `WIN-GJ1-001`..`WIN-GJ5-001` registered `NOT_RUN`, #2399) | 71 (69 `partial`, 0 `notImplemented`, 116 unset) | skeleton done (#2365); Device (#2375) and Settings (#2383) built, Sessions and Job results in History (#2393); Debug, Flash, Viewer, Diagnostics open | host rows run, maintainer rows open / WinUI 3 go (provisional) / go |
+| 0 (`operation.list` names all 30, none `available`) | 73 answered by a composed owner (13 results, 60 owner refusals); 0 non-conforming; 32 no owner | 0 | 0 (rows `WIN-GJ1-001`..`WIN-GJ5-001` registered `NOT_RUN`, #2399) | 75 (69 `partial`, 2 `notImplemented`, 110 unset) | skeleton done (#2365); Device (#2375) and Settings (#2383) built, Sessions and Job results in History (#2393); Debug, Flash, Viewer, Diagnostics open | host rows run, maintainer rows open / WinUI 3 go (provisional) / go |
 
 Previous refreshes:
 
@@ -63,7 +63,7 @@ How each number is read and measured:
 - **CLI coverage.** `implementationStatusByPlatform.windows == "implemented"` in
   `openspec/contracts/cli-feature-coverage.json`, generated from
   `rust/crates/arkdeck-cli/src/feature_coverage.rs`.
-  - The 71 are the leaves that need no Runtime (`help`, `commands`, `completion`, the capability
+  - The 75 are the leaves that need no Runtime (`help`, `commands`, `completion`, the capability
     stubs) plus `WINDOWS_MEASURED_LEAVES`:
     - `doctor`, `runtime health`, `operation list|describe|example|validate`;
     - `target list|show|display-name set|clear`;
@@ -77,7 +77,9 @@ How each number is read and measured:
     - `session list|show|pin|unpin|export preview|export apply|cleanup preview|cleanup apply`;
     - `artifact import hap|native-library|workspace-patch|flash-bundle|inspect|list|release|abort`;
     - `recovery cleanup list` and `cleanup-debt list` (#2425);
-    - `trace cache purge` and `diagnostics export` (#2431).
+    - `trace cache purge` and `diagnostics export` (#2431);
+    - `runtime service status|verify|restart|uninstall` (#2411; `install` and `update` are the two
+      `notImplemented`).
   - Each measured leaf is run through the real CLI against a development-signed daemon, over a
     root holding recorded Swift state. Each test also asserts that the leaves it measured are
     `implemented` in the manifest the CLI renders:
