@@ -158,12 +158,18 @@ development certificate is refused as a production publisher, and the three
 samples above yield the identities in the table. No production package was built
 (no Artifact Signing account).
 
-## Not in this slice (open pull request at the base)
+## The pre-launch check (#2344, merged after the first push)
 
-- #2344 (client-started daemon) adds `verify_installed_image`, the pre-launch image
-  check, which calls `verify_signature(&file, &path, pin)` with the certificate pin
-  only. Whichever of #2344 and this change lands second must make that check use
-  `SignerPins::configured(expected)?` and `verify_signature(&file, &path, &pins)`
-  (image pin = signer when it holds, package family otherwise, none configured
-  refuses), so the pre-launch check accepts the same publisher identity; the two
-  do not conflict textually but do not compile together unchanged.
+#2344 merged first; this branch merged `main` and then changed `verify_installed_image`
+(the check before the client starts its daemon) to read `SignerPins::configured`
+before opening anything and to call `verify_signature(&file, &path, &pins)`: a
+signing pin that holds (certificate or publisher identity) gives `ImagePin::Signer`;
+otherwise a configured package family gives `ImagePin::PackageFamily`, proved on the
+running server; otherwise the image is refused. A partial or malformed publisher
+identity refuses the start whatever else is set. The CLI's `installed_identity`
+(`runtime_service_windows.rs`, used by `runtime service status/verify/restart`) reads
+the two publisher inputs as `runtime_endpoint` does. Test:
+`daemon_start::tests::the_pre_launch_check_honours_the_publisher_identity` (partial
+configurations refused and nothing launched; a malformed EKU refused; a complete
+publisher identity the unsigned test image cannot prove refused and nothing launched;
+with a package family beside it, the family is left to the running server).

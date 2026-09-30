@@ -403,7 +403,9 @@ impl ProcessIdentity {
 /// What vouches for an installed daemon image before it runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImagePin {
-    /// The image's Authenticode signer certificate is the pinned one.
+    /// The image's Authenticode signature satisfies a signing pin: the
+    /// development signer's certificate SHA-256 or the production publisher
+    /// identity (maintainer ruling 17).
     Signer,
     /// A package family is pinned; only a running process has one, so it is
     /// proved on the pipe server after the start, never before.
@@ -421,9 +423,14 @@ pub(crate) struct VerifiedImage {
 }
 
 /// Checks the pinned daemon image as a file: an absolute local path, a
-/// regular file, and, when a signer is pinned, a trusted Authenticode
-/// signature by that certificate. No identity configured refuses.
+/// regular file, and, when a signing pin is configured (certificate SHA-256
+/// or publisher identity), a trusted Authenticode signature that satisfies
+/// it; otherwise a package family, proved later on the running server. A
+/// partial or malformed publisher identity, or no identity at all, refuses.
 pub(crate) fn verify_installed_image(expected: &ServerIdentity) -> io::Result<VerifiedImage> {
+    // Read before anything is opened: a partial publisher identity refuses
+    // whatever else is configured (maintainer ruling 17).
+    let pins = SignerPins::configured(expected)?;
     if !expected.executable.is_absolute() {
         return Err(denied("the installed daemon path must be absolute"));
     }
@@ -434,19 +441,18 @@ pub(crate) fn verify_installed_image(expected: &ServerIdentity) -> io::Result<Ve
         .package_family
         .as_deref()
         .is_some_and(|family| !family.is_empty());
-    let pin = match &expected.authenticode_sha256 {
-        Some(pin) => match verify_signature(&file, &path, pin) {
+    let pin = if !pins.is_empty() {
+        match verify_signature(&file, &path, &pins) {
             Ok(()) => ImagePin::Signer,
             Err(_) if family => ImagePin::PackageFamily,
             Err(error) => return Err(error),
-        },
-        None if family => ImagePin::PackageFamily,
-        None => {
-            return Err(denied(
-                "no installed daemon identity is configured (a signer certificate SHA-256 or a \
-                 package family)",
-            ));
         }
+    } else if family {
+        ImagePin::PackageFamily
+    } else {
+        return Err(denied(
+            "no installed daemon identity is configured (a signer certificate SHA-256, a              publisher identity or a package family)",
+        ));
     };
     Ok(VerifiedImage {
         pin,

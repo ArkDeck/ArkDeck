@@ -286,15 +286,17 @@ names a daemon no client starts. Only when that pipe is absent does the client
 take the starters' turn (a named mutex `<guard>.Start` beside the guard, so
 concurrent starters launch one daemon), look at the pipe again, and launch the
 pinned image (`ARKDECK_DAEMON_PATH` or the CLI's sibling). Before launch it checks
-that file: a trusted Authenticode signature by the pinned certificate. A package
-family can only be proved on a running process. With no identity configured,
-nothing is launched. The image is held against replacement while it is launched
+that file: a trusted Authenticode signature that satisfies a configured signing
+pin, the pinned certificate or the publisher identity (maintainer ruling 17). A
+package family can only be proved on a running process. With no identity
+configured, or a publisher identity with only one of its two inputs, nothing is
+launched. The image is held against replacement while it is launched
 detached: `DETACHED_PROCESS`, no console window, no inherited handle and no
 standard streams, the image alone as its argument array, in its own directory,
 with the caller's environment minus `ARKDECK_ENDPOINT`. The client waits up to 20
 seconds for the pipe. It then makes the same check every connection makes: the
-pipe owner SID and the server process's image path and signer pin or package
-family. A process that fails that check is reported with the PID this client
+pipe owner SID and the server process's image path and signer pin, publisher
+identity or package family. A process that fails that check is reported with the PID this client
 started (`runtimeUnavailable`, `details.daemonStart.outcome` `identityRefused`)
 and is never trusted. A daemon that finds the root held exits `already running`,
 and the holder's pipe is used. No frame is sent while starting, and a request
