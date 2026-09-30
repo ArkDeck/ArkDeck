@@ -12,17 +12,31 @@
 use arkdeck_hoststore::NativeRockUsbIdentity;
 use arkdeck_platform::ServerExit;
 use arkdeck_provider_arkforge::{Absence, DaemonStop, Lane, LaneInputs};
+#[cfg(unix)]
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 
 /// `<state>/arkforge`, created owner-only when it is missing. An existing
 /// directory keeps its mode, as Swift's `createDirectory` leaves it.
+#[cfg(unix)]
 pub(crate) fn runtime_directory(state: &Path) -> PathBuf {
     let directory = state.join("arkforge");
     let _ = std::fs::DirBuilder::new()
         .recursive(true)
         .mode(0o700)
         .create(&directory);
+    directory
+}
+
+/// `<state>\arkforge` on Windows (TASK-XPA-010): created with the store's
+/// private DACL when it is missing, best effort; an existing directory keeps
+/// its DACL.
+#[cfg(windows)]
+pub(crate) fn runtime_directory(state: &Path) -> PathBuf {
+    let directory = state.join("arkforge");
+    if std::fs::symlink_metadata(&directory).is_err() {
+        let _ = arkdeck_platform::HostDirectory::open_or_create_private(&directory);
+    }
     directory
 }
 

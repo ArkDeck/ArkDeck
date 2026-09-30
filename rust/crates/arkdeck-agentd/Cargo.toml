@@ -19,8 +19,7 @@ serde_json.workspace = true
 # host-store owner on macOS only.
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 arkdeck-hoststore.workspace = true
-
-[target.'cfg(target_os = "macos")'.dependencies]
+# The ArkForge lane (TASK-XPA-010).
 arkdeck-provider-arkforge.workspace = true
 
 # A stand-in for `arkforged`'s public socket, spoken with ArkForge's own codec.

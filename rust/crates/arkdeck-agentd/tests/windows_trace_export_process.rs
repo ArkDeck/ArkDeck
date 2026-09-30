@@ -539,7 +539,7 @@ fn the_trace_cache_owner_answers_status_and_purges_what_nothing_retains() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess"
                 .to_owned()
         ),
         "{:?}",
