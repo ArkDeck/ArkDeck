@@ -1,0 +1,39 @@
+---
+schema_version: 1.0.0
+change_id: CHG-2026-078-windows-hdc-registration
+change_revision: 1
+platform: windows
+evidence_classes:
+- contract
+- platform
+cases:
+- acceptance_id: WHR-IDENTITY-001
+  test_id: TEST-WHR-IDENTITY-001
+  method: Registry, fixture, profile and lock hash closure for each registered Windows tuple.
+  expected_source: openspec/changes/chg-2026-078-windows-hdc-registration/verification.md#WHR-IDENTITY-001
+  minimum_evidence: platform
+  expected_result: >-
+    Each Windows entry names one hdc.exe by executable SHA-256 and the hdc -v bytes observed with
+    it, and the exact endpoint the Windows listener was observed on. Every registered fixture is a
+    redacted byte file of the maintainer's capture, listed with its SHA-256 in resources.json and
+    the lock, and classifies as its family. A tool, endpoint or output outside the entry is
+    unsupported or unknown.
+- acceptance_id: WHR-SEPARATION-001
+  test_id: TEST-WHR-SEPARATION-001
+  method: macOS registry byte identity plus a cross-platform substitution matrix.
+  expected_source: openspec/changes/chg-2026-078-windows-hdc-registration/verification.md#WHR-SEPARATION-001
+  minimum_evidence: contract
+  expected_result: >-
+    The macOS 3.2.0d readonly, trace, 3.2.0f device-observation and supervisor-observation
+    registries and their resources stay byte-identical. A macOS tuple offered to the Windows
+    registry, and a Windows tuple offered to a macOS registry, are unsupported, and nothing falls
+    back across them.
+- acceptance_id: WHR-PRIVACY-001
+  test_id: TEST-WHR-PRIVACY-001
+  method: Leak scan of every sanitized output and a reviewer's own search for the board serial.
+  expected_source: openspec/changes/chg-2026-078-windows-hdc-registration/verification.md#WHR-PRIVACY-001
+  minimum_evidence: contract
+  expected_result: >-
+    No connect key, USB serial, user path, account or machine name, other USB device identity,
+    or hash of key-bearing raw bytes appears in any committed file; keys and serials are
+    same-length placeholders and every other output byte is unchanged.
