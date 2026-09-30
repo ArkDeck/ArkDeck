@@ -404,6 +404,129 @@
     <value>Interrupted</value>
     <comment>job.state.interrupted (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="device_action_rename" xml:space="preserve">
+    <value>Rename…</value>
+    <comment>device.action.rename (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_title" xml:space="preserve">
+    <value>Rename device</value>
+    <comment>device.rename.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_message" xml:space="preserve">
+    <value>Enter 1–64 characters. This name is shown only in ArkDeck; it does not change the device identity or binding.</value>
+    <comment>device.rename.message (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_field" xml:space="preserve">
+    <value>Device name</value>
+    <comment>device.rename.field (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_commit" xml:space="preserve">
+    <value>Rename</value>
+    <comment>device.rename.commit (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>device.rename.cancel (Localizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_title" xml:space="preserve">
+    <value>Job details</value>
+    <comment>history.detail.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_select" xml:space="preserve">
+    <value>Select a Job to inspect its details. The planned / simulated marker stays with a job permanently, in History and in any export.</value>
+    <comment>history.detail.select (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_loading" xml:space="preserve">
+    <value>Loading Job detail</value>
+    <comment>history.detail.loading (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_reload" xml:space="preserve">
+    <value>Reload details</value>
+    <comment>history.detail.reload (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>history.detail.job (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_operation" xml:space="preserve">
+    <value>Operation</value>
+    <comment>history.detail.operation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>history.detail.target (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_state" xml:space="preserve">
+    <value>State</value>
+    <comment>history.detail.state (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_mode" xml:space="preserve">
+    <value>Execution mode</value>
+    <comment>history.detail.mode (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_created" xml:space="preserve">
+    <value>Created</value>
+    <comment>history.detail.created (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_finished" xml:space="preserve">
+    <value>Finished</value>
+    <comment>history.detail.finished (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_outcomeUnknown" xml:space="preserve">
+    <value>Outcome unknown — this Job's effect on the device was never confirmed.</value>
+    <comment>history.detail.outcomeUnknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_waitingForHuman" xml:space="preserve">
+    <value>Waiting for a person to act.</value>
+    <comment>history.detail.waitingForHuman (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_artifacts" xml:space="preserve">
+    <value>Artifacts</value>
+    <comment>history.detail.artifacts (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_empty" xml:space="preserve">
+    <value>No Artifacts were recorded for this Job.</value>
+    <comment>history.artifacts.empty (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_emptyPlanned" xml:space="preserve">
+    <value>No captured artifacts: a planned job carries only its plan record, by design.</value>
+    <comment>history.artifacts.emptyPlanned (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_export" xml:space="preserve">
+    <value>Export…</value>
+    <comment>history.artifacts.export (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportSensitive" xml:space="preserve">
+    <value>Export sensitive Artifact…</value>
+    <comment>history.artifacts.exportSensitive (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportBoundary" xml:space="preserve">
+    <value>Artifact bytes are read in bounded verified chunks. The selected destination stays in the App and is never sent to Runtime.</value>
+    <comment>history.artifacts.exportBoundary (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportPreview_title" xml:space="preserve">
+    <value>Review Artifact export</value>
+    <comment>history.artifacts.exportPreview.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportPreview_message" xml:space="preserve">
+    <value>Name: %1$@
+Size: %2$@
+Privacy: %3$@
+SHA-256: %4$@</value>
+    <comment>history.artifacts.exportPreview.message (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportConfirm" xml:space="preserve">
+    <value>Choose save location…</value>
+    <comment>history.artifacts.exportConfirm (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>history.artifacts.exportCancel (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exporting" xml:space="preserve">
+    <value>Exporting Artifact</value>
+    <comment>history.artifacts.exporting (HistoryLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime unavailable</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -535,5 +658,141 @@
   <data name="windows_testTransport_message" xml:space="preserve">
     <value>Scripted daemon "%@": nothing on this window comes from ArkDeck Runtime.</value>
     <comment>windows.testTransport.message (Windows only)</comment>
+  </data>
+  <data name="windows_bytes" xml:space="preserve">
+    <value>%@ bytes</value>
+    <comment>windows.bytes (Windows only)</comment>
+  </data>
+  <data name="windows_device_targets_title" xml:space="preserve">
+    <value>Adopted targets</value>
+    <comment>windows.device.targets.title (Windows only)</comment>
+  </data>
+  <data name="windows_device_targets_empty" xml:space="preserve">
+    <value>No device has been adopted yet.</value>
+    <comment>windows.device.targets.empty (Windows only)</comment>
+  </data>
+  <data name="windows_device_targets_unavailable" xml:space="preserve">
+    <value>Adopted targets unavailable</value>
+    <comment>windows.device.targets.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_select" xml:space="preserve">
+    <value>Select an adopted target to see its details.</value>
+    <comment>windows.device.target.select (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_detail_unavailable" xml:space="preserve">
+    <value>Target details unavailable</value>
+    <comment>windows.device.target.detail.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_adoptedAt" xml:space="preserve">
+    <value>Adopted at</value>
+    <comment>windows.device.target.adoptedAt (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_toolVersion" xml:space="preserve">
+    <value>HDC version at adoption</value>
+    <comment>windows.device.target.toolVersion (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_identity" xml:space="preserve">
+    <value>Stable identity (SHA-256)</value>
+    <comment>windows.device.target.identity (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_confirmedAt" xml:space="preserve">
+    <value>Facts confirmed at</value>
+    <comment>windows.device.target.confirmedAt (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_binding" xml:space="preserve">
+    <value>Binding</value>
+    <comment>windows.device.target.binding (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_presence" xml:space="preserve">
+    <value>Presence</value>
+    <comment>windows.device.target.presence (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_profile" xml:space="preserve">
+    <value>Device profile</value>
+    <comment>windows.device.target.profile (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_tool" xml:space="preserve">
+    <value>HDC</value>
+    <comment>windows.device.target.tool (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_operations" xml:space="preserve">
+    <value>Operations on this device</value>
+    <comment>windows.device.target.operations (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_operationsScope" xml:space="preserve">
+    <value>Scope: %1$@ (%2$@)</value>
+    <comment>windows.device.target.operationsScope (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_clear" xml:space="preserve">
+    <value>Clear name</value>
+    <comment>windows.device.rename.clear (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_saved" xml:space="preserve">
+    <value>Name saved: %@</value>
+    <comment>windows.device.rename.saved (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_cleared" xml:space="preserve">
+    <value>Name cleared</value>
+    <comment>windows.device.rename.cleared (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_refused" xml:space="preserve">
+    <value>The name was not changed</value>
+    <comment>windows.device.rename.refused (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_unavailable" xml:space="preserve">
+    <value>Artifacts unavailable</value>
+    <comment>windows.history.artifacts.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_exported" xml:space="preserve">
+    <value>Exported to %@</value>
+    <comment>windows.history.artifacts.exported (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_exportFailed" xml:space="preserve">
+    <value>Export failed</value>
+    <comment>windows.history.artifacts.exportFailed (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_showInExplorer" xml:space="preserve">
+    <value>Show in File Explorer</value>
+    <comment>windows.history.artifacts.showInExplorer (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_action" xml:space="preserve">
+    <value>Inspect Trace</value>
+    <comment>windows.trace.inspect.action (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_inspecting" xml:space="preserve">
+    <value>Inspecting Trace</value>
+    <comment>windows.trace.inspect.inspecting (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_title" xml:space="preserve">
+    <value>Trace inspection</value>
+    <comment>windows.trace.inspect.title (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_unavailable" xml:space="preserve">
+    <value>Trace inspection unavailable</value>
+    <comment>windows.trace.inspect.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_engine" xml:space="preserve">
+    <value>Engine: %1$@ %2$@</value>
+    <comment>windows.trace.inspect.engine (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_parser" xml:space="preserve">
+    <value>Parser: %1$@ %2$@</value>
+    <comment>windows.trace.inspect.parser (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_duration" xml:space="preserve">
+    <value>Duration: %@ ns</value>
+    <comment>windows.trace.inspect.duration (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_capabilities" xml:space="preserve">
+    <value>Capabilities: %@</value>
+    <comment>windows.trace.inspect.capabilities (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_quality" xml:space="preserve">
+    <value>Data quality: %1$@ · %2$lld issues</value>
+    <comment>windows.trace.inspect.quality (Windows only)</comment>
+  </data>
+  <data name="windows_trace_viewerDeferred" xml:space="preserve">
+    <value>The Trace viewer is not available on Windows yet: the Runtime inspects the Trace, and Export… saves it for another tool.</value>
+    <comment>windows.trace.viewerDeferred (Windows only)</comment>
   </data>
 </root>

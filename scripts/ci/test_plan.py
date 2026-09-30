@@ -239,6 +239,8 @@ class PathClassificationTests(unittest.TestCase):
             "spec/recovery/job-state-preflight.json",
             "openspec/contracts/cli-feature-coverage.json",
             "rust/scripts/windows-dev-identity.ps1",
+            "rust/tests/fixtures/trace-inspect",
+            "rust/tests/fixtures/target-adoption",
         ]
         for path in declared:
             source = root / path

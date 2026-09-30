@@ -601,6 +601,186 @@
       "zh-Hans": "已中断"
     },
     {
+      "key": "device.action.rename",
+      "table": "Localizable",
+      "en": "Rename…",
+      "zh-Hans": "重命名…"
+    },
+    {
+      "key": "device.rename.title",
+      "table": "Localizable",
+      "en": "Rename device",
+      "zh-Hans": "重命名设备"
+    },
+    {
+      "key": "device.rename.message",
+      "table": "Localizable",
+      "en": "Enter 1–64 characters. This name is shown only in ArkDeck; it does not change the device identity or binding.",
+      "zh-Hans": "请输入 1–64 个字符。此名称仅用于 ArkDeck 中显示，不会修改设备标识或绑定关系。"
+    },
+    {
+      "key": "device.rename.field",
+      "table": "Localizable",
+      "en": "Device name",
+      "zh-Hans": "设备名称"
+    },
+    {
+      "key": "device.rename.commit",
+      "table": "Localizable",
+      "en": "Rename",
+      "zh-Hans": "重命名"
+    },
+    {
+      "key": "device.rename.cancel",
+      "table": "Localizable",
+      "en": "Cancel",
+      "zh-Hans": "取消"
+    },
+    {
+      "key": "history.detail.title",
+      "table": "HistoryLocalizable",
+      "en": "Job details",
+      "zh-Hans": "Job 详情"
+    },
+    {
+      "key": "history.detail.select",
+      "table": "HistoryLocalizable",
+      "en": "Select a Job to inspect its details. The planned / simulated marker stays with a job permanently, in History and in any export.",
+      "zh-Hans": "选择一个 Job 以查看详情。planned / simulated 标识永久跟随 Job，包括历史与导出。"
+    },
+    {
+      "key": "history.detail.loading",
+      "table": "HistoryLocalizable",
+      "en": "Loading Job detail",
+      "zh-Hans": "正在加载 Job 详情"
+    },
+    {
+      "key": "history.detail.reload",
+      "table": "HistoryLocalizable",
+      "en": "Reload details",
+      "zh-Hans": "重新加载详情"
+    },
+    {
+      "key": "history.detail.job",
+      "table": "HistoryLocalizable",
+      "en": "Job",
+      "zh-Hans": "Job"
+    },
+    {
+      "key": "history.detail.operation",
+      "table": "HistoryLocalizable",
+      "en": "Operation",
+      "zh-Hans": "操作"
+    },
+    {
+      "key": "history.detail.target",
+      "table": "HistoryLocalizable",
+      "en": "Target",
+      "zh-Hans": "目标"
+    },
+    {
+      "key": "history.detail.state",
+      "table": "HistoryLocalizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "history.detail.mode",
+      "table": "HistoryLocalizable",
+      "en": "Execution mode",
+      "zh-Hans": "执行模式"
+    },
+    {
+      "key": "history.detail.created",
+      "table": "HistoryLocalizable",
+      "en": "Created",
+      "zh-Hans": "创建时间"
+    },
+    {
+      "key": "history.detail.finished",
+      "table": "HistoryLocalizable",
+      "en": "Finished",
+      "zh-Hans": "结束时间"
+    },
+    {
+      "key": "history.detail.outcomeUnknown",
+      "table": "HistoryLocalizable",
+      "en": "Outcome unknown — this Job's effect on the device was never confirmed.",
+      "zh-Hans": "结果未知——此 Job 对设备的影响从未被确认。"
+    },
+    {
+      "key": "history.detail.waitingForHuman",
+      "table": "HistoryLocalizable",
+      "en": "Waiting for a person to act.",
+      "zh-Hans": "等待人工处理。"
+    },
+    {
+      "key": "history.detail.artifacts",
+      "table": "HistoryLocalizable",
+      "en": "Artifacts",
+      "zh-Hans": "Artifacts"
+    },
+    {
+      "key": "history.artifacts.empty",
+      "table": "HistoryLocalizable",
+      "en": "No Artifacts were recorded for this Job.",
+      "zh-Hans": "此 Job 未记录 Artifact。"
+    },
+    {
+      "key": "history.artifacts.emptyPlanned",
+      "table": "HistoryLocalizable",
+      "en": "No captured artifacts: a planned job carries only its plan record, by design.",
+      "zh-Hans": "无采集产物：planned Job 按设计只含计划记录。"
+    },
+    {
+      "key": "history.artifacts.export",
+      "table": "HistoryLocalizable",
+      "en": "Export…",
+      "zh-Hans": "导出…"
+    },
+    {
+      "key": "history.artifacts.exportSensitive",
+      "table": "HistoryLocalizable",
+      "en": "Export sensitive Artifact…",
+      "zh-Hans": "导出敏感 Artifact…"
+    },
+    {
+      "key": "history.artifacts.exportBoundary",
+      "table": "HistoryLocalizable",
+      "en": "Artifact bytes are read in bounded verified chunks. The selected destination stays in the App and is never sent to Runtime.",
+      "zh-Hans": "Artifact 字节通过有界分块读取并校验；所选保存位置仅留在 App 内，不会发送给 Runtime。"
+    },
+    {
+      "key": "history.artifacts.exportPreview.title",
+      "table": "HistoryLocalizable",
+      "en": "Review Artifact export",
+      "zh-Hans": "检查 Artifact 导出信息"
+    },
+    {
+      "key": "history.artifacts.exportPreview.message",
+      "table": "HistoryLocalizable",
+      "en": "Name: %1$@\nSize: %2$@\nPrivacy: %3$@\nSHA-256: %4$@",
+      "zh-Hans": "名称：%1$@\n大小：%2$@\n隐私级别：%3$@\nSHA-256：%4$@"
+    },
+    {
+      "key": "history.artifacts.exportConfirm",
+      "table": "HistoryLocalizable",
+      "en": "Choose save location…",
+      "zh-Hans": "选择保存位置…"
+    },
+    {
+      "key": "history.artifacts.exportCancel",
+      "table": "HistoryLocalizable",
+      "en": "Cancel",
+      "zh-Hans": "取消"
+    },
+    {
+      "key": "history.artifacts.exporting",
+      "table": "HistoryLocalizable",
+      "en": "Exporting Artifact",
+      "zh-Hans": "正在导出 Artifact"
+    },
+    {
       "key": "windows.recovery.title",
       "table": null,
       "en": "ArkDeck Runtime unavailable",
@@ -797,6 +977,210 @@
       "table": null,
       "en": "Scripted daemon \"%@\": nothing on this window comes from ArkDeck Runtime.",
       "zh-Hans": "脚本化 daemon “%@”：此窗口中的内容均不来自 ArkDeck Runtime。"
+    },
+    {
+      "key": "windows.bytes",
+      "table": null,
+      "en": "%@ bytes",
+      "zh-Hans": "%@ 字节"
+    },
+    {
+      "key": "windows.device.targets.title",
+      "table": null,
+      "en": "Adopted targets",
+      "zh-Hans": "已接管的目标"
+    },
+    {
+      "key": "windows.device.targets.empty",
+      "table": null,
+      "en": "No device has been adopted yet.",
+      "zh-Hans": "尚未接管任何设备。"
+    },
+    {
+      "key": "windows.device.targets.unavailable",
+      "table": null,
+      "en": "Adopted targets unavailable",
+      "zh-Hans": "无法读取已接管的目标"
+    },
+    {
+      "key": "windows.device.target.select",
+      "table": null,
+      "en": "Select an adopted target to see its details.",
+      "zh-Hans": "选择一个已接管的目标以查看详情。"
+    },
+    {
+      "key": "windows.device.target.detail.unavailable",
+      "table": null,
+      "en": "Target details unavailable",
+      "zh-Hans": "无法读取目标详情"
+    },
+    {
+      "key": "windows.device.target.adoptedAt",
+      "table": null,
+      "en": "Adopted at",
+      "zh-Hans": "接管时间"
+    },
+    {
+      "key": "windows.device.target.toolVersion",
+      "table": null,
+      "en": "HDC version at adoption",
+      "zh-Hans": "接管时的 HDC 版本"
+    },
+    {
+      "key": "windows.device.target.identity",
+      "table": null,
+      "en": "Stable identity (SHA-256)",
+      "zh-Hans": "稳定标识（SHA-256）"
+    },
+    {
+      "key": "windows.device.target.confirmedAt",
+      "table": null,
+      "en": "Facts confirmed at",
+      "zh-Hans": "信息确认时间"
+    },
+    {
+      "key": "windows.device.target.binding",
+      "table": null,
+      "en": "Binding",
+      "zh-Hans": "绑定"
+    },
+    {
+      "key": "windows.device.target.presence",
+      "table": null,
+      "en": "Presence",
+      "zh-Hans": "在线状态"
+    },
+    {
+      "key": "windows.device.target.profile",
+      "table": null,
+      "en": "Device profile",
+      "zh-Hans": "设备 Profile"
+    },
+    {
+      "key": "windows.device.target.tool",
+      "table": null,
+      "en": "HDC",
+      "zh-Hans": "HDC"
+    },
+    {
+      "key": "windows.device.target.operations",
+      "table": null,
+      "en": "Operations on this device",
+      "zh-Hans": "此设备上的操作"
+    },
+    {
+      "key": "windows.device.target.operationsScope",
+      "table": null,
+      "en": "Scope: %1$@ (%2$@)",
+      "zh-Hans": "范围：%1$@（%2$@）"
+    },
+    {
+      "key": "windows.device.rename.clear",
+      "table": null,
+      "en": "Clear name",
+      "zh-Hans": "清除名称"
+    },
+    {
+      "key": "windows.device.rename.saved",
+      "table": null,
+      "en": "Name saved: %@",
+      "zh-Hans": "名称已保存：%@"
+    },
+    {
+      "key": "windows.device.rename.cleared",
+      "table": null,
+      "en": "Name cleared",
+      "zh-Hans": "名称已清除"
+    },
+    {
+      "key": "windows.device.rename.refused",
+      "table": null,
+      "en": "The name was not changed",
+      "zh-Hans": "名称未更改"
+    },
+    {
+      "key": "windows.history.artifacts.unavailable",
+      "table": null,
+      "en": "Artifacts unavailable",
+      "zh-Hans": "无法读取 Artifact"
+    },
+    {
+      "key": "windows.history.artifacts.exported",
+      "table": null,
+      "en": "Exported to %@",
+      "zh-Hans": "已导出到 %@"
+    },
+    {
+      "key": "windows.history.artifacts.exportFailed",
+      "table": null,
+      "en": "Export failed",
+      "zh-Hans": "导出失败"
+    },
+    {
+      "key": "windows.history.artifacts.showInExplorer",
+      "table": null,
+      "en": "Show in File Explorer",
+      "zh-Hans": "在文件资源管理器中显示"
+    },
+    {
+      "key": "windows.trace.inspect.action",
+      "table": null,
+      "en": "Inspect Trace",
+      "zh-Hans": "检查 Trace"
+    },
+    {
+      "key": "windows.trace.inspect.inspecting",
+      "table": null,
+      "en": "Inspecting Trace",
+      "zh-Hans": "正在检查 Trace"
+    },
+    {
+      "key": "windows.trace.inspect.title",
+      "table": null,
+      "en": "Trace inspection",
+      "zh-Hans": "Trace 检查结果"
+    },
+    {
+      "key": "windows.trace.inspect.unavailable",
+      "table": null,
+      "en": "Trace inspection unavailable",
+      "zh-Hans": "无法检查 Trace"
+    },
+    {
+      "key": "windows.trace.inspect.engine",
+      "table": null,
+      "en": "Engine: %1$@ %2$@",
+      "zh-Hans": "引擎：%1$@ %2$@"
+    },
+    {
+      "key": "windows.trace.inspect.parser",
+      "table": null,
+      "en": "Parser: %1$@ %2$@",
+      "zh-Hans": "解析器：%1$@ %2$@"
+    },
+    {
+      "key": "windows.trace.inspect.duration",
+      "table": null,
+      "en": "Duration: %@ ns",
+      "zh-Hans": "时长：%@ ns"
+    },
+    {
+      "key": "windows.trace.inspect.capabilities",
+      "table": null,
+      "en": "Capabilities: %@",
+      "zh-Hans": "能力：%@"
+    },
+    {
+      "key": "windows.trace.inspect.quality",
+      "table": null,
+      "en": "Data quality: %1$@ · %2$lld issues",
+      "zh-Hans": "数据质量：%1$@ · %2$lld 个问题"
+    },
+    {
+      "key": "windows.trace.viewerDeferred",
+      "table": null,
+      "en": "The Trace viewer is not available on Windows yet: the Runtime inspects the Trace, and Export… saves it for another tool.",
+      "zh-Hans": "Windows 版暂不提供 Trace 查看器：Trace 由 Runtime 检查，可用“导出…”保存后在其他工具中打开。"
     }
   ]
 }

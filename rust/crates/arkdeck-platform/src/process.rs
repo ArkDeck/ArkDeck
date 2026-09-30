@@ -536,7 +536,7 @@ fn same_metadata(left: &Metadata, right: &Metadata) -> bool {
     }
 }
 
-fn hash_file(file: &File, length: u64) -> io::Result<String> {
+pub(crate) fn hash_file(file: &File, length: u64) -> io::Result<String> {
     let mut hasher = Sha256::new();
     let mut buffer = [0; 65536];
     let mut offset = 0;

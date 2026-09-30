@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text;
 using ArkDeck.App.Core.Daemon;
 using ArkDeck.ClientKit;
@@ -22,9 +23,10 @@ public static class ScriptedDaemon
     /// <summary>A peer that speaks another control contract (health names another identity).</summary>
     public const string ContractMismatch = "contract-mismatch";
 
-    /// <summary>The Windows daemon as it answers today (the read-only foundation): health and
-    /// a blocked doctor; <c>device.observations</c> refused with <c>hdc.notConfigured</c>; the
-    /// Job methods refused because no Job owner is composed.</summary>
+    /// <summary>The Windows daemon's read-only foundation (a private endpoint, no state root),
+    /// answering as the real one does: health and a blocked doctor; <c>device.observations</c>
+    /// refused with <c>hdc.notConfigured</c>; the Job methods refused because no Job owner is
+    /// composed; the Target, Artifact and Trace inspection owners absent.</summary>
     public const string Foundation = "foundation";
 
     /// <summary><see cref="Unavailable"/> for the first two connections (the start reads the
@@ -37,14 +39,47 @@ public static class ScriptedDaemon
     /// the daemon goes away while the App shows its data.</summary>
     public const string Outage = "outage";
 
-    /// <summary>A daemon with a Job store and devices: three candidates, three Jobs, and a
-    /// running Job whose state advances on each <c>job.status</c> read.</summary>
+    /// <summary>A daemon with a Job store, an Artifact owner and devices: three candidates, one
+    /// adopted Target, three Jobs (a running one whose state advances on each
+    /// <c>job.status</c> read) with their Artifacts; no Trace inspector, so
+    /// <c>trace.inspect</c> is refused as on Windows today.</summary>
     public const string Jobs = "jobs";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs];
+    /// <summary>The Windows daemon as <c>origin/main</c> composes it over a development state
+    /// root (TASK-XPA-004): the Target store holds the Swift adoption oracle's Target, whose
+    /// display name can be set and cleared; no HDC (<c>device.observations</c> refused), no
+    /// Job owner, no Artifact owner, no Trace inspector.</summary>
+    public const string DevelopmentRoot = "targets";
+
+    /// <summary><see cref="Jobs"/> with a Trace inspector: <c>trace.inspect</c> answers the
+    /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
+    public const string Inspector = "inspector";
+
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
+    public const string FailedJobId = "job-0000000000000000000000000000a002";
+    public const string TraceJobId = "job-0000000000000000000000000000a003";
     public static readonly IReadOnlyList<string> RunningJobStates = ["running", "waitingForDevice", "running", "succeeded"];
+
+    /// <summary>The Target of <see cref="Jobs"/> (the adopted candidate's).</summary>
+    public const string FixtureTargetId = "TGT-FIXTURE-1";
+
+    /// <summary>The Swift adoption oracle's Target (rust/tests/fixtures/target-adoption).</summary>
+    public const string OracleTargetId = "TGT-3ba3f5f43b92";
+
+    /// <summary>The Artifacts of <see cref="Jobs"/>: (Job, id, name, media type, privacy,
+    /// status, source operation, bytes). The raw Trace spans two export chunks.</summary>
+    public static readonly IReadOnlyList<ScriptedArtifact> Artifacts =
+    [
+        new(FailedJobId, "ART-00000000000000000000000000000b01", "flash-log.txt", "text/plain", "standard", "published", "flash.images@1",
+            Encoding.UTF8.GetBytes("flash.images@1: write verification mismatch on partition system\n")),
+        new(FailedJobId, "ART-00000000000000000000000000000b02", "partition-table.json", "application/json", "standard", "missing", "flash.images@1", []),
+        new(TraceJobId, "ART-00000000000000000000000000000c01", "trace.htrace", "application/octet-stream", "sensitive", "published", "trace.capture@1",
+            Enumerable.Range(0, 300_000).Select(i => (byte)(i * 31 % 251)).ToArray()),
+        new(TraceJobId, "ART-00000000000000000000000000000c02", "trace-config.json", "application/json", "standard", "published", "trace.capture@1",
+            Encoding.UTF8.GetBytes("{\"durationSeconds\":5,\"tags\":[\"sched\",\"freq\"]}\n")),
+    ];
 
     public static IControlChannel Channel(string scenario)
     {
@@ -55,6 +90,12 @@ public static class ScriptedDaemon
 
     private sealed class Script(string scenario)
     {
+        private readonly object _gate = new();
+        private readonly Dictionary<string, (string? Name, long Generation)> _names = new(StringComparer.Ordinal)
+        {
+            [OracleTargetId] = (null, 1),
+            [FixtureTargetId] = ("Bench board", 1),
+        };
         private int _connections;
         private int _statusReads;
 
@@ -67,32 +108,51 @@ public static class ScriptedDaemon
                 Outage => connection <= 4 ? Foundation : Unavailable,
                 _ => scenario,
             };
-            return new Peer(request => Answer(mode, request));
+            return new Peer(request =>
+            {
+                lock (_gate) return Answer(mode, request);
+            });
         }
 
         private byte[]? Answer(string mode, JsonObject request)
         {
             var method = ((JsonString)request["method"]).Value;
+            if (mode == Unavailable) return null;
+            if (mode == ContractMismatch) return Success(request, Health(new string('0', 64)));
+            if (method == "health") return Success(request, Health(ControlContract.ContractIdentity));
             return mode switch
             {
-                Unavailable => null,
-                ContractMismatch => Success(request, Health(new string('0', 64))),
                 Foundation => method switch
                 {
-                    "health" => Success(request, Health(ControlContract.ContractIdentity)),
                     "doctor" => Success(request, Parse(BlockedDoctor)),
                     "device.observations" => Failure(request, "rejected", "hdc.notConfigured"),
                     _ when method.StartsWith("job.", StringComparison.Ordinal) => Failure(request, "rejected", "The Job owner is not configured"),
+                    _ when method.StartsWith("target.", StringComparison.Ordinal) => Failure(request, "internalError", "Target owner is not configured"),
+                    _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
+                    "trace.inspect" => NoTraceInspector(request),
+                    _ => Failure(request, "rejected", "this method is unavailable in the read-only Rust foundation"),
+                },
+                DevelopmentRoot => method switch
+                {
+                    "doctor" => Success(request, Parse(BlockedDoctor)),
+                    "device.observations" => Failure(request, "rejected", "hdc.notConfigured"),
+                    _ when method.StartsWith("job.", StringComparison.Ordinal) => Failure(request, "rejected", "The Job owner is not configured"),
+                    _ when method.StartsWith("target.", StringComparison.Ordinal) => Target(request, method, [OracleTargetId]),
+                    _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
+                    "trace.inspect" => NoTraceInspector(request),
                     _ => Failure(request, "rejected", "this method is unavailable in the read-only Rust foundation"),
                 },
                 _ => method switch
                 {
-                    "health" => Success(request, Health(ControlContract.ContractIdentity)),
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(Observations)),
                     "job.list" => Success(request, Parse(JobPage([.. JobsNow().Select(j => JobJson(j, list: true))]))),
                     "job.status" => JobStatus(request),
                     "job.events" => JobEvents(request),
+                    _ when method.StartsWith("target.", StringComparison.Ordinal) => Target(request, method, [FixtureTargetId]),
+                    "artifact.list" => ArtifactList(request),
+                    "artifact.read" => ArtifactRead(request),
+                    "trace.inspect" => mode == Inspector ? TraceInspect(request) : NoTraceInspector(request),
                     _ => Failure(request, "rejected", "not scripted"),
                 },
             };
@@ -101,8 +161,8 @@ public static class ScriptedDaemon
         private (string Id, string Operation, string State, string Created)[] JobsNow() =>
         [
             (RunningJobId, "observe.device@1", RunningJobStates[Math.Min(_statusReads, RunningJobStates.Count - 1)], "2026-09-30T08:02:00Z"),
-            ("job-0000000000000000000000000000a002", "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
-            ("job-0000000000000000000000000000a003", "trace.capture@1", "succeeded", "2026-09-30T08:00:00Z"),
+            (FailedJobId, "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
+            (TraceJobId, "trace.capture@1", "succeeded", "2026-09-30T08:00:00Z"),
         ];
 
         private byte[] JobStatus(JsonObject request)
@@ -137,7 +197,177 @@ public static class ScriptedDaemon
                 {"hasMore":false,"items":[{{string.Join(",", items)}}],"nextCursor":"c-end","order":"streamPositionAsc","pageKind":"eventStream","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"{{path.Length}}"}
                 """));
         }
+
+        /// <summary>The Target owner over a Target store holding <paramref name="known"/>, as
+        /// the Windows daemon's (TASK-XPA-004) answers: list, show, availability, and the
+        /// generation-guarded display name set and clear.</summary>
+        private byte[] Target(JsonObject request, string method, string[] known)
+        {
+            var parameters = request.TryGetValue("params", out var p) ? (JsonObject)p : new JsonObject();
+            if (method == "target.list") return Success(request, Parse("[" + string.Join(",", known.Select(TargetRow)) + "]"));
+            var id = parameters.TryGetValue("targetId", out var t) ? ((JsonString)t).Value : "";
+            var writes = method is "target.display-name.set" or "target.display-name.clear";
+            if (!known.Contains(id))
+            {
+                return writes ? Failure(request, "notFound", "Target not found", NameOwnerDetails) : Failure(request, "notFound", "Target not found");
+            }
+            switch (method)
+            {
+                case "target.show":
+                    return Success(request, Parse(TargetShow(id)));
+                case "target.availability":
+                    return Success(request, Parse(TargetAvailability(id)));
+                case "target.display-name.set":
+                case "target.display-name.clear":
+                    var current = _names[id];
+                    var expected = parameters.TryGetValue("expectedGeneration", out var g) ? ((JsonString)g).Value : "";
+                    if (expected != current.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    {
+                        return Failure(request, "resourceConflict", "Target display-name generation changed or is exhausted", NameOwnerDetails);
+                    }
+                    string? name = null;
+                    if (method == "target.display-name.set")
+                    {
+                        name = parameters.TryGetValue("name", out var n) ? ((JsonString)n).Value : "";
+                        if (string.IsNullOrWhiteSpace(name)) return Failure(request, "invalidInput", "Display name must be nonblank bounded text", NameOwnerDetails);
+                    }
+                    _names[id] = (name, current.Generation + 1);
+                    return Success(request, new JsonObject(
+                    [
+                        new("generation", new JsonString((current.Generation + 1).ToString(System.Globalization.CultureInfo.InvariantCulture))),
+                        new("name", name is null ? JsonNull.Instance : new JsonString(name)),
+                        new("schemaVersion", new JsonString("arkdeck.target-display-name/1")),
+                        new("targetId", new JsonString(id)),
+                        new("updatedAtUtc", new JsonString("2026-09-30T08:05:00Z")),
+                    ]));
+                default:
+                    return Failure(request, "rejected", "not scripted");
+            }
+        }
+
+        private static readonly JsonObject NameOwnerDetails = new(
+        [
+            new("newDispatchCount", JsonNumber.FromInt64(0)),
+            new("phase", new JsonString("targetDisplayNameOwner")),
+        ]);
+
+        private (string Connect, long Binding, string Adopted, string Tool, string? Facts) TargetFacts(string id) => id == OracleTargetId
+            ? ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 1, "2026-09-14T00:00:00Z", "3.2.0d", null)
+            : ("fixture-serial-1", 3, "2026-09-29T10:00:00Z", "3.2.0f",
+                """{"confirmedAtUtc":"2026-09-30T08:00:00Z","firmware":"OpenHarmony 6.0","model":"DAYU200","targetId":"TGT-FIXTURE-1","transport":"usb"}""");
+
+        private string TargetRow(string id)
+        {
+            var (_, binding, adopted, tool, _) = TargetFacts(id);
+            var (name, generation) = _names[id];
+            return $$"""{"adoptedAtUtc":"{{adopted}}","bindingRevision":{{binding}},"displayName":{{Quote(name)}},"displayNameGeneration":"{{generation}}","targetId":"{{id}}","toolVersion":"{{tool}}"}""";
+        }
+
+        private string TargetShow(string id)
+        {
+            var (connect, binding, adopted, tool, facts) = TargetFacts(id);
+            var (name, generation) = _names[id];
+            return $$"""{"adoptedAtUtc":"{{adopted}}","bindingRevision":{{binding}},"connectKey":"{{connect}}","displayName":{{Quote(name)}},"displayNameGeneration":"{{generation}}","live":null,"observedFacts":{{facts ?? "null"}},"schemaVersion":"arkdeck.target/1","stablePhysicalIdentitySha256":"{{Sha256Hex(Encoding.ASCII.GetBytes(connect))}}","targetId":"{{id}}","toolVersion":"{{tool}}"}""";
+        }
+
+        private string TargetAvailability(string id)
+        {
+            var (connect, binding, adopted, tool, _) = TargetFacts(id);
+            return $$$"""
+                {"binding":{"adoptedAtUtc":"{{{adopted}}}","bindingRevision":{{{binding}}},"stablePhysicalIdentitySha256":"{{{Sha256Hex(Encoding.ASCII.GetBytes(connect))}}}","state":"ready","toolVersion":"{{{tool}}}"},"observedAtUtc":"2026-09-30T08:00:00Z","operations":{"items":[{"availability":"unavailable","reasonCodes":["provider_not_registered"],"reasons":["provider hdc is not registered"],"reference":"observe.device@1"},{"availability":"unavailable","reasonCodes":["provider_not_registered"],"reasons":["provider hdc is not registered"],"reference":"trace.capture@1"},{"availability":"unavailable","reasonCodes":["provider_not_registered"],"reasons":["provider arkforge is not registered"],"reference":"flash.dayu200"}],"reason":"operation availability is computed per host; no target-scoped resolver exists","reasonCode":"target_scoped_operation_availability_unavailable","scope":"host","targetResolution":"unresolved"},"presence":{"observationHealth":null,"observedAtUtc":null,"reason":"the Runtime has no device observation source configured","reasonCode":"device_observation_unavailable","state":"unresolved"},"profile":{"reason":"no target-to-profile resolver exists; catalog profiles are published but unmatched","reasonCode":"profile_resolver_unavailable","state":"unresolved"},"targetId":"{{{id}}}","tool":{"reason":"Runtime has no managed HDC server","reasonCode":"runtime_tool_unavailable","state":"absent"}}
+                """;
+        }
+
+        private static byte[] ArtifactList(JsonObject request)
+        {
+            var owner = (JsonObject)request["params"]["owner"];
+            var jobId = ((JsonString)owner["id"]).Value;
+            if (jobId is not (RunningJobId or FailedJobId or TraceJobId)) return Failure(request, "notFound", "no such Job", ArtifactDetails);
+            var rows = Artifacts.Where(a => a.JobId == jobId).OrderBy(a => a.Id, StringComparer.Ordinal).Select(a => a.Json());
+            return Success(request, Parse($$"""
+                {"hasMore":false,"items":[{{string.Join(",", rows)}}],"nextCursor":null,"order":"createdAtDescArtifactIdAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"0f5e0c1a-0000-4000-8000-000000000001"}
+                """));
+        }
+
+        private static byte[] ArtifactRead(JsonObject request)
+        {
+            var parameters = (JsonObject)request["params"];
+            var jobId = ((JsonString)((JsonObject)parameters["owner"])["id"]).Value;
+            var artifactId = ((JsonString)parameters["artifactId"]).Value;
+            var artifact = Artifacts.FirstOrDefault(a => a.JobId == jobId && a.Id == artifactId);
+            if (artifact is null || artifact.Status != "published") return Failure(request, "resourceNotFound", "no published Artifact", ArtifactDetails);
+            var allow = parameters.TryGetValue("allowSensitive", out var s) && s is JsonBool { Value: true };
+            if (artifact.Privacy == "sensitive" && !allow) return Failure(request, "sensitiveAccessDenied", "Sensitive Artifact access requires allowSensitive", ArtifactDetails);
+            var offset = (int)TypedJson.Int64(parameters["offset"]);
+            var max = (int)TypedJson.Int64(parameters["maxBytes"]);
+            var count = Math.Max(0, Math.Min(max, artifact.Bytes.Length - offset));
+            var next = offset + count;
+            return Success(request, new JsonObject(
+            [
+                new("artifactDigest", new JsonString(artifact.Sha256)),
+                new("artifactId", new JsonString(artifact.Id)),
+                new("base64", new JsonString(Convert.ToBase64String(artifact.Bytes, offset, count))),
+                new("byteCount", JsonNumber.FromInt64(count)),
+                new("eof", JsonBool.Of(next == artifact.Bytes.Length)),
+                new("nextOffset", JsonNumber.FromInt64(next)),
+                new("offset", JsonNumber.FromInt64(offset)),
+                new("totalByteCount", JsonNumber.FromInt64(artifact.Bytes.Length)),
+            ]));
+        }
+
+        private static byte[] TraceInspect(JsonObject request)
+        {
+            var parameters = (JsonObject)request["params"];
+            var jobId = ((JsonString)((JsonObject)parameters["owner"])["id"]).Value;
+            var artifactId = ((JsonString)parameters["artifactId"]).Value;
+            var trace = Artifacts.FirstOrDefault(a => a.JobId == jobId && a.Id == artifactId && a.Name == "trace.htrace");
+            if (trace is null) return Failure(request, "notFound", "no raw Trace", TraceDetails);
+            return Success(request, Parse($$$"""
+                {"dataQuality":{"issues":[],"status":"ok"},"deviceEvidenceCreated":false,"engine":{"build":"fixture","name":"ArkTrace","sourceRevision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","version":"4.3.7"},"owner":{"id":"{{{jobId}}}","kind":"job"},"parser":{"adapterVersion":"1","binarySha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","buildRecipeVersion":"1","name":"trace_streamer","upstreamRevision":"cccccccccccccccccccccccccccccccccccccccc","version":"fixture"},"schema":{"fingerprint":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","provenance":{"adapterVersion":"1","indexVersion":1,"upstreamDatabaseByteCount":"13","upstreamDatabaseSha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}},"schemaVersion":"arkdeck.trace-inspection/1","source":{"artifactDigest":"{{{trace.Sha256}}}","artifactId":"{{{trace.Id}}}","byteCount":"{{{trace.Bytes.Length}}}","mediaType":"application/octet-stream","name":"trace.htrace","privacy":"sensitive","sourceOperation":"trace.capture@1"},"storageMode":"ephemeral","trace":{"capabilities":{"cpuCounters":false,"cpuScheduling":true,"namedSlices":true,"processCounters":false,"threadStates":true},"durationNs":"5000000000"}}
+                """));
+        }
+
+        private static readonly JsonObject ArtifactDetails = new(
+        [
+            new("newDispatchCount", JsonNumber.FromInt64(0)),
+            new("phase", new JsonString("artifactOwner")),
+        ]);
+
+        private static readonly JsonObject TraceDetails = new(
+        [
+            new("deviceEvidenceCreated", JsonBool.False),
+            new("newDispatchCount", JsonNumber.FromInt64(0)),
+            new("phase", new JsonString("traceInspectionOwner")),
+        ]);
+
+        /// <summary>The Windows daemon without an Artifact owner (its real answer).</summary>
+        private static byte[] ArtifactOwnerAbsent(JsonObject request) =>
+            Failure(request, "operationUnavailable", "Artifact owner is not configured", ArtifactDetails);
+
+        /// <summary>The Windows daemon without a Trace inspector (its real answer, the Swift oracle's bytes).</summary>
+        private static byte[] NoTraceInspector(JsonObject request) =>
+            Failure(request, "operationUnavailable", "Trace inspection is unavailable", TraceDetails);
+
+        private static string Quote(string? value) => value is null ? "null" : Encoding.UTF8.GetString(CanonicalJson.Encode(new JsonString(value)));
     }
+
+    /// <summary>One scripted Job Artifact and its bytes.</summary>
+    public sealed record ScriptedArtifact(string JobId, string Id, string Name, string MediaType, string Privacy, string Status, string SourceOperation, byte[] Bytes)
+    {
+        public string Sha256 => Sha256Hex(Bytes);
+
+        internal string Json()
+        {
+            var published = Status == "published";
+            var digest = published ? $"\"{Sha256}\"" : "null";
+            var lease = published ? $"\"lease-v1:{JobId}:{Id}\"" : "null";
+            return $$"""
+                {"artifactDigest":{{digest}},"artifactId":"{{Id}}","binding":{"bindingRevision":3,"stableIdentitySha256":null,"targetId":"TGT-FIXTURE-1"},"byteCount":{{Bytes.Length}},"createdAtUtc":"2026-09-30T08:03:00Z","lease":{{lease}},"mediaType":"{{MediaType}}","name":"{{Name}}","observationWindow":null,"owner":{"id":"{{JobId}}","kind":"job"},"privacy":"{{Privacy}}","providerId":"hdc","redactionApplied":false,"retention":{"class":"default","deadlineUtc":null,"pinned":false},"schemaVersion":"arkdeck.artifact/1","sourceOperation":"{{SourceOperation}}","status":"{{Status}}"}
+                """;
+        }
+    }
+
+    private static string Sha256Hex(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
     private static JsonValue Health(string contractIdentity) => new JsonObject(
     [
@@ -188,13 +418,18 @@ public static class ScriptedDaemon
     private static byte[] Success(JsonObject request, JsonValue result) =>
         Wire.EncodeFrame(new JsonObject([new("id", request["id"]), new("ok", JsonBool.True), new("result", result)]), ControlContract.MaxResponseBytes);
 
-    private static byte[] Failure(JsonObject request, string code, string message) =>
-        Wire.EncodeFrame(new JsonObject(
+    private static byte[] Failure(JsonObject request, string code, string message, JsonObject? details = null)
+    {
+        var error = new List<KeyValuePair<string, JsonValue>> { new("code", new JsonString(code)) };
+        if (details is not null) error.Add(new("details", details));
+        error.Add(new("message", new JsonString(message)));
+        return Wire.EncodeFrame(new JsonObject(
         [
             new("id", request["id"]),
             new("ok", JsonBool.False),
-            new("error", new JsonObject([new("code", new JsonString(code)), new("message", new JsonString(message))])),
+            new("error", new JsonObject(error)),
         ]), ControlContract.MaxResponseBytes);
+    }
 
     /// <summary>One connection: each complete request frame gets its scripted reply; a null
     /// reply closes the connection (the client then reads end of stream).</summary>

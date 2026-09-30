@@ -121,6 +121,9 @@ internal sealed class AppSession : IDisposable
 
     public void Invoke(string automationId) => Find(automationId).Patterns.Invoke.Pattern.Invoke();
 
+    /// <summary>Selects a list item (UIA SelectionItem pattern, no synthetic input).</summary>
+    public void Select(string automationId) => Find(automationId).Patterns.SelectionItem.Pattern.Select();
+
     public static string Name(AutomationElement element)
     {
         try

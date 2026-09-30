@@ -61,7 +61,11 @@ internal sealed partial class Catalogue
 
 internal sealed record ExpectedElement(string AutomationId, string Origin, string Role, string Name, bool Prefix, string? Live);
 
-internal sealed record Snapshot(string Id, string Scenario, string Page, IReadOnlyList<ExpectedElement> Elements);
+/// <summary>What a person does on the page before a snapshot is compared: select an item or
+/// invoke a button, by identifier.</summary>
+internal sealed record Step(string Action, string AutomationId);
+
+internal sealed record Snapshot(string Id, string Scenario, string Page, IReadOnlyList<Step> Steps, IReadOnlyList<ExpectedElement> Elements);
 
 /// <summary>spec/ui-semantics/surfaces.json, with names resolved in one language.</summary>
 internal static class SurfaceSpec
@@ -75,6 +79,9 @@ internal static class SurfaceSpec
             s.GetProperty("id").GetString()!,
             s.GetProperty("scenario").GetString()!,
             s.GetProperty("page").GetString()!,
+            s.TryGetProperty("steps", out var steps)
+                ? steps.EnumerateArray().Select(step => step.EnumerateObject().Single()).Select(p => new Step(p.Name, p.Value.GetString()!)).ToArray()
+                : [],
             s.GetProperty("elements").EnumerateArray().Select(e => new ExpectedElement(
                 e.GetProperty("automationId").GetString()!,
                 e.GetProperty("origin").GetString()!,

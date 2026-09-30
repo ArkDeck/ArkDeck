@@ -262,7 +262,7 @@ fn projects_register_over_the_pipe_and_survive_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, planning"
+            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, planning, traceCache"
                 .to_owned()
         ),
         "{:?}",

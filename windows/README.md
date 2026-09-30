@@ -53,11 +53,22 @@ first, `ControlResult` back.
 ## ArkDeck (the App)
 
 - **Data only through ClientKit.** `App.Core` reads `health`, `doctor`, `device.observations`,
-  `job.list`, `job.status` and `job.events` — one authenticated connection per call, health
-  first — and keeps each answer as it came: the data, or `unavailable(reasonCode): detail` with
-  the CLI command that reads the same thing (the daemon's wire code, e.g.
-  `unavailable(rejected): hdc.notConfigured`, or `daemonUnavailable` when nothing answered). It
-  writes nothing to the daemon.
+  `target.list|show|availability`, `job.list`, `job.status`, `job.events`, `artifact.list`,
+  `artifact.read` and `trace.inspect` — one authenticated connection per call, health first —
+  and keeps each answer as it came: the data, or `unavailable(reasonCode): detail` with the CLI
+  command that reads the same thing (the daemon's wire code, e.g.
+  `unavailable(rejected): hdc.notConfigured`, or `daemonUnavailable` when nothing answered). Its
+  one write is an adopted Target's Runtime display name (`target.display-name.set|clear`,
+  guarded by the generation the App read; TASK-XPA-020).
+- **Surfaces (TASK-XPA-020).** Device lists the adopted Targets (the Target store answers
+  without an HDC), shows a Target's `target.show` and `target.availability`, and renames or
+  clears its display name in a Fluent dialog (the macOS rename rule: whitespace collapsed,
+  1–64 characters). History shows the selected Job's detail and Artifacts; a published
+  Artifact is exported as on macOS (preview, a save location the person picks, bounded
+  `artifact.read` chunks each checked against the metadata, SHA-256 verified before a staging
+  file replaces the destination; a sensitive one needs its own confirmation), and a Job's raw
+  Trace can be inspected by the Runtime (`trace.inspect`; without a Windows Trace inspector the
+  refusal is shown as it came, and the viewer is deferred, decision 5).
 - **Which daemon.** The installation inputs the CLI reads: `ARKDECK_DAEMON_PATH` (default
   `arkdeck-agentd.exe` beside the App), `ARKDECK_DAEMON_SIGNER_SHA256` or
   `ARKDECK_DAEMON_PACKAGE_FAMILY`, optional `ARKDECK_ENDPOINT`. Without a pin there is nothing
@@ -76,7 +87,7 @@ first, `ControlResult` back.
   Job Inspector status, the selected Job's state and the recovery banner.
 - **Test transport.** `--test-transport <scenario>` replaces the pipe with an in-process
   scripted daemon (`App.Core/Testing/ScriptedDaemon.cs`: `unavailable`, `contract-mismatch`,
-  `foundation`, `recovers`, `outage`, `jobs`) so the UIA tests can show states the real daemon
+  `foundation`, `recovers`, `outage`, `jobs`, `targets`, `inspector`) so the UIA tests can show states the real daemon
   cannot be made to show on demand. ClientKit still decodes and schema-checks every reply; the
   window shows a "Test transport" banner.
 

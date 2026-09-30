@@ -1339,7 +1339,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-020 — WinUI surfaces to parity (Debug, Flash, Viewer, Diagnostics, Settings, Device)
 
-- Status:blocked
+- Status:in-progress（the Device Targets and display names, the History Job detail with Artifact export and the Trace inspection surface are built on the TASK-XPA-007 skeleton, see `evidence/runs/TASK-XPA-020/winui-surfaces-run.md`; Debug, Flash, Viewer and Settings await their Golden Journey owners on the Windows daemon）
 - Platform:windows
 - Requirements:REQ-UX-001..007, REQ-DIAG-001/002, REQ-I18N-001, `ui-dump`, `debug-workbench`, `flashing` (presentation clauses)
 - Acceptance:XPA-AC-5, XPA-AC-8; design §H.3 gates per surface

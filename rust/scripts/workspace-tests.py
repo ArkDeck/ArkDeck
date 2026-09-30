@@ -24,7 +24,6 @@ regeneration or cannot be read.
 from __future__ import annotations
 
 import importlib.util
-import os
 import pathlib
 import subprocess
 import sys
@@ -52,9 +51,10 @@ def main(run=subprocess.run, generator=None) -> int:
             file=sys.stderr,
         )
         return 1
-    command = ("cargo", "test", "--workspace", "--no-fail-fast")
-    if os.environ.get("ARKDECK_RUST_TEST_WORKERS") == "2":
-        command = (sys.executable, str(REPO_ROOT / "rust/scripts/run-workspace-tests.py"))
+    # One worker (Windows and Linux in CI, and local runs) skips the
+    # integration tests whose crate-level cfg is false on this host; two run
+    # the macOS queues. Both run every other default target and the doctests.
+    command = (sys.executable, str(REPO_ROOT / "rust/scripts/run-workspace-tests.py"))
     return run(
         command,
         cwd=REPO_ROOT / "rust",

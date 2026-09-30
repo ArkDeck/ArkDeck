@@ -103,6 +103,10 @@ WINDOWS_INPUT_PREFIXES = (
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
     # The shared UI semantics: bilingual strings and the UIA semantic snapshots.
     "spec/ui-semantics/",
+    # The App's tests read the recorded Trace inspections and the adoption oracle's
+    # Target store (TASK-XPA-020).
+    "rust/tests/fixtures/trace-inspect/",
+    "rust/tests/fixtures/target-adoption/",
 )
 WINDOWS_INPUT_FILES = frozenset({
     "Packages/ArkDeckKit/Contracts/control-protocol.json",
