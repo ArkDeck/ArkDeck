@@ -195,9 +195,27 @@ composition accepts these process-environment inputs:
 | --- | --- |
 | `ARKDECK_ENDPOINT` | Absolute physical Unix socket path in a `0700` parent, or local `\\.\pipe\arkdeck-*` name. |
 | `ARKDECK_DAEMON_PATH` | Expected installed daemon executable; defaults to the CLI's sibling daemon. |
-| `ARKDECK_DAEMON_SIGNER_SHA256` | Windows trusted signing-certificate SHA-256, configured from installation evidence. |
-| `ARKDECK_DAEMON_PACKAGE_FAMILY` | Alternative exact Windows installed MSIX package family. |
+| `ARKDECK_DAEMON_SIGNER_SHA256` | Windows development signer: the trusted signing certificate's DER SHA-256, configured from installation evidence. |
+| `ARKDECK_DAEMON_PACKAGE_FAMILY` | Windows MSIX daemon: the exact installed package family. |
+| `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` | Windows production xcopy daemon: the exact subject `O=` of its Artifact Signing leaf certificate. Set together with the next input. |
+| `ARKDECK_DAEMON_PUBLISHER_EKU` | Windows production xcopy daemon: the Artifact Signing certificate-profile identity EKU, `1.3.6.1.4.1.311.97.<profile>` (never the shared Public Trust marker `1.3.6.1.4.1.311.97.1.0`). |
 | `ARKDECK_HDC_PATH` / `ARKDECK_HDC_SHA256` | Exact existing tool selection; both are required and the platform tuple must already be registered. |
+
+Every Windows form keeps the pipe-owner SID check and the server PID → image
+path → held-handle file identity check; the inputs above only choose what vouches
+for that image (maintainer ruling 17, 2026-09-30). The MSIX daemon is pinned by
+its package family. The xcopy daemon signed by Azure Artifact Signing, whose leaf
+certificates are renewed daily and valid for 72 hours, is pinned by publisher
+identity: `WinVerifyTrust` accepts it (generic Authenticode policy, whole-chain
+revocation from cache only), its chain ends at Microsoft Identity Verification
+Root Certificate Authority 2020 (DER SHA-256
+`5367f20c7ade0e2bca790915056d086b720c33c1fa2a2661acf787e3292e1270`, compiled
+into `arkdeck-platform/src/windows/publisher.rs` with its update path), and the
+leaf's single `O=` and its identity EKU equal the two publisher inputs. The
+development signer keeps its certificate-hash pin. Any one configured pin that
+holds admits the image; none configured, or a publisher identity with only one
+of its two inputs or a malformed value, refuses with zero frames. No input skips
+the check.
 
 These are local host configuration, never control request fields or capability
 authority. An arbitrary configured hash cannot register a Windows HDC tool.
@@ -1986,10 +2004,19 @@ sibling. It then signs both (`-SigningMode`):
 | `development` | `windows-dev-identity.ps1 sign` with the host-trusted development certificate (`-Thumbprint`, else `ARKDECK_DEV_SIGNER_THUMBPRINT` from the process or the user environment). This is not an installation identity. |
 | `production` | An external command the maintainer supplies (`-ProductionSignCommand`, else `ARKDECK_PRODUCTION_SIGN_COMMAND`), called once per file with the file's path as its only argument. For example, a wrapper around `signtool sign /fd SHA256 /tr <timestamp URL> /td SHA256 /dlib <Artifact Signing dlib> /dmdf <metadata.json>`. The script holds no credential. If no command is configured, it fails before building. |
 
-Each signed file must pass `Get-AuthenticodeSignature` with status `Valid`, and
-both files must carry the same signer. A production signature must also carry
-a timestamp; `-ExpectedSignerSha256` optionally pins the expected certificate.
-The pin is the SHA-256 of the signer certificate's DER. The script writes
+Each signed file must pass `Get-AuthenticodeSignature` with status `Valid`. In
+development mode both files must carry the same signer, and the pin is the
+SHA-256 of the signer certificate's DER; `-ExpectedSignerSha256` optionally pins
+the expected certificate. A production signature must also carry a timestamp,
+and is pinned by publisher identity instead (maintainer ruling 17): each file's
+chain must end at Microsoft Identity Verification Root Certificate Authority 2020
+(the root the CLI pins), and both leaves must carry the same single subject `O=`
+and the same Artifact Signing identity EKU (`1.3.6.1.4.1.311.97.<profile>`); the
+leaves themselves may differ across a daily renewal, and `-ExpectedSignerSha256`
+is refused. The manifest's `signing.publisher` and `daemonConfiguration` then
+name `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` and `ARKDECK_DAEMON_PUBLISHER_EKU`
+in place of a pin, the script prints those, and the smoke checks the unpacked
+daemon's publisher and configures them. The script writes
 `manifest.json` (`arkdeck.windows-xcopy-package/1`) inside the package. It
 records the revision, the dirty flag and entries, `rustc -V`, `cargo -V`, the
 target, the cargo arguments, each file's size and SHA-256, the signing mode and
