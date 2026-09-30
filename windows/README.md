@@ -161,7 +161,14 @@ whole product from one recorded checkout (r12 decision 10, rulings 8, 12 and 17)
   are in the manifest.
 
 `-SigningMode none` (CI) signs nothing; `development` signs with the host-trusted development
-certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`). A production RC is not built here.
+certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`); `production` calls the maintainer's command
+(`-ProductionSignCommand` / `ARKDECK_PRODUCTION_SIGN_COMMAND`, one call per file) for the daemon,
+the CLI and `ArkDeck.exe`, and requires timestamps, one publisher identity (ruling 17) and a
+clean checkout. `-MsixSignCommand` / `ARKDECK_MSIX_SIGN_COMMAND` signs the MSIX, whose signer's
+subject must be the manifest's `Publisher`. The scripts hold no credential. `-FeedBaseUri
+https://…/` writes the App Installer feed `ArkDeck.appinstaller` from the MSIX this run built
+(name, publisher, version and architecture read from its `AppxManifest.xml`). The package
+version must rise with each published RC.
 
 ```powershell
 pwsh windows/scripts/package-rc.ps1 -OutputDirectory D:\out\rc -SigningMode development -Smoke
@@ -172,13 +179,18 @@ data with a private development state root, checks every file against the manife
 executable's signer against the pin, lets `arkdeck doctor` start the installed daemon (decision
 11), runs the App's UIA smoke (`App.UITests` `InstalledRcTests`: the installed `ArkDeck.exe`
 connects to that daemon and shows its doctor report, no recovery banner), runs doctor again,
-stops the daemon through its stop event, and uninstalls by removing the directory: no process
-may run from it, no new entry may appear in the local application data and `%LOCALAPPDATA%\ArkDeck`
-must be as it was. The record is `smoke.json` beside the zip.
+and uninstalls with `uninstall-rc.ps1`: no process may run from the directory, no new entry
+may appear in the local application data and `%LOCALAPPDATA%\ArkDeck` must be as it was. The
+record is `smoke.json` beside the zip.
 
-Uninstall of the xcopy form is deleting its directory; the daemon's state (`%LOCALAPPDATA%\ArkDeck`:
-its state directory `Agentd`, the default Sessions root `Sessions` and the Trace cache `Trace`;
-or a development root) stays. The workflow `.github/workflows/windows-rc.yml` builds the
+`windows/scripts/uninstall-rc.ps1 -InstallDirectory <dir>` uninstalls the xcopy form. It refuses
+a directory without an RC manifest. It stops a daemon running from the directory through its
+own stop event, refuses while the App or a CLI still runs from it, and removes the directory.
+`-PackageName <identity>` does the same for the MSIX with `Remove-AppxPackage` for this user.
+The daemon's state (`%LOCALAPPDATA%\ArkDeck`: its state directory `Agentd`, the default Sessions
+root `Sessions` and the Trace cache `Trace`; or a development root) and the signing credentials
+stay, and are listed in the answer. The clean-host smoke is a maintainer runbook
+(`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/windows-clean-host-smoke-runbook.md`). The workflow `.github/workflows/windows-rc.yml` builds the
 unsigned RC on `main` and keeps it as the artifact `arkdeck-windows-rc-<revision>`; it uses no
 secret.
 
