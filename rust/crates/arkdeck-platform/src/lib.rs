@@ -354,14 +354,16 @@ mod host_deveco_resources;
 #[cfg(target_os = "macos")]
 pub use host_deveco_resources::{DEVECO_RESOURCE_PATHS, verify_deveco_resource_envelope};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod self_resources;
-#[cfg(target_os = "macos")]
+#[cfg(windows)]
+pub use self_resources::{SelfMemory, self_memory};
+#[cfg(any(target_os = "macos", windows))]
 pub use self_resources::{SelfResources, self_resources};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod continuous_clock;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use continuous_clock::ContinuousInstant;
 
 #[cfg(target_os = "macos")]

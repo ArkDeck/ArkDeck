@@ -1,6 +1,6 @@
 //! Host-only InputArtifact benchmark publication through the actual Import owner.
 //! Synthetic binding stays inside this fixture; no TargetStore or device facts.
-use crate::{Result, canonical_root, error};
+use super::{Result, canonical_root, error};
 use arkdeck_contract::{ImportIntent, WireError, encode_import_chunk, sha256_hex};
 use arkdeck_hoststore::{ArtifactReadStore, ImportBinding, ImportUploadStore};
 use arkdeck_platform::{ContinuousInstant, HostDirectory};
@@ -45,7 +45,7 @@ pub fn seed(root: &Path, count: u64, digest: &str) -> Result<Value> {
     directory.private_child("artifacts").map_err(error)?;
     let artifacts = ArtifactReadStore::open(&root.join("artifacts")).map_err(error)?;
     let uploads = ImportUploadStore::open(&root.join("artifacts")).map_err(error)?;
-    let now = crate::now()?;
+    let now = super::now()?;
     let started = ContinuousInstant::now().map_err(error)?;
     let intent = json!({"schemaVersion":"arkdeck.import-intent/1", "importRequestId":"artifact-benchmark",
         "kind":"flash-bundle", "targetId":"host-fixture", "bindingRevision":"1",
