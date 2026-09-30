@@ -36,17 +36,24 @@
             SelectionChanged="NavView_SelectionChanged">
             <NavigationView.MenuItems>
                 <NavigationViewItemHeader x:Name="SectionDevice" />
-                <NavigationViewItem x:Name="NavOverview" Tag="overview" AutomationProperties.AutomationId="app.navigation.overview">
+                <NavigationViewItem x:Name="NavOverview" Tag="overview" AccessKey="O" AutomationProperties.AutomationId="app.navigation.overview">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xF0E2;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem x:Name="NavDevice" Tag="device" AutomationProperties.AutomationId="app.navigation.device">
+                <NavigationViewItem x:Name="NavDevice" Tag="device" AccessKey="D" AutomationProperties.AutomationId="app.navigation.device">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8EA;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItemHeader x:Name="SectionRecords" />
-                <NavigationViewItem x:Name="NavHistory" Tag="history" AutomationProperties.AutomationId="app.navigation.history">
+                <NavigationViewItem x:Name="NavHistory" Tag="history" AccessKey="H" AutomationProperties.AutomationId="app.navigation.history">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE81C;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
+            <!-- Settings as a footer item, where Windows apps keep it (the built-in item has no
+                 stable AutomationId, so it stays hidden). -->
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem x:Name="NavSettings" Tag="settings" AccessKey="S" AutomationProperties.AutomationId="app.navigation.settings">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.FooterMenuItems>
 
             <Grid>
                 <Grid.RowDefinitions>
@@ -74,7 +81,7 @@
                     IsClosable="False"
                     IsOpen="False"
                     Severity="Error" />
-                <ContentControl x:Name="PageHost" Grid.Row="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+                <ContentControl x:Name="PageHost" Grid.Row="2" IsTabStop="False" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
                 <!-- The global Job Inspector, below every page as on macOS (VSplitView). -->
                 <Border
                     x:Name="InspectorHost"

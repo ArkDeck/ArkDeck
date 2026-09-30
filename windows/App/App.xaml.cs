@@ -30,10 +30,30 @@ public partial class App : Application
 
         Loader = new SurfaceLoader(DaemonConfiguration.Create(Options, Environment.GetEnvironmentVariable, AppContext.BaseDirectory));
         InitializeComponent();
+
+    }
+
+    /// <summary>Test runs only (<c>--high-contrast-tokens</c>): every ArkDeck token takes its
+    /// high-contrast value in the light and dark themes as well, which is what the system's
+    /// high-contrast themes select. WinUI's own resources are unchanged.</summary>
+    private void UseHighContrastTokens()
+    {
+        var tokens = Resources.MergedDictionaries.First(d => d.Source?.OriginalString.EndsWith("ArkDeckTokens.xaml", StringComparison.Ordinal) == true);
+        var contrast = (ResourceDictionary)tokens.ThemeDictionaries["HighContrast"];
+        foreach (var theme in new[] { "Light", "Dark" })
+        {
+            var dictionary = (ResourceDictionary)tokens.ThemeDictionaries[theme];
+            // A brush belongs to one dictionary: each theme gets its own, of the same system colour.
+            foreach (var key in contrast.Keys.ToArray())
+            {
+                dictionary[key] = contrast[key] is Microsoft.UI.Xaml.Media.SolidColorBrush brush ? new Microsoft.UI.Xaml.Media.SolidColorBrush(brush.Color) : contrast[key];
+            }
+        }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (Options.HighContrastTokens) UseHighContrastTokens();
         _window = new MainWindow();
         _window.Activate();
     }

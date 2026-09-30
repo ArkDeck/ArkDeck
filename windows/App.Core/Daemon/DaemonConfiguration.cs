@@ -12,13 +12,25 @@ namespace ArkDeck.App.Core.Daemon;
 /// <item><c>--test-transport &lt;scenario&gt;</c>: connect to an in-process scripted daemon
 /// (<see cref="ScriptedDaemon"/>) instead of the pipe, for the UIA tests of states the real
 /// daemon cannot be made to show on demand. The window then says so in a banner.</item>
+/// <item><c>--text-scale &lt;factor&gt;</c> (with <c>--test-transport</c> only): multiplies the
+/// App's own text sizes, so the layout tests can check the pages at the largest Windows
+/// text size (225 %) without changing the system setting. WinUI's own chrome keeps the
+/// system size.</item>
+/// <item><c>--high-contrast-tokens</c> (with <c>--test-transport</c> only): the App's tokens take
+/// their high-contrast values (system colours) in the light and dark themes too, so the UIA
+/// tests can check the high-contrast mapping without switching the system theme.</item>
+/// <item><c>--focus-walk &lt;file&gt;</c> (with <c>--test-transport</c> only): the keyboard tests'
+/// in-process Tab walk (see the App's <c>FocusWalk</c>) writes its stops to the file.</item>
 /// </list>
 /// </summary>
-public sealed record LaunchOptions(string? Language, string? StartPage, string? TestTransport)
+public sealed record LaunchOptions(string? Language, string? StartPage, string? TestTransport, double TextScale = 1.0, bool HighContrastTokens = false, string? FocusWalkFile = null)
 {
     public static LaunchOptions Parse(IReadOnlyList<string> args)
     {
         string? language = null, page = null, transport = null;
+        var scale = 1.0;
+        var highContrast = false;
+        string? focusWalk = null;
         for (var i = 0; i < args.Count; i++)
         {
             switch (args[i])
@@ -26,9 +38,20 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
                 case "--language" when i + 1 < args.Count: language = args[++i]; break;
                 case "--page" when i + 1 < args.Count: page = args[++i]; break;
                 case "--test-transport" when i + 1 < args.Count: transport = args[++i]; break;
+                case "--high-contrast-tokens": highContrast = true; break;
+                case "--focus-walk" when i + 1 < args.Count: focusWalk = args[++i]; break;
+                case "--text-scale" when i + 1 < args.Count:
+                    if (double.TryParse(args[++i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var factor)
+                        && factor is >= 1.0 and <= 2.25)
+                    {
+                        scale = factor;
+                    }
+                    break;
             }
         }
-        return new LaunchOptions(language, page, transport);
+        // Only the scripted transport's test runs may enlarge the text; a real run follows Windows.
+        return new LaunchOptions(language, page, transport, transport is null ? 1.0 : scale, transport is not null && highContrast,
+            transport is null ? null : focusWalk);
     }
 }
 

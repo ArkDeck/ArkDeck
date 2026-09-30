@@ -4024,7 +4024,7 @@
       "feature": "target.display-name.clear",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4042,7 +4042,7 @@
       "feature": "target.display-name.set",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4060,7 +4060,7 @@
       "feature": "target.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4078,7 +4078,7 @@
       "feature": "target.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4114,7 +4114,7 @@
       "feature": "trace.cache.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4364,7 +4364,7 @@
       "feature": "workspace.preset.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4418,7 +4418,7 @@
       "feature": "workspace.preset.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4454,7 +4454,7 @@
       "feature": "workspace.project.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4472,7 +4472,7 @@
       "feature": "workspace.project.register",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4508,7 +4508,7 @@
       "feature": "workspace.project.show",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

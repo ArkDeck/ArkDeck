@@ -212,6 +212,145 @@
         {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.capabilities", "origin": "windows", "role": "text", "name": [{"format": "windows.trace.inspect.capabilities", "args": ["cpuScheduling, namedSlices, threadStates"]}]},
         {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.quality", "origin": "windows", "role": "text", "name": [{"format": "windows.trace.inspect.quality", "args": ["ok", "0"]}]}
       ]
+    },
+    {
+      "id": "settings.general",
+      "scenario": "foundation",
+      "page": "settings",
+      "elements": [
+        {"automationId": "settings.title", "origin": "windows", "role": "text", "name": ["@windows.navigation.settings"]},
+        {"automationId": "settings.refresh", "origin": "windows", "role": "button", "name": ["@settings.common.refresh"]},
+        {"automationId": "settings.tab.general", "origin": "windows", "role": "listItem", "name": ["@settings.tab.general"]},
+        {"automationId": "settings.tab.runtime", "origin": "windows", "role": "listItem", "name": ["@windows.settings.tab.runtime"]},
+        {"automationId": "settings.tab.toolchains", "origin": "windows", "role": "listItem", "name": ["@settings.tab.toolchains"]},
+        {"automationId": "settings.tab.storage", "origin": "windows", "role": "listItem", "name": ["@settings.tab.storage"]},
+        {"automationId": "settings.tab.trace", "origin": "windows", "role": "listItem", "name": ["@settings.tab.trace"]},
+        {"automationId": "settings.tab.workspace", "origin": "windows", "role": "listItem", "name": ["@windows.settings.tab.workspace"]},
+        {"automationId": "settings.subtitle", "origin": "windows", "role": "text", "name": ["@settings.general.subtitle"]},
+        {"automationId": "settings.general.build.title", "origin": "windows", "role": "text", "name": ["@settings.general.build"]},
+        {"automationId": "settings.general.app.label", "origin": "windows", "role": "text", "name": ["@settings.general.app"]},
+        {"automationId": "settings.general.app", "origin": "windows", "role": "text", "name": ["@app.shell.title"]},
+        {"automationId": "settings.general.architecture", "origin": "windows", "role": "text", "name": ["x64"]},
+        {"automationId": "settings.general.localFirst", "origin": "windows", "role": "text", "name": ["@settings.general.localFirst"]},
+        {"automationId": "settings.general.noUpload.detail", "origin": "windows", "role": "text", "name": ["@settings.general.noUpload.detail"]}
+      ]
+    },
+    {
+      "id": "settings.runtime.foundation",
+      "scenario": "foundation",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.runtime"}],
+      "elements": [
+        {"automationId": "settings.subtitle", "origin": "windows", "role": "text", "name": ["@windows.settings.runtime.subtitle"]},
+        {"automationId": "settings.runtime.status", "origin": "windows", "role": "text", "name": ["ok"]},
+        {"automationId": "settings.runtime.protocol", "origin": "windows", "role": "text", "name": ["1.0.0"]},
+        {"automationId": "settings.runtime.providers", "origin": "windows", "role": "text", "name": ["@windows.settings.runtime.none"]},
+        {"automationId": "settings.runtime.overall", "origin": "windows", "role": "text", "name": [{"format": "windows.overview.doctor.overall", "args": ["@windows.overview.doctor.overall.blocked"]}]},
+        {"automationId": "settings.runtime.check.hdc", "origin": "windows", "role": "text", "name": ["unavailable (hdc.notConfigured) · unknown · unknown"]},
+        {"automationId": "settings.runtime.check.targets", "origin": "windows", "role": "text", "name": ["@windows.settings.runtime.notConfigured"]},
+        {"automationId": "settings.runtime.check.recovery", "origin": "windows", "role": "text", "name": ["@windows.settings.runtime.notChecked"]},
+        {"automationId": "settings.runtime.finding.hdc.notConfigured", "origin": "windows", "role": "listItem", "name": ["@windows.overview.doctor.severity.blocker", ": the Runtime has no bounded HDC status observer (hdc.notConfigured)"]},
+        {"automationId": "settings.runtime.service.title", "origin": "windows", "role": "text", "name": ["@windows.settings.service.title"]},
+        {"automationId": "settings.runtime.service.detail", "origin": "windows", "role": "text", "name": ["@windows.settings.service.detail"]},
+        {"automationId": "settings.runtime.service.status.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck runtime service status"]}]},
+        {"automationId": "settings.runtime.service.verify.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck runtime service verify"]}]},
+        {"automationId": "settings.runtime.service.restart.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck runtime service restart"]}]},
+        {"automationId": "settings.runtime.service.restart.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"]},
+        {"automationId": "settings.runtime.signing.detail", "origin": "windows", "role": "text", "name": ["@windows.settings.signing.detail"]},
+        {"automationId": "settings.runtime.signing.status.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck runtime signing status"]}]}
+      ]
+    },
+    {
+      "id": "settings.toolchains.foundation",
+      "scenario": "foundation",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.toolchains"}],
+      "elements": [
+        {"automationId": "settings.toolchains.hdc.title", "origin": "windows", "role": "text", "name": ["@settings.toolchains.hdc"]},
+        {"automationId": "settings.toolchains.hdc.unavailable", "origin": "windows", "role": "text", "name": ["@windows.settings.hdc.unavailable"]},
+        {"automationId": "settings.toolchains.hdc.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["rejected", "this method is unavailable in the read-only Rust foundation"]}]},
+        {"automationId": "settings.toolchains.hdc.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck runtime hdc status"]}]},
+        {"automationId": "settings.toolchains.tools.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["operationUnavailable", "Bootstrap bundle list owner is not configured"]}]},
+        {"automationId": "settings.toolchains.signing.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck runtime signing status"]}]}
+      ]
+    },
+    {
+      "id": "settings.storage.foundation",
+      "scenario": "foundation",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.storage"}],
+      "elements": [
+        {"automationId": "settings.storage.runtimeUsage.title", "origin": "windows", "role": "text", "name": ["@settings.storage.runtimeUsage"]},
+        {"automationId": "settings.storage.unavailable", "origin": "windows", "role": "text", "name": ["@settings.storage.runtimeUnavailable"]},
+        {"automationId": "settings.storage.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["rejected", "Runtime storage owners are not configured"]}]},
+        {"automationId": "settings.storage.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck runtime storage status"]}]}
+      ]
+    },
+    {
+      "id": "settings.trace.foundation",
+      "scenario": "foundation",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.trace"}],
+      "elements": [
+        {"automationId": "settings.trace.cache.title", "origin": "windows", "role": "text", "name": ["@windows.settings.trace.title"]},
+        {"automationId": "settings.trace.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["rejected", "Trace cache owner is not configured"]}]},
+        {"automationId": "settings.trace.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck trace cache status"]}]}
+      ]
+    },
+    {
+      "id": "settings.workspace.targets",
+      "scenario": "targets",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.workspace"}, {"select": "settings.workspace.project.project-04dfc9a54d0e77e090fbb537"}],
+      "elements": [
+        {"automationId": "settings.subtitle", "origin": "windows", "role": "text", "name": ["@windows.settings.workspace.subtitle"]},
+        {"automationId": "settings.workspace.list", "origin": "windows", "role": "list", "name": ["@windows.settings.workspace.projects"]},
+        {"automationId": "settings.workspace.project.project-04dfc9a54d0e77e090fbb537", "origin": "windows", "role": "listItem", "name": ["project-04dfc9a54d0e77e090fbb537 · openharmony · unavailable"]},
+        {"automationId": "settings.workspace.detail.title", "origin": "windows", "role": "text", "name": ["project-04dfc9a54d0e77e090fbb537"]},
+        {"automationId": "settings.workspace.detail.availability", "origin": "windows", "role": "text", "name": ["unavailable (workspace_runtime_restart_required)"]},
+        {"automationId": "settings.workspace.detail.configuration", "origin": "windows", "role": "text", "name": ["runtimeRestartRequired"]},
+        {"automationId": "settings.workspace.detail.reason", "origin": "windows", "role": "text", "name": ["restart the Runtime to compose the registered root before submitting a workspace Job"]},
+        {"automationId": "settings.workspace.presets", "origin": "windows", "role": "list", "name": ["@windows.settings.workspace.presets"]},
+        {"automationId": "settings.workspace.preset.preset-f55cf38289a9c8bf32967f7d", "origin": "windows", "role": "listItem", "name": ["preset-f55cf38289a9c8bf32967f7d · symbol · openharmony.arkts-symbol@1 · ", {"format": "windows.settings.workspace.timeout", "args": ["600"]}, " · runtimeRestartRequired"]},
+        {"automationId": "settings.workspace.preset.preset-f55cf38289a9c8bf32967f7d.relativeSourceMap", "origin": "windows", "role": "text", "name": ["relativeSourceMap: entry/build/sourceMaps.map"]},
+        {"automationId": "settings.workspace.presets.cli.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck workspace preset list --project project-04dfc9a54d0e77e090fbb537"]}]}
+      ]
+    },
+    {
+      "id": "settings.workspace.foundation",
+      "scenario": "foundation",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.workspace"}],
+      "elements": [
+        {"automationId": "settings.workspace.unavailable", "origin": "windows", "role": "text", "name": ["@windows.settings.workspace.unavailable"]},
+        {"automationId": "settings.workspace.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["operationUnavailable", "workspace project owner is unavailable"]}]},
+        {"automationId": "settings.workspace.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck workspace project list"]}]}
+      ]
+    },
+    {
+      "id": "settings.toolchains.jobs",
+      "scenario": "jobs",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.toolchains"}],
+      "elements": [
+        {"automationId": "settings.toolchains.health", "origin": "windows", "role": "text", "name": ["available (hdc.available) · healthy"]},
+        {"automationId": "settings.toolchains.path.label", "origin": "windows", "role": "text", "name": ["@settings.toolchains.path"]},
+        {"automationId": "settings.toolchains.path", "origin": "windows", "role": "text", "name": ["C:\\Tools\\hdc\\hdc.exe"]},
+        {"automationId": "settings.toolchains.clientVersion", "origin": "windows", "role": "text", "name": ["3.2.0f"]},
+        {"automationId": "settings.toolchains.tools.list", "origin": "windows", "role": "list", "name": ["@windows.settings.tools.title"]},
+        {"automationId": "settings.toolchains.tool.tool-hdc-3.2.0f", "origin": "windows", "role": "listItem", "name": ["tool-hdc-3.2.0f · hdc · windows-x64 · active"]}
+      ]
+    },
+    {
+      "id": "settings.storage.jobs",
+      "scenario": "jobs",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.storage"}],
+      "elements": [
+        {"automationId": "settings.storage.runtime.used", "origin": "windows", "role": "text", "name": [{"format": "windows.bytes", "args": ["1073741824"]}]},
+        {"automationId": "settings.storage.retention", "origin": "windows", "role": "text", "name": ["30"]},
+        {"automationId": "settings.storage.pinGuarantee", "origin": "windows", "role": "text", "name": ["@settings.storage.pinGuarantee"]}
+      ]
     }
   ]
 }

@@ -118,6 +118,19 @@ AGENT_RESUME_OWNER_ERROR_CODES = [
 # needs the derived data are not composed (maintainer ruling 18's shape, the
 # one `target.adopt` answers without a registered HDC; delegated 2026-09-30).
 TRACE_CACHE_PURGE_OWNER_ERROR_CODES = ["operationUnavailable"]
+# The Target display-name owner's refusals, as Swift's CLI failure mapper
+# names them for both mutations (`CLIControlMethodRegistry`): a clear of a
+# Target that is not an active durable Target is `resourceNotFound`, as a set
+# is, though only the set's refusal was ever recorded.
+TARGET_DISPLAY_NAME_OWNER_ERROR_CODES = [
+    "invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
+    "quotaExceeded", "ioFailure", "outcomeUnknown",
+]
+# Swift's `RuntimeImportControlHandler` without its Import, Artifact or Target
+# owner refuses every Import method `operationUnavailable` (phase
+# `importOwner`, no dispatch); only `artifact.import.list` was never recorded
+# doing so.
+IMPORT_OWNER_ERROR_CODES = ["operationUnavailable"]
 # Members keyed by caller data — operation input names, Artifact fact names,
 # provenance keys — rather than records with a fixed member set. Each is
 # published as a map, `{"type": "object", "additionalProperties": <schema of
@@ -301,7 +314,11 @@ def derive_method_schemas(source):
                        | (set(TOOL_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.tool.remove" else set())
                        | (set(TOOL_LIST_OWNER_ERROR_CODES) if method == "runtime.tool.list" else set())
                        | (set(AGENT_RESUME_OWNER_ERROR_CODES) if method in {"agent.resume", "human-action.resume"} else set())
-                       | (set(TRACE_CACHE_PURGE_OWNER_ERROR_CODES) if method == "trace.cache.purge" else set()))
+                       | (set(TRACE_CACHE_PURGE_OWNER_ERROR_CODES) if method == "trace.cache.purge" else set())
+                       | (set(TARGET_DISPLAY_NAME_OWNER_ERROR_CODES) if method in {
+                           "target.display-name.set", "target.display-name.clear"
+                       } else set())
+                       | (set(IMPORT_OWNER_ERROR_CODES) if method.startswith("artifact.import.") else set()))
         maps = dict.fromkeys(MAP_VALUED_MEMBERS.get(method, []), False)
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window
                      (NavOverview, UiStrings.AppNavigationOverview),
                      (NavDevice, UiStrings.AppNavigationDevice),
                      (NavHistory, UiStrings.AppNavigationHistory),
+                     (NavSettings, UiStrings.WindowsNavigationSettings),
                  })
         {
             item.Content = S.Text(key);
@@ -58,6 +59,8 @@ public sealed partial class MainWindow : Window
 
         var retry = Ui.Button("app.recovery.retry", S.Text(UiStrings.WindowsActionRetry), async (_, _) => await RefreshAllAsync(), accent: true);
         RecoveryBar.ActionButton = retry;
+
+        if (App.Options.FocusWalkFile is { } walk) FocusWalk.Install(this, walk);
 
         Inspector = new JobInspector();
         InspectorHost.Child = Inspector;
@@ -85,7 +88,7 @@ public sealed partial class MainWindow : Window
 
     public void Select(string tag)
     {
-        foreach (var item in NavView.MenuItems.OfType<NavigationViewItem>())
+        foreach (var item in NavView.MenuItems.Concat(NavView.FooterMenuItems).OfType<NavigationViewItem>())
         {
             if ((string)item.Tag == tag)
             {
@@ -139,6 +142,7 @@ public sealed partial class MainWindow : Window
             {
                 "device" => new DevicePage(),
                 "history" => new HistoryPage(),
+                "settings" => new SettingsPage(),
                 _ => new OverviewPage(),
             };
             _pages[tag] = page;

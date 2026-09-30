@@ -100,6 +100,5 @@ public sealed partial class OverviewPage() : SurfacePage<OverviewState>(
         _ => UiStrings.OverviewRecordStateInProgress,
     };
 
-    private static StackPanel Fact(string id, string labelKey, string value) =>
-        Ui.Row(Ui.Text(id + ".label", S.Text(labelKey), "ArkDeckCaptionStyle"), Ui.Text(id, value, "ArkDeckMonoStyle"));
+    private static Grid Fact(string id, string labelKey, string value) => Ui.Fact(id, S.Text(labelKey), value);
 }

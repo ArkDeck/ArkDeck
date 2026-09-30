@@ -539,7 +539,7 @@
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "7566c7319c49b4e28e2e00ca2c02c72ed1f079e97baa2a71003d8e9927a063ec",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "ad2eef4e754763618b5ff6e3d447e5034f9dfe9d0835eca66950e6e5800bed44"
+    "spec/control/methods": "f21d7fe493c0a7a1f4af7428ae10fdaa4c4c616277b10907f83ed58a142b32fd"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1355,8 +1355,8 @@
       "sha256": "abc2a8409153a438d39ab648b564c011b07cb5d808ba9c0443b72f348b24a30d"
     },
     "spec/control/methods/artifact.import.list.json": {
-      "blob": "0972e4114b0da074b7abf19e2949577cc79cb2bb",
-      "sha256": "fd6b4f324753e1ea6159036fb5f82f023f7b05fe53b78e2bbacc435e8e97618b"
+      "blob": "e077029f8ed2efb1c70f419e67e4eac852332dcf",
+      "sha256": "7057ba787315387d8c48306826c18bdb1daa7c266a155ee3ad3630fdf869e714"
     },
     "spec/control/methods/artifact.import.release.json": {
       "blob": "73b820477fb427e33513fcde6c4d9600233ce8b7",
@@ -1655,8 +1655,8 @@
       "sha256": "8264bdab287cdb87f37a2e29a12090a1b393bb596c33579041d371563ed9661d"
     },
     "spec/control/methods/target.display-name.clear.json": {
-      "blob": "f1087bdb2d94971da4dd77afa7089e00f27a03a3",
-      "sha256": "490752f0ac647157db5c73aa80c78c54676042fc7719234a2bb40088dfc962f0"
+      "blob": "d66270807fa2e01c3e7736a987e956fb7aab5552",
+      "sha256": "2335960ae10eb669813fb054ddd551c6fc30d152b5a8af144cf4dbe113f1f947"
     },
     "spec/control/methods/target.display-name.set.json": {
       "blob": "c82fe4938e7e9bcb48c779a729f39a2e48e38bf4",
@@ -1727,7 +1727,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "7417770f7445be52f8e26bac29fd8b248d72b6152470e8816e743ea4c4bf1f04",
+  "inputDigest": "1ed4cefc6e5d352a3127e651fc61b0d402fa05d6326b3ef0a65bbdabe454abf8",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

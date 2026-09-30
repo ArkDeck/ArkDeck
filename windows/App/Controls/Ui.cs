@@ -26,6 +26,7 @@ internal static class Ui
             Style = (Style)Application.Current.Resources[style],
             IsTextSelectionEnabled = true,
         };
+        Scale(block);
         AutomationProperties.SetAutomationId(block, automationId);
         AutomationProperties.SetName(block, text);
         return block;
@@ -43,6 +44,7 @@ internal static class Ui
     {
         var button = new Button { Content = text };
         if (accent) button.Style = (Style)Application.Current.Resources["AccentButtonStyle"];
+        if (App.Options.TextScale != 1.0) button.FontSize *= App.Options.TextScale;
         AutomationProperties.SetAutomationId(button, automationId);
         AutomationProperties.SetName(button, text);
         button.Click += click;
@@ -72,9 +74,10 @@ internal static class Ui
         return panel;
     }
 
-    public static StackPanel Row(params UIElement[] children)
+    /// <summary>Elements side by side, continuing on the next line when they do not fit.</summary>
+    public static FlowPanel Row(params UIElement[] children)
     {
-        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var panel = new FlowPanel();
         foreach (var child in children) panel.Children.Add(child);
         return panel;
     }
@@ -118,12 +121,39 @@ internal static class Ui
         return ring;
     }
 
+    /// <summary>A list of rows (one Tab stop, arrow keys between rows).</summary>
     public static ListView List(string automationId, string name)
     {
         var list = new ListView { SelectionMode = ListViewSelectionMode.None };
         AutomationProperties.SetAutomationId(list, automationId);
         AutomationProperties.SetName(list, name);
         return list;
+    }
+
+    /// <summary>A list whose rows are chosen (one Tab stop, arrow keys between rows).</summary>
+    public static ListView Choice(string automationId, string name)
+    {
+        var list = List(automationId, name);
+        list.SelectionMode = ListViewSelectionMode.Single;
+        return list;
+    }
+
+    /// <summary>A list whose rows carry their own buttons (<see cref="SemanticList"/>).</summary>
+    public static SemanticList ActionList(string automationId, string name)
+    {
+        var list = new SemanticList();
+        AutomationProperties.SetAutomationId(list, automationId);
+        AutomationProperties.SetName(list, name);
+        return list;
+    }
+
+    /// <summary>A row of <see cref="ActionList"/>, styled as a card row.</summary>
+    public static SemanticRow ActionItem(string automationId, string name, UIElement content)
+    {
+        var row = new SemanticRow(new Border { Style = (Style)Application.Current.Resources["ArkDeckCardStyle"], Child = content });
+        AutomationProperties.SetAutomationId(row, automationId);
+        AutomationProperties.SetName(row, name);
+        return row;
     }
 
     public static ListViewItem Item(string automationId, string name, UIElement content)
@@ -143,9 +173,27 @@ internal static class Ui
     }
 
     /// <summary>A labelled Runtime fact: the label (<c>{id}.label</c>) and the value as the
-    /// daemon gave it (<c>{id}</c>, monospaced, selectable).</summary>
-    public static StackPanel Fact(string id, string label, string value) =>
-        Row(Text(id + ".label", label, "ArkDeckCaptionStyle"), Text(id, value, "ArkDeckMonoStyle"));
+    /// daemon gave it (<c>{id}</c>, monospaced, selectable). A grid, not a horizontal stack, so
+    /// a long value (a digest, a path) wraps inside the page instead of running past it.</summary>
+    public static Grid Fact(string id, string label, string value)
+    {
+        var grid = new Grid { ColumnSpacing = 8 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var name = Text(id + ".label", label, "ArkDeckCaptionStyle");
+        name.MaxWidth = 280 * App.Options.TextScale;
+        var text = Text(id, value, "ArkDeckMonoStyle");
+        Grid.SetColumn(text, 1);
+        grid.Children.Add(name);
+        grid.Children.Add(text);
+        return grid;
+    }
+
+    /// <summary>The App's text size under <c>--text-scale</c> (layout tests only).</summary>
+    private static void Scale(TextBlock block)
+    {
+        if (App.Options.TextScale != 1.0) block.FontSize *= App.Options.TextScale;
+    }
 
     /// <summary>Changes a text element and its UIA name together.</summary>
     public static void SetText(TextBlock block, string text)

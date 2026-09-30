@@ -89,7 +89,21 @@ first, `ControlResult` back.
   scripted daemon (`App.Core/Testing/ScriptedDaemon.cs`: `unavailable`, `contract-mismatch`,
   `foundation`, `recovers`, `outage`, `jobs`, `targets`, `inspector`) so the UIA tests can show states the real daemon
   cannot be made to show on demand. ClientKit still decodes and schema-checks every reply; the
-  window shows a "Test transport" banner.
+  window shows a "Test transport" banner. Only beside it, three accessibility test hooks:
+  `--text-scale <1..2.25>` (the App's own text at up to 225 %), `--high-contrast-tokens` (the
+  tokens take their high-contrast system colours) and `--focus-walk <file>` (on the window
+  message `ArkDeck.FocusWalk`, WinUI's own Tab navigation walks the window and writes each stop).
+- **Settings (TASK-XPA-020).** A footer item with the macOS Settings tabs the Windows daemon can
+  speak to — General, Toolchains (`runtime.hdc.status`, `runtime.tool.list`), Storage
+  (`runtime.storage.status`), Trace (`trace.cache.status`) — and two Windows tabs: Runtime
+  (`health` and every `doctor` check; service status/verify/restart and signing status as their
+  CLI commands, since the App never controls the Runtime) and Workspace
+  (`workspace.project.list|show`, `workspace.preset.list`). All read-only.
+- **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
+  rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
+  have access keys (Alt+O, D, H, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  label and value) instead of running past the page at large text sizes; no host control is an
+  empty Tab stop.
 
 ## Build and test
 

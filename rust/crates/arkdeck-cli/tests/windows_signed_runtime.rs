@@ -15,6 +15,15 @@
 //!   private pipe with every other `ARKDECK_`/`OHOS_HDC_` input removed:
 //!   `doctor`, `doctor --deep`, `operation list` and `device candidates` are
 //!   answered as `check-readonly.py`'s signed matrix records them.
+//! - The same daemon over a development root holding a recorded Target
+//!   (`rust/tests/fixtures/target-adoption`) and a project directory: every
+//!   leaf in `WINDOWS_MEASURED_LEAVES` beyond `doctor` and `operation list`
+//!   is run through the CLI and answers its complete contract (`target
+//!   list|show|display-name set|clear`, `workspace project
+//!   register|list|show`, `workspace preset list|show`, `trace cache
+//!   status`), and what they wrote is read back after a restart. Each of
+//!   their coverage entries must be Windows `implemented` in
+//!   `openspec/contracts/cli-feature-coverage.json`.
 //! - A fake Runtime, which is this binary itself run as
 //!   `<exe> --fake-runtime <pipe>` (a `harness = false` target, so nothing but
 //!   its own lines reach its streams), serving `job watch` the same recorded
@@ -148,6 +157,10 @@ mod windows {
             (
                 "daemon_answered_leaves_run_end_to_end_through_the_pipe",
                 daemon_answered_leaves_run_end_to_end_through_the_pipe as fn(&str),
+            ),
+            (
+                "measured_owner_leaves_answer_their_contract_through_the_pipe",
+                measured_owner_leaves_answer_their_contract_through_the_pipe,
             ),
             (
                 "ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope",
@@ -384,6 +397,220 @@ mod windows {
         server.line_starting("arkdeck-agentd stopped");
         let status = server.child.wait().unwrap();
         assert!(status.success(), "{status:?}");
+    }
+
+    /// The daemon over its development root, started and serving: its pipe.
+    fn serve(daemon: &Path, root: &Path) -> (Server, String) {
+        let mut command = Command::new(daemon);
+        command.env("ARKDECK_DEVELOPMENT_STATE_ROOT", root);
+        let server = Server::start(command);
+        let pipe = server
+            .line_starting("arkdeck-agentd listening on ")
+            .pop()
+            .unwrap()
+            .trim_start_matches("arkdeck-agentd listening on ")
+            .to_owned();
+        (server, pipe)
+    }
+
+    /// Stopped by its root's stop request, as the restart hop stops it.
+    fn stop(mut server: Server, root: &Path) {
+        let scope = arkdeck_platform::StateRoot::development(root)
+            .unwrap()
+            .scope()
+            .unwrap();
+        scope.request_stop(server.child.id()).unwrap();
+        server.line_starting("arkdeck-agentd stopped");
+        let status = server.child.wait().unwrap();
+        assert!(status.success(), "{status:?}");
+    }
+
+    /// One CLI leaf that must answer: its result.
+    fn answered(pipe: &str, daemon: &Path, pin: &str, argv: &[&str]) -> Value {
+        let output = cli(pipe, daemon, pin)
+            .args(argv)
+            .args(["--output", "json"])
+            .output()
+            .unwrap();
+        let envelope: Value = serde_json::from_slice(&output.stdout)
+            .unwrap_or_else(|_| panic!("{argv:?}: {output:?}"));
+        assert_eq!(output.status.code(), Some(0), "{argv:?}: {envelope}");
+        assert_eq!(envelope["ok"], true, "{argv:?}: {envelope}");
+        envelope["result"].clone()
+    }
+
+    /// The Windows status of the coverage entry of the daemon method `leaf`
+    /// fronts.
+    fn windows_statuses(leaf: &str) -> Vec<String> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../openspec/contracts/cli-feature-coverage.json");
+        let coverage: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == leaf)
+            .map(|entry| {
+                entry["implementationStatusByPlatform"]["windows"]
+                    .as_str()
+                    .unwrap_or("unset")
+                    .to_owned()
+            })
+            .collect()
+    }
+
+    fn measured_owner_leaves_answer_their_contract_through_the_pipe(thumbprint: &str) {
+        const TARGET: &str = "TGT-3ba3f5f43b92";
+        let directory = Directory::new();
+        let (daemon, pin) = signed_copy(
+            &Path::new(CLI).with_file_name("arkdeck-agentd.exe"),
+            &directory,
+            thumbprint,
+        );
+        // A development root named as the disk names it (a workspace root
+        // must be that spelling), holding the Swift adoption oracle's Target.
+        let canonical = std::fs::canonicalize(&directory.0).unwrap();
+        let canonical = canonical.to_str().unwrap();
+        let base = PathBuf::from(canonical.strip_prefix(r"\\?\").unwrap_or(canonical));
+        let root = base.join("root");
+        std::fs::create_dir(&root).unwrap();
+        arkdeck_platform::HostDirectory::open_or_create_private(&root.join("targets-state"))
+            .unwrap();
+        std::fs::copy(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/target-adoption/targets-state/targets.json"),
+            root.join("targets-state").join("targets.json"),
+        )
+        .unwrap();
+        let project = base.join("project");
+        std::fs::create_dir(&project).unwrap();
+        let project = project.to_str().unwrap().to_owned();
+
+        let (server, pipe) = serve(&daemon, &root);
+        let run = |argv: &[&str]| answered(&pipe, &daemon, &pin, argv);
+        let listed = run(&["target", "list"]);
+        assert_eq!(listed[0]["targetId"], TARGET, "{listed}");
+        let shown = run(&["target", "show", "--target", TARGET]);
+        assert_eq!(shown["targetId"], TARGET, "{shown}");
+        let named = run(&[
+            "target",
+            "display-name",
+            "set",
+            "--target",
+            TARGET,
+            "--expected-generation",
+            "1",
+            "--name",
+            "Bench",
+        ]);
+        assert_eq!(named["generation"], "2", "{named}");
+        let registered = run(&[
+            "workspace",
+            "project",
+            "register",
+            "--registration-request-id",
+            "request-measured",
+            "--kind",
+            "openharmony",
+            "--root",
+            &project,
+        ]);
+        let reference = registered["projectRef"].as_str().unwrap().to_owned();
+        assert_eq!(
+            run(&["workspace", "project", "list"])["projects"],
+            json!([registered])
+        );
+        assert_eq!(
+            run(&["workspace", "project", "show", "--project", &reference]),
+            registered
+        );
+        assert_eq!(
+            run(&["workspace", "preset", "list", "--project", &reference])["presets"],
+            json!([])
+        );
+        // A symbol preset pins no toolchain or credential, so it registers
+        // on Windows and its projection can be shown.
+        let preset = run(&[
+            "workspace",
+            "preset",
+            "register",
+            "--registration-request-id",
+            "preset-measured",
+            "--project",
+            &reference,
+            "--kind",
+            "symbol",
+            "--template",
+            "openharmony.arkts-symbol@1",
+            "--timeout-seconds",
+            "600",
+            "--relative-source-map",
+            "entry/build/sourceMaps.map",
+        ]);
+        let preset_ref = preset["presetRef"].as_str().unwrap().to_owned();
+        let status = run(&["trace", "cache", "status"]);
+        assert_eq!(status["schemaVersion"], "arkdeck.trace-cache-status/1");
+        assert_eq!(status["entryCount"], 0, "{status}");
+        stop(server, &root);
+
+        // Restarted over the same root: every write is read back.
+        let (server, pipe) = serve(&daemon, &root);
+        let run = |argv: &[&str]| answered(&pipe, &daemon, &pin, argv);
+        assert_eq!(
+            run(&["target", "show", "--target", TARGET])["displayName"],
+            "Bench"
+        );
+        let cleared = run(&[
+            "target",
+            "display-name",
+            "clear",
+            "--target",
+            TARGET,
+            "--expected-generation",
+            "2",
+        ]);
+        assert_eq!(cleared["generation"], "3", "{cleared}");
+        assert_eq!(
+            run(&["workspace", "project", "show", "--project", &reference]),
+            registered
+        );
+        assert_eq!(
+            run(&[
+                "workspace",
+                "preset",
+                "show",
+                "--project",
+                &reference,
+                "--preset",
+                &preset_ref,
+            ]),
+            preset
+        );
+        assert_eq!(
+            run(&["workspace", "preset", "list", "--project", &reference])["presets"],
+            json!([preset])
+        );
+        stop(server, &root);
+
+        // What this measured is what the coverage manifest counts.
+        for leaf in [
+            "target.list",
+            "target.show",
+            "target.display-name.set",
+            "target.display-name.clear",
+            "workspace.project.register",
+            "workspace.project.list",
+            "workspace.project.show",
+            "workspace.preset.list",
+            "workspace.preset.show",
+            "trace.cache.status",
+        ] {
+            let statuses = windows_statuses(leaf);
+            assert!(
+                !statuses.is_empty() && statuses.iter().all(|status| status == "implemented"),
+                "{leaf}: {statuses:?}"
+            );
+        }
     }
 
     fn ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope(thumbprint: &str) {

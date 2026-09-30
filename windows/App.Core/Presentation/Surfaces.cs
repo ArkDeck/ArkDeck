@@ -24,6 +24,21 @@ public static class CliCommands
     public const string ArtifactRead = "arkdeck artifact read --artifact <artifact-id> (--job <id> | --import <id>)"; // artifact.read, app.history.export
     public const string TraceInspect = "arkdeck trace inspect --job <job-id> --artifact <artifact-id> --allow-sensitive"; // trace.inspect
 
+    public const string RuntimeServiceStatus = "arkdeck runtime service status";   // runtime.service.status
+    public const string RuntimeServiceVerify = "arkdeck runtime service verify";   // runtime.service.verify
+    public const string RuntimeServiceRestart = "arkdeck runtime service restart"; // runtime.service.restart
+    public const string RuntimeSigningStatus = "arkdeck runtime signing status";   // app.settings.toolchains
+    public const string RuntimeHdcStatus = "arkdeck runtime hdc status";           // runtime.hdc.status
+    public const string RuntimeToolList = "arkdeck runtime tool list";             // runtime.tool.list, app.settings.toolchains
+    public const string RuntimeStorageStatus = "arkdeck runtime storage status";   // runtime.storage.status, app.settings.storage
+    public const string TraceCacheStatus = "arkdeck trace cache status";           // trace.cache.status, app.settings.traceCache
+    public const string WorkspaceProjectList = "arkdeck workspace project list";   // workspace.project.list
+    public const string WorkspaceProjectRegister = "arkdeck workspace project register --registration-request-id <id> --kind <arkdeck|openharmony> --root <absolute-path>"; // workspace.project.register
+    public const string WorkspaceProjectShow = "arkdeck workspace project show --project <project-ref>"; // workspace.project.show
+    public const string WorkspacePresetList = "arkdeck workspace preset list --project <project-ref>";   // workspace.preset.list
+
+    public static string ForProject(string template, string projectRef) => template.Replace("<project-ref>", projectRef, StringComparison.Ordinal);
+
     public static string ForJob(string template, string jobId) => template.Replace("<job-id>", jobId, StringComparison.Ordinal);
 
     public static string ForTarget(string template, string targetId) => template.Replace("<target-id>", targetId, StringComparison.Ordinal);
@@ -83,7 +98,7 @@ public sealed record TraceInspectionState(string JobId, string ArtifactId, Loade
 /// daemon unavailable, the remaining calls of the same refresh are not made (nothing could
 /// answer them) and report the same failure.
 /// </summary>
-public sealed class SurfaceLoader(IControlChannel channel)
+public sealed partial class SurfaceLoader(IControlChannel channel)
 {
     public const int OverviewRecentCount = 5;
     public const int HistoryPageSize = 100;
