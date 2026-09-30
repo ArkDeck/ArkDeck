@@ -2798,7 +2798,12 @@ account is also the user name every read checks. An absent credential is
 `Status(CREDENTIAL_NOT_FOUND)` / `Absent` / `Ok(false)` as macOS answers
 `errSecItemNotFound`; values are bounded by Credential Manager's 2560 bytes;
 `presence` has to read the blob (no attribute-only query exists) and wipes it
-in place. `read_terminal_secret` requires a console on stdin, clears echo and
+in place. Credential Manager loses concurrent updates of one user's
+credentials: writes vanish and deletions come back. So every call takes this
+user's Credential Manager turn, the owner-only named mutex
+`Local\ArkDeck.CredentialManager.<user SID>`, and `set` keeps it through its
+read-back (TASK-XPA-005, `windows-credential-manager-turn-run.md`).
+`read_terminal_secret` requires a console on stdin, clears echo and
 line input, reads UTF-16 with `ReadConsoleW` into a wiped buffer, and restores
 the mode on every return and, through a console control handler, on Ctrl-C.
 `tests/windows_credential_store.rs` works in a per-run fixture namespace and
