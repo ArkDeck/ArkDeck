@@ -1988,6 +1988,26 @@ fake signer is the test binary on the pseudo console; no signer is launched.
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-pty-exchange-run.md`.
 
+## Windows persistent device shell channel (TASK-XPA-016, G19)
+
+`DeviceShellChannel` and its answer and error types build on Windows with the
+macOS signature. The framing, the bare-token rule, the budgets and the
+outcomes stay in `src/shell_channel.rs`, shared; only the client under them
+is per platform: the macOS pseudo-terminal client keeps its code, and
+`src/windows/shell.rs` attaches `hdc` to a pseudo console through the G19
+spawn (argv array, suspended, image proved before resume, kill-on-close Job,
+clean environment with a validated overlay), because `hdc shell` refuses a
+plain pipe. Windows differences: a framed line ends with CR; the console's
+rendering is read as text (its VT control sequences are removed before the
+frame is looked for, a cursor-forward over blanks reads back as the blanks,
+lines end in CRLF), so the answer bytes are T1; the shell "comes up" only on
+rendered text; a flood is bounded by the console and ends at the timeout,
+still an unknown outcome; closing ends the client's Job, its descendants
+included. `tests/windows_shell_channel.rs` is a `harness = false` target
+whose fake `hdc -t <key> shell` is the test binary on the pseudo console; no
+HDC is launched. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-016/windows-shell-channel-run.md`.
+
 ## HDC process dispatch (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
