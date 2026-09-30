@@ -21,6 +21,17 @@ recorded elsewhere (the Windows profile, design §L.1), that document is updated
 | 11 | Windows spelling of the USB topology (`runs/TASK-XPA-004/windows-usb-census-run.md`) | The decimal of the first eight bytes of the SHA-256 of the first `DEVPKEY_Device_LocationPaths` entry: stable per port, never equal to a macOS value. Revisit only if the DAYU200 sample shows it unstable. |
 | 12 | Development MSIX publisher and client code location | `CN=ArkDeck Development`, host-trusted only; client code under `windows/`. |
 
+Four further questions, raised later the same day by the portable text/calendar slice (#2336,
+`runs/TASK-XPA-004/portable-text-calendar-run.md` §4) and SPK-4 (#2347,
+`runs/TASK-XPA-007/spk-4-20260930-run.md`), were answered the same way ("全部按推荐"):
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 13 | The portable Unicode tables reproduce the CoreFoundation of the CI image (macOS 27), while the design names macOS 26 as the reference | Follow the CI image: CI is the unified gate. When the reference host or the CI image moves, regenerate the tables (`rust/scripts/generate-host-text-tables.py`, whose `--check` stops silent drift). |
+| 14 | The portable legacy ISO 8601 parser refuses spellings only ICU accepted (one-digit fields, `GMT`/`UTC`, trailing text, other digit scripts, leading spaces), on macOS too | Accepted (fail closed): no Swift or Rust writer produces them, so every recorded document still decodes. |
+| 15 | NFC keeps CoreFoundation's dropping of one leading U+FEFF, which Swift `String` equality does not do | Keep the CoreFoundation behaviour, so keys stay byte-identical with existing macOS data (T0); the difference from Swift `String` equality is recorded as T1. |
+| 16 | WinUI accent: the system accent (what the spike does) or the product accent of `tokens.css` | The product accent from `docs/design/arkdeck-ds/src/tokens.css`, for one brand on both platforms; light/dark still follow the system, and high-contrast themes use system colours only. |
+
 Related rulings the same day: the WinUI alpha project templates are accepted, the client uses the
 latest stable stack (.NET 10, Windows App SDK 2.5.1, WinUI 3) with a Fluent 2 style whose product
 semantics come from `docs/design/arkdeck-ds/src/tokens.css`; the Windows support tuple is Windows
