@@ -219,18 +219,25 @@ mod job_admission;
 pub use job_admission::FlashAdmitter;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_admission::{AdmissionRefusal, JobAdmitter, MutationAuthority, runtime_now};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod agent_execution;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use agent_execution::{
     AgentAdmission, AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart, Observing,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod human_action;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use human_action::HumanActionResources;
 #[cfg(target_os = "macos")]
 mod control_action;
+// The control actions are the HDC lifecycle's and the tool selection's, not
+// built on Windows yet; the human-action owner is the same code with none.
+#[cfg(windows)]
+#[path = "absent_control_action.rs"]
+mod control_action;
+#[cfg(windows)]
+pub use control_action::ControlActionResources;
 #[cfg(target_os = "macos")]
 pub use control_action::{ControlActionResources, control_action_without_owner};
 #[cfg(target_os = "macos")]
@@ -301,10 +308,12 @@ pub use job_recovery::{RecoveredJobs, RecoveryError, recover_active_jobs, recove
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_lineage_repair;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod job_reconcile;
 #[cfg(target_os = "macos")]
-pub use job_reconcile::{FlashReconciler, JobReconciler};
+pub use job_reconcile::FlashReconciler;
+#[cfg(any(target_os = "macos", windows))]
+pub use job_reconcile::JobReconciler;
 // The Session publication writer on macOS and Windows. Its callers, the Job
 // runners, cancellation and reconciliation, are still macOS-only; on Windows
 // the replay of the recorded Swift Sessions drives it

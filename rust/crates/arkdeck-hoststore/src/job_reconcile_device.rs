@@ -861,9 +861,12 @@ mod tests {
             "reconcile-sequence-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
+        #[cfg(target_os = "macos")]
         std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
             .create(&root)
             .unwrap();
+        #[cfg(windows)]
+        arkdeck_platform::HostDirectory::open_or_create_private(&root).unwrap();
         let targets = crate::TargetStore::open(&root).unwrap();
         let facts = DeviceFacts {
             target_id: "TGT-3ba3f5f43b92".into(),
