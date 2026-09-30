@@ -323,19 +323,19 @@ fn target_list_plan() -> ProcessPlan {
 }
 
 fn build_property_plan(connect_key: &str) -> ProcessPlan {
-    read_plan(&[
-        "-t",
+    owned_read_plan(crate::device_arguments(
         connect_key,
-        "shell",
-        "param",
-        "get",
-        Property::FullBuildVersion.key(),
-    ])
+        ["shell", "param", "get", Property::FullBuildVersion.key()].map(str::to_owned),
+    ))
 }
 
 fn read_plan(arguments: &[&str]) -> ProcessPlan {
+    owned_read_plan(arguments.iter().map(|value| (*value).to_owned()).collect())
+}
+
+fn owned_read_plan(arguments: Vec<String>) -> ProcessPlan {
     ProcessPlan {
-        arguments: arguments.iter().map(|value| (*value).to_owned()).collect(),
+        arguments,
         timeout: READ_TIMEOUT,
         capture_bytes: READ_CAPTURE_BYTES,
     }

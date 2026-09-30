@@ -22,6 +22,7 @@ use crate::capture_files::{
     DirectoryPurpose, FileActionError, FilePlan, FileReceipt, ImageType, Invocation,
     OwnedRemoteDirectory, OwnedRemotePath, path_presence,
 };
+use crate::operation::device_arguments;
 use crate::{Outcome, ProcessPlan, Receipt, RequestError};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -714,11 +715,7 @@ impl HapAction {
                 "factsUnavailable(\"{step_id} has no descriptor-bound target connect key\")"
             ));
         };
-        let device = |tail: Vec<String>| -> Vec<String> {
-            let mut arguments = vec!["-t".to_owned(), key.to_owned()];
-            arguments.extend(tail);
-            arguments
-        };
+        let device = |tail: Vec<String>| -> Vec<String> { device_arguments(key, tail) };
         let owned = |tail: &[&str]| device(tail.iter().map(|part| (*part).to_owned()).collect());
         let process = |arguments: Vec<String>, seconds: u64| {
             FilePlan::Process(ProcessPlan {

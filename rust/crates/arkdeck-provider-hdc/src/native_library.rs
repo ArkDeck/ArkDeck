@@ -18,6 +18,7 @@ use crate::debug_hap::{
     BundleReference, PersistedArguments, ResolvedArtifact, bounded_process_diagnostic,
 };
 use crate::native_elf::{CodeSignFacts, NativeAbi, NativeLibraryFacts, validate_elf};
+use crate::operation::device_arguments;
 use crate::{Outcome, Receipt};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -1185,8 +1186,7 @@ impl NativeAction {
             commands
                 .into_iter()
                 .map(|(tail, continue_after_non_zero, seconds)| {
-                    let mut arguments = vec!["-t".to_owned(), key.to_owned()];
-                    arguments.extend(tail);
+                    let arguments = device_arguments(key, tail);
                     Invocation {
                         arguments,
                         timeout: Duration::from_secs(seconds),

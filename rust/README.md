@@ -2504,6 +2504,17 @@ them on Windows, since no Windows HDC tuple is registered.
 test binary itself; no real HDC is launched. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
 
+A device command names its target in one place:
+`arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
+`-t <connectKey>` before the command's own arguments. Every plan the provider
+lowers goes through it: observation, capture, Debug HAP and reads, native
+library, port forward, pointer input, trace probe, live mode, and the Rockchip
+reads and Loader entry. `operation::tests::every_target_flag_is_added_here`
+fails if any other non-test code writes `-t` before a connect key. On Windows,
+`windows_managed_hdc.rs` runs a lowered device plan through `ProcessDispatch`:
+the fake process face receives exactly `-t <key> shell param get
+const.product.name`. A plan with no connect key runs nothing.
+
 ## Windows xcopy package (TASK-XPA-022)
 
 The daemon and the CLI also ship as an xcopy package for CI and headless use

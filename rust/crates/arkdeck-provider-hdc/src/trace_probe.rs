@@ -430,11 +430,10 @@ fn parameter(
 
 fn plan(connect_key: &str, command: &[&str], capture_bytes: usize) -> ProcessPlan {
     ProcessPlan {
-        arguments: ["-t", connect_key]
-            .into_iter()
-            .chain(command.iter().copied())
-            .map(str::to_owned)
-            .collect(),
+        arguments: crate::device_arguments(
+            connect_key,
+            command.iter().map(|part| (*part).to_owned()),
+        ),
         timeout: READ_TIMEOUT,
         capture_bytes,
     }
