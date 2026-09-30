@@ -550,7 +550,10 @@ pub use loader_binding::LoaderBinding;
 mod rockchip_startup;
 #[cfg(target_os = "macos")]
 pub use rockchip_startup::{RockchipStartup, reconcile_rockchip_startup};
-#[cfg(target_os = "macos")]
+// The Flash archive reader (TASK-XPA-010): on Windows its readers, the
+// Flash planner and the flash-bundle Import validator, are not composed yet.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod flash_archive;
 #[cfg(target_os = "macos")]
 mod flash_facts;

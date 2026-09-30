@@ -273,6 +273,10 @@ pub use host_url_properties::{EntryPresentation, host_entry_presentation};
 mod host_inflate;
 #[cfg(target_os = "macos")]
 pub use host_inflate::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
+// Windows has no raw DEFLATE decoder of its own; the platform's decoder
+// gives the same answers (TASK-XPA-010).
+#[cfg(windows)]
+pub use windows::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
 
 // Portable: Foundation's Julian/Gregorian UTC calendar and the legacy
 // ISO8601DateFormatter's written shape, with the Foundation originals as the
