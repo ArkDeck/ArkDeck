@@ -282,6 +282,8 @@ pub fn run(configuration: &Configuration) -> Result<Metrics> {
         executable: std::env::current_exe().map_err(error)?,
         authenticode_sha256: Some(signer_pin()?),
         package_family: None,
+        publisher_organization: None,
+        publisher_eku: None,
     };
     let (root, directory) = open_root(configuration)?;
     let _lock = directory

@@ -362,6 +362,58 @@ mod tests {
         );
     }
 
+    /// Maintainer ruling 17 before the start: a partial publisher identity
+    /// refuses whatever else is configured, and a complete one the image
+    /// cannot prove launches nothing (the test image is unsigned), unless a
+    /// package family is left to be proved on the running server.
+    #[test]
+    fn the_pre_launch_check_honours_the_publisher_identity() {
+        let image = std::env::current_exe().unwrap();
+        const EKU: &str = "1.3.6.1.4.1.311.97.990309390.766961637.194916062.941502583";
+        let family = Some("Contoso.ArkDeck_8wekyb3d8bbwe".to_owned());
+        for (organization, eku) in [(Some("Contoso Ltd"), None), (None, Some(EKU))] {
+            let partial = ServerIdentity {
+                authenticode_sha256: Some("0".repeat(64)),
+                package_family: family.clone(),
+                publisher_organization: organization.map(str::to_owned),
+                publisher_eku: eku.map(str::to_owned),
+                ..ServerIdentity::new(&image)
+            };
+            let refused = verify_daemon_image(&partial).expect_err("partial publisher identity");
+            assert_eq!(refused.kind(), io::ErrorKind::PermissionDenied);
+            assert!(
+                refused
+                    .to_string()
+                    .contains("partial daemon publisher identity")
+            );
+            assert!(DetachedDaemon::launch(&partial, None, Some(&[])).is_err());
+        }
+        let malformed = ServerIdentity {
+            publisher_organization: Some("Contoso Ltd".into()),
+            publisher_eku: Some("1.3.6.1.4.1.311.97.1.0".into()),
+            ..ServerIdentity::new(&image)
+        };
+        assert!(verify_daemon_image(&malformed).is_err());
+        let publisher = ServerIdentity {
+            publisher_organization: Some("Contoso Ltd".into()),
+            publisher_eku: Some(EKU.into()),
+            ..ServerIdentity::new(&image)
+        };
+        assert_eq!(
+            verify_daemon_image(&publisher).unwrap_err().kind(),
+            io::ErrorKind::PermissionDenied
+        );
+        assert!(DetachedDaemon::launch(&publisher, None, Some(&[])).is_err());
+        let with_family = ServerIdentity {
+            package_family: family,
+            ..publisher
+        };
+        assert_eq!(
+            verify_daemon_image(&with_family).unwrap(),
+            ImagePin::PackageFamily
+        );
+    }
+
     #[test]
     fn the_environment_block_is_sorted_and_double_terminated() {
         let block = environment_block(&[
