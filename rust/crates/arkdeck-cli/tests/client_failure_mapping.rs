@@ -482,16 +482,29 @@ fn an_unproven_refusal_of_a_mutation_is_an_unknown_outcome_unless_the_spec_fixes
 /// admits the answer, and the CLI reports the refusal (`operationUnavailable`,
 /// exit 69), not an unknown outcome. The `rejected` it answered before, with
 /// no proof, is read as an unknown outcome.
+///
+/// check-contracts' published view compiles this build against the merge
+/// base's contract, which predates the widening: there the code is not
+/// published, and nothing else is asserted.
 #[test]
 fn a_trace_cache_purge_refused_before_admission_is_a_refusal() {
     let details = json!({"phase": "preAdmission", "newDispatchCount": 0,
         "purgeScope": "inactiveDerivedDatabases"});
-    arkdeck_contract::validate_method_value(
+    if arkdeck_contract::validate_method_value(
         "trace.cache.purge",
         "errorCode",
         &json!("operationUnavailable"),
     )
-    .unwrap();
+    .is_err()
+    {
+        let inputs =
+            arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+        assert!(
+            inputs["kind"] == "development" && inputs.get("commit").is_some(),
+            "trace.cache.purge must publish operationUnavailable"
+        );
+        return;
+    }
     arkdeck_contract::validate_method_value("trace.cache.purge", "errorDetails", &details).unwrap();
     let error = CliError::from_client(
         refused(

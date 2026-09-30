@@ -121,4 +121,22 @@ Checks after the fix:
 - clippy of the changed crates: exit 0.
 - `client_failure_mapping`: 9 passed.
 
+The second head (`0e07b68d`) was red on `rust-checks / Rust contract parity
+(ubuntu-latest)` (run 36688704108, job 109801522622). It was not a pin or a
+sample count. `check-contracts.py`'s published view compiles this build
+against the merge base's contract, which does not publish
+`operationUnavailable` for `trace.cache.purge`, so the new CLI test's
+`validate_method_value(...).unwrap()` failed with `SchemaMismatch`. That was
+the only failure in the log. The candidate view passed.
+
+Both new tests now follow the repository's pattern for a widening (as in
+`debug_invocation_control.rs` and `app_ingress/import_tests.rs`). Where the
+compiled contract does not publish the code, they assert that this is the
+published view (`CONTRACT_INPUTS` of kind `development` with a `commit`),
+and:
+
+- the CLI test returns there;
+- the macOS host test asserts the control layer's `internalError` for a
+  non-conforming answer, with the cache untouched.
+
 The rest of CI is still to be recorded.

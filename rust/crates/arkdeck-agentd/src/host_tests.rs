@@ -430,6 +430,25 @@ mod cancellation_tests {
             .unwrap()
             .outcome
             .unwrap_err();
+        // check-contracts' published view compiles this build against the
+        // merge base's contract, which does not publish the code yet: the
+        // control layer answers that the result does not conform.
+        let inputs =
+            arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+        if inputs["kind"] == "development"
+            && inputs.get("commit").is_some()
+            && arkdeck_contract::validate_method_value(
+                "trace.cache.purge",
+                "errorCode",
+                &serde_json::json!("operationUnavailable"),
+            )
+            .is_err()
+        {
+            assert_eq!(error.code, "internalError");
+            assert!(traces.join(".locks").is_dir());
+            fs::remove_dir_all(root).unwrap();
+            return;
+        }
         assert_eq!(
             error,
             arkdeck_hoststore::TraceCacheStore::purge_unavailable()
