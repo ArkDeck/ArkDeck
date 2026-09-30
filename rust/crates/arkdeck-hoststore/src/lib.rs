@@ -795,21 +795,24 @@ mod tool_list_owner;
 mod tool_retirement;
 
 // Portable: the product and SDK manifest facts, the same format on macOS
-// and Windows (TASK-XPA-011, G15). The registry and its read owner stay
-// macOS-only until the Windows DevEco trust (G12) exists.
+// and Windows (TASK-XPA-011, G15). The DevEco registry and its owner are
+// built on macOS and Windows: on Windows node and hvigor register as the
+// child roles of one content-addressed toolchain, node's Authenticode
+// signature and the DevEco launcher's publisher (G12) in place of the macOS
+// bundle signature and resource envelope.
 mod deveco_manifest;
 pub use deveco_manifest::{
     DevEcoLaunchHost, DevEcoManifestError, DevEcoManifestFacts, parse_deveco_manifests,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_registry;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use deveco_registry::decode_deveco_toolchains;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_content;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_registry_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use deveco_registry_owner::DevEcoRegistryStore;
 
 // The Artifact read, inspect, list and export owners (TASK-XPA-006), on the
@@ -832,18 +835,13 @@ pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
 #[cfg(any(target_os = "macos", windows))]
 mod artifact_resources;
 
-#[cfg(target_os = "macos")]
+// The Import owner (`artifact.import.*`) on macOS and Windows; on Windows a
+// flash-bundle Import is refused at publication, as a kind whose validator
+// is not configured, until the Flash archive reader is ported (AF-W1).
+#[cfg(any(target_os = "macos", windows))]
 mod import_upload;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
-// The Import owner has no value on Windows yet (its publication needs the
-// Artifact publication and Flash archive owners); the Job planner is the
-// same code with none.
-#[cfg(windows)]
-#[path = "absent_import_upload.rs"]
-mod import_upload;
-#[cfg(windows)]
-pub use import_upload::ImportUploadStore;
 
 #[cfg(any(target_os = "macos", windows))]
 mod artifact_export;

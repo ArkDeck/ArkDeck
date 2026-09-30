@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
@@ -42,7 +42,7 @@ internal static class FocusWalk
     {
         var root = window.Content;
         var options = new FindNextElementOptions { SearchRoot = root.XamlRoot.Content };
-        var stops = new List<object>();
+        var stops = new JsonArray();
         var first = direction == FocusNavigationDirection.Next
             ? FocusManager.FindFirstFocusableElement(root.XamlRoot.Content)
             : FocusManager.FindLastFocusableElement(root.XamlRoot.Content);
@@ -52,13 +52,14 @@ internal static class FocusWalk
         {
             if (FocusManager.GetFocusedElement(root.XamlRoot) is not DependencyObject focused) break;
             if (!seen.Add(focused)) break;
-            stops.Add(Describe(focused, root));
+            stops.Add((JsonNode)Describe(focused, root));
             if (!FocusManager.TryMoveFocus(direction, options)) break;
         }
-        File.WriteAllText(file, JsonSerializer.Serialize(stops));
+        // JsonNode, not reflection-based serialization: the published App is trimmed (IL2026).
+        File.WriteAllText(file, stops.ToJsonString());
     }
 
-    private static object Describe(DependencyObject element, UIElement root)
+    private static JsonObject Describe(DependencyObject element, UIElement root)
     {
         var id = AutomationProperties.GetAutomationId(element);
         double x = 0, y = 0, width = 0, height = 0;
@@ -69,7 +70,16 @@ internal static class FocusWalk
             (x, y, width, height) = (origin.X, origin.Y, fe.ActualWidth, fe.ActualHeight);
         }
         if (element is Control c) state = c.FocusState.ToString();
-        return new { id, type = element.GetType().Name, state, x, y, width, height };
+        return new JsonObject
+        {
+            ["id"] = id,
+            ["type"] = element.GetType().Name,
+            ["state"] = state,
+            ["x"] = x,
+            ["y"] = y,
+            ["width"] = width,
+            ["height"] = height,
+        };
     }
 
     private delegate IntPtr SubclassProc(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam, UIntPtr id, IntPtr data);

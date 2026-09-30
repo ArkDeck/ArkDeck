@@ -460,8 +460,7 @@ impl TargetStore {
     }
     /// Resolve only existing durable Target authority for a new Import intent.
     /// No wire input supplies a binding, route, observation or inspected fact.
-    /// Its one consumer, the Import owner, is composed on macOS only.
-    #[cfg(target_os = "macos")]
+    /// Its one consumer is the Import owner.
     pub fn resolve_import_binding(
         &self,
         intent: &arkdeck_contract::ImportIntent,

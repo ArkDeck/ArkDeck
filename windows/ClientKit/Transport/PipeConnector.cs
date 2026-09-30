@@ -51,8 +51,8 @@ public sealed class ServerAuthenticationException(DaemonUnavailableReason reason
 /// owner is Administrators, so elevation is covered too).</item>
 /// <item>Layer 2, instance: the connection's server PID (<c>GetNamedPipeServerProcessId</c>,
 /// confirmed on a client handle by SPK-3), its process opened and held, its image the
-/// installed daemon's path and file, signed by the pinned signer or in the installed
-/// package, and the PID unchanged afterwards.</item>
+/// installed daemon's path and file, signed by the pinned signer or publisher (maintainer
+/// ruling 17) or in the installed package, and the PID unchanged afterwards.</item>
 /// </list>
 /// Any failure closes the handle having sent zero frames.
 /// </summary>
@@ -75,6 +75,16 @@ public static class PipeConnector
 
     internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner, TimeSpan wait)
     {
+        // Read before anything is opened: a partial or malformed publisher identity refuses
+        // whatever else is configured (maintainer ruling 17; the Rust verify_installed_image).
+        try
+        {
+            SignerPins.Configured(expected);
+        }
+        catch (UnauthorizedAccessException error)
+        {
+            throw new ServerAuthenticationException(DaemonUnavailableReason.InstanceMismatch, error.Message, error);
+        }
         var deadline = Environment.TickCount64 + (long)Math.Max(0, wait.TotalMilliseconds);
         SafeFileHandle file;
         while (true)

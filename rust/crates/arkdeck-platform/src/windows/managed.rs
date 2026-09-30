@@ -9,10 +9,15 @@
 //! TERM), when it exits on its own, or when its owner drops it (the Job is
 //! terminated, and closing the Job handle kills anything left).
 //!
-//! The paired launch (`launch_paired`, `arkforged`) is not ported: no Windows
-//! owner needs it yet (GJ-4/GJ-5).
+//! A paired server (`launch_paired`, Swift's `IdentityBoundDaemonLauncher`,
+//! which starts `arkforged`; TASK-XPA-010) is also handed one secret on
+//! stdin, and the write end of that pipe stays with its owner as the
+//! server's liveness: its close is the server's end of input, the proof its
+//! owning generation is gone. Its stop closes that input first, gives the
+//! server the half second macOS gives it before KILL to end on its own, and
+//! only then terminates its Job.
 use super::identity::{FileIdentity, ProcessIdentity};
-use super::process::{RunningChild, spawn_in};
+use super::process::{RunningChild, input_pipe, spawn_in, spawn_paired};
 use super::server::{owns_local_listener, process_started_by_pid, unix_birth};
 use super::tool::{Capture, validate_environment};
 use crate::process::tool_request::MAX_CAPTURE_BYTES;
@@ -20,11 +25,19 @@ use crate::{
     ServerExit, ServerIdentityReceipt, ServerLaunch, ServerStop, VerifiedTool, denied, invalid,
 };
 use std::ffi::OsString;
-use std::io;
+use std::fs::File;
+use std::io::{self, Write};
+use std::path::Path;
 use std::process::ExitStatus;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+/// How long a paired server has, after its end of input, to end on its own
+/// before its Job is terminated: macOS's `stopDaemonProcessGroup` sends TERM
+/// (which `arkforged` starts ignoring) and KILLs half a second later.
+/// Windows has no TERM, so the end of input alone opens that half second.
+const PAIRED_INPUT_GRACE: Duration = Duration::from_millis(500);
 
 type Captured = io::Result<(Vec<u8>, bool)>;
 
@@ -40,6 +53,8 @@ pub struct ManagedServer {
     stdout: Option<Captured>,
     stderr: Option<Captured>,
     exit: Option<ServerExit>,
+    /// A paired server's liveness: the write end of its stdin.
+    liveness: Option<File>,
 }
 
 impl ManagedServer {
@@ -54,6 +69,57 @@ impl ManagedServer {
         environment: &[(OsString, OsString)],
         capture_bytes: usize,
     ) -> io::Result<Self> {
+        Self::spawn(tool, arguments, environment, None, capture_bytes)
+    }
+
+    /// Swift `IdentityBoundDaemonLauncher.launch`: the verified tool in its
+    /// own Job, run in `working_directory` (absolute and canonical, as a tool
+    /// request's), handed `secret` on stdin; the pipe's write end stays open
+    /// in the returned server. `secret` is written and never kept. A child
+    /// the whole secret did not reach is stopped and its launch refused: it
+    /// could never pair, and nothing is left running unpaired.
+    ///
+    /// Windows has no signal disposition to hand the child: there is no
+    /// TERM, and a console break cannot reach a child created without a
+    /// console. Its end of input is the only way its owner asks it to end.
+    pub fn launch_paired(
+        tool: &VerifiedTool,
+        arguments: &[OsString],
+        environment: &[(OsString, OsString)],
+        working_directory: &Path,
+        secret: &[u8],
+        capture_bytes: usize,
+    ) -> io::Result<Self> {
+        let directory = super::tool::validate_working_directory(working_directory)?;
+        let (read, write) = input_pipe()?;
+        let mut server = Self::spawn(
+            tool,
+            arguments,
+            environment,
+            Some((&directory, &read)),
+            capture_bytes,
+        )?;
+        drop(read);
+        let mut liveness = write.into_file();
+        if let Err(error) = liveness.write_all(secret) {
+            drop(liveness);
+            let _ = server.child.kill_and_wait();
+            return Err(io::Error::other(format!(
+                "the child started but the secret did not reach it ({error}); it is left \
+                 unpaired rather than started with a partial handshake"
+            )));
+        }
+        server.liveness = Some(liveness);
+        Ok(server)
+    }
+
+    fn spawn(
+        tool: &VerifiedTool,
+        arguments: &[OsString],
+        environment: &[(OsString, OsString)],
+        paired: Option<(&[u16], &super::Handle)>,
+        capture_bytes: usize,
+    ) -> io::Result<Self> {
         if capture_bytes == 0 || capture_bytes > MAX_CAPTURE_BYTES {
             return Err(invalid("server capture must be 1 byte..64 MiB per stream"));
         }
@@ -62,7 +128,12 @@ impl ManagedServer {
         // The creation time is read while the child is still suspended, so a
         // server that exits at once is an exit its owner sees, never a launch
         // that could not be recorded.
-        let mut child = spawn_in(tool, arguments, environment, None)?;
+        let mut child = match paired {
+            None => spawn_in(tool, arguments, environment, None)?,
+            Some((directory, input)) => {
+                spawn_paired(tool, arguments, environment, directory, input)?
+            }
+        };
         let (start_seconds, start_microseconds) = unix_birth(child.started)?;
         let pid = i32::try_from(child.pid)
             .map_err(|_| io::Error::other("server launch could not be recorded from the kernel"))?;
@@ -94,6 +165,7 @@ impl ManagedServer {
             stdout: None,
             stderr: None,
             exit: None,
+            liveness: None,
         })
     }
 
@@ -122,19 +194,11 @@ impl ManagedServer {
         Ok(Some(exit))
     }
 
-    /// Ends the server — its whole Job at once — or takes the end it already
-    /// had, and collects what it wrote.
+    /// Ends the server — a paired server's end of input first, then its
+    /// whole Job at once — or takes the end it already had, and collects
+    /// what it wrote.
     pub fn stop(mut self) -> io::Result<ServerStop> {
-        let exit = match self.exit()? {
-            Some(exit) => exit,
-            None => {
-                self.child.kill_and_wait()?;
-                match self.child.try_wait()? {
-                    Some(status) => classify(status)?,
-                    None => return Err(io::Error::other("server did not end after termination")),
-                }
-            }
-        };
+        let exit = self.end()?;
         self.child.kill_and_wait()?;
         self.stop.store(true, Ordering::Release);
         let deadline = Instant::now() + crate::process::READER_CLEANUP_TIMEOUT;
@@ -146,6 +210,30 @@ impl ManagedServer {
             truncated: stdout_dropped || stderr_dropped,
             exit,
         })
+    }
+
+    /// The end `stop` gives a server: a paired server's end of input, then
+    /// the half second it has to end on its own, then its Job terminated;
+    /// or the end it already had.
+    fn end(&mut self) -> io::Result<ServerExit> {
+        let paired = self.liveness.take().is_some();
+        if let Some(exit) = self.exit()? {
+            return Ok(exit);
+        }
+        if paired {
+            let deadline = Instant::now() + PAIRED_INPUT_GRACE;
+            while Instant::now() < deadline {
+                if let Some(exit) = self.exit()? {
+                    return Ok(exit);
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        }
+        self.child.kill_and_wait()?;
+        match self.child.try_wait()? {
+            Some(status) => classify(status),
+            None => Err(io::Error::other("server did not end after termination")),
+        }
     }
 
     /// The Windows form of `verifies_managed_process`, without argv: Windows
@@ -212,6 +300,22 @@ impl ManagedServer {
             .and_then(|option| self.launch.arguments.get(option + 1))
             .is_some_and(|argument| *argument == *endpoint);
         Ok(declares && owns_local_listener(pid, receipt.endpoint)?)
+    }
+}
+
+/// A paired server its owner lets go of without stopping it is ended as its
+/// stop ends it: its end of input first, so that it sees its owner go, and
+/// only then its Job. Left to the child's own drop, its Job would be
+/// terminated before its input closed. An unpaired server is still left to
+/// that drop, and a server `stop` ended has nothing left here.
+impl Drop for ManagedServer {
+    fn drop(&mut self) {
+        if self.liveness.is_none() {
+            return;
+        }
+        let _ = self.end();
+        let _ = self.child.kill_and_wait();
+        self.stop.store(true, Ordering::Release);
     }
 }
 

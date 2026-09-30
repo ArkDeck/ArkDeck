@@ -14,6 +14,7 @@ holds no runtime semantics: everything it shows is a projection read from the lo
 | `App.UITests/` | MSTest + FlaUI (UIA3): UIA semantic snapshots of the running App; needs a desktop session (`ARKDECK_APP_UITESTS=1`), otherwise reported skipped |
 | `scripts/generate-clientkit.py` | Generator of `ClientKit/Generated/ControlContract.g.cs`; `--check` fails on drift |
 | `scripts/generate-ui-strings.py` | Generator of the App's `.resw` from `spec/ui-semantics/strings.json` (values equal to the macOS `.xcstrings`); `--check` fails on drift |
+| `scripts/generate-app-icons.py` | Generator of `App/Assets/AppIcon.ico` (16–256 px) and the MSIX visual assets (scale-100/200, the taskbar target sizes) from the macOS AppIcon (`ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset`), resampled, never drawn; `--check` compares decoded pixels |
 | `scripts/generate-xaml-tokens.py` | Generator of `App/Themes/ArkDeckTokens.xaml` from `docs/design/arkdeck-ds/src/tokens.css` (product accent on controls, ruling 16); `--check` fails on drift |
 | `ArkDeck.Windows.slnx` | The solution the `windows` CI lane builds and tests |
 | `spikes/spk4/` | The SPK-4 WinUI 3 spike (its own solution and pins; not part of the lane) |
@@ -42,7 +43,8 @@ holds no runtime semantics: everything it shows is a projection read from the lo
   `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION`. Layer 1: the pipe object's owner SID must equal
   this process token's owner SID. Layer 2: the connection's server PID is opened and held, its image
   must be the installed daemon (canonical path and file id), signed by the pinned Authenticode
-  signer (SHA-256 of the certificate DER) or running in the installed MSIX package family, and the
+  signer (SHA-256 of the certificate DER) or by the pinned publisher (ruling 17), or running in
+  the installed MSIX package family, and the
   PID must not change; the image file and its ancestor directories are held for the connection.
 - **Failures are typed.** `ControlFailureKind.DaemonUnavailable` (with a `DaemonUnavailableReason`)
   means nothing ran; the UI shows `ControlFailure.Banner`, the daemon-unavailable recovery banner,
@@ -72,9 +74,13 @@ first, `ControlResult` back.
   Trace can be inspected by the Runtime (`trace.inspect`; without a Windows Trace inspector the
   refusal is shown as it came, and the viewer is deferred, decision 5).
 - **Which daemon.** The installation inputs the CLI reads: `ARKDECK_DAEMON_PATH` (default
-  `arkdeck-agentd.exe` beside the App), `ARKDECK_DAEMON_SIGNER_SHA256` or
-  `ARKDECK_DAEMON_PACKAGE_FAMILY`, optional `ARKDECK_ENDPOINT`. Without a pin there is nothing
-  to verify, so the App connects to nothing and shows the recovery banner. The App does not
+  `arkdeck-agentd.exe` beside the App), `ARKDECK_DAEMON_SIGNER_SHA256` (the development
+  signer), `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` with `ARKDECK_DAEMON_PUBLISHER_EKU` (a
+  production daemon, maintainer ruling 17: the chain `WinVerifyTrust` accepted ends at the
+  Microsoft Identity Verification Root 2020, and the leaf has exactly that one `O=` and the
+  Artifact Signing profile EKU; both or neither), or `ARKDECK_DAEMON_PACKAGE_FAMILY`, optional
+  `ARKDECK_ENDPOINT`. Without a pin there is nothing to verify, so the App connects to nothing
+  and shows the recovery banner. The App does not
   start the daemon (the client-started daemon lives in the CLI); the banner names
   `arkdeck doctor`, which starts it and says what is wrong.
 - **Recovery banner.** A daemon-unavailable failure (ClientKit refused or reached nothing)
@@ -124,6 +130,7 @@ host the NuGet cache is `D:\nuget\packages` (`NUGET_PACKAGES`). From the reposit
 python windows/scripts/generate-clientkit.py --check   # --write after a contract input changed
 python windows/scripts/generate-ui-strings.py --check  # --write after spec/ui-semantics/strings.json changed
 python windows/scripts/generate-xaml-tokens.py --check # (no flag) rewrites after tokens.css changed
+python windows/scripts/generate-app-icons.py --check   # (no flag) rewrites after the macOS AppIcon changed
 dotnet build windows/ArkDeck.Windows.slnx -c Release
 dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build
 ```
@@ -154,12 +161,30 @@ whole product from one recorded checkout (r12 decision 10, rulings 8, 12 and 17)
   `rc-manifest.json` (`arkdeck.windows-rc-package/1`: every file's size and SHA-256, the
   toolchains, the signer pin), zipped, with the manifest beside the zip carrying its SHA-256;
 - the **MSIX form**: the same App with the signed daemon and CLI at the package root
-  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12), write
-  virtualization off (ruling 8), **unsigned**; its SHA-256 and the daemon's and CLI's inside it
-  are in the manifest.
+  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12) unless
+  `-MsixPublisher` names the signing certificate's subject (the package is then built from a
+  copy of `Package.appxmanifest` under `<out>\msix-manifest`, passed as `ArkDeckPackageManifest`;
+  the tracked manifest is never rewritten), write virtualization off (ruling 8), unsigned unless
+  `-MsixSignCommand` is given; its SHA-256 and the daemon's and CLI's inside it are in the
+  manifest.
 
 `-SigningMode none` (CI) signs nothing; `development` signs with the host-trusted development
-certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`). A production RC is not built here.
+certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`); `production` calls the maintainer's command
+(`-ProductionSignCommand` / `ARKDECK_PRODUCTION_SIGN_COMMAND`, one call per file) for the daemon,
+the CLI and `ArkDeck.exe`, and requires timestamps, one publisher identity (ruling 17) and a
+clean checkout. That identity must be the one the clients pin, given by the maintainer:
+`-ExpectedPublisherOrganization` and `-ExpectedPublisherEku` (else
+`ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` / `ARKDECK_DAEMON_PUBLISHER_EKU`, the CLI's own inputs;
+the EKU is an Artifact Signing certificate profile `1.3.6.1.4.1.311.97.<profile>`, never the
+Public Trust marker). Unless `-SkipMsix`, a production run also signs the MSIX:
+`-MsixSignCommand` and `-MsixPublisher` are required and the publisher's `O=` must be the
+expected organisation. Anything missing is refused before anything is built.
+`-MsixSignCommand` / `ARKDECK_MSIX_SIGN_COMMAND` signs the MSIX, whose signer's subject must be
+the manifest's `Publisher`. The scripts hold no credential; the commands obtain them from the
+maintainer at run time. `-FeedBaseUri
+https://…/` writes the App Installer feed `ArkDeck.appinstaller` from the MSIX this run built
+(name, publisher, version and architecture read from its `AppxManifest.xml`). The package
+version must rise with each published RC.
 
 ```powershell
 pwsh windows/scripts/package-rc.ps1 -OutputDirectory D:\out\rc -SigningMode development -Smoke
@@ -167,16 +192,22 @@ pwsh windows/scripts/package-rc.ps1 -OutputDirectory D:\out\rc -SigningMode deve
 
 `-Smoke` installs the zip into a new owner-only directory under the account's local application
 data with a private development state root, checks every file against the manifest and every
-executable's signer against the pin, lets `arkdeck doctor` start the installed daemon (decision
+executable's signer against the pin (a production RC: its timestamped signature against the
+manifest's publisher identity, which then configures the CLI and the App), lets `arkdeck doctor` start the installed daemon (decision
 11), runs the App's UIA smoke (`App.UITests` `InstalledRcTests`: the installed `ArkDeck.exe`
 connects to that daemon and shows its doctor report, no recovery banner), runs doctor again,
-stops the daemon through its stop event, and uninstalls by removing the directory: no process
-may run from it, no new entry may appear in the local application data and `%LOCALAPPDATA%\ArkDeck`
-must be as it was. The record is `smoke.json` beside the zip.
+and uninstalls with `uninstall-rc.ps1`: no process may run from the directory, no new entry
+may appear in the local application data and `%LOCALAPPDATA%\ArkDeck` must be as it was. The
+record is `smoke.json` beside the zip.
 
-Uninstall of the xcopy form is deleting its directory; the daemon's state (`%LOCALAPPDATA%\ArkDeck`:
-its state directory `Agentd`, the default Sessions root `Sessions` and the Trace cache `Trace`;
-or a development root) stays. The workflow `.github/workflows/windows-rc.yml` builds the
+`windows/scripts/uninstall-rc.ps1 -InstallDirectory <dir>` uninstalls the xcopy form. It refuses
+a directory without an RC manifest. It stops a daemon running from the directory through its
+own stop event, refuses while the App or a CLI still runs from it, and removes the directory.
+`-PackageName <identity>` does the same for the MSIX with `Remove-AppxPackage` for this user.
+The daemon's state (`%LOCALAPPDATA%\ArkDeck`: its state directory `Agentd`, the default Sessions
+root `Sessions` and the Trace cache `Trace`; or a development root) and the signing credentials
+stay, and are listed in the answer. The clean-host smoke is a maintainer runbook
+(`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/windows-clean-host-smoke-runbook.md`). The workflow `.github/workflows/windows-rc.yml` builds the
 unsigned RC on `main` and keeps it as the artifact `arkdeck-windows-rc-<revision>`; it uses no
 secret.
 

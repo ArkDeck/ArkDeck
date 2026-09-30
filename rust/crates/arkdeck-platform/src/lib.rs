@@ -400,6 +400,13 @@ pub use windows::{
 // and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
 #[cfg(windows)]
 pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
+// The Authenticode signature of a registered DevEco tool and the DevEco
+// launcher's publisher, with the macOS answer type (TASK-XPA-011, G12).
+#[cfg(windows)]
+pub use windows::{
+    DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,
+    inspect_native_code_signature, inspect_publisher,
+};
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]
@@ -426,6 +433,9 @@ pub use usb_registry::{RegistryEntry, RegistryUnavailable, RegistryValue, UsbHos
 pub use usb_registry::{registry_census, usb_host_devices};
 
 mod usb_device_nodes;
+pub use usb_device_nodes::{
+    CENSUS_MAPPING, CensusField, CensusSample, DeviceNode, NodeProperty, NodeValue,
+    unconfirmed_census_fields,
+};
 #[cfg(windows)]
-pub use usb_device_nodes::usb_host_devices;
-pub use usb_device_nodes::{DeviceNode, NodeProperty, NodeValue};
+pub use usb_device_nodes::{usb_device_node_census, usb_host_devices};

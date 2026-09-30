@@ -80,6 +80,53 @@ class ReadOnlyImportExpectationTests(unittest.TestCase):
                     readonly.missing_import_owner_error("artifact.import.commit")
 
 
+class ReadOnlyMachineOutputTests(unittest.TestCase):
+    """The pinned leaves' machine output: `observedAt` read as its label, then byte-equal to
+    the committed fixtures, which the recorded macOS lane produced (TASK-XPA-002)."""
+
+    def run_matrix(self, directory: Path, outputs: dict, write: bool = False) -> None:
+        rows = []
+        # Windows records the unsigned refusal first; the matrix's own row is the last.
+        readonly.record(directory, rows, "doctor", "cli.jsonl", b'{"refused":true}\n')
+        for name, data in outputs.items():
+            readonly.record(directory, rows, name, "cli.jsonl", data)
+        readonly.machine_output(directory, rows, write)
+
+    def test_each_pinned_leaf_equals_its_fixture_but_for_the_observed_time(self):
+        fixtures = readonly.MACHINE_OUTPUT
+        self.assertEqual(sorted(path.name for path in fixtures.iterdir() if path.suffix == ".jsonl"),
+                         sorted(f"{name}.cli.jsonl" for name in readonly.MACHINE_OUTPUT_LEAVES))
+        observed = {}
+        for name in readonly.MACHINE_OUTPUT_LEAVES:
+            data = (fixtures / f"{name}.cli.jsonl").read_bytes()
+            observed[name] = data.replace(b'"observedAt":"<observedAt>"',
+                                          b'"observedAt":"2026-09-30T12:38:52Z"')
+        with tempfile.TemporaryDirectory() as temporary:
+            self.run_matrix(Path(temporary), observed)
+        for name, change in (("operations", (b'"availability":"unavailable"', b'"availability":"available"')),
+                             ("candidates", (b"hdc.notConfigured", b"hdc.notconfigured")),
+                             ("doctor", (b'"observedAt":"2026-09-30T12:38:52Z"', b'"observedAt":"2026-09-30T12:38:52.1Z"'))):
+            changed = dict(observed, **{name: observed[name].replace(*change, 1)})
+            self.assertNotEqual(changed, observed, name)
+            with tempfile.TemporaryDirectory() as temporary, self.subTest(name), self.assertRaises(AssertionError):
+                self.run_matrix(Path(temporary), changed)
+
+    def test_write_rewrites_the_fixtures_with_the_observed_time_labelled(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            fixtures = Path(temporary) / "fixtures"
+            fixtures.mkdir()
+            outputs = {name: b'{"n":"%s"}\n' % name.encode() for name in readonly.MACHINE_OUTPUT_LEAVES}
+            for name in ("doctor", "deep", "healthy"):
+                outputs[name] = b'{"observedAt":"2026-09-30T00:00:00Z","n":"%s"}\n' % name.encode()
+            recordings = Path(temporary) / "recordings"
+            recordings.mkdir()
+            with patch.object(readonly, "MACHINE_OUTPUT", fixtures):
+                self.run_matrix(recordings, outputs, write=True)
+            self.assertEqual((fixtures / "doctor.cli.jsonl").read_bytes(),
+                             b'{"observedAt":"<observedAt>","n":"doctor"}\n')
+            self.assertEqual((fixtures / "candidates.cli.jsonl").read_bytes(), b'{"n":"candidates"}\n')
+
+
 class ContractChecksTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="arkdeck-contract-tests-")

@@ -1,7 +1,7 @@
 //! Existing typed Import CLI leaves. A lost upload reply is resolved only by
 //! rediscovering the same durable request; bytes are sent at that exact prefix.
 use crate::{CliError, Invocation};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use arkdeck_contract::ImportIntent;
 use arkdeck_contract::{ImportProjection, import_id};
 use serde_json::{Map, Value, json};
@@ -123,7 +123,7 @@ fn projection_invalid() -> CliError {
         "Runtime returned an invalid Import projection",
     )
 }
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn source_changed() -> CliError {
     CliError::new(
         "artifactIntegrityFailed",
@@ -136,11 +136,11 @@ fn timed_out() -> CliError {
         "Import client timed out; inspect or retry the same request identity",
     )
 }
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn uncertain(error: &CliError) -> bool {
     matches!(error.code, "outcomeUnknown" | "runtimeUnavailable")
 }
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn request_fields(key: &str, value: &str) -> Map<String, Value> {
     Map::from_iter([(key.into(), json!(value))])
 }
@@ -340,8 +340,8 @@ pub fn execute_import(
 }
 /// `artifact import <kind>`: the upload of one source file, read without
 /// following a link and held to its identity while it is sent
-/// (`arkdeck_platform::HostImportSource`, the macOS host store).
-#[cfg(target_os = "macos")]
+/// (`arkdeck_platform::HostImportSource`, the macOS and Windows host store).
+#[cfg(any(target_os = "macos", windows))]
 fn upload(
     invocation: &Invocation,
     fields: &Map<String, Value>,
@@ -580,13 +580,9 @@ fn upload(
         )),
     }
 }
-/// Off macOS an upload is refused before any frame is sent. On Windows the
-/// host store reads an Import source (`HostImportSource`, TASK-XPA-008), but
-/// the daemon's Import owner (`arkdeck-hoststore` `ImportUploadStore`) is
-/// still macOS-only: it composes the Job store's import references, the
-/// Artifact publication and read owners, and the `std::fs::Metadata`-typed
-/// `document_metadata`/`remove_document`, none of which is on Windows yet.
-#[cfg(not(target_os = "macos"))]
+/// Off macOS and Windows an upload is refused before any frame is sent: no
+/// other host reads an Import source (`HostImportSource`).
+#[cfg(not(any(target_os = "macos", windows)))]
 fn upload(
     _: &Invocation,
     _: &Map<String, Value>,
@@ -598,7 +594,7 @@ fn upload(
         "Import upload is not supported on this platform",
     ))
 }
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn canonical_native_name(source: &str) -> Result<String, CliError> {
     let stripped = source
         .strip_prefix("ART-")

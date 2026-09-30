@@ -315,7 +315,46 @@ pub(crate) fn spawn_in(
     environment: &[(OsString, OsString)],
     working_directory: Option<&[u16]>,
 ) -> io::Result<RunningChild> {
-    spawn_with(tool, args, environment, working_directory, None)
+    spawn_with(tool, args, environment, working_directory, None, None)
+}
+
+/// `spawn_in` with `input` — the inheritable read end of an [`input_pipe`] —
+/// as the child's stdin in place of `NUL`: the paired server's launch
+/// (`arkforged`, TASK-XPA-010). The caller keeps the write end and drops its
+/// own copy of `input` once this returns.
+pub(crate) fn spawn_paired(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: &[u16],
+    input: &Handle,
+) -> io::Result<RunningChild> {
+    spawn_with(
+        tool,
+        args,
+        environment,
+        Some(working_directory),
+        None,
+        Some(input),
+    )
+}
+
+/// A child's input pipe: the read end inheritable, the write end the
+/// owner's alone, so that closing it is the child's end of input.
+pub(crate) fn input_pipe() -> io::Result<(Handle, Handle)> {
+    let attributes = SECURITY_ATTRIBUTES {
+        nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+        lpSecurityDescriptor: null_mut(),
+        bInheritHandle: 1,
+    };
+    let (mut read, mut write) = (null_mut(), null_mut());
+    // SAFETY: valid output pointers; both handles immediately enter RAII ownership.
+    bool_result(unsafe { CreatePipe(&mut read, &mut write, &attributes, 0) })?;
+    let read = Handle::new(read)?;
+    let write = Handle::new(write)?;
+    // SAFETY: only the write handle's inheritance flag is changed.
+    bool_result(unsafe { SetHandleInformation(write.raw(), HANDLE_FLAG_INHERIT, 0) })?;
+    Ok((read, write))
 }
 
 /// `spawn_in` with the child attached to a pseudo console instead of pipes
@@ -331,7 +370,14 @@ pub(crate) fn spawn_attached(
     working_directory: Option<&[u16]>,
     console: HPCON,
 ) -> io::Result<RunningChild> {
-    spawn_with(tool, args, environment, working_directory, Some(console))
+    spawn_with(
+        tool,
+        args,
+        environment,
+        working_directory,
+        Some(console),
+        None,
+    )
 }
 
 fn spawn_with(
@@ -340,6 +386,7 @@ fn spawn_with(
     environment: &[(OsString, OsString)],
     working_directory: Option<&[u16]>,
     console: Option<HPCON>,
+    input: Option<&Handle>,
 ) -> io::Result<RunningChild> {
     if !tool
         .path
@@ -352,10 +399,11 @@ fn spawn_with(
     }
     let application = wide(tool.path.as_os_str())?;
     let mut command_line = command_line(tool.path.as_os_str(), args)?;
-    // Pipes: NUL stdin and two output pipes, the only handles inherited.
-    // The list stays live through CreateProcessW.
+    // Pipes: NUL stdin (or the paired input) and two output pipes, the only
+    // handles inherited. The list stays live through CreateProcessW.
     let mut pipes = None;
     let mut inherited: [HANDLE; 3];
+    let mut standard_input: HANDLE = null_mut();
     let mut attributes = match console {
         None => {
             let (stdout, out_write) = output_pipe()?;
@@ -365,31 +413,41 @@ fn spawn_with(
                 lpSecurityDescriptor: null_mut(),
                 bInheritHandle: 1,
             };
-            let null_name = wide(OsStr::new("NUL"))?;
-            // SAFETY: NUL is a fixed host device; read-only and explicitly inherited.
-            let stdin = Handle::new(unsafe {
-                CreateFileW(
-                    null_name.as_ptr(),
-                    GENERIC_READ,
-                    FILE_SHARE_READ | FILE_SHARE_WRITE,
-                    &inheritable,
-                    OPEN_EXISTING,
-                    FILE_ATTRIBUTE_NORMAL,
-                    null_mut(),
-                )
-            })?;
+            let stdin = match input {
+                Some(_) => None,
+                None => {
+                    let null_name = wide(OsStr::new("NUL"))?;
+                    // SAFETY: NUL is a fixed host device; read-only and explicitly inherited.
+                    Some(Handle::new(unsafe {
+                        CreateFileW(
+                            null_name.as_ptr(),
+                            GENERIC_READ,
+                            FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            &inheritable,
+                            OPEN_EXISTING,
+                            FILE_ATTRIBUTE_NORMAL,
+                            null_mut(),
+                        )
+                    })?)
+                }
+            };
             let pipes = pipes.insert((stdin, out_write, err_write, stdout, stderr));
-            inherited = [pipes.0.raw(), pipes.1.raw(), pipes.2.raw()];
+            let stdin = match (&pipes.0, input) {
+                (Some(stdin), _) | (None, Some(stdin)) => stdin.raw(),
+                (None, None) => unreachable!("NUL is opened when no input is named"),
+            };
+            standard_input = stdin;
+            inherited = [stdin, pipes.1.raw(), pipes.2.raw()];
             Attributes::handles(&mut inherited)?
         }
         Some(console) => Attributes::pseudo_console(console)?,
     };
     let startup = STARTUPINFOEXW {
         StartupInfo: match &pipes {
-            Some((stdin, out_write, err_write, _, _)) => STARTUPINFOW {
+            Some((_, out_write, err_write, _, _)) => STARTUPINFOW {
                 cb: size_of::<STARTUPINFOEXW>() as u32,
                 dwFlags: STARTF_USESTDHANDLES,
-                hStdInput: stdin.raw(),
+                hStdInput: standard_input,
                 hStdOutput: out_write.raw(),
                 hStdError: err_write.raw(),
                 ..Default::default()
