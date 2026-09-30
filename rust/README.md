@@ -146,6 +146,11 @@ checkout's inputs are byte-identical to the published pin, the published view
 is recorded as covered by the candidate view (`publishedView` in
 `summary.json`) and the native checks run once; any drift runs both views. On Unix it
 records every current method, malformed frames and the three CLI leaves. On
+Unix and, through a daemon signed with the host-trusted development signer, on Windows,
+the machine output of `doctor` (plain, `--deep`, `--require-healthy`), `operation list`
+and `device candidates` must equal `tests/fixtures/readonly-machine-output` (recorded
+on the macOS lane) byte for byte once `observedAt` reads as its label; rewrite it with
+`--write-machine-output`. On
 Windows an unsigned build must refuse the actual daemon identity before sending
 frames. Positive installed-daemon authentication and DAYU200 acceptance require
 the [Windows SPK-3 harness](scripts/windows-spk3.ps1) and its real host conditions.

@@ -8,6 +8,14 @@ when ARKDECK_DEV_SIGNER_THUMBPRINT names a certificate trusted only on this host
 Unix over the named pipe against a copy of the daemon signed with it. Positive
 installed-daemon and DAYU200 acceptance belongs to windows-spk3.ps1.
 No fixture response is substituted for a daemon output.
+
+The machine output of `doctor` (plain, `--deep` and `--require-healthy`), `operation list`
+and `device candidates` must equal the recorded fixtures in
+`rust/tests/fixtures/readonly-machine-output` byte for byte on every host that runs the
+matrix (TASK-XPA-002: Windows output byte-equal to the macOS fixtures), once the one
+wall-clock member, `observedAt`, reads as its label. Rewrite them from a run with
+`--write-machine-output` after a change that legitimately moves them; every host's lane
+then has to reproduce the new bytes.
 """
 from __future__ import annotations
 
@@ -18,6 +26,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -34,6 +43,11 @@ CANDIDATE_INPUTS = ROOT / "spec/baselines/swift-candidate-inputs.json"
 REGISTRY = ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json"
 SUPPORTED = {"health", "doctor", "operation.list", "device.observations"}
 # These methods reach the Import owner, including immutable discovery lists.
+MACHINE_OUTPUT = ROOT / "rust/tests/fixtures/readonly-machine-output"
+# The leaves whose machine output is pinned, by recording name.
+MACHINE_OUTPUT_LEAVES = ("doctor", "deep", "healthy", "operations", "candidates")
+# The one wall-clock member of those answers (T2), a whole-second UTC time.
+OBSERVED_AT = re.compile(rb'"observedAt":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"')
 IMPORT_OWNER_METHODS = frozenset({
     "artifact.import.list", "artifact.import.begin", "artifact.import.append", "artifact.import.abort",
     "artifact.import.inspect", "artifact.import.inspection", "artifact.import.release",
@@ -364,8 +378,26 @@ def validate_spk3(directory: Path) -> None:
     print(json.dumps({"validationFile": str(output), **result}))
 
 
+def machine_output(directory: Path, rows: list, write: bool) -> None:
+    """The pinned leaves' stdout, `observedAt` labelled, against the fixtures (or written
+    to them): the same bytes on macOS, Linux and, through the signed pipe, Windows."""
+    for name in MACHINE_OUTPUT_LEAVES:
+        # The matrix's own recording: on Windows the unsigned refusal came first.
+        row = [row for row in rows if row["file"].endswith(f"-{name}.cli.jsonl")][-1]
+        data = (directory / row["file"]).read_bytes()
+        labelled, count = OBSERVED_AT.subn(b'"observedAt":"<observedAt>"', data)
+        assert count == (1 if name in ("doctor", "deep", "healthy") else 0), (name, count)
+        fixture = MACHINE_OUTPUT / f"{name}.cli.jsonl"
+        if write:
+            fixture.write_bytes(labelled)
+        else:
+            assert labelled == fixture.read_bytes(), (
+                f"{name}: the machine output differs from {fixture.relative_to(ROOT)}; if the "
+                f"change is intended, rewrite it with --write-machine-output", labelled)
+
+
 def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpoint: str,
-                registry: dict) -> None:
+                registry: dict, write: bool = False) -> None:
     """Every CLI leaf, every method and the malformed-frame matrix against a daemon the
     CLI authenticates: the Unix socket, or the Windows pipe of a daemon with a pinned
     development signer (design §L.1 item 22)."""
@@ -377,6 +409,7 @@ def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpo
         ("candidates", ["device", "candidates"], 1, "operationFailed"),
     ]:
         invoke(cli, directory, rows, environment, name, command, code, error)
+    machine_output(directory, rows, write)
     invoke(cli, directory, rows, environment, "debug-probe-cli-missing-owner",
            ["debug", "probe", "--target", "target-fixture"], 70, "internalError")
     operations = invoke(cli, directory, rows, environment, "descriptor-source",
@@ -504,7 +537,8 @@ def pwsh() -> str:
 
 
 def signed_windows_matrix(directory: Path, rows: list, base: dict, registry: dict, cli: Path,
-                          daemon_binary: Path, thumbprint: str, endpoint: str) -> dict:
+                          daemon_binary: Path, thumbprint: str, endpoint: str,
+                          write: bool = False) -> dict:
     """The same matrix as on Unix, against a copy of the daemon signed with a certificate
     trusted only on this host (design §L.1 item 22): the CLI checks the pinned image path and
     the pinned signer exactly as for an installed daemon; nothing skips the check."""
@@ -524,7 +558,7 @@ def signed_windows_matrix(directory: Path, rows: list, base: dict, registry: dic
                               stderr=subprocess.PIPE)
     try:
         wait_ready(endpoint, daemon)
-        full_matrix(signed_cli, directory, rows, environment, endpoint, registry)
+        full_matrix(signed_cli, directory, rows, environment, endpoint, registry, write)
     finally:
         daemon.terminate()
         try:
@@ -541,6 +575,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bin-dir", type=Path, default=ROOT / "rust/target/debug")
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--write-machine-output", action="store_true",
+                        help="rewrite rust/tests/fixtures/readonly-machine-output from this run "
+                             "instead of comparing with it")
     parser.add_argument("--spk3-recordings", type=Path,
                         help="only validate a completed SPK-3 recording directory; start no processes")
     args = parser.parse_args()
@@ -577,7 +614,8 @@ def main() -> None:
                     value = invoke(cli, directory, rows, environment, name, command, 69, "runtimeUnavailable")
                     assert "signing identity" in value["error"]["message"], value
             else:
-                full_matrix(cli, directory, rows, environment, endpoint, registry)
+                full_matrix(cli, directory, rows, environment, endpoint, registry,
+                            args.write_machine_output)
             # A verb no CLI publishes: the Rust CLI now serves `job run`.
             invoke(cli, directory, rows, environment, "unknown-command", ["job", "no-such-command"], 64,
                    "invalidCommand")
@@ -596,7 +634,8 @@ def main() -> None:
         thumbprint = os.environ.get("ARKDECK_DEV_SIGNER_THUMBPRINT")
         if os.name == "nt" and thumbprint:
             signed = signed_windows_matrix(directory, rows, environment, registry, cli, daemon_binary,
-                                           thumbprint, rf"\\.\pipe\arkdeck-readonly-signed-{nonce}")
+                                           thumbprint, rf"\\.\pipe\arkdeck-readonly-signed-{nonce}",
+                                           args.write_machine_output)
             (directory / "recordings.json").write_text(json.dumps(rows, indent=2) + "\n")
     counts = validate_completed(directory, rows, registry)
     summary = {"schemaVersion": "arkdeck.rust-readonly-host-check/1", "kind": "host-test",
