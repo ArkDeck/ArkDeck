@@ -6,16 +6,20 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies]
+# The serving path, client, resource counters and document are shared; the
+# Job owners and the simulated HDC provider compose the macOS workload only.
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
 arkdeck-agentd.workspace = true
 arkdeck-client.workspace = true
 arkdeck-control.workspace = true
 arkdeck-contract.workspace = true
-arkdeck-hoststore.workspace = true
 arkdeck-platform.workspace = true
-arkdeck-provider-hdc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+arkdeck-hoststore.workspace = true
+arkdeck-provider-hdc.workspace = true
 
 [lints]
 workspace = true

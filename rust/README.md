@@ -3140,3 +3140,39 @@ or provides hardware acceptance evidence. See
 [the soak record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)
 and [the SPK-11 record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md)
 for validation, the three-run Rust numbers and the remaining scope.
+
+The workload tests (`tests/workload.rs`) run one at a time: the gate reads
+process-wide counters, and libtest runs one binary's tests as threads of one
+process, so a sibling test's descriptors would count as another run's growth.
+
+### Windows transport soak
+
+On Windows the same executable soaks the named-pipe serving path: each cycle
+binds a private `\\.\pipe\arkdeck-soak-<run>` with `FILE_FLAG_FIRST_PIPE_INSTANCE`
+(so a generation that did not release every instance fails the next bind),
+serves the shared `serve_control` loop, and connects `--jobs-per-cycle` times
+with the production client, which verifies the server's image and Authenticode
+signer as the CLI does. The Job owners are macOS-only until the Job store
+reaches Windows (G01), so every exchange is a verified health handshake and a
+refused `job.list`, and the document says `workload: windows-pipe-transport/v1`
+and counts no Job. The same growth bounds apply to the Windows counters: the
+peak working set for `maxResidentSetBytes` and open handles
+(`GetProcessHandleCount`) for the descriptor fields; `workingSetBytes` and
+`privateBytes` are recorded beside them. The client pins the soak's own image,
+so run a copy signed with the host-trusted development certificate:
+
+```powershell
+New-Item -ItemType Directory $env:TEMP\soak-bin | Out-Null
+Copy-Item target\release\arkdeck-soak.exe $env:TEMP\soak-bin\
+$signed = pwsh -File scripts\windows-dev-identity.ps1 sign `
+  -Thumbprint $env:ARKDECK_DEV_SIGNER_THUMBPRINT -Path $env:TEMP\soak-bin\arkdeck-soak.exe
+$env:ARKDECK_SOAK_SIGNER_SHA256 = ($signed | ConvertFrom-Json).pin
+& $env:TEMP\soak-bin\arkdeck-soak.exe --state-directory $env:TEMP\adksoak-1 `
+  --duration-seconds 60 --restart-interval-seconds 5 --jobs-per-cycle 10
+```
+
+Without the pin it refuses before creating anything; the Job-store fixtures
+(`--seed-recovery`, `--measure-journal`, `--seed-artifact-bench`) are refused on
+Windows. `cargo test -p arkdeck-soak --test windows_pipe -- --ignored` runs the
+signed leg with `ARKDECK_DEV_SIGNER_THUMBPRINT` set. Enablement only: formal
+Windows measurement belongs to phase A on a quiet reference host.
