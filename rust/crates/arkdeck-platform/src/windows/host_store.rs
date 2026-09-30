@@ -598,8 +598,7 @@ impl HostDirectory {
         file.write_all(bytes)?;
         host_fs::flush(&file)?;
         checkpoint("beforeRename");
-        host_fs::rename(&file, &self.0, &target, true)
-            .map_err(DocumentPublishError::OutcomeUnknown)?;
+        rename_replacing(&file, &self.0, &target).map_err(DocumentPublishError::OutcomeUnknown)?;
         checkpoint("afterRename");
         host_fs::flush_directory(&self.0).map_err(DocumentPublishError::OutcomeUnknown)
     }
@@ -1239,6 +1238,37 @@ impl HostDirectory {
 
 /// Hash a file from its first byte to its end through one handle, calling
 /// `each` with every chunk and the running total after it.
+/// The atomic replacement of a published document. Replacing a name whose
+/// file another process holds open without delete sharing fails
+/// (`STATUS_ACCESS_DENIED` or `STATUS_SHARING_VIOLATION`), and on NTFS the
+/// holder is typically an anti-malware or indexing filter reading the
+/// document just published, for a moment. Such a failure replaced nothing,
+/// so the rename is retried a bounded number of times (about a second in
+/// all) before the failure is answered; any other failure is answered at
+/// once. Measured on the Windows reference host: a Job record persisted a
+/// dozen times in a row met one such failure in most runs of the recorded
+/// Job store corpus (`arkdeck-hoststore/tests/job_store_corpus.rs`).
+fn rename_replacing(file: &File, directory: &File, target: &[u16]) -> io::Result<()> {
+    const ACCESS_DENIED: i32 = 5;
+    const SHARING_VIOLATION: i32 = 32;
+    let mut delay = std::time::Duration::from_millis(1);
+    for _ in 0..12 {
+        match host_fs::rename(file, directory, target, true) {
+            Err(error)
+                if matches!(
+                    error.raw_os_error(),
+                    Some(ACCESS_DENIED | SHARING_VIOLATION)
+                ) =>
+            {
+                std::thread::sleep(delay);
+                delay = (delay * 2).min(std::time::Duration::from_millis(200));
+            }
+            answer => return answer,
+        }
+    }
+    host_fs::rename(file, directory, target, true)
+}
+
 fn hash_to_end(file: &File, mut each: impl FnMut(&[u8], u64) -> io::Result<()>) -> io::Result<u64> {
     let mut buffer = [0_u8; 65536];
     let mut total = 0_u64;

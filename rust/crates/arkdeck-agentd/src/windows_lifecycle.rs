@@ -13,8 +13,8 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Target owners are composed over it (see
-//!   [`Authority::compose`]); every input that would compose another owner
+//!   lifecycle only the Target owners and the Job store are composed over
+//!   it (see [`Authority::compose`]); every input that would compose another owner
 //!   on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
@@ -121,9 +121,10 @@ impl Authority {
     ///   started as its managed server. No Windows HDC tuple is registered
     ///   yet (its integration change waits for the maintainer's samples),
     ///   so no relation is read, nothing is observed or dispatched, and
-    ///   `target.adopt` is refused before admission with zero dispatch.
+    ///   `target.adopt` is refused before admission with zero dispatch;
+    /// * the Job store (`jobs-state`, [`Self::job_store`]).
     ///
-    /// Composing opens the store, which reads both documents under their
+    /// Composing opens the stores, which read their documents under their
     /// locks; a store it cannot read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
@@ -144,7 +145,7 @@ impl Authority {
                 path.display()
             )
         })?;
-        let host = host.with_targets(targets);
+        let host = host.with_targets(targets).with_jobs(self.job_store()?);
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {
@@ -161,6 +162,35 @@ impl Authority {
             host.owner_census().join(", ")
         ));
         Ok(host)
+    }
+
+    /// The Job store owner over its private child of the root (created
+    /// owner-only when absent, an existing one opened as it is, never
+    /// re-permissioned): `runtime-jobs.sqlite3` under `.rust-job-owner.lock`,
+    /// `jobs/<id>/job-record.json` and `jobs/<id>/journal.jsonl`, as the macOS
+    /// isolated owner keeps them in `jobs-state`. The account's root keeps it
+    /// in the same private child rather than beside its other entries (as
+    /// Swift's production daemon does): the host store cannot open the
+    /// account root itself, whose DACL also grants SYSTEM. `job.status`,
+    /// `job.show`, `job.events` and a `job.list` of one page answer from it
+    /// (so `runtime service restart` reads the current Jobs), and a restart
+    /// reads back what it holds; nothing admits a Job on Windows yet. Opening validates
+    /// the index's layout and rows and its files' owner and identity; a
+    /// store it cannot open ends the start.
+    fn job_store(&self) -> Result<arkdeck_hoststore::JobStore, String> {
+        const NAME: &str = "jobs-state";
+        let path = self.root.private_child(NAME).map_err(|error| {
+            format!(
+                "the Job store {} is unusable: {error}; nothing was started",
+                self.root.path().join(NAME).display()
+            )
+        })?;
+        arkdeck_hoststore::JobStore::open_owner(&path).map_err(|error| {
+            format!(
+                "the Job store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        })
     }
 
     /// After a complete drain: the owner lock, then the guard, on the thread

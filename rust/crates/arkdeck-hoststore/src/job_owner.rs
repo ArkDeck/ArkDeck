@@ -1,15 +1,27 @@
 //! Runtime-owned Job discovery. A read-only SQLite snapshot supplies Job
 //! identity and state; presentation cursors retain immutable query results.
+//!
+//! On Windows the store, its index and record writers and the Job read
+//! resources it answers without the snapshot pager (`job.status`,
+//! `job.show`, `job.events`) are built; what reads other macOS-only owners
+//! (the pager behind `job.list` and `job.timeline`, the Session, Import,
+//! workspace and HDC lifecycle censuses, Flash recovery) is not.
+#[path = "job_epoch_indexes.rs"]
+mod epoch_indexes;
+#[cfg(target_os = "macos")]
 #[path = "import_references.rs"]
 pub(crate) mod import_references;
+#[cfg(target_os = "macos")]
 #[path = "job_retention_census.rs"]
 mod retention_census;
+#[cfg(target_os = "macos")]
 #[path = "workspace_references.rs"]
 mod workspace_references;
 use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};
 use crate::job_repository::{
     AdmissionVerdict, JobRepository, JobRow, JobWriteError, identifier, order_key,
 };
+#[cfg(target_os = "macos")]
 use crate::snapshot_pager::SnapshotPager;
 use arkdeck_contract::{WireError, canonical_json};
 use arkdeck_platform::{DocumentPublishError, HostDirectory};
@@ -19,11 +31,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(target_os = "macos")]
 #[path = "mutation_state_continuity.rs"]
 mod mutation_state_continuity;
+#[cfg(target_os = "macos")]
 pub(crate) use mutation_state_continuity::require_retained_sessions_without_owner;
 
-#[cfg(target_os = "macos")]
 #[path = "job_flash_state.rs"]
 mod flash_state;
 
@@ -35,11 +48,11 @@ pub(crate) mod arkforge_job_state;
 #[path = "flash_recovery.rs"]
 pub(crate) mod flash_recovery;
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 #[path = "job_hdc_interlock_tests.rs"]
 mod hdc_interlock_tests;
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 #[path = "job_list_stream_tests.rs"]
 mod list_stream_tests;
 
@@ -61,6 +74,7 @@ pub struct JobStore {
     /// The retained Sessions the last complete continuity scan let pass, in
     /// memory only (`mutation_state_continuity.rs`). Taken only under
     /// `activity`.
+    #[cfg(target_os = "macos")]
     session_verdicts: std::sync::Mutex<mutation_state_continuity::SessionVerdicts>,
 }
 const RECORD_BOUND: usize = 16 * 1024 * 1024;
@@ -68,12 +82,15 @@ const RECORD_BOUND: usize = 16 * 1024 * 1024;
 /// Exclusive ownership of the final HDC participant inventory. Keep this
 /// lease until the lifecycle has durably settled or recovered its boundary.
 /// Dropping it releases admission, including on a normal error return.
+/// (No HDC lifecycle is composed on Windows yet, so neither is its census.)
+#[cfg(target_os = "macos")]
 #[must_use = "keep the interlock until the lifecycle outcome or recovery is durable"]
 pub struct HdcLifecycleInterlock<'a> {
     _guard: std::sync::RwLockWriteGuard<'a, ()>,
     recomposition: &'a std::sync::atomic::AtomicBool,
 }
 
+#[cfg(target_os = "macos")]
 impl HdcLifecycleInterlock<'_> {
     /// A selected executable requires a new provider graph. This latch has
     /// no reset in this process; dropping the borrowed lock cannot reopen it.
@@ -153,6 +170,7 @@ impl JobStore {
     /// Freeze admission before reading current Jobs. The same gate covers
     /// final admission after materialization, so either the Job is visible
     /// to this census or its admission is refused. No caller-supplied census.
+    #[cfg(target_os = "macos")]
     pub fn acquire_hdc_lifecycle_interlock(&self) -> Result<HdcLifecycleInterlock<'_>, WireError> {
         let guard = self
             .hdc_lifecycle
@@ -225,6 +243,7 @@ impl JobStore {
             hdc_lifecycle: std::sync::RwLock::new(()),
             hdc_recomposition: std::sync::atomic::AtomicBool::new(false),
             resident: Default::default(),
+            #[cfg(target_os = "macos")]
             session_verdicts: Default::default(),
         })
     }
@@ -559,6 +578,7 @@ impl JobStore {
     /// established recovery epoch or a Target alias resolution settle an
     /// unknown outcome; this owner holds neither index, so an outcome-unknown
     /// Job stays current. An unreadable row fails the whole read.
+    #[cfg(target_os = "macos")]
     pub fn current_jobs(&self) -> Result<Vec<crate::hdc_impact_source::CurrentJob>, WireError> {
         self.root.validate_path(&self.path).map_err(unreadable)?;
         let rows = self.repository.rows(None).map_err(unreadable)?;
@@ -649,7 +669,7 @@ impl JobStore {
         &self,
         job_id: &str,
     ) -> Result<Option<crate::RecoveryEpoch>, crate::RecoveryEpochError> {
-        match self.root.document_metadata(crate::RECOVERY_EPOCH_DOCUMENT) {
+        match epoch_indexes::probe_private_document(&self.root, crate::RECOVERY_EPOCH_DOCUMENT) {
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
             _ => {}
         }
@@ -665,6 +685,13 @@ impl JobStore {
         params: &Map<String, Value>,
     ) -> Result<Value, WireError> {
         self.root.validate_path(&self.path).map_err(unreadable)?;
+        // The timeline pages through the snapshot pager (`snapshot_pager`),
+        // which is not built off macOS: refused as the read-only foundation
+        // refuses a method it lacks.
+        #[cfg(not(target_os = "macos"))]
+        if method == "job.timeline" {
+            return Err(failure("rejected", PAGER_UNAVAILABLE));
+        }
         if method == "job.list" {
             return self.list(params);
         }
@@ -707,6 +734,7 @@ impl JobStore {
                 shown["job"] = self.indexed_status(&record);
                 shown
             }
+            #[cfg(target_os = "macos")]
             "job.timeline" => {
                 let (size, cursor) = pagination(params, MALFORMED_SNAPSHOT_CURSOR)?;
                 SnapshotPager::open(&self.path.join("cli-job-snapshots"))
@@ -784,71 +812,169 @@ impl JobStore {
         // time and then identity, so each history row goes to the snapshot as
         // it is projected, and no list of them all is held.
         let descending = order == "createdAtDescJobIdAsc";
-        SnapshotPager::open(&self.path.join("cli-job-snapshots"))
-            .map_err(unreadable)?
-            .page_streamed("job.list", &filters, order, size, cursor, |emit| {
-                // A typed record refusal is the list's answer once the
-                // repository has validated every source row in its complete
-                // snapshot: the refusal of the first such record in creation
-                // order, however the rows are handed over.
-                let mut refused: Option<(String, String, WireError)> = None;
-                // Swift's Job owner bounds the canonical bytes of the rows the
-                // query keeps, before its pager (`RuntimeJobEngine.swift`
-                // `jobListSnapshot`); past the bound no row is handed over.
-                let mut kept = 0usize;
-                self.repository
-                    .map_rows_ordered(None, descending, |row| {
-                        let projected = (|| -> Result<_, WireError> {
-                            let record = JobRecord::from_row(&row)?;
-                            let mut value = record.history(timeline);
-                            indexes.project_history(&record, &mut value);
-                            if [
-                                ("state", "state"),
-                                ("operation", "operation"),
-                                ("target", "targetId"),
-                                ("thread", "threadId"),
-                            ]
-                            .iter()
-                            .any(|(filter, field)| {
-                                filters
-                                    .get(*filter)
-                                    .is_some_and(|expected| expected != &value[*field])
-                            }) {
-                                return Ok(None);
-                            }
-                            Ok(Some(value))
-                        })();
-                        match projected {
-                            Ok(Some(_)) if kept > MAX_JOB_SNAPSHOT => {}
-                            Ok(Some(value)) => {
-                                kept += canonical_json(&value).map_err(io::Error::other)?.len();
-                                if kept <= MAX_JOB_SNAPSHOT {
-                                    emit(value);
-                                }
-                            }
-                            Ok(None) => {}
-                            Err(error) => {
-                                if refused.as_ref().is_none_or(|(key, id, _)| {
-                                    (&row.order_key, &row.id) < (key, id)
-                                }) {
-                                    refused = Some((row.order_key, row.id, error));
-                                }
+        let rows = |emit: &mut dyn FnMut(Value)| -> Result<(), WireError> {
+            // A typed record refusal is the list's answer once the
+            // repository has validated every source row in its complete
+            // snapshot: the refusal of the first such record in creation
+            // order, however the rows are handed over.
+            let mut refused: Option<(String, String, WireError)> = None;
+            // Swift's Job owner bounds the canonical bytes of the rows the
+            // query keeps, before its pager (`RuntimeJobEngine.swift`
+            // `jobListSnapshot`); past the bound no row is handed over.
+            let mut kept = 0usize;
+            self.repository
+                .map_rows_ordered(None, descending, |row| {
+                    let projected = (|| -> Result<_, WireError> {
+                        let record = JobRecord::from_row(&row)?;
+                        let mut value = record.history(timeline);
+                        indexes.project_history(&record, &mut value);
+                        if [
+                            ("state", "state"),
+                            ("operation", "operation"),
+                            ("target", "targetId"),
+                            ("thread", "threadId"),
+                        ]
+                        .iter()
+                        .any(|(filter, field)| {
+                            filters
+                                .get(*filter)
+                                .is_some_and(|expected| expected != &value[*field])
+                        }) {
+                            return Ok(None);
+                        }
+                        Ok(Some(value))
+                    })();
+                    match projected {
+                        Ok(Some(_)) if kept > MAX_JOB_SNAPSHOT => {}
+                        Ok(Some(value)) => {
+                            kept += canonical_json(&value).map_err(io::Error::other)?.len();
+                            if kept <= MAX_JOB_SNAPSHOT {
+                                emit(value);
                             }
                         }
-                        Ok(())
-                    })
-                    .map_err(unreadable)?;
-                match refused {
-                    Some((_, _, error)) => Err(error),
-                    None if kept > MAX_JOB_SNAPSHOT => Err(pre_admission(failure(
-                        "operationUnavailable",
-                        "Job snapshot exceeds its storage bound; narrow the query",
-                    ))),
-                    None => Ok(()),
-                }
-            })
-            .map_err(pager_refusal)
+                        Ok(None) => {}
+                        Err(error) => {
+                            if refused
+                                .as_ref()
+                                .is_none_or(|(key, id, _)| (&row.order_key, &row.id) < (key, id))
+                            {
+                                refused = Some((row.order_key, row.id, error));
+                            }
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(unreadable)?;
+            match refused {
+                Some((_, _, error)) => Err(error),
+                None if kept > MAX_JOB_SNAPSHOT => Err(pre_admission(failure(
+                    "operationUnavailable",
+                    "Job snapshot exceeds its storage bound; narrow the query",
+                ))),
+                None => Ok(()),
+            }
+        };
+        #[cfg(target_os = "macos")]
+        {
+            SnapshotPager::open(&self.path.join("cli-job-snapshots"))
+                .map_err(unreadable)?
+                .page_streamed("job.list", &filters, order, size, cursor, rows)
+                .map_err(pager_refusal)
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            single_page(order, size, cursor, rows)
+        }
     }
+}
+
+/// Why a Job read that pages through the snapshot pager is refused on
+/// Windows.
+#[cfg(not(target_os = "macos"))]
+const PAGER_UNAVAILABLE: &str =
+    "the Job snapshot pager is not built on Windows yet; nothing was read";
+
+/// `job.list` on Windows until the snapshot pager is built there
+/// (`snapshot_pager`, whose retention waits for the
+/// `document_metadata`/`remove_document` port). A snapshot that is one page
+/// is answered as the pager answers its first page: the same rows, bounds,
+/// refusals and spelling, a fresh revision, no more pages and no cursor. The
+/// pager also stores such a snapshot, but nothing can read it back, since
+/// the one cursor into it is never handed out; so it is not stored. A
+/// snapshot of more than one page (by `pageSize` or by the pager's page byte
+/// bound) and any cursor are refused as the pager's absence, and nothing is
+/// stored.
+#[cfg(not(target_os = "macos"))]
+fn single_page(
+    order: &str,
+    page_size: usize,
+    cursor: Option<&str>,
+    rows: impl FnOnce(&mut dyn FnMut(Value)) -> Result<(), WireError>,
+) -> Result<Value, WireError> {
+    /// The pager's page byte bound (`snapshot_pager::MAX_PAGE`).
+    const MAX_PAGE: usize = 1024 * 1024;
+    if cursor.is_some() {
+        return Err(failure("rejected", PAGER_UNAVAILABLE));
+    }
+    let (mut items, mut bytes, mut more) = (Vec::new(), 2usize, false);
+    let mut refused: Option<WireError> = None;
+    rows(&mut |row| {
+        if refused.is_some() || more {
+            return;
+        }
+        let size = match canonical_json(&row) {
+            Ok(encoded) => encoded.len() + 1,
+            Err(error) => {
+                refused = Some(unreadable(error));
+                return;
+            }
+        };
+        if size + 2 > MAX_PAGE {
+            // The pager's own refusal, as the Job reader answers it.
+            refused = Some(pre_admission(failure(
+                "inputTooLarge",
+                "resource projection exceeds its page bound",
+            )));
+        } else if items.len() == page_size || bytes + size > MAX_PAGE {
+            more = true;
+        } else {
+            bytes += size;
+            items.push(row);
+        }
+    })?;
+    if let Some(refusal) = refused {
+        return Err(refusal);
+    }
+    if more {
+        return Err(failure(
+            "rejected",
+            "a Job list of more than one page needs the Job snapshot pager, which is not \
+             built on Windows yet; nothing was stored",
+        ));
+    }
+    let mut revision = arkdeck_platform::random_bytes::<16>().map_err(unreadable)?;
+    revision[6] = (revision[6] & 0x0f) | 0x40;
+    revision[8] = (revision[8] & 0x3f) | 0x80;
+    let hex: String = revision.iter().map(|b| format!("{b:02x}")).collect();
+    let mut answer = Map::new();
+    answer.insert("schemaVersion".into(), json!("arkdeck.cli.page/1"));
+    answer.insert("pageKind".into(), json!("snapshot"));
+    answer.insert("items".into(), Value::Array(items));
+    answer.insert("order".into(), json!(order));
+    answer.insert(
+        "snapshotRevision".into(),
+        json!(format!(
+            "{}-{}-{}-{}-{}",
+            &hex[..8],
+            &hex[8..12],
+            &hex[12..16],
+            &hex[16..20],
+            &hex[20..]
+        )),
+    );
+    answer.insert("hasMore".into(), Value::Bool(false));
+    answer.insert("nextCursor".into(), Value::Null);
+    Ok(Value::Object(answer))
 }
 /// The canonical bytes of the rows one Job list snapshot may keep.
 const MAX_JOB_SNAPSHOT: usize = 16 * 1024 * 1024;

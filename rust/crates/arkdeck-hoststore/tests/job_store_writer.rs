@@ -1,12 +1,13 @@
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 //! The Rust Job owner writes the SQLite admission index and `job-record.json`
 //! as Swift RuntimeAdmissionService and RuntimeJobRecord.persist do, checked
 //! against the oracle Swift JobStoreRustWriterParityContractTests records in
-//! rust/tests/fixtures/job-store-writer.
+//! rust/tests/fixtures/job-store-writer. On macOS and on Windows (NTFS).
+mod journal_scratch;
+
 use arkdeck_hoststore::{AdmissionVerdict, JobRecord, JobStore, JobWriteError};
 use arkdeck_platform::{HostSqlite, SqliteValue as Sql};
 use serde_json::{Map, Value, json};
-use std::os::unix::fs::PermissionsExt;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -24,25 +25,9 @@ fn record(name: &str) -> JobRecord {
     JobRecord::decode(&fs::read(oracle(name)).unwrap()).unwrap()
 }
 
-struct Root(PathBuf);
-impl Root {
-    fn new() -> Self {
-        let nonce = arkdeck_platform::random_bytes::<8>().unwrap();
-        let path = PathBuf::from(format!(
-            "/private/tmp/arkdeck-job-writer-{}-{:x}",
-            std::process::id(),
-            u64::from_ne_bytes(nonce)
-        ));
-        fs::create_dir(&path).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
-        Self(path)
-    }
-}
-impl Drop for Root {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
+/// Owner-only scratch roots: mode 0700 on macOS, the store's protected
+/// owner-only DACL on Windows.
+use journal_scratch::Root;
 
 fn verdict(value: &Value) -> AdmissionVerdict {
     match value.as_str() {
@@ -149,10 +134,12 @@ fn swift_records_reencode_to_their_exact_bytes() {
 
 #[test]
 fn rust_owner_replays_the_swift_index_scenario() {
-    let root = Root::new();
+    let root = Root::new("job-writer");
     replay(&root.0);
     assert_eq!(index(&root.0), value("index.json"));
+    #[cfg(target_os = "macos")]
     if let Some(output) = std::env::var_os("ARKDECK_RUST_JOB_STORE_OUTPUT") {
+        use std::os::unix::fs::PermissionsExt;
         // Local evidence: Swift JobStoreRustWriterParityContractTests reads it.
         let output = PathBuf::from(output);
         assert!(output.starts_with("/private/tmp/") && !output.exists());
@@ -192,7 +179,7 @@ fn rust_owner_replays_the_swift_index_scenario() {
 
 #[test]
 fn refused_writes_leave_the_index_and_records_unchanged() {
-    let root = Root::new();
+    let root = Root::new("job-writer");
     let store = JobStore::open_owner(&root.0).unwrap();
     let admitted = record("records/admitted-a.json");
     let running = record("records/running-a.json");
@@ -243,7 +230,7 @@ fn refused_writes_leave_the_index_and_records_unchanged() {
 
 #[test]
 fn one_owner_holds_the_store() {
-    let root = Root::new();
+    let root = Root::new("job-writer");
     let owner = JobStore::open_owner(&root.0).unwrap();
     assert!(JobStore::open_owner(&root.0).is_err());
     assert!(JobStore::open(&root.0).is_err());
@@ -255,7 +242,7 @@ fn one_owner_holds_the_store() {
 
 #[test]
 fn a_refused_layout_with_a_live_log_is_not_rewritten() {
-    let root = Root::new();
+    let root = Root::new("job-writer");
     {
         let store = JobStore::open_owner(&root.0).unwrap();
         store

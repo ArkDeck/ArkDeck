@@ -261,24 +261,7 @@ pub(super) fn compensations<'a>(
     descriptor: &'a CatalogOperation,
     inputs: &Map<String, Value>,
 ) -> Result<Vec<&'a CatalogStep>, PlanRefusal> {
-    [
-        "stop-ability",
-        "cleanup-uninstall",
-        "cleanup-remote-staging",
-    ]
-    .into_iter()
-    .filter(|id| {
-        *id != "cleanup-uninstall"
-            || inputs.get("cleanupPolicy").and_then(Value::as_str) != Some("retain")
-    })
-    .map(|id| {
-        descriptor
-            .steps
-            .iter()
-            .find(|step| step.step_id == id)
-            .ok_or_else(internal_failure)
-    })
-    .collect()
+    crate::job_step_digest::hap_compensations(descriptor, inputs).ok_or_else(internal_failure)
 }
 
 /// Swift `MaterializedAdmission.artifactFacts` of a resolved input: its

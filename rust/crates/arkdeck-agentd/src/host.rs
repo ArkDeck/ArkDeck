@@ -102,7 +102,7 @@ pub struct Host {
     targets: Option<std::sync::Arc<arkdeck_hoststore::TargetStore>>,
     #[cfg(target_os = "macos")]
     artifacts: Option<std::sync::Arc<arkdeck_hoststore::ArtifactReadStore>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     jobs: Option<std::sync::Arc<arkdeck_hoststore::JobStore>>,
     /// The agent execution owner beside the Job state.
     #[cfg(target_os = "macos")]
@@ -243,7 +243,7 @@ impl Host {
         self.targets = Some(std::sync::Arc::new(targets));
         self
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
         self.jobs = Some(std::sync::Arc::new(jobs));
         self
@@ -1200,6 +1200,7 @@ impl Host {
     pub(crate) fn owner_census(&self) -> Vec<&'static str> {
         [
             ("targets", self.targets.is_some()),
+            ("jobs", self.jobs.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
@@ -1233,7 +1234,7 @@ impl Host {
             targets: None,
             #[cfg(target_os = "macos")]
             artifacts: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             jobs: None,
             #[cfg(target_os = "macos")]
             capabilities: None,
@@ -1797,7 +1798,7 @@ impl HostServices for Host {
         self.with_hdc_impact(|source| owner.answer(method, params, source))
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn job_resource(
         &self,
         method: &str,
