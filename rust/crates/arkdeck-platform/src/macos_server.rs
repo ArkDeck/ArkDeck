@@ -12,7 +12,7 @@
 //! Beyond Swift, the owner must be the calling user, as the Windows lease
 //! requires: a server another account started is refused rather than trusted
 //! on its path alone.
-use crate::{ServerIdentityReceipt, VerifiedTool, denied, invalid};
+use crate::{ProvedProcessEnd, ServerIdentityReceipt, VerifiedTool, denied, invalid};
 use std::ffi::CStr;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -73,21 +73,6 @@ impl LoopbackServerLease {
     pub fn identity(&self) -> &ServerIdentityReceipt {
         &self.identity
     }
-}
-
-/// How [`end_proved_process`] left the process a receipt names. Every answer
-/// means that process's exit has finished: the kernel has closed its
-/// descriptors, so no listener of its own accepts any more.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ProvedProcessEnd {
-    /// Its exit had begun, or finished, before the call (the kernel no longer
-    /// reported its birth): nothing was signalled.
-    AlreadyEnded,
-    /// SIGTERM ended it: within the grace, or its exit was under way when the
-    /// grace ran out.
-    Terminated,
-    /// It outlived the grace, and SIGKILL ended it.
-    Killed,
 }
 
 /// How often an ending process is looked for (Swift's group drain probe).
