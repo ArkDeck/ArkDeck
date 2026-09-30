@@ -18,11 +18,14 @@ use windows_sys::Win32::System::Pipes::*;
 use windows_sys::Win32::System::Threading::*;
 
 mod account;
+mod console_secret;
+mod credential;
 mod daemon_start;
 mod deveco_files;
 mod host_fs;
 pub(crate) mod host_store;
 mod identity;
+mod inspected_directory;
 mod managed;
 mod pinned_file;
 mod process;
@@ -33,6 +36,11 @@ mod state;
 mod stop;
 mod tool;
 pub use account::{application_support_directory, arkdeck_application_support_root};
+pub use console_secret::{TerminalSecretError, read_terminal_secret};
+pub use credential::{
+    CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
+    KeychainPresence,
+};
 pub use daemon_start::{
     DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
 };
@@ -43,6 +51,7 @@ pub use deveco_files::{
 pub use identity::ImagePin;
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
+pub use inspected_directory::InspectedDirectory;
 pub use managed::ManagedServer;
 pub use pinned_file::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file,

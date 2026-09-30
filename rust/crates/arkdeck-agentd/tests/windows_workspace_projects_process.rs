@@ -1,14 +1,14 @@
-//! The Windows daemon's Target owners (TASK-XPA-004), as the real daemon
-//! composes them over an isolated development root: GJ-1's Target hops up
-//! to the point where a registered Windows HDC tuple is needed.
+//! The Windows daemon's workspace project owner (TASK-XPA-015), as the real
+//! daemon composes it over an isolated development root.
 //!
 //! * Over its pipe, with a plain pipe handle (no signer needed):
-//!   `target.list`, `target.show` and `target.display-name.set|clear`
-//!   answer from `targets-state` — the same `targets.json` bytes as macOS,
-//!   under `.targets.lock` — and what they wrote is read back after a
-//!   restart; `device.display-name.set` and `target.adopt` are refused
-//!   before admission with no new dispatch, and nothing is observed; a
-//!   Target directory that is not owner-only refuses the start.
+//!   `workspace.project.register|list|show` and `workspace.preset.list|show`
+//!   answer from `workspace-projects` (`projects.json` under
+//!   `.projects.lock`), a symbol preset registers, and what they wrote is
+//!   read back after a restart; a project or preset mutation is refused with
+//!   no new dispatch, because no Job owner is composed to prove that no
+//!   workspace Job names it; a store directory that is not owner-only, or a
+//!   document the owner cannot read, refuses the start.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
 //!   `rust/scripts/check-readonly.py` signs one): the same hops as the CLI
@@ -17,9 +17,9 @@
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
-//! nothing installed is read or written, no HDC is configured, and no device
-//! or `hdc` is involved. Each daemon is stopped by its own stop request, or
-//! ended by this test if it outlives a failed assertion.
+//! nothing installed is read or written, and no toolchain, device or `hdc`
+//! is involved. Each daemon is stopped by its own stop request, or ended by
+//! this test if it outlives a failed assertion.
 #![cfg(windows)]
 
 use arkdeck_platform::{HostDirectory, StateRoot};
@@ -39,44 +39,37 @@ fn turn() -> MutexGuard<'static, ()> {
 }
 
 const DEADLINE: Duration = Duration::from_secs(60);
-/// The Swift adoption oracle's device and Target.
-const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const TARGET: &str = "TGT-3ba3f5f43b92";
+const SOURCE_MAP: &str = "entry/build/sourceMaps.map";
 
-fn fixture(name: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/target-adoption")
-        .join(name)
-}
-
-/// A fresh development root, removed afterwards.
+/// A fresh development root named as the disk names it (a workspace root
+/// must be that spelling), with two project directories, removed afterwards.
 struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
+        let temporary = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+        let temporary = temporary.to_str().unwrap();
+        let temporary = temporary.strip_prefix(r"\\?\").unwrap_or(temporary);
         let nonce = u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap());
-        let path = std::env::temp_dir()
-            .canonicalize()
-            .unwrap()
-            .join(format!("ad-wintargets-{nonce:016x}"));
+        let path = Path::new(temporary).join(format!("ad-winprojects-{nonce:016x}"));
         std::fs::create_dir(&path).unwrap();
+        for name in ["first", "second"] {
+            std::fs::create_dir_all(path.join("sources").join(name)).unwrap();
+        }
         Self(path)
     }
-    fn targets_state(&self) -> PathBuf {
-        self.0.join("targets-state")
+    fn project(&self, name: &str) -> String {
+        self.0
+            .join("sources")
+            .join(name)
+            .to_str()
+            .unwrap()
+            .to_owned()
     }
-    /// The Target store the oracle's adoption left: its `targets.json`, in a
-    /// private `targets-state` the store itself creates.
-    fn with_oracle_target(self) -> Self {
-        HostDirectory::open_or_create_private(&self.targets_state()).unwrap();
-        std::fs::copy(
-            fixture("targets-state/targets.json"),
-            self.targets_state().join("targets.json"),
-        )
-        .unwrap();
-        self
+    fn store(&self) -> PathBuf {
+        self.0.join("workspace-projects")
     }
-    fn targets(&self) -> Vec<u8> {
-        std::fs::read(self.targets_state().join("targets.json")).unwrap()
+    fn document(&self) -> Vec<u8> {
+        std::fs::read(self.store().join("projects.json")).unwrap()
     }
 }
 impl Drop for Root {
@@ -230,32 +223,39 @@ fn answered(pipe: &str, method: &str, params: Value) -> Value {
     reply["result"].clone()
 }
 
-/// A refusal with the zero-dispatch proof in its details.
-fn refused(pipe: &str, method: &str, params: Value, code: &str, phase: &str) -> Value {
+/// A refusal of the workspace owner, with the zero-dispatch proof: under
+/// the preset owner's phase for a preset method, as Swift answers it.
+fn refused(pipe: &str, method: &str, params: Value, code: &str) -> Value {
     let reply = request(pipe, method, params);
     assert_eq!(reply["ok"], false, "{method}: {reply}");
     assert_eq!(reply["error"]["code"], code, "{method}: {reply}");
+    let phase = if method.starts_with("workspace.preset.") {
+        "workspacePresetOwner"
+    } else {
+        "workspaceProjectOwner"
+    };
     assert_eq!(
-        reply["error"]["details"]["phase"], phase,
-        "{method}: {reply}"
-    );
-    assert_eq!(
-        reply["error"]["details"]["newDispatchCount"], 0,
+        reply["error"]["details"],
+        json!({"phase": phase, "newDispatchCount": 0}),
         "{method}: {reply}"
     );
     reply
 }
 
-fn adoption() -> Value {
-    json!({"candidate": KEY, "observationId": "obs-00000000-0000-4000-8000-000000000000",
-        "observationGeneration": "1"})
+fn registration(request: &str, root: &str) -> Value {
+    json!({"registrationRequestId": request, "kind": "openharmony", "root": root})
+}
+
+fn symbol_preset(project: &Value) -> Value {
+    json!({"registrationRequestId": "preset-one", "projectRef": project, "kind": "symbol",
+        "templateRef": "openharmony.arkts-symbol@1", "timeoutSeconds": "600",
+        "relativeSourceMap": SOURCE_MAP})
 }
 
 #[test]
-fn the_target_owners_answer_over_the_pipe_and_survive_a_restart() {
+fn projects_register_over_the_pipe_and_survive_a_restart() {
     let _turn = turn();
-    let root = Root::new().with_oracle_target();
-    let before = root.targets();
+    let root = Root::new();
     let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
 
     let mut first = Daemon::start(executable, &root.0);
@@ -267,132 +267,199 @@ fn the_target_owners_answer_over_the_pipe_and_survive_a_restart() {
         "{:?}",
         first.seen
     );
-    let listed = answered(&pipe, "target.list", json!({}));
     assert_eq!(
-        listed,
-        json!([{"targetId": TARGET, "bindingRevision": 1, "toolVersion": "3.2.0d",
-            "adoptedAtUtc": "2026-09-14T00:00:00Z", "displayName": null,
-            "displayNameGeneration": "1"}])
+        answered(&pipe, "workspace.project.list", json!({})),
+        json!({"schemaVersion": "arkdeck.workspace-project-list/1", "projects": []})
     );
-    let shown = answered(&pipe, "target.show", json!({"targetId": TARGET}));
+    let project = answered(
+        &pipe,
+        "workspace.project.register",
+        registration("request-first", &root.project("first")),
+    );
     assert_eq!(
-        shown["stablePhysicalIdentitySha256"],
-        arkdeck_contract::sha256_hex(KEY.as_bytes()),
-        "{shown}"
+        project["projectRef"],
+        format!(
+            "project-{}",
+            &arkdeck_contract::sha256_hex(b"request-first")[..24]
+        )
     );
-    assert_eq!(shown["connectKey"], KEY);
-    // The Target's availability: its durable binding, no presence observed.
-    let availability = answered(&pipe, "target.availability", json!({"targetId": TARGET}));
-    assert_eq!(availability["targetId"], TARGET, "{availability}");
-    assert_eq!(availability["binding"]["state"], "ready", "{availability}");
-    assert_eq!(availability["binding"]["bindingRevision"], 1);
-    assert_eq!(availability["presence"]["state"], "unresolved");
-    let set = answered(
+    assert_eq!(project["configurationStatus"], "runtimeRestartRequired");
+    assert_eq!(project["reasonCode"], "workspace_runtime_restart_required");
+    assert!(!project.to_string().contains(&root.project("first")));
+    let reference = project["projectRef"].clone();
+    // A replay answers the same receipt and writes nothing.
+    let written = root.document();
+    assert_eq!(
+        answered(
+            &pipe,
+            "workspace.project.register",
+            registration("request-first", &root.project("first")),
+        ),
+        project
+    );
+    assert_eq!(root.document(), written);
+    let second = answered(
         &pipe,
-        "target.display-name.set",
-        json!({"targetId": TARGET, "expectedGeneration": "1", "name": "Bench e\u{301}"}),
+        "workspace.project.register",
+        registration("request-second", &root.project("second")),
     );
-    assert_eq!(set["generation"], "2", "{set}");
-    // A stale generation is refused and changes nothing.
-    let stale = request(
-        &pipe,
-        "target.display-name.clear",
-        json!({"targetId": TARGET, "expectedGeneration": "1"}),
+    // The owner's own refusals, before anything is written.
+    for (params, code) in [
+        (
+            registration("request-third", &root.project("first")),
+            "resourceConflict",
+        ),
+        (
+            registration("request-first", &root.project("second")),
+            "idempotencyConflict",
+        ),
+        (
+            registration("request-third", &root.project("first").replace('\\', "/")),
+            "invalidInput",
+        ),
+        (
+            registration("request-third", &root.project("FIRST")),
+            "invalidInput",
+        ),
+        (
+            registration("request-third", "/private/tmp/first"),
+            "invalidInput",
+        ),
+    ] {
+        refused(&pipe, "workspace.project.register", params, code);
+    }
+    assert_eq!(
+        answered(
+            &pipe,
+            "workspace.project.show",
+            json!({"projectRef": reference})
+        ),
+        project
     );
-    assert_eq!(stale["error"]["code"], "resourceConflict", "{stale}");
+    let listed = answered(&pipe, "workspace.project.list", json!({}));
+    assert_eq!(listed["projects"].as_array().unwrap().len(), 2, "{listed}");
 
-    // No HDC is registered: nothing is observed, no candidate is named, and
-    // the adoption is refused before admission with no new dispatch.
-    let observed = request(&pipe, "device.observations", json!({}));
-    assert_eq!(observed["error"]["code"], "rejected", "{observed}");
-    assert_eq!(observed["error"]["message"], "hdc.notConfigured");
-    refused(
-        &pipe,
-        "device.display-name.set",
-        json!({"candidate": KEY, "observationId": "obs-00000000-0000-4000-8000-000000000000",
-            "observationGeneration": "1", "name": "Bench"}),
-        "resourceConflict",
-        "candidateDisplayNameOwner",
+    // Presets: read, and a symbol preset registered; it pins nothing.
+    assert_eq!(
+        answered(
+            &pipe,
+            "workspace.preset.list",
+            json!({"projectRef": reference})
+        )["presets"],
+        json!([])
     );
-    let adopt = refused(
+    let preset = answered(
         &pipe,
-        "target.adopt",
-        adoption(),
-        "operationUnavailable",
-        "preAdmission",
+        "workspace.preset.register",
+        symbol_preset(&reference),
+    );
+    assert_eq!(preset["configurationStatus"], "runtimeRestartRequired");
+    assert_eq!(preset["constraints"]["relativeSourceMap"], SOURCE_MAP);
+    let absent = request(
+        &pipe,
+        "workspace.preset.show",
+        json!({"projectRef": reference, "presetRef": "preset-absent"}),
     );
     assert_eq!(
-        adopt["error"]["details"],
-        json!({"phase": "preAdmission", "newDispatchCount": 0})
+        absent["error"]["code"], "workspaceReferenceNotFound",
+        "{absent}"
     );
-    refused(
-        &pipe,
-        "target.adopt",
-        json!({}),
-        "invalidInput",
-        "preAdmission",
-    );
-    assert_eq!(root.targets(), before, "no Target was adopted or rewritten");
+
+    // No Job owner proves that no workspace Job names the project or the
+    // preset: every mutation is refused and nothing is written.
+    let written = root.document();
+    for (method, params) in [
+        (
+            "workspace.project.update",
+            json!({"projectRef": second["projectRef"], "expectedGeneration": "1",
+                "kind": "arkdeck", "root": root.project("second")}),
+        ),
+        (
+            "workspace.project.remove",
+            json!({"projectRef": second["projectRef"], "expectedGeneration": "1"}),
+        ),
+        (
+            "workspace.preset.remove",
+            json!({"mutationRequestId": "preset-remove", "projectRef": reference,
+                "presetRef": preset["presetRef"], "expectedGeneration": "1"}),
+        ),
+    ] {
+        let reply = refused(&pipe, method, params, "recordUnreadable");
+        assert_eq!(
+            reply["error"]["message"], "workspace Job references cannot be verified",
+            "{reply}"
+        );
+    }
+    assert_eq!(root.document(), written);
     first.stop(&root.0);
 
-    // Restarted over the same root: the name is read back, then cleared.
-    let mut second = Daemon::start(executable, &root.0);
-    let pipe = second.serving();
-    let listed = answered(&pipe, "target.list", json!({}));
-    assert_eq!(listed[0]["displayName"], "Bench e\u{301}", "{listed}");
-    assert_eq!(listed[0]["displayNameGeneration"], "2");
-    let cleared = answered(
-        &pipe,
-        "target.display-name.clear",
-        json!({"targetId": TARGET, "expectedGeneration": "2"}),
-    );
-    assert_eq!(cleared["generation"], "3", "{cleared}");
-    assert!(cleared["name"].is_null());
-    second.stop(&root.0);
-
-    let mut third = Daemon::start(executable, &root.0);
-    let pipe = third.serving();
-    let shown = answered(&pipe, "target.show", json!({"targetId": TARGET}));
-    assert!(shown["displayName"].is_null(), "{shown}");
-    assert_eq!(shown["displayNameGeneration"], "3");
-    // `doctor` reads the Target store and counts the adopted Target.
-    let doctor = answered(&pipe, "doctor", json!({}));
+    // Restarted over the same root: both projects and the preset are read
+    // back, still awaiting a composition this daemon does not have.
+    let mut restarted = Daemon::start(executable, &root.0);
+    let pipe = restarted.serving();
+    assert_eq!(answered(&pipe, "workspace.project.list", json!({})), listed);
     assert_eq!(
-        doctor["checks"]["target"],
-        json!({"adoptedTargetCount": 1, "bootstrapConfigured": false, "configured": true}),
-        "{doctor}"
+        answered(
+            &pipe,
+            "workspace.preset.show",
+            json!({"projectRef": reference, "presetRef": preset["presetRef"]})
+        ),
+        preset
     );
-    third.stop(&root.0);
-    assert_eq!(
-        root.targets(),
-        before,
-        "names never touch the binding bytes"
-    );
+    restarted.stop(&root.0);
+    assert_eq!(root.document(), written);
 }
 
 #[test]
-fn a_target_directory_that_is_not_owner_only_refuses_the_start() {
+fn a_store_that_is_not_owner_only_or_unreadable_refuses_the_start() {
     let _turn = turn();
-    let root = Root::new();
+    let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
+    let refuses = |root: &Root| {
+        let output = daemon(executable, &root.0).output().unwrap();
+        assert_eq!(output.status.code(), Some(69), "{output:?}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains("the workspace project store")
+                && stderr.contains("nothing was started"),
+            "{stderr}"
+        );
+        assert!(
+            !String::from_utf8(output.stdout)
+                .unwrap()
+                .contains("listening on"),
+            "nothing served"
+        );
+    };
     // Created as any directory below the temporary directory is: it
     // inherits grants to others, which the store refuses and never rewrites.
-    std::fs::create_dir(root.targets_state()).unwrap();
-    let output = daemon(Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")), &root.0)
-        .output()
+    let root = Root::new();
+    std::fs::create_dir(root.store()).unwrap();
+    refuses(&root);
+    assert!(!root.store().join("projects.json").exists());
+
+    // A document cut short: not repaired, not rewritten.
+    let root = Root::new();
+    HostDirectory::open_or_create_private(&root.store()).unwrap();
+    let mut first = Daemon::start(executable, &root.0);
+    let pipe = first.serving();
+    answered(
+        &pipe,
+        "workspace.project.register",
+        registration("request-first", &root.project("first")),
+    );
+    first.stop(&root.0);
+    let whole = root.document();
+    let cut = &whole[..whole.len() / 2];
+    // Rewritten in place, so the file keeps its owner-only descriptor.
+    std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(root.store().join("projects.json"))
+        .unwrap()
+        .write_all(cut)
         .unwrap();
-    assert_eq!(output.status.code(), Some(69), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(
-        stderr.contains("the Target store") && stderr.contains("nothing was started"),
-        "{stderr}"
-    );
-    assert!(
-        !String::from_utf8(output.stdout)
-            .unwrap()
-            .contains("listening on"),
-        "nothing served"
-    );
-    assert!(!root.targets_state().join("targets.json").exists());
+    refuses(&root);
+    assert_eq!(root.document(), cut);
 }
 
 /// PowerShell 7, which signs the development daemon.
@@ -448,7 +515,7 @@ fn cli(daemon: &Path, pin: &str, pipe: &str, arguments: &[&str]) -> (Option<i32>
 }
 
 #[test]
-fn gj1_target_hops_run_through_the_cli_against_a_dev_signed_daemon() {
+fn workspace_project_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     let Some(thumbprint) =
         std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT").filter(|value| !value.is_empty())
     else {
@@ -460,8 +527,7 @@ fn gj1_target_hops_run_through_the_cli_against_a_dev_signed_daemon() {
         return;
     };
     let _turn = turn();
-    let root = Root::new().with_oracle_target();
-    let before = root.targets();
+    let root = Root::new();
     let signed = root.0.join("signed-bin");
     std::fs::create_dir(&signed).unwrap();
     let daemon = signed.join("arkdeck-agentd.exe");
@@ -482,53 +548,68 @@ fn gj1_target_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     assert!(signing.status.success(), "{signing:?}");
     let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
     let pin = pin["pin"].as_str().unwrap().to_owned();
+    let first_root = root.project("first");
 
     let mut first = Daemon::start(&daemon, &root.0);
     let pipe = first.serving();
-    let (status, envelope) = cli(&daemon, &pin, &pipe, &["target", "list"]);
+    let register = [
+        "workspace",
+        "project",
+        "register",
+        "--registration-request-id",
+        "request-first",
+        "--kind",
+        "openharmony",
+        "--root",
+        &first_root,
+    ];
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &register);
     assert_eq!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["result"][0]["targetId"], TARGET, "{envelope}");
-    let (status, envelope) = cli(
-        &daemon,
-        &pin,
-        &pipe,
-        &[
-            "target",
-            "display-name",
-            "set",
-            "--target",
-            TARGET,
-            "--expected-generation",
-            "1",
-            "--name",
-            "Bench",
-        ],
-    );
-    assert_eq!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["result"]["generation"], "2", "{envelope}");
-    // Adoption is refused before admission: the CLI reports the refusal,
-    // not an unknown outcome, and nothing was dispatched or written.
-    let (status, envelope) = cli(
-        &daemon,
-        &pin,
-        &pipe,
-        &[
-            "target",
-            "adopt",
-            "--candidate",
-            KEY,
-            "--observation",
-            "obs-00000000-0000-4000-8000-000000000000",
-            "--observation-generation",
-            "1",
-        ],
-    );
-    assert_eq!(status, Some(69), "{envelope}");
+    let project = envelope["result"].clone();
+    let reference = project["projectRef"].as_str().unwrap().to_owned();
     assert_eq!(
-        envelope["error"]["code"], "operationUnavailable",
+        project["configurationStatus"], "runtimeRestartRequired",
         "{envelope}"
     );
-    assert_eq!(root.targets(), before);
+    // The replay is the same receipt.
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &register);
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"], project);
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["workspace", "project", "list"]);
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(
+        envelope["result"]["projects"],
+        json!([project]),
+        "{envelope}"
+    );
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &["workspace", "preset", "list", "--project", &reference],
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"]["presets"], json!([]), "{envelope}");
+    // A mutation is refused before anything is written: the CLI reports the
+    // refusal, not an unknown outcome.
+    let written = root.document();
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "workspace",
+            "project",
+            "remove",
+            "--project",
+            &reference,
+            "--expected-generation",
+            "1",
+        ],
+    );
+    assert_ne!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["error"]["code"], "recordUnreadable", "{envelope}");
+    assert_eq!(root.document(), written);
     first.stop(&root.0);
 
     let mut second = Daemon::start(&daemon, &root.0);
@@ -537,34 +618,10 @@ fn gj1_target_hops_run_through_the_cli_against_a_dev_signed_daemon() {
         &daemon,
         &pin,
         &pipe,
-        &["target", "show", "--target", TARGET],
+        &["workspace", "project", "show", "--project", &reference],
     );
     assert_eq!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["result"]["displayName"], "Bench", "{envelope}");
-    let (status, envelope) = cli(
-        &daemon,
-        &pin,
-        &pipe,
-        &[
-            "target",
-            "display-name",
-            "clear",
-            "--target",
-            TARGET,
-            "--expected-generation",
-            "2",
-        ],
-    );
-    assert_eq!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["result"]["generation"], "3", "{envelope}");
+    assert_eq!(envelope["result"], project);
     second.stop(&root.0);
-
-    let mut third = Daemon::start(&daemon, &root.0);
-    let pipe = third.serving();
-    let (status, envelope) = cli(&daemon, &pin, &pipe, &["target", "list"]);
-    assert_eq!(status, Some(0), "{envelope}");
-    assert!(envelope["result"][0]["displayName"].is_null(), "{envelope}");
-    assert_eq!(envelope["result"][0]["displayNameGeneration"], "3");
-    third.stop(&root.0);
-    assert_eq!(root.targets(), before);
+    assert_eq!(root.document(), written);
 }

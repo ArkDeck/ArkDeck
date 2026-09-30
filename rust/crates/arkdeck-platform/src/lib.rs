@@ -48,6 +48,14 @@ mod terminal_secret;
 pub use secret::{Secret, wipe};
 #[cfg(target_os = "macos")]
 pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
+// The Windows console reader and Credential Manager store (TASK-XPA-011, G13)
+// with the macOS surface; `trusted_daemon_fingerprint` stays macOS-only until
+// the Authenticode identity (G12) binds a signing receipt on Windows.
+#[cfg(windows)]
+pub use windows::{
+    CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
+    KeychainPresence, TerminalSecretError, read_terminal_secret,
+};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;
@@ -223,6 +231,10 @@ pub use windows::host_store::{
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
+// A workspace project root, pinned by the identity it was registered with
+// (TASK-XPA-015).
+#[cfg(windows)]
+pub use windows::InspectedDirectory;
 
 #[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;
