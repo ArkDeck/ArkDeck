@@ -219,7 +219,9 @@ resolved with `SHGetKnownFolderPath(FOLDERID_LocalAppData)` for its own token
 the user SID and SYSTEM); `cargo run -p arkdeck-agentd` therefore creates that
 directory. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
 user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
-text) instead; only the lifecycle is composed over it, and every input from which
+text) instead; beside the lifecycle only the
+[Target owners](#windows-target-owners-task-xpa-004) are composed over either
+root, and every input from which
 the isolated macOS owner composes an owner (development HDC, USB relations,
 code-sign helper, mutation authority, App ingress, analyzer, ArkTrace, workspace
 inspector) refuses the start until its store is ported. `ARKDECK_ENDPOINT` alone
@@ -2250,10 +2252,10 @@ confirms it:
   or zero, and then no relation is formed).
 
 `UsbRegistryRelations::system()` reads this census on Windows. The Windows
-daemon does not compose it yet: the Target observation owner it would feed
-(`Host::with_usb_registry_relations` and the HDC, observation and adoption
-owners beside it) is still composed on macOS only, so the Windows Runtime keeps
-reading no relation until that owner is ported.
+daemon composes the Target observation owner it feeds (see
+[Windows Target owners](#windows-target-owners-task-xpa-004)) and reads it by the
+macOS rule: only beside a registered HDC the composition started as its managed
+server. No Windows HDC tuple is registered yet, so it reads no relation.
 
 Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
 sets, and this host's census answering with well-formed entries, shape only);
@@ -2261,6 +2263,60 @@ the provider's `tests/windows_usb_census.rs` (a synthetic node through the
 Windows rule proving a scripted HDC's candidate and holding the adoption's final
 check, a replug or a missing name, arrival or serial proving nothing, and on
 Windows this host's tree through `system()`). None of it is device evidence.
+
+## Windows Target owners (TASK-XPA-004)
+
+A Windows daemon that owns a state root composes the Target owners over it
+(`windows_lifecycle::Authority::compose`), in the macOS layout: `targets` below
+`%LOCALAPPDATA%\ArkDeck\Agentd` (Swift's production layout) or `targets-state`
+below a development root (the isolated owner's). The directory is created
+relative to the held root handle with the host store's owner-only descriptor
+(owner and sole grantee the user SID, protected) when absent
+(`StateRoot::private_child`), so it is private although the account root also
+grants SYSTEM; an existing one is never re-permissioned, and one that is not
+owner-only refuses the start (exit 69, `the Target store … is unusable`).
+
+- The Target store (`arkdeck_hoststore::TargetStore`, now compiled on macOS and
+  Windows): `targets.json` and `target-display-names.json` under `.targets.lock`
+  and `.target-display-names.lock`, on the NTFS host store, the same bytes as
+  macOS. `target.list`, `target.show`, `target.availability`,
+  `target.display-name.set|clear` answer from it, `doctor` counts its Targets,
+  and a restart reads back what it holds. A torn document or a lock name that
+  is not a lock file fails closed without a write; two writers have one CAS
+  winner and a writer waits out another owner's locks, as on macOS.
+- The Target observation owner (`TargetObservations`) with the USB relations
+  the macOS rule names (`development_usb::relation_source`): the Windows census
+  only beside a registered HDC the composition started as its managed server.
+  No Windows HDC tuple is registered yet (its integration change waits for the
+  maintainer's samples), so nothing is observed or dispatched:
+  `device.observations` answers `rejected` (`hdc.notConfigured`),
+  `device.display-name.*` finds no snapshot (`resourceConflict`, phase
+  `candidateDisplayNameOwner`, `newDispatchCount: 0`), and `target.adopt`
+  refuses before admission as Swift's owner refuses a snapshot it cannot take:
+  `operationUnavailable`, details `{"phase": "preAdmission",
+  "newDispatchCount": 0}` (a malformed reference is `invalidInput` first). The
+  CLI therefore reports a refusal (exit 69), not an unknown outcome. macOS
+  answers the same whenever its Target owner has no HDC (a production
+  composition without `ARKDECK_HDC_PATH`); a composition without a Target owner
+  (the read-only foundation) keeps its `rejected`.
+- The stable identity is `stable_identity_sha256_for_serial` (the SHA-256 of
+  the trimmed, lowercased serial) on both platforms; a node without a serial,
+  or a serial two nodes carry, proves no relation and nothing is adopted.
+
+Still macOS-only beside these owners: the Rockchip binding lineage and
+post-flash alias (GJ-4), the Import binding the Target store resolves, the Job,
+Artifact, Session and bootstrap-registry owners, and every HDC composition.
+Tests: the store's unit tests (now on NTFS too);
+`arkdeck-hoststore/tests/windows_target_owners.rs` (the Swift adoption oracle's
+board through a scripted HDC and the Windows census rule: the same Target and
+`targets.json` bytes, an idempotent re-adoption, the trust stop, no serial or
+two boards proving nothing, torn and replaced-lock documents failing closed);
+`arkdeck-agentd/tests/windows_target_owners_process.rs` (the real daemon over a
+development root through its pipe, a restart reading the names back, the
+zero-dispatch refusals, a non-private Target directory refusing the start, and
+the same hops through the real CLI against a copy of the daemon signed with the
+host-trusted development signer, skipped with a message when
+`ARKDECK_DEV_SIGNER_THUMBPRINT` is not set).
 
 ## Trace Runtime probe (TASK-XPA-016, M1)
 

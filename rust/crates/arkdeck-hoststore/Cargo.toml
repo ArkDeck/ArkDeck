@@ -15,10 +15,14 @@ serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 unicode-segmentation.workspace = true
 
+# The Target owners (TASK-XPA-004) read the HDC provider's candidates and
+# observation rules on macOS and Windows.
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+arkdeck-provider-hdc.workspace = true
+
 [target.'cfg(target_os = "macos")'.dependencies]
 aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
 arkdeck-provider-arkforge.workspace = true
-arkdeck-provider-hdc.workspace = true
 # Workspace signing (TASK-XPA-015): the design's crate graph, RUNTIME --> PWS.
 arkdeck-provider-workspace.workspace = true
 libc.workspace = true

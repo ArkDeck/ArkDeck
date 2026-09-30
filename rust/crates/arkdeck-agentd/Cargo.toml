@@ -14,8 +14,12 @@ arkdeck-provider-hdc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies]
+# The Target owners are composed on macOS and Windows (TASK-XPA-004); every
+# other host-store owner on macOS only.
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
 arkdeck-hoststore.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
 arkdeck-provider-arkforge.workspace = true
 
 # A stand-in for `arkforged`'s public socket, spoken with ArkForge's own codec.
