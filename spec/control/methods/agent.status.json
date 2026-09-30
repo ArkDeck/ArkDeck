@@ -428,7 +428,10 @@
           "type": "string"
         },
         "failureCode": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "generation": {
           "type": "string"
@@ -485,7 +488,32 @@
                   "type": "string"
                 },
                 "selectionSchema": {
-                  "type": "null"
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "enum": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "enum",
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": [
+                        "null"
+                      ]
+                    }
+                  ]
                 },
                 "status": {
                   "type": "string"

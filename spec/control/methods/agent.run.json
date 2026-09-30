@@ -12,6 +12,8 @@
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "orchestrationBudgetExpired",
+        "orchestrationClockUntrusted",
         "recordUnreadable",
         "rejected",
         "resourceNotFound",
