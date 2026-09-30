@@ -455,12 +455,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "trace.cache.status",
     "trace.cache.purge",
     // The Import owner (TASK-XPA-008; `windows_import_owner_process.rs`):
-    // the HAP, native-library and workspace-patch uploads committed with
-    // their exact bytes, and the Import reads, release and abort. Not
-    // `artifact import flash-bundle`: its publication is refused on Windows
-    // while the owner's flash-bundle validator is macOS-only.
+    // the HAP, native-library, workspace-patch and DAYU200 flash-bundle
+    // uploads committed with their exact bytes (the flash bundle judged by
+    // the Flash archive reader, TASK-XPA-010), and the Import reads, release
+    // and abort.
     "artifact.import.hap",
     "artifact.import.native-library",
+    "artifact.import.flash-bundle",
     "artifact.import.workspace-patch",
     "artifact.import.inspect",
     "artifact.import.list",
@@ -1189,7 +1190,7 @@ mod tests {
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),
-            ("artifact.import.flash-bundle", "partial"),
+            ("artifact.import.flash-bundle", "implemented"),
         ] {
             assert_eq!(windows(&document, feature), status, "{feature}");
         }
