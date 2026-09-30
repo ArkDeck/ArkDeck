@@ -197,6 +197,20 @@ pub use host_store::{
     UploadWritePoint,
 };
 
+// The same durable host store on NTFS (TASK-XPA-005): the core document,
+// lock, publication and Job journal surface. The export, import-upload,
+// update, trace-removal, session-removal, diagnostic-log and payload-cache
+// submodules, and the `std::fs::Metadata`-typed `document_metadata`/
+// `remove_document`, are not on Windows yet.
+#[cfg(windows)]
+pub use windows::host_store::{
+    DocumentPublishError, ExclusiveOutcome, HostDirectory, HostDirectoryFacts, HostDocument,
+    HostDocumentPass, HostEntryKind, HostFileIdentity, HostJournal, HostJournalAppender,
+    HostReadLock, JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck,
+};
+#[cfg(windows)]
+pub use windows::{application_support_directory, arkdeck_application_support_root};
+
 #[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;
 #[cfg(any(target_os = "macos", windows))]
