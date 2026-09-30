@@ -16,7 +16,7 @@
 //! be admitted or dispatched. A composition without a verified helper cannot
 //! plan a deployment at all. Fixture data is isolated host evidence, never a
 //! device acceptance result.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
@@ -34,6 +34,7 @@ fn rust_plans_the_swift_native_library_requests() {
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc(&NoDispatch);
     let (mut plans, mut materialized, mut differences) = (0, 0, Vec::new());
+    let mut labels = debug_hap::HostLabels::default();
     for exchange in cases["exchanges"]
         .as_array()
         .unwrap()
@@ -51,6 +52,12 @@ fn rust_plans_the_swift_native_library_requests() {
             materialized += 1;
         }
         let actual = support::legacy_plan_answer(actual);
+        labels.learn(
+            &actual,
+            &exchange["answer"],
+            "/result/materializedPlanDigest",
+        );
+        let actual = labels.swift(&actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",
