@@ -2,8 +2,11 @@
 """Record actual host-only CLI/control output, then validate the completed set.
 
 This runs the built Rust binaries with no HDC tool or production endpoint. Unix
-checks the real UDS exchanges. Windows checks the actual unsigned-daemon refusal;
-positive installed-daemon and DAYU200 acceptance belongs to windows-spk3.ps1.
+checks the real UDS exchanges. Windows checks the actual unsigned-daemon refusal and,
+when ARKDECK_DEV_SIGNER_THUMBPRINT names a certificate trusted only on this host
+(rust/scripts/windows-dev-identity.ps1, CHG-2026-074 r12 item 22), the same matrix as
+Unix over the named pipe against a copy of the daemon signed with it. Positive
+installed-daemon and DAYU200 acceptance belongs to windows-spk3.ps1.
 No fixture response is substituted for a daemon output.
 """
 from __future__ import annotations
@@ -15,6 +18,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -220,17 +224,20 @@ def exchange(endpoint: str, directory: Path, rows: list, name: str, data: bytes,
              method: str | None, expected_error: str | None = None,
              valid_request: bool = True) -> dict:
     record(directory, rows, name, "request.bin", data, method=method, validRequest=valid_request)
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-        connection.settimeout(10)
-        connection.connect(endpoint)
-        try:
-            connection.sendall(data)
-        except BrokenPipeError:
-            # An oversized frame may be rejected before its trailing bytes.
-            # Read the refusal from this connection; never replay it.
-            pass
-        with connection.makefile("rb") as reader:
-            response = reader.readline(8 * 1024 * 1024 + 1)
+    if os.name == "nt":
+        response = pipe_exchange(endpoint, data)
+    else:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(10)
+            connection.connect(endpoint)
+            try:
+                connection.sendall(data)
+            except BrokenPipeError:
+                # An oversized frame may be rejected before its trailing bytes.
+                # Read the refusal from this connection; never replay it.
+                pass
+            with connection.makefile("rb") as reader:
+                response = reader.readline(8 * 1024 * 1024 + 1)
     record(directory, rows, name, "response.jsonl", response,
            method=method, expectedError=expected_error)
     value = json.loads(response)
@@ -239,6 +246,43 @@ def exchange(endpoint: str, directory: Path, rows: list, name: str, data: bytes,
     else:
         assert value["ok"] is True, (name, value)
     return value
+
+
+def pipe_exchange(endpoint: str, data: bytes) -> bytes:
+    """One request on a fresh connection to the daemon's named pipe, as the UDS path does.
+
+    The daemon checks this client's user SID and elevation; it is this process's own
+    account. Like the UDS path it sends the frame once and never replays it."""
+    wait_pipe = ctypes.WinDLL("kernel32", use_last_error=True).WaitNamedPipeW
+    wait_pipe.argtypes = [ctypes.c_wchar_p, ctypes.c_uint32]
+    wait_pipe.restype = ctypes.c_int
+    deadline = time.monotonic() + 10
+    while True:
+        try:
+            pipe = open(endpoint, "r+b", buffering=0)  # noqa: SIM115 - closed below
+            break
+        except OSError:
+            # Every instance busy (ERROR_PIPE_BUSY): wait for one, within the budget.
+            if time.monotonic() >= deadline:
+                raise
+            wait_pipe(endpoint, 100)
+    with pipe:
+        try:
+            pipe.write(data)
+        except OSError:
+            # An oversized frame may be refused before its trailing bytes.
+            pass
+        response = b""
+        limit = 8 * 1024 * 1024 + 1
+        while not response.endswith(b"\n") and len(response) < limit:
+            try:
+                chunk = pipe.read(65536)
+            except (BrokenPipeError, OSError):
+                break
+            if not chunk:
+                break
+            response += chunk
+    return response[: response.find(b"\n") + 1] if b"\n" in response else response
 
 
 def wait_ready(endpoint: str, daemon: subprocess.Popen) -> None:
@@ -320,6 +364,178 @@ def validate_spk3(directory: Path) -> None:
     print(json.dumps({"validationFile": str(output), **result}))
 
 
+def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpoint: str,
+                registry: dict) -> None:
+    """Every CLI leaf, every method and the malformed-frame matrix against a daemon the
+    CLI authenticates: the Unix socket, or the Windows pipe of a daemon with a pinned
+    development signer (design §L.1 item 22)."""
+    for name, command, code, error in [
+        ("doctor", ["doctor"], 0, None),
+        ("deep", ["doctor", "--deep"], 0, None),
+        ("healthy", ["doctor", "--require-healthy"], 69, "healthRequirementFailed"),
+        ("operations", ["operation", "list"], 0, None),
+        ("candidates", ["device", "candidates"], 1, "operationFailed"),
+    ]:
+        invoke(cli, directory, rows, environment, name, command, code, error)
+    invoke(cli, directory, rows, environment, "debug-probe-cli-missing-owner",
+           ["debug", "probe", "--target", "target-fixture"], 70, "internalError")
+    operations = invoke(cli, directory, rows, environment, "descriptor-source",
+                        ["operation", "list"], 0)["result"]
+    reference = operations[0]["reference"]
+    descriptor = invoke(cli, directory, rows, environment, "descriptor",
+                        ["operation", "describe", "--operation", reference], 0)
+    assert descriptor["result"]["reference"] == reference
+    assert descriptor["result"]["availability"] == "unavailable"
+    example = invoke(cli, directory, rows, environment, "example",
+                     ["operation", "example", "--operation", reference], 0)
+    assert example["result"] == descriptor["result"]["exampleRequest"]
+    invoke(cli, directory, rows, environment, "descriptor-missing",
+           ["operation", "describe", "--operation", "unknown@1"], 65, "resourceNotFound")
+    invoke(cli, directory, rows, environment, "job-unknown",
+           ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
+    for method in registry["methods"]:
+        expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
+        # Debug and Trace reads validate required typed parameters before asking
+        # for a provider.
+        if method in {"debug.probe", "debug.template.run", "trace.probe"}:
+            expected = "invalidParams"
+        if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register", "target.availability"}:
+            expected = "invalidParams"
+        if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
+                      "artifact.export", "artifact.list"}:
+            expected = "operationUnavailable"
+        # Only the macOS daemon composes an agent execution owner; without one it
+        # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
+        if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.resume", "human-action.list", "human-action.show"} and platform.system() == "Darwin":
+            expected = "operationUnavailable"
+        # The macOS daemon starts no managed HDC server, so it answers the live HDC
+        # status as Swift's daemon without its HDC host does.
+        if method == "runtime.hdc.status" and platform.system() == "Darwin":
+            expected = None
+        # Keeping no state, it composes no control-action owner either: it answers as
+        # Swift's handler without one, which wants an exact identity for show and reconcile.
+        if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "runtime.tool.select", "control-action.list"} and platform.system() == "Darwin":
+            expected = "operationUnavailable"
+        if method in {"control-action.show", "control-action.reconcile"} and platform.system() == "Darwin":
+            expected = "invalidInput"
+        if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
+            expected = "internalError"
+        # No composition here holds the Flash recovery broker's invocations, the
+        # post-flash alias, the Loader binding or the ArkForge lane's runtime
+        # directory: as Swift's daemon without them, the broker and the reads answer
+        # that their owner is not configured, and the reconciler, the binding, the
+        # prerequisites and the lane plan preview read their parameters first.
+        if method in {"debug.start", "debug.evaluate", "debug.status", "recovery.flash-invocation.list", "flash.bootloader-status", "flash.device-access"}:
+            expected = "internalError"
+        if method in {"flash.reconcile-alias", "flash.prerequisites", "flash.bind-current-loader", "flash.lanePlanPreview"}:
+            expected = "invalidParams"
+        # No composition here holds a Trace inspector (Swift composes one only beside
+        # a loaded ArkTrace distribution): its owner refuses before any parameter.
+        if method == "trace.inspect":
+            expected = "operationUnavailable"
+        # Without parameters, as Swift's handler, every workspace method but the
+        # project list is refused before its owner is asked.
+        if method in {"workspace.project.register", "workspace.project.show",
+                      "workspace.project.update", "workspace.project.remove",
+                      "workspace.preset.list", "workspace.preset.show",
+                      "workspace.preset.register", "workspace.preset.update",
+                      "workspace.preset.remove"}:
+            expected = "invalidParams"
+        if method == "workspace.project.list":
+            schema = read_json(ROOT / "spec/control/methods" / f"{method}.json")
+            definitions = schema["$defs"]
+            error_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorCode"})
+            detail_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorDetails"})
+            expected = "operationUnavailable" if error_schema.is_valid("operationUnavailable") and detail_schema.is_valid({"phase": "workspaceProjectOwner", "newDispatchCount": 0}) else "internalError"
+        if method in IMPORT_OWNER_METHODS:
+            expected = missing_import_owner_error(method)
+        exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
+    wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",
+        encode(request(registry, "operation.describe", "descriptor-success", {"reference": reference})),
+        "operation.describe")
+    assert wire_descriptor["result"] == descriptor["result"]
+    for name, method, params, error in [
+        ("debug-probe-missing-owner", "debug.probe", {"targetId": "target-fixture"}, "internalError"),
+        ("debug-template-missing-owner", "debug.template.run", {"targetId": "target-fixture", "templateId": "device.uptime"}, "internalError"),
+        ("debug-probe-extra", "debug.probe", {"targetId": "target-fixture", "rawCommand": "shell uptime"}, "invalidParams"),
+        ("debug-template-unknown", "debug.template.run", {"targetId": "target-fixture", "templateId": "shell uptime"}, "invalidParams"),
+        ("trace-probe-missing-owner", "trace.probe", {"targetId": "target-fixture"}, "internalError"),
+        ("trace-probe-bad-type", "trace.probe", {"targetId": 1}, "invalidParams"),
+        ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
+        ("reconcile-alias-missing-owner", "flash.reconcile-alias", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
+        ("bind-loader-missing-owner", "flash.bind-current-loader", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
+        ("prerequisites-missing-owner", "flash.prerequisites", {"targetId": "target-fixture", "profileReference": "dayu200"}, "internalError"),
+        ("lane-preview-missing-owner", "flash.lanePlanPreview", {"targetId": "target-fixture", "profileReference": "dayu200", "archiveSha256": "e" * 64}, "internalError"),
+        ("device-access-parameter", "flash.device-access", {"socketPath": "/caller/path"}, "invalidParams"),
+        ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
+        ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
+        ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),
+        ("bad-deep", "doctor", {"deep": "true"}, "invalidParams"),
+        ("bad-health", "health", {"extra": True}, "invalidParams"),
+        ("bad-list", "operation.list", {"extra": True}, "invalidParams"),
+        ("bad-observations", "device.observations", {"candidateKey": "untrusted"}, "invalidInput"),
+        ("bad-following", "device.observations", {"following": None}, "invalidInput"),
+        ("old-following", "device.observations", {"following": {"candidate": "x", "observationId": "old", "observationGeneration": "1"}}, "resourceConflict"),
+    ]:
+        exchange(endpoint, directory, rows, name, encode(request(registry, method, name, params)), method, error)
+    valid = request(registry, "health", "negative")
+    for name, data, method, error in [
+        ("malformed", b"{\n", None, "malformedFrame"),
+        ("utf8", b"\xff\n", None, "malformedFrame"),
+        ("crlf", encode(valid)[:-1] + b"\r\n", None, "malformedFrame"),
+        ("duplicate", encode(valid)[:-2] + b',"id":"again"}\n', None, "malformedFrame"),
+        ("forged-origin", encode(dict(valid, arkdeckOrigin={"foregroundConsole": True})), None, "malformedFrame"),
+        ("wrong-version", encode(dict(valid, protocolVersion="2.0.0")), "health", "unsupportedProtocolVersion"),
+        ("wrong-identity", encode(dict(valid, contractIdentity="0" * 64)), "health", "unsupportedProtocolVersion"),
+        ("old-method", encode(dict(valid, method="device.candidates")), None, "unknownMethod"),
+        ("oversized", b"x" * registry["maximumRequestFrameBytes"] + b"\n", None, "malformedFrame"),
+    ]:
+        exchange(endpoint, directory, rows, name, data, method, error, valid_request=False)
+
+
+def pwsh() -> str:
+    found = shutil.which("pwsh")
+    if found:
+        return found
+    alias = Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft/WindowsApps/pwsh.exe"
+    assert alias.exists(), "PowerShell 7 is required to sign the development daemon"
+    return str(alias)
+
+
+def signed_windows_matrix(directory: Path, rows: list, base: dict, registry: dict, cli: Path,
+                          daemon_binary: Path, thumbprint: str, endpoint: str) -> dict:
+    """The same matrix as on Unix, against a copy of the daemon signed with a certificate
+    trusted only on this host (design §L.1 item 22): the CLI checks the pinned image path and
+    the pinned signer exactly as for an installed daemon; nothing skips the check."""
+    signed = directory / "signed-bin"
+    signed.mkdir()
+    signed_cli = Path(shutil.copy2(cli, signed / cli.name))
+    signed_daemon = Path(shutil.copy2(daemon_binary, signed / daemon_binary.name))
+    result = subprocess.run([pwsh(), "-NoProfile", "-NonInteractive", "-File",
+                             str(ROOT / "rust/scripts/windows-dev-identity.ps1"), "sign",
+                             "-Thumbprint", thumbprint, "-Path", str(signed_daemon)],
+                            capture_output=True, timeout=120, stdin=subprocess.DEVNULL)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    pin = json.loads(result.stdout)["pin"]
+    environment = dict(base, ARKDECK_ENDPOINT=endpoint, ARKDECK_DAEMON_PATH=str(signed_daemon),
+                       ARKDECK_DAEMON_SIGNER_SHA256=pin)
+    daemon = subprocess.Popen([str(signed_daemon)], env=environment, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE)
+    try:
+        wait_ready(endpoint, daemon)
+        full_matrix(signed_cli, directory, rows, environment, endpoint, registry)
+    finally:
+        daemon.terminate()
+        try:
+            stdout, stderr = daemon.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            daemon.kill()
+            stdout, stderr = daemon.communicate(timeout=5)
+        record(directory, rows, "signed-daemon", "stdout.txt", stdout)
+        record(directory, rows, "signed-daemon", "stderr.txt", stderr)
+    return {"signerPin": pin, "daemonSha256": hashlib.sha256(signed_daemon.read_bytes()).hexdigest()}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bin-dir", type=Path, default=ROOT / "rust/target/debug")
@@ -360,128 +576,7 @@ def main() -> None:
                     value = invoke(cli, directory, rows, environment, name, command, 69, "runtimeUnavailable")
                     assert "signing identity" in value["error"]["message"], value
             else:
-                for name, command, code, error in [
-                    ("doctor", ["doctor"], 0, None),
-                    ("deep", ["doctor", "--deep"], 0, None),
-                    ("healthy", ["doctor", "--require-healthy"], 69, "healthRequirementFailed"),
-                    ("operations", ["operation", "list"], 0, None),
-                    ("candidates", ["device", "candidates"], 1, "operationFailed"),
-                ]:
-                    invoke(cli, directory, rows, environment, name, command, code, error)
-                invoke(cli, directory, rows, environment, "debug-probe-cli-missing-owner",
-                       ["debug", "probe", "--target", "target-fixture"], 70, "internalError")
-                operations = invoke(cli, directory, rows, environment, "descriptor-source",
-                                    ["operation", "list"], 0)["result"]
-                reference = operations[0]["reference"]
-                descriptor = invoke(cli, directory, rows, environment, "descriptor",
-                                    ["operation", "describe", "--operation", reference], 0)
-                assert descriptor["result"]["reference"] == reference
-                assert descriptor["result"]["availability"] == "unavailable"
-                example = invoke(cli, directory, rows, environment, "example",
-                                 ["operation", "example", "--operation", reference], 0)
-                assert example["result"] == descriptor["result"]["exampleRequest"]
-                invoke(cli, directory, rows, environment, "descriptor-missing",
-                       ["operation", "describe", "--operation", "unknown@1"], 65, "resourceNotFound")
-                invoke(cli, directory, rows, environment, "job-unknown",
-                       ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
-                for method in registry["methods"]:
-                    expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    # Debug and Trace reads validate required typed parameters before asking
-                    # for a provider.
-                    if method in {"debug.probe", "debug.template.run", "trace.probe"}:
-                        expected = "invalidParams"
-                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register", "target.availability"}:
-                        expected = "invalidParams"
-                    if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
-                                  "artifact.export", "artifact.list"}:
-                        expected = "operationUnavailable"
-                    # Only the macOS daemon composes an agent execution owner; without one it
-                    # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
-                    if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.resume", "human-action.list", "human-action.show"} and platform.system() == "Darwin":
-                        expected = "operationUnavailable"
-                    # The macOS daemon starts no managed HDC server, so it answers the live HDC
-                    # status as Swift's daemon without its HDC host does.
-                    if method == "runtime.hdc.status" and platform.system() == "Darwin":
-                        expected = None
-                    # Keeping no state, it composes no control-action owner either: it answers as
-                    # Swift's handler without one, which wants an exact identity for show and reconcile.
-                    if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "runtime.tool.select", "control-action.list"} and platform.system() == "Darwin":
-                        expected = "operationUnavailable"
-                    if method in {"control-action.show", "control-action.reconcile"} and platform.system() == "Darwin":
-                        expected = "invalidInput"
-                    if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
-                        expected = "internalError"
-                    # No composition here holds the Flash recovery broker's invocations, the
-                    # post-flash alias, the Loader binding or the ArkForge lane's runtime
-                    # directory: as Swift's daemon without them, the broker and the reads answer
-                    # that their owner is not configured, and the reconciler, the binding, the
-                    # prerequisites and the lane plan preview read their parameters first.
-                    if method in {"debug.start", "debug.evaluate", "debug.status", "recovery.flash-invocation.list", "flash.bootloader-status", "flash.device-access"}:
-                        expected = "internalError"
-                    if method in {"flash.reconcile-alias", "flash.prerequisites", "flash.bind-current-loader", "flash.lanePlanPreview"}:
-                        expected = "invalidParams"
-                    # No composition here holds a Trace inspector (Swift composes one only beside
-                    # a loaded ArkTrace distribution): its owner refuses before any parameter.
-                    if method == "trace.inspect":
-                        expected = "operationUnavailable"
-                    # Without parameters, as Swift's handler, every workspace method but the
-                    # project list is refused before its owner is asked.
-                    if method in {"workspace.project.register", "workspace.project.show",
-                                  "workspace.project.update", "workspace.project.remove",
-                                  "workspace.preset.list", "workspace.preset.show",
-                                  "workspace.preset.register", "workspace.preset.update",
-                                  "workspace.preset.remove"}:
-                        expected = "invalidParams"
-                    if method == "workspace.project.list":
-                        schema = read_json(ROOT / "spec/control/methods" / f"{method}.json")
-                        definitions = schema["$defs"]
-                        error_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorCode"})
-                        detail_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorDetails"})
-                        expected = "operationUnavailable" if error_schema.is_valid("operationUnavailable") and detail_schema.is_valid({"phase": "workspaceProjectOwner", "newDispatchCount": 0}) else "internalError"
-                    if method in IMPORT_OWNER_METHODS:
-                        expected = missing_import_owner_error(method)
-                    exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
-                wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",
-                    encode(request(registry, "operation.describe", "descriptor-success", {"reference": reference})),
-                    "operation.describe")
-                assert wire_descriptor["result"] == descriptor["result"]
-                for name, method, params, error in [
-                    ("debug-probe-missing-owner", "debug.probe", {"targetId": "target-fixture"}, "internalError"),
-                    ("debug-template-missing-owner", "debug.template.run", {"targetId": "target-fixture", "templateId": "device.uptime"}, "internalError"),
-                    ("debug-probe-extra", "debug.probe", {"targetId": "target-fixture", "rawCommand": "shell uptime"}, "invalidParams"),
-                    ("debug-template-unknown", "debug.template.run", {"targetId": "target-fixture", "templateId": "shell uptime"}, "invalidParams"),
-                    ("trace-probe-missing-owner", "trace.probe", {"targetId": "target-fixture"}, "internalError"),
-                    ("trace-probe-bad-type", "trace.probe", {"targetId": 1}, "invalidParams"),
-                    ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
-                    ("reconcile-alias-missing-owner", "flash.reconcile-alias", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
-                    ("bind-loader-missing-owner", "flash.bind-current-loader", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
-                    ("prerequisites-missing-owner", "flash.prerequisites", {"targetId": "target-fixture", "profileReference": "dayu200"}, "internalError"),
-                    ("lane-preview-missing-owner", "flash.lanePlanPreview", {"targetId": "target-fixture", "profileReference": "dayu200", "archiveSha256": "e" * 64}, "internalError"),
-                    ("device-access-parameter", "flash.device-access", {"socketPath": "/caller/path"}, "invalidParams"),
-                    ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
-                    ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
-                    ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),
-                    ("bad-deep", "doctor", {"deep": "true"}, "invalidParams"),
-                    ("bad-health", "health", {"extra": True}, "invalidParams"),
-                    ("bad-list", "operation.list", {"extra": True}, "invalidParams"),
-                    ("bad-observations", "device.observations", {"candidateKey": "untrusted"}, "invalidInput"),
-                    ("bad-following", "device.observations", {"following": None}, "invalidInput"),
-                    ("old-following", "device.observations", {"following": {"candidate": "x", "observationId": "old", "observationGeneration": "1"}}, "resourceConflict"),
-                ]:
-                    exchange(endpoint, directory, rows, name, encode(request(registry, method, name, params)), method, error)
-                valid = request(registry, "health", "negative")
-                for name, data, method, error in [
-                    ("malformed", b"{\n", None, "malformedFrame"),
-                    ("utf8", b"\xff\n", None, "malformedFrame"),
-                    ("crlf", encode(valid)[:-1] + b"\r\n", None, "malformedFrame"),
-                    ("duplicate", encode(valid)[:-2] + b',"id":"again"}\n', None, "malformedFrame"),
-                    ("forged-origin", encode(dict(valid, arkdeckOrigin={"foregroundConsole": True})), None, "malformedFrame"),
-                    ("wrong-version", encode(dict(valid, protocolVersion="2.0.0")), "health", "unsupportedProtocolVersion"),
-                    ("wrong-identity", encode(dict(valid, contractIdentity="0" * 64)), "health", "unsupportedProtocolVersion"),
-                    ("old-method", encode(dict(valid, method="device.candidates")), None, "unknownMethod"),
-                    ("oversized", b"x" * registry["maximumRequestFrameBytes"] + b"\n", None, "malformedFrame"),
-                ]:
-                    exchange(endpoint, directory, rows, name, data, method, error, valid_request=False)
+                full_matrix(cli, directory, rows, environment, endpoint, registry)
             # A verb no CLI publishes: the Rust CLI now serves `job run`.
             invoke(cli, directory, rows, environment, "unknown-command", ["job", "no-such-command"], 64,
                    "invalidCommand")
@@ -496,10 +591,18 @@ def main() -> None:
             record(directory, rows, "daemon", "stdout.txt", stdout)
             record(directory, rows, "daemon", "stderr.txt", stderr)
             (directory / "recordings.json").write_text(json.dumps(rows, indent=2) + "\n")
+        signed = None
+        thumbprint = os.environ.get("ARKDECK_DEV_SIGNER_THUMBPRINT")
+        if os.name == "nt" and thumbprint:
+            signed = signed_windows_matrix(directory, rows, environment, registry, cli, daemon_binary,
+                                           thumbprint, rf"\\.\pipe\arkdeck-readonly-signed-{nonce}")
+            (directory / "recordings.json").write_text(json.dumps(rows, indent=2) + "\n")
     counts = validate_completed(directory, rows, registry)
     summary = {"schemaVersion": "arkdeck.rust-readonly-host-check/1", "kind": "host-test",
                "result": "PASS", "platform": platform.platform(), "deviceAcceptance": False,
                "windowsInstalledDaemonAcceptance": False, "allRecordingsCompletedBeforeValidation": True,
+               # A host-trusted development signer is not an installed-daemon identity (r12 item 22).
+               "windowsDevelopmentSignerMatrix": signed,
                **metadata, "counts": counts,
                "binaries": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in [cli, daemon_binary]}}
     (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")

@@ -428,6 +428,18 @@ jobs:
         working-directory: .
         run: python rust/scripts/ci-workspace.py prepare
 
+      # CHG-2026-074 r12 item 22: the positive Windows identity path is tested with a
+      # temporary self-signed certificate trusted only on this runner. The CLI still checks
+      # the pinned image path and signer; nothing skips the identity check. The unsigned
+      # refusal is checked as before.
+      - name: Temporary development daemon signer (Windows runner only)
+        if: runner.os == 'Windows'
+        working-directory: .
+        shell: pwsh
+        run: |
+          $identity = ./rust/scripts/windows-dev-identity.ps1 create -Machine | ConvertFrom-Json
+          "ARKDECK_DEV_SIGNER_THUMBPRINT=$($identity.thumbprint)" >> $env:GITHUB_ENV
+
       - name: Published consumer and candidate contract parity
         working-directory: .
         run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --output-dir "$GITHUB_WORKSPACE/rust/target/readonly-check"
