@@ -14,6 +14,7 @@ holds no runtime semantics: everything it shows is a projection read from the lo
 | `App.UITests/` | MSTest + FlaUI (UIA3): UIA semantic snapshots of the running App; needs a desktop session (`ARKDECK_APP_UITESTS=1`), otherwise reported skipped |
 | `scripts/generate-clientkit.py` | Generator of `ClientKit/Generated/ControlContract.g.cs`; `--check` fails on drift |
 | `scripts/generate-ui-strings.py` | Generator of the App's `.resw` from `spec/ui-semantics/strings.json` (values equal to the macOS `.xcstrings`); `--check` fails on drift |
+| `scripts/generate-app-icons.py` | Generator of `App/Assets/AppIcon.ico` (16–256 px) and the MSIX visual assets (scale-100/200, the taskbar target sizes) from the macOS AppIcon (`ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset`), resampled, never drawn; `--check` compares decoded pixels |
 | `scripts/generate-xaml-tokens.py` | Generator of `App/Themes/ArkDeckTokens.xaml` from `docs/design/arkdeck-ds/src/tokens.css` (product accent on controls, ruling 16); `--check` fails on drift |
 | `ArkDeck.Windows.slnx` | The solution the `windows` CI lane builds and tests |
 | `spikes/spk4/` | The SPK-4 WinUI 3 spike (its own solution and pins; not part of the lane) |
@@ -124,6 +125,7 @@ host the NuGet cache is `D:\nuget\packages` (`NUGET_PACKAGES`). From the reposit
 python windows/scripts/generate-clientkit.py --check   # --write after a contract input changed
 python windows/scripts/generate-ui-strings.py --check  # --write after spec/ui-semantics/strings.json changed
 python windows/scripts/generate-xaml-tokens.py --check # (no flag) rewrites after tokens.css changed
+python windows/scripts/generate-app-icons.py --check   # (no flag) rewrites after the macOS AppIcon changed
 dotnet build windows/ArkDeck.Windows.slnx -c Release
 dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build
 ```
