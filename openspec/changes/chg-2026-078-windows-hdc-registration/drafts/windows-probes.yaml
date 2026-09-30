@@ -1,0 +1,213 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "draftNotice": "DRAFT of CHG-2026-078. Not a registry: it lives under the change, is not in the integration lock and is read by no consumer. Every TBD(sample) value comes from the maintainer's processed Windows samples, every TBD(maintainer) value is the maintainer's decision. No value here may be copied from a macOS registry.",
+  "registryId": "OPENHARMONY-HDC-WINDOWS-PROBES",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@TBD(registration)",
+  "registeredBy": "CHG-2026-078-windows-hdc-registration/TASK-WHR-002",
+  "unknownFamilyDisposition": "unknown",
+  "toolContext": {
+    "platform": "windows",
+    "identity": "executable SHA-256 plus the hdc -v stdout bytes observed with it; never path, file version, timestamp or signature (the only version resource is winpthread's, the timestamp is normalised, both candidates are NotSigned)",
+    "candidates": [
+      {
+        "label": "c1",
+        "source": "hand-placed hdc.exe in a tools directory (origin not recorded on the host)",
+        "executableSHA256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+        "bytes": 5448704,
+        "authenticode": "NotSigned",
+        "markOfTheWeb": false,
+        "reportedVersion": "TBD(sample)",
+        "versionBytes": "TBD(sample)",
+        "registered": "TBD(maintainer)"
+      },
+      {
+        "label": "c2",
+        "source": "DevEco Studio bundled sdk/default/openharmony/toolchains/hdc.exe, toolchains 26.0.0.43, apiVersion 26, Beta",
+        "executableSHA256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "bytes": 5743104,
+        "authenticode": "NotSigned",
+        "markOfTheWeb": true,
+        "reportedVersion": "TBD(sample)",
+        "versionBytes": "TBD(sample)",
+        "registered": "TBD(maintainer)"
+      }
+    ],
+    "divergenceNote": "Windows builds are different executables from the macOS 3.2.0d (48395ba8...d260) and 3.2.0f (05b2bf7a...8f83) tools. No entry, receipt, output family, endpoint or fact crosses this registry and the macOS readonly, trace, device-observation or supervisor-observation registries, even when -v prints the same version text."
+  },
+  "entries": [
+    {
+      "id": "openharmony-hdc-version-TBD(sample)-windows-TBD(candidate)",
+      "family": "version",
+      "status": "TBD(maintainer)",
+      "probeKind": "hdcCommand",
+      "platform": "windows",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "TBD(candidate)",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": ["-v"],
+      "invocationAllowed": true,
+      "effectClassification": "readOnly",
+      "serverEffectObserved": "TBD(sample): from the per-command listener brackets; a family that starts a server is not read-only",
+      "inputContract": {
+        "stream": "stdout",
+        "exitCode": 0,
+        "stderrMustBeEmpty": true,
+        "form": "Ver: X",
+        "observedBytes": "TBD(sample)",
+        "observedTerminator": "TBD(sample)"
+      },
+      "fixture": "rust/tests/fixtures/hdc-windows/TBD(candidate)/golden/version.stdout.bin"
+    },
+    {
+      "id": "openharmony-hdc-healthy-checkserver-TBD(sample)-windows-TBD(candidate)",
+      "family": "healthyCheckserver",
+      "status": "TBD(maintainer)",
+      "probeKind": "hdcCommand",
+      "platform": "windows",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "TBD(candidate)",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": ["checkserver"],
+      "invocationAllowed": "TBD(sample): only if checkserver with no server started none; otherwise this family is server-starting and is not registered as a read-only probe",
+      "preconditions": ["existingServerOnExactEndpointRequired"],
+      "effectClassification": "readOnly",
+      "inputContract": {
+        "stream": "stdout",
+        "exitCode": 0,
+        "stderrMustBeEmpty": true,
+        "form": "Client version:Ver: X, server version:Ver: X",
+        "observedTerminator": "TBD(sample)",
+        "noServerBehaviour": "TBD(sample)"
+      },
+      "fixture": "rust/tests/fixtures/hdc-windows/TBD(candidate)/golden/checkserver-server-up.stdout.bin"
+    },
+    {
+      "id": "openharmony-hdc-device-observation-snapshot-TBD(sample)-windows-TBD(candidate)",
+      "family": "deviceObservationSnapshot",
+      "status": "TBD(maintainer)",
+      "probeKind": "hdcCommand",
+      "platform": "windows",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "TBD(candidate)",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": ["list", "targets", "-v"],
+      "invocationAllowed": true,
+      "preconditions": [
+        "existingServerOnExactEndpointRequired",
+        "stablePreAndPostServerIdentityRequired"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "exactEndpoint": "TBD(sample): the address the Windows listener was observed on; not normalised to the macOS 127.0.0.1:8710",
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable"
+      },
+      "effectClassification": "readOnly",
+      "forbiddenEffects": [
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "inputContract": {
+        "rawFamily": "tabDelimitedDeviceRowsOrEmptyMarker",
+        "stream": "stdout",
+        "exitCode": 0,
+        "stderrMustBeEmpty": true,
+        "encoding": "utf-8",
+        "lineTerminators": ["LF", "CRLF"],
+        "residualCarriageReturnForbidden": true,
+        "zeroByteStdoutDisposition": "unknown",
+        "emptyMarker": {
+          "literal": "[Empty]",
+          "observedTerminator": "TBD(sample)",
+          "observedBytes": "TBD(sample)",
+          "emittedAfterADeviceWasSeen": "TBD(sample)"
+        },
+        "row": {
+          "delimiter": "TBD(sample)",
+          "columnCount": "TBD(sample)",
+          "observedTerminator": "TBD(sample)",
+          "columns": "TBD(sample): names and closed sets from the Windows rows; connectKey is identifier-bearing and redacted in every fixture",
+          "stateLiterals": "TBD(sample)",
+          "transportLiterals": "TBD(sample)",
+          "hostTagLiterals": "TBD(sample)",
+          "observedRowBytes": "TBD(sample)",
+          "removedDeviceRow": "TBD(sample): kept with an Offline state, or deleted"
+        }
+      },
+      "fixtures": "rust/tests/fixtures/hdc-windows/TBD(candidate)/probes/device-observation/"
+    },
+    {
+      "id": "openharmony-hdc-supervisor-identity-generation-TBD(sample)-windows-TBD(candidate)",
+      "family": "serverIdentityGeneration",
+      "status": "TBD(maintainer)",
+      "probeKind": "platformProcessObservation",
+      "platform": "windows",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "TBD(candidate)",
+        "pathSource": "selectedToolchainSnapshot",
+        "verifyBytesBeforePreScan": true,
+        "verifyBytesAfterPostScan": true,
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [],
+      "invocationAllowed": false,
+      "preconditions": [
+        "selectedToolchainSnapshotPinned",
+        "exactObservedEndpoint",
+        "exactlyOneExistingServerProcess",
+        "exactlyOneListener",
+        "listenerOwnedByObservedProcess",
+        "selectedExecutableBytesVerifiedBeforeAndAfter"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "endpoint": "TBD(sample)",
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable",
+        "multipleOrAmbiguousDisposition": "unknown",
+        "fallbackAllowed": false
+      },
+      "observationContract": {
+        "listenerSource": "the Windows TCP table (listening entries on the endpoint port) and the owning process",
+        "processIdentity": ["pid", "creationTime", "imagePath", "imageSHA256"],
+        "requiredListenerCount": 1,
+        "listenerMustBeOwnedByObservedProcess": true,
+        "boundedPrePostScanRequired": true,
+        "prePostEqualityFields": ["pid", "creationTime", "imagePath", "imageSHA256", "endpoint", "listenerOwner"],
+        "serverStartingCommand": "TBD(sample): which command started the server in the no-board phase",
+        "identityStableAcrossPhases": "TBD(sample)",
+        "perCommandBrackets": "recorded by the Windows sample for every command (closes the macOS DEV-1 gap for this tuple only)"
+      },
+      "forbiddenEffects": [
+        "hdcChild",
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "fixtures": "rust/tests/fixtures/hdc-windows/TBD(candidate)/probes/supervisor-observation/"
+    }
+  ]
+}
