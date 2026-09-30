@@ -2117,8 +2117,10 @@ test binary itself; no real HDC is launched. The run record is
 ## Windows xcopy package (TASK-XPA-022)
 
 The daemon and the CLI also ship as an xcopy package for CI and headless use
-(CHG-2026-074 r12 decision 10; Windows 11 x64 only, r13). The App is the MSIX,
-which this package does not cover.
+(CHG-2026-074 r12 decision 10; Windows 11 x64 only, r13). The App is not in
+this package; the whole-product release candidate (the App, the daemon and the
+CLI, xcopy and MSIX) is `windows/scripts/package-rc.ps1`, which builds this
+package first (`windows/README.md`, "Release candidate package").
 [`scripts/windows-package-xcopy.ps1`](scripts/windows-package-xcopy.ps1)
 (PowerShell 7.2+) builds it from one recorded checkout:
 

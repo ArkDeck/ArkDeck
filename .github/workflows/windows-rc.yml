@@ -1,0 +1,105 @@
+name: Windows release candidate (unsigned)
+
+# Builds the unsigned Windows x64 release-candidate package (TASK-XPA-022):
+# the daemon, the CLI and the WinUI App as one xcopy directory (zipped) and as
+# an MSIX, with windows/scripts/package-rc.ps1 — the same entry a maintainer
+# runs locally — and keeps both with their manifest as the workflow artifact
+# arkdeck-windows-rc-<revision>.
+#
+# Nothing here is signed and no secret is used: the job has only the
+# repository's read token. Signing is the maintainer's step (the development
+# certificate of ruling 12, Azure Artifact Signing with the publisher identity
+# of ruling 17), and an unsigned daemon is refused by both clients, so this
+# artifact is for inspection and for the maintainer's signing run, not for
+# installation. There is no pull_request trigger; runs on main only, after a
+# change to the product's sources or on demand.
+on:
+  push:
+    branches: [main]
+    paths:
+      - rust/**
+      - windows/**
+      - scripts/release/release-version.json
+      - .github/workflows/windows-rc.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-rc-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-rc:
+    name: Unsigned Windows x64 release candidate
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - name: Require main
+        run: |
+          set -eu
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error title=Release candidates come from main only::$GITHUB_REF is not refs/heads/main"
+            exit 1
+          fi
+
+      - name: Checkout exact revision with runner Git
+        env:
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git config core.autocrlf false
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth=1 origin \
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Pinned .NET SDK (windows/global.json)
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0 (Node 24)
+        with:
+          global-json-file: windows/global.json
+
+      - name: Activate workspace toolchain
+        working-directory: rust
+        run: |
+          set -eu
+          rustup toolchain install --profile minimal --no-self-update
+          rustc --version
+          cargo --version
+
+      # The Windows build needs no ArkForge crate (its lane is macOS-only), but
+      # cargo still reads the pinned ArkForge revision named in the lockfile,
+      # anonymously; no credential is passed.
+      - name: Fetch the locked dependency graph for Windows x64
+        working-directory: rust
+        run: cargo fetch --locked --target x86_64-pc-windows-msvc
+
+      - name: Build the unsigned release candidate
+        shell: pwsh
+        run: |
+          windows/scripts/package-rc.ps1 -OutputDirectory "$env:RUNNER_TEMP/rc" -SigningMode none
+          Get-Content -LiteralPath "$env:RUNNER_TEMP/rc/rc-manifest.json"
+
+      - name: Keep the release candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: arkdeck-windows-rc-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/rc/*.zip
+            ${{ runner.temp }}/rc/*.msix
+            ${{ runner.temp }}/rc/rc-manifest.json
+            ${{ runner.temp }}/rc/runtime/manifest.json
+          if-no-files-found: error
+          retention-days: 30
