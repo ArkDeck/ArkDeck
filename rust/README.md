@@ -1988,6 +1988,26 @@ fake signer is the test binary on the pseudo console; no signer is launched.
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-pty-exchange-run.md`.
 
+## Windows persistent device shell channel (TASK-XPA-016, G19)
+
+`DeviceShellChannel` and its answer and error types build on Windows with the
+macOS signature. The framing, the bare-token rule, the budgets and the
+outcomes stay in `src/shell_channel.rs`, shared; only the client under them
+is per platform: the macOS pseudo-terminal client keeps its code, and
+`src/windows/shell.rs` attaches `hdc` to a pseudo console through the G19
+spawn (argv array, suspended, image proved before resume, kill-on-close Job,
+clean environment with a validated overlay), because `hdc shell` refuses a
+plain pipe. Windows differences: a framed line ends with CR; the console's
+rendering is read as text (its VT control sequences are removed before the
+frame is looked for, a cursor-forward over blanks reads back as the blanks,
+lines end in CRLF), so the answer bytes are T1; the shell "comes up" only on
+rendered text; a flood is bounded by the console and ends at the timeout,
+still an unknown outcome; closing ends the client's Job, its descendants
+included. `tests/windows_shell_channel.rs` is a `harness = false` target
+whose fake `hdc -t <key> shell` is the test binary on the pseudo console; no
+HDC is launched. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-016/windows-shell-channel-run.md`.
+
 ## HDC process dispatch (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
@@ -3025,6 +3045,27 @@ envelopes, and `rust/tests/fixtures/arktrace-analysis-validator/` holds those
 envelopes (`reviewed/`, answered for `zlib.htrace` and
 `trace_small_10.systrace`), Swift's verdicts on 176 edits of them and Swift's
 reading of 49 analysis requests (`ArkTraceAnalysisValidatorOracleContractTests`).
+
+On Windows (TASK-XPA-021, decision 5) there is no ArkTrace distribution: the
+repository pins one `trace_streamer`, a macOS arm64 build
+(`Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx`), and the distribution
+contract the loader verifies is an Apple one (Developer ID signatures,
+notarization and code directory hashes; a tree digest that spells each
+file's POSIX mode). So the loader, its trust checker and the doctor probe
+stay macOS-only, and nothing is loaded on Windows, pinned or not: a Windows
+development root that names `ARKDECK_ARKTRACE_DESCRIPTOR` is refused before
+anything is opened or read. What reads nothing from the host is built there:
+the two judges of the CLI's answers and the request reader
+(`arktrace_summary.rs`, `arktrace_analysis.rs`) with the contract and JSON
+token rules they share (`arktrace_envelope.rs`), and the three recorded
+oracles above replay on Windows with Swift's verdicts. The Windows daemon
+answers the offline Trace surface as a daemon without the distribution:
+`trace.inspect` with Swift's refusal without a Trace inspector
+(`trace-inspect-unavailable`, every recorded request), `trace.cache.status`
+and `trace.cache.purge` refused without the Trace cache owner, and both
+ArkTrace analyzers unavailable (`provider_not_registered`); `cargo test -p
+arkdeck-agentd --test windows_trace_offline_process` runs them against the
+real daemon ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/windows-trace-offline-run.md)).
 
 ## Retired facade mode (TASK-XPA-017)
 

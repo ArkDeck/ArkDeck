@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    ArkDeck.ClientKit: the Windows client's only way to the local Runtime (TASK-XPA-007).
+    Generated contract bindings (Generated/, from windows/scripts/generate-clientkit.py), the
+    method schemas embedded from spec/control/methods, and the authenticated named-pipe
+    transport. It holds no runtime semantics.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RootNamespace>ArkDeck.ClientKit</RootNamespace>
+    <AssemblyName>ArkDeck.ClientKit</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsTrimmable>true</IsTrimmable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The generator records each file's SHA-256; ContractSchemas refuses any other bytes.
+         WithCulture=false: MSBuild would otherwise take `agent.run.json` or
+         `runtime.storage.root.json` for culture-specific ("run", "root") satellite resources. -->
+    <EmbeddedResource Include="..\..\spec\control\methods\*.json" LogicalName="ArkDeck.ClientKit.methods/%(Filename)%(Extension)" WithCulture="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ArkDeck.ClientKit.Tests" />
+  </ItemGroup>
+</Project>

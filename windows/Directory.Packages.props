@@ -1,0 +1,6 @@
+<Project>
+  <!-- Toolchain pins of the Windows client (SPK-4, 2026-09-30). Change only together with a run record. -->
+  <ItemGroup>
+    <PackageVersion Include="MSTest" Version="4.4.1" />
+  </ItemGroup>
+</Project>

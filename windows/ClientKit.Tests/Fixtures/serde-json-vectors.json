@@ -1,0 +1,270 @@
+{
+  "schemaVersion": "arkdeck.clientkit.serde-json-vectors/1",
+  "provenance": "Recorded on 2026-09-30 from the Rust contract crate itself: each input decoded with arkdeck_contract::strict_json and re-encoded with serde_json::to_vec (the Rust client's encode_frame writer), `expected` null where strict_json refused it. Oracle: a scratch binary depending on rust/crates/arkdeck-contract at the base commit of this change; see openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-007/clientkit-run.md.",
+  "vectors": [
+    {
+      "expected": "0",
+      "inputHex": "30"
+    },
+    {
+      "expected": "-0.0",
+      "inputHex": "2d30"
+    },
+    {
+      "expected": "-9223372036854775808",
+      "inputHex": "2d39323233333732303336383534373735383038"
+    },
+    {
+      "expected": "-9.223372036854776e+18",
+      "inputHex": "2d39323233333732303336383534373735383039"
+    },
+    {
+      "expected": "18446744073709551615",
+      "inputHex": "3138343436373434303733373039353531363135"
+    },
+    {
+      "expected": "1.8446744073709552e+19",
+      "inputHex": "3138343436373434303733373039353531363136"
+    },
+    {
+      "expected": "1.2345678901234568e+22",
+      "inputHex": "3132333435363738393031323334353637383930313233"
+    },
+    {
+      "expected": null,
+      "inputHex": "3165343030"
+    },
+    {
+      "expected": null,
+      "inputHex": "2d3165343030"
+    },
+    {
+      "expected": "0.0",
+      "inputHex": "31652d343030"
+    },
+    {
+      "expected": "100.0",
+      "inputHex": "314532"
+    },
+    {
+      "expected": "1.0",
+      "inputHex": "312e30"
+    },
+    {
+      "expected": "0.1",
+      "inputHex": "302e31"
+    },
+    {
+      "expected": "1e+16",
+      "inputHex": "31653136"
+    },
+    {
+      "expected": "1000000000000000.0",
+      "inputHex": "31653135"
+    },
+    {
+      "expected": "1.5e-7",
+      "inputHex": "312e35652d37"
+    },
+    {
+      "expected": "0.00001",
+      "inputHex": "302e3030303031"
+    },
+    {
+      "expected": "1e-6",
+      "inputHex": "302e303030303031"
+    },
+    {
+      "expected": "123456.789",
+      "inputHex": "3132333435362e373839"
+    },
+    {
+      "expected": "-0.0",
+      "inputHex": "2d302e30"
+    },
+    {
+      "expected": "1.7976931348623157e+308",
+      "inputHex": "312e3739373639333133343836323331353765333038"
+    },
+    {
+      "expected": "5e-324",
+      "inputHex": "35652d333234"
+    },
+    {
+      "expected": "2.5e+20",
+      "inputHex": "322e35653230"
+    },
+    {
+      "expected": "-1.25",
+      "inputHex": "2d312e3235"
+    },
+    {
+      "expected": "100",
+      "inputHex": "313030"
+    },
+    {
+      "expected": "3.0",
+      "inputHex": "332e306530"
+    },
+    {
+      "expected": "0.30000000000000004",
+      "inputHex": "302e3330303030303030303030303030303034"
+    },
+    {
+      "expected": "9007199254740993",
+      "inputHex": "39303037313939323534373430393933"
+    },
+    {
+      "expected": "\"\\u0001\u007f\u2028/\\\"\\\\\\b\\f\\n\\r\\t\"",
+      "inputHex": "225c75303030315c75303037665c75323032385c2f5c225c5c5c625c665c6e5c725c7422"
+    },
+    {
+      "expected": null,
+      "inputHex": "225c756438303022"
+    },
+    {
+      "expected": null,
+      "inputHex": "225c75646330307822"
+    },
+    {
+      "expected": "\"\ud83d\ude00\"",
+      "inputHex": "225c75643833645c756465303022"
+    },
+    {
+      "expected": "\"a\\u0000b\"",
+      "inputHex": "22615c75303030306222"
+    },
+    {
+      "expected": "\"\u00e9\u4e2d\ud83d\ude00\"",
+      "inputHex": "22c3a9e4b8adf09f988022"
+    },
+    {
+      "expected": "{\"A\":4,\"z\":3,\"\uff61\":1,\"\ud83d\ude00\":2}",
+      "inputHex": "7b225c7566663631223a312c225c75643833645c7564653030223a322c227a223a332c2241223a347d"
+    },
+    {
+      "expected": null,
+      "inputHex": "7b2261223a312c225c7530303631223a327d"
+    },
+    {
+      "expected": null,
+      "inputHex": "7b2261223a7b2262223a312c2262223a327d7d"
+    },
+    {
+      "expected": null,
+      "inputHex": "5b7b226b223a312c226b223a317d5d"
+    },
+    {
+      "expected": "{\"a\":null,\"b\":[1,2]}",
+      "inputHex": "7b20226222203a205b2031202c2032205d202c20226122203a206e756c6c207d"
+    },
+    {
+      "expected": null,
+      "inputHex": "efbbbf7b7d"
+    },
+    {
+      "expected": "{}",
+      "inputHex": "7b7d20"
+    },
+    {
+      "expected": "{}",
+      "inputHex": "20097b7d"
+    },
+    {
+      "expected": null,
+      "inputHex": "7b7d78"
+    },
+    {
+      "expected": null,
+      "inputHex": "7b7d7b7d"
+    },
+    {
+      "expected": null,
+      "inputHex": "2f2a632a2f7b7d"
+    },
+    {
+      "expected": null,
+      "inputHex": "5b312c5d"
+    },
+    {
+      "expected": null,
+      "inputHex": "7b2261223a312c7d"
+    },
+    {
+      "expected": null,
+      "inputHex": "22ff22"
+    },
+    {
+      "expected": null,
+      "inputHex": "22c0af22"
+    },
+    {
+      "expected": null,
+      "inputHex": "22610122"
+    },
+    {
+      "expected": null,
+      "inputHex": "3031"
+    },
+    {
+      "expected": null,
+      "inputHex": "2e35"
+    },
+    {
+      "expected": null,
+      "inputHex": "2b31"
+    },
+    {
+      "expected": null,
+      "inputHex": "4e614e"
+    },
+    {
+      "expected": null,
+      "inputHex": "74527565"
+    },
+    {
+      "expected": null,
+      "inputHex": "312e"
+    },
+    {
+      "expected": null,
+      "inputHex": "2d"
+    },
+    {
+      "expected": "true",
+      "inputHex": "74727565"
+    },
+    {
+      "expected": "false",
+      "inputHex": "66616c7365"
+    },
+    {
+      "expected": "null",
+      "inputHex": "6e756c6c"
+    },
+    {
+      "expected": "[]",
+      "inputHex": "5b5d"
+    },
+    {
+      "expected": "{}",
+      "inputHex": "7b7d"
+    },
+    {
+      "expected": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "inputHex": "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d"
+    },
+    {
+      "expected": null,
+      "inputHex": "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d"
+    },
+    {
+      "expected": "{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":{\"a\":1}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}",
+      "inputHex": "7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a317d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d"
+    },
+    {
+      "expected": null,
+      "inputHex": "7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a7b2261223a317d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d"
+    }
+  ]
+}
