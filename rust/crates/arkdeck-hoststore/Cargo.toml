@@ -24,10 +24,13 @@ aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "a
 # its credential pinning is composed on Windows too (TASK-XPA-011).
 arkdeck-provider-workspace.workspace = true
 
+# The Flash archive reader streams its SHA-256 on macOS and Windows
+# (TASK-XPA-010).
+sha2.workspace = true
+
 [target.'cfg(target_os = "macos")'.dependencies]
 arkdeck-provider-arkforge.workspace = true
 libc.workspace = true
-sha2.workspace = true
 
 # A stand-in for the ArkForge lane daemon's public socket, spoken with
 # ArkForge's own codec.
