@@ -35,13 +35,30 @@ recovery, journal or device-mutation API.
   keep the borrowed buffer safe. A strict cancellation wall-clock bound is not
   established by this implementation or cross compilation; native cancellation
   latency and races remain part of SPK-3 validation.
-- The Windows `LoopbackServerLease` reads the kernel TCP owner table without a
-  network connection or process spawn. It requires exactly one listener at the
-  specified IPv4 loopback endpoint, the verified tool's file identity, matching
-  process user/elevation and a retained process creation identity, checked before
-  and after observation. Missing/ambiguous/wildcard/changed identity is refused.
-  The macOS equivalent is explicitly unavailable in this delivery: that shadow
-  provider must not run HDC without the missing proof.
+- The Windows `LoopbackServerLease` reads the kernel TCP owner tables (IPv4 and
+  IPv6, `GetExtendedTcpTable`) without a network connection or process spawn,
+  as the macOS lease reads libproc (TASK-XPA-005). The candidates are the owners
+  of a listener on the endpoint's port whose image is the verified path; exactly
+  one must own exactly one listener, bound to `127.0.0.1` or `::ffff:127.0.0.1`,
+  run the verified tool's file (`FileIdInfo`, whose bytes the SHA-256 pin covers)
+  as the calling user and elevation, and two scans must agree. The lease holds
+  the process handle and yields a `ServerIdentityReceipt` (PID, `GetProcessTimes`
+  creation time as Unix seconds/microseconds, path, digest, endpoint). No
+  candidate is `NotFound`; a wildcard, a second listener, a second process, an
+  owner that cannot be inspected or a changed file is `PermissionDenied`. No argv
+  is read: Windows has no supported read of another process's command line.
+- `VerifiedTool::run_tool` and `ManagedServer::launch` run on Windows too
+  (TASK-XPA-005): `CreateProcessW` from the argv array, suspended, admitted into
+  a kill-on-close Job object and resumed once its image is the retained file; the
+  base environment `PATH`/`SystemRoot`/`WINDIR` plus a named overlay that cannot
+  replace the base or set `__COMPAT_LAYER` (names compared ignoring case); an
+  optional canonical (`\\?\`-spelled) working directory; `NUL` stdin; per-stream
+  capture with drain (blocking readers cancelled with `CancelSynchronousIo` once
+  stopped); a deadline or cancellation that terminates the whole Job at once
+  (there is no TERM; the owner's exit code is 1). `ManagedServer::verifies`
+  proves a receipt names that very child (launch record, creation time, image
+  file, membership of its own Job, declared `-s <endpoint>`, loopback or
+  wildcard listener) in place of the macOS argv read.
 
 The trust boundary is the current design F.2: arbitrary same-user code is outside
 the boundary; the same user's correctly signed installed daemon is trusted.
@@ -103,7 +120,10 @@ do not count as Windows OS or hardware acceptance. Windows-native tests cover
 actual named-pipe name ownership, same-account wrong-image/unsigned-server
 zero-frame refusals, exact completion counts, rapid-disconnect recovery, exit
 code 259, open-writer behavior, cleanup failure reporting, checked token/TCP
-array lengths, and existing-listener kernel identity. Successful trusted
+array lengths, existing-listener kernel identity, the tool runner and managed
+server (`tests/windows_tool_dispatch.rs`, whose fake tool is the test binary
+itself, a `harness = false` target) and Job kill-on-close of a live child tree
+(`windows::process::tests`). Successful trusted
 publisher/package authentication, cross-account/elevation/remote tests and
 packaged client access still need the corresponding real host/setup.
 

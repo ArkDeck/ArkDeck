@@ -22,6 +22,12 @@ sha2 = { workspace = true, features = ["asm"] }
 [dev-dependencies]
 serde_json.workspace = true
 
+# The fake tool of the Windows tool-dispatch tests is the test binary itself,
+# so it runs without libtest, whose output would reach the child's streams.
+[[test]]
+name = "windows_tool_dispatch"
+harness = false
+
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
 

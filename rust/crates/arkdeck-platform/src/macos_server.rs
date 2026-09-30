@@ -12,23 +12,11 @@
 //! Beyond Swift, the owner must be the calling user, as the Windows lease
 //! requires: a server another account started is refused rather than trusted
 //! on its path alone.
-use crate::{VerifiedTool, denied, invalid};
+use crate::{ServerIdentityReceipt, VerifiedTool, denied, invalid};
 use std::ffi::CStr;
 use std::io;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::path::{Path, PathBuf};
-
-/// Swift `HDCServerProcessIdentityReceipt`: the birth identity of the one
-/// process that owns the registered endpoint with the verified executable.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ServerIdentityReceipt {
-    pub pid: i32,
-    pub start_seconds: u64,
-    pub start_microseconds: u64,
-    pub executable_path: PathBuf,
-    pub executable_sha256: String,
-    pub endpoint: SocketAddrV4,
-}
 
 /// Holds a kernel-proven, already-running HDC process through an observation.
 /// Acquiring and revalidating it performs no network connect and no process

@@ -408,7 +408,7 @@ pub(crate) fn process_image(process: HANDLE) -> io::Result<PathBuf> {
     )))
 }
 
-fn process_started(process: HANDLE) -> io::Result<u64> {
+pub(crate) fn process_started(process: HANDLE) -> io::Result<u64> {
     let (mut creation, mut exit, mut kernel, mut user) = (
         FILETIME::default(),
         FILETIME::default(),

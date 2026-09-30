@@ -10,13 +10,13 @@ mod capture_files;
 mod debug_hap;
 mod debug_read;
 pub use debug_read::{DebugInventory, DebugReadTemplate, debug_inventory};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod dispatch;
 mod host_diagnostics;
 #[cfg(target_os = "macos")]
 mod lifecycle;
 mod live_mode;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod managed_server;
 mod native_elf;
 mod native_library;
@@ -46,7 +46,7 @@ pub use debug_hap::{
     StagedPackageSet, append_native_library_facts, bounded_process_diagnostic,
     install_dispatch_outcome, package_presence, process_presence,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
 pub use host_diagnostics::{DIAGNOSTIC_REPORTS_DIRECTORY, signal_death, signal_number};
 #[cfg(target_os = "macos")]
@@ -58,7 +58,7 @@ pub use live_mode::{
     DeviceMode, HdcIdentity, LiveModeFailure, LiveModeObservation, LiveModeProbe, LoaderIdentity,
     LoaderObserver, UsbProbe,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use managed_server::{EndpointSelection, ManagedHdcServer, StartBudget, StartFailure};
 pub use native_elf::{
     CodeSignFacts, MAXIMUM_LIBRARY_BYTES, NativeAbi, NativeLibraryFacts, ValidationError,

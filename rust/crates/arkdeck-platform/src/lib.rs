@@ -19,11 +19,16 @@ mod windows;
 pub use process::{
     AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, DeviceShellAnswer,
     DeviceShellChannel, DeviceShellChannelError, ManagedServer, PtyError, PtyExecution,
-    PtyFailureCategory, PtyInteraction, PtyRequest, ServerExit, ServerLaunch, ServerStop,
-    ToolExecution, ToolLaunchIdentity, ToolLimits, ToolRequest, ToolRunError, ToolTermination,
-    VerifiedNamespace, VerifiedResource, VerifiedSource,
+    PtyFailureCategory, PtyInteraction, PtyRequest, ToolLaunchIdentity, VerifiedNamespace,
+    VerifiedResource, VerifiedSource,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
+#[cfg(any(target_os = "macos", windows))]
+pub use process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
+#[cfg(any(target_os = "macos", windows))]
+mod server_identity;
+#[cfg(any(target_os = "macos", windows))]
+pub use server_identity::{ServerExit, ServerIdentityReceipt, ServerLaunch, ServerStop};
 #[cfg(unix)]
 mod account;
 #[cfg(unix)]
@@ -93,14 +98,14 @@ pub use stop_signal::{Latch, StopSignal};
 mod macos_server;
 #[cfg(target_os = "macos")]
 pub use macos_server::{
-    LoopbackServerLease, ProvedProcessEnd, ServerIdentityReceipt, end_proved_process,
-    process_argument_record, process_arguments, verifies_managed_process,
+    LoopbackServerLease, ProvedProcessEnd, end_proved_process, process_argument_record,
+    process_arguments, verifies_managed_process,
 };
 #[cfg(windows)]
 pub use windows::{
     ConnectionCloser, GuardAcquisition, GuardObject, InstanceScope, Latch, ListenerLock,
-    LocalConnection, LocalListener, LoopbackServerLease, OwnerLock, Readiness, SingleInstanceGuard,
-    StateRoot, StopSignal, default_user_endpoint,
+    LocalConnection, LocalListener, LoopbackServerLease, ManagedServer, OwnerLock, Readiness,
+    SingleInstanceGuard, StateRoot, StopSignal, default_user_endpoint,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
