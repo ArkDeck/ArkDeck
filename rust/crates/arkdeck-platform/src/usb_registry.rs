@@ -20,6 +20,9 @@
 //! registered DAYU200, and when a relation proves a candidate, is the HDC
 //! provider's (`arkdeck_provider_hdc::UsbRegistryRelations`).
 //!
+//! The Windows counterpart, which produces the same [`UsbHostDevice`] from
+//! the Plug and Play device tree, is `crate::usb_device_nodes`.
+//!
 //! One difference from Swift, which never asks: a census whose iterator did
 //! not stay valid through the enumeration may be incomplete, so it is
 //! unavailable rather than a shorter list.
@@ -47,7 +50,8 @@ pub trait RegistryEntry {
 }
 
 /// Why a census could not be taken. Swift's census throws its one
-/// "USB registry unavailable" for the first two and never asks the third.
+/// "USB registry unavailable" for the first two and never asks the third;
+/// the last two are the Windows census's (`crate::usb_device_nodes`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RegistryUnavailable {
     /// No matching dictionary could be created for the class.
@@ -56,6 +60,12 @@ pub enum RegistryUnavailable {
     Services(i32),
     /// The iterator did not stay valid through the enumeration.
     Invalidated,
+    /// `SetupDiGetClassDevsW` answered no device information set, with this
+    /// Win32 error.
+    DeviceSet(u32),
+    /// `SetupDiEnumDeviceInfo` stopped before the end of the set, with this
+    /// Win32 error.
+    Enumeration(u32),
 }
 
 impl fmt::Display for RegistryUnavailable {
@@ -71,6 +81,14 @@ impl fmt::Display for RegistryUnavailable {
             Self::Invalidated => {
                 formatter.write_str("USB registry unavailable: the census iterator was invalidated")
             }
+            Self::DeviceSet(error) => write!(
+                formatter,
+                "USB registry unavailable: SetupDiGetClassDevsW answered error {error}"
+            ),
+            Self::Enumeration(error) => write!(
+                formatter,
+                "USB registry unavailable: SetupDiEnumDeviceInfo answered error {error}"
+            ),
         }
     }
 }
@@ -512,10 +530,20 @@ mod tests {
             RegistryUnavailable::Services(-536_870_210).to_string(),
             "USB registry unavailable: IOServiceGetMatchingServices answered 0xe00002be"
         );
-        assert!(
-            RegistryUnavailable::Invalidated
-                .to_string()
-                .starts_with("USB registry unavailable")
+        for unavailable in [
+            RegistryUnavailable::Invalidated,
+            RegistryUnavailable::DeviceSet(5),
+            RegistryUnavailable::Enumeration(21),
+        ] {
+            assert!(
+                unavailable
+                    .to_string()
+                    .starts_with("USB registry unavailable")
+            );
+        }
+        assert_eq!(
+            RegistryUnavailable::DeviceSet(5).to_string(),
+            "USB registry unavailable: SetupDiGetClassDevsW answered error 5"
         );
     }
 }

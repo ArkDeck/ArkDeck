@@ -174,9 +174,11 @@ where
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl UsbRegistryRelations<fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable>> {
-    /// The host's I/O Registry (`arkdeck_platform::usb_host_devices`).
+    /// The host's own census (`arkdeck_platform::usb_host_devices`): the I/O
+    /// Registry on macOS, the Plug and Play device tree on Windows, whose
+    /// property choice is provisional until the DAYU200 sample confirms it.
     pub fn system() -> Self {
         Self::new(arkdeck_platform::usb_host_devices)
     }
