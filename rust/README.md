@@ -910,25 +910,13 @@ isolated owner's name, and for the account's root too, because the host
 store cannot open `Agentd` itself (its DACL also grants SYSTEM), where
 Swift's production daemon keeps the index beside its other owners. It
 answers `job.status`, `job.show` and `job.events` (`jec1` cursors that still
-open after a restart). `job.list` and `job.timeline` page through
-`snapshot_pager`, whose retention needs the
-`document_metadata`/`remove_document` port (ruling 7, in its own slice), so
-it is not built on Windows. Until it is, a `job.list` whose snapshot is one
-page is answered as the pager answers its first page, without storing the
-snapshot (nothing can read a one-page snapshot back: its one cursor is never
-handed out); a longer list, any cursor and `job.timeline` are refused
-`rejected` ("… the Job snapshot pager, which is not built on Windows yet").
-That one page is what `runtime service restart` reads the current Jobs from,
-so a restart still refuses to interrupt a current Job; its proof now reports
-`jobOwner: true`. Nothing admits a Job on Windows yet (no registered HDC
-or runner; the planner and the admitter refuse before admission, below).
-The Windows CLI coverage statuses stay `partial`.
 open after a restart), and `job.list` and `job.timeline` through
 `snapshot_pager` in its `cli-job-snapshots` (see "Windows Session owner,
 publication and snapshot pages" below). `runtime service restart` reads the
 current Jobs from those pages, so a restart still refuses to interrupt a
-current Job; its proof reports `jobOwner: true`. Nothing admits a Job on Windows yet (no planner, admitter or runner, no
-registered HDC). The Windows CLI coverage statuses stay `partial`.
+current Job; its proof reports `jobOwner: true`. Jobs are planned, admitted
+and run through the planner, admitter and runner below; no HDC is registered
+yet. The Windows CLI coverage statuses stay `partial`.
 
 The NTFS store's document replacement (`publish_document`) now waits out,
 for about a second, a moment's holder of the replaced file (an
@@ -953,9 +941,10 @@ reads them over its pipe before and after a restart, and, with
 daemon.
 
 Still macOS-only: the HDC lifecycle interlock and the current-Job census (over
-`hdc_impact_source`); the Job owner's Import, workspace, retention and
-Session-continuity censuses; Flash recovery; and the runner and
-reconciler. The planner and the admitter build on Windows (next section).
+`hdc_impact_source`); the Job owner's Import and Session-continuity
+censuses (its workspace census is on Windows, TASK-XPA-005 #2379); Flash
+recovery; and the reconciler. The planner, the admitter and the runner
+build on Windows (next sections).
 
 ## Job planner and admitter on Windows (TASK-XPA-005)
 
@@ -1113,15 +1102,17 @@ is left as it is.
 
 The Windows daemon composes the runner, `job.cancel`, `job.result` and
 `job.evidence`, the capability store (`jobs-state\capabilities`), the Session
-owner over a development root (`session-state`, `sessions`; the account root
-composes none yet) and `operation.list` (the HDC and analyzer operations
+owner (`session-state`, `sessions`, below `Agentd` on the account root; see
+the Session owner section) and `operation.list` (the HDC and analyzer operations
 `provider_not_registered`), and recovers the active Jobs at its start
 (`recover_active_jobs`, then the staged Sessions) as the macOS daemon does.
 No HDC provider is composed until the Windows HDC tuple is registered, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
 `jobs, capabilities, targets, artifacts, storage, workspaceProjects,
-planning`. The start's Artifact retention sweep stays macOS-only for now.
+planning, traceCache` over a development root (the account's daemon composes
+no Trace cache), the macOS census's order. The start's Artifact retention
+sweep stays macOS-only for now.
 
 Tests on Windows: `arkdeck-hoststore/tests/job_recovery.rs` (the five macOS
 restart and recovery cases), `tests/windows_job_runner.rs` (the recorded

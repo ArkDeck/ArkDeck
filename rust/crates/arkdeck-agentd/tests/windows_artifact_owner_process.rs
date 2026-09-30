@@ -4,8 +4,8 @@
 //! (`rust/tests/fixtures/agent-execution`, `job-73b1…`): its Artifacts in the
 //! root's `artifacts`, and the Job itself recorded into `jobs-state` by the
 //! Job store owner before the daemon starts (admitted and advanced to its
-//! recorded version, its Journal beside it), as nothing admits a Job on
-//! Windows yet:
+//! recorded version, its Journal beside it), as the daemon runs no device
+//! Job on Windows without a registered HDC:
 //!
 //! * over its pipe, with a plain pipe handle (no signer needed): the Job
 //!   owner proves the Artifacts' Job, and `artifact.list`, `inspect` and

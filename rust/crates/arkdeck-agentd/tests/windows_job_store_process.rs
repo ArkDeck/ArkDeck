@@ -3,8 +3,8 @@
 //! (index, `job-record.json`, Journal, restart readback) for the recorded
 //! Swift `observe.device@1` Jobs.
 //!
-//! Nothing admits a Job on Windows yet (no planner, admitter or runner and
-//! no registered HDC), so the Jobs are recorded into `jobs-state` by the Job
+//! The daemon runs no device Job on Windows without a registered HDC, so
+//! the recorded Jobs are recorded into `jobs-state` by the Job
 //! store owner itself before the daemon starts: each recorded Swift record
 //! admitted and advanced to its recorded version, its recorded Journal
 //! beside it. Then:
