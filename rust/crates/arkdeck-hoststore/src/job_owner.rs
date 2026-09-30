@@ -3,9 +3,10 @@
 //!
 //! On Windows the store, its index and record writers and the Job read
 //! resources it answers without the snapshot pager (`job.status`,
-//! `job.show`, `job.events`) are built; what reads other macOS-only owners
-//! (the pager behind `job.list` and `job.timeline`, the Session, Import,
-//! workspace and HDC lifecycle censuses, Flash recovery) is not.
+//! `job.show`, `job.events`) are built, and the workspace project and preset
+//! census; what reads other macOS-only owners (the pager behind `job.list`
+//! and `job.timeline`, the Session, Import and HDC lifecycle censuses, the
+//! workspace copy sweep, Flash recovery) is not.
 #[path = "job_epoch_indexes.rs"]
 mod epoch_indexes;
 #[cfg(target_os = "macos")]
@@ -14,7 +15,6 @@ pub(crate) mod import_references;
 #[cfg(target_os = "macos")]
 #[path = "job_retention_census.rs"]
 mod retention_census;
-#[cfg(target_os = "macos")]
 #[path = "workspace_references.rs"]
 mod workspace_references;
 use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};

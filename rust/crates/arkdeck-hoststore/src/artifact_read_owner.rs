@@ -169,6 +169,16 @@ impl ArtifactReadStore {
         })
     }
 
+    /// `artifact.quota` over this owner's root: the Swift store's walk (see
+    /// `artifact_quota`) against `quota` bytes, writing nothing, or Swift's
+    /// rendering of the store error that stopped it. The Windows daemon
+    /// answers it here; the macOS daemon through its storage owner's
+    /// `ArtifactUsage` over the same root.
+    #[cfg(windows)]
+    pub fn quota(&self, quota: u64) -> Result<serde_json::Value, String> {
+        crate::artifact_quota::answer(&self.path, quota)
+    }
+
     /// Bounded host fault injection for crash tests, never a wire field: the
     /// production composition opens the store with `open`.
     pub fn open_with_fault(path: &Path, fault: PublicationFault) -> io::Result<Self> {

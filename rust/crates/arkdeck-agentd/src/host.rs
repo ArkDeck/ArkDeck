@@ -42,7 +42,7 @@ fn job_owner_not_configured() -> WireError {
 }
 
 /// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
 
 /// The lane and per-action host are shared by direct and background Jobs.
@@ -2034,6 +2034,27 @@ impl HostServices for Host {
             details: None,
         })
     }
+    /// The Windows daemon composes no storage owner yet; its Artifact owner,
+    /// over the same Artifact root, walks it as the Swift store does
+    /// (`ArtifactReadStore::quota`). Without one it answers as the macOS
+    /// daemon answers without its storage owner.
+    #[cfg(windows)]
+    fn artifact_quota(&self) -> Result<serde_json::Value, WireError> {
+        let Some(artifacts) = self.artifacts.as_deref() else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        artifacts
+            .quota(ARTIFACT_QUOTA)
+            .map_err(|message| WireError {
+                code: "internalError".into(),
+                message,
+                details: None,
+            })
+    }
     /// `capability.list` and `capability.inspect` read the capability store as
     /// the Swift daemon reads it, under the store's lock; nothing mints,
     /// reserves or settles a use here.
@@ -2641,17 +2662,23 @@ impl HostServices for Host {
                     ("newDispatchCount".into(), serde_json::json!(0)),
                 ])),
             };
-            // The Windows composition does not ask its Job owner yet.
-            #[cfg(windows)]
-            let census = |_: WorkspaceReference<'_>| Err(unverified());
+            // A Runtime-owned copy's reference maps to the project it was
+            // copied from through the workspace provider. Windows composes no
+            // workspace provider, so it has made no copy, and every reference
+            // is compared as written (Swift `resolveRegistrationProjectRef`
+            // for a reference nothing maps).
             #[cfg(target_os = "macos")]
+            let registration = |reference: &str| {
+                self.workspace
+                    .as_ref()
+                    .and_then(|workspace| workspace.census_registration(reference))
+            };
+            #[cfg(windows)]
+            let registration = |_: &str| None;
             let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
-                (Some(jobs), WorkspaceReference::Project(project)) => jobs
-                    .require_no_active_workspace_project_reference(project, &|reference| {
-                        self.workspace
-                            .as_ref()
-                            .and_then(|workspace| workspace.census_registration(reference))
-                    }),
+                (Some(jobs), WorkspaceReference::Project(project)) => {
+                    jobs.require_no_active_workspace_project_reference(project, &registration)
+                }
                 (Some(jobs), WorkspaceReference::Preset(preset)) => {
                     jobs.require_no_active_workspace_preset_reference(preset)
                 }

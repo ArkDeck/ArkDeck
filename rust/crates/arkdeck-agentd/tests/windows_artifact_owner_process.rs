@@ -12,7 +12,10 @@
 //!   `read` answer exactly what the owner answers in process (a list's
 //!   snapshot revision is fresh on every read), before and after a restart;
 //!   `artifact.export` publishes the recorded bytes under the Artifact's
-//!   name. A Job the Job owner does not hold is refused before anything is
+//!   name; `artifact.quota` answers the Artifact root's walk (the 8 GiB
+//!   quota, the published bytes the root holds, what remains) as the owner
+//!   answers it in process, and writes nothing. A Job the Job owner does
+//!   not hold is refused before anything is
 //!   read (`resourceNotFound`, phase `artifactOwner`, no new dispatch), and
 //!   the recorded Job's Artifacts stay byte for byte as they were. An
 //!   `artifacts` directory that is not owner-only refuses the start (it is
@@ -20,12 +23,14 @@
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
 //!   `rust/scripts/check-readonly.py` signs one): `artifact list`, `inspect`,
-//!   `read` and `export` answer the same, with the CLI verifying the
+//!   `read`, `export` and `quota` answer the same, with the CLI verifying the
 //!   daemon's image and signer. Without that variable this test says so and
 //!   checks nothing.
 //!
 //! The recorded bytes and digests themselves, and every export refusal, are
-//! proved at the owner (`arkdeck-hoststore/tests/windows_artifact_owners.rs`).
+//! proved at the owner (`arkdeck-hoststore/tests/windows_artifact_owners.rs`);
+//! the quota walk against the Swift quota oracle in
+//! `arkdeck-hoststore/tests/windows_artifact_quota.rs`.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -358,6 +363,31 @@ fn expected_reads(root: &Root) -> Vec<(&'static str, Value, Value)> {
 }
 
 /// An answer with its snapshot revision as a label: fresh on every list.
+/// `artifact.quota` as the owner answers it in process: the 8 GiB quota
+/// against the recorded Job's published bytes.
+fn expected_quota(root: &Root) -> Value {
+    let quota = ArtifactReadStore::open(&root.artifacts())
+        .unwrap()
+        .quota(8 << 30)
+        .unwrap();
+    let index: Value =
+        serde_json::from_slice(&std::fs::read(recorded().join("index.json")).unwrap()).unwrap();
+    let published: i64 = index["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["status"].get("published").is_some())
+        .map(|row| row["byteCount"].as_i64().unwrap())
+        .sum();
+    assert!(published > 0);
+    assert_eq!(
+        quota,
+        json!({"totalBytes": 8_589_934_592_i64, "usedBytes": published,
+            "remainingBytes": 8_589_934_592_i64 - published})
+    );
+    quota
+}
+
 fn labelled(mut answer: Value) -> Value {
     if answer["snapshotRevision"].is_string() {
         answer["snapshotRevision"] = json!("<revision>");
@@ -385,10 +415,14 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     let exports = root.exports();
     let job_artifacts = Root::tree(&root.artifacts().join(JOB));
     let expected = expected_reads(&root);
+    let quota = expected_quota(&root);
     let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
 
     let mut daemon = Daemon::start(executable, &root.0);
     let pipe = daemon.serving();
+    // Swift reads no parameter of a quota request.
+    let reply = request(&pipe, "artifact.quota", json!({}));
+    assert_eq!(reply["result"], quota, "{reply}");
     assert!(
         daemon.seen.contains(
             &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects".to_owned()
@@ -455,10 +489,13 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     );
     daemon.stop(&root.0);
 
-    // After a restart the same answers.
+    // After a restart the same answers; the quota still counts only the
+    // Artifact root, not the export written outside it.
     let mut daemon = Daemon::start(executable, &root.0);
     let pipe = daemon.serving();
     assert_reads(&pipe, &expected);
+    let reply = request(&pipe, "artifact.quota", json!({}));
+    assert_eq!(reply["result"], quota, "{reply}");
     daemon.stop(&root.0);
     assert_eq!(
         Root::tree(&root.artifacts().join(JOB)),
@@ -582,8 +619,12 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
     let pin = pin["pin"].as_str().unwrap().to_owned();
 
+    let quota = expected_quota(&root);
     let mut running = Daemon::start(&daemon, &root.0);
     let pipe = running.serving();
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["artifact", "quota"]);
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"], quota, "{envelope}");
     for (method, params, answer) in &expected {
         let mut arguments = vec![
             "artifact".to_owned(),
