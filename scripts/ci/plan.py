@@ -107,6 +107,8 @@ WINDOWS_INPUT_PREFIXES = (
     # Target store (TASK-XPA-020).
     "rust/tests/fixtures/trace-inspect/",
     "rust/tests/fixtures/target-adoption/",
+    # The Flash host review is checked against the Swift archive oracle (TASK-XPA-020).
+    "rust/tests/fixtures/flash-archive/",
     # The App's icon and MSIX assets are the macOS AppIcon (generate-app-icons.py).
     "ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
 )
@@ -122,11 +124,14 @@ WINDOWS_INPUT_FILES = frozenset({
     "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
     "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
     "ArkDeckApp/Resources/DebugLocalizable.xcstrings",
+    "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
     # The App's theme is generated from the design tokens (generate-xaml-tokens.py).
     "docs/design/arkdeck-ds/src/tokens.css",
     # The App's tests read the Job state classes and the CLI coverage commands.
     "spec/recovery/job-state-preflight.json",
     "openspec/contracts/cli-feature-coverage.json",
+    # The embedded Flash catalog review is checked against the one macOS compiles in.
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift",
 })
 
 

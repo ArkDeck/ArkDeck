@@ -1,0 +1,633 @@
+{
+ "bootloader": {
+  "bindingRevision": 2,
+  "disposition": "exactBoundTarget",
+  "mode": "loader",
+  "observationCount": 1,
+  "targetId": "TGT-HOST"
+ },
+ "describe": {
+  "aliasFor": null,
+  "artifacts": [
+   {
+    "mediaType": "application/json",
+    "name": "flash-report.json",
+    "privacy": "standard",
+    "required": true,
+    "retentionClass": "default",
+    "role": "derived"
+   },
+   {
+    "mediaType": "application/json",
+    "name": "post-flash-facts.json",
+    "privacy": "sensitive",
+    "required": true,
+    "retentionClass": "default",
+    "role": "raw"
+   },
+   {
+    "mediaType": "text/plain",
+    "name": "post-flash-hilog.txt",
+    "privacy": "sensitive",
+    "required": false,
+    "retentionClass": "default",
+    "role": "raw"
+   }
+  ],
+  "authorization": {
+   "destructive": "runtimeCapability"
+  },
+  "availability": "available",
+  "availabilityReasonCodes": [],
+  "availabilityReasonOrigins": [],
+  "availabilityReasons": [],
+  "binding": "confirmedDevice",
+  "completeOverwriteRecovery": {
+   "contractVersion": "1.0.0",
+   "overwriteStepId": "flash-partitions",
+   "profiles": [
+    {
+     "coveredEffects": [
+      "partition:uboot",
+      "partition:resource",
+      "partition:boot_linux",
+      "partition:ramdisk",
+      "partition:system",
+      "partition:vendor",
+      "partition:updater",
+      "partition:chip_ckm",
+      "partition:userdata"
+     ],
+     "reference": "dayu200"
+    }
+   ],
+   "verificationStepIds": [
+    "verify-flash-readback",
+    "reboot-device",
+    "wait-for-hdc",
+    "rebind-and-verify-build"
+   ]
+  },
+  "concurrencyKey": "deviceExclusive",
+  "defaultPolicyIssuanceEnabled": true,
+  "exampleRequest": {
+   "documentType": "runtime-operation-request",
+   "idempotencyKey": "idem-example-0001",
+   "inputs": {
+    "artifactLease": "lease-v1:JOB-REPLACE-ME:ART-REPLACE-ME",
+    "deviceProfileRef": "dayu200",
+    "intent": "fullRestore"
+   },
+   "operation": {
+    "id": "flash.full-restore",
+    "version": 1
+   },
+   "requestId": "req-example",
+   "requestedOutputs": [
+    "derivedArtifacts"
+   ],
+   "schemaVersion": "1.0.0",
+   "target": {
+    "expectedBindingRevision": 1,
+    "targetId": "TGT-REPLACE-ME"
+   }
+  },
+  "inputs": [
+   {
+    "description": "Trusted full-restore image bundle lease; Runtime resolves immutable Artifact bytes before authorization.",
+    "name": "artifactLease",
+    "required": true,
+    "type": "artifactLease"
+   },
+   {
+    "description": "Published device profile reference selected after target admission; DAYU200 is the currently published profile.",
+    "enum": [
+     "dayu200"
+    ],
+    "name": "deviceProfileRef",
+    "required": true,
+    "type": "string"
+   },
+   {
+    "description": "Closed restore intent. It requests the profile's complete overwrite contract and cannot name partitions, addresses or tools.",
+    "enum": [
+     "fullRestore"
+    ],
+    "name": "intent",
+    "required": true,
+    "type": "string"
+   },
+   {
+    "default": "full",
+    "description": "Post-restore verification depth. `full` additionally captures bounded diagnostics after required readback and rebind checks.",
+    "enum": [
+     "basic",
+     "full"
+    ],
+    "name": "verification",
+    "required": false,
+    "type": "string"
+   }
+  ],
+  "minimumEffect": "destructive",
+  "outputByteBudget": 134217728,
+  "outputs": [
+   {
+    "name": "flashReport",
+    "required": true,
+    "type": "artifactReference"
+   },
+   {
+    "name": "postFlashFacts",
+    "required": true,
+    "type": "artifactReference"
+   }
+  ],
+  "permittedEffects": [
+   "destructive"
+  ],
+  "preflightAttempts": 1,
+  "profiles": [
+   "dayu200"
+  ],
+  "provider": "arkforge",
+  "reference": "flash.full-restore@1",
+  "stepCount": 14,
+  "steps": [
+   {
+    "action": null,
+    "binding": "none",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "hostOnly",
+    "kind": "verifyArtifact",
+    "optional": false,
+    "stepId": "verify-image-bundle"
+   },
+   {
+    "action": null,
+    "binding": "none",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "hostOnly",
+    "kind": "hashFile",
+    "optional": false,
+    "stepId": "hash-images"
+   },
+   {
+    "action": null,
+    "binding": "none",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "hostOnly",
+    "kind": "requestConfirmation",
+    "optional": false,
+    "stepId": "confirm-flash-intent"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "atSafeBoundary",
+    "compensation": "none",
+    "effect": "deviceMutation",
+    "kind": "enterUpdater",
+    "optional": false,
+    "stepId": "enter-loader-mode"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "readOnly",
+    "kind": "waitForDisconnect",
+    "optional": false,
+    "stepId": "wait-loader-disconnect"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "readOnly",
+    "kind": "waitForReconnect",
+    "optional": false,
+    "stepId": "wait-loader-reconnect"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "readOnly",
+    "kind": "probeDevice",
+    "optional": false,
+    "stepId": "rebind-loader-identity"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "criticalNonInterruptible",
+    "compensation": "none",
+    "effect": "destructive",
+    "kind": "flashPartition",
+    "optional": false,
+    "stepId": "flash-partitions"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "readOnly",
+    "kind": "verifyRemoteState",
+    "optional": false,
+    "stepId": "verify-flash-readback"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "atSafeBoundary",
+    "compensation": "none",
+    "effect": "deviceMutation",
+    "kind": "rebootDevice",
+    "optional": false,
+    "stepId": "reboot-device"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "readOnly",
+    "kind": "waitForReconnect",
+    "optional": false,
+    "stepId": "wait-for-hdc"
+   },
+   {
+    "action": null,
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "readOnly",
+    "kind": "probeDevice",
+    "optional": false,
+    "stepId": "rebind-and-verify-build"
+   },
+   {
+    "action": {
+     "actionId": "boundedHilog",
+     "catalogId": "arkdeck-diagnostics"
+    },
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "compensation": "none",
+    "effect": "readOnly",
+    "kind": "captureRemoteStdout",
+    "optional": true,
+    "stepId": "capture-post-flash-diagnostics"
+   },
+   {
+    "action": null,
+    "binding": "none",
+    "cancellation": "atSafeBoundary",
+    "compensation": "none",
+    "effect": "hostOnly",
+    "kind": "finalizeSession",
+    "optional": false,
+    "stepId": "finalize-session"
+   }
+  ],
+  "timeoutSeconds": 1800,
+  "title": "Fully restore a bound device from a trusted image bundle with rebind and post-flash verification"
+ },
+ "description": "The Flash answers the scripted `flash` scenario replays (windows/App.Core/Testing/ScriptedDaemon.Flash.cs): describe/list are the Windows daemon's measured answers for flash.full-restore@1 made available; device access is the ControlFrames flash.device-access corpus; bootloader status, prerequisites and lane preview are flash-host-facts status.exactBoundLoader, prerequisites.loaderReady and preview.loaderReady; plan, run and evidence are the flash-run canonical story's plan, run and first.evidence. Target identities are substituted at answer time.",
+ "deviceAccess": {
+  "observationCount": 2,
+  "observedModes": [
+   "Loader",
+   "Maskrom"
+  ]
+ },
+ "evidence": {
+  "actualEffect": "destructive",
+  "actualStepKinds": [
+   "waitForReconnect",
+   "probeDevice",
+   "flashPartition",
+   "verifyRemoteState",
+   "rebootDevice",
+   "captureRemoteStdout"
+  ],
+  "artifacts": [
+   {
+    "bindingRevision": 1,
+    "byteCount": "947",
+    "bytesVerified": true,
+    "jobId": "job-015b9785301763965a34ec80b54d9c0b",
+    "providerId": "arkforge",
+    "reference": "arkdeck-artifact://job-015b9785301763965a34ec80b54d9c0b/ART-0dc6059cd891c1d91ae2a65b935816e6",
+    "sha256": "b3dee661680ed358d46211fc79c8596a04905dec866ded697dd8a79c33b0f2e8",
+    "stableIdentitySha256": "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetId": "TGT-83405c84ff74"
+   },
+   {
+    "bindingRevision": 1,
+    "byteCount": "149",
+    "bytesVerified": true,
+    "jobId": "job-015b9785301763965a34ec80b54d9c0b",
+    "providerId": "arkforge",
+    "reference": "arkdeck-artifact://job-015b9785301763965a34ec80b54d9c0b/ART-24d4fec1e2aaed7767b7c0edd9d867b2",
+    "sha256": "6bbbd0aae2215135c309fd6df3b6e5bee70b801d187a69b01e7e2103aa06b657",
+    "stableIdentitySha256": "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetId": "TGT-83405c84ff74"
+   },
+   {
+    "bindingRevision": 1,
+    "byteCount": "1852",
+    "bytesVerified": true,
+    "jobId": "job-015b9785301763965a34ec80b54d9c0b",
+    "providerId": "arkforge",
+    "reference": "arkdeck-artifact://job-015b9785301763965a34ec80b54d9c0b/ART-ab8b7e9e70aedca8b32337b62f85a17f",
+    "sha256": "3b47ccc79ab1b0af26f890a724292b593575f25a142bef6d3b25678dcd7e1f77",
+    "stableIdentitySha256": "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetId": "TGT-83405c84ff74"
+   }
+  ],
+  "authority": {
+   "admittedAtUtc": "2026-09-25T00:00:00Z",
+   "artifactDigest": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+   "consumptionFingerprintSha256": "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+   "kind": "runtimeCapability",
+   "planDigest": "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+   "recoveryEpoch": null,
+   "reference": "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1",
+   "reservationId": "idem-flash-first",
+   "stepSetDigest": "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+   "targetBindingDigest": "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+   "useOrdinal": 1,
+   "validUntilUtc": "2026-09-25T04:00:00Z"
+  },
+  "bindingRevision": 1,
+  "blockers": [],
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "executionMode": "execute",
+  "finishedAtUtc": "2026-09-25T00:00:00Z",
+  "firstEvidenceStepAtUtc": "2026-09-25T00:00:00Z",
+  "inventoryAvailable": true,
+  "jobId": "job-015b9785301763965a34ec80b54d9c0b",
+  "missingRequiredArtifacts": [],
+  "observation": {
+   "bindingRevision": 1,
+   "confirmationMethod": "machineReadback",
+   "confirmedAtUtc": "2026-09-25T00:00:00Z",
+   "firmware": "OpenHarmony-7.0.0.36",
+   "model": "DAYU200",
+   "preflightSteps": [],
+   "providerId": "arkforge",
+   "stableIdentitySha256": "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+   "targetId": "TGT-83405c84ff74",
+   "toolSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+   "toolVersion": "arkforged native RockUSB",
+   "transport": "usb"
+  },
+  "operationReference": "flash.full-restore@1",
+  "outcomeUnknown": false,
+  "parameters": {
+   "artifactLease": "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+   "deviceProfileRef": "dayu200",
+   "intent": "fullRestore",
+   "verification": "full"
+  },
+  "providerId": "arkforge",
+  "recoveryEpoch": null,
+  "schemaVersion": "arkdeck.job-evidence/1",
+  "startedAtUtc": "2026-09-25T00:00:00Z",
+  "status": "verified",
+  "targetId": "TGT-83405c84ff74",
+  "terminalState": "succeeded",
+  "traceProbeAfter": null,
+  "traceProbeBefore": null
+ },
+ "lanePreview": {
+  "bindingRevision": 2,
+  "state": "bundleNotInLaneStore",
+  "targetId": "TGT-HOST"
+ },
+ "list": {
+  "aliasFor": null,
+  "availability": "available",
+  "binding": "confirmedDevice",
+  "canonicalReference": "flash.full-restore@1",
+  "minimumEffect": "destructive",
+  "profiles": [
+   "dayu200"
+  ],
+  "reasonCodes": [],
+  "reasonOrigins": [],
+  "reasons": [],
+  "reference": "flash.full-restore@1"
+ },
+ "plan": {
+  "authorizationPolicy": "runtimeCapability",
+  "bindingRevision": 1,
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "dispatchDisposition": "notDispatched",
+  "effectiveEffect": "destructive",
+  "executionMode": "planOnly",
+  "inputs": {
+   "artifactLease": "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+   "deviceProfileRef": "dayu200",
+   "intent": "fullRestore",
+   "verification": "full"
+  },
+  "jobAdmitted": false,
+  "materializedPlanDigest": "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "operation": "flash.full-restore@1",
+  "providerAdmissionBlocker": null,
+  "providerId": "arkforge",
+  "requestFingerprintSha256": "5c9be3c3b2bb5c1595a02e8359354f36383831ec49ffb34418044c839668f361",
+  "schemaVersion": "arkdeck.job-plan/1",
+  "stableIdentitySha256": "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "steps": [
+   {
+    "binding": "none",
+    "cancellation": "immediate",
+    "effect": "hostOnly",
+    "kind": "verifyArtifact",
+    "optional": false,
+    "stepId": "verify-image-bundle"
+   },
+   {
+    "binding": "none",
+    "cancellation": "immediate",
+    "effect": "hostOnly",
+    "kind": "hashFile",
+    "optional": false,
+    "stepId": "hash-images"
+   },
+   {
+    "binding": "none",
+    "cancellation": "immediate",
+    "effect": "hostOnly",
+    "kind": "requestConfirmation",
+    "optional": false,
+    "stepId": "confirm-flash-intent"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "atSafeBoundary",
+    "effect": "deviceMutation",
+    "kind": "enterUpdater",
+    "optional": false,
+    "stepId": "enter-loader-mode"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "effect": "readOnly",
+    "kind": "waitForDisconnect",
+    "optional": false,
+    "stepId": "wait-loader-disconnect"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "effect": "readOnly",
+    "kind": "waitForReconnect",
+    "optional": false,
+    "stepId": "wait-loader-reconnect"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "effect": "readOnly",
+    "kind": "probeDevice",
+    "optional": false,
+    "stepId": "rebind-loader-identity"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "criticalNonInterruptible",
+    "effect": "destructive",
+    "kind": "flashPartition",
+    "optional": false,
+    "stepId": "flash-partitions"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "effect": "readOnly",
+    "kind": "verifyRemoteState",
+    "optional": false,
+    "stepId": "verify-flash-readback"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "atSafeBoundary",
+    "effect": "deviceMutation",
+    "kind": "rebootDevice",
+    "optional": false,
+    "stepId": "reboot-device"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "effect": "readOnly",
+    "kind": "waitForReconnect",
+    "optional": false,
+    "stepId": "wait-for-hdc"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "effect": "readOnly",
+    "kind": "probeDevice",
+    "optional": false,
+    "stepId": "rebind-and-verify-build"
+   },
+   {
+    "binding": "confirmedDevice",
+    "cancellation": "immediate",
+    "effect": "readOnly",
+    "kind": "captureRemoteStdout",
+    "optional": true,
+    "stepId": "capture-post-flash-diagnostics"
+   },
+   {
+    "binding": "none",
+    "cancellation": "atSafeBoundary",
+    "effect": "hostOnly",
+    "kind": "finalizeSession",
+    "optional": false,
+    "stepId": "finalize-session"
+   }
+  ],
+  "targetId": "TGT-83405c84ff74"
+ },
+ "prerequisites": {
+  "bindingRevision": 2,
+  "observations": [
+   {
+    "identifier": "loader",
+    "status": "satisfied"
+   },
+   {
+    "identifier": "recoveryPath",
+    "status": "satisfied"
+   },
+   {
+    "identifier": "unlocked",
+    "status": "satisfied"
+   },
+   {
+    "identifier": "stablePower",
+    "status": "unknown"
+   }
+  ],
+  "profileReference": "dayu200",
+  "targetId": "TGT-HOST"
+ },
+ "run": {
+  "actualEffect": "destructive",
+  "createdAtUtc": "2026-09-25T00:00:00Z",
+  "executionMode": "execute",
+  "failure": null,
+  "finishedAtUtc": "2026-09-25T00:00:00Z",
+  "jobId": "job-015b9785301763965a34ec80b54d9c0b",
+  "nextAction": {
+   "kind": "readResult",
+   "owner": {
+    "id": "job-015b9785301763965a34ec80b54d9c0b",
+    "kind": "job"
+   },
+   "reasonCode": "job.resultAvailable",
+   "resource": {
+    "id": "job-015b9785301763965a34ec80b54d9c0b",
+    "kind": "job"
+   }
+  },
+  "operation": "flash.full-restore@1",
+  "outcome": "succeeded",
+  "outcomeUnknown": false,
+  "outstandingResidueCount": 0,
+  "processProgress": null,
+  "recoveryEpochId": null,
+  "resolvedByTargetAliasResolutionId": null,
+  "schemaVersion": "arkdeck.job-status/1",
+  "sessionId": "session-job-015b9785301763965a34ec80b54d9c0b",
+  "sessionPublication": {
+   "catalogGeneration": "1",
+   "manifestSha256": "dafe620b26a8faec207e01c968575e7c52f13b9bb883fc66dccf81c690e2050f",
+   "reasonCode": null,
+   "state": "published"
+  },
+  "startedAtUtc": "2026-09-25T00:00:00Z",
+  "state": "succeeded",
+  "supersededByRecoveryEpochId": null,
+  "targetId": "TGT-83405c84ff74",
+  "threadId": null,
+  "waitingForHuman": false,
+  "workspaceKind": "flash"
+ }
+}

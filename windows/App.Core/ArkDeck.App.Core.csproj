@@ -26,5 +26,7 @@
   <ItemGroup>
     <!-- The answers the scripted test transport replays (Testing/ScriptedDaemon*.cs). -->
     <EmbeddedResource Include="Testing\Recorded\*.json" LogicalName="ArkDeck.Recorded.%(Filename)%(Extension)" />
+    <!-- The Catalog facts the macOS App compiles in (FlashReviewCatalogGenerated), for the Flash review. -->
+    <EmbeddedResource Include="Catalog\*.json" LogicalName="ArkDeck.Catalog.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

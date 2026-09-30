@@ -57,7 +57,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -83,7 +83,13 @@ public static partial class ScriptedDaemon
     /// <summary>The committed Import of <see cref="Jobs"/>.</summary>
     public const string CommittedImportId = "imp-dcb7943f-d934-43da-b290-65d0066cae35";
 
-    public const string FlashRefusal = "This Import kind's publication validator is not configured";
+    /// <summary>The Windows daemon's flash-bundle validator refusing content that is not a DAYU200
+    /// images archive (measured).</summary>
+    public const string FlashContentRefusal = "Import content failed its registered format validator";
+
+    /// <summary>The Windows daemon's <c>job.plan</c> of a Flash without an ArkForge lane (measured).</summary>
+    public const string FlashLaneAbsence = "flash.full-restore@1 is runtime unavailable: no ArkForge lane: ARKDECK_ARKFORGE_BUNDLE_PATH is unset, "
+        + "so this daemon performs no Rockchip writes. canonical ArkForge Flash refuses before authorization";
 
     public static readonly IReadOnlyList<string> RunningJobStates = ["running", "waitingForDevice", "running", "succeeded"];
 
@@ -134,6 +140,7 @@ public static partial class ScriptedDaemon
         private readonly Dictionary<string, JsonObject> _imports = new(StringComparer.Ordinal);
         // The Imports whose first chunk opens a ZIP container (a HAP's publication check).
         private readonly HashSet<string> _zipImports = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, MemoryStream> _flashBundles = new(StringComparer.Ordinal);
         private long _catalogGeneration = 2;
         private string? _cleanupPreviewId;
 
@@ -197,7 +204,7 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => Debug(request, method) ?? method switch
+                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(Observations)),
@@ -604,6 +611,22 @@ public static partial class ScriptedDaemon
             };
         }
 
+        /// <summary>The content of a flash-bundle Import through the host's DAYU200 import policy,
+        /// as the Windows daemon's registered validator reads it.</summary>
+        private bool IsFlashBundle(string id)
+        {
+            var path = Path.Combine(Path.GetTempPath(), "arkdeck-scripted-" + Guid.NewGuid().ToString("N") + ".tar.gz");
+            try
+            {
+                File.WriteAllBytes(path, _flashBundles.TryGetValue(id, out var bundle) ? bundle.ToArray() : []);
+                return Presentation.FlashArchive.ValidateForImport(path).Error is null;
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
         private static JsonObject Details(string phase) => new(
         [
             new("newDispatchCount", JsonNumber.FromInt64(0)),
@@ -792,14 +815,22 @@ public static partial class ScriptedDaemon
                         return Failure(request, "invalidInput", "Import append requires exact bounded bytes, offset and digest", owner);
                     }
                     if (offset == 0 && bytes.AsSpan().StartsWith("PK\u0003\u0004"u8)) _zipImports.Add(id);
+                    if (((JsonString)Meta(import)["kind"]).Value == "flash-bundle")
+                    {
+                        if (!_flashBundles.TryGetValue(id, out var bundle)) _flashBundles[id] = bundle = new MemoryStream();
+                        bundle.Write(bytes);
+                    }
                     _imports[id] = ImportJson(id, Meta(import), 1, "inProgress", offset + bytes.Length, JsonNull.Instance);
                     return Success(request, _imports[id]);
                 }
                 case "artifact.import.commit":
                 {
                     if (Param("importId") is not { } id || !_imports.TryGetValue(id, out var import)) return Failure(request, "resourceNotFound", "Import does not exist", owner);
-                    if (((JsonString)Meta(import)["kind"]).Value == "flash-bundle") return Failure(request, "operationUnavailable", FlashRefusal, owner);
                     if (Long(import, "nextOffset") != Long(Meta(import), "byteCount")) return Failure(request, "invalidInput", "Import is incomplete", owner);
+                    if (((JsonString)Meta(import)["kind"]).Value == "flash-bundle" && scenario != Flash && !IsFlashBundle(id))
+                    {
+                        return Failure(request, "invalidInput", FlashContentRefusal, Details("importOwner"));
+                    }
                     if (((JsonString)Meta(import)["kind"]).Value == "hap" && !_zipImports.Contains(id))
                     {
                         return Failure(request, "invalidInput", "Import is not a ZIP-based HAP/HSP container", owner);

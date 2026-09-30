@@ -45,6 +45,7 @@ public static partial class ScriptedDaemon
                 case "job.plan":
                 {
                     if (Request(Param("requestJson")) is not { } document) return Failure(request, "invalidInput", "requestJson is not a runtime operation request");
+                    if (Operation(document) == "flash.full-restore@1") return Failure(request, "invalidInput", FlashLaneAbsence, Details("preAdmission"));
                     if (Operation(document) != "deploy.native-library.app-owned@1") return Failure(request, "rejected", "not scripted");
                     if (Target(document) is not (FixtureTargetId, 3)) return Failure(request, "invalidInput", "the exact target binding is no longer current");
                     var plan = (JsonObject)recorded["plan"];
@@ -129,7 +130,7 @@ public static partial class ScriptedDaemon
         private JsonObject DebugStatus((string Id, string Operation, string State, string Request) job)
         {
             if (job.State == "queued") return (JsonObject)Parse(JobJson((job.Id, job.Operation, job.State, "2026-09-30T09:00:00Z"), list: false));
-            var recorded = (JsonObject)((JsonObject)DebugRecorded.Value["runs"])[job.Operation];
+            var recorded = job.Operation == "flash.full-restore@1" ? FlashRun : (JsonObject)((JsonObject)DebugRecorded.Value["runs"])[job.Operation];
             var text = recorded.ToString().Replace((((JsonString)recorded["jobId"]).Value), job.Id, StringComparison.Ordinal)
                 .Replace(OracleTargetId, FixtureTargetId, StringComparison.Ordinal);
             var status = (JsonObject)Parse(text);

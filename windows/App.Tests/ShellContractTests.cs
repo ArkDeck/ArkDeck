@@ -88,7 +88,10 @@ public sealed class ShellContractTests
             // TASK-XPA-020 (Debug; delegated minor decision, pending the next rulings batch): the
             // macOS workspaces' closed typed Jobs, planned, submitted, run and cancelled through
             // the one typed request builder; which operations is pinned below.
-            "job.plan", "job.submit", "job.run" };
+            "job.plan", "job.submit", "job.run",
+            // TASK-XPA-020 (Flash): binding the board in Loader mode to the selected Target before
+            // the one submission, as the macOS Flash page does (flash.bind-current-loader).
+            "flash.bind-current-loader" };
         var sources = RepoPaths.AppSources("*.cs")
             .Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
                 .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")));
@@ -96,8 +99,8 @@ public sealed class ShellContractTests
         {
             var text = File.ReadAllText(file);
             foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
-            if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs"
-                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs"))
+            if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs" or "Flash.cs"
+                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs"))
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }
@@ -114,6 +117,7 @@ public sealed class ShellContractTests
         var published = new HashSet<string>(StringComparer.Ordinal)
         {
             "capture.diagnostics", "debug.hap", "debug.template", "deploy.native-library.app-owned", "port-forward.create", "port-forward.remove",
+            "flash.full-restore",
         };
         var built = new List<string>();
         foreach (var file in RepoPaths.AppSources("*.cs").Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
@@ -198,7 +202,7 @@ public sealed class ShellContractTests
         foreach (var snapshot in doc.RootElement.GetProperty("snapshots").EnumerateArray())
         {
             Assert.IsTrue(scenarios.Contains(snapshot.GetProperty("scenario").GetString()!));
-            Assert.IsTrue(new[] { "overview", "device", "history", "sessions", "agents", "imports", "debug", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
+            Assert.IsTrue(new[] { "overview", "device", "history", "sessions", "agents", "imports", "debug", "flash", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
             if (snapshot.TryGetProperty("steps", out var steps))
             {
                 foreach (var step in steps.EnumerateArray())

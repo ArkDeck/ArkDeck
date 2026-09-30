@@ -241,6 +241,8 @@ class PathClassificationTests(unittest.TestCase):
             "rust/scripts/windows-dev-identity.ps1",
             "rust/tests/fixtures/trace-inspect",
             "rust/tests/fixtures/target-adoption",
+            "rust/tests/fixtures/flash-archive",
+            "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift",
         ]
         for path in declared:
             source = root / path
@@ -261,7 +263,7 @@ class PathClassificationTests(unittest.TestCase):
             "spec/recovery/README.md",
             "docs/design/cross-platform/windows-phase-agent-prompt.md",
             "docs/design/arkdeck-ds/src/styles.css",
-            "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
+            "ArkDeckApp/Resources/DeviceLocalizable.xcstrings",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
         ):
             with self.subTest(path=path):

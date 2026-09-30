@@ -126,7 +126,7 @@ first, `ControlResult` back.
   bounded `append` chunks each with its SHA-256, `commit`), with its progress and a Cancel that
   aborts the partial Import; it lists and inspects the Imports (`artifact.import.list|inspect`)
   and releases a committed one after a confirmation (`artifact.import.release`). A flash bundle
-  is refused by the Runtime at publication until its validator exists (AF-W1).
+  that is not a DAYU200 images archive is refused by the Runtime's format validator.
 - **Debug (TASK-XPA-020).** The macOS Debug workspace: the Target the page submits against and
   five tabs — Artifacts (an app-owned native library imported, planned with `job.plan`, reviewed
   in the plan sheet, then submitted exactly as reviewed), Logs (a bounded HiLog capture and its
@@ -137,9 +137,21 @@ first, `ControlResult` back.
   inputs, the Target and binding revision read, the workspace's client name) submitted with
   `job.submit`, run with `job.run` and read back with `job.show`; an action that cannot run says
   why instead of being disabled.
+- **Flash (TASK-XPA-020).** The macOS Flash workspace for the DAYU200 full restore
+  (`flash.full-restore@1`): the current device and its readiness, one primary surface (choose an
+  image, then the one fully named Flash button with its user-data impact; the running progress;
+  the result with its postflight build and binding checks) and a details toggle with the
+  operation's availability, device access (`flash.device-access`), the bootloader
+  (`flash.bootloader-status`), the profile and Target, the prerequisites (`flash.prerequisites`),
+  the exact plan (catalog stages, plan and step-set digests, lane plan preview, partitions) and
+  the Runtime activity. The chosen archive is reviewed on the host exactly as macOS reviews it
+  (`FlashArchive`, verified against the Swift oracle cases), imported as a flash bundle, planned
+  with `job.plan` against the embedded catalog review, bound to the current loader when the plan
+  asks, then submitted as reviewed and followed to its terminal Job and evidence. Wherever the
+  Runtime refuses (no lane, no validator), the page shows its reason and offers no Flash button.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
-  have access keys (Alt+O, D, H, N, A, I, B, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  have access keys (Alt+O, D, H, N, A, I, B, F, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
   empty Tab stop.
 

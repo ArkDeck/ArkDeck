@@ -153,10 +153,12 @@ public sealed class ImportUploader(IControlChannel channel)
 {
     public const int ChunkBytes = 512 * 1024;
 
+    /// <summary>Uploads <paramref name="path"/>; <paramref name="name"/> names the Import when it is
+    /// not the file's (a flash bundle is always <c>images.tar.gz</c>, as the macOS App uploads it).</summary>
     public async Task<ImportOutcome> UploadAsync(string path, string kind, TargetSummary target, IProgress<(long Sent, long Total)>? progress,
-        CancellationToken cancellation)
+        CancellationToken cancellation, string? name = null)
     {
-        var name = Path.GetFileName(path);
+        name ??= Path.GetFileName(path);
         var requestId = "app-import-" + Guid.NewGuid().ToString("D");
         var cli = CliCommands.ForImport(kind);
         FileStream file;

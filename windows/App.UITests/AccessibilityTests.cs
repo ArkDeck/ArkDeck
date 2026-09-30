@@ -46,6 +46,7 @@ public sealed class AccessibilityTests
         ["debug", "jobs", new[] { "debug.tab.apps" }],
         ["debug", "jobs", new[] { "debug.tab.network" }],
         ["debug", "jobs", new[] { "debug.tab.commands" }],
+        ["flash", "flash", Array.Empty<string>()],
         ["overview", "jobs", new[] { "jobInspector.row.job-0000000000000000000000000000a004" }],
     ];
 
@@ -113,6 +114,7 @@ public sealed class AccessibilityTests
             ["agents"] = ("A", 0),
             ["imports"] = ("I", 0),
             ["debug"] = ("B", 0),
+            ["flash"] = ("F", 0),
             ["history"] = ("H", 0),
             ["device"] = ("D", 0),
             ["settings"] = ("S", 0),
@@ -259,6 +261,8 @@ public sealed class AccessibilityTests
         ["debug", "jobs", new[] { "debug.tab.network" }],
         ["debug", "jobs", new[] { "debug.tab.commands" }],
         ["debug", "foundation", Array.Empty<string>()],
+        ["flash", "flash", new[] { "flash.workspace.details" }],
+        ["flash", "foundation", new[] { "flash.workspace.details" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a002" }],
     ];
 
@@ -353,6 +357,22 @@ public sealed class AccessibilityTests
 
     private sealed record Stop(string Id, string Type, string State, double X, double Y, double Width, double Height);
 
+    /// <summary>The walk's file once the App has closed it (it may still be writing when it appears).</summary>
+    private static string ReadWhenWritten(string file, Stopwatch watch)
+    {
+        while (true)
+        {
+            try
+            {
+                return File.ReadAllText(file);
+            }
+            catch (IOException) when (watch.Elapsed < AppSession.Timeout)
+            {
+                Thread.Sleep(100);
+            }
+        }
+    }
+
     /// <summary>The App's in-process Tab (or Shift+Tab) walk over the whole window.</summary>
     private static List<Stop> Walk(AppSession app, string file, bool backward)
     {
@@ -364,8 +384,7 @@ public sealed class AccessibilityTests
             if (watch.Elapsed > AppSession.Timeout) Assert.Fail("the App did not walk its focus");
             Thread.Sleep(100);
         }
-        Thread.Sleep(100);
-        using var doc = JsonDocument.Parse(File.ReadAllText(file));
+        using var doc = JsonDocument.Parse(ReadWhenWritten(file, watch));
         return doc.RootElement.EnumerateArray().Select(s => new Stop(
             s.GetProperty("id").GetString() ?? "", s.GetProperty("type").GetString()!, s.GetProperty("state").GetString()!,
             s.GetProperty("x").GetDouble(), s.GetProperty("y").GetDouble(), s.GetProperty("width").GetDouble(), s.GetProperty("height").GetDouble())).ToList();

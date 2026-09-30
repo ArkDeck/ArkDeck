@@ -102,14 +102,14 @@ public sealed class AgentImportFlowTests
             app.WaitForName("imports.status", n => n == strings["windows.imports.release.done"]);
             app.WaitForName("imports.detail.state", n => n == "released");
 
-            // A flash bundle is checked, sent, and refused by the Runtime at publication.
+            // A flash bundle that is not an images archive is sent and refused by the Runtime's validator.
             app.Find("imports.kind").AsComboBox().Select(3);
             app.WaitForName("imports.file", n => n == strings["windows.imports.noFile"]);
             Choose(app, flash);
             app.Invoke("imports.start");
             var refused = app.WaitForName("imports.status", n => n.StartsWith(strings["windows.imports.failed"], StringComparison.Ordinal));
             Assert.AreEqual($"{strings["windows.imports.failed"]} · " + strings.Format("windows.unavailable.reason",
-                ["operationUnavailable", "This Import kind's publication validator is not configured"]), refused);
+                ["invalidInput", "Import content failed its registered format validator"]), refused);
             foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
         }
         finally

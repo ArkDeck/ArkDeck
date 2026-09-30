@@ -71,6 +71,13 @@ public static class CliCommands
     public const string DebugPortForward = "arkdeck port-forward create --inputs-file <path>"; // port-forward.create|remove@1
     public const string DebugPortForwardRemove = "arkdeck port-forward remove --inputs-file <path>";
     public const string JobRun = "arkdeck job run --job <job-id>";                // job.run
+    public const string FlashDeviceAccess = "arkdeck flash device-access";                // flash.device-access
+    public const string FlashBootloaderStatus = "arkdeck flash bootloader-status";        // flash.bootloader-status
+    public const string FlashPrerequisites = "arkdeck flash prerequisites --target <target-id> --device-profile <dayu200>"; // flash.prerequisites
+    public const string FlashLanePreview = "arkdeck flash lane-preview --target <target-id> --device-profile <dayu200> --archive-sha256 <sha256>"; // flash.lanePlanPreview
+    public const string FlashBindLoader = "arkdeck flash bind-loader --target <target-id> --expected-binding-revision <n>"; // flash.bind-current-loader
+    public const string FlashPlan = "arkdeck flash plan";                                 // flash.full-restore@1 (job.plan)
+    public const string FlashRun = "arkdeck flash run --target <id> --inputs-file <path>"; // flash.full-restore@1 (job.submit)
 
     public static string ForExecution(string template, string executionId) =>
         template.Replace("(--execution-id <id>)", "--execution-id " + executionId, StringComparison.Ordinal);

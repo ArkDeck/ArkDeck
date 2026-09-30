@@ -460,6 +460,74 @@ public sealed class RealDaemonTests
     }
 
     /// <summary>
+    /// The Flash page against the real Runtime over a development root holding the recorded
+    /// adopted Target. The Windows daemon composes no ArkForge lane (no HDC tuple is registered),
+    /// so Flash is unavailable (<c>provider arkforge is not registered</c>) and its device access
+    /// observation fails; a real DAYU200 archive chosen in the system file dialog is reviewed on
+    /// the host, passes the Runtime's flash-bundle validator and is imported, and <c>job.plan</c>
+    /// is refused before admission with the lane's absence, which ends the preparation. No button
+    /// is offered, and nothing reaches the device.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void TheFlashPageShowsTheRuntimesRefusalWithoutTheLane()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-flash-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            (process, _) = StartRootDaemon(signed, root);
+            process.Kill();
+            process.WaitForExit();
+            process.Dispose();
+            CopyTree(RepoPaths.At("rust", "tests", "fixtures", "agent-human-action", "targets-state"), Path.Combine(root, "targets-state"));
+            (process, var endpoint) = StartRootDaemon(signed, root);
+            var archive = Path.Combine(Directory.CreateDirectory(Path.Combine(directory.FullName, "files")).FullName, "images.tar.gz");
+            File.Copy(RepoPaths.At("rust", "tests", "fixtures", "flash-archive", "archives", "complete.tar.gz"), archive);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "flash"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            Assert.AreEqual(strings["flash.workspace.readiness.blocked"], app.WaitForName("flash.workspace.readiness", n => n.Length > 0));
+            Assert.AreEqual("provider arkforge is not registered", AppSession.Name(app.Find("flash.workspace.readiness.detail")));
+            Assert.AreEqual(strings.Format("flash.workspace.device.detail", ["TGT-3ba3f5f43b92", "1"]), AppSession.Name(app.Find("flash.workspace.currentDevice.detail")));
+            app.Invoke("flash.workspace.details");
+            Assert.AreEqual(strings["flash.availability.unavailable"], app.WaitForName("flash.availability.status", n => n.Length > 0));
+            Assert.AreEqual(strings.Format("windows.unavailable.reason", ["rejected", "Rockchip device access observation failed"]),
+                AppSession.Name(app.Find("flash.deviceAccess.reason")));
+
+            AgentImportFlowTests.ChooseFile(app, "flash.image.choose", archive);
+            Assert.AreEqual(strings["flash.error.plan"], app.WaitForName("flash.plan.error", n => n.Length > 0));
+            var detail = AppSession.Name(app.Find("flash.plan.error.detail"));
+            TestContext.WriteLine("flash plan: " + detail);
+            Assert.AreEqual("invalidInput: flash.full-restore@1 is runtime unavailable: no ArkForge lane: ARKDECK_ARKFORGE_BUNDLE_PATH is unset, "
+                + "so this daemon performs no Rockchip writes. canonical ArkForge Flash refuses before authorization", detail);
+            Assert.IsNull(app.TryFind("flash.execute.submit", TimeSpan.FromMilliseconds(500)), "no button without a plan");
+            var imports = Frame(endpoint, "artifact.import.list", """{"pageSize":200}""").GetProperty("result").GetProperty("items").EnumerateArray()
+                .Select(i => $"{i.GetProperty("metadata").GetProperty("kind").GetString()}:{i.GetProperty("state").GetString()}").ToArray();
+            TestContext.WriteLine("Runtime Imports: " + string.Join(", ", imports));
+            CollectionAssert.AreEqual(new[] { "flash-bundle:committed" }, imports);
+            Assert.AreEqual(0, Frame(endpoint, "job.list", """{"pageSize":200,"order":"createdAtDescJobIdAsc","includeTimeline":false,"includeCurrent":true}""")
+                .GetProperty("result").GetProperty("items").GetArrayLength(), "nothing was admitted");
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            Stop(process, directory);
+        }
+    }
+
+    /// <summary>
     /// The Debug page against the real Runtime over a development root holding the recorded
     /// adopted Target. No Windows HDC tuple is registered, so the Runtime refuses every Debug
     /// operation before admission and has no Debug probe; the page shows exactly that — each
@@ -523,7 +591,7 @@ public sealed class RealDaemonTests
     /// The Imports page against the real Runtime's Import owner (TASK-XPA-008), over a
     /// development root holding the recorded adopted Target: the recorded HAP chosen in the
     /// system file dialog is uploaded in verified chunks and published, then released; a flash
-    /// bundle is sent and refused at publication (no validator until AF-W1).
+    /// bundle that is not an image archive is sent and refused by its format validator.
     /// </summary>
     [TestMethod]
     [Timeout(300_000, CooperativeCancellation = true)]
@@ -586,7 +654,7 @@ public sealed class RealDaemonTests
             var refused = app.WaitForName("imports.status", n => n.StartsWith(strings["windows.imports.failed"], StringComparison.Ordinal));
             TestContext.WriteLine("flash bundle: " + refused);
             Assert.AreEqual($"{strings["windows.imports.failed"]} · " + strings.Format("windows.unavailable.reason",
-                ["operationUnavailable", "This Import kind's publication validator is not configured"]), refused);
+                ["invalidInput", "Import content failed its registered format validator"]), refused);
 
             var listed = Frame(endpoint, "artifact.import.list", """{"pageSize":200}""").GetProperty("result").GetProperty("items").EnumerateArray()
                 .Select(i => $"{i.GetProperty("metadata").GetProperty("name").GetString()}:{i.GetProperty("state").GetString()}").ToArray();
