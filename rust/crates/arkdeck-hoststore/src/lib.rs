@@ -397,9 +397,10 @@ pub use job_journal_replay::{AbandonmentFact, IntentFact, ReplayFacts, UnknownFa
 #[cfg(any(target_os = "macos", windows))]
 pub use job_journal_writer::{JournalWriteError, JournalWriter, inspect_journal};
 
-#[cfg(target_os = "macos")]
+// The History filter owner (`history.filter.*`), on macOS and Windows.
+#[cfg(any(target_os = "macos", windows))]
 mod history_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use history_owner::HistoryStore;
 // The Session storage owner (`runtime.storage.*`, `session.list`, `show`,
 // `pin`, `unpin`, `session.cleanup.*`, `session.export.*`) and the storage

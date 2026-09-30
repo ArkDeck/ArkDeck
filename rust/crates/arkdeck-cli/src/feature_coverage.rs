@@ -461,6 +461,11 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // without a registered HDC a debt is refused before its readback.
     "recovery.cleanup.list",
     "cleanup-debt.list",
+    // The History filter owner over Swift's recorded filters (TASK-XPA-012;
+    // `windows_history_filter_process.rs`).
+    "history.filter.list",
+    "history.filter.save",
+    "history.filter.delete",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the

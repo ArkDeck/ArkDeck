@@ -129,7 +129,8 @@ list|inspect|read|export|quota`, `capability list`, `runtime storage
 status|policy`, `session list|show|pin|unpin|export preview|export
 apply|cleanup preview|cleanup apply`, `artifact import
 hap|native-library|workspace-patch|inspect|list|release|abort`, `recovery
-cleanup list` and its alias `cleanup-debt list`),
+cleanup list` and its alias `cleanup-debt list`, `history filter
+list|save|delete`),
 `notImplemented` where a leaf it reaches is refused off macOS for a macOS host
 primitive (the macOS-only families below), and `partial` otherwise: the leaves
 parse, send their frames and render their envelopes on Windows, but the target
