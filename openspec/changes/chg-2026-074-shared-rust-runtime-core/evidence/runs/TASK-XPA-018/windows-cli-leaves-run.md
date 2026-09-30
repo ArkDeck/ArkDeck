@@ -45,6 +45,11 @@ schema, Catalog, corpus, command registry or `openspec/platforms/**` change.
   macOS-only families keep no Windows status (widening `requiredPlatforms` is a §11 profile decision,
   not this slice's).
 - **`docs/design/cli-machine-contracts.md`**: the sentence stating the Windows rule.
+- **`rust/tests/fixtures/maintainer-contracts/oracle.json`**: the six recorded export trees pin
+  `contracts/cli-feature-coverage.json` by SHA-256; each now names the regenerated file
+  (`25431fa7…` → `c167080b…`). The oracle has no refresh script, and the test that reads it
+  (`maintainer_contracts.rs` `swifts_recorded_answers_replay`) is `cfg(unix)`, so it failed first on
+  the ubuntu lane. Nothing else in the repository pins the old digest.
 
 The four non-macOS Unicode fallback arms (`target_resources.rs`, `domain_leaves.rs`,
 `trace_inspect.rs`, `machine_contracts.rs`) are slice S2's and are not touched.
