@@ -1,7 +1,8 @@
 # TASK-XPA-002/005 — the account daemon's Sessions root and Trace cache on Windows
 
 Change: CHG-2026-074-shared-rust-runtime-core. Windows phase, slice CI2-L. Base: #2385's head
-`4db744ca` (the Job, Session and runner owners composed on the Windows daemon). Host: the
+`4db744ca` (the Job, Session and runner owners composed on the Windows daemon), then merged with
+`origin/main` `c7fa14cb` once #2385 landed; the targeted checks were run again after the merge. Host: the
 Windows 11 x64 reference host, non-elevated, NTFS. No device was contacted, no HDC or board was
 used, and no operation was submitted. The account's own `%LOCALAPPDATA%\ArkDeck` was neither
 read nor written: it did not exist before these tests and does not exist after them. No system
