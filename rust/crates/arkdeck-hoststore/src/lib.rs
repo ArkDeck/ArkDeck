@@ -260,9 +260,14 @@ mod job_lineage_repair;
 mod job_reconcile;
 #[cfg(target_os = "macos")]
 pub use job_reconcile::{FlashReconciler, JobReconciler};
-#[cfg(target_os = "macos")]
+// The Session publication writer on macOS and Windows. Its callers, the Job
+// runners, cancellation and reconciliation, are still macOS-only; on Windows
+// the replay of the recorded Swift Sessions drives it
+// (`session_publication_windows_tests.rs`).
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_publication;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_publication::{
     PublicationPoint, SessionPublisher, StagedRecovery, StorageClaims, StorageProbe,
     StorageSnapshot, SystemStorageProbe,
@@ -338,15 +343,22 @@ pub use job_journal_writer::{JournalWriteError, JournalWriter, inspect_journal};
 mod history_owner;
 #[cfg(target_os = "macos")]
 pub use history_owner::HistoryStore;
-#[cfg(target_os = "macos")]
+// The Session storage owner (`runtime.storage.*`, `session.list`, `show`,
+// `pin`, `unpin`) and the storage hold a publication registers under, on
+// macOS and Windows; its cleanup and export are still macOS-only.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_owner;
-// The private snapshot pages `artifact.list` keeps (and every other macOS
-// pager), on the durable host store both OSes have.
+// The private snapshot pages `artifact.list`, `job.list`, `job.timeline` and
+// `session.list` keep (and every other macOS pager), on the durable host
+// store both OSes have.
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod snapshot_pager;
 #[cfg(target_os = "macos")]
-pub use session_owner::{ActiveSessions, SessionStore};
+pub use session_owner::ActiveSessions;
+#[cfg(any(target_os = "macos", windows))]
+pub use session_owner::SessionStore;
 #[cfg(target_os = "macos")]
 mod session_cleanup_plan;
 #[cfg(target_os = "macos")]
@@ -680,10 +692,13 @@ pub use trace_owner::TraceCacheStore;
 #[cfg(any(target_os = "macos", windows))]
 mod recovery_manifest;
 mod session_graphemes;
-#[cfg(target_os = "macos")]
+// The Session census and retention catalog the storage owner and the
+// publication writer read and register in, on macOS and Windows.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_inventory;
-// The Session Manifest decoder serves the Journal's closed format on macOS and
-// Windows; its Session readers (inventory, publication) are still macOS-only.
+// The Session Manifest decoder serves the Journal's closed format and the
+// Session census and publication, on macOS and Windows.
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_manifest;
@@ -695,7 +710,7 @@ pub use recovery_manifest::{
     RecoveryManifestError, RecoveryManifestGuide, RecoveryManifestHazard,
 };
 pub use session_graphemes::decode_graphemes;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_inventory::{session_inventory, session_inventory_owned};
 
 // The Bootstrap registry's bundle and HDC tool file owners are

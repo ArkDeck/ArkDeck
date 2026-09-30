@@ -226,11 +226,13 @@ impl Authority {
     /// in the same private child rather than beside its other entries (as
     /// Swift's production daemon does): the host store cannot open the
     /// account root itself, whose DACL also grants SYSTEM. `job.status`,
-    /// `job.show`, `job.events` and a `job.list` of one page answer from it
-    /// (so `runtime service restart` reads the current Jobs), and a restart
-    /// reads back what it holds; nothing admits a Job on Windows yet. Opening validates
-    /// the index's layout and rows and its files' owner and identity; a
-    /// store it cannot open ends the start.
+    /// `job.show` and `job.events` answer from it, and `job.list` and
+    /// `job.timeline` page through its snapshot pager (`cli-job-snapshots`,
+    /// whose cursors read on across a restart), so `runtime service restart`
+    /// reads the current Jobs; a restart reads back what it holds. Nothing
+    /// admits a Job on Windows yet. Opening validates the index's layout and
+    /// rows and its files' owner and identity; a store it cannot open ends
+    /// the start.
     fn job_store(&self) -> Result<arkdeck_hoststore::JobStore, String> {
         const NAME: &str = "jobs-state";
         let path = self.root.private_child(NAME).map_err(|error| {
