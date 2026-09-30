@@ -434,7 +434,8 @@ impl ReplayState {
 
     /// Whether any step intent declared a destructive effect: Swift
     /// `pendingLoaderTransition`'s check that no `stepIntent` event's effect
-    /// is at least destructive.
+    /// is at least destructive. Its caller, the cutover facts, is macOS-only.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) fn holds_destructive_step_intent(&self) -> bool {
         self.destructive_step_intent
     }
@@ -1083,10 +1084,10 @@ mod tests {
     /// records takes, and a device mutation's proof over one retained Session
     /// holding the longest. A measurement, not a check:
     /// `cargo test -p arkdeck-hoststore --lib job_journal_replay::tests::a_replay -- --ignored --nocapture`.
+    /// The proof runs through the Job owner, which is macOS-only.
     #[test]
     #[ignore = "a measurement"]
     fn a_replay_of_ten_thousand_records_takes() {
-        use std::os::unix::fs::DirBuilderExt;
         for retries in [1_250, 2_500, 5_000] {
             let journal = long_journal(retries);
             let records = journal.split(|byte| *byte == b'\n').count() - 1;
@@ -1104,39 +1105,44 @@ mod tests {
                 samples[2], samples[4]
             );
         }
-        let journal = long_journal(5_000);
-        let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
-        let base = std::env::temp_dir()
-            .canonicalize()
-            .unwrap()
-            .join(format!("replay-measure-{nonce:032x}"));
-        let private = |path: &Path| {
-            std::fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(path)
-                .unwrap();
-        };
-        let session = base.join("Sessions/2026/09/session-job-4ac2c3640786ad0e831952ab62bb71bc");
-        private(&base.join("Runtime"));
-        private(&session);
-        std::fs::write(session.join("journal.jsonl"), &journal).unwrap();
-        let jobs = crate::JobStore::open_owner(&base.join("Runtime")).unwrap();
-        let mut samples: Vec<_> = (0..5)
-            .map(|_| {
-                let started = std::time::Instant::now();
-                jobs.require_mutation_state(&base.join("Runtime"), &[])
+        #[cfg(target_os = "macos")]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            let journal = long_journal(5_000);
+            let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+            let base = std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("replay-measure-{nonce:032x}"));
+            let private = |path: &Path| {
+                std::fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(path)
                     .unwrap();
-                started.elapsed()
-            })
-            .collect();
-        samples.sort();
-        println!(
-            "proof over one retained Session of {} records: median {:?}, max {:?}",
-            journal.split(|byte| *byte == b'\n').count() - 1,
-            samples[2],
-            samples[4]
-        );
-        std::fs::remove_dir_all(&base).unwrap();
+            };
+            let session =
+                base.join("Sessions/2026/09/session-job-4ac2c3640786ad0e831952ab62bb71bc");
+            private(&base.join("Runtime"));
+            private(&session);
+            std::fs::write(session.join("journal.jsonl"), &journal).unwrap();
+            let jobs = crate::JobStore::open_owner(&base.join("Runtime")).unwrap();
+            let mut samples: Vec<_> = (0..5)
+                .map(|_| {
+                    let started = std::time::Instant::now();
+                    jobs.require_mutation_state(&base.join("Runtime"), &[])
+                        .unwrap();
+                    started.elapsed()
+                })
+                .collect();
+            samples.sort();
+            println!(
+                "proof over one retained Session of {} records: median {:?}, max {:?}",
+                journal.split(|byte| *byte == b'\n').count() - 1,
+                samples[2],
+                samples[4]
+            );
+            std::fs::remove_dir_all(&base).unwrap();
+        }
     }
 }

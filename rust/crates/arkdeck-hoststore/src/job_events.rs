@@ -1,7 +1,7 @@
 //! Metadata event stream. Encrypted cursors grant no execution authority.
 use crate::{
+    job_failure::{failure, unreadable},
     job_journal::JournalEvent,
-    job_record::{failure, unreadable},
 };
 use aes_gcm::{
     Aes256Gcm, KeyInit, Nonce,
@@ -356,15 +356,20 @@ pub fn page(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{fs, io::Write, os::unix::fs::PermissionsExt, path::PathBuf};
+    use std::{fs, io::Write, path::PathBuf};
     const JOURNAL: &str = include_str!("../../../tests/fixtures/journal/all-event-kinds.jsonl");
     struct Root(PathBuf);
     impl Root {
         fn new() -> Self {
             let n = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+            #[cfg(target_os = "macos")]
             let p = PathBuf::from(format!("/private/tmp/arkdeck-events-{n:032x}"));
-            fs::create_dir(&p).unwrap();
-            fs::set_permissions(&p, fs::Permissions::from_mode(0o700)).unwrap();
+            #[cfg(windows)]
+            let p = std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("arkdeck-events-{n:032x}"));
+            crate::test_private::create_private_directory(&p);
             fs::write(p.join("journal.jsonl"), JOURNAL).unwrap();
             Self(p)
         }
@@ -425,13 +430,24 @@ mod tests {
             fs::read(root.0.join("journal.jsonl")).unwrap(),
             JOURNAL.as_bytes()
         );
+        #[cfg(unix)]
         assert_eq!(
-            fs::metadata(root.0.join("event-cursor-key.v1"))
-                .unwrap()
-                .permissions()
-                .mode()
-                & 0o777,
+            std::os::unix::fs::PermissionsExt::mode(
+                &fs::metadata(root.0.join("event-cursor-key.v1"))
+                    .unwrap()
+                    .permissions()
+            ) & 0o777,
             0o600
+        );
+        // The owner alone may read and write it: the store's owner-only read.
+        #[cfg(windows)]
+        assert_eq!(
+            arkdeck_platform::HostDirectory::open(&root.0)
+                .unwrap()
+                .read_owner_only("event-cursor-key.v1", 32)
+                .unwrap()
+                .map(|key| key.len()),
+            Some(32)
         );
     }
     #[test]

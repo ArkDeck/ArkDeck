@@ -15,8 +15,11 @@ serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 unicode-segmentation.workspace = true
 
-[target.'cfg(target_os = "macos")'.dependencies]
+# The Job events reader's cursor (macOS and Windows).
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
 aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
 arkdeck-provider-arkforge.workspace = true
 arkdeck-provider-hdc.workspace = true
 # Workspace signing (TASK-XPA-015): the design's crate graph, RUNTIME --> PWS.

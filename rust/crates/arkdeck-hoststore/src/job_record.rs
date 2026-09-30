@@ -5,19 +5,7 @@ use arkdeck_contract::{WireError, strict_json};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
-pub(super) fn failure(code: &str, message: &str) -> WireError {
-    WireError {
-        code: code.into(),
-        message: message.into(),
-        details: None,
-    }
-}
-pub(super) fn unreadable(_: impl std::fmt::Debug) -> WireError {
-    failure(
-        "recordUnreadable",
-        "The Runtime Job snapshot is unreadable or unsupported",
-    )
-}
+pub(super) use crate::job_failure::{failure, unreadable};
 pub(super) const STATES: &[&str] = &[
     "queued",
     "preflight",

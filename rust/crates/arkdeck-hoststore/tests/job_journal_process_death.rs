@@ -1,4 +1,4 @@
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 //! A process that dies at either durable write point leaves the old journal or
 //! the new record, never a partial record that replay adopts.
 //!
@@ -8,7 +8,6 @@
 use arkdeck_hoststore::job_journal_events::{self as events, Envelope};
 use arkdeck_hoststore::{JournalWriter, ReplayFacts};
 use serde_json::Value;
-use std::os::unix::fs::DirBuilderExt;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -23,7 +22,15 @@ impl Root {
             .canonicalize()
             .unwrap()
             .join(format!("journal-process-death-{nonce:032x}"));
-        fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+        }
+        // The store's own owner-only DACL: a directory std creates inherits
+        // the temporary directory's, which the store refuses.
+        #[cfg(windows)]
+        arkdeck_platform::HostDirectory::open_or_create_private(&path).unwrap();
         fs::write(
             path.join("journal.jsonl"),
             fixture(&format!("{name}.jsonl")),
