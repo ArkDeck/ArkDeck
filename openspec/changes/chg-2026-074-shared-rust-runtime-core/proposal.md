@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 11
-status: proposed # r9 approval remains historical; the r10/r11 deltas require maintainer review
+revision: 12
+status: proposed # r9 approval remains historical; the r10/r11/r12 deltas require maintainer review
 class: platform
 core_change_level: none
 owner: fuhanfeng
@@ -10,6 +10,17 @@ platforms: [macos, windows]
 ---
 
 # CHG-2026-074 — Shared Rust runtime core with native SwiftUI and WinUI 3 clients
+
+Revision 12 (2026-09-30) opens the Windows phase now, beside the macOS real-device acceptance
+instead of after it: the Swift runtime targets are deleted and Rust is the only implementation, so
+the r8 reason for waiting no longer holds. G5 stays the macOS gate. Windows, like macOS, completes
+software first and real hosts and the DAYU200 last. The revision records proposed rulings on design
+§L.1 items 5, 9, 10, 11 and 18, adds items 20–22 (how the verification rows that name Swift are
+read, software-first on Windows, the development daemon identity), removes TASK-XPA-004's
+dependency on TASK-XPA-017, and adds the Windows host W0 record and the Windows dashboard. It
+changes no Requirement, Acceptance Scenario, Core baseline, safety invariant or hardware
+criterion; the maintainer's merge is the attestation of the rulings it records (§ "Revision 12"
+below).
 
 Revision 11 (2026-09-14) re-measures the macOS chain after four days of delivery and changes
 how the remaining work is cut, verified and parallelised: Golden Journey milestones on the
@@ -279,6 +290,74 @@ acceleration review of the macOS chain measured on `main` `6cf99fb6` (#1905).
     14, 19) changed; nothing else. `docs/design/cross-platform/macos-chain-agent-prompt.md` is
     re-issued at version 2026-09-14 for the executing agents.
 
+## Revision 12 — the Windows phase opens beside the macOS real-device acceptance (2026-09-30)
+
+Revision 12 changes no scope, no Requirement, no Acceptance Scenario, no Acceptance row wording,
+no Core baseline, no safety invariant and no hardware criterion, and it does not approve r6–r11 or
+itself; the maintainer's merge of this PR is the attestation of the rulings it records. It is
+proposed from `main` `66b7474b` (#2326).
+
+1. **Measured state.** The macOS software is merged: the Rust daemon routes 105/105 control
+   methods, the Swift daemon, engine, storage and CLI are deleted (#2311, #2312, #2316) and the
+   release candidate is built in GitHub Actions (#2319, #2323–#2325). The macOS real-device
+   acceptance (phase A) has not run, so G5 is not reached and TASK-XPA-017 stays `blocked`. On
+   Windows the daemon serves only the TASK-XPA-002 read-only foundation (`doctor`,
+   `operation list`, `device candidates`), most of the Runtime sits behind
+   `cfg(target_os = "macos")`, the 30 operations are unavailable, no Windows HDC tuple is
+   registered, `cli-feature-coverage.json` has 0/256 entries `implemented` for Windows (140
+   `notImplemented`, 116 unset) and SPK-3/4/5 have not run. The Windows 11 x64 reference host is
+   initialised and reproduces the hosted `windows-latest` workspace lane on the same revision
+   (593 tests passed, identical per-binary counts; `evidence/runs/TASK-XPA-002/windows-host-w0-20260930-run.md`).
+2. **Ruling (design §L.1 item 18): open the Windows phase now.** r8 kept Windows waiting so that
+   it would not be built on a snapshot the macOS differential then reshaped; with the Swift
+   runtime deleted, Rust is the only implementation and that premise no longer holds. G5
+   remains the macOS gate (TASK-XPA-017), and the macOS phase A runs beside the Windows phase.
+   Where both touch one file, the macOS phase A fix goes first; every Windows change keeps the
+   macOS and ubuntu Rust lanes green. TASK-XPA-004 no longer depends on TASK-XPA-017; the
+   Windows acceptance of TASK-XPA-002 is the first step of the Windows phase.
+3. **Ruling (design §L.1 item 21): Windows also completes software first, real devices last.**
+   This follows the maintainer's 2026-09-28 ruling for macOS. Phase S — every Golden Journey
+   end to end on Windows through the Rust CLI and the named pipe against the Rust daemon with a
+   fake HDC or stand-in lane, the Windows HDC tuple, CLI coverage, the client, Trace per
+   decision 5 and the packaging scripts — is delivered by the agents; phase A — the SPK-3 host
+   rows, GJ-1..5 headless `REAL_DEVICE_PASS` on Windows 11 x64 (and ARM64 per decision 9), the
+   clean-host smoke and the flips of conformance, traceability and the platform lock — is the
+   maintainer's. The exception is host facts that decide the design, which are collected early:
+   HDC output on Windows, DAYU200 USB properties and the SPK-3 rows CI cannot measure.
+4. **Ruling (design §L.1 item 20): the reference of the rows that name Swift.** XPA-005
+   "decoded by the Swift decoders unchanged", XPA-008 "decoded by Swift", XPA-AC-2 "`job.plan`
+   digest equality with Swift", XPA-AC-4 "ledger decodes in Swift" and XPA-010 "Swift and Rust
+   compute the same plan digest" are read against the recorded Swift oracles and corpora under
+   `rust/tests/fixtures/**` and `spec/**` together with the T0 bytes the Rust writers produce on
+   macOS. No row's wording changes; like r11's tiers this only names the reference.
+5. **Rulings on the Windows product decisions** already recommended by design §H.4 and §L.1:
+   item 9, Windows 11 x64 and ARM64, not Windows 10; item 10, the App as MSIX packaged with a
+   self-contained Windows App SDK, signed with Azure Artifact Signing and a timestamp and updated
+   through App Installer, with an xcopy form of the daemon and CLI for CI and headless use; item
+   11, the daemon started by its client and single-instance; item 5, option (b) — capture,
+   inspect and export parity is the threshold for `supported`, the viewer follows later and an
+   absent viewer says `unavailable`. TASK-XPA-021 and TASK-XPA-022 therefore wait only for their
+   task dependencies.
+6. **Ruling (design §L.1 item 22): the development daemon identity.** On the host the maintainer
+   creates a development code-signing certificate trusted only there; the client pins its signer
+   through `ARKDECK_DAEMON_SIGNER_SHA256` and the daemon lives at the pinned path. CI tests the
+   positive path on the hosted runner with a temporary self-signed certificate. No switch that
+   skips identity verification is ever added; XPA-AC-6 and design §F.2 are unchanged.
+7. **How Windows reaches the Runtime.** One Runtime semantics: `arkdeck-platform` gains Windows
+   implementations of the platform primitives (paths, locks, atomic replace, process launch, USB
+   census, tool identity, pipe transport, credential storage) and the `cfg(target_os = "macos")`
+   gates come down; nothing forks Runtime semantics by operating system. Each gate is removed
+   only after its reason is known, and each structural change rides with a Golden Journey hop
+   (PRODUCT-LOOP §12). The prohibitions of `openspec/platforms/windows/profile.md` stand.
+8. **Carried with this revision.** The Windows host W0 record, redacted
+   (`evidence/runs/TASK-XPA-002/windows-host-w0-20260930-run.md`), and
+   `evidence/windows-remaining.md`, the Windows dashboard refreshed once per milestone. The
+   executing agents follow `docs/design/cross-platform/windows-phase-agent-prompt.md` (#2326).
+9. **Design re-pin.** Sections A (item 6), E (the Windows client row), J.2 (the X002 → X004
+   label; the X017 → X004 edge removed), J.4 (rows 002, 003, 004), J.5 (critical path, parallel
+   group 3, the 2026-09-30 entry, the gate note) and L.1 (items 5, 9, 10, 11, 18 and new 20–22)
+   changed; nothing else.
+
 ## Governance loop
 
 1. **Why a change is required at all.** `core-portability.md:30` states that introducing a shared
@@ -349,7 +428,8 @@ acceleration review of the macOS chain measured on `main` `6cf99fb6` (#1905).
     the current digest before it ships.
   - Windows: from `NOT_STARTED` to a real `arkdeck doctor` / `device candidates` / `target adopt` /
     `observe.device@1` / `capture.diagnostics@1` walking skeleton, then GJ-2..5 — after the macOS
-    side is complete (r8, design §J.5 gate G5).
+    side is complete (r8, design §J.5 gate G5); r12 starts it now, beside the macOS real-device
+    acceptance.
 
 ## Scope (Requirements / AC)
 
@@ -400,7 +480,10 @@ Windows App SDK; (13) ADR-0009 open ruling before recovery is ported; (17) the s
 boundary statement (r5); (18) the macOS-first order, ruled on 2026-09-09 and recorded in r8,
 effective on its merge; (r11) item 19 the parity tiers, item 7 the Swift CLI retirement with M5 and
 item 14 the device window cadence, recorded in r11 and effective on its merge, while item 13 waits for
-the ruling requested by `evidence/adr-0009-decision-package-20260914.md`.
+the ruling requested by `evidence/adr-0009-decision-package-20260914.md` (ruled on 2026-09-19);
+(r12) item 18 revised to open the Windows phase now, items 5, 9, 10 and 11 ruled as recommended,
+and new items 20 (the reference of the rows that name Swift), 21 (software first on Windows) and
+22 (the development daemon identity), recorded in r12 and effective on its merge.
 
 ## Historical revisions 2–5
 

@@ -7,3 +7,5 @@ passwords, private keys, SSH credentials, device UDIDs or raw device output. Spi
 (`SPK-1..11`) are recorded under `runs/<task-id>/` of the task they unlock (`spk-N-run.md`, r11).
 `macos-remaining.md` carries the six-number dashboard of the macOS chain and is updated on every merge
 (r11); `adr-0009-decision-package-20260914.md` is the decision package for design §L.1 item 13.
+`windows-remaining.md` carries the dashboard of the Windows phase and is refreshed once per
+milestone in its own docs PR (r12).

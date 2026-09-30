@@ -92,6 +92,33 @@ Compatibility note (PRODUCT-LOOP §2/§16): earlier status text, `pin-example` p
 r8 serial order remain historical records; a runnable milestone on the isolated Rust daemon is the
 unit of progress, and device activation still requires the r10 safety proof.
 
+Revision 12 (2026-09-30) opens the Windows phase beside the macOS real-device acceptance. It changes
+no Requirement, no Acceptance Scenario, no Core baseline, no safety invariant and no hardware
+criterion; the maintainer's merge of the PR that carries it is the attestation of the rulings it
+records (proposal r12, design §L.1 items 5, 9, 10, 11, 18 and 20–22). (1) The r8 order is
+reversed for Windows: the Swift runtime targets are deleted (#2311, #2312, #2316) and Rust is the
+only implementation, so the Windows phase no longer waits for TASK-XPA-017. G5 stays the macOS gate;
+where the macOS acceptance and a Windows change touch one file the macOS fix goes first, and a
+Windows change keeps the macOS and ubuntu Rust lanes green. TASK-XPA-004 no longer depends on
+TASK-XPA-017, and TASK-XPA-002's Windows acceptance is the first step of the Windows phase.
+(2) Windows completes software first (phase S) and real hosts and the DAYU200 last (phase A, the
+maintainer), except for host facts that decide the design: HDC output on Windows, DAYU200 USB
+properties and the SPK-3 rows CI cannot measure. (3) The verification rows that name Swift as the
+reference (TASK-XPA-005 "decoded by the Swift decoders unchanged", TASK-XPA-008 "decoded by
+Swift", XPA-AC-2, XPA-AC-4, TASK-XPA-010 "Swift and Rust compute the same plan digest") are read
+against the recorded Swift oracles and corpora under `rust/tests/fixtures/**` and `spec/**` plus
+the T0 bytes the Rust writers produce on macOS; no row's wording changes. (4) Decisions 5 (Trace:
+capture/inspect/export parity is the supported threshold, the viewer later), 9 (Windows 11 x64 and
+ARM64, not Windows 10), 10 (MSIX packaged + self-contained Windows App SDK, Azure Artifact
+Signing with timestamp, App Installer updates; xcopy daemon and CLI for CI and headless use) and
+11 (client-started, single-instance daemon) are ruled, so TASK-XPA-021 and TASK-XPA-022 wait only
+for their task dependencies. (5) The development daemon identity is a maintainer-created code-signing
+certificate trusted only on the host and pinned through `ARKDECK_DAEMON_SIGNER_SHA256`, with a
+temporary self-signed certificate on the hosted runner; no switch ever skips identity checks.
+Windows reaches the Runtime by giving `arkdeck-platform` Windows implementations of the platform
+primitives and removing `cfg(target_os = "macos")` gates, never by forking Runtime semantics.
+`evidence/windows-remaining.md` carries the Windows dashboard, refreshed once per milestone.
+
 Conventions shared by every task:
 
 - One task = one vertical PR that carries production code, tests, applicable real-device
@@ -194,7 +221,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-002 — Rust contract kernel and the first Windows GJ-1 hops (doctor, device candidates)
 
-- Status:in-progress（the macOS read-only foundation against the pinned Swift development baseline is delivered — #1768, baseline re-pinned at `main` `a61848f9` — and is TASK-XPA-003's input (r8); the Windows acceptance — SPK-3, Windows 11 x64 + DAYU200 with a trusted installed daemon and a reviewed Windows HDC tuple — is the first step of the Windows phase after TASK-XPA-017 (r8), and maintainer review remains outstanding, see `evidence/xpa-002-readonly-foundation.md`）
+- Status:in-progress（the macOS read-only foundation against the pinned Swift development baseline is delivered — #1768, baseline re-pinned at `main` `a61848f9` — and is TASK-XPA-003's input (r8); the Windows acceptance — SPK-3, Windows 11 x64 + DAYU200 with a trusted installed daemon and a reviewed Windows HDC tuple — is the first step of the Windows phase, which r12 opens beside the macOS real-device acceptance instead of after TASK-XPA-017 (r8); its software part — machine output byte-equal to the macOS fixtures, the SPK-3 host-side rows, the Windows HDC tuple through its own integration change — is phase S, the real-host and DAYU200 rows phase A; the W0 host record is `evidence/runs/TASK-XPA-002/windows-host-w0-20260930-run.md`, and maintainer review remains outstanding, see `evidence/xpa-002-readonly-foundation.md`）
 - Platform:windows（the same crates run read-only on macOS as a shadow tool）
 - Requirements:`toolchain-hdc-server` REQ-HDC-006/REQ-HDC-009 (unchanged), CLI-REQ-001/005/006/013/014
 - Acceptance:XPA-AC-1, XPA-AC-3, XPA-AC-6; Windows GJ-1 `NOT_STARTED → IMPLEMENTING`
@@ -385,11 +412,11 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-004 — Windows target adopt with durable binding and human trust stop
 
-- Status:blocked（r8: waits for the macOS side to complete, TASK-XPA-017）
+- Status:blocked（r12: no longer waits for TASK-XPA-017; waits for the software part of TASK-XPA-002's Windows acceptance — Windows `doctor` / `operation list` / `device candidates` byte-equal to the macOS fixtures and the Windows HDC tuple registered through its own integration change from host samples — and, for the Windows stable-identity census, the DAYU200 USB properties sample; readiness pins are instantiated when it flips to `ready`）
 - Platform:windows
 - Requirements:`device-targeting-auth` (identity before convenience, POL-TARGET-001); ADR-0006 decisions 1–5
 - Acceptance:XPA-AC-1, XPA-AC-2; Windows GJ-1 hops 4–5
-- Depends on:TASK-XPA-002（its Windows acceptance）, TASK-XPA-017（r8: GJ-1..5 on the pure Rust daemon — design §J.5 gate G5 — before any Windows Golden Journey task starts）
+- Depends on:TASK-XPA-002（its Windows acceptance; r12 removes the r8 dependency on TASK-XPA-017 and gate G5）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -1338,7 +1365,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-021 — Trace on Windows (capture/inspect/export parity; viewer scope per maintainer decision)
 
-- Status:blocked（awaits maintainer decision 5）
+- Status:blocked（r12: decision 5 ruled — capture/inspect/export parity, viewer later; awaits TASK-XPA-020）
 - Platform:windows
 - Requirements:`trace` spec (REQ-TRACE-006 job-scoped isolation among others), `analyzer.analyze-trace@1` / `analyzer.summarize-trace@1` descriptors (unchanged)
 - Acceptance:XPA-AC-2, XPA-AC-8
@@ -1371,7 +1398,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-022 — Windows packaging, signing, update channel and clean-host smoke
 
-- Status:blocked（awaits maintainer decisions 9–11）
+- Status:blocked（r12: decisions 9–11 ruled; awaits TASK-XPA-007, TASK-XPA-010 and TASK-XPA-011）
 - Platform:windows
 - Requirements:`openspec/platforms/windows/profile.md:71-81` (trust and distribution spike), POL-PRIVACY-001
 - Acceptance:XPA-AC-6, XPA-AC-9; release gate G9

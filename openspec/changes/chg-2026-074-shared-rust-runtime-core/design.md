@@ -9,8 +9,8 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 2e9ad45ab4f10d57b859245090730f100a06cc35
-  sha256: a1fcfdea8c2f409acccb609bcbdf1e0871adb2823b95741f0a52f75d4bd1de6e
+  blob: 1d2e9189f275425ba141a4a7d8abed34121845c2
+  sha256: c22631317fa6b738c93ceab1beff7f0ac81046ade89e5a8046881a33d28c767c
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
@@ -38,6 +38,11 @@ installed store-by-store composition, four lanes with file ownership, spikes, ve
 overhead, the estimate), J.2 (four edges become acceptance-only), J.3 (SPK-6..11), J.4 (rows 012,
 014, 015, 016, 019, 025), J.5 (the 2026-09-14 entry) and L.1 (items 7, 13, 14, 19) changed;
 nothing else.
+Revision 12 re-pins it for opening the Windows phase beside the macOS real-device acceptance:
+sections A (item 6), E (the Windows client row of the parity table), J.2 (the X002 → X004 label;
+the X017 → X004 edge removed), J.4 (rows 002, 003, 004), J.5 (critical path, parallel group 3,
+the 2026-09-30 entry, the release-gate note) and L.1 (ruling notes on items 5, 9, 10, 11 and 18;
+new items 20–22) changed; nothing else.
 
 The 2026-09-06 design refresh is re-pinned for review against checkout
 `d3d5c32c60cf60c96c64c50f8f1ab52b4d444cfa`. It updates current single-v1 facts,
@@ -133,7 +138,8 @@ requirements from development. No historical receipt is rewritten or reclassifie
    number order. Add a temporary executor sidecar only if needed to shorten the final path.
 3. Detach all actual consumers before removing Swift daemon/engine/storage/CLI and the temporary
    facade. Validate paired installation, signing, IPC identity, final GJ-1..5, applicable App UI,
-   crash recovery and performance. Windows implementation/acceptance follows.
+   crash recovery and performance. Windows implementation/acceptance follows (r12: it now runs
+beside the macOS real-device acceptance instead of after it; see the Revision 12 note below).
 
 Revision 11 (2026-09-14) keeps the three routes and makes the unit of progress a Golden Journey
 on the isolated Rust daemon: M1 GJ-1, M2 GJ-2/3, M3 GJ-5, M4 GJ-4, M5 the one-shot cutover and
@@ -144,6 +150,18 @@ formats read after the cutover; T1 semantic equality for transitions, codes, ref
 T2 free for message text and incidental behaviour — and the executor sidecar of step 2 is not
 built if the process-executor, ArkForge and signing spikes (SPK-6, SPK-9, SPK-10) pass.
 TASK-XPA-015/016/019/025 run in parallel lanes on their interface dependencies.
+
+Revision 12 (2026-09-30) opens the Windows phase now. The Swift runtime targets are deleted and
+Rust is the only implementation, so the r8 concern — Windows built on a snapshot the macOS
+differential would reshape — no longer holds. G5 stays the macOS gate (TASK-XPA-017) and the
+macOS real-device acceptance runs beside the Windows phase; where both touch one file, the macOS
+fix goes first, and a Windows change keeps the macOS and ubuntu Rust lanes green. Windows also
+completes software first (phase S, the agent) and real hosts and the DAYU200 last (phase A, the
+maintainer), except for host facts that decide the design. Windows reaches the Runtime semantics
+only by giving `arkdeck-platform` Windows implementations of the platform primitives (paths,
+locks, atomic replace, process launch, USB census, tool identity, pipe transport, credential
+storage) and removing the `cfg(target_os = "macos")` gates, never by forking Runtime semantics
+per operating system.
 
 Old state is preserved or explicitly archived. Raw Artifact, real device intent/outcome,
 capability/recovery and evidence remain immutable/preserved. A new root cannot clear unresolved
