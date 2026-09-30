@@ -108,7 +108,7 @@ parent may grant others access but must be owned by the token user.
 (device, inode, size, modification and change times) on both OSes (maintainer
 ruling 7); `owner_only_document` is the same identity of a document that is
 exactly owner read/write. The import-upload submodule is on Windows
-(TASK-XPA-008). Not yet on Windows: the update, trace-removal,
+too (TASK-XPA-008, below). Not yet on Windows: the update, trace-removal,
 session-removal and diagnostic-log submodules.
 `PayloadCheck::Unopenable` carries a
 Win32 error code on Windows. `HostJournal::generation` is 0 on NTFS, whose
