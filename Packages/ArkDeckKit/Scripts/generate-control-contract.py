@@ -137,6 +137,17 @@ IMPORT_OWNER_ERROR_CODES = ["operationUnavailable"]
 # stopped execution); the daemon adds `phase: preAdmission` and
 # `newDispatchCount: 0`. No `agent.run` refusal of either was ever recorded.
 AGENT_RUN_OWNER_ERROR_CODES = ["orchestrationBudgetExpired", "orchestrationClockUntrusted"]
+# Swift's `RuntimeArtifactResourceHandler` answers `artifact.export` of a
+# sensitive Artifact without `allowSensitive` `sensitiveAccessDenied` (#1663,
+# `RuntimeArtifactError.sensitiveAccessRequiresOptIn`), as it answers
+# `artifact.read`; the Rust owner adds `phase: artifactOwner` and
+# `newDispatchCount: 0`. Only the read's refusal was ever recorded. The
+# export's integrity and publication failures (`artifactIntegrityFailed`,
+# `operationFailed`) were published from recordings the committed corpus no
+# longer selects, and the owner still answers them.
+ARTIFACT_EXPORT_OWNER_ERROR_CODES = [
+    "artifactIntegrityFailed", "operationFailed", "sensitiveAccessDenied",
+]
 # Members that carry one Swift type wherever a method answers it, so a value
 # recorded for it in one method is a sample of it in every other. Each entry is
 # (source method, source path) -> the (method, path) pairs that answer the same
@@ -377,7 +388,8 @@ def derive_method_schemas(source):
                            "target.display-name.set", "target.display-name.clear"
                        } else set())
                        | (set(IMPORT_OWNER_ERROR_CODES) if method.startswith("artifact.import.") else set())
-                       | (set(AGENT_RUN_OWNER_ERROR_CODES) if method == "agent.run" else set()))
+                       | (set(AGENT_RUN_OWNER_ERROR_CODES) if method == "agent.run" else set())
+                       | (set(ARTIFACT_EXPORT_OWNER_ERROR_CODES) if method == "artifact.export" else set()))
         SHARED_SAMPLES.clear()
         for (source, source_path), targets in SHARED_MEMBERS.items():
             for target, target_path in targets:
