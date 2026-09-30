@@ -42,7 +42,7 @@ internal static class FocusWalk
     {
         var root = window.Content;
         var options = new FindNextElementOptions { SearchRoot = root.XamlRoot.Content };
-        var stops = new List<Stop>();
+        var stops = new List<object>();
         var first = direction == FocusNavigationDirection.Next
             ? FocusManager.FindFirstFocusableElement(root.XamlRoot.Content)
             : FocusManager.FindLastFocusableElement(root.XamlRoot.Content);
@@ -55,26 +55,10 @@ internal static class FocusWalk
             stops.Add(Describe(focused, root));
             if (!FocusManager.TryMoveFocus(direction, options)) break;
         }
-        // Written by hand: the published App is trimmed, and reflection-based serialization is not.
-        using var stream = File.Create(file);
-        using var json = new Utf8JsonWriter(stream);
-        json.WriteStartArray();
-        foreach (var stop in stops)
-        {
-            json.WriteStartObject();
-            json.WriteString("id", stop.Id);
-            json.WriteString("type", stop.Type);
-            json.WriteString("state", stop.State);
-            json.WriteNumber("x", stop.X);
-            json.WriteNumber("y", stop.Y);
-            json.WriteNumber("width", stop.Width);
-            json.WriteNumber("height", stop.Height);
-            json.WriteEndObject();
-        }
-        json.WriteEndArray();
+        File.WriteAllText(file, JsonSerializer.Serialize(stops));
     }
 
-    private static Stop Describe(DependencyObject element, UIElement root)
+    private static object Describe(DependencyObject element, UIElement root)
     {
         var id = AutomationProperties.GetAutomationId(element);
         double x = 0, y = 0, width = 0, height = 0;
@@ -85,10 +69,8 @@ internal static class FocusWalk
             (x, y, width, height) = (origin.X, origin.Y, fe.ActualWidth, fe.ActualHeight);
         }
         if (element is Control c) state = c.FocusState.ToString();
-        return new Stop(id, element.GetType().Name, state, x, y, width, height);
+        return new { id, type = element.GetType().Name, state, x, y, width, height };
     }
-
-    private readonly record struct Stop(string Id, string Type, string State, double X, double Y, double Width, double Height);
 
     private delegate IntPtr SubclassProc(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam, UIntPtr id, IntPtr data);
 

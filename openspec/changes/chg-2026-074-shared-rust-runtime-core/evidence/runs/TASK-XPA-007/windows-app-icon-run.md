@@ -2,7 +2,8 @@
 
 - Task: TASK-XPA-007 (the WinUI skeleton's icon and MSIX visual assets), the maintainer's request
   relayed by the lead: the Windows App shows the macOS App's icon.
-- Base: branch `agent/xpa-007-windows-app-icon-20260930`, one commit on `origin/main`.
+- Base: branch `agent/xpa-007-windows-app-icon-20260930` on `origin/main` `2c1480ba`: the icon commit
+  (`c4a5e335`, pushed) and a second one after the lead's note on #2404 (no force-push).
 - Host: the Windows 11 x64 reference host, non-elevated; .NET SDK 10.0.401, Windows App SDK 2.5.1.
   No system setting changed, no MSIX registered, no device or `hdc`.
 
@@ -44,10 +45,16 @@
 | `dotnet test` App.UITests `EveryActionIsATabStopInReadingOrder` and `SemanticSnapshotTests` (`ARKDECK_APP_UITESTS=1`) | 21 passed (the focus walk's rewritten JSON read by every page's Tab walk) |
 | `PYTHONUTF8=1 sh scripts/check-sdd.sh`, `git diff --check` | 0 errors, 0 warnings; clean |
 
-Found on the way: `package-rc.ps1` failed at the trimmed publish of the App on `main`
-(`IL2026` in `Controls/FocusWalk.cs`, the keyboard tests' focus walk added in #2383, which
-serialized an anonymous type by reflection). The walk now writes its JSON with `Utf8JsonWriter`
-(same fields), and the trimmed publish and the MSIX build succeed.
+Found on the way: `package-rc.ps1` fails at the trimmed publish of the App on `main` (`IL2026`
+in `Controls/FocusWalk.cs`, the keyboard tests' focus walk, which serializes an anonymous type
+by reflection). G2's #2404 fixes that file; this PR does not touch it (its first commit had its own
+fix, which the second commit takes back). This PR adds the check that was missing: PR builds never
+publish trimmed, so the App and App.Core now build with `EnableTrimAnalyzer` (warnings are errors
+in `windows/Directory.Build.props`), and `ShellContractTests.EveryBuildRunsTheTrimAnalyzer` keeps
+the setting. With `main`'s `FocusWalk.cs` the build fails with that `IL2026`; with #2404's it
+builds with 0 warnings and App.Tests (50) and ClientKit.Tests (32, 1 skipped) pass. So this PR
+builds once #2404 is on `main` (its checks run on the merge with `main`). The RC and Desktop install
+below were built from the first commit, with its own `FocusWalk.cs` fix.
 
 For the maintainer to look at (the lead's request), the development RC above was installed on the
 Desktop, not registered: the xcopy form extracted to `C:\Users\fuhan\Desktop\ArkDeck`, a
