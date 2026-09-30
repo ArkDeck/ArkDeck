@@ -30,6 +30,7 @@ mod managed;
 mod pinned_file;
 mod process;
 mod pty;
+mod publisher;
 mod server;
 pub(crate) mod shell;
 mod state;

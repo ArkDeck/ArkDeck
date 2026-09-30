@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="ArkDeck.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Mica (Base) behind the NavigationView shell (SPK-4). Every visible string is set from
+         the shared catalogue in code (App.Strings); no text is written here. -->
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="Base" />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <TitleBar
+            x:Name="AppTitleBar"
+            IsBackButtonVisible="False"
+            IsPaneToggleButtonVisible="True"
+            PaneToggleRequested="TitleBar_PaneToggleRequested">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <NavigationView
+            x:Name="NavView"
+            Grid.Row="1"
+            AutomationProperties.AutomationId="app.navigation"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            IsSettingsVisible="False"
+            PaneDisplayMode="Auto"
+            SelectionChanged="NavView_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItemHeader x:Name="SectionDevice" />
+                <NavigationViewItem x:Name="NavOverview" Tag="overview" AutomationProperties.AutomationId="app.navigation.overview">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xF0E2;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavDevice" Tag="device" AutomationProperties.AutomationId="app.navigation.device">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8EA;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItemHeader x:Name="SectionRecords" />
+                <NavigationViewItem x:Name="NavHistory" Tag="history" AutomationProperties.AutomationId="app.navigation.history">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE81C;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <!-- Honest provenance while the scripted test transport is in use. -->
+                <InfoBar
+                    x:Name="TestTransportBar"
+                    AutomationProperties.AutomationId="app.testTransport"
+                    Margin="{StaticResource ArkDeckSpace2Thickness}"
+                    IsClosable="False"
+                    IsOpen="False"
+                    Severity="Informational" />
+                <!-- XPA-AC-6: the daemon-unavailable recovery banner, shown instead of any data.
+                     A UIA live region: Narrator announces when it appears or changes. -->
+                <InfoBar
+                    x:Name="RecoveryBar"
+                    Grid.Row="1"
+                    AutomationProperties.AutomationId="app.recovery.daemonUnavailable"
+                    AutomationProperties.LiveSetting="Assertive"
+                    Margin="{StaticResource ArkDeckSpace2Thickness}"
+                    IsClosable="False"
+                    IsOpen="False"
+                    Severity="Error" />
+                <ContentControl x:Name="PageHost" Grid.Row="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+                <!-- The global Job Inspector, below every page as on macOS (VSplitView). -->
+                <Border
+                    x:Name="InspectorHost"
+                    Grid.Row="3"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="0,1,0,0" />
+            </Grid>
+        </NavigationView>
+    </Grid>
+</Window>

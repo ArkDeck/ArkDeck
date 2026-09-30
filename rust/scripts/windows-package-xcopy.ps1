@@ -22,16 +22,23 @@ Build mode (default) builds `arkdeck.exe` and `arkdeck-agentd.exe` from one reco
                     its only argument. It must sign with a timestamp (for example signtool with
                     the Azure Artifact Signing dlib and /tr); this script holds no credential.
                     Not configured, a failed command or an untimestamped result fails closed.
-     Every signed file must then verify (Get-AuthenticodeSignature: Valid), and both must carry
-     the same signer; the pin is the SHA-256 of that signer certificate's DER.
+     Every signed file must then verify (Get-AuthenticodeSignature: Valid). Development: both
+     carry the same signer and the pin is the SHA-256 of that certificate's DER. Production
+     (maintainer ruling 17): Artifact Signing leaves renew daily, so the pin is the publisher
+     identity instead: each file's chain ends at Microsoft Identity Verification Root
+     Certificate Authority 2020 (the SHA-256 compiled into the CLI), and both leaves carry the
+     same single subject O= and the same certificate-profile identity EKU
+     (1.3.6.1.4.1.311.97.<profile>, not the shared marker 1.3.6.1.4.1.311.97.1.0).
   5. Writes manifest.json inside the package (revision, dirty flag, rustc -V, cargo -V, target,
-     file SHA-256s, signing mode and signer pin), zips the package, and writes manifest.json
-     beside the zip with the zip's SHA-256 added.
-  6. Prints the pin the CLI must be configured with (ARKDECK_DAEMON_SIGNER_SHA256).
+     file SHA-256s, signing mode and signer pin or publisher identity), zips the package, and
+     writes manifest.json beside the zip with the zip's SHA-256 added.
+  6. Prints what the CLI must be configured with: ARKDECK_DAEMON_SIGNER_SHA256 (development),
+     or ARKDECK_DAEMON_PUBLISHER_ORGANIZATION and ARKDECK_DAEMON_PUBLISHER_EKU (production).
 
 -Smoke after a build, or -SmokeZip <zip> alone (for example on a clean host), unpacks the zip
 into a fresh directory under -SmokeParent, checks every file against the manifest and the
-daemon's signer against the pin, and with ARKDECK_DAEMON_SIGNER_SHA256 set to the pin and a
+daemon's signer against the pin (or its publisher identity against the manifest's), and with
+that pin (or the two publisher inputs) configured and a
 private development state root (ARKDECK_DEVELOPMENT_STATE_ROOT) inside that directory:
 
   - runs `arkdeck --output json doctor`. A CLI that starts its daemon (decision 11) starts it
@@ -106,6 +113,46 @@ function Test-Pin([string]$Value, [string]$What) {
     return $Value
 }
 
+# The Artifact Signing Public Trust root, as arkdeck-platform/src/windows/publisher.rs pins it
+# (ARTIFACT_SIGNING_ROOT_SHA256; SHA-1 f40042e2e5f7e8ef8189fed15519aece42c3bfa2 in the Microsoft
+# PKI Services repository). Change both together.
+$ArtifactSigningRootSha256 = '5367f20c7ade0e2bca790915056d086b720c33c1fa2a2661acf787e3292e1270'
+$IdentityEkuPrefix = '1.3.6.1.4.1.311.97.'
+$PublicTrustMarkerEku = '1.3.6.1.4.1.311.97.1.0'
+
+# The publisher identity of a production (Artifact Signing) leaf, read as the CLI matches it:
+# the chain ends at the pinned root, exactly one subject O=, and exactly one certificate-profile
+# identity EKU beside code signing.
+function Get-PublisherIdentity($Certificate) {
+    $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
+    try {
+        # Trust was already decided by Get-AuthenticodeSignature; the chain only names the root.
+        $chain.ChainPolicy.RevocationMode = 'NoCheck'
+        [void]$chain.Build($Certificate)
+        $elements = @($chain.ChainElements)
+        if ($elements.Count -lt 2) { throw "The production signer $($Certificate.Subject) has no chain to a root." }
+        $root = Get-CertificatePin $elements[-1].Certificate
+    } finally {
+        $chain.Dispose()
+    }
+    if ($root -ne $ArtifactSigningRootSha256) {
+        throw "The production signer chains to root $root, not Microsoft Identity Verification Root Certificate Authority 2020 ($ArtifactSigningRootSha256)."
+    }
+    $organizations = @(foreach ($rdn in $Certificate.SubjectName.EnumerateRelativeDistinguishedNames()) {
+            if ($rdn.GetSingleElementType().Value -eq '2.5.4.10') { $rdn.GetSingleElementValue() }
+        })
+    if ($organizations.Count -ne 1) { throw "The production signer $($Certificate.Subject) must carry exactly one O=, not $($organizations.Count)." }
+    $usages = @(foreach ($extension in $Certificate.Extensions) {
+            if ($extension -is [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]) {
+                foreach ($usage in $extension.EnhancedKeyUsages) { $usage.Value }
+            }
+        })
+    if ($usages -notcontains '1.3.6.1.5.5.7.3.3') { throw "The production signer $($Certificate.Subject) has no code-signing EKU." }
+    $profiles = @($usages | Where-Object { $_.StartsWith($IdentityEkuPrefix) -and $_ -ne $PublicTrustMarkerEku })
+    if ($profiles.Count -ne 1) { throw "The production signer must carry exactly one Artifact Signing identity EKU, not: $($profiles -join ', ')" }
+    return [ordered]@{ organization = $organizations[0]; eku = $profiles[0] }
+}
+
 # The signature every signed file must carry: valid (trusted on this host), and the signer's pin.
 function Get-VerifiedSigner([string]$Path, [bool]$RequireTimestamp) {
     $signature = Get-AuthenticodeSignature -LiteralPath $Path
@@ -120,6 +167,7 @@ function Get-VerifiedSigner([string]$Path, [bool]$RequireTimestamp) {
         subject     = $signature.SignerCertificate.Subject
         notAfter    = $signature.SignerCertificate.NotAfter.ToUniversalTime().ToString('o')
         timestamped = [bool]$signature.TimeStamperCertificate
+        certificate = $signature.SignerCertificate
     }
 }
 
@@ -173,6 +221,9 @@ function New-PackageBuild {
         throw "The checkout at $repository is not clean ($($status.Count) entries); commit or remove them, or pass -AllowDirty (recorded in the manifest).`n$($status -join "`n")"
     }
     if ($SigningMode -eq 'production' -and $dirty) { throw 'A production package is built from a clean checkout only.' }
+    if ($SigningMode -eq 'production' -and $ExpectedSignerSha256) {
+        throw 'A production package is pinned by publisher identity, not by one certificate''s SHA-256 (maintainer ruling 17); -ExpectedSignerSha256 does not apply.'
+    }
     $expectedPin = if ($ExpectedSignerSha256) { Test-Pin $ExpectedSignerSha256 '-ExpectedSignerSha256' } else { $null }
     # Signing is configured before anything is built: an unconfigured mode fails closed at once.
     $signer = switch ($SigningMode) {
@@ -209,17 +260,26 @@ function New-PackageBuild {
     foreach ($file in @($CliName, $DaemonName)) { Copy-Item -LiteralPath (Join-Path $binaries $file) -Destination $stage }
     $staged = @($CliName, $DaemonName | ForEach-Object { Join-Path $stage $_ })
 
-    $signing = [ordered]@{ mode = $SigningMode; signerSha256 = $null }
+    $signing = [ordered]@{ mode = $SigningMode; signerSha256 = $null; publisher = $null }
     if ($SigningMode -ne 'none') {
         $detail = if ($SigningMode -eq 'development') { Invoke-DevelopmentSigning $staged $signer } else { Invoke-ProductionSigning $staged $signer }
         $signers = @($staged | ForEach-Object { Get-VerifiedSigner $_ ($SigningMode -eq 'production') })
-        $pins = @($signers | ForEach-Object { $_.pin } | Select-Object -Unique)
-        if ($pins.Count -ne 1) { throw "The CLI and the daemon carry different signers: $($pins -join ', ')" }
-        if ($SigningMode -eq 'development' -and (@($detail.reportedPins) -join ',') -ne $pins[0]) {
-            throw "windows-dev-identity.ps1 reported $($detail.reportedPins -join ', ') but the files carry $($pins[0])."
+        if ($SigningMode -eq 'production') {
+            # Two signings may straddle a daily renewal: the leaves may differ, the publisher may not.
+            $publishers = @($signers | ForEach-Object { Get-PublisherIdentity $_.certificate })
+            $distinct = @($publishers | ForEach-Object { "$($_.organization)|$($_.eku)" } | Select-Object -Unique)
+            if ($distinct.Count -ne 1) { throw "The CLI and the daemon carry different publishers: $($distinct -join ', ')" }
+            $signing.publisher = $publishers[1]
+            $signing.daemonSignerSha256 = $signers[1].pin
+        } else {
+            $pins = @($signers | ForEach-Object { $_.pin } | Select-Object -Unique)
+            if ($pins.Count -ne 1) { throw "The CLI and the daemon carry different signers: $($pins -join ', ')" }
+            if ((@($detail.reportedPins) -join ',') -ne $pins[0]) {
+                throw "windows-dev-identity.ps1 reported $($detail.reportedPins -join ', ') but the files carry $($pins[0])."
+            }
+            if ($expectedPin -and $pins[0] -ne $expectedPin) { throw "The files carry signer $($pins[0]), not the expected $expectedPin." }
+            $signing.signerSha256 = $pins[0]
         }
-        if ($expectedPin -and $pins[0] -ne $expectedPin) { throw "The files carry signer $($pins[0]), not the expected $expectedPin." }
-        $signing.signerSha256 = $pins[0]
         $signing.signerSubject = $signers[1].subject
         $signing.signerNotAfter = $signers[1].notAfter
         $signing.timestamped = $signers[1].timestamped
@@ -250,9 +310,17 @@ function New-PackageBuild {
         files                = @(foreach ($path in $staged) {
                 [ordered]@{ path = [System.IO.Path]::GetFileName($path); bytes = (Get-Item -LiteralPath $path).Length; sha256 = Get-Sha256 $path }
             })
-        daemonConfiguration  = [ordered]@{
-            ARKDECK_DAEMON_SIGNER_SHA256 = $signing.signerSha256
-            ARKDECK_DAEMON_PATH          = "unset: the CLI's sibling $DaemonName"
+        daemonConfiguration  = if ($signing.publisher) {
+            [ordered]@{
+                ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = $signing.publisher.organization
+                ARKDECK_DAEMON_PUBLISHER_EKU          = $signing.publisher.eku
+                ARKDECK_DAEMON_PATH                   = "unset: the CLI's sibling $DaemonName"
+            }
+        } else {
+            [ordered]@{
+                ARKDECK_DAEMON_SIGNER_SHA256 = $signing.signerSha256
+                ARKDECK_DAEMON_PATH          = "unset: the CLI's sibling $DaemonName"
+            }
         }
     }
     $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stage $ManifestName) -Encoding utf8NoBOM
@@ -263,7 +331,9 @@ function New-PackageBuild {
 
     Write-Host "package  $zip"
     Write-Host "sha256   $($manifest.zip.sha256)"
-    if ($signing.signerSha256) {
+    if ($signing.publisher) {
+        Write-Host "Configure the CLI with ARKDECK_DAEMON_PUBLISHER_ORGANIZATION=$($signing.publisher.organization) and ARKDECK_DAEMON_PUBLISHER_EKU=$($signing.publisher.eku) (the daemon is the CLI's sibling; publisher identity, maintainer ruling 17)."
+    } elseif ($signing.signerSha256) {
         Write-Host "Configure the CLI with ARKDECK_DAEMON_SIGNER_SHA256=$($signing.signerSha256) (the daemon is the CLI's sibling)."
     } else {
         Write-Host 'Unsigned: the CLI refuses this daemon; no pin can be configured.'
@@ -344,10 +414,19 @@ function Invoke-XcopySmoke([string]$Zip) {
         $record.sourceRevision = $manifest.sourceRevision
         $record.signingMode = $manifest.signing.mode
         $pin = $manifest.signing.signerSha256
-        if (-not $pin) { throw 'The package is unsigned; the CLI refuses an unsigned daemon, so there is nothing to smoke.' }
+        $publisher = Get-Property $manifest @('signing', 'publisher')
+        if (-not $pin -and -not $publisher) { throw 'The package is unsigned; the CLI refuses an unsigned daemon, so there is nothing to smoke.' }
         $signer = Get-VerifiedSigner (Join-Path $package $DaemonName) $false
-        if ($signer.pin -ne $pin) { throw "The unpacked daemon carries signer $($signer.pin), not the manifest's $pin." }
-        $record.signerSha256 = $pin
+        if ($publisher) {
+            $actual = Get-PublisherIdentity $signer.certificate
+            if ($actual.organization -ne $publisher.organization -or $actual.eku -ne $publisher.eku) {
+                throw "The unpacked daemon's publisher $($actual.organization) / $($actual.eku) is not the manifest's."
+            }
+            $record.publisher = [ordered]@{ organization = $publisher.organization; eku = $publisher.eku }
+        } else {
+            if ($signer.pin -ne $pin) { throw "The unpacked daemon carries signer $($signer.pin), not the manifest's $pin." }
+            $record.signerSha256 = $pin
+        }
         # The development root is created owner-only (the user and SYSTEM, protected), as the
         # daemon creates the account's root; it is this smoke's own directory.
         $state = Join-Path $work 'state'
@@ -364,7 +443,12 @@ function Invoke-XcopySmoke([string]$Zip) {
         foreach ($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
             if ($entry.Key -notmatch '^(ARKDECK_|OHOS_HDC_)') { $environment[$entry.Key] = $entry.Value }
         }
-        $environment['ARKDECK_DAEMON_SIGNER_SHA256'] = $pin
+        if ($publisher) {
+            $environment['ARKDECK_DAEMON_PUBLISHER_ORGANIZATION'] = $publisher.organization
+            $environment['ARKDECK_DAEMON_PUBLISHER_EKU'] = $publisher.eku
+        } else {
+            $environment['ARKDECK_DAEMON_SIGNER_SHA256'] = $pin
+        }
         $environment['ARKDECK_DEVELOPMENT_STATE_ROOT'] = $state
         $cli = Join-Path $package $CliName
 
