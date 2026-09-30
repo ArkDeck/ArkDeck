@@ -92,7 +92,7 @@ from the SPK-5 facts measured on NTFS.
 `application_support_directory()` is the account's `FOLDERID_LocalAppData`
 (Known Folder API, never the `LOCALAPPDATA` variable, as Unix ignores `HOME`);
 `arkdeck_application_support_root()` is its `ArkDeck` child. Not yet on
-Windows: the export, import-upload, update, trace-removal, session-removal,
+Windows: the export, update, trace-removal, session-removal,
 diagnostic-log and payload-cache submodules, and the `std::fs::Metadata`-typed
 `document_metadata`/`remove_document`. `PayloadCheck::Unopenable` carries a
 Win32 error code on Windows. `HostJournal::generation` is 0 on NTFS, whose
@@ -105,6 +105,45 @@ recorded bytes and reads it back under the lock. It also covers the refusals
 (hard links, junctions, foreign ACEs, reserved name characters, non-canonical
 paths), lock exclusion within and across processes and its release on kill,
 and readers that keep their bytes across a replace.
+
+## Import upload on NTFS (TASK-XPA-008)
+
+`src/windows/host_import_upload.rs` gives Windows the import-upload submodule
+with the Unix names, bounds, bytes and refusals: `HostImportSource`,
+`HostUploadFile` (with `HostUploadReader`, `UploadChunkCheckpoint`,
+`UploadWritePoint`) and `HostDirectory::publish_import_checkpoint`.
+
+- The source is opened by `CreateFileW` with `FILE_FLAG_OPEN_REPARSE_POINT`
+  (a link or junction as its last component is refused as `O_NOFOLLOW`
+  refuses it; a `:` stream name and any non-disk handle too) and shared for
+  reading only: while it is held nobody writes it, renames it, or replaces or
+  deletes its name. Its `FileIdInfo` identity, size, link count, attributes
+  and both times are still compared before and after every chunk, and its name
+  is reopened for its attributes and must still name the same file, which
+  catches what no share mode refuses (a metadata change, a new hard link, a
+  replaced parent directory).
+- Staging files are created owner-only (`0600`) only for a durable
+  zero-offset checkpoint, written by offset, flushed with `FlushFileBuffers`,
+  and must stay the owner's single-link regular file bound to their name.
+- An Artifact payload is copied into a private `.<name>.<nonce>.tmp`, digest
+  checked, sealed owner read-only (`0400`) through the handle opened before
+  the seal, flushed and renamed with POSIX semantics and no replace
+  (`RENAME_EXCL`): an existing Artifact is never replaced. An interrupted
+  copy is deleted through its own handle; one left by a killed process is
+  reclaimed by the next publication after the same owner-only check.
+- `checkpoint_identity` keeps the Unix eleven-field order (generation 0; the
+  owner's granted rights and the attributes where Unix has uid and mode). It
+  is an in-memory cache key, never persisted.
+
+`tests/host_import_upload.rs` runs on macOS and Windows alike: the recorded
+`import-upload-current` source read by identity, staged to the recorded Swift
+committed prefix (T0), recovered, completed and published to the recorded
+digest; the frozen checkpoint records published and replaced; a source whose
+identity changes mid-read refused (and on Windows its name cannot be replaced
+while it is held); symbolic-link and junction sources refused; an existing
+Artifact never replaced; and a writer killed inside an append leaving a byte
+prefix and no Artifact, rolled back to the recorded prefix and completed by
+the next lifetime, which also reclaims a killed publisher's copy file.
 
 ## Validation
 
