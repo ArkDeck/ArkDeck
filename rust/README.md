@@ -1484,6 +1484,27 @@ capability. `tests/native_library_plan.rs` and `tests/native_library_submit.rs`
 replay the native-library oracle's plans and submissions; `job.run` runs the
 admitted Job (below), and `agent.run` admits the deployment it starts at once.
 
+On Windows (TASK-XPA-008 and XPA-009) the same four replays run over the
+oracle's layout below the temporary directory, owner-only as the store makes it
+and each published payload sealed by the store. A plan's digest covers its
+sends' arguments, which name the package's, the library's and the helper's host
+paths, so a Windows root digests the same plan document with its own paths.
+`hap_plan_digest` and `native_plan_digest` (the documents split out of
+`materialize_hap` and `materialize_native`) reproduce every Swift plan digest of
+both oracles over the paths Swift named, on every host. The replays read the
+plan digests and whatever they derive (the Runtime capability's ID, a use's
+query and scope fingerprints, its receipt and outcome hashes) as Swift's
+through a one-to-one relabelling (`support::debug_hap::HostLabels`); every other
+byte of the answers, the capability store and ledger, the Job records, the
+admission journals and the index rows must be Swift's, and on macOS nothing is
+relabelled. With no HDC composition (the Windows daemon's until the Windows HDC
+tuple is registered) an admitted HAP or deployment is refused before its first
+step with zero dispatch and no use consumed, and the daemon refuses every
+recorded `debug.hap@1` plan and submission before admission
+(`windows_job_admission_process.rs`). The runs themselves (`debug_hap_run.rs`,
+`native_library_run.rs`) stay macOS-only: they dispatch to the shared fake HDC,
+a POSIX shell script.
+
 ## Job run (TASK-XPA-014)
 
 The isolated development composition answers `job.run` for the analyzer Jobs it

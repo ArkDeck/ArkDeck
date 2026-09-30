@@ -20,43 +20,11 @@ impl<'a> JobPlanner<'a> {
         let (resolved, artifact_facts) = self.resolve_hap_leases(request, descriptor, facts)?;
         self.refuse_debug_permit(request)?;
         let now = (self.hdc.ok_or_else(internal_failure)?.now)().ok_or_else(internal_failure)?;
-        let mut steps = Vec::new();
-        for step in descriptor
-            .steps
-            .iter()
-            .filter(|step| descriptor.step_is_selected(step, &request.inputs))
-        {
-            steps.push(materialize_step(
-                step,
-                &step.step_id,
-                request,
-                facts,
-                &resolved,
-                &now,
-            )?);
-        }
-        // Reverse source order: start, install, send. Stop is still present
-        // when the successful plan intentionally leaves the ability running.
-        for step in compensations(descriptor, &request.inputs)? {
-            let id = &step.step_id;
-            steps.push(materialize_step(
-                step,
-                &format!("compensation-{id}"),
-                request,
-                facts,
-                &resolved,
-                &now,
-            )?);
-        }
-        let document = json!({"operationReference": descriptor.reference(), "catalogDigest": CATALOG_DIGEST,
-            "inputs": request.inputs, "targetID": request.target_id,
-            "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
-            "providerID": descriptor.provider, "steps": steps});
         Ok(Materialized {
             _import_use: None,
             _workspace_use: None,
             artifact_facts,
-            digest: sha256_hex(&session_json::encode(&document).map_err(|_| internal_failure())?),
+            digest: hap_plan_digest(request, descriptor, facts, &resolved, &now)?,
             identity: Some(facts.identity.clone()),
             binding_revision: Some(facts.binding_revision),
         })
@@ -146,6 +114,54 @@ impl<'a> JobPlanner<'a> {
         }
         Ok((resolved, artifact_facts))
     }
+}
+
+/// Swift `materializeTypedPlanBeforeAuthorization`'s digest of a HAP plan:
+/// the selected steps, then the failure-only compensations, over the packages
+/// as the engine resolved them. A send names its package's host path, so the
+/// digest is Swift's for the same request, facts, packages and paths.
+fn hap_plan_digest(
+    request: &OperationRequest,
+    descriptor: &CatalogOperation,
+    facts: &DeviceFacts,
+    resolved: &[ResolvedArtifact],
+    now: &str,
+) -> Result<String, PlanRefusal> {
+    let mut steps = Vec::new();
+    for step in descriptor
+        .steps
+        .iter()
+        .filter(|step| descriptor.step_is_selected(step, &request.inputs))
+    {
+        steps.push(materialize_step(
+            step,
+            &step.step_id,
+            request,
+            facts,
+            resolved,
+            now,
+        )?);
+    }
+    // Reverse source order: start, install, send. Stop is still present
+    // when the successful plan intentionally leaves the ability running.
+    for step in compensations(descriptor, &request.inputs)? {
+        let id = &step.step_id;
+        steps.push(materialize_step(
+            step,
+            &format!("compensation-{id}"),
+            request,
+            facts,
+            resolved,
+            now,
+        )?);
+    }
+    let document = json!({"operationReference": descriptor.reference(), "catalogDigest": CATALOG_DIGEST,
+        "inputs": request.inputs, "targetID": request.target_id,
+        "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
+        "providerID": descriptor.provider, "steps": steps});
+    Ok(sha256_hex(
+        &session_json::encode(&document).map_err(|_| internal_failure())?,
+    ))
 }
 
 fn materialize_step(
@@ -366,6 +382,101 @@ mod tests {
             primary_facts(&entry).is_err(),
             "metadata count must be an integer, never an injected string"
         );
+    }
+    /// Every plan the Swift debug-hap oracle answered, materialized again from
+    /// its request with its packages at the oracle's root as Swift spelled
+    /// their paths (`HDCOracleFake`'s, which each send names): the digest is
+    /// Swift's byte for byte on every host, since a path keeps the spelling it
+    /// is given. A host whose Artifact root is spelled otherwise (a Windows
+    /// root) digests the same document with its own paths in the sends.
+    #[test]
+    fn the_recorded_plans_digest_as_swift_s_over_the_oracle_s_package_paths() {
+        let fixture =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/debug-hap");
+        let read = |path: std::path::PathBuf| -> Value {
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+        };
+        let cases = read(fixture.join("cases.json"));
+        let targets = read(fixture.join("targets-state").join("targets.json"));
+        let target = &targets["targets"][0];
+        let descriptor = CatalogOperation::lookup("debug.hap", Some(1)).unwrap();
+        let resolve = |lease: &str| {
+            let mut parts = lease.split(':');
+            let (Some("lease-v1"), Some(job), Some(artifact), None) =
+                (parts.next(), parts.next(), parts.next(), parts.next())
+            else {
+                panic!("{lease} is not a lease");
+            };
+            let index = read(fixture.join("artifacts").join(job).join("index.json"));
+            let row = index["artifacts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["artifactID"] == artifact)
+                .unwrap();
+            ResolvedArtifact {
+                artifact_id: artifact.into(),
+                sha256: row["sha256"].as_str().unwrap().into(),
+                path: PathBuf::from(format!(
+                    "/private/tmp/arkdeck-hdc-oracle/artifacts/{job}/{artifact}"
+                )),
+            }
+        };
+        let mut replayed = 0;
+        for exchange in cases["exchanges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row["method"] == "job.plan" && row["answer"]["ok"] == true)
+        {
+            let request = OperationRequest::decode(
+                exchange["params"]["requestJson"]
+                    .as_str()
+                    .unwrap()
+                    .as_bytes(),
+            )
+            .unwrap();
+            let facts = DeviceFacts {
+                target_id: request.target_id.clone(),
+                binding_revision: target["bindingRevision"].as_i64().unwrap(),
+                tool_version: target["toolVersion"].as_str().unwrap().into(),
+                tool_sha256: String::new(),
+                connect_key: target["connectKey"].as_str().unwrap().into(),
+                identity: target["stablePhysicalIdentitySHA256"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
+            };
+            let mut resolved = vec![resolve(
+                request.inputs["hapArtifactLease"].as_str().unwrap(),
+            )];
+            if let Some(Value::Array(additional)) =
+                request.inputs.get("additionalHapArtifactLeases")
+            {
+                resolved.extend(
+                    additional
+                        .iter()
+                        .map(|lease| resolve(lease.as_str().unwrap())),
+                );
+            }
+            assert_eq!(
+                hap_plan_digest(
+                    &request,
+                    descriptor,
+                    &facts,
+                    &resolved,
+                    "2026-09-14T00:00:00Z"
+                )
+                .unwrap(),
+                exchange["answer"]["result"]["materializedPlanDigest"]
+                    .as_str()
+                    .unwrap(),
+                "{}",
+                exchange["name"]
+            );
+            replayed += 1;
+        }
+        assert_eq!(replayed, 10);
     }
     #[test]
     fn native_consumed_step_digest_includes_ordered_compensations() {
