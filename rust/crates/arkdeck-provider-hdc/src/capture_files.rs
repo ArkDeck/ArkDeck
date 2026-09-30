@@ -20,6 +20,7 @@
 //! owner's.
 use crate::debug_hap::{HapAction, PersistedArguments};
 use crate::native_library::Reconcile;
+use crate::operation::device_arguments;
 use crate::{DispatchFailure, HdcDispatch, Outcome, Persisted, ProcessPlan, Receipt, RequestError};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -1084,11 +1085,7 @@ impl FileAction {
                 "factsUnavailable(\"{step_id} has no descriptor-bound target connect key\")"
             ));
         };
-        let device = |tail: Vec<String>| -> Vec<String> {
-            let mut arguments = vec!["-t".to_owned(), key.to_owned()];
-            arguments.extend(tail);
-            arguments
-        };
+        let device = |tail: Vec<String>| -> Vec<String> { device_arguments(key, tail) };
         let owned = |tail: &[&str]| device(tail.iter().map(|part| (*part).to_owned()).collect());
         let process = |arguments: Vec<String>, seconds: u64| {
             FilePlan::Process(ProcessPlan {
