@@ -1,3 +1,4 @@
+use super::publisher::{self, PublisherIdentity};
 use super::{Handle, bool_result, wide};
 use crate::{ServerIdentity, denied};
 use sha2::{Digest, Sha256};
@@ -370,6 +371,9 @@ impl ProcessIdentity {
                 "pipe server image differs from installed daemon; zero frames sent",
             ));
         }
+        // A partial or malformed publisher identity refuses the server
+        // outright, whatever else is configured (maintainer ruling 17).
+        let pins = SignerPins::configured(expected)?;
         let installed = crate::process::open_locked_file(&expected.executable)?;
         if file_identity(&installed)? != file_identity(&self.image)? {
             return Err(denied(
@@ -385,10 +389,8 @@ impl ProcessIdentity {
             }
             None => false,
         };
-        let signature_matches = match &expected.authenticode_sha256 {
-            Some(pin) => verify_signature(&self.image, &self.path, pin).is_ok(),
-            None => false,
-        };
+        let signature_matches =
+            !pins.is_empty() && verify_signature(&self.image, &self.path, &pins).is_ok();
         if !package_matches && !signature_matches {
             return Err(denied(
                 "pipe server lacks the installed package or trusted signing identity; zero frames sent",
@@ -401,7 +403,9 @@ impl ProcessIdentity {
 /// What vouches for an installed daemon image before it runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImagePin {
-    /// The image's Authenticode signer certificate is the pinned one.
+    /// The image's Authenticode signature satisfies a signing pin: the
+    /// development signer's certificate SHA-256 or the production publisher
+    /// identity (maintainer ruling 17).
     Signer,
     /// A package family is pinned; only a running process has one, so it is
     /// proved on the pipe server after the start, never before.
@@ -419,9 +423,14 @@ pub(crate) struct VerifiedImage {
 }
 
 /// Checks the pinned daemon image as a file: an absolute local path, a
-/// regular file, and, when a signer is pinned, a trusted Authenticode
-/// signature by that certificate. No identity configured refuses.
+/// regular file, and, when a signing pin is configured (certificate SHA-256
+/// or publisher identity), a trusted Authenticode signature that satisfies
+/// it; otherwise a package family, proved later on the running server. A
+/// partial or malformed publisher identity, or no identity at all, refuses.
 pub(crate) fn verify_installed_image(expected: &ServerIdentity) -> io::Result<VerifiedImage> {
+    // Read before anything is opened: a partial publisher identity refuses
+    // whatever else is configured (maintainer ruling 17).
+    let pins = SignerPins::configured(expected)?;
     if !expected.executable.is_absolute() {
         return Err(denied("the installed daemon path must be absolute"));
     }
@@ -432,19 +441,18 @@ pub(crate) fn verify_installed_image(expected: &ServerIdentity) -> io::Result<Ve
         .package_family
         .as_deref()
         .is_some_and(|family| !family.is_empty());
-    let pin = match &expected.authenticode_sha256 {
-        Some(pin) => match verify_signature(&file, &path, pin) {
+    let pin = if !pins.is_empty() {
+        match verify_signature(&file, &path, &pins) {
             Ok(()) => ImagePin::Signer,
             Err(_) if family => ImagePin::PackageFamily,
             Err(error) => return Err(error),
-        },
-        None if family => ImagePin::PackageFamily,
-        None => {
-            return Err(denied(
-                "no installed daemon identity is configured (a signer certificate SHA-256 or a \
-                 package family)",
-            ));
         }
+    } else if family {
+        ImagePin::PackageFamily
+    } else {
+        return Err(denied(
+            "no installed daemon identity is configured (a signer certificate SHA-256, a              publisher identity or a package family)",
+        ));
     };
     Ok(VerifiedImage {
         pin,
@@ -494,14 +502,70 @@ fn package_family(process: HANDLE) -> io::Result<String> {
     Ok(String::from_utf16_lossy(&output[..length as usize - 1]))
 }
 
-fn verify_signature(file: &File, path: &std::path::Path, pin: &str) -> io::Result<()> {
-    if pin.len() != 64
-        || !pin
-            .bytes()
-            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+/// The signing pins configured for an installed daemon: the development
+/// signer's certificate SHA-256, and the production xcopy daemon's publisher
+/// identity (maintainer ruling 17). Either that is configured may vouch for
+/// the image; the package family is checked separately on the process.
+pub(crate) struct SignerPins {
+    certificate: Option<String>,
+    publisher: Option<PublisherIdentity>,
+}
+
+impl SignerPins {
+    /// Reads the pins from the installation inputs. A publisher identity with
+    /// only one of its two values, or a malformed one, is an error: the
+    /// caller refuses with zero frames rather than falling back.
+    pub(crate) fn configured(expected: &ServerIdentity) -> io::Result<Self> {
+        Ok(Self {
+            certificate: expected.authenticode_sha256.clone(),
+            publisher: PublisherIdentity::from_config(
+                expected.publisher_organization.as_deref(),
+                expected.publisher_eku.as_deref(),
+            )?,
+        })
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.certificate.is_none() && self.publisher.is_none()
+    }
+}
+
+/// `WinVerifyTrust` (generic Authenticode policy, whole-chain revocation from
+/// cache only, root excluded) must accept the image, and its verified signer
+/// chain must then satisfy one configured pin: the leaf certificate's SHA-256
+/// for the development signer, or the publisher identity for Artifact Signing.
+fn verify_signature(file: &File, path: &std::path::Path, pins: &SignerPins) -> io::Result<()> {
+    if pins.is_empty() {
+        return Err(denied("no daemon signing identity is configured"));
+    }
+    if let Some(pin) = &pins.certificate
+        && (pin.len() != 64
+            || !pin
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)))
     {
         return Err(denied("invalid installed signer certificate SHA256"));
     }
+    let chain = trusted_signer_chain(file, path)?;
+    let certificate_matches = pins.certificate.as_ref().is_some_and(|pin| {
+        chain
+            .first()
+            .is_some_and(|leaf| format!("{:x}", Sha256::digest(leaf)) == *pin)
+    });
+    let publisher_matches = pins.publisher.as_ref().is_some_and(|publisher| {
+        publisher::chain_matches(&chain, publisher::ARTIFACT_SIGNING_ROOT_SHA256, publisher)
+    });
+    if !certificate_matches && !publisher_matches {
+        return Err(denied(
+            "daemon Authenticode trust or publisher identity pin failed",
+        ));
+    }
+    Ok(())
+}
+
+/// The DER certificates, leaf first and root last, of the first signer of an
+/// image that `WinVerifyTrust` accepted; an error when it did not.
+fn trusted_signer_chain(file: &File, path: &std::path::Path) -> io::Result<Vec<Vec<u8>>> {
     let path = wide(path.as_os_str())?;
     let mut file_info = WINTRUST_FILE_INFO {
         cbStruct: size_of::<WINTRUST_FILE_INFO>() as u32,
@@ -522,57 +586,208 @@ fn verify_signature(file: &File, path: &std::path::Path, pin: &str) -> io::Resul
         ..Default::default()
     };
     let mut action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
-    // SAFETY: file/path/data remain alive throughout verify, inspect and close.
-    let result = unsafe {
+    // SAFETY: file/path/data remain alive throughout verify, inspect and close;
+    // the certificates are copied out before the state is closed.
+    let chain = unsafe {
         let status = WinVerifyTrust(
             INVALID_HANDLE_VALUE,
             &mut action,
             std::ptr::from_mut(&mut data).cast(),
         );
-        let verified = if status == 0 {
+        let mut chain = Vec::new();
+        if status == 0 {
             let provider = WTHelperProvDataFromStateData(data.hWVTStateData);
             let signer = if provider.is_null() {
                 null_mut()
             } else {
                 WTHelperGetProvSignerFromChain(provider, 0, 0, 0)
             };
-            let certificate = if signer.is_null() {
-                null_mut()
+            let count = if signer.is_null() {
+                0
             } else {
-                WTHelperGetProvCertFromChain(signer, 0)
+                (*signer).csCertChain
             };
-            if certificate.is_null() || (*certificate).pCert.is_null() {
-                false
-            } else {
+            for index in 0..count {
+                let certificate = WTHelperGetProvCertFromChain(signer, index);
+                if certificate.is_null() || (*certificate).pCert.is_null() {
+                    chain.clear();
+                    break;
+                }
                 let context = &*(*certificate).pCert;
-                let bytes = std::slice::from_raw_parts(
-                    context.pbCertEncoded,
-                    context.cbCertEncoded as usize,
+                chain.push(
+                    std::slice::from_raw_parts(
+                        context.pbCertEncoded,
+                        context.cbCertEncoded as usize,
+                    )
+                    .to_vec(),
                 );
-                format!("{:x}", Sha256::digest(bytes)) == pin
             }
-        } else {
-            false
-        };
+        }
         data.dwStateAction = WTD_STATEACTION_CLOSE;
         WinVerifyTrust(
             INVALID_HANDLE_VALUE,
             &mut action,
             std::ptr::from_mut(&mut data).cast(),
         );
-        verified
+        chain
     };
-    if !result {
-        return Err(denied(
-            "daemon Authenticode trust or publisher certificate pin failed",
-        ));
+    if chain.is_empty() {
+        return Err(denied("daemon Authenticode trust failed"));
     }
-    Ok(())
+    Ok(chain)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const PROFILE_EKU: &str = "1.3.6.1.4.1.311.97.990309390.766961637.194916062.941502583";
+
+    fn pins(
+        certificate: Option<&str>,
+        organization: Option<&str>,
+        eku: Option<&str>,
+    ) -> SignerPins {
+        let mut identity = ServerIdentity::new("C:\\unused.exe");
+        identity.authenticode_sha256 = certificate.map(str::to_owned);
+        identity.publisher_organization = organization.map(str::to_owned);
+        identity.publisher_eku = eku.map(str::to_owned);
+        SignerPins::configured(&identity).unwrap()
+    }
+
+    /// A copy of a small system executable in a private temporary directory,
+    /// removed on drop.
+    struct Copy(PathBuf);
+    impl Copy {
+        fn new(tag: &str) -> Self {
+            let directory = std::env::temp_dir().join(format!(
+                "arkdeck-publisher-{tag}-{}-{}",
+                std::process::id(),
+                crate::random_bytes::<8>()
+                    .unwrap()
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>()
+            ));
+            std::fs::create_dir(&directory).unwrap();
+            let system = PathBuf::from(std::env::var_os("SystemRoot").unwrap());
+            let path = directory.join("daemon.exe");
+            std::fs::copy(system.join("System32").join("whoami.exe"), &path).unwrap();
+            Self(path)
+        }
+        fn verify(&self, pins: &SignerPins) -> io::Result<()> {
+            let file = File::open(&self.0)?;
+            verify_signature(&file, &self.0, pins)
+        }
+    }
+    impl Drop for Copy {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(self.0.parent().unwrap());
+        }
+    }
+
+    #[test]
+    fn partial_publisher_configuration_is_refused_whatever_else_is_set() {
+        let mut identity = ServerIdentity::new("C:\\unused.exe");
+        identity.authenticode_sha256 = Some("0".repeat(64));
+        identity.package_family = Some("Contoso.ArkDeck_8wekyb3d8bbwe".into());
+        identity.publisher_organization = Some("Contoso Ltd".into());
+        assert!(SignerPins::configured(&identity).is_err());
+        identity.publisher_organization = None;
+        identity.publisher_eku = Some(PROFILE_EKU.into());
+        assert!(SignerPins::configured(&identity).is_err());
+        identity.publisher_eku = None;
+        assert!(!SignerPins::configured(&identity).unwrap().is_empty());
+        assert!(pins(None, None, None).is_empty());
+    }
+
+    #[test]
+    fn an_unsigned_image_satisfies_no_pin() {
+        let copy = Copy::new("unsigned");
+        assert!(copy.verify(&pins(None, None, None)).is_err());
+        assert!(
+            copy.verify(&pins(Some(&"0".repeat(64)), None, None))
+                .is_err()
+        );
+        assert!(
+            copy.verify(&pins(None, Some("Contoso Ltd"), Some(PROFILE_EKU)))
+                .is_err()
+        );
+    }
+
+    /// The `WinVerifyTrust`-integrated path with the host-trusted development
+    /// signer (`rust/scripts/windows-dev-identity.ps1`, whose thumbprint CI
+    /// exports as `ARKDECK_DEV_SIGNER_THUMBPRINT`): its certificate pin is
+    /// accepted exactly as before, and a publisher identity is not satisfied
+    /// by a trusted chain that does not end at the Artifact Signing root.
+    #[test]
+    fn the_development_signer_keeps_its_certificate_pin() {
+        let Some(thumbprint) = std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT") else {
+            eprintln!("ARKDECK_DEV_SIGNER_THUMBPRINT is not set; the signed path is not exercised");
+            return;
+        };
+        let copy = Copy::new("signed");
+        let script = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../scripts/windows-dev-identity.ps1");
+        // PowerShell 7 from PATH, else its App Execution Alias (as
+        // check-readonly.py finds it).
+        let alias = std::env::var_os("LOCALAPPDATA")
+            .map(|local| PathBuf::from(local).join("Microsoft\\WindowsApps\\pwsh.exe"))
+            .filter(|alias| alias.exists());
+        let pwsh = std::env::var_os("PATH")
+            .and_then(|paths| {
+                std::env::split_paths(&paths)
+                    .map(|directory| directory.join("pwsh.exe"))
+                    .find(|candidate| candidate.is_file())
+            })
+            .or(alias)
+            .expect("PowerShell 7 signs the development daemon copy");
+        let output = std::process::Command::new(pwsh)
+            .args(["-NoProfile", "-NonInteractive", "-File"])
+            .arg(&script)
+            .arg("sign")
+            .arg("-Thumbprint")
+            .arg(&thumbprint)
+            .arg("-Path")
+            .arg(&copy.0)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let pin = stdout
+            .split('"')
+            .skip_while(|part| *part != "pin")
+            .nth(2)
+            .expect("the signing script prints the pin")
+            .to_owned();
+        assert_eq!(pin.len(), 64, "{stdout}");
+
+        copy.verify(&pins(Some(&pin), None, None)).unwrap();
+        assert!(
+            copy.verify(&pins(Some(&"0".repeat(64)), None, None))
+                .is_err()
+        );
+        // Uppercase or otherwise malformed pins are refused, as before.
+        assert!(
+            copy.verify(&pins(Some(&pin.to_uppercase()), None, None))
+                .is_err()
+        );
+        // The development chain is trusted, but it is not the Artifact
+        // Signing root, so no publisher identity matches it ...
+        assert!(
+            copy.verify(&pins(
+                None,
+                Some("ArkDeck Development Daemon (host-trusted only)"),
+                Some(PROFILE_EKU)
+            ))
+            .is_err()
+        );
+        // ... and configuring one beside the certificate pin changes nothing
+        // for the development signer.
+        copy.verify(&pins(Some(&pin), Some("Contoso Ltd"), Some(PROFILE_EKU)))
+            .unwrap();
+    }
 
     #[test]
     fn token_headers_and_flexible_arrays_use_returned_length() {
@@ -590,6 +805,35 @@ mod tests {
         assert_eq!(information.groups().unwrap().len(), 1);
         information.length -= 1;
         assert!(information.groups().is_err());
+    }
+
+    /// The `WinVerifyTrust`-integrated publisher path against a real Artifact
+    /// Signing Public Trust signature, when the host has one:
+    /// `ARKDECK_PUBLISHER_SAMPLE` names a signed executable and
+    /// `ARKDECK_PUBLISHER_SAMPLE_ORGANIZATION` / `_EKU` its publisher (for
+    /// example the GitHub CLI's `gh.exe`, `GitHub, Inc.`). The file is only
+    /// opened and verified, never run.
+    #[test]
+    fn a_real_artifact_signing_publisher_is_matched_through_winverifytrust() {
+        let (Some(sample), Some(organization), Some(eku)) = (
+            std::env::var_os("ARKDECK_PUBLISHER_SAMPLE"),
+            std::env::var("ARKDECK_PUBLISHER_SAMPLE_ORGANIZATION").ok(),
+            std::env::var("ARKDECK_PUBLISHER_SAMPLE_EKU").ok(),
+        ) else {
+            eprintln!("ARKDECK_PUBLISHER_SAMPLE is not set; no real publisher is exercised");
+            return;
+        };
+        let path = PathBuf::from(sample);
+        let verify = |pins: &SignerPins| {
+            let file = File::open(&path)?;
+            verify_signature(&file, &path, pins)
+        };
+        verify(&pins(None, Some(&organization), Some(&eku))).unwrap();
+        assert!(verify(&pins(None, Some("Contoso Ltd"), Some(&eku))).is_err());
+        assert!(verify(&pins(None, Some(&organization), Some(PROFILE_EKU))).is_err());
+        // Its leaf is short-lived: a certificate pin on it is exactly what
+        // ruling 17 retires, and a wrong one fails.
+        assert!(verify(&pins(Some(&"0".repeat(64)), None, None)).is_err());
     }
 
     #[test]

@@ -180,6 +180,36 @@ class WorkspaceCacheTests(unittest.TestCase):
             self.write("rust/Cargo.lock", "new dependencies")
             self.assertNotEqual(cache.cache_outputs(self.source, str(self.root), "2026-09-28")["prefix"], first["prefix"])
 
+    def test_fallback_keeps_host_toolchain_image_flags_and_root_but_not_manifests(self):
+        environment = {"RUNNER_OS": "Windows", "RUNNER_ARCH": "X64", "ImageVersion": "20260922.246.2"}
+        with patch.object(cache.subprocess, "check_output", return_value="compiler-v1"), patch.dict(os.environ, environment):
+            first = cache.cache_outputs(self.source, str(self.root), "2026-09-28")
+            self.assertTrue(first["prefix"].startswith(first["fallback"]))
+            self.assertTrue(first["key"].startswith(first["prefix"]))
+            # The image is in clear, so retention can keep one entry per image.
+            self.assertTrue(first["fallback"].startswith("arkdeck-rust-build-v3-Windows-X64-image-20260922.246.2-"))
+            self.assertEqual(retention.RUST_KEY.fullmatch(first["key"])["image"], "20260922.246.2")
+            # Manifest churn: a new exact prefix, the same fallback.
+            for path, text in (("rust/Cargo.lock", "# new dependency\n"),
+                               ("rust/crates/new/Cargo.toml", '[package]\nname = "new"\n')):
+                self.write(path, text)
+                changed = cache.cache_outputs(self.source, str(self.root), "2026-09-28")
+                self.assertNotEqual(changed["prefix"], first["prefix"])
+                self.assertEqual(changed["fallback"], first["fallback"])
+            # Every other compatibility dimension still separates the fallback.
+            for variable, value in (("ImageVersion", "20260925.250.1"), ("RUNNER_OS", "Linux"),
+                                    ("RUSTFLAGS", "-C debuginfo=0"), ("CARGO_INCREMENTAL", "1")):
+                with patch.dict(os.environ, {variable: value}):
+                    self.assertNotEqual(cache.cache_outputs(self.source, str(self.root))["fallback"], first["fallback"])
+            self.assertNotEqual(cache.cache_outputs(self.source, str(self.root / "other"))["fallback"], first["fallback"])
+            with patch.object(cache.subprocess, "check_output", return_value="compiler-v2"):
+                self.assertNotEqual(cache.cache_outputs(self.source, str(self.root))["fallback"], first["fallback"])
+            self.write("rust/rust-toolchain.toml", '[toolchain]\nchannel = "beta"\n')
+            self.assertNotEqual(cache.cache_outputs(self.source, str(self.root))["fallback"], first["fallback"])
+            # An image string cannot forge the key's separators.
+            with patch.dict(os.environ, {"ImageVersion": "a-b/c d"}):
+                self.assertIn("-image-a_b_c_d-", cache.cache_outputs(self.source, str(self.root))["fallback"])
+
     def test_compaction_preserves_each_views_linked_products_and_debug_info(self):
         mirror = cache.prepare(self.source, self.root)
         targets = [mirror / "rust/target"]
@@ -324,6 +354,43 @@ class CacheRetentionTests(unittest.TestCase):
         same_path_other_host = entry(10)
         same_path_other_host["key"] = same_path_other_host["key"].replace("macOS-ARM64", "Linux-X64")
         self.assertEqual(retention.removals([entry(3), same_path_other_host]), [])
+
+    @staticmethod
+    def v3(n, image, size=700_000_000, version="win", host="Windows-X64", manifests="c"):
+        return {"id": n, "created_at": f"2026-09-{n:02d}", "version": version, "ref": "refs/heads/main",
+                "size_in_bytes": size,
+                "key": f"arkdeck-rust-build-v3-{host}-image-{image}-{'a' * 64}-{manifests * 64}-2026-09-{n:02d}"}
+
+    def test_keeps_the_newest_entry_of_a_second_image_but_never_a_third(self):
+        rows = [self.v3(1, "old"), self.v3(2, "img.1"), self.v3(3, "img.2"), self.v3(4, "img.1", manifests="d"),
+                self.v3(5, "img.2", manifests="d"), self.v3(6, "img.1", version="lin", host="Linux-X64")]
+        # 5 (img.2) is the newest Windows entry and 4 the newest of img.1; the
+        # older entries of either image and a third image go. Linux is its
+        # own format.
+        self.assertEqual(sorted(e["id"] for e in retention.removals(rows)), [1, 2, 3])
+        # One entry per image: the same image never takes the second slot.
+        self.assertEqual([e["id"] for e in retention.removals([self.v3(1, "img.1"), self.v3(2, "img.1")])], [1])
+        # A v2 key names no image, so it never takes the second slot.
+        v2 = {"id": 1, "created_at": "2026-09-01", "version": "win", "ref": "refs/heads/main", "size_in_bytes": 1,
+              "key": f"arkdeck-rust-build-v2-Windows-X64-{'a' * 64}-2026-09-01"}
+        self.assertEqual([e["id"] for e in retention.removals([v2, self.v3(2, "img.1")])], [1])
+
+    def test_other_image_entries_fit_the_rust_budget_and_never_displace_the_newest(self):
+        budget = retention.RUST_BUDGET_BYTES
+        rows = [self.v3(1, "a", size=budget // 4, version="w1"), self.v3(2, "b", size=budget // 4, version="w1"),
+                self.v3(3, "a", size=budget // 4, version="w2"), self.v3(4, "b", size=budget // 4, version="w2"),
+                self.v3(5, "a", size=budget // 4, version="w3"), self.v3(6, "b", size=budget // 4, version="w3")]
+        # Primaries 2, 4 and 6 take three quarters; only the newest other-image
+        # entry (5) fits, the older ones (3, 1) are deleted.
+        self.assertEqual(sorted(e["id"] for e in retention.removals(rows)), [1, 3])
+        # Primaries alone over the budget are all kept, as before this rule.
+        huge = [self.v3(1, "a", size=budget, version="w1"), self.v3(2, "b", size=budget, version="w1"),
+                self.v3(3, "a", size=budget, version="w2")]
+        self.assertEqual([e["id"] for e in retention.removals(huge)], [1])
+        # Other families are neither counted nor deleted.
+        other = {"id": 9, "created_at": "2026-09-09", "version": "w1", "ref": "refs/heads/main",
+                 "size_in_bytes": 10 * budget, "key": "arkdeck-swiftpm-v2-macOS-ARM64-xcode-27.0-image-x-y"}
+        self.assertEqual(retention.removals(rows[:2] + [other]), [])
 
     def test_write_authority_requires_successful_same_repository_main_ci(self):
         event = {"repository": {"full_name": "o/r"}, "workflow_run": {

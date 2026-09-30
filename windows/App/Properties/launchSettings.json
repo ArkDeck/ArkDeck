@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "ArkDeck (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "ArkDeck (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
