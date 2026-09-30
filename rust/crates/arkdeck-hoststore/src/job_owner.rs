@@ -30,7 +30,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "mutation_state_continuity.rs"]
 mod mutation_state_continuity;
 #[cfg(target_os = "macos")]
@@ -73,7 +73,7 @@ pub struct JobStore {
     /// The retained Sessions the last complete continuity scan let pass, in
     /// memory only (`mutation_state_continuity.rs`). Taken only under
     /// `activity`.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     session_verdicts: std::sync::Mutex<mutation_state_continuity::SessionVerdicts>,
 }
 const RECORD_BOUND: usize = 16 * 1024 * 1024;
@@ -242,7 +242,7 @@ impl JobStore {
             hdc_lifecycle: std::sync::RwLock::new(()),
             hdc_recomposition: std::sync::atomic::AtomicBool::new(false),
             resident: Default::default(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             session_verdicts: Default::default(),
         })
     }

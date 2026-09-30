@@ -753,25 +753,73 @@ impl PublicationSource<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::{PermissionsExt, symlink};
+    use crate::test_private::{create_private_directories, owner_only_file};
+
+    /// A link at `path` to `target`, which need not exist: a symbolic link
+    /// on macOS; on Windows, where one needs a privilege, a directory
+    /// junction, the reparse point any user may make.
+    fn link_to(target: &Path, path: &Path) {
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, path).unwrap();
+        #[cfg(windows)]
+        {
+            let made = std::process::Command::new("cmd")
+                .args(["/d", "/c", "mklink", "/J"])
+                .arg(path)
+                .arg(target)
+                .stdin(std::process::Stdio::null())
+                .output()
+                .unwrap();
+            assert!(made.status.success(), "{made:?}");
+        }
+    }
+
+    /// Removes the link at `path`, never what it names: a symbolic link is
+    /// a file on macOS, a junction a directory on Windows.
+    fn remove_link(path: &Path) {
+        #[cfg(unix)]
+        std::fs::remove_file(path).unwrap();
+        #[cfg(windows)]
+        std::fs::remove_dir(path).unwrap();
+    }
+
+    /// Whether `path` is a link, not followed.
+    fn is_link(path: &Path) -> bool {
+        let metadata = std::fs::symlink_metadata(path).unwrap();
+        #[cfg(unix)]
+        return metadata.file_type().is_symlink();
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            // FILE_ATTRIBUTE_REPARSE_POINT
+            metadata.file_attributes() & 0x400 != 0
+        }
+    }
 
     struct Fixture {
         base: PathBuf,
         root: PathBuf,
         jobs: JobStore,
+        /// Dropped last, once the Job store has closed its index: NTFS
+        /// removes no directory holding a file still open.
+        _removed: Removed,
     }
+    /// The fixture's directory, removed when dropped.
+    struct Removed(PathBuf);
     impl Fixture {
         fn new() -> Self {
             let id = arkdeck_contract::sha256_hex(&arkdeck_platform::random_bytes::<16>().unwrap());
-            let base = std::env::temp_dir()
-                .canonicalize()
-                .unwrap()
-                .join(format!("mutation-continuity-{id}"));
+            let base =
+                crate::test_private::temporary_root().join(format!("mutation-continuity-{id}"));
             let root = base.join("Runtime");
-            std::fs::create_dir_all(&root).unwrap();
-            std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+            create_private_directories(&root);
             let jobs = JobStore::open_owner(&root).unwrap();
-            Self { base, root, jobs }
+            Self {
+                _removed: Removed(base.clone()),
+                base,
+                root,
+                jobs,
+            }
         }
         fn check(&self) -> Result<(), WireError> {
             self.jobs.require_mutation_state(&self.root, &[])
@@ -787,14 +835,14 @@ mod tests {
         }
         fn file(&self, relative: &str, bytes: &[u8]) {
             let path = self.base.join(relative);
-            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            create_private_directories(path.parent().unwrap());
             std::fs::write(&path, bytes).unwrap();
-            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+            owner_only_file(&path);
         }
     }
-    impl Drop for Fixture {
+    impl Drop for Removed {
         fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.base);
+            let _ = std::fs::remove_dir_all(&self.0);
         }
     }
 
@@ -821,10 +869,7 @@ mod tests {
         let fixture = Fixture::new();
         let relative = "Runtime/jobs/job-one/job-record.json";
         let parent = fixture.root.join("jobs");
-        std::fs::create_dir_all(parent.join("job-one")).unwrap();
-        for path in [&parent, &parent.join("job-one")] {
-            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)).unwrap();
-        }
+        create_private_directories(&parent.join("job-one"));
         fixture.file(relative, br#"{"request":{},"actualEffect":"readOnly"}"#);
         assert!(fixture.check().is_ok());
         for bytes in [
@@ -870,11 +915,6 @@ mod tests {
     fn retained_session_mutation_and_torn_tail_block_even_with_checkpoint() {
         let fixture = Fixture::new();
         fixture.file("Runtime/capabilities/runtime-capabilities.json", b"{}");
-        std::fs::set_permissions(
-            fixture.root.join("capabilities"),
-            std::fs::Permissions::from_mode(0o700),
-        )
-        .unwrap();
         let original = include_bytes!(
             "../../../tests/fixtures/pointer-input/store/jobs/job-50242330d29da200cc17ae91a74808d1/journal.jsonl"
         );
@@ -937,7 +977,8 @@ mod tests {
                 .is_err()
         );
         if fixture.base.join("Sessions").exists() {
-            // APFS case-insensitive spelling must inspect the same real root.
+            // A case-insensitive spelling (APFS, NTFS) must inspect the same
+            // real root.
             assert!(fixture.check().is_err());
             std::fs::write(
                 fixture
@@ -953,25 +994,19 @@ mod tests {
     #[test]
     fn symlinked_roots_and_retired_state_are_not_followed() {
         let fixture = Fixture::new();
-        symlink(
-            fixture.base.join("missing"),
-            fixture.base.join("AuthorizationUsage"),
-        )
-        .unwrap();
-        assert!(fixture.check().is_err());
-        std::fs::remove_file(fixture.base.join("AuthorizationUsage")).unwrap();
-        symlink(
-            fixture.base.join("elsewhere"),
-            fixture.base.join("Sessions"),
-        )
-        .unwrap();
-        assert!(fixture.check().is_err());
-        assert!(
-            std::fs::symlink_metadata(fixture.base.join("Sessions"))
-                .unwrap()
-                .file_type()
-                .is_symlink()
+        link_to(
+            &fixture.base.join("missing"),
+            &fixture.base.join("AuthorizationUsage"),
         );
+        assert!(fixture.check().is_err());
+        remove_link(&fixture.base.join("AuthorizationUsage"));
+        create_private_directories(&fixture.base.join("elsewhere"));
+        link_to(
+            &fixture.base.join("elsewhere"),
+            &fixture.base.join("Sessions"),
+        );
+        assert!(fixture.check().is_err());
+        assert!(is_link(&fixture.base.join("Sessions")));
     }
 
     #[test]
@@ -981,8 +1016,7 @@ mod tests {
         // listed it finds it gone, as Swift's scan may, and skips it.
         let fixture = Fixture::new();
         let sessions = fixture.base.join("Sessions");
-        std::fs::create_dir(&sessions).unwrap();
-        std::fs::set_permissions(&sessions, std::fs::Permissions::from_mode(0o700)).unwrap();
+        create_private_directories(&sessions);
         let root = HostDirectory::open_session_tree(&sessions).unwrap();
         let previous = HashMap::new();
         let mut verdicts = Verdicts {
@@ -1120,7 +1154,7 @@ mod tests {
         assert_eq!(fixture.scan(SETTLED), full());
         let replacement = journal.with_file_name("journal.jsonl.new");
         std::fs::write(&replacement, &changed).unwrap();
-        std::fs::set_permissions(&replacement, std::fs::Permissions::from_mode(0o600)).unwrap();
+        owner_only_file(&replacement);
         std::fs::rename(&replacement, &journal).unwrap();
         assert_ne!(identity(&journal).inode, before.inode);
         assert!(full().is_err());

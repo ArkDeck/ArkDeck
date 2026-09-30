@@ -382,7 +382,7 @@ impl Host {
     /// Swift's daemon startup `collectGarbage`: the expired Artifacts this
     /// host's owners may reclaim, reclaimed now, or why nothing more was;
     /// `None` without a Job and an Artifact owner.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn collect_expired_artifacts(&self) -> Option<Result<Vec<String>, String>> {
         let (jobs, artifacts) = (self.jobs.as_ref()?, self.artifacts.as_ref()?);
         Some(match arkdeck_hoststore::runtime_now() {
@@ -638,8 +638,9 @@ impl Host {
     }
     /// The installed Runtime's own state root, which a device mutation
     /// proves its continuity against: the production composition names it
-    /// from the same account home as every other root it composes.
-    #[cfg(target_os = "macos")]
+    /// from the same account home as every other root it composes (on
+    /// Windows, `windows_lifecycle::Authority::compose`).
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn with_mutation_root(mut self, root: std::path::PathBuf) -> Self {
         self.default_mutation_root = Some(root);
         self
@@ -1322,6 +1323,7 @@ impl Host {
         [
             ("jobs", self.jobs.is_some()),
             ("capabilities", self.capabilities.is_some()),
+            ("mutationAuthority", self.authority().is_some()),
             ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
             ("storage", self.storage.is_some()),
@@ -1398,7 +1400,8 @@ impl Host {
                 .map(std::path::PathBuf::from)
                 .filter(|home| home.is_absolute())
                 .map(|home| home.join("Library/Application Support/ArkDeck/Agentd")),
-            // No mutation authority is composed on Windows yet.
+            // Named by the composition over a state root
+            // (`windows_lifecycle::Authority::mutation_root`).
             #[cfg(windows)]
             default_mutation_root: None,
             #[cfg(any(target_os = "macos", windows))]
@@ -2490,7 +2493,7 @@ impl HostServices for Host {
     /// `capability.list` and `capability.inspect` read the capability store as
     /// the Swift daemon reads it, under the store's lock; nothing mints,
     /// reserves or settles a use here.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn capability_resource(
         &self,
         method: &str,

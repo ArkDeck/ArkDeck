@@ -284,7 +284,7 @@ fn recorded_sessions_are_served_exported_and_cleaned_up_across_a_restart() {
     let pipe = daemon.serving();
     assert!(
         daemon.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, targets, artifacts, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
                 .to_owned()
         ),
         "{:?}",

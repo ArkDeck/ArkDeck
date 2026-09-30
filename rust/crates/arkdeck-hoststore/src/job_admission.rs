@@ -20,19 +20,16 @@
 //! executor.
 //!
 //! On Windows (TASK-XPA-005, GJ-1) the same admission runs over the same
-//! members. The mutation authority is the same type, but its proof of the
-//! Runtime's mutation state fails closed there (the Job owner's continuity
-//! census is not built on Windows yet) and no daemon composes one; the
-//! ArkForge Flash lane (`FlashAdmitter`, AF-W1) and the Agent engine that
-//! `submit_for_agent` serves are not built. So nothing above `readOnly` is
-//! admitted on Windows, as macOS admits nothing above it without an
-//! authority.
+//! members: the mutation authority proves the Runtime's mutation state with
+//! the same continuity census, and a device mutation is preauthorized against
+//! the capability store as on macOS. The workspace subject
+//! (`preauthorize_workspace`, XPA-011) and the ArkForge Flash lane
+//! (`FlashAdmitter`, AF-W1) are not built there: a workspace mutation is
+//! refused as one without its provider.
 use crate::JobStore;
 use crate::capability_policy::DeviceHolds;
-#[cfg(target_os = "macos")]
 use crate::capability_policy::{self, IssueFailure};
 use crate::capability_store::CapabilityStore;
-#[cfg(target_os = "macos")]
 use crate::capability_store::{CapabilityQuery, CapabilityStoreError, Effect};
 use crate::job_journal_events::{self, Envelope};
 use crate::job_journal_writer::JournalWriter;
@@ -159,7 +156,6 @@ fn default_read_only(
     )
 }
 
-#[cfg(target_os = "macos")]
 /// Swift `denialCode(of:)`: the machine-readable half of a capability
 /// refusal. Only decisions are named; a store fault is `unclassified`.
 fn denial_code(error: &CapabilityStoreError) -> &'static str {
@@ -214,7 +210,6 @@ impl MutationAuthority<'_> {
         self.prove(jobs, status.as_ref()).is_ok()
     }
 
-    #[cfg(target_os = "macos")]
     fn prove(
         &self,
         jobs: &JobStore,
@@ -232,22 +227,6 @@ impl MutationAuthority<'_> {
             roots.push(std::path::PathBuf::from(root));
         }
         jobs.require_mutation_state(self.default_root, &roots)
-    }
-
-    /// The Job owner's mutation-state continuity census
-    /// (`mutation_state_continuity.rs`) is not built on Windows yet, so the
-    /// state is never proved there: every device mutation fails closed.
-    #[cfg(windows)]
-    fn prove(
-        &self,
-        _jobs: &JobStore,
-        _status: Option<&Value>,
-    ) -> Result<(), arkdeck_contract::WireError> {
-        Err(arkdeck_contract::WireError {
-            code: "recordUnreadable".into(),
-            message: "the Runtime mutation state's continuity is not proved on Windows yet".into(),
-            details: None,
-        })
     }
 }
 
@@ -312,7 +291,6 @@ impl JobAdmitter<'_> {
         // Swift `repairProvablyTerminalCapabilityOutcomeGaps`, before the
         // plan is materialized: a use whose Job's journal already proves it
         // settled is recorded again, and nothing is dispatched.
-        #[cfg(target_os = "macos")]
         if !matches!(effect.as_str(), "hostOnly" | "readOnly")
             && let (Some(revision), Some(authority)) =
                 (request.expected_binding_revision, self.authority)
@@ -395,7 +373,6 @@ impl JobAdmitter<'_> {
     /// admission, and nothing is consumed yet. A destructive effect and the
     /// Runtime-capability policy are not served yet; a workspace subject is
     /// `preauthorize_workspace`'s.
-    #[cfg(target_os = "macos")]
     fn preauthorize(
         &self,
         request: &OperationRequest,
@@ -412,6 +389,7 @@ impl JobAdmitter<'_> {
                 ),
             )
         };
+        #[cfg(target_os = "macos")]
         if descriptor.provider == "workspace" {
             return self.preauthorize_workspace(request, descriptor, effect, materialized);
         }
@@ -657,25 +635,6 @@ impl JobAdmitter<'_> {
                 )
             })?;
         Ok(capability)
-    }
-
-    /// Without a capability authority nothing above `readOnly` is admitted,
-    /// as macOS refuses it without one.
-    #[cfg(windows)]
-    fn preauthorize(
-        &self,
-        _request: &OperationRequest,
-        descriptor: &CatalogOperation,
-        _effect: &str,
-        _materialized: &Materialized<'_>,
-    ) -> Result<String, AdmissionRefusal> {
-        Err(refused(
-            "rejected",
-            format!(
-                "{} needs a Runtime capability, which the Rust Runtime does not issue yet",
-                descriptor.reference()
-            ),
-        ))
     }
 
     /// Swift `currentCatalogDuplicate` and the reviewed-plan check of a
