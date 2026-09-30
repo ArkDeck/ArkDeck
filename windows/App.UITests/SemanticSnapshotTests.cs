@@ -17,7 +17,7 @@ public sealed class SemanticSnapshotTests
     public TestContext TestContext { get; set; } = null!;
 
     public static IEnumerable<object[]> Scenarios() =>
-        from scenario in new[] { "foundation", "unavailable", "contract-mismatch", "jobs" }
+        from scenario in new[] { "foundation", "unavailable", "contract-mismatch", "jobs", "targets", "inspector" }
         from language in new[] { "en-US", "zh-Hans" }
         select new object[] { scenario, language };
 
@@ -37,6 +37,11 @@ public sealed class SemanticSnapshotTests
         foreach (var snapshot in snapshots)
         {
             app.Navigate(snapshot.Page);
+            foreach (var step in snapshot.Steps)
+            {
+                if (step.Action == "select") app.Select(step.AutomationId);
+                else app.Invoke(step.AutomationId);
+            }
             foreach (var expected in snapshot.Elements)
             {
                 var element = app.TryFind(expected.AutomationId, AppSession.Timeout);
