@@ -374,6 +374,23 @@ fn cleanup_preview(value: &Value) -> Result<(), CliError> {
     Ok(())
 }
 
+/// An absolute path as the daemon spells a Session export's: `/…`, or on
+/// Windows a local drive's `D:\…`.
+#[cfg(not(windows))]
+fn absolute(path: &str) -> bool {
+    path.starts_with('/')
+}
+
+#[cfg(windows)]
+fn absolute(path: &str) -> bool {
+    use std::path::{Component, Path, Prefix};
+    let mut components = Path::new(path).components();
+    matches!(
+        components.next(),
+        Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::Disk(_))
+    ) && components.next() == Some(Component::RootDir)
+}
+
 #[cfg(test)]
 mod cleanup_tests {
     use super::*;
@@ -490,7 +507,7 @@ fn export_preview(value: &Value) -> Result<(), CliError> {
                 "expectedState",
             ],
         )
-        || !dest["path"].as_str().is_some_and(|s| s.starts_with('/'))
+        || !dest["path"].as_str().is_some_and(absolute)
         || decimal(&dest["parentDevice"]).is_none()
         || decimal(&dest["parentInode"]).is_none()
         || !dest["volumeIdentity"]
@@ -563,11 +580,21 @@ mod export_tests {
     use super::*;
     use arkdeck_contract::{canonical_json, sha256_hex};
     use serde_json::json;
+    /// The macOS daemon's recorded preview; on Windows its destination
+    /// spelled as a Windows daemon spells it, and signed again.
     fn preview() -> Value {
         let record: Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/session-export/rust-export-ready.json"
         ))
         .unwrap();
+        #[cfg(windows)]
+        {
+            let mut value = record["preview"].clone();
+            assert!(export_preview(&value).is_err(), "a POSIX destination");
+            value["destination"]["path"] = json!(r"C:\exports\session-export");
+            sign(value)
+        }
+        #[cfg(not(windows))]
         record["preview"].clone()
     }
     fn sign(mut value: Value) -> Value {
@@ -693,9 +720,7 @@ fn export_result(value: &Value) -> Result<(), CliError> {
         || !digest(&value["previewDigest"])
         || !value["sessionId"].as_str().is_some_and(valid_correlation)
         || !value["publishedAtUtc"].as_str().is_some_and(plain_date)
-        || !value["exportedPath"]
-            .as_str()
-            .is_some_and(|s| s.starts_with('/'))
+        || !value["exportedPath"].as_str().is_some_and(absolute)
         || value["deviceIdentifierPolicy"] != "redact"
         || value["evidenceClass"] != "derivedExport"
         || value["newDispatchCount"] != 0
@@ -729,11 +754,21 @@ fn export_result(value: &Value) -> Result<(), CliError> {
 mod export_result_tests {
     use super::*;
     use serde_json::json;
+    /// The macOS daemon's recorded result; on Windows its exported path
+    /// spelled as a Windows daemon spells it.
     fn actual() -> Value {
         let record: Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/session-export/rust-export-applied.json"
         ))
         .unwrap();
+        #[cfg(windows)]
+        {
+            let mut value = record["result"].clone();
+            assert!(export_result(&value).is_err(), "a POSIX exported path");
+            value["exportedPath"] = json!(r"C:\exports\session-export");
+            value
+        }
+        #[cfg(not(windows))]
         record["result"].clone()
     }
     #[test]

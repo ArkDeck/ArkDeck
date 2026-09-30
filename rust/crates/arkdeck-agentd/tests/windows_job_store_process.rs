@@ -450,7 +450,8 @@ fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: targets, artifacts, jobs, workspaceProjects".to_owned()
+            &"arkdeck-agentd owners: targets, artifacts, jobs, storage, workspaceProjects"
+                .to_owned()
         ),
         "{:?}",
         first.seen

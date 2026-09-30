@@ -30,6 +30,9 @@ mod import_upload;
 pub use import_upload::{
     HostImportSource, HostUploadFile, HostUploadReader, UploadChunkCheckpoint, UploadWritePoint,
 };
+#[path = "host_session_removal.rs"]
+mod session_removal;
+pub use session_removal::PreparedSessionRemoval;
 
 pub struct HostDirectory(pub(super) File, pub(super) Ownership);
 

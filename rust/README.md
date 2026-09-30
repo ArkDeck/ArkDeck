@@ -946,13 +946,47 @@ The writer now closes every handle below its staged Session before renaming
 it (Windows renames no directory while a handle below it is open); nothing
 else changes, on either OS.
 
-Still macOS-only: the Session cleanup and export owners (their previews,
-plans and records, and the host store's Session removal), the Artifact usage
-owner the daemon's `runtime.storage.*` answers pair the Session domain with,
-and the Job runners, cancellation and reconciliation that call the writer.
-So the Windows daemon composes no Session owner yet; it serves `job.list`
-and `job.timeline` through the Job store's pager, with cursors that read on
-across a restart. The one-page `job.list` answer without the pager is gone.
+The Session cleanup and export owners (their previews, plans, records and
+censuses) and the Artifact usage owner are on Windows too (slice H3b, below).
+Still macOS-only: the Job runners, cancellation and reconciliation that call
+the writer. `job.list` and `job.timeline` page through the Job store's pager
+on Windows, with cursors that read on across a restart; the one-page
+`job.list` answer without the pager is gone.
+
+### Windows Session cleanup, export and storage (H3b)
+
+`arkdeck-platform` removes a Session on NTFS (`PreparedSessionRemoval`,
+`windows/host_session_removal.rs`, after W1's Trace removal): the same
+bounded capture of the year/month/Session tree (owner, single link, no
+reparse point, every file digested), each removal deleting through a handle
+opened relative to its held parent and compared with the capture just
+before, so a replacement is never removed; NTFS refuses to move an ancestor
+of a prepared tree away while its handles are held. `arkdeck-hoststore`
+builds the Session cleanup and export owners (`session.cleanup.preview` and
+`apply`, `session.export.preview` and `apply`), their records and censuses,
+and `ArtifactUsage` on Windows; a Session export destination is absolute as
+the Session root is (`session::absolute_root`), and its physical spelling is
+E1's. The CLI's Session answer checks take the same Windows spelling. Their
+unit tests run on Windows (fixtures made owner-only by `test_private`;
+where Unix renames a held Sessions root away and the cleanup refuses, NTFS
+refuses the rename and the cleanup applies to the root it proved).
+
+The Windows daemon composes the Session owner (`storage` in its census):
+`session-state` and a default Sessions root `sessions` in private children of
+its root, the macOS isolated names, isolated to the development root as on
+macOS (its reserved owners' directories are never a Sessions root); the
+account's root keeps both below `Agentd` until the Windows App names its
+Sessions location. `runtime.storage.status|policy|root` pair the Session
+domain with the Artifact usage of `artifacts`, and a start removes the
+staged Sessions a crash left (`recover_staged_sessions`), as on macOS.
+`tests/windows_session_owner.rs` (hoststore) replays every frame of the
+Swift storage lock-wait oracle, its Artifact domain and
+`session.export.preview` included;
+`arkdeck-agentd/tests/windows_session_owner_process.rs` serves the recorded
+Swift Sessions over the real daemon (status, list, show, pin, export,
+cleanup, and the same cleanup receipt after a restart) and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-session-cleanup-run.md`.
 
 Tests on Windows: the pager's own tests and the Job list stream tests run
 there as on macOS (their owner-only and unsafe fixtures made by
@@ -2283,8 +2317,8 @@ The Artifact read, inspect, list and export owner (`ArtifactReadStore`,
 `ArtifactReadRequest`, `ArtifactInspectRequest`, `ArtifactExportRequest`) is
 built on Windows over the host store's NTFS export, file-export and
 payload-cache primitives (`crates/arkdeck-platform/README.md`), with the same
-Job index documents, payloads and snapshot pages as macOS; its Import owner,
-usage and quota answers stay macOS-only. An export destination on Windows is a
+Job index documents, payloads and snapshot pages as macOS; its Import owner
+and quota answer stay macOS-only (the usage owner is on Windows, H3b). An export destination on Windows is a
 local drive's absolute path (`C:\…`), `.` and `..` resolved and the drive
 letter upper-case, which must be the directory's own spelling (no junction,
 link, short name or other case); the receipt's `exportedPath` joins the file
@@ -2305,18 +2339,10 @@ recorded bytes and digests and reproduces the Swift daemon's recorded
 (agentd) records the Job into the daemon's Job store, answers `artifact list`,
 `inspect`, `read` and `export` over the real daemon's pipe before and after a
 restart and, with
-a Job, which the Job owner proves before anything is read, listed or exported;
-no Job owner is composed on Windows yet, so `artifact list`, `inspect`, `read`
-and `export` answer `operationUnavailable` ("Artifact Job owner is
-unavailable") and touch nothing, as the macOS daemon answers without a Job
-owner. `tests/windows_artifact_owners.rs` (hoststore) reads and exports the
-macOS-recorded Artifacts of `rust/tests/fixtures/agent-execution` with their
-recorded bytes and digests and reproduces the Swift daemon's recorded
-`artifact.inspect`/`artifact.read` frames; `tests/windows_artifact_owner_process.rs`
-(agentd) runs the real daemon over its pipe and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in

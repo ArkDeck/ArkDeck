@@ -42,7 +42,7 @@ fn job_owner_not_configured() -> WireError {
 }
 
 /// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
 
 /// The lane and per-action host are shared by direct and background Jobs.
@@ -102,7 +102,7 @@ pub struct Host {
     quarantined: std::sync::OnceLock<Vec<(String, String)>>,
     /// The staged Session entries the start kept in the active Sessions
     /// root, and why (`recover_staged_sessions`); `doctor` names them.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     staged_kept: std::sync::OnceLock<Vec<(String, String)>>,
     #[cfg(target_os = "macos")]
     imports: Option<std::sync::Arc<arkdeck_hoststore::ImportUploadStore>>,
@@ -134,7 +134,7 @@ pub struct Host {
     workspace: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceComposition>>,
     #[cfg(target_os = "macos")]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     storage: Option<
         std::sync::Arc<(
             arkdeck_hoststore::SessionStore,
@@ -163,7 +163,7 @@ pub struct Host {
     default_mutation_root: Option<std::path::PathBuf>,
     /// Swift `HostStorageCoordinator`'s claims, held by the Session
     /// publications this process makes.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     claims: std::sync::Arc<arkdeck_hoststore::StorageClaims>,
     /// The isolated owner's development HDC: the executable its
     /// device-bound Jobs dispatch to, through the process dispatch every HDC
@@ -285,7 +285,7 @@ impl Host {
     /// (`SessionPublisher::recover_staged`); nothing is published again. A
     /// recovery that cannot read staging keeps it all. None without a Job and
     /// a Session owner.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn recover_staged_sessions(&self) -> Option<arkdeck_hoststore::StagedRecovery> {
         let (Some(storage), Some(jobs)) = (self.storage.as_deref(), self.jobs.as_deref()) else {
             return None;
@@ -808,14 +808,6 @@ impl Host {
             .read_snapshot(job_id)
             .map(|_| ())
     }
-    /// The Windows daemon composes no Job owner yet (its store follows the
-    /// Job index on SQLite), so every Artifact a Job owns is refused as the
-    /// macOS daemon refuses it without one: before any Artifact is read,
-    /// listed or exported.
-    #[cfg(windows)]
-    fn require_artifact_job(&self, _job_id: &str) -> Result<(), WireError> {
-        Err(job_owner_not_configured())
-    }
     #[cfg(target_os = "macos")]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
         self.trace_cache = Some(cache);
@@ -829,7 +821,7 @@ impl Host {
         Ok(self)
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_storage(
         mut self,
         sessions: arkdeck_hoststore::SessionStore,
@@ -1216,6 +1208,7 @@ impl Host {
             ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
             ("jobs", self.jobs.is_some()),
+            ("storage", self.storage.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
@@ -1242,7 +1235,7 @@ impl Host {
         Self {
             #[cfg(target_os = "macos")]
             quarantined: std::sync::OnceLock::new(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             staged_kept: std::sync::OnceLock::new(),
             #[cfg(target_os = "macos")]
             imports: None,
@@ -1267,7 +1260,7 @@ impl Host {
             workspace: None,
             #[cfg(target_os = "macos")]
             trace_cache: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             storage: None,
             unavailable,
             observations: Mutex::new(ObservationState::default()),
@@ -1285,7 +1278,7 @@ impl Host {
                 .map(std::path::PathBuf::from)
                 .filter(|home| home.is_absolute())
                 .map(|home| home.join("Library/Application Support/ArkDeck/Agentd")),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             claims: Default::default(),
             #[cfg(target_os = "macos")]
             hdc: None,
@@ -2484,7 +2477,7 @@ impl HostServices for Host {
             .inspect(kind, reference)
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn session_resource(
         &self,
         method: &str,
@@ -2606,7 +2599,7 @@ impl HostServices for Host {
             sessions.handle_resource(method, params)
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn runtime_storage(
         &self,
         method: &str,

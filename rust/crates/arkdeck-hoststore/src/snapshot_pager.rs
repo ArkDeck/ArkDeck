@@ -1026,8 +1026,6 @@ mod tests {
     }
 }
 
-// Unix fixtures (mode bits, symbolic links); the Windows owners are proved
-// by `tests/windows_artifact_owners.rs`.
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 #[path = "snapshot_pager_tests.rs"]
 mod bounded_tests;

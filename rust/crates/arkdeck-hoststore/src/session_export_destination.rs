@@ -83,7 +83,8 @@ pub fn session_export_destination_facts(
             "Session export destination must be an absent path outside Runtime storage with an owned physical parent",
         )
     };
-    if !path.starts_with('/')
+    // Absolute: `/…`, or on Windows a local drive's `D:\…`.
+    if !crate::session::absolute_root(path)
         || path.len() > 4096
         || path.chars().next().is_some_and(host_whitespace_or_newline)
         || path

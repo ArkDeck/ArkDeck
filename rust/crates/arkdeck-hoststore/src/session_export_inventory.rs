@@ -389,20 +389,15 @@ impl SessionExportSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt},
-        path::PathBuf,
-    };
+    use crate::test_private::owner_only_file;
+    use std::{fs, path::PathBuf};
     struct Root(PathBuf);
     impl Root {
         fn new() -> Self {
             let nonce = u128::from_le_bytes(arkdeck_platform::random_bytes().unwrap());
-            let path = std::env::temp_dir()
-                .canonicalize()
-                .unwrap()
-                .join(format!("export-source-{nonce:x}"));
-            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            let path =
+                crate::test_private::temporary_root().join(format!("export-source-{nonce:x}"));
+            crate::test_private::create_private_directories(&path);
             Self(path)
         }
         fn config(&self) -> Vec<u8> {
@@ -413,11 +408,7 @@ mod tests {
         }
         fn session(&self, id: &str) -> PathBuf {
             let path = self.0.join("2026/07").join(id);
-            fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(&path)
-                .unwrap();
+            crate::test_private::create_private_directories(&path);
             let timestamp = "2026-07-01T00:00:00Z";
             let job = format!("job-{id}");
             let manifest = json!({"schemaVersion":"1.0.0","appVersion":"1.0.0-test","coreSpecBaseline":"CORE-2.0.0","platformProfile":"macos-1.0.0",
@@ -435,7 +426,7 @@ mod tests {
                 ),
             ] {
                 fs::write(path.join(name), serde_json::to_vec(&value).unwrap()).unwrap();
-                fs::set_permissions(path.join(name), fs::Permissions::from_mode(0o600)).unwrap();
+                owner_only_file(&path.join(name));
             }
             path
         }
@@ -481,7 +472,7 @@ mod tests {
             let path = session.join(record["relativePath"].as_str().unwrap());
             fs::create_dir_all(path.parent().unwrap()).unwrap();
             fs::write(&path, &payloads[record["id"].as_str().unwrap()]).unwrap();
-            fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+            owner_only_file(&path);
         }
         let snapshot = root.snapshot(id).unwrap();
         let target = destination_root.0.join("published");

@@ -72,3 +72,73 @@ pub(crate) fn link(outside: &Path, path: &Path) {
     #[cfg(windows)]
     std::fs::hard_link(outside, path).unwrap();
 }
+
+/// The temporary directory in its canonical spelling: `canonicalize` on
+/// macOS; on Windows a local drive's plain spelling (`D:\…`), which the
+/// Session owner compares its roots with.
+pub(crate) fn temporary_root() -> std::path::PathBuf {
+    let path = std::env::temp_dir().canonicalize().unwrap();
+    #[cfg(windows)]
+    let path = match path.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+        Some(plain) => std::path::PathBuf::from(plain),
+        None => path,
+    };
+    path
+}
+
+/// Creates `path` and every missing ancestor as owner-only directories: mode
+/// 0700 on macOS; on Windows each with the store's owner-only DACL, which a
+/// file or directory std creates below it then inherits.
+pub(crate) fn create_private_directories(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)
+            .unwrap();
+    }
+    #[cfg(windows)]
+    {
+        let missing: Vec<&Path> = path
+            .ancestors()
+            .take_while(|level| std::fs::symlink_metadata(level).is_err())
+            .collect();
+        for level in missing.into_iter().rev() {
+            arkdeck_platform::HostDirectory::open_or_create_private(level).unwrap();
+        }
+    }
+}
+
+/// Makes the file at `path` owner read/write only: mode 0600 on macOS. On
+/// Windows a file std writes in an owner-only directory already inherits its
+/// owner-only DACL, so nothing changes.
+pub(crate) fn owner_only_file(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    #[cfg(windows)]
+    let _ = path;
+}
+
+/// The file identity of the entry at `path`: its device and inode on macOS;
+/// its volume serial and NTFS file id on Windows.
+pub(crate) fn file_id(path: &Path) -> (u64, u64) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let metadata = std::fs::symlink_metadata(path).unwrap();
+        (metadata.dev(), metadata.ino())
+    }
+    #[cfg(windows)]
+    {
+        let identity = arkdeck_platform::HostDirectory::open_export_parent(path.parent().unwrap())
+            .unwrap()
+            .file_identity(path.file_name().unwrap().to_str().unwrap())
+            .unwrap();
+        (identity.device, identity.inode)
+    }
+}

@@ -344,8 +344,8 @@ mod history_owner;
 #[cfg(target_os = "macos")]
 pub use history_owner::HistoryStore;
 // The Session storage owner (`runtime.storage.*`, `session.list`, `show`,
-// `pin`, `unpin`) and the storage hold a publication registers under, on
-// macOS and Windows; its cleanup and export are still macOS-only.
+// `pin`, `unpin`, `session.cleanup.*`, `session.export.*`) and the storage
+// hold a publication registers under, on macOS and Windows.
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_owner;
@@ -355,17 +355,17 @@ mod session_owner;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod snapshot_pager;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_owner::ActiveSessions;
 #[cfg(any(target_os = "macos", windows))]
 pub use session_owner::SessionStore;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod session_cleanup_plan;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_cleanup_plan::{CleanupCandidate, CleanupPlan, plan_session_cleanup};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod session_cleanup_records;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_cleanup_records::{
     CleanupRecord, CleanupState, SessionCleanupRecords, SessionExportRecords,
 };
@@ -374,29 +374,29 @@ pub use session_cleanup_records::{
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_export_destination;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_export_destination::session_export_destination_facts;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_inventory::{CleanupSession, CleanupSnapshot, session_cleanup_snapshot};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_inventory::{SessionExportSnapshot, session_export_snapshot};
-// The Artifact index decoder the read owner shares; the usage and quota
-// answers are still macOS-only.
+// The Artifact index decoder the read owner shares, and the usage answer
+// `runtime.storage.*` carries; the quota answer is still macOS-only.
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod artifact_usage;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use artifact_usage::ArtifactUsage;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod session_export_artifacts;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_export_artifacts::{
     ExportArtifactMeasurement, PlannedExportArtifact, PreparedSessionExport,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod session_export_manifest;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use session_export_manifest::{RedactedSessionManifest, redact_session_manifest_fields};
 mod session_export_redaction;
 pub use session_export_redaction::SessionExportRedactor;

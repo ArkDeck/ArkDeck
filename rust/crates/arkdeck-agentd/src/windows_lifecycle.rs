@@ -13,8 +13,9 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Target owners, the Artifact read and export owner
-//!   and the Job store are composed over it (see [`Authority::compose`]);
+//!   lifecycle only the Target owners, the Artifact read and export owner,
+//!   the Job store, the workspace project owner and the Session owner are
+//!   composed over it (see [`Authority::compose`]);
 //!   every input that would compose another owner on macOS is refused, not
 //!   ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
@@ -141,7 +142,10 @@ impl Authority {
     ///   project stays `runtimeRestartRequired`; the Job owner's census of
     ///   the workspace Jobs that name a project or preset is still
     ///   macOS-only, so every project or preset mutation is refused
-    ///   (`recordUnreadable`, no new dispatch).
+    ///   (`recordUnreadable`, no new dispatch);
+    /// * the Session owner and the Artifact usage owner
+    ///   ([`Self::session_store`]): `runtime.storage.*`, `session.list|show|
+    ///   pin|unpin`, `session.cleanup.*` and `session.export.*`.
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each
@@ -199,7 +203,18 @@ impl Authority {
         projects
             .startup_records()
             .map_err(|error| unusable(&path, &error.message))?;
-        let host = host.with_workspace_projects(projects);
+        let host =
+            host.with_workspace_projects(projects)
+                .with_storage(self.session_store()?, {
+                    let path = self.root.path().join("artifacts");
+                    arkdeck_hoststore::ArtifactUsage::open(&path, crate::host::ARTIFACT_QUOTA)
+                    .map_err(|error| {
+                        format!(
+                            "the Artifact usage owner {} is unusable: {error}; nothing was started",
+                            path.display()
+                        )
+                    })?
+                });
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {
@@ -247,6 +262,68 @@ impl Authority {
                 path.display()
             )
         })
+    }
+
+    /// The Session storage owner: its settings in the private `session-state`
+    /// and its default Sessions root in the private `sessions`, the macOS
+    /// isolated owner's names. A development root's owner is isolated as the
+    /// macOS one is: a selected Sessions root stays inside the development
+    /// root and outside every other owner's directory. The account's root
+    /// keeps both in the same children, below `Agentd`, until the Windows App
+    /// names its Sessions location (macOS keeps them in `ArkDeck/Sessions`).
+    /// Its Artifact usage owner (`artifacts`) is the one the Artifact read
+    /// owner reads.
+    fn session_store(&self) -> Result<arkdeck_hoststore::SessionStore, String> {
+        let unusable = |path: &Path, error: &dyn std::fmt::Display| {
+            format!(
+                "the Session store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        for name in ["session-state", "sessions"] {
+            self.root
+                .private_child(name)
+                .map_err(|error| unusable(&self.root.path().join(name), &error))?;
+        }
+        // The Session owner compares its roots with their canonical plain
+        // spelling (`D:\…`), which a verbatim root (`\\?\D:\…`) is not.
+        let root = &match self
+            .root
+            .path()
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+        {
+            Some(plain) if plain.as_bytes().get(1) == Some(&b':') => {
+                std::path::PathBuf::from(plain)
+            }
+            _ => self.root.path().to_path_buf(),
+        };
+        let (state, sessions) = (root.join("session-state"), root.join("sessions"));
+        let store = arkdeck_hoststore::SessionStore::open(&state, &sessions)
+            .map_err(|error| unusable(&state, &error))?;
+        if !self.development {
+            return Ok(store);
+        }
+        store
+            .isolated(
+                root,
+                [
+                    "artifacts",
+                    "trace-cache",
+                    "bootstrap",
+                    "jobs-state",
+                    "targets-state",
+                    "agent-executions",
+                    "human-action-snapshots",
+                    "control-action-snapshots",
+                    "evolution-workspaces",
+                    "workspace-projects",
+                ]
+                .into_iter()
+                .map(|name| root.join(name))
+                .collect(),
+            )
+            .map_err(|error| unusable(&state, &error))
     }
 
     /// After a complete drain: the owner lock, then the guard, on the thread
