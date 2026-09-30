@@ -436,13 +436,13 @@ impl SnapshotPager {
                 continue;
             }
             let metadata = self.root.document_metadata(&name).map_err(unreadable)?;
-            if metadata.len() == 0 || metadata.len() > MAX_SNAPSHOT as u64 {
+            if metadata.size == 0 || metadata.size > MAX_SNAPSHOT as u64 {
                 return Err(unreadable(()));
             }
             total = total
-                .checked_add(metadata.len())
+                .checked_add(metadata.size)
                 .ok_or_else(|| unreadable(()))?;
-            records.push((metadata.modified().map_err(unreadable)?, name, metadata));
+            records.push((metadata.modified, name, metadata));
         }
         if records.len() > 32 {
             return Err(unreadable(()));
@@ -456,7 +456,7 @@ impl SnapshotPager {
             self.root
                 .remove_document(&name, &metadata)
                 .map_err(unreadable)?;
-            total -= metadata.len();
+            total -= metadata.size;
             remaining -= 1;
         }
         Ok(())
@@ -733,7 +733,9 @@ impl<'de> DeserializeSeed<'de> for PageSeed<'_> {
     }
 }
 
-#[cfg(test)]
+// Unix fixtures (mode bits, symbolic links); the Windows owners are proved
+// by `tests/windows_artifact_owners.rs`.
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{
@@ -1025,6 +1027,8 @@ mod tests {
     }
 }
 
-#[cfg(test)]
+// Unix fixtures (mode bits, symbolic links); the Windows owners are proved
+// by `tests/windows_artifact_owners.rs`.
+#[cfg(all(test, target_os = "macos"))]
 #[path = "snapshot_pager_tests.rs"]
 mod bounded_tests;

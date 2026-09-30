@@ -9,7 +9,7 @@ use arkdeck_platform::{HostDirectory, HostReadLock, HostSqlite, SqliteValue};
 use std::fs::{File, OpenOptions};
 use std::io;
 #[cfg(target_os = "macos")]
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -132,7 +132,7 @@ fn create_database(root: &HostDirectory, path: &Path) -> io::Result<()> {
 #[cfg(target_os = "macos")]
 fn database_identity(root: &HostDirectory) -> io::Result<(u64, u64)> {
     let metadata = root.document_metadata(DATABASE)?;
-    Ok((metadata.dev(), metadata.ino()))
+    Ok((metadata.device, metadata.inode))
 }
 
 #[cfg(windows)]

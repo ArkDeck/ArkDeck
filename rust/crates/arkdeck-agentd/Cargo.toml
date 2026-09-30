@@ -14,8 +14,9 @@ arkdeck-provider-hdc.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-# The Target owners are composed on macOS and Windows (TASK-XPA-004); every
-# other host-store owner on macOS only.
+# The Target owners (TASK-XPA-004) and the Artifact read and export
+# owners (TASK-XPA-006) are composed on macOS and Windows; every other
+# host-store owner on macOS only.
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 arkdeck-hoststore.workspace = true
 
