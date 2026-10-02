@@ -304,6 +304,42 @@ impl Owners {
     fn record(&self, job: &str) -> Value {
         self.jobs.read_snapshot(job).unwrap().value().unwrap()
     }
+
+    /// Close execution and read owners before reopening only durable readers.
+    /// This is owner-level restart evidence, not a daemon/CLI process run.
+    fn assert_reopened_readback(self, job_ids: &[&str]) {
+        let expected: Vec<_> = job_ids
+            .iter()
+            .map(|job| (self.record(job), self.result(job)))
+            .collect();
+        let Self {
+            root,
+            jobs,
+            artifacts,
+            capabilities,
+            holds,
+            workspace,
+        } = self;
+        drop((jobs, artifacts, capabilities, holds, workspace));
+        let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+        let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+        let reader = JobResultReader {
+            jobs: &jobs,
+            artifacts: &artifacts,
+        };
+        for (job, (record, result)) in job_ids.iter().zip(expected) {
+            assert_eq!(jobs.read_snapshot(job).unwrap().value().unwrap(), record);
+            let reopened =
+                match reader.handle("job.result", json!({"jobId": job}).as_object().unwrap()) {
+                    Ok(value) => json!({"ok": true, "result": value}),
+                    Err(error) => refused(&error.code, &error.message, error.details),
+                };
+            assert_eq!(
+                reopened, result,
+                "{job}: durable result after closing owners"
+            );
+        }
+    }
 }
 
 fn proven() -> Map<String, Value> {
@@ -602,6 +638,9 @@ fn the_rust_runtime_answers_the_recorded_signing_sequence() {
     for path in every {
         secret_free(&path.display().to_string(), &fs::read(&path).unwrap());
     }
+    let mut readback_jobs: Vec<&str> = jobs.values().map(String::as_str).collect();
+    readback_jobs.push(&job);
+    owners.assert_reopened_readback(&readback_jobs);
 }
 
 fn ledger_owners(root: &Root) -> Value {
@@ -621,6 +660,15 @@ fn ledger_owners(root: &Root) -> Value {
 /// is signed. Removing the preset releases its pin.
 #[test]
 fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
+    registered_signing_preset(false);
+}
+
+#[test]
+fn a_registered_signing_project_need_not_be_the_first_project() {
+    registered_signing_preset(true);
+}
+
+fn registered_signing_preset(signing_last: bool) {
     let _held = exclusive();
     let fixture = support::fixture("workspace-sign-oracle");
     let root = Root::fixed();
@@ -673,8 +721,15 @@ fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
             .unwrap()
             .to_owned()
     };
-    let project = register("project", "source");
-    let other = register("other", "other");
+    let first = register("project", "source");
+    let second = register("other", "other");
+    // Startup records are sorted by project reference. Exercise both orders
+    // without weakening the foreign-project credential refusal below.
+    let (project, other) = if (first > second) == signing_last {
+        (first, second)
+    } else {
+        (second, first)
+    };
     // The installed receipt binds the credential to the registered project.
     let receipt = fs::read_to_string(root.join("preset/preset-v1.json")).unwrap();
     write(
@@ -834,4 +889,5 @@ fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
     for path in every_file(&owners.root.0) {
         secret_free(&path.display().to_string(), &fs::read(&path).unwrap());
     }
+    owners.assert_reopened_readback(&[&job]);
 }

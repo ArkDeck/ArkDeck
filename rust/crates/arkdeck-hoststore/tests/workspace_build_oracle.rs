@@ -391,6 +391,42 @@ impl Owners {
     fn record(&self, job: &str) -> Value {
         self.jobs.read_snapshot(job).unwrap().value().unwrap()
     }
+
+    /// Close execution and read owners before reopening only durable readers.
+    /// This is owner-level restart evidence, not a daemon/CLI process run.
+    fn assert_reopened_readback(self, job_ids: &[&str]) {
+        let expected: Vec<_> = job_ids
+            .iter()
+            .map(|job| (self.record(job), self.result(job)))
+            .collect();
+        let Self {
+            root,
+            jobs,
+            artifacts,
+            capabilities,
+            holds,
+            workspace,
+        } = self;
+        drop((jobs, artifacts, capabilities, holds, workspace));
+        let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+        let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+        let reader = JobResultReader {
+            jobs: &jobs,
+            artifacts: &artifacts,
+        };
+        for (job, (record, result)) in job_ids.iter().zip(expected) {
+            assert_eq!(jobs.read_snapshot(job).unwrap().value().unwrap(), record);
+            let reopened =
+                match reader.handle("job.result", json!({"jobId": job}).as_object().unwrap()) {
+                    Ok(value) => json!({"ok": true, "result": value}),
+                    Err(error) => refused(&error.code, &error.message, error.details),
+                };
+            assert_eq!(
+                reopened, result,
+                "{job}: durable result after closing owners"
+            );
+        }
+    }
 }
 
 fn proven() -> Map<String, Value> {
@@ -660,6 +696,8 @@ fn the_rust_runtime_answers_the_recorded_build_sequence() {
     let parked = support::document(&fixture, "parked-record.json");
     let job = parked["jobID"].as_str().unwrap();
     assert_eq!(owners.record(job), parked);
+    owners.assert_reopened_readback(&jobs.values().map(String::as_str).collect::<Vec<_>>());
+    assert_eq!(loss.started.load(Ordering::SeqCst), 3);
 }
 
 /// A Node launcher or Hvigor script whose bytes changed after the Job was
@@ -958,4 +996,6 @@ fn a_registered_hvigor_preset_composes_through_its_resolved_toolchain() {
     assert!(log.contains("BUILD SUCCESSFUL"), "{log}");
     // The registered project's own tree is never built.
     assert!(!source.join("entry/build").exists());
+    owners.assert_reopened_readback(&[&job]);
+    assert_eq!(loss.started.load(Ordering::SeqCst), 1);
 }

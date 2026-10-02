@@ -250,7 +250,7 @@ struct RuntimeHistoryView: View {
       VStack(spacing: WorkspaceMetrics.tightGap) {
         Text(reason)
           .font(WorkspaceFont.monospacedValue)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
           .accessibilityIdentifier("history.unavailable.reason")
         Text(historyLocalized("history.unavailable.guidance"))
       }
@@ -774,13 +774,13 @@ struct RuntimeHistoryView: View {
                       .font(WorkspaceFont.caption)
                     Text(artifact.id)
                       .font(WorkspaceFont.monospacedDense)
-                      .textSelection(.enabled)
+                      .modifier(WorkspaceTextSelection())
                     Text(artifact.sha256)
                       .font(WorkspaceFont.monospacedDense)
                       .lineLimit(1)
                       .truncationMode(.middle)
                       .help(artifact.sha256)
-                      .textSelection(.enabled)
+                      .modifier(WorkspaceTextSelection())
                   }
                   .accessibilityIdentifier("history.correlation.artifact.\(artifact.id)")
                 }
@@ -882,7 +882,7 @@ struct RuntimeHistoryView: View {
               .accessibilityHidden(true)
               Text(entry)
                 .font(WorkspaceFont.monospacedValue)
-                .textSelection(.enabled)
+                .modifier(WorkspaceTextSelection())
             }
           }
         }
@@ -961,7 +961,7 @@ struct RuntimeHistoryView: View {
           } else if !evidence.actualStepKinds.isEmpty {
             Text(evidence.actualStepKinds.joined(separator: " · "))
               .font(WorkspaceFont.monospacedDense)
-              .textSelection(.enabled)
+              .modifier(WorkspaceTextSelection())
               .accessibilityIdentifier("history.evidence.steps")
           }
           ForEach(evidence.blockers, id: \.self) { blocker in
@@ -1013,7 +1013,7 @@ struct RuntimeHistoryView: View {
           .font(WorkspaceFont.monospacedDense)
           .lineLimit(2)
           .help(parameter.name)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
       }
       .width(min: 90, ideal: 170)
       TableColumn(historyLocalized("history.parameters.column.before")) { parameter in
@@ -1064,7 +1064,7 @@ struct RuntimeHistoryView: View {
     return Text(displayValue)
       .font(WorkspaceFont.monospacedDense)
       .lineLimit(2)
-      .textSelection(.enabled)
+      .modifier(WorkspaceTextSelection())
   }
 
   private func traceParameterStatus(
@@ -1147,7 +1147,7 @@ struct RuntimeHistoryView: View {
         .lineLimit(1)
         .truncationMode(.middle)
         .help(artifact.sha256)
-        .textSelection(.enabled)
+        .modifier(WorkspaceTextSelection())
       Text("\(artifact.privacy) · \(artifact.mediaType)")
         .font(WorkspaceFont.caption)
         .foregroundStyle(.secondary)
@@ -1155,7 +1155,7 @@ struct RuntimeHistoryView: View {
         Label(statusDetail, systemImage: "exclamationmark.triangle")
           .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.orange)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
       }
       HStack(spacing: WorkspaceMetrics.tightGap) {
         Button(historyLocalized("history.artifacts.export")) {
@@ -1304,7 +1304,7 @@ struct RuntimeHistoryView: View {
     Label {
       Text(reason)
         .font(WorkspaceFont.monospacedValue)
-        .textSelection(.enabled)
+        .modifier(WorkspaceTextSelection())
         .fixedSize(horizontal: false, vertical: true)
     } icon: {
       Image(systemName: "exclamationmark.triangle")
@@ -1546,7 +1546,7 @@ struct HistoryWorkspaceContextBanner: View {
           Text(context.artifacts.map(\.name).joined(separator: ", "))
             .font(WorkspaceFont.monospacedDense)
             .lineLimit(2)
-            .textSelection(.enabled)
+            .modifier(WorkspaceTextSelection())
         }
         .accessibilityIdentifier("history.context.artifacts")
       }
@@ -1568,7 +1568,7 @@ struct HistoryWorkspaceContextBanner: View {
       Text(value)
         .font(WorkspaceFont.monospacedDense)
         .lineLimit(1)
-        .textSelection(.enabled)
+        .modifier(WorkspaceTextSelection())
         .accessibilityLabel(Text("\(historyLocalized(key)): \(value)"))
         .accessibilityIdentifier(id)
     }

@@ -44,7 +44,7 @@ struct FlashPlanDetailsView: View {
             Text(plan.writeForbiddenMemberNames.joined(separator: ", "))
               .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
-              .textSelection(.enabled)
+              .modifier(WorkspaceTextSelection())
               .fixedSize(horizontal: false, vertical: true)
           }
         }
@@ -82,7 +82,7 @@ struct FlashPlanDetailsView: View {
           .lineLimit(1)
           .truncationMode(.middle)
           .help(partition.imageSHA256)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
       }
     }
     .padding(.horizontal, WorkspaceMetrics.noticePaddingHorizontal)

@@ -129,6 +129,20 @@ gh run download <run-id> -n arkdeck-rc-<版本>-<build> -D /abs/arkdeck-rc-<版�
 receipt 一致；`xcrun stapler validate` 与 `spctl --assess --type open --context context:primary-signature` 可在任意
 Mac 上只读复核。
 
+在离线主机上先检查下载物料（不挂载、不执行包内程序、不改安装态）：
+
+```sh
+python3 scripts/release/build_macos_release.py verify \
+  --input /abs/arkdeck-rc-<版本>-<build> \
+  --expected-revision <发布-run-的完整-source-SHA> \
+  --expected-sha256 <从可信发布-run-预先保存的-DMG-SHA256>
+```
+
+预期 revision 和摘要必须从可信发布 run 保存，不能从待检下载包自身重新取值。此检查核对正式
+receipt、DMG 字节与摘要、ArkForge 构建 pin 和两份公证日志的 submission ID；无签名结构包、错版、
+混包或损坏均拒绝。输出明确区分下载完整性与 Apple 签名评估，不能代替上述 macOS 签名/Gatekeeper
+检查，也不代表 Runtime 切换或真机验收。保存 DMG、receipt、公证日志和可信摘要，供断网恢复使用。
+
 ## 维护者：本机构建 RC
 
 凭据在维护者本人已登录的钥匙串里；锁屏或 Agent 沙盒里取不到，所以这条路径只由维护者在自己的终端执行。

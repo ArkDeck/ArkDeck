@@ -1766,16 +1766,16 @@ impl WorkspaceComposition {
         })
     }
 
-    /// Swift `WorkspaceOperationsProvider.lower` for a signing action, which
-    /// Swift's provider answers before routing by project: the action owned
-    /// by `job_id` and by the provider's own profile — the first registered
-    /// profile, as Swift composes its provider over it — then every pinned
-    /// signing file measured again.
+    /// A signing action belongs to its Job and a primary profile in this
+    /// composition. Project ordering must not decide which registered
+    /// project's credential can be used. Keep the credential's project
+    /// binding and remeasure every pinned signing file before dispatch.
     pub(crate) fn lower_sign(&self, action: &SigningAction, job_id: &str) -> Result<(), String> {
         let owned = self.signing.as_ref().is_some_and(|signing| {
             action.output == SigningAttemptPaths::for_job(Path::new(&signing.attempts), job_id)
         }) && action.job_id == job_id
-            && self.primaries.first() == Some(&action.project_ref);
+            && self.primaries.contains(&action.project_ref)
+            && action.preset.project_ref == action.project_ref;
         if !owned {
             return Err("workspace signing action is not owned by this Job/Profile".into());
         }

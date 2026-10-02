@@ -1016,14 +1016,66 @@ def parse(argv: Sequence[str]) -> argparse.Namespace:
     unsigned.add_argument("--helpers", type=Path, required=True)
     unsigned.add_argument("--arkforge-bundle", type=Path, required=True)
     unsigned.add_argument("--arkforge-checkout", type=Path)
+    verify = modes.add_parser("verify", help="offline integrity check of a downloaded signed RC")
+    verify.add_argument("--input", type=Path, required=True)
+    verify.add_argument("--expected-revision", required=True)
+    verify.add_argument("--expected-sha256", required=True,
+                        help="DMG SHA-256 saved from the trusted release run, not the download")
     return parser.parse_args(argv)
+
+
+def verify_download(directory: Path, revision: str, digest: str) -> dict[str, Any]:
+    """Check saved release inputs without mounting, executing, networking or installing.
+
+    The caller pins the source and DMG digest from the trusted release run.
+    This verifies artifact integrity, not Apple signatures or installed health.
+    """
+    require(re.fullmatch(r"[0-9a-f]{40}", revision) is not None,
+            "expected revision must be a full Git commit ID")
+    require(re.fullmatch(r"[0-9a-f]{64}", digest) is not None,
+            "expected SHA-256 must be a lowercase hexadecimal digest")
+    receipt = json.loads((directory / RECEIPT).read_text(encoding="utf-8"))
+    require(receipt["schema"] == RECEIPT_SCHEMA and receipt["mode"] == "release",
+            "a signed release receipt is required; an unsigned structure check is not an RC")
+    require(receipt["source"] == {"clean": True, "revision": revision},
+            "release source does not match the expected clean revision")
+    version, build_number = receipt["version"], receipt["build"]
+    require(release_version.valid(version) and release_version.valid(build_number),
+            "release version or build is invalid")
+    name = f"ArkDeck-{version}-{build_number}.dmg"
+    dmg = receipt["dmg"]
+    require(dmg["name"] == name and dmg["entries"] == expected_entries(False),
+            "release DMG name or layout does not match the release")
+    require(dmg["signed"] is True and dmg["stapled"] is True,
+            "release receipt does not record signing and stapling")
+    require(dmg["sha256"] == digest and sha256_file(directory / name) == digest,
+            "DMG does not match the trusted release SHA-256")
+    require((directory / name).stat().st_size == dmg["bytes"], "DMG byte count differs")
+    forge = receipt["arkforge"]
+    require(re.fullmatch(r"[0-9a-f]{40}", forge["pinnedRevision"]) is not None
+            and forge["builtRevision"] == forge["pinnedRevision"] == forge["checkoutRevision"],
+            "ArkForge was not built at the receipt's dependency pin")
+    for component in ("app", "dmg"):
+        accepted = receipt["notarization"][component]
+        log = json.loads((directory / f"notary-log-{component}.json").read_text(encoding="utf-8"))
+        require(accepted["status"] == log["status"] == "Accepted"
+                and accepted["submissionId"] == log["jobId"] and not log.get("issues"),
+                f"{component} notarization log does not match the accepted submission")
+    return {"check": "download-integrity", "sourceRevision": revision,
+            "version": version, "build": build_number, "dmgSHA256": digest,
+            "appleSignatureAssessment": "not-run", "installedRuntime": "not-checked"}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse(sys.argv[1:] if argv is None else argv)
     try:
+        if arguments.mode == "verify":
+            result = verify_download(arguments.input, arguments.expected_revision,
+                                     arguments.expected_sha256)
+            print(json.dumps(result, sort_keys=True))
+            return 0
         dmg = build(arguments.mode, arguments, os.environ)
-    except (ReleaseError, OSError) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError) as error:
         print(f"build_macos_release: {error}", file=sys.stderr)
         return 1
     if arguments.mode == "unsigned":

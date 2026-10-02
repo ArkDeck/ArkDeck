@@ -30,7 +30,7 @@ struct DiagnosticsWorkspaceView: View {
           Label(diagnosticsText(model.isHilogSummaryContext ? "diagnostics.hilog.failed" : "diagnostics.session.failed"), systemImage: "exclamationmark.triangle")
         } description: {
           if model.isHilogSummaryContext { Text(diagnosticsText("diagnostics.hilog.failed.detail")) }
-          Text(reason).textSelection(.enabled)
+          Text(reason).modifier(WorkspaceTextSelection())
         } actions: {
           Button(diagnosticsText("diagnostics.session.retry"), action: model.reload)
         }
@@ -106,7 +106,7 @@ struct DiagnosticsWorkspaceView: View {
         Text(model.captureUnavailableReasonCode)
           .font(.system(size: 10, design: .monospaced))
           .foregroundStyle(.secondary)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .accessibilityElement(children: .contain)
@@ -153,7 +153,7 @@ struct DiagnosticsWorkspaceView: View {
       VStack(alignment: .leading, spacing: 16) {
         Text(summary.jobID)
           .font(WorkspaceFont.monospacedValue)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
           .accessibilityIdentifier("diagnostics.hilog.job")
         Text(diagnosticsText("diagnostics.hilog.readOnly"))
           .font(.callout).foregroundStyle(.secondary)
@@ -215,7 +215,7 @@ struct DiagnosticsWorkspaceView: View {
     VStack(alignment: .leading, spacing: 3) {
       Text(diagnosticsText(key)).font(.caption).foregroundStyle(.secondary)
       Text(value).font(WorkspaceFont.monospacedDense)
-        .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+        .modifier(WorkspaceTextSelection()).fixedSize(horizontal: false, vertical: true)
         .accessibilityIdentifier("diagnostics.hilog.\(id)")
     }
   }
@@ -223,7 +223,7 @@ struct DiagnosticsWorkspaceView: View {
   private func sessionSection(_ session: DiagnosticSessionPresentation) -> some View {
     VStack(alignment: .leading, spacing: 6) {
       Text(session.reading.jobID).font(WorkspaceFont.monospacedValue)
-        .textSelection(.enabled).accessibilityIdentifier("diagnostics.session.job")
+        .modifier(WorkspaceTextSelection()).accessibilityIdentifier("diagnostics.session.job")
       Text(diagnosticsText("diagnostics.session.readOnly"))
         .font(WorkspaceFont.caption).foregroundStyle(.secondary)
       if let covered = session.ringHeldAnchor {
@@ -234,7 +234,7 @@ struct DiagnosticsWorkspaceView: View {
       }
       DisclosureGroup(diagnosticsText("diagnostics.session.timeline")) {
         Text(session.timeline.joined(separator: "\n"))
-          .font(.system(size: 10, design: .monospaced)).textSelection(.enabled)
+          .font(.system(size: 10, design: .monospaced)).modifier(WorkspaceTextSelection())
           .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
@@ -297,7 +297,7 @@ struct DiagnosticsWorkspaceView: View {
         }
         if let text = model.previewText {
           Text(text).font(.system(size: 10, design: .monospaced))
-            .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            .modifier(WorkspaceTextSelection()).frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("diagnostics.preview.text")
         }
       }

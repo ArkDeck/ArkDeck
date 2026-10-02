@@ -29,6 +29,7 @@ REPO = RELEASE.parents[1]
 SCRIPT = RELEASE / "build_macos_release.py"
 sys.path.insert(0, str(RELEASE))
 import release_version  # noqa: E402
+import build_macos_release as release_builder  # noqa: E402
 
 IDENTITY = "Developer ID Application: Fixture (8AQTYW5FKR)"
 TEAM = "8AQTYW5FKR"
@@ -267,7 +268,8 @@ class Fixture(unittest.TestCase):
              "xcrun", "hdiutil", "swift", "launchctl"]
 
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="arkdeck-release-test-", dir="/private/tmp")
+        self.temporary = tempfile.TemporaryDirectory(
+            prefix="arkdeck-release-test-", dir="/private/tmp" if DARWIN else None)
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.bin = self.root / "tools"
@@ -799,7 +801,8 @@ class Unsigned(Fixture):
 
 class Versions(unittest.TestCase):
     def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory(prefix="arkdeck-version-test-", dir="/private/tmp")
+        self.temporary = tempfile.TemporaryDirectory(
+            prefix="arkdeck-version-test-", dir="/private/tmp" if DARWIN else None)
         self.addCleanup(self.temporary.cleanup)
         self.repo = Path(self.temporary.name)
         for path in (release_version.SOURCE, release_version.PROJECT, release_version.APP_INFO,
@@ -837,6 +840,73 @@ class Versions(unittest.TestCase):
         self.assertEqual(release_version.drift(self.repo),
                          [f"ArkDeckAgent-Info.plist CFBundleVersion '99' != {VERSIONS['build']}"])
         self.assertEqual(release_version.main(["check"], self.repo), 1)
+
+
+class DownloadIntegrity(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="arkdeck-download-test-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.dmg = self.root / "ArkDeck-0.1.0-2.dmg"
+        self.dmg.write_bytes(b"download fixture; not an Apple disk image")
+        self.digest = hashlib.sha256(self.dmg.read_bytes()).hexdigest()
+        self.receipt = {
+            "schema": release_builder.RECEIPT_SCHEMA, "mode": "release",
+            "source": {"clean": True, "revision": SOURCE_HEAD},
+            "version": "0.1.0", "build": "2",
+            "dmg": {"name": self.dmg.name, "sha256": self.digest,
+                    "bytes": self.dmg.stat().st_size, "signed": True, "stapled": True,
+                    "entries": release_builder.expected_entries(False)},
+            "arkforge": {key: PIN for key in ("pinnedRevision", "builtRevision", "checkoutRevision")},
+            "notarization": {},
+        }
+        for component in ("app", "dmg"):
+            self.receipt["notarization"][component] = {"status": "Accepted", "submissionId": component}
+            (self.root / f"notary-log-{component}.json").write_text(json.dumps(
+                {"status": "Accepted", "jobId": component, "issues": None}))
+
+    def verify(self, revision=SOURCE_HEAD, digest=None):
+        (self.root / release_builder.RECEIPT).write_text(json.dumps(self.receipt))
+        return release_builder.verify_download(self.root, revision, digest or self.digest)
+
+    def test_integrity_does_not_claim_signature_or_installed_acceptance(self):
+        result = self.verify()
+        self.assertEqual(result["check"], "download-integrity")
+        self.assertEqual(result["appleSignatureAssessment"], "not-run")
+        self.assertEqual(result["installedRuntime"], "not-checked")
+
+    def test_corruption_and_self_consistent_replacement_do_not_match_trusted_digest(self):
+        self.dmg.write_bytes(b"replaced")
+        with self.assertRaisesRegex(release_builder.ReleaseError, "SHA-256"):
+            self.verify()
+        self.receipt["dmg"]["sha256"] = hashlib.sha256(self.dmg.read_bytes()).hexdigest()
+        self.receipt["dmg"]["bytes"] = self.dmg.stat().st_size
+        with self.assertRaisesRegex(release_builder.ReleaseError, "SHA-256"):
+            self.verify()
+
+    def test_wrong_source_unsigned_receipt_and_mixed_pin_are_refused(self):
+        with self.assertRaisesRegex(release_builder.ReleaseError, "revision"):
+            self.verify(revision="a" * 40)
+        self.receipt["mode"] = "unsigned-structure-check"
+        with self.assertRaisesRegex(release_builder.ReleaseError, "not an RC"):
+            self.verify()
+        self.receipt["mode"] = "release"
+        self.receipt["arkforge"]["builtRevision"] = "a" * 40
+        with self.assertRaisesRegex(release_builder.ReleaseError, "dependency pin"):
+            self.verify()
+
+    def test_mismatched_or_failed_notary_logs_are_refused(self):
+        for status, job in (("Invalid", "app"), ("Accepted", "other-submission")):
+            with self.subTest(status=status, job=job):
+                (self.root / "notary-log-app.json").write_text(json.dumps(
+                    {"status": status, "jobId": job, "issues": None}))
+                with self.assertRaisesRegex(release_builder.ReleaseError, "notarization log"):
+                    self.verify()
+
+    def test_receipt_cannot_name_a_path_outside_the_download(self):
+        self.receipt["dmg"]["name"] = "../another.dmg"
+        with self.assertRaisesRegex(release_builder.ReleaseError, "name or layout"):
+            self.verify()
 
 
 def package_arkforge() -> int:

@@ -420,9 +420,9 @@ final class AppShellUITests: XCTestCase {
       let search = app.textFields["history.filter.search"]
       XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
       app.typeKey("f", modifierFlags: .command)
-      app.typeText("job-fixture-0001")
-      XCTAssertEqual(search.value as? String, "job-fixture-0001")
-      assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+      app.typeText("job-fixture-diagnostics")
+      XCTAssertEqual(search.value as? String, "job-fixture-diagnostics")
+      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-diagnostics")
       app.typeKey("a", modifierFlags: .command)
       app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
 
@@ -454,8 +454,8 @@ final class AppShellUITests: XCTestCase {
       select("app.navigation.history", in: app)
       XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
       app.typeKey("f", modifierFlags: .command)
-      app.typeText("job-fixture-0001")
-      XCTAssertEqual(search.value as? String, "job-fixture-0001")
+      app.typeText("job-fixture-diagnostics")
+      XCTAssertEqual(search.value as? String, "job-fixture-diagnostics")
       app.terminate()
     }
   }
@@ -2127,7 +2127,12 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(element("device.fact.state", in: app), equals: "Unauthorized")
     let recheck = element("device.action.recheck", in: app)
     XCTAssertTrue(recheck.exists, file: file, line: line)
-    XCTAssertTrue(recheck.isEnabled, file: file, line: line)
+    // The periodic read keeps the last verdict visible while disabling this
+    // action. A matching verdict alone does not mean that read has finished.
+    XCTAssertTrue(
+      waitUntil(timeout: 10) { recheck.exists && recheck.isEnabled },
+      "Re-check must become enabled after the current observation finishes",
+      file: file, line: line)
     XCTAssertFalse(
       app.buttons["device.action.adopt"].exists,
       "the App must not offer adoption", file: file, line: line)
@@ -3302,7 +3307,11 @@ final class AppShellUITests: XCTestCase {
   /// SwiftUI renders most of these strings into the accessibility *value*, and
   /// section headings into the label, so both are considered.
   private func displayedValues(for element: XCUIElement) -> [String] {
-    [element.label, element.value as? String].compactMap { $0 }
+    // A filtered detail can leave the hierarchy before its replacement is
+    // inserted. Reading label/value on a missing element raises an XCTest
+    // snapshot failure before assertDisplayed can evaluate its predicate.
+    guard element.exists else { return [] }
+    return [element.label, element.value as? String].compactMap { $0 }
   }
 
   private func displayedText(for element: XCUIElement) -> String {
