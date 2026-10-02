@@ -346,7 +346,7 @@ struct GlobalJobInspectorView: View {
             } else if !detail.timeline.isEmpty {
               Text(jobsText("jobInspector.timeline")).font(WorkspaceFont.label)
               Text(detail.timeline.suffix(200).joined(separator: "\n"))
-                .font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+                .font(WorkspaceFont.monospacedDense).modifier(WorkspaceTextSelection())
                 .accessibilityIdentifier("jobInspector.timeline.entries")
               if detail.timeline.count > 200 {
                 Text(jobsText("jobInspector.log.tail")).font(WorkspaceFont.caption)
@@ -362,7 +362,7 @@ struct GlobalJobInspectorView: View {
             }
             if case .unavailable(let reason) = detail.artifactAvailability {
               Text(reason).font(WorkspaceFont.secondary).foregroundStyle(.orange)
-                .textSelection(.enabled)
+                .modifier(WorkspaceTextSelection())
                 .accessibilityIdentifier("jobInspector.artifacts.unavailable")
             }
             if actions.isReadingLog {
@@ -372,7 +372,7 @@ struct GlobalJobInspectorView: View {
             }
             if let log = actions.logText {
               Text(jobsText("jobInspector.log.tail")).font(WorkspaceFont.caption).foregroundStyle(.secondary)
-              Text(log).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+              Text(log).font(WorkspaceFont.monospacedDense).modifier(WorkspaceTextSelection())
                 .accessibilityIdentifier("jobInspector.log.text")
             }
             if let error = actions.logError {
@@ -414,7 +414,7 @@ struct GlobalJobInspectorView: View {
                   .accessibilityHidden(true)
                   Text(entry)
                     .font(WorkspaceFont.monospacedValue)
-                    .textSelection(.enabled)
+                    .modifier(WorkspaceTextSelection())
                     .fixedSize(horizontal: false, vertical: true)
                 }
       }
@@ -704,7 +704,7 @@ struct GlobalRecoveryBannerView: View {
         Text("\(job.id) · \(job.targetID)")
           .font(WorkspaceFont.monospacedDense)
           .foregroundStyle(.secondary)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
           .fixedSize(horizontal: false, vertical: true)
         if compact { reviewButton(job) }
       }

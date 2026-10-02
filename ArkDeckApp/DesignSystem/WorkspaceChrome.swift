@@ -586,15 +586,23 @@ struct WorkspaceFactRow: View {
   }
 }
 
-/// `.textSelection(.enabled)` and `.textSelection(.disabled)` are different
-/// types, so the choice cannot be a ternary.
+/// These are selectable, read-only facts, not editable text fields. Give the
+/// native text bridge an explicit static-text role: on macOS 27, inferring its
+/// role while resolving its label can recurse between SwiftUI and AppKit.
+struct WorkspaceTextSelection: ViewModifier {
+  func body(content: Content) -> some View {
+    content.textSelection(.enabled)
+      .accessibilityAddTraits(.isStaticText)
+  }
+}
+
 private struct WorkspaceSelectableValue: ViewModifier {
   let isEnabled: Bool
 
   @ViewBuilder
   func body(content: Content) -> some View {
     if isEnabled {
-      content.textSelection(.enabled)
+      content.modifier(WorkspaceTextSelection())
     } else {
       content
     }

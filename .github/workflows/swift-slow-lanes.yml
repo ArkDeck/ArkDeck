@@ -116,20 +116,6 @@ jobs:
           resolution=$(displayplacer list | awk '/^Resolution:/ { print $2; exit }')
           echo "runner display: $resolution"
           test "$resolution" = "1920x1080"
-      - name: Diagnose selectable text bridge (non-release experiment)
-        run: |
-          python3 - <<'PYTHON'
-          from pathlib import Path
-          changed = []
-          for path in Path("ArkDeckApp").rglob("*.swift"):
-              original = path.read_text()
-              probe = original.replace(".textSelection(.enabled)", ".textSelection(.disabled)")
-              if probe != original:
-                  path.write_text(probe)
-                  changed.append(str(path))
-          print("DIAGNOSTIC ONLY: text selection disabled in test build; not a release or product pass")
-          print("\n".join(changed))
-          PYTHON
       - name: Run the App UI tests
         env:
           ARKDECK_UI_TEST_DERIVED_DATA: ${{ runner.temp }}/arkdeck-ui-tests

@@ -2127,7 +2127,12 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(element("device.fact.state", in: app), equals: "Unauthorized")
     let recheck = element("device.action.recheck", in: app)
     XCTAssertTrue(recheck.exists, file: file, line: line)
-    XCTAssertTrue(recheck.isEnabled, file: file, line: line)
+    // The periodic read keeps the last verdict visible while disabling this
+    // action. A matching verdict alone does not mean that read has finished.
+    XCTAssertTrue(
+      waitUntil(timeout: 10) { recheck.exists && recheck.isEnabled },
+      "Re-check must become enabled after the current observation finishes",
+      file: file, line: line)
     XCTAssertFalse(
       app.buttons["device.action.adopt"].exists,
       "the App must not offer adoption", file: file, line: line)
