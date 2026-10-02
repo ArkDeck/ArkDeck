@@ -1688,7 +1688,7 @@
       "feature": "artifact.import.flash-bundle",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2359,7 +2359,7 @@
       "feature": "diagnostics.export",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2677,7 +2677,7 @@
       "feature": "history.filter.delete",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2695,7 +2695,7 @@
       "feature": "history.filter.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2713,7 +2713,7 @@
       "feature": "history.filter.save",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3407,11 +3407,13 @@
       "equivalentCommands": [],
       "feature": "runtime.service.install",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "notImplemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "cli:runtime.service.install",
       "targetClassification": "local",
@@ -3423,11 +3425,13 @@
       "equivalentCommands": [],
       "feature": "runtime.service.restart",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "cli:runtime.service.restart",
       "targetClassification": "local",
@@ -3439,11 +3443,13 @@
       "equivalentCommands": [],
       "feature": "runtime.service.status",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "cli:runtime.service.status",
       "targetClassification": "local",
@@ -3455,11 +3461,13 @@
       "equivalentCommands": [],
       "feature": "runtime.service.uninstall",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "cli:runtime.service.uninstall",
       "targetClassification": "local",
@@ -3471,11 +3479,13 @@
       "equivalentCommands": [],
       "feature": "runtime.service.update",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "notImplemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "cli:runtime.service.update",
       "targetClassification": "local",
@@ -3487,11 +3497,13 @@
       "equivalentCommands": [],
       "feature": "runtime.service.verify",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "cli:runtime.service.verify",
       "targetClassification": "local",
@@ -4114,7 +4126,7 @@
       "feature": "trace.cache.purge",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

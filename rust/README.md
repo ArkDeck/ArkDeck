@@ -626,9 +626,10 @@ for the account, over `%LOCALAPPDATA%\ArkDeck\Trace	races` (beside its
 the daemon creates owner-only because the App, the daemon and the CLI share
 one physical `%LOCALAPPDATA%` (ruling 8; the account-location decision in
 `runs/TASK-XPA-005/windows-account-locations-run.md`); `trace.cache.status`
-answers there, and `trace.cache.purge` is refused
-as the macOS daemon refuses it without its retention owners: the Job owner's
-active-Session census is not asked on Windows yet. `trace export` is the
+answers there, and `trace.cache.purge` purges as on macOS, while the Job
+owner holds its active-Session census and the Artifact owner its Trace
+retention census (TASK-XPA-018, `runs/TASK-XPA-018/windows-non-hdc-leaves-run.md`).
+`trace export` is the
 Artifact export path of TASK-XPA-006 and needs nothing Windows-specific beyond
 it; the daemon's Job store proves the Trace's Job first, and refuses a Job it
 does not hold (`resourceNotFound`).
@@ -2717,6 +2718,74 @@ bundle is refused with nothing published, and, with
 releases. Run record:
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
 
+## Windows History filter owner (TASK-XPA-012)
+
+`arkdeck-hoststore` builds the History filter owner (`HistoryStore`) on
+Windows: the macOS code over the host store's NTFS directory, the same
+`history-filter.json` (the store's frozen encoding) under
+`.history-filter.lock`. Both macOS compositions keep them in the state
+directory itself; the host store cannot open a Windows root itself (any
+directory of this user for a development root, one that grants SYSTEM for
+the account's), so the Windows daemon composes the owner over the root's
+private `history-filter`, as it keeps the Job store in `jobs-state`. The
+census names it at its macOS position (`…, storage, history,
+workspaceProjects, …`), and `history.filter.list|save|delete` answer from
+it. Its unit tests run on both hosts and replay the committed control-frame
+corpus at the recorded time, the document bytes pinned;
+`arkdeck-agentd/tests/windows_history_filter_process.rs` replays the corpus
+over the real daemon across restarts, reads a document Swift wrote as Swift
+answered it and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `history filter
+list|save|delete` through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-history-filter-owner-run.md`.
+## Windows Flash lane (TASK-XPA-010)
+
+The software part of GJ-4 on Windows. `ManagedServer::launch_paired` starts
+the bundle's `bin/arkforged.exe` in its own kill-on-close Job and hands it
+the pairing secret on stdin. Its stop is the end of input, half a second,
+then `TerminateJobObject`. `arkdeck-provider-arkforge`'s `Lane` composes
+over ArkForge's named pipes (#2403). The Flash archive reader reads a
+bundle through the platform's raw DEFLATE decoder (#2410).
+
+`arkdeck-hoststore` builds the Runtime's Flash owners on Windows:
+
+- the planner, the admitter, the run, the recovery and the reconcile
+  (`flash_plan`, `flash_admission`, `flash_run`, `flash_recovery`,
+  `flash_reconcile`), including the delegated Flash's lane receipt;
+- the Rockchip host's dispatcher, durable records, executor and startup
+  reconcile;
+- the Flash facts, the post-flash alias, and the flash-bundle Import
+  validator.
+
+The records keep the platform's owner-only boundary: private directories
+and files, owner-only single-link reads, and no directory `fsync` on NTFS.
+The Swift `flash-plan` oracle, plan digests included, and the `flash-run`
+oracle's eight stories replay on Windows. What a Windows Session names of
+its platform is read back as Swift's wrote it before it is compared. The
+owners that compose beside a managed HDC build on Windows too:
+`control_performer`, `rockchip_reactivation` and `loader_binding`. The
+Loader binding oracle replays 33/33 through the Windows Host, and the
+post-flash alias and start-up oracles replay there too. The daemon composes
+the Loader binding coordinator. It installs the executable lane
+(`arkforge_execution::install`) only with a descriptor-bound HDC, and none
+exists on Windows until the managed HDC is composed.
+
+The Windows daemon composes the lane beside its Job state
+(`Authority::compose_arkforge`): the account root, or a development root's
+`jobs-state`, with the lane's runtime directory `arkforge` in it. It
+composes, as the macOS compositions do:
+
+- the lane from `ARKDECK_ARKFORGE_BUNDLE_PATH`, with Swift's absences;
+- the Flash planning over it;
+- the Flash facts over the Windows USB census, which fails closed until the
+  DAYU200 sample confirms its mapping;
+- the device access observer.
+
+The lane's authority binds the managed-control HDC's digest, and no HDC is
+composed on Windows. So a verified bundle is refused before its
+`arkforged.exe` is launched, with Swift's words. A Flash `job.plan` or
+`job.submit` is refused before admission with that reason and zero
+dispatch (`windows_flash_lane_process.rs`).
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in
@@ -2729,7 +2798,12 @@ account is also the user name every read checks. An absent credential is
 `Status(CREDENTIAL_NOT_FOUND)` / `Absent` / `Ok(false)` as macOS answers
 `errSecItemNotFound`; values are bounded by Credential Manager's 2560 bytes;
 `presence` has to read the blob (no attribute-only query exists) and wipes it
-in place. `read_terminal_secret` requires a console on stdin, clears echo and
+in place. Credential Manager loses concurrent updates of one user's
+credentials: writes vanish and deletions come back. So every call takes this
+user's Credential Manager turn, the owner-only named mutex
+`Local\ArkDeck.CredentialManager.<user SID>`, and `set` keeps it through its
+read-back (TASK-XPA-005, `windows-credential-manager-turn-run.md`).
+`read_terminal_secret` requires a console on stdin, clears echo and
 line input, reads UTF-16 with `ReadConsoleW` into a wiped buffer, and restores
 the mode on every return and, through a console control handler, on Ctrl-C.
 `tests/windows_credential_store.rs` works in a per-run fixture namespace and

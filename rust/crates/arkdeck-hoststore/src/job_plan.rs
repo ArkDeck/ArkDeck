@@ -6,11 +6,11 @@
 //! pre-admission with zero new dispatch.
 //!
 //! On Windows (TASK-XPA-005, GJ-1) the planner is the same code over the
-//! same owners, but two of them do not exist there yet: the ArkForge Flash
-//! lane (`flash_plan`, AF-W1) and the analyzers' ArkTrace profiles
-//! (`AnalyzerProfile`, `analyzer_composition`; no Windows trace_streamer).
-//! The Flash planner stays macOS-only; the `analyzer` member is there but no
-//! analyzer can be named (`AnalyzerComposition` has no implementation on
+//! same owners, the Flash planner (`flash_plan`) included since TASK-XPA-010,
+//! but one of them does not exist there yet: the analyzers' ArkTrace
+//! profiles (`AnalyzerProfile`, `analyzer_composition`; no Windows
+//! trace_streamer). The `analyzer` member is there but no analyzer can be
+//! named (`AnalyzerComposition` has no implementation on
 //! Windows), so a Windows plan of an analyzer operation is refused as macOS
 //! refuses it without an analyzer. The Import and workspace owners have no
 //! value on Windows yet either (`ImportUploadStore`, `WorkspaceComposition`),
@@ -35,7 +35,7 @@ use std::path::PathBuf;
 
 #[path = "debug_hap_plan.rs"]
 mod debug_hap_plan;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "flash_plan.rs"]
 mod flash_plan;
 #[path = "native_library_plan.rs"]
@@ -45,11 +45,11 @@ mod screen_sequence_plan;
 #[cfg(target_os = "macos")]
 #[path = "workspace_plan.rs"]
 mod workspace_plan;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_plan::{
     FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) use flash_plan::{
     PARTITIONS as DAYU200_PARTITIONS, admission_blocker, canonical_inputs, delegated_arguments,
     is_flash, plan_completion_arguments,

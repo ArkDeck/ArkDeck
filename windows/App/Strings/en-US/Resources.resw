@@ -763,6 +763,1797 @@ SHA-256: %4$@</value>
     <value>Review the recorded reason and evidence before continuing through an approved Runtime path.</value>
     <comment>jobRecovery.humanRequired.guidance (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="debug_action_cancel" xml:space="preserve">
+    <value>Stop after the current step</value>
+    <comment>debug.action.cancel (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_action_refresh" xml:space="preserve">
+    <value>Refresh Debug facts</value>
+    <comment>debug.action.refresh (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_ability" xml:space="preserve">
+    <value>Ability name</value>
+    <comment>debug.apps.ability (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_action_start" xml:space="preserve">
+    <value>Start Ability</value>
+    <comment>debug.apps.action.start (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_action_stop" xml:space="preserve">
+    <value>Stop process</value>
+    <comment>debug.apps.action.stop (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_action_uninstall" xml:space="preserve">
+    <value>Uninstall…</value>
+    <comment>debug.apps.action.uninstall (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_additional_add" xml:space="preserve">
+    <value>Add HAP / HSP…</value>
+    <comment>debug.apps.additional.add (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_additional_note" xml:space="preserve">
+    <value>Choose the entry HAP first. Add up to 16 feature HAPs or HSPs from the same bundle; all packages are installed together. Each file must be 1 byte–64 MiB.</value>
+    <comment>debug.apps.additional.note (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_additional_remove" xml:space="preserve">
+    <value>Remove</value>
+    <comment>debug.apps.additional.remove (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_additional_removeNamed" xml:space="preserve">
+    <value>Remove %@</value>
+    <comment>debug.apps.additional.removeNamed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_additional_title" xml:space="preserve">
+    <value>Additional packages (optional)</value>
+    <comment>debug.apps.additional.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_artifacts_title" xml:space="preserve">
+    <value>HAP run Artifacts</value>
+    <comment>debug.apps.artifacts.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_bundle" xml:space="preserve">
+    <value>Bundle name</value>
+    <comment>debug.apps.bundle (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_captureDiagnostics" xml:space="preserve">
+    <value>Capture bounded HiLog while the app runs</value>
+    <comment>debug.apps.captureDiagnostics (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_chooseHAP" xml:space="preserve">
+    <value>Choose entry HAP…</value>
+    <comment>debug.apps.chooseHAP (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_cleanup_retain" xml:space="preserve">
+    <value>Retain installed app</value>
+    <comment>debug.apps.cleanup.retain (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_cleanup_uninstall" xml:space="preserve">
+    <value>Uninstall after run</value>
+    <comment>debug.apps.cleanup.uninstall (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_cleanupPolicy" xml:space="preserve">
+    <value>Cleanup policy</value>
+    <comment>debug.apps.cleanupPolicy (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_clearSelection" xml:space="preserve">
+    <value>Clear package selection</value>
+    <comment>debug.apps.clearSelection (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_diagnosticsDuration" xml:space="preserve">
+    <value>Diagnostics duration: %d seconds</value>
+    <comment>debug.apps.diagnosticsDuration (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_identity_note" xml:space="preserve">
+    <value>Names are validated against the Catalog schema; they are never interpreted as arguments.</value>
+    <comment>debug.apps.identity.note (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_identity_title" xml:space="preserve">
+    <value>Application identity</value>
+    <comment>debug.apps.identity.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_importing" xml:space="preserve">
+    <value>Checking and importing packages…</value>
+    <comment>debug.apps.importing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_install_replace" xml:space="preserve">
+    <value>Install or replace</value>
+    <comment>debug.apps.install.replace (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_installPolicy" xml:space="preserve">
+    <value>Install policy</value>
+    <comment>debug.apps.installPolicy (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_inventory_debuggable" xml:space="preserve">
+    <value>Debuggable</value>
+    <comment>debug.apps.inventory.debuggable (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_inventory_empty" xml:space="preserve">
+    <value>No package inventory</value>
+    <comment>debug.apps.inventory.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_inventory_empty_detail" xml:space="preserve">
+    <value>The current target probe returned no package names.</value>
+    <comment>debug.apps.inventory.empty.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_inventory_package" xml:space="preserve">
+    <value>Package / process</value>
+    <comment>debug.apps.inventory.package (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_inventory_pid" xml:space="preserve">
+    <value>PID</value>
+    <comment>debug.apps.inventory.pid (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_inventory_title" xml:space="preserve">
+    <value>Packages and debuggable processes</value>
+    <comment>debug.apps.inventory.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_lifecycle_title" xml:space="preserve">
+    <value>Lifecycle request</value>
+    <comment>debug.apps.lifecycle.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_localOnly" xml:space="preserve">
+    <value>The App checks and imports every package in bounded chunks before submitting one Job. Local paths never cross into Runtime.</value>
+    <comment>debug.apps.localOnly (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_mutationDetail" xml:space="preserve">
+    <value>Install, start, stop, uninstall, and remote staging are device mutations. Every dispatch must bind the durable target revision and consume matching authority.</value>
+    <comment>debug.apps.mutationDetail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_mutationScope" xml:space="preserve">
+    <value>Device mutation scope is explicit</value>
+    <comment>debug.apps.mutationScope (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_noHAP" xml:space="preserve">
+    <value>No local HAP selected</value>
+    <comment>debug.apps.noHAP (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_package_title" xml:space="preserve">
+    <value>HAP package</value>
+    <comment>debug.apps.package.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_plan_title" xml:space="preserve">
+    <value>Published operation plan</value>
+    <comment>debug.apps.plan.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_postRun" xml:space="preserve">
+    <value>After the run</value>
+    <comment>debug.apps.postRun (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_postRun_running" xml:space="preserve">
+    <value>Leave running</value>
+    <comment>debug.apps.postRun.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_postRun_stopped" xml:space="preserve">
+    <value>Stop Ability</value>
+    <comment>debug.apps.postRun.stopped (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_run" xml:space="preserve">
+    <value>Import and run</value>
+    <comment>debug.apps.run (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_running" xml:space="preserve">
+    <value>Runtime is executing the typed HAP lifecycle…</value>
+    <comment>debug.apps.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_runningCleanupHint" xml:space="preserve">
+    <value>Uninstall after run removes the app, so it cannot stay running. Choose Retain installed app to keep observing it.</value>
+    <comment>debug.apps.runningCleanupHint (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_selection_duplicatePackage" xml:space="preserve">
+    <value>Each package can be selected only once. Remove the duplicate selection.</value>
+    <comment>debug.apps.selection.duplicatePackage (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_selection_failed" xml:space="preserve">
+    <value>The selected file could not be read.</value>
+    <comment>debug.apps.selection.failed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_selection_invalid" xml:space="preserve">
+    <value>Choose one .hap entry package.</value>
+    <comment>debug.apps.selection.invalid (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_selection_invalidAdditional" xml:space="preserve">
+    <value>Choose .hap or .hsp files with basenames containing letters, numbers, dots, underscores or hyphens.</value>
+    <comment>debug.apps.selection.invalidAdditional (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_selection_invalidEntry" xml:space="preserve">
+    <value>Choose one entry .hap. Use a basename with letters, numbers, dots, underscores or hyphens.</value>
+    <comment>debug.apps.selection.invalidEntry (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_selection_tooManyPackages" xml:space="preserve">
+    <value>Choose at most 16 additional packages.</value>
+    <comment>debug.apps.selection.tooManyPackages (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_apps_target" xml:space="preserve">
+    <value>Exact target</value>
+    <comment>debug.apps.target (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_abi" xml:space="preserve">
+    <value>Artifact ABI</value>
+    <comment>debug.artifacts.abi (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_abi_observed" xml:space="preserve">
+    <value>Read from the signed ELF during validation</value>
+    <comment>debug.artifacts.abi.observed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_advanced" xml:space="preserve">
+    <value>Required verification and rollback</value>
+    <comment>debug.artifacts.advanced (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_browseRemote" xml:space="preserve">
+    <value>Browse remote .so…</value>
+    <comment>debug.artifacts.browseRemote (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_bundle" xml:space="preserve">
+    <value>Target bundle</value>
+    <comment>debug.artifacts.bundle (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_bundleInvalid" xml:space="preserve">
+    <value>Use a dotted bundle name such as com.example.app.</value>
+    <comment>debug.artifacts.bundleInvalid (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_chooseLibrary" xml:space="preserve">
+    <value>Choose local .so…</value>
+    <comment>debug.artifacts.chooseLibrary (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_destination_detail" xml:space="preserve">
+    <value>Name the owning app and library. Runtime derives the app-owned device destination from the published profile; this page never accepts a remote path.</value>
+    <comment>debug.artifacts.destination.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_destination_title" xml:space="preserve">
+    <value>Deployment target</value>
+    <comment>debug.artifacts.destination.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_logicalName" xml:space="preserve">
+    <value>Library name</value>
+    <comment>debug.artifacts.logicalName (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_logicalNameInvalid" xml:space="preserve">
+    <value>Use a lib&lt;name&gt;.so filename with no directory components.</value>
+    <comment>debug.artifacts.logicalNameInvalid (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_noLibrary" xml:space="preserve">
+    <value>No local library selected</value>
+    <comment>debug.artifacts.noLibrary (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_notVerified" xml:space="preserve">
+    <value>Deployment did not reach verified completion</value>
+    <comment>debug.artifacts.notVerified (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_openLogs" xml:space="preserve">
+    <value>Capture logs to verify</value>
+    <comment>debug.artifacts.openLogs (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_planReady" xml:space="preserve">
+    <value>Runtime plan is ready for review</value>
+    <comment>debug.artifacts.planReady (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_policy_required" xml:space="preserve">
+    <value>The Native Debug path always verifies the published hash, restarted process, and loaded-library maps. Any failed verification automatically restores and re-verifies the previous library.</value>
+    <comment>debug.artifacts.policy.required (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_preparing" xml:space="preserve">
+    <value>Validating the signed ELF and materializing the Runtime plan…</value>
+    <comment>debug.artifacts.preparing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_preview" xml:space="preserve">
+    <value>Validate and review plan</value>
+    <comment>debug.artifacts.preview (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_productionBoundary" xml:space="preserve">
+    <value>Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.</value>
+    <comment>debug.artifacts.productionBoundary (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBindingFailed" xml:space="preserve">
+    <value>The artifact was selected, but its server could not be bound to this target.</value>
+    <comment>debug.artifacts.remoteBindingFailed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>debug.artifacts.remoteBrowser.cancel (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_choose" xml:space="preserve">
+    <value>Use selected library</value>
+    <comment>debug.artifacts.remoteBrowser.choose (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_detail" xml:space="preserve">
+    <value>Browse folders below the verified build root. Only lib*.so files are shown.</value>
+    <comment>debug.artifacts.remoteBrowser.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_directory" xml:space="preserve">
+    <value>Directory</value>
+    <comment>debug.artifacts.remoteBrowser.directory (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_empty_detail" xml:space="preserve">
+    <value>Add and verify an SSH server in Settings &gt; Servers first.</value>
+    <comment>debug.artifacts.remoteBrowser.empty.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_empty_title" xml:space="preserve">
+    <value>No remote servers</value>
+    <comment>debug.artifacts.remoteBrowser.empty.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_library" xml:space="preserve">
+    <value>Native library</value>
+    <comment>debug.artifacts.remoteBrowser.library (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_noArtifacts" xml:space="preserve">
+    <value>No folders or native libraries here</value>
+    <comment>debug.artifacts.remoteBrowser.noArtifacts (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_openSettings" xml:space="preserve">
+    <value>Open Server Settings</value>
+    <comment>debug.artifacts.remoteBrowser.openSettings (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_refresh" xml:space="preserve">
+    <value>Refresh directory</value>
+    <comment>debug.artifacts.remoteBrowser.refresh (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_root" xml:space="preserve">
+    <value>Build root</value>
+    <comment>debug.artifacts.remoteBrowser.root (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_server" xml:space="preserve">
+    <value>Server</value>
+    <comment>debug.artifacts.remoteBrowser.server (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_title" xml:space="preserve">
+    <value>Remote build artifacts</value>
+    <comment>debug.artifacts.remoteBrowser.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_remoteBrowser_up" xml:space="preserve">
+    <value>Up</value>
+    <comment>debug.artifacts.remoteBrowser.up (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_reopenPlan" xml:space="preserve">
+    <value>Review prepared plan</value>
+    <comment>debug.artifacts.reopenPlan (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_results_title" xml:space="preserve">
+    <value>Publish and verification Artifacts</value>
+    <comment>debug.artifacts.results.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_review_detail" xml:space="preserve">
+    <value>Validation must complete before the plan can be submitted. The reviewed plan digest pins the exact target, binding, Artifact lease, inputs, and step sequence.</value>
+    <comment>debug.artifacts.review.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_review_title" xml:space="preserve">
+    <value>Review and run</value>
+    <comment>debug.artifacts.review.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_rollback" xml:space="preserve">
+    <value>Rollback policy</value>
+    <comment>debug.artifacts.rollback (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_rollback_auto" xml:space="preserve">
+    <value>Restore and verify the previous library on failure</value>
+    <comment>debug.artifacts.rollback.auto (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_running" xml:space="preserve">
+    <value>Runtime is deploying and verifying the library</value>
+    <comment>debug.artifacts.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_running_detail" xml:space="preserve">
+    <value>Waiting for the next durable Runtime stage.</value>
+    <comment>debug.artifacts.running.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_selectedLibrary" xml:space="preserve">
+    <value>Selected library</value>
+    <comment>debug.artifacts.selectedLibrary (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_back" xml:space="preserve">
+    <value>Back to selection</value>
+    <comment>debug.artifacts.sheet.back (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_bundle" xml:space="preserve">
+    <value>Owning bundle</value>
+    <comment>debug.artifacts.sheet.bundle (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_digest" xml:space="preserve">
+    <value>Plan digest</value>
+    <comment>debug.artifacts.sheet.digest (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_library" xml:space="preserve">
+    <value>Library</value>
+    <comment>debug.artifacts.sheet.library (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_rollback" xml:space="preserve">
+    <value>Failure handling</value>
+    <comment>debug.artifacts.sheet.rollback (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_run" xml:space="preserve">
+    <value>Back up, replace, restart, and verify</value>
+    <comment>debug.artifacts.sheet.run (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_steps" xml:space="preserve">
+    <value>Materialized steps</value>
+    <comment>debug.artifacts.sheet.steps (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_target" xml:space="preserve">
+    <value>Exact target</value>
+    <comment>debug.artifacts.sheet.target (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_title" xml:space="preserve">
+    <value>Review replacement plan</value>
+    <comment>debug.artifacts.sheet.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_verification" xml:space="preserve">
+    <value>Required verification</value>
+    <comment>debug.artifacts.sheet.verification (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sheet_warning" xml:space="preserve">
+    <value>ABI and signature validation block incompatible input before device writes. Runtime backs up the current library, publishes atomically, restarts the owning Ability, and requires loaded-library maps. Any failed verification automatically restores and re-verifies the previous library.</value>
+    <comment>debug.artifacts.sheet.warning (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_source_detail" xml:space="preserve">
+    <value>Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.</value>
+    <comment>debug.artifacts.source.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_source_kind" xml:space="preserve">
+    <value>Build source</value>
+    <comment>debug.artifacts.source.kind (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_source_local" xml:space="preserve">
+    <value>Local file</value>
+    <comment>debug.artifacts.source.local (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_source_remote" xml:space="preserve">
+    <value>Remote server</value>
+    <comment>debug.artifacts.source.remote (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_source_title" xml:space="preserve">
+    <value>Build Artifact</value>
+    <comment>debug.artifacts.source.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_sourceBoundary" xml:space="preserve">
+    <value>SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.</value>
+    <comment>debug.artifacts.sourceBoundary (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_target" xml:space="preserve">
+    <value>Target device</value>
+    <comment>debug.artifacts.target (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_targetConfirmed" xml:space="preserve">
+    <value>Binding confirmed</value>
+    <comment>debug.artifacts.targetConfirmed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_verification" xml:space="preserve">
+    <value>Post-publish verification</value>
+    <comment>debug.artifacts.verification (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_verified" xml:space="preserve">
+    <value>Library published, Ability restarted, and loaded state verified</value>
+    <comment>debug.artifacts.verified (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_verify_maps" xml:space="preserve">
+    <value>Verify hash, process, and loaded maps</value>
+    <comment>debug.artifacts.verify.maps (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_availability_available" xml:space="preserve">
+    <value>Provider reports available</value>
+    <comment>debug.availability.available (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_availability_checking" xml:space="preserve">
+    <value>Checking Runtime availability…</value>
+    <comment>debug.availability.checking (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_availability_effect" xml:space="preserve">
+    <value>Minimum effect: %@</value>
+    <comment>debug.availability.effect (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_availability_missing" xml:space="preserve">
+    <value>The operation descriptor is missing from this build. Nothing can be prepared.</value>
+    <comment>debug.availability.missing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_availability_operation" xml:space="preserve">
+    <value>Operation</value>
+    <comment>debug.availability.operation (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_availability_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>debug.availability.unavailable (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_blocked_bufferOperation" xml:space="preserve">
+    <value>No published Runtime operation exposes device buffer mutation. Normal capture never clears, resizes, or flushes it.</value>
+    <comment>debug.blocked.bufferOperation (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_blocked_packageLifecycle" xml:space="preserve">
+    <value>No published Runtime operation starts, stops, or uninstalls an individual package. Use the typed HAP lifecycle above.</value>
+    <comment>debug.blocked.packageLifecycle (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_argv_note" xml:space="preserve">
+    <value>Only the provider may lower this typed input into executable + argv after Runtime admission. The Job's derived report discloses that lowering; the UI never guesses or concatenates a shell command.</value>
+    <comment>debug.commands.argv.note (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_argv_title" xml:space="preserve">
+    <value>Typed Runtime request</value>
+    <comment>debug.commands.argv.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_artifacts_empty" xml:space="preserve">
+    <value>No published template Artifacts</value>
+    <comment>debug.commands.artifacts.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_artifacts_empty_detail" xml:space="preserve">
+    <value>Run an approved template to publish its bounded output and report.</value>
+    <comment>debug.commands.artifacts.empty.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_artifacts_title" xml:space="preserve">
+    <value>Runtime Job Artifacts</value>
+    <comment>debug.commands.artifacts.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_calloutTyped" xml:space="preserve">
+    <value>The App submits approved typed templates only through debug.template@1. Runtime records the request as a durable Job and publishes bounded Artifacts.</value>
+    <comment>debug.commands.calloutTyped (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_effect" xml:space="preserve">
+    <value>Effect</value>
+    <comment>debug.commands.effect (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_footerNoFreeText" xml:space="preserve">
+    <value>There is no free-text command, argv or path field; PTY and raw shell do not belong to this surface.</value>
+    <comment>debug.commands.footerNoFreeText (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_job_id" xml:space="preserve">
+    <value>Job</value>
+    <comment>debug.commands.job.id (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_job_known" xml:space="preserve">
+    <value>Known</value>
+    <comment>debug.commands.job.known (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_job_latest" xml:space="preserve">
+    <value>Latest event</value>
+    <comment>debug.commands.job.latest (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_job_outcome" xml:space="preserve">
+    <value>Outcome</value>
+    <comment>debug.commands.job.outcome (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_job_running" xml:space="preserve">
+    <value>Debug template Job running</value>
+    <comment>debug.commands.job.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_job_state" xml:space="preserve">
+    <value>State</value>
+    <comment>debug.commands.job.state (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_job_unknown" xml:space="preserve">
+    <value>Unknown — inspect Runtime recovery</value>
+    <comment>debug.commands.job.unknown (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_noPTY" xml:space="preserve">
+    <value>No PTY, password prompt, sudo, or interactive session</value>
+    <comment>debug.commands.noPTY (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_noParameters" xml:space="preserve">
+    <value>This template declares no user parameters.</value>
+    <comment>debug.commands.noParameters (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_result_none" xml:space="preserve">
+    <value>No result</value>
+    <comment>debug.commands.result.none (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_result_title" xml:space="preserve">
+    <value>Runtime Job result</value>
+    <comment>debug.commands.result.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_run" xml:space="preserve">
+    <value>Run once</value>
+    <comment>debug.commands.run (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_select" xml:space="preserve">
+    <value>Select an approved template</value>
+    <comment>debug.commands.select (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_commands_target" xml:space="preserve">
+    <value>Exact target</value>
+    <comment>debug.commands.target (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_artifactFinalizationFailed" xml:space="preserve">
+    <value>Runtime could not finalize all artifacts. Review the Job details.</value>
+    <comment>debug.failure.artifactFinalizationFailed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_artifactPublicationFailed" xml:space="preserve">
+    <value>Runtime could not publish an execution artifact. Review the Job details.</value>
+    <comment>debug.failure.artifactPublicationFailed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_cancelled" xml:space="preserve">
+    <value>The operation stopped at a safe boundary.</value>
+    <comment>debug.failure.cancelled (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_executionConfirmedNotPerformed" xml:space="preserve">
+    <value>The operation did not run. Runtime proof is required before another request.</value>
+    <comment>debug.failure.executionConfirmedNotPerformed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_executionFailed" xml:space="preserve">
+    <value>Execution failed. Review this Job’s artifacts and diagnostics.</value>
+    <comment>debug.failure.executionFailed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_interrupted" xml:space="preserve">
+    <value>Runtime was interrupted. Review the Job before continuing.</value>
+    <comment>debug.failure.interrupted (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_legacyFailure" xml:space="preserve">
+    <value>The operation failed. Review the Job timeline and artifacts.</value>
+    <comment>debug.failure.legacyFailure (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_outcomeUnknown" xml:space="preserve">
+    <value>The device effect is unknown. Keep the device unchanged while Runtime reconciles it.</value>
+    <comment>debug.failure.outcomeUnknown (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_failure_reconciliationConfirmedNotPerformed" xml:space="preserve">
+    <value>Runtime confirmed that the operation did not complete. Submit another typed request only after Runtime permits it.</value>
+    <comment>debug.failure.reconciliationConfirmedNotPerformed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_jobs_active" xml:space="preserve">
+    <value>%d active Debug jobs</value>
+    <comment>debug.jobs.active (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_jobs_empty" xml:space="preserve">
+    <value>Runtime reports no related jobs.</value>
+    <comment>debug.jobs.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_jobs_title" xml:space="preserve">
+    <value>Recent Runtime jobs</value>
+    <comment>debug.jobs.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_capture_title" xml:space="preserve">
+    <value>Bounded HiLog capture</value>
+    <comment>debug.logs.capture.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_destructive_clear" xml:space="preserve">
+    <value>Clear device buffer…</value>
+    <comment>debug.logs.destructive.clear (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_destructive_menu" xml:space="preserve">
+    <value>Device buffer actions</value>
+    <comment>debug.logs.destructive.menu (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_destructive_scope" xml:space="preserve">
+    <value>These actions modify global device logging state and require separate capability checks, confirmation, and audit.</value>
+    <comment>debug.logs.destructive.scope (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_destructive_title" xml:space="preserve">
+    <value>Separate destructive actions</value>
+    <comment>debug.logs.destructive.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_domain" xml:space="preserve">
+    <value>Domain filter</value>
+    <comment>debug.logs.domain (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_duration" xml:space="preserve">
+    <value>Duration: %d seconds</value>
+    <comment>debug.logs.duration (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_export" xml:space="preserve">
+    <value>Export…</value>
+    <comment>debug.logs.export (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_exportBoundary" xml:space="preserve">
+    <value>Artifact bytes are read in bounded verified chunks; the save location is handled only by the App and is never sent to Runtime.</value>
+    <comment>debug.logs.exportBoundary (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_exportCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>debug.logs.exportCancel (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_exportConfirm" xml:space="preserve">
+    <value>Choose save location…</value>
+    <comment>debug.logs.exportConfirm (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_exportPreview_message" xml:space="preserve">
+    <value>Name: %1$@
+Size: %2$@
+Privacy: %3$@
+SHA-256: %4$@</value>
+    <comment>debug.logs.exportPreview.message (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_exportPreview_title" xml:space="preserve">
+    <value>Review Artifact export</value>
+    <comment>debug.logs.exportPreview.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_exportSensitive" xml:space="preserve">
+    <value>Export sensitive Artifact…</value>
+    <comment>debug.logs.exportSensitive (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_exporting" xml:space="preserve">
+    <value>Exporting Artifact</value>
+    <comment>debug.logs.exporting (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_filters_invalid" xml:space="preserve">
+    <value>Invalid typed value in: %@. Use letters, numbers, dot, underscore, colon, or hyphen only.</value>
+    <comment>debug.logs.filters.invalid (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_filters_note" xml:space="preserve">
+    <value>Every filter is a bounded typed token. Free shell fragments are never accepted.</value>
+    <comment>debug.logs.filters.note (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_keyword" xml:space="preserve">
+    <value>Keyword</value>
+    <comment>debug.logs.keyword (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_level" xml:space="preserve">
+    <value>Minimum level</value>
+    <comment>debug.logs.level (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_live_empty" xml:space="preserve">
+    <value>No live stream is attached</value>
+    <comment>debug.logs.live.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_live_empty_detail" xml:space="preserve">
+    <value>A Runtime capture can publish bounded shards and a manifest. Pausing this viewport would never stop host capture.</value>
+    <comment>debug.logs.live.empty.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_live_title" xml:space="preserve">
+    <value>Live viewport</value>
+    <comment>debug.logs.live.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_marker" xml:space="preserve">
+    <value>Marker</value>
+    <comment>debug.logs.marker (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_pause" xml:space="preserve">
+    <value>Pause viewport</value>
+    <comment>debug.logs.pause (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_pause_requiresCapture" xml:space="preserve">
+    <value>The viewport can pause only while a capture is running; pausing never stops host capture.</value>
+    <comment>debug.logs.pause.requiresCapture (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_pid" xml:space="preserve">
+    <value>PID filter</value>
+    <comment>debug.logs.pid (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_rawSave" xml:space="preserve">
+    <value>Save raw HiLog artifact (required)</value>
+    <comment>debug.logs.rawSave (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_request_title" xml:space="preserve">
+    <value>Typed request preview</value>
+    <comment>debug.logs.request.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_resume" xml:space="preserve">
+    <value>Resume viewport</value>
+    <comment>debug.logs.resume (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_shards_empty" xml:space="preserve">
+    <value>No host shards</value>
+    <comment>debug.logs.shards.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_shards_empty_detail" xml:space="preserve">
+    <value>Completed shards appear here in manifest order with exact size and hash.</value>
+    <comment>debug.logs.shards.empty.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_shards_hash" xml:space="preserve">
+    <value>SHA-256</value>
+    <comment>debug.logs.shards.hash (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_shards_sequence" xml:space="preserve">
+    <value>Sequence / shard</value>
+    <comment>debug.logs.shards.sequence (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_shards_size" xml:space="preserve">
+    <value>Size</value>
+    <comment>debug.logs.shards.size (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_shards_title" xml:space="preserve">
+    <value>Host shards and retention</value>
+    <comment>debug.logs.shards.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_showInFinder" xml:space="preserve">
+    <value>Show in Finder</value>
+    <comment>debug.logs.showInFinder (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_start" xml:space="preserve">
+    <value>Start capture</value>
+    <comment>debug.logs.start (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_storage_totalBudget" xml:space="preserve">
+    <value>Published operation total output budget: %@</value>
+    <comment>debug.logs.storage.totalBudget (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_tag" xml:space="preserve">
+    <value>Tag filter</value>
+    <comment>debug.logs.tag (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_target" xml:space="preserve">
+    <value>Exact target</value>
+    <comment>debug.logs.target (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_logs_viewport_bounded" xml:space="preserve">
+    <value>Bounded memory window</value>
+    <comment>debug.logs.viewport.bounded (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_add" xml:space="preserve">
+    <value>Add rule</value>
+    <comment>debug.network.add (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_delete" xml:space="preserve">
+    <value>Delete selected…</value>
+    <comment>debug.network.delete (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_delete_scope" xml:space="preserve">
+    <value>Deletion must name the exact rule and durable target binding</value>
+    <comment>debug.network.delete.scope (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_direction" xml:space="preserve">
+    <value>Direction</value>
+    <comment>debug.network.direction (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_editor_title" xml:space="preserve">
+    <value>Typed port rule</value>
+    <comment>debug.network.editor.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_forward" xml:space="preserve">
+    <value>Forward</value>
+    <comment>debug.network.forward (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_localPort" xml:space="preserve">
+    <value>Host port (1024–65535)</value>
+    <comment>debug.network.localPort (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_remotePort" xml:space="preserve">
+    <value>Device port (1024–65535)</value>
+    <comment>debug.network.remotePort (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_reverse" xml:space="preserve">
+    <value>Reverse</value>
+    <comment>debug.network.reverse (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_action" xml:space="preserve">
+    <value>Action</value>
+    <comment>debug.network.rules.action (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_direction" xml:space="preserve">
+    <value>Direction</value>
+    <comment>debug.network.rules.direction (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_empty" xml:space="preserve">
+    <value>No forwarding inventory</value>
+    <comment>debug.network.rules.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_empty_detail" xml:space="preserve">
+    <value>The current Runtime publishes no operation for reading forward/reverse rules.</value>
+    <comment>debug.network.rules.empty.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_local" xml:space="preserve">
+    <value>Host endpoint</value>
+    <comment>debug.network.rules.local (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_remote" xml:space="preserve">
+    <value>Device endpoint</value>
+    <comment>debug.network.rules.remote (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_state" xml:space="preserve">
+    <value>State</value>
+    <comment>debug.network.rules.state (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_rules_title" xml:space="preserve">
+    <value>Forward / reverse rules</value>
+    <comment>debug.network.rules.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_safety_binding" xml:space="preserve">
+    <value>Every create/delete operation binds one durable target revision</value>
+    <comment>debug.network.safety.binding (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_safety_noShell" xml:space="preserve">
+    <value>No shell fragments, schemes, hosts, or flags are accepted</value>
+    <comment>debug.network.safety.noShell (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_safety_title" xml:space="preserve">
+    <value>Validation and scope</value>
+    <comment>debug.network.safety.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_safety_typed" xml:space="preserve">
+    <value>Only decimal TCP ports from 1024 through 65535 are accepted</value>
+    <comment>debug.network.safety.typed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_target" xml:space="preserve">
+    <value>Exact target</value>
+    <comment>debug.network.target (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_typedRule" xml:space="preserve">
+    <value>Typed rule</value>
+    <comment>debug.network.typedRule (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_validation_localPortNotNumeric" xml:space="preserve">
+    <value>Enter a decimal host port.</value>
+    <comment>debug.network.validation.localPortNotNumeric (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_validation_localPortOutOfRange" xml:space="preserve">
+    <value>Host port must be from 1024 through 65535.</value>
+    <comment>debug.network.validation.localPortOutOfRange (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_validation_remotePortNotNumeric" xml:space="preserve">
+    <value>Enter a decimal device port.</value>
+    <comment>debug.network.validation.remotePortNotNumeric (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_validation_remotePortOutOfRange" xml:space="preserve">
+    <value>Device port must be from 1024 through 65535.</value>
+    <comment>debug.network.validation.remotePortOutOfRange (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_network_validation_valid" xml:space="preserve">
+    <value>Both ports are valid typed values.</value>
+    <comment>debug.network.validation.valid (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_optional" xml:space="preserve">
+    <value>Optional</value>
+    <comment>debug.optional (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_scope" xml:space="preserve">
+    <value>Typed Artifact deployment, logs, app lifecycle, network rules, and approved read-only tools — never a raw terminal.</value>
+    <comment>debug.scope (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_tab_apps" xml:space="preserve">
+    <value>Apps</value>
+    <comment>debug.tab.apps (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_tab_artifacts" xml:space="preserve">
+    <value>Artifacts</value>
+    <comment>debug.tab.artifacts (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_tab_commands" xml:space="preserve">
+    <value>Commands</value>
+    <comment>debug.tab.commands (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_tab_logs" xml:space="preserve">
+    <value>Logs</value>
+    <comment>debug.tab.logs (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_tab_network" xml:space="preserve">
+    <value>Network</value>
+    <comment>debug.tab.network (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_tabs_label" xml:space="preserve">
+    <value>Debug workspace</value>
+    <comment>debug.tabs.label (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_target_binding" xml:space="preserve">
+    <value>Binding r%d · HDC %@</value>
+    <comment>debug.target.binding (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_target_label" xml:space="preserve">
+    <value>Target device</value>
+    <comment>debug.target.label (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_target_none" xml:space="preserve">
+    <value>No adopted target</value>
+    <comment>debug.target.none (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_typed_invalidIdentifier" xml:space="preserve">
+    <value>%@ accepts only letters, digits and . _ : - — the value never reaches a shell.</value>
+    <comment>debug.typed.invalidIdentifier (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_action_cancel" xml:space="preserve">
+    <value>Cancel remaining steps</value>
+    <comment>flash.action.cancel (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_action_cancel_help" xml:space="preserve">
+    <value>If a partition write is in progress, Runtime finishes that critical step and stops only at the next safe boundary.</value>
+    <comment>flash.action.cancel.help (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_action_refresh" xml:space="preserve">
+    <value>Refresh Flash facts</value>
+    <comment>flash.action.refresh (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_available" xml:space="preserve">
+    <value>AVAILABLE — Runtime can materialize flash.full-restore@1</value>
+    <comment>flash.availability.available (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_checking" xml:space="preserve">
+    <value>Checking Runtime availability</value>
+    <comment>flash.availability.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_scope" xml:space="preserve">
+    <value>Availability describes the production Runtime. Preparing a preview never submits or runs an operation.</value>
+    <comment>flash.availability.scope (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_title" xml:space="preserve">
+    <value>Availability</value>
+    <comment>flash.availability.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_unavailable" xml:space="preserve">
+    <value>UNAVAILABLE — Flash execution is blocked</value>
+    <comment>flash.availability.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_binding_unprepared_hdc_detail" xml:space="preserve">
+    <value>The selected board matches one adopted Runtime target, while another board is still the active Flash binding. Click Flash once; Runtime will re-read the unique USB identity, atomically activate only the exact selected target, refresh prerequisites, and stop before any write if those facts drift.</value>
+    <comment>flash.binding.unprepared.hdc.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_binding_unprepared_hdc_title" xml:space="preserve">
+    <value>Selected DAYU200 needs active binding</value>
+    <comment>flash.binding.unprepared.hdc.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_bound" xml:space="preserve">
+    <value>Loader is bound to the selected device</value>
+    <comment>flash.bootloader.bound (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unbound_detail" xml:space="preserve">
+    <value>ArkDeck found one DAYU200 in Loader mode, but it is not yet linked to a durable target. Select the device, then click Flash once; Runtime will bind the Loader, refresh the exact plan, and continue only if every prerequisite passes.</value>
+    <comment>flash.bootloader.unbound.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unbound_title" xml:space="preserve">
+    <value>DAYU200 is already in Loader mode</value>
+    <comment>flash.bootloader.unbound.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unprepared_detail" xml:space="preserve">
+    <value>ArkDeck found the selected DAYU200 in Loader mode, but its historical binding needs a fresh Runtime attestation. Click Flash once; Runtime will re-attest the selected Loader, refresh the exact plan, and continue only if every prerequisite passes.</value>
+    <comment>flash.bootloader.unprepared.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_checking" xml:space="preserve">
+    <value>Checking RockUSB device access</value>
+    <comment>flash.deviceAccess.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_nextStep" xml:space="preserve">
+    <value>Minimum next step</value>
+    <comment>flash.deviceAccess.nextStep (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_observationValue" xml:space="preserve">
+    <value>%1$d device(s) · %2$@</value>
+    <comment>flash.deviceAccess.observationValue (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_observations" xml:space="preserve">
+    <value>Observed</value>
+    <comment>flash.deviceAccess.observations (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_chooseSupportedLoaderObservation" xml:space="preserve">
+    <value>Use the supported DAYU200 Loader device shown above, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.chooseSupportedLoaderObservation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_inspectControlledDiagnostics" xml:space="preserve">
+    <value>Have the device or tool vendor inspect the controlled probe diagnostics.</value>
+    <comment>flash.deviceAccess.remediation.inspectControlledDiagnostics (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_reconnectOrEnterLoader" xml:space="preserve">
+    <value>Reconnect the board or put it into Loader mode, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.reconnectOrEnterLoader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_repairDriverOutsideArkDeck" xml:space="preserve">
+    <value>Ask the device or tool vendor to repair the host USB driver or libusb backend outside ArkDeck, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.repairDriverOutsideArkDeck (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_reviewDevicePermissionOutsideArkDeck" xml:space="preserve">
+    <value>Ask a system administrator to grant this user access to the RockUSB device outside ArkDeck, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.reviewDevicePermissionOutsideArkDeck (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_reprobe" xml:space="preserve">
+    <value>Re-check device access</value>
+    <comment>flash.deviceAccess.reprobe (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility" xml:space="preserve">
+    <value>Responsible party</value>
+    <comment>flash.deviceAccess.responsibility (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_deviceOrToolVendor" xml:space="preserve">
+    <value>Device or tool vendor</value>
+    <comment>flash.deviceAccess.responsibility.deviceOrToolVendor (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_systemAdministrator" xml:space="preserve">
+    <value>System administrator</value>
+    <comment>flash.deviceAccess.responsibility.systemAdministrator (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_user" xml:space="preserve">
+    <value>Device operator</value>
+    <comment>flash.deviceAccess.responsibility.user (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_title" xml:space="preserve">
+    <value>Rockchip device access</value>
+    <comment>flash.deviceAccess.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_toolUnavailable" xml:space="preserve">
+    <value>ArkForge RockUSB discovery is unavailable</value>
+    <comment>flash.deviceAccess.toolUnavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_accessible" xml:space="preserve">
+    <value>Loader device access is ready</value>
+    <comment>flash.deviceAccess.verdict.accessible (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_driverUnavailable" xml:space="preserve">
+    <value>Host driver or libusb backend is unavailable</value>
+    <comment>flash.deviceAccess.verdict.driverUnavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_malformedOutput" xml:space="preserve">
+    <value>The registered probe returned unknown output</value>
+    <comment>flash.deviceAccess.verdict.malformedOutput (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_offline" xml:space="preserve">
+    <value>Device is offline or not in Loader mode</value>
+    <comment>flash.deviceAccess.verdict.offline (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_permissionDenied" xml:space="preserve">
+    <value>Host permission denies RockUSB access</value>
+    <comment>flash.deviceAccess.verdict.permissionDenied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_probeFailed" xml:space="preserve">
+    <value>The registered device probe failed</value>
+    <comment>flash.deviceAccess.verdict.probeFailed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_protocolBlocked" xml:space="preserve">
+    <value>A device was found, but it is not a supported DAYU200 Loader target</value>
+    <comment>flash.deviceAccess.verdict.protocolBlocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_destructive" xml:space="preserve">
+    <value>Destructive</value>
+    <comment>flash.effect.destructive (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_deviceMutation" xml:space="preserve">
+    <value>Device mutation</value>
+    <comment>flash.effect.deviceMutation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_hostOnly" xml:space="preserve">
+    <value>Host only</value>
+    <comment>flash.effect.hostOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_readOnly" xml:space="preserve">
+    <value>Read only</value>
+    <comment>flash.effect.readOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_fileAccess" xml:space="preserve">
+    <value>Unable to read the selected file. Select the image bundle again.</value>
+    <comment>flash.error.fileAccess (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_format" xml:space="preserve">
+    <value>Choose a .tar.gz, .zip, or .7z image archive.</value>
+    <comment>flash.error.format (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_invalid" xml:space="preserve">
+    <value>Choose a complete, valid DAYU200 image archive.</value>
+    <comment>flash.error.invalid (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_plan" xml:space="preserve">
+    <value>Unable to materialize the exact plan. Review the detail below.</value>
+    <comment>flash.error.plan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_unreadable" xml:space="preserve">
+    <value>Unable to read the image bundle. Select it again.</value>
+    <comment>flash.error.unreadable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_unsupported" xml:space="preserve">
+    <value>This image bundle does not match the selected DAYU200 profile.</value>
+    <comment>flash.error.unsupported (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_planRequired" xml:space="preserve">
+    <value>Prepare an exact execute plan before flashing.</value>
+    <comment>flash.execute.planRequired (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_prerequisiteBlocker" xml:space="preserve">
+    <value>Required Runtime prerequisites are unknown or not satisfied. Keep the intended DAYU200 connected, prepare its cross-mode binding, then prepare the exact plan again.</value>
+    <comment>flash.execute.prerequisiteBlocker (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_terminal" xml:space="preserve">
+    <value>Runtime Flash finished: %@</value>
+    <comment>flash.execute.terminal (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_image_choose" xml:space="preserve">
+    <value>Choose image bundle…</value>
+    <comment>flash.image.choose (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_partitions" xml:space="preserve">
+    <value>The plan overwrites %d mapped partitions.</value>
+    <comment>flash.impact.partitions (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_preserved" xml:space="preserve">
+    <value>Orphan images, unmapped partitions, and sector gaps remain untouched.</value>
+    <comment>flash.impact.preserved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_userdata" xml:space="preserve">
+    <value>userdata is overwritten; existing user data is destroyed.</value>
+    <comment>flash.impact.userdata (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_archiveHash" xml:space="preserve">
+    <value>Archive SHA-256</value>
+    <comment>flash.plan.archiveHash (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_build" xml:space="preserve">
+    <value>Embedded build</value>
+    <comment>flash.plan.build (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_digest" xml:space="preserve">
+    <value>Plan digest</value>
+    <comment>flash.plan.digest (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_digest_materializedAtSubmission" xml:space="preserve">
+    <value>Materialized by Runtime at submission (recorded on the job)</value>
+    <comment>flash.plan.digest.materializedAtSubmission (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_imageHash" xml:space="preserve">
+    <value>Image SHA-256</value>
+    <comment>flash.plan.imageHash (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_imageSize" xml:space="preserve">
+    <value>Image size</value>
+    <comment>flash.plan.imageSize (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan" xml:space="preserve">
+    <value>ArkForge lane plan (preview)</value>
+    <comment>flash.plan.lanePlan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_bundleNotInLaneStore" xml:space="preserve">
+    <value>Not previewable yet: this bundle has never entered the lane store; it becomes previewable after its first flash</value>
+    <comment>flash.plan.lanePlan.bundleNotInLaneStore (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_deviceNotObserved" xml:space="preserve">
+    <value>Device not observed</value>
+    <comment>flash.plan.lanePlan.deviceNotObserved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_laneNotComposed" xml:space="preserve">
+    <value>This runtime has no ArkForge lane composed</value>
+    <comment>flash.plan.lanePlan.laneNotComposed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_pending" xml:space="preserve">
+    <value>Asking arkforged for a pre-materialization…</value>
+    <comment>flash.plan.lanePlan.pending (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_planNotExecutable" xml:space="preserve">
+    <value>arkforged declined an executable plan</value>
+    <comment>flash.plan.lanePlan.planNotExecutable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_unavailable" xml:space="preserve">
+    <value>Preview unavailable</value>
+    <comment>flash.plan.lanePlan.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_partitionCount" xml:space="preserve">
+    <value>Mapped partition images: %d</value>
+    <comment>flash.plan.partitionCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_preparing" xml:space="preserve">
+    <value>Reading, hashing, and validating the image bundle…</value>
+    <comment>flash.plan.preparing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisites" xml:space="preserve">
+    <value>Execution prerequisites</value>
+    <comment>flash.plan.prerequisites (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisitesAwaitPlan" xml:space="preserve">
+    <value>Profile prerequisites are listed once an exact plan exists.</value>
+    <comment>flash.plan.prerequisitesAwaitPlan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisitesNote" xml:space="preserve">
+    <value>These are the latest read-only Runtime observations. Unknown is never upgraded by the App; Runtime verifies every required prerequisite again before a critical write.</value>
+    <comment>flash.plan.prerequisitesNote (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_size" xml:space="preserve">
+    <value>Archive size</value>
+    <comment>flash.plan.size (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_stepSetDigest" xml:space="preserve">
+    <value>Step-set digest</value>
+    <comment>flash.plan.stepSetDigest (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_title" xml:space="preserve">
+    <value>Exact plan</value>
+    <comment>flash.plan.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_writeForbidden" xml:space="preserve">
+    <value>Archive members excluded from writes</value>
+    <comment>flash.plan.writeForbidden (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_binding" xml:space="preserve">
+    <value>Device binding</value>
+    <comment>flash.postflight.binding (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_build" xml:space="preserve">
+    <value>System build</value>
+    <comment>flash.postflight.build (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_comparison" xml:space="preserve">
+    <value>Expected %1$@ · observed %2$@</value>
+    <comment>flash.postflight.comparison (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_match" xml:space="preserve">
+    <value>%1$@ matches. Expected %2$@; observed %3$@.</value>
+    <comment>flash.postflight.match (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_mismatch" xml:space="preserve">
+    <value>%1$@ does not match. Expected %2$@; observed %3$@.</value>
+    <comment>flash.postflight.mismatch (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_title" xml:space="preserve">
+    <value>Postflight checks</value>
+    <comment>flash.postflight.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_loader" xml:space="preserve">
+    <value>Loader mode</value>
+    <comment>flash.prerequisite.loader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_notApplicable" xml:space="preserve">
+    <value>Not applicable for this profile</value>
+    <comment>flash.prerequisite.notApplicable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_optional" xml:space="preserve">
+    <value>Optional for this profile</value>
+    <comment>flash.prerequisite.optional (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_recoveryPath" xml:space="preserve">
+    <value>Recovery path available</value>
+    <comment>flash.prerequisite.recoveryPath (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_required" xml:space="preserve">
+    <value>Required by this profile</value>
+    <comment>flash.prerequisite.required (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_stablePower" xml:space="preserve">
+    <value>Stable host and device power</value>
+    <comment>flash.prerequisite.stablePower (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_satisfied" xml:space="preserve">
+    <value>Satisfied</value>
+    <comment>flash.prerequisite.status.satisfied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>flash.prerequisite.status.unknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_unsatisfied" xml:space="preserve">
+    <value>Not satisfied</value>
+    <comment>flash.prerequisite.status.unsatisfied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_unlocked" xml:space="preserve">
+    <value>Device write access</value>
+    <comment>flash.prerequisite.unlocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_profile_label" xml:space="preserve">
+    <value>Device profile</value>
+    <comment>flash.profile.label (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_criticalWrite" xml:space="preserve">
+    <value>Writing a partition — this critical step cannot be interrupted. Stopping only prevents later steps. Do not close the lid, sleep the Mac, disconnect power, or unplug the device.</value>
+    <comment>flash.runtime.criticalWrite (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_empty" xml:space="preserve">
+    <value>No Runtime Flash jobs</value>
+    <comment>flash.runtime.empty (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_emptyDescription" xml:space="preserve">
+    <value>Preparing or confirming a local plan does not create a Job. Authorized Runtime execution will appear here.</value>
+    <comment>flash.runtime.emptyDescription (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>flash.runtime.job (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_jobCount" xml:space="preserve">
+    <value>Runtime Flash jobs: %d</value>
+    <comment>flash.runtime.jobCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_openRecord" xml:space="preserve">
+    <value>Open Runtime record</value>
+    <comment>flash.runtime.openRecord (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_outcomeUnknownGuidance" xml:space="preserve">
+    <value>The old device effect remains unknown. Runtime will automatically recognize or run an exact complete-overwrite recovery when proof is sufficient; a user confirmation cannot override missing proof.</value>
+    <comment>flash.runtime.outcomeUnknownGuidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_readOnly" xml:space="preserve">
+    <value>Read only: this card cannot cancel, retry, reconcile, or resume.</value>
+    <comment>flash.runtime.readOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_recoveryTitle" xml:space="preserve">
+    <value>A Runtime Flash job needs attention</value>
+    <comment>flash.runtime.recoveryTitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_residue" xml:space="preserve">
+    <value>Outstanding cleanup items: %d</value>
+    <comment>flash.runtime.residue (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_cancelled" xml:space="preserve">
+    <value>Runtime reports cancellation. Review the last confirmed stage before disconnecting the device.</value>
+    <comment>flash.runtime.result.cancelled (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_failed" xml:space="preserve">
+    <value>Runtime reports failure. Use the Job record to find the last confirmed stage before recovery.</value>
+    <comment>flash.runtime.result.failed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_inProgress" xml:space="preserve">
+    <value>Runtime is still processing this Job. Progress is stage-based; no percentage is fabricated.</value>
+    <comment>flash.runtime.result.inProgress (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_interrupted" xml:space="preserve">
+    <value>Runtime reports an interruption. Open the Job record before deciding the device state.</value>
+    <comment>flash.runtime.result.interrupted (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_needsAction" xml:space="preserve">
+    <value>Runtime stopped at a non-overridable safety blocker. This page cannot supply missing device-state proof.</value>
+    <comment>flash.runtime.result.needsAction (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_outcomeUnknown" xml:space="preserve">
+    <value>Device effect is unknown. Do not treat this Job as finished or start another flash.</value>
+    <comment>flash.runtime.result.outcomeUnknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_planned" xml:space="preserve">
+    <value>Plan-only Job completed. No device mutation was dispatched.</value>
+    <comment>flash.runtime.result.planned (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_succeeded" xml:space="preserve">
+    <value>Runtime reports success after the Flash and postflight checks.</value>
+    <comment>flash.runtime.result.succeeded (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_supersededByRecovery" xml:space="preserve">
+    <value>This Job's outcome remains unknown, but a later confirmed complete-overwrite recovery established the current target state.</value>
+    <comment>flash.runtime.result.supersededByRecovery (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_targetAliasResolved" xml:space="preserve">
+    <value>This Job's outcome remains unknown, but a later confirmed full Flash proved its target was an alias and established the current device state.</value>
+    <comment>flash.runtime.result.targetAliasResolved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_unknown" xml:space="preserve">
+    <value>Runtime returned an unfamiliar state. Open the record before deciding what to do.</value>
+    <comment>flash.runtime.result.unknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>flash.runtime.target (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_timeline" xml:space="preserve">
+    <value>Observed Runtime timeline</value>
+    <comment>flash.runtime.timeline (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_title" xml:space="preserve">
+    <value>Runtime Flash activity</value>
+    <comment>flash.runtime.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_unavailable" xml:space="preserve">
+    <value>Runtime Flash activity is unavailable</value>
+    <comment>flash.runtime.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_unavailableNote" xml:space="preserve">
+    <value>An unreadable history is not an empty history. Refresh after Runtime becomes reachable.</value>
+    <comment>flash.runtime.unavailableNote (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_waitingForHumanGuidance" xml:space="preserve">
+    <value>Runtime stopped for an operator decision. Open the Job record and follow its exact recovery instruction; confirmation on this page cannot resume it.</value>
+    <comment>flash.runtime.waitingForHumanGuidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_awaitingRebindConfirmation" xml:space="preserve">
+    <value>Waiting for device rebind confirmation</value>
+    <comment>flash.state.awaitingRebindConfirmation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancelRequested" xml:space="preserve">
+    <value>Cancel requested</value>
+    <comment>flash.state.cancelRequested (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+    <comment>flash.state.cancelled (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancellingAtSafeBoundary" xml:space="preserve">
+    <value>Cancelling at a safe boundary</value>
+    <comment>flash.state.cancellingAtSafeBoundary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_failed" xml:space="preserve">
+    <value>Failed</value>
+    <comment>flash.state.failed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_finalizing" xml:space="preserve">
+    <value>Finalizing</value>
+    <comment>flash.state.finalizing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_interrupted" xml:space="preserve">
+    <value>Interrupted</value>
+    <comment>flash.state.interrupted (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_planned" xml:space="preserve">
+    <value>Planned</value>
+    <comment>flash.state.planned (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_planning" xml:space="preserve">
+    <value>Planning</value>
+    <comment>flash.state.planning (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_preflight" xml:space="preserve">
+    <value>Preflight</value>
+    <comment>flash.state.preflight (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_queued" xml:space="preserve">
+    <value>Queued</value>
+    <comment>flash.state.queued (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_reconciling" xml:space="preserve">
+    <value>Reconciling device outcome</value>
+    <comment>flash.state.reconciling (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_recovered" xml:space="preserve">
+    <value>Recovered by complete overwrite</value>
+    <comment>flash.state.recovered (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_recoveringByCompleteOverwrite" xml:space="preserve">
+    <value>Recovering by complete overwrite</value>
+    <comment>flash.state.recoveringByCompleteOverwrite (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_resumeAtConfirmedSafeBoundary" xml:space="preserve">
+    <value>Ready to resume at a confirmed boundary</value>
+    <comment>flash.state.resumeAtConfirmedSafeBoundary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_running" xml:space="preserve">
+    <value>Running</value>
+    <comment>flash.state.running (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_succeeded" xml:space="preserve">
+    <value>Succeeded</value>
+    <comment>flash.state.succeeded (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_userAbandonRequested" xml:space="preserve">
+    <value>Waiting to confirm abandonment</value>
+    <comment>flash.state.userAbandonRequested (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_waitingForDevice" xml:space="preserve">
+    <value>Waiting for device</value>
+    <comment>flash.state.waitingForDevice (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_waitingForRecovery" xml:space="preserve">
+    <value>Waiting for recovery</value>
+    <comment>flash.state.waitingForRecovery (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_binding" xml:space="preserve">
+    <value>Binding revision</value>
+    <comment>flash.target.binding (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_guidance" xml:space="preserve">
+    <value>Connect and adopt a DAYU200 in ArkDeck Runtime, then refresh this workspace.</value>
+    <comment>flash.target.guidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_historyMissing" xml:space="preserve">
+    <value>The historical target is not available. Select a current target explicitly to prepare a new plan; refreshing never switches devices for a historical run.</value>
+    <comment>flash.target.historyMissing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_label" xml:space="preserve">
+    <value>Exact target</value>
+    <comment>flash.target.label (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_none" xml:space="preserve">
+    <value>No adopted target is available</value>
+    <comment>flash.target.none (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_toolVersion" xml:space="preserve">
+    <value>Adopted tool version</value>
+    <comment>flash.target.toolVersion (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_unavailable" xml:space="preserve">
+    <value>unavailable</value>
+    <comment>flash.target.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_authority" xml:space="preserve">
+    <value>This click acknowledges the shown impact. Runtime still rechecks the exact target, image, plan, and prerequisites before any device effect.</value>
+    <comment>flash.workspace.action.authority (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_blocked" xml:space="preserve">
+    <value>%d required safety check(s) are unknown or not satisfied. Flash remains blocked.</value>
+    <comment>flash.workspace.action.blocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_impact" xml:space="preserve">
+    <value>This erases user data on %@.</value>
+    <comment>flash.workspace.action.impact (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_power" xml:space="preserve">
+    <value>Keep the device connected and on stable power. Do not close the Mac during flashing.</value>
+    <comment>flash.workspace.action.power (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_submit" xml:space="preserve">
+    <value>Erase data and start flashing</value>
+    <comment>flash.workspace.action.submit (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details" xml:space="preserve">
+    <value>Show flash details</value>
+    <comment>flash.workspace.details (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details_configuration" xml:space="preserve">
+    <value>Target, profile, and prerequisites</value>
+    <comment>flash.workspace.details.configuration (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details_hide" xml:space="preserve">
+    <value>Hide flash details</value>
+    <comment>flash.workspace.details.hide (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_device_detail" xml:space="preserve">
+    <value>%@ · binding revision %d</value>
+    <comment>flash.workspace.device.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_device_none" xml:space="preserve">
+    <value>No current device</value>
+    <comment>flash.workspace.device.none (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_change" xml:space="preserve">
+    <value>Change image…</value>
+    <comment>flash.workspace.image.change (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_choose" xml:space="preserve">
+    <value>Choose image…</value>
+    <comment>flash.workspace.image.choose (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_chooseHelp" xml:space="preserve">
+    <value>Choose a .tar.gz, .zip, or .7z DAYU200 image archive</value>
+    <comment>flash.workspace.image.chooseHelp (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_chooseTitle" xml:space="preserve">
+    <value>Choose an image to flash</value>
+    <comment>flash.workspace.image.chooseTitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_retry" xml:space="preserve">
+    <value>Retry image validation</value>
+    <comment>flash.workspace.image.retry (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_validating" xml:space="preserve">
+    <value>Validating the image and materializing the exact plan…</value>
+    <comment>flash.workspace.image.validating (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_effect" xml:space="preserve">
+    <value>Highest effect</value>
+    <comment>flash.workspace.plan.effect (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_loader" xml:space="preserve">
+    <value>Enter Loader and bind identity</value>
+    <comment>flash.workspace.plan.loader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_prepare" xml:space="preserve">
+    <value>Prepare and validate</value>
+    <comment>flash.workspace.plan.prepare (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_stage" xml:space="preserve">
+    <value>Plan stage</value>
+    <comment>flash.workspace.plan.stage (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_steps" xml:space="preserve">
+    <value>Steps</value>
+    <comment>flash.workspace.plan.steps (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_summary" xml:space="preserve">
+    <value>%d steps · highest effect: %@</value>
+    <comment>flash.workspace.plan.summary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_verify" xml:space="preserve">
+    <value>Read back, reboot, and verify</value>
+    <comment>flash.workspace.plan.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_write" xml:space="preserve">
+    <value>Write partitions</value>
+    <comment>flash.workspace.plan.write (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_bootloader" xml:space="preserve">
+    <value>Entering Bootloader</value>
+    <comment>flash.workspace.progress.bootloader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_extracting" xml:space="preserve">
+    <value>Extracting image archive</value>
+    <comment>flash.workspace.progress.extracting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_importing" xml:space="preserve">
+    <value>Importing image</value>
+    <comment>flash.workspace.progress.importing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_indeterminate" xml:space="preserve">
+    <value>Waiting for the next confirmed Runtime progress boundary.</value>
+    <comment>flash.workspace.progress.indeterminate (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_keepConnected" xml:space="preserve">
+    <value>Do not unplug, power off, or close the Mac. The current partition write will not be force-stopped.</value>
+    <comment>flash.workspace.progress.keepConnected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partition" xml:space="preserve">
+    <value>Flashing %@ partition</value>
+    <comment>flash.workspace.progress.partition (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partitionDetail" xml:space="preserve">
+    <value>%d/%d partitions completed · current partition %d%% · image write %d%%</value>
+    <comment>flash.workspace.progress.partitionDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partitionUnknown" xml:space="preserve">
+    <value>current</value>
+    <comment>flash.workspace.progress.partitionUnknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_rebooting" xml:space="preserve">
+    <value>Rebooting device</value>
+    <comment>flash.workspace.progress.rebooting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_reconnecting" xml:space="preserve">
+    <value>Waiting for device to reconnect</value>
+    <comment>flash.workspace.progress.reconnecting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_running" xml:space="preserve">
+    <value>Running</value>
+    <comment>flash.workspace.progress.running (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_validating" xml:space="preserve">
+    <value>Validating image</value>
+    <comment>flash.workspace.progress.validating (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_verifyingPartitions" xml:space="preserve">
+    <value>Verifying written partitions</value>
+    <comment>flash.workspace.progress.verifyingPartitions (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_verifyingSystem" xml:space="preserve">
+    <value>Verifying flashed system</value>
+    <comment>flash.workspace.progress.verifyingSystem (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_blocked" xml:space="preserve">
+    <value>Flash blocked</value>
+    <comment>flash.workspace.readiness.blocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_blockerCount" xml:space="preserve">
+    <value>%d required check(s) need attention</value>
+    <comment>flash.workspace.readiness.blockerCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checkCount" xml:space="preserve">
+    <value>%d required safety check(s) passed</value>
+    <comment>flash.workspace.readiness.checkCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checking" xml:space="preserve">
+    <value>Checking device</value>
+    <comment>flash.workspace.readiness.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checkingDetail" xml:space="preserve">
+    <value>Runtime is validating the selected image and device facts</value>
+    <comment>flash.workspace.readiness.checkingDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_chooseImage" xml:space="preserve">
+    <value>Choose an image to run the exact safety checks</value>
+    <comment>flash.workspace.readiness.chooseImage (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_noDevice" xml:space="preserve">
+    <value>Device required</value>
+    <comment>flash.workspace.readiness.noDevice (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_noDeviceDetail" xml:space="preserve">
+    <value>Connect and adopt one DAYU200 target</value>
+    <comment>flash.workspace.readiness.noDeviceDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_planFailedDetail" xml:space="preserve">
+    <value>The exact plan could not be materialized</value>
+    <comment>flash.workspace.readiness.planFailedDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_ready" xml:space="preserve">
+    <value>Device ready</value>
+    <comment>flash.workspace.readiness.ready (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_selected" xml:space="preserve">
+    <value>Device selected</value>
+    <comment>flash.workspace.readiness.selected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_again" xml:space="preserve">
+    <value>Flash again</value>
+    <comment>flash.workspace.result.again (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_history" xml:space="preserve">
+    <value>Open History</value>
+    <comment>flash.workspace.result.history (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_state" xml:space="preserve">
+    <value>Runtime finished with state: %@. The device is not shown as successfully flashed.</value>
+    <comment>flash.workspace.result.state (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_stopped" xml:space="preserve">
+    <value>Flash stopped</value>
+    <comment>flash.workspace.result.stopped (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_success" xml:space="preserve">
+    <value>Flash succeeded</value>
+    <comment>flash.workspace.result.success (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_successDetail" xml:space="preserve">
+    <value>The device reconnected and its reported build and binding match the selected image and exact plan.</value>
+    <comment>flash.workspace.result.successDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_unverified" xml:space="preserve">
+    <value>Runtime did not provide complete postflight proof. The device is not shown as successfully flashed.</value>
+    <comment>flash.workspace.result.unverified (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_prepare" xml:space="preserve">
+    <value>Prepare</value>
+    <comment>flash.workspace.stage.prepare (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_verify" xml:space="preserve">
+    <value>Reboot &amp; verify</value>
+    <comment>flash.workspace.stage.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_write" xml:space="preserve">
+    <value>Write image</value>
+    <comment>flash.workspace.stage.write (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_subtitle" xml:space="preserve">
+    <value>Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.</value>
+    <comment>flash.workspace.subtitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_title" xml:space="preserve">
+    <value>Flash</value>
+    <comment>flash.workspace.title (FlashLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime unavailable</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -1702,5 +3493,65 @@ SHA-256: %4$@</value>
   <data name="windows_imports_sha256" xml:space="preserve">
     <value>SHA-256</value>
     <comment>windows.imports.sha256 (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_debug" xml:space="preserve">
+    <value>Debug</value>
+    <comment>windows.navigation.debug (Windows only)</comment>
+  </data>
+  <data name="windows_debug_remote_unavailable" xml:space="preserve">
+    <value>Remote build servers are configured in the macOS App's Settings; the Windows App has none yet. Choose a local library.</value>
+    <comment>windows.debug.remote.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_debug_jobs_cancelFailed" xml:space="preserve">
+    <value>Runtime refused the cancellation request</value>
+    <comment>windows.debug.jobs.cancelFailed (Windows only)</comment>
+  </data>
+  <data name="windows_debug_needsTarget" xml:space="preserve">
+    <value>Choose an adopted Target first.</value>
+    <comment>windows.debug.needsTarget (Windows only)</comment>
+  </data>
+  <data name="windows_debug_needsInputs" xml:space="preserve">
+    <value>Complete the fields above with valid values first.</value>
+    <comment>windows.debug.needsInputs (Windows only)</comment>
+  </data>
+  <data name="windows_debug_operationUnavailable" xml:space="preserve">
+    <value>The Runtime cannot run this operation now; the reasons are shown above.</value>
+    <comment>windows.debug.operationUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_debug_busy" xml:space="preserve">
+    <value>A Job of this tab is running; wait for it or stop it first.</value>
+    <comment>windows.debug.busy (Windows only)</comment>
+  </data>
+  <data name="windows_debug_running" xml:space="preserve">
+    <value>Running %@</value>
+    <comment>windows.debug.running (Windows only)</comment>
+  </data>
+  <data name="windows_debug_selectedTab" xml:space="preserve">
+    <value>%@ tab</value>
+    <comment>windows.debug.selectedTab (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_flash" xml:space="preserve">
+    <value>Flash</value>
+    <comment>windows.navigation.flash (Windows only)</comment>
+  </data>
+  <data name="windows_flash_action_power" xml:space="preserve">
+    <value>Keep the device connected and on stable power. Do not shut down, sleep or unplug the PC during flashing.</value>
+    <comment>windows.flash.action.power (Windows only)</comment>
+  </data>
+  <data name="windows_flash_progress_keepConnected" xml:space="preserve">
+    <value>Do not unplug, power off, or put the PC to sleep. The current partition write will not be force-stopped.</value>
+    <comment>windows.flash.progress.keepConnected (Windows only)</comment>
+  </data>
+  <data name="windows_flash_runtime_criticalWrite" xml:space="preserve">
+    <value>Writing a partition — this critical step cannot be interrupted. Stopping only prevents later steps. Do not put the PC to sleep, disconnect power, or unplug the device.</value>
+    <comment>windows.flash.runtime.criticalWrite (Windows only)</comment>
+  </data>
+  <data name="windows_flash_chooseImage_invalid" xml:space="preserve">
+    <value>Choose a .tar.gz, .zip, or .7z image archive.</value>
+    <comment>windows.flash.chooseImage.invalid (Windows only)</comment>
+  </data>
+  <data name="windows_flash_targetChanged" xml:space="preserve">
+    <value>The selected target changed; the exact plan is prepared again.</value>
+    <comment>windows.flash.targetChanged (Windows only)</comment>
   </data>
 </root>

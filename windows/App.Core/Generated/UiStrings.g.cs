@@ -196,6 +196,453 @@ public static class UiStrings
     public const string SettingsCommonCancel = "settings.common.cancel";
     public const string JobRecoveryHumanRequiredTitle = "jobRecovery.humanRequired.title";
     public const string JobRecoveryHumanRequiredGuidance = "jobRecovery.humanRequired.guidance";
+    public const string DebugActionCancel = "debug.action.cancel";
+    public const string DebugActionRefresh = "debug.action.refresh";
+    public const string DebugAppsAbility = "debug.apps.ability";
+    public const string DebugAppsActionStart = "debug.apps.action.start";
+    public const string DebugAppsActionStop = "debug.apps.action.stop";
+    public const string DebugAppsActionUninstall = "debug.apps.action.uninstall";
+    public const string DebugAppsAdditionalAdd = "debug.apps.additional.add";
+    public const string DebugAppsAdditionalNote = "debug.apps.additional.note";
+    public const string DebugAppsAdditionalRemove = "debug.apps.additional.remove";
+    public const string DebugAppsAdditionalRemoveNamed = "debug.apps.additional.removeNamed";
+    public const string DebugAppsAdditionalTitle = "debug.apps.additional.title";
+    public const string DebugAppsArtifactsTitle = "debug.apps.artifacts.title";
+    public const string DebugAppsBundle = "debug.apps.bundle";
+    public const string DebugAppsCaptureDiagnostics = "debug.apps.captureDiagnostics";
+    public const string DebugAppsChooseHAP = "debug.apps.chooseHAP";
+    public const string DebugAppsCleanupRetain = "debug.apps.cleanup.retain";
+    public const string DebugAppsCleanupUninstall = "debug.apps.cleanup.uninstall";
+    public const string DebugAppsCleanupPolicy = "debug.apps.cleanupPolicy";
+    public const string DebugAppsClearSelection = "debug.apps.clearSelection";
+    public const string DebugAppsDiagnosticsDuration = "debug.apps.diagnosticsDuration";
+    public const string DebugAppsIdentityNote = "debug.apps.identity.note";
+    public const string DebugAppsIdentityTitle = "debug.apps.identity.title";
+    public const string DebugAppsImporting = "debug.apps.importing";
+    public const string DebugAppsInstallReplace = "debug.apps.install.replace";
+    public const string DebugAppsInstallPolicy = "debug.apps.installPolicy";
+    public const string DebugAppsInventoryDebuggable = "debug.apps.inventory.debuggable";
+    public const string DebugAppsInventoryEmpty = "debug.apps.inventory.empty";
+    public const string DebugAppsInventoryEmptyDetail = "debug.apps.inventory.empty.detail";
+    public const string DebugAppsInventoryPackage = "debug.apps.inventory.package";
+    public const string DebugAppsInventoryPid = "debug.apps.inventory.pid";
+    public const string DebugAppsInventoryTitle = "debug.apps.inventory.title";
+    public const string DebugAppsLifecycleTitle = "debug.apps.lifecycle.title";
+    public const string DebugAppsLocalOnly = "debug.apps.localOnly";
+    public const string DebugAppsMutationDetail = "debug.apps.mutationDetail";
+    public const string DebugAppsMutationScope = "debug.apps.mutationScope";
+    public const string DebugAppsNoHAP = "debug.apps.noHAP";
+    public const string DebugAppsPackageTitle = "debug.apps.package.title";
+    public const string DebugAppsPlanTitle = "debug.apps.plan.title";
+    public const string DebugAppsPostRun = "debug.apps.postRun";
+    public const string DebugAppsPostRunRunning = "debug.apps.postRun.running";
+    public const string DebugAppsPostRunStopped = "debug.apps.postRun.stopped";
+    public const string DebugAppsRun = "debug.apps.run";
+    public const string DebugAppsRunning = "debug.apps.running";
+    public const string DebugAppsRunningCleanupHint = "debug.apps.runningCleanupHint";
+    public const string DebugAppsSelectionDuplicatePackage = "debug.apps.selection.duplicatePackage";
+    public const string DebugAppsSelectionFailed = "debug.apps.selection.failed";
+    public const string DebugAppsSelectionInvalid = "debug.apps.selection.invalid";
+    public const string DebugAppsSelectionInvalidAdditional = "debug.apps.selection.invalidAdditional";
+    public const string DebugAppsSelectionInvalidEntry = "debug.apps.selection.invalidEntry";
+    public const string DebugAppsSelectionTooManyPackages = "debug.apps.selection.tooManyPackages";
+    public const string DebugAppsTarget = "debug.apps.target";
+    public const string DebugArtifactsAbi = "debug.artifacts.abi";
+    public const string DebugArtifactsAbiObserved = "debug.artifacts.abi.observed";
+    public const string DebugArtifactsAdvanced = "debug.artifacts.advanced";
+    public const string DebugArtifactsBrowseRemote = "debug.artifacts.browseRemote";
+    public const string DebugArtifactsBundle = "debug.artifacts.bundle";
+    public const string DebugArtifactsBundleInvalid = "debug.artifacts.bundleInvalid";
+    public const string DebugArtifactsChooseLibrary = "debug.artifacts.chooseLibrary";
+    public const string DebugArtifactsDestinationDetail = "debug.artifacts.destination.detail";
+    public const string DebugArtifactsDestinationTitle = "debug.artifacts.destination.title";
+    public const string DebugArtifactsLogicalName = "debug.artifacts.logicalName";
+    public const string DebugArtifactsLogicalNameInvalid = "debug.artifacts.logicalNameInvalid";
+    public const string DebugArtifactsNoLibrary = "debug.artifacts.noLibrary";
+    public const string DebugArtifactsNotVerified = "debug.artifacts.notVerified";
+    public const string DebugArtifactsOpenLogs = "debug.artifacts.openLogs";
+    public const string DebugArtifactsPlanReady = "debug.artifacts.planReady";
+    public const string DebugArtifactsPolicyRequired = "debug.artifacts.policy.required";
+    public const string DebugArtifactsPreparing = "debug.artifacts.preparing";
+    public const string DebugArtifactsPreview = "debug.artifacts.preview";
+    public const string DebugArtifactsProductionBoundary = "debug.artifacts.productionBoundary";
+    public const string DebugArtifactsRemoteBindingFailed = "debug.artifacts.remoteBindingFailed";
+    public const string DebugArtifactsRemoteBrowserCancel = "debug.artifacts.remoteBrowser.cancel";
+    public const string DebugArtifactsRemoteBrowserChoose = "debug.artifacts.remoteBrowser.choose";
+    public const string DebugArtifactsRemoteBrowserDetail = "debug.artifacts.remoteBrowser.detail";
+    public const string DebugArtifactsRemoteBrowserDirectory = "debug.artifacts.remoteBrowser.directory";
+    public const string DebugArtifactsRemoteBrowserEmptyDetail = "debug.artifacts.remoteBrowser.empty.detail";
+    public const string DebugArtifactsRemoteBrowserEmptyTitle = "debug.artifacts.remoteBrowser.empty.title";
+    public const string DebugArtifactsRemoteBrowserLibrary = "debug.artifacts.remoteBrowser.library";
+    public const string DebugArtifactsRemoteBrowserNoArtifacts = "debug.artifacts.remoteBrowser.noArtifacts";
+    public const string DebugArtifactsRemoteBrowserOpenSettings = "debug.artifacts.remoteBrowser.openSettings";
+    public const string DebugArtifactsRemoteBrowserRefresh = "debug.artifacts.remoteBrowser.refresh";
+    public const string DebugArtifactsRemoteBrowserRoot = "debug.artifacts.remoteBrowser.root";
+    public const string DebugArtifactsRemoteBrowserServer = "debug.artifacts.remoteBrowser.server";
+    public const string DebugArtifactsRemoteBrowserTitle = "debug.artifacts.remoteBrowser.title";
+    public const string DebugArtifactsRemoteBrowserUp = "debug.artifacts.remoteBrowser.up";
+    public const string DebugArtifactsReopenPlan = "debug.artifacts.reopenPlan";
+    public const string DebugArtifactsResultsTitle = "debug.artifacts.results.title";
+    public const string DebugArtifactsReviewDetail = "debug.artifacts.review.detail";
+    public const string DebugArtifactsReviewTitle = "debug.artifacts.review.title";
+    public const string DebugArtifactsRollback = "debug.artifacts.rollback";
+    public const string DebugArtifactsRollbackAuto = "debug.artifacts.rollback.auto";
+    public const string DebugArtifactsRunning = "debug.artifacts.running";
+    public const string DebugArtifactsRunningDetail = "debug.artifacts.running.detail";
+    public const string DebugArtifactsSelectedLibrary = "debug.artifacts.selectedLibrary";
+    public const string DebugArtifactsSheetBack = "debug.artifacts.sheet.back";
+    public const string DebugArtifactsSheetBundle = "debug.artifacts.sheet.bundle";
+    public const string DebugArtifactsSheetDigest = "debug.artifacts.sheet.digest";
+    public const string DebugArtifactsSheetLibrary = "debug.artifacts.sheet.library";
+    public const string DebugArtifactsSheetRollback = "debug.artifacts.sheet.rollback";
+    public const string DebugArtifactsSheetRun = "debug.artifacts.sheet.run";
+    public const string DebugArtifactsSheetSteps = "debug.artifacts.sheet.steps";
+    public const string DebugArtifactsSheetTarget = "debug.artifacts.sheet.target";
+    public const string DebugArtifactsSheetTitle = "debug.artifacts.sheet.title";
+    public const string DebugArtifactsSheetVerification = "debug.artifacts.sheet.verification";
+    public const string DebugArtifactsSheetWarning = "debug.artifacts.sheet.warning";
+    public const string DebugArtifactsSourceDetail = "debug.artifacts.source.detail";
+    public const string DebugArtifactsSourceKind = "debug.artifacts.source.kind";
+    public const string DebugArtifactsSourceLocal = "debug.artifacts.source.local";
+    public const string DebugArtifactsSourceRemote = "debug.artifacts.source.remote";
+    public const string DebugArtifactsSourceTitle = "debug.artifacts.source.title";
+    public const string DebugArtifactsSourceBoundary = "debug.artifacts.sourceBoundary";
+    public const string DebugArtifactsTarget = "debug.artifacts.target";
+    public const string DebugArtifactsTargetConfirmed = "debug.artifacts.targetConfirmed";
+    public const string DebugArtifactsVerification = "debug.artifacts.verification";
+    public const string DebugArtifactsVerified = "debug.artifacts.verified";
+    public const string DebugArtifactsVerifyMaps = "debug.artifacts.verify.maps";
+    public const string DebugAvailabilityAvailable = "debug.availability.available";
+    public const string DebugAvailabilityChecking = "debug.availability.checking";
+    public const string DebugAvailabilityEffect = "debug.availability.effect";
+    public const string DebugAvailabilityMissing = "debug.availability.missing";
+    public const string DebugAvailabilityOperation = "debug.availability.operation";
+    public const string DebugAvailabilityUnavailable = "debug.availability.unavailable";
+    public const string DebugBlockedBufferOperation = "debug.blocked.bufferOperation";
+    public const string DebugBlockedPackageLifecycle = "debug.blocked.packageLifecycle";
+    public const string DebugCommandsArgvNote = "debug.commands.argv.note";
+    public const string DebugCommandsArgvTitle = "debug.commands.argv.title";
+    public const string DebugCommandsArtifactsEmpty = "debug.commands.artifacts.empty";
+    public const string DebugCommandsArtifactsEmptyDetail = "debug.commands.artifacts.empty.detail";
+    public const string DebugCommandsArtifactsTitle = "debug.commands.artifacts.title";
+    public const string DebugCommandsCalloutTyped = "debug.commands.calloutTyped";
+    public const string DebugCommandsEffect = "debug.commands.effect";
+    public const string DebugCommandsFooterNoFreeText = "debug.commands.footerNoFreeText";
+    public const string DebugCommandsJobId = "debug.commands.job.id";
+    public const string DebugCommandsJobKnown = "debug.commands.job.known";
+    public const string DebugCommandsJobLatest = "debug.commands.job.latest";
+    public const string DebugCommandsJobOutcome = "debug.commands.job.outcome";
+    public const string DebugCommandsJobRunning = "debug.commands.job.running";
+    public const string DebugCommandsJobState = "debug.commands.job.state";
+    public const string DebugCommandsJobUnknown = "debug.commands.job.unknown";
+    public const string DebugCommandsNoPTY = "debug.commands.noPTY";
+    public const string DebugCommandsNoParameters = "debug.commands.noParameters";
+    public const string DebugCommandsResultNone = "debug.commands.result.none";
+    public const string DebugCommandsResultTitle = "debug.commands.result.title";
+    public const string DebugCommandsRun = "debug.commands.run";
+    public const string DebugCommandsSelect = "debug.commands.select";
+    public const string DebugCommandsTarget = "debug.commands.target";
+    public const string DebugFailureArtifactFinalizationFailed = "debug.failure.artifactFinalizationFailed";
+    public const string DebugFailureArtifactPublicationFailed = "debug.failure.artifactPublicationFailed";
+    public const string DebugFailureCancelled = "debug.failure.cancelled";
+    public const string DebugFailureExecutionConfirmedNotPerformed = "debug.failure.executionConfirmedNotPerformed";
+    public const string DebugFailureExecutionFailed = "debug.failure.executionFailed";
+    public const string DebugFailureInterrupted = "debug.failure.interrupted";
+    public const string DebugFailureLegacyFailure = "debug.failure.legacyFailure";
+    public const string DebugFailureOutcomeUnknown = "debug.failure.outcomeUnknown";
+    public const string DebugFailureReconciliationConfirmedNotPerformed = "debug.failure.reconciliationConfirmedNotPerformed";
+    public const string DebugJobsActive = "debug.jobs.active";
+    public const string DebugJobsEmpty = "debug.jobs.empty";
+    public const string DebugJobsTitle = "debug.jobs.title";
+    public const string DebugLogsCaptureTitle = "debug.logs.capture.title";
+    public const string DebugLogsDestructiveClear = "debug.logs.destructive.clear";
+    public const string DebugLogsDestructiveMenu = "debug.logs.destructive.menu";
+    public const string DebugLogsDestructiveScope = "debug.logs.destructive.scope";
+    public const string DebugLogsDestructiveTitle = "debug.logs.destructive.title";
+    public const string DebugLogsDomain = "debug.logs.domain";
+    public const string DebugLogsDuration = "debug.logs.duration";
+    public const string DebugLogsExport = "debug.logs.export";
+    public const string DebugLogsExportBoundary = "debug.logs.exportBoundary";
+    public const string DebugLogsExportCancel = "debug.logs.exportCancel";
+    public const string DebugLogsExportConfirm = "debug.logs.exportConfirm";
+    public const string DebugLogsExportPreviewMessage = "debug.logs.exportPreview.message";
+    public const string DebugLogsExportPreviewTitle = "debug.logs.exportPreview.title";
+    public const string DebugLogsExportSensitive = "debug.logs.exportSensitive";
+    public const string DebugLogsExporting = "debug.logs.exporting";
+    public const string DebugLogsFiltersInvalid = "debug.logs.filters.invalid";
+    public const string DebugLogsFiltersNote = "debug.logs.filters.note";
+    public const string DebugLogsKeyword = "debug.logs.keyword";
+    public const string DebugLogsLevel = "debug.logs.level";
+    public const string DebugLogsLiveEmpty = "debug.logs.live.empty";
+    public const string DebugLogsLiveEmptyDetail = "debug.logs.live.empty.detail";
+    public const string DebugLogsLiveTitle = "debug.logs.live.title";
+    public const string DebugLogsMarker = "debug.logs.marker";
+    public const string DebugLogsPause = "debug.logs.pause";
+    public const string DebugLogsPauseRequiresCapture = "debug.logs.pause.requiresCapture";
+    public const string DebugLogsPid = "debug.logs.pid";
+    public const string DebugLogsRawSave = "debug.logs.rawSave";
+    public const string DebugLogsRequestTitle = "debug.logs.request.title";
+    public const string DebugLogsResume = "debug.logs.resume";
+    public const string DebugLogsShardsEmpty = "debug.logs.shards.empty";
+    public const string DebugLogsShardsEmptyDetail = "debug.logs.shards.empty.detail";
+    public const string DebugLogsShardsHash = "debug.logs.shards.hash";
+    public const string DebugLogsShardsSequence = "debug.logs.shards.sequence";
+    public const string DebugLogsShardsSize = "debug.logs.shards.size";
+    public const string DebugLogsShardsTitle = "debug.logs.shards.title";
+    public const string DebugLogsShowInFinder = "debug.logs.showInFinder";
+    public const string DebugLogsStart = "debug.logs.start";
+    public const string DebugLogsStorageTotalBudget = "debug.logs.storage.totalBudget";
+    public const string DebugLogsTag = "debug.logs.tag";
+    public const string DebugLogsTarget = "debug.logs.target";
+    public const string DebugLogsViewportBounded = "debug.logs.viewport.bounded";
+    public const string DebugNetworkAdd = "debug.network.add";
+    public const string DebugNetworkDelete = "debug.network.delete";
+    public const string DebugNetworkDeleteScope = "debug.network.delete.scope";
+    public const string DebugNetworkDirection = "debug.network.direction";
+    public const string DebugNetworkEditorTitle = "debug.network.editor.title";
+    public const string DebugNetworkForward = "debug.network.forward";
+    public const string DebugNetworkLocalPort = "debug.network.localPort";
+    public const string DebugNetworkRemotePort = "debug.network.remotePort";
+    public const string DebugNetworkReverse = "debug.network.reverse";
+    public const string DebugNetworkRulesAction = "debug.network.rules.action";
+    public const string DebugNetworkRulesDirection = "debug.network.rules.direction";
+    public const string DebugNetworkRulesEmpty = "debug.network.rules.empty";
+    public const string DebugNetworkRulesEmptyDetail = "debug.network.rules.empty.detail";
+    public const string DebugNetworkRulesLocal = "debug.network.rules.local";
+    public const string DebugNetworkRulesRemote = "debug.network.rules.remote";
+    public const string DebugNetworkRulesState = "debug.network.rules.state";
+    public const string DebugNetworkRulesTitle = "debug.network.rules.title";
+    public const string DebugNetworkSafetyBinding = "debug.network.safety.binding";
+    public const string DebugNetworkSafetyNoShell = "debug.network.safety.noShell";
+    public const string DebugNetworkSafetyTitle = "debug.network.safety.title";
+    public const string DebugNetworkSafetyTyped = "debug.network.safety.typed";
+    public const string DebugNetworkTarget = "debug.network.target";
+    public const string DebugNetworkTypedRule = "debug.network.typedRule";
+    public const string DebugNetworkValidationLocalPortNotNumeric = "debug.network.validation.localPortNotNumeric";
+    public const string DebugNetworkValidationLocalPortOutOfRange = "debug.network.validation.localPortOutOfRange";
+    public const string DebugNetworkValidationRemotePortNotNumeric = "debug.network.validation.remotePortNotNumeric";
+    public const string DebugNetworkValidationRemotePortOutOfRange = "debug.network.validation.remotePortOutOfRange";
+    public const string DebugNetworkValidationValid = "debug.network.validation.valid";
+    public const string DebugOptional = "debug.optional";
+    public const string DebugScope = "debug.scope";
+    public const string DebugTabApps = "debug.tab.apps";
+    public const string DebugTabArtifacts = "debug.tab.artifacts";
+    public const string DebugTabCommands = "debug.tab.commands";
+    public const string DebugTabLogs = "debug.tab.logs";
+    public const string DebugTabNetwork = "debug.tab.network";
+    public const string DebugTabsLabel = "debug.tabs.label";
+    public const string DebugTargetBinding = "debug.target.binding";
+    public const string DebugTargetLabel = "debug.target.label";
+    public const string DebugTargetNone = "debug.target.none";
+    public const string DebugTypedInvalidIdentifier = "debug.typed.invalidIdentifier";
+    public const string FlashActionCancel = "flash.action.cancel";
+    public const string FlashActionCancelHelp = "flash.action.cancel.help";
+    public const string FlashActionRefresh = "flash.action.refresh";
+    public const string FlashAvailabilityAvailable = "flash.availability.available";
+    public const string FlashAvailabilityChecking = "flash.availability.checking";
+    public const string FlashAvailabilityScope = "flash.availability.scope";
+    public const string FlashAvailabilityTitle = "flash.availability.title";
+    public const string FlashAvailabilityUnavailable = "flash.availability.unavailable";
+    public const string FlashBindingUnpreparedHdcDetail = "flash.binding.unprepared.hdc.detail";
+    public const string FlashBindingUnpreparedHdcTitle = "flash.binding.unprepared.hdc.title";
+    public const string FlashBootloaderBound = "flash.bootloader.bound";
+    public const string FlashBootloaderUnboundDetail = "flash.bootloader.unbound.detail";
+    public const string FlashBootloaderUnboundTitle = "flash.bootloader.unbound.title";
+    public const string FlashBootloaderUnpreparedDetail = "flash.bootloader.unprepared.detail";
+    public const string FlashDeviceAccessChecking = "flash.deviceAccess.checking";
+    public const string FlashDeviceAccessNextStep = "flash.deviceAccess.nextStep";
+    public const string FlashDeviceAccessObservationValue = "flash.deviceAccess.observationValue";
+    public const string FlashDeviceAccessObservations = "flash.deviceAccess.observations";
+    public const string FlashDeviceAccessRemediationChooseSupportedLoaderObservation = "flash.deviceAccess.remediation.chooseSupportedLoaderObservation";
+    public const string FlashDeviceAccessRemediationInspectControlledDiagnostics = "flash.deviceAccess.remediation.inspectControlledDiagnostics";
+    public const string FlashDeviceAccessRemediationReconnectOrEnterLoader = "flash.deviceAccess.remediation.reconnectOrEnterLoader";
+    public const string FlashDeviceAccessRemediationRepairDriverOutsideArkDeck = "flash.deviceAccess.remediation.repairDriverOutsideArkDeck";
+    public const string FlashDeviceAccessRemediationReviewDevicePermissionOutsideArkDeck = "flash.deviceAccess.remediation.reviewDevicePermissionOutsideArkDeck";
+    public const string FlashDeviceAccessReprobe = "flash.deviceAccess.reprobe";
+    public const string FlashDeviceAccessResponsibility = "flash.deviceAccess.responsibility";
+    public const string FlashDeviceAccessResponsibilityDeviceOrToolVendor = "flash.deviceAccess.responsibility.deviceOrToolVendor";
+    public const string FlashDeviceAccessResponsibilitySystemAdministrator = "flash.deviceAccess.responsibility.systemAdministrator";
+    public const string FlashDeviceAccessResponsibilityUser = "flash.deviceAccess.responsibility.user";
+    public const string FlashDeviceAccessTitle = "flash.deviceAccess.title";
+    public const string FlashDeviceAccessToolUnavailable = "flash.deviceAccess.toolUnavailable";
+    public const string FlashDeviceAccessVerdictAccessible = "flash.deviceAccess.verdict.accessible";
+    public const string FlashDeviceAccessVerdictDriverUnavailable = "flash.deviceAccess.verdict.driverUnavailable";
+    public const string FlashDeviceAccessVerdictMalformedOutput = "flash.deviceAccess.verdict.malformedOutput";
+    public const string FlashDeviceAccessVerdictOffline = "flash.deviceAccess.verdict.offline";
+    public const string FlashDeviceAccessVerdictPermissionDenied = "flash.deviceAccess.verdict.permissionDenied";
+    public const string FlashDeviceAccessVerdictProbeFailed = "flash.deviceAccess.verdict.probeFailed";
+    public const string FlashDeviceAccessVerdictProtocolBlocked = "flash.deviceAccess.verdict.protocolBlocked";
+    public const string FlashEffectDestructive = "flash.effect.destructive";
+    public const string FlashEffectDeviceMutation = "flash.effect.deviceMutation";
+    public const string FlashEffectHostOnly = "flash.effect.hostOnly";
+    public const string FlashEffectReadOnly = "flash.effect.readOnly";
+    public const string FlashErrorFileAccess = "flash.error.fileAccess";
+    public const string FlashErrorFormat = "flash.error.format";
+    public const string FlashErrorInvalid = "flash.error.invalid";
+    public const string FlashErrorPlan = "flash.error.plan";
+    public const string FlashErrorUnreadable = "flash.error.unreadable";
+    public const string FlashErrorUnsupported = "flash.error.unsupported";
+    public const string FlashExecutePlanRequired = "flash.execute.planRequired";
+    public const string FlashExecutePrerequisiteBlocker = "flash.execute.prerequisiteBlocker";
+    public const string FlashExecuteTerminal = "flash.execute.terminal";
+    public const string FlashImageChoose = "flash.image.choose";
+    public const string FlashImpactPartitions = "flash.impact.partitions";
+    public const string FlashImpactPreserved = "flash.impact.preserved";
+    public const string FlashImpactUserdata = "flash.impact.userdata";
+    public const string FlashPlanArchiveHash = "flash.plan.archiveHash";
+    public const string FlashPlanBuild = "flash.plan.build";
+    public const string FlashPlanDigest = "flash.plan.digest";
+    public const string FlashPlanDigestMaterializedAtSubmission = "flash.plan.digest.materializedAtSubmission";
+    public const string FlashPlanImageHash = "flash.plan.imageHash";
+    public const string FlashPlanImageSize = "flash.plan.imageSize";
+    public const string FlashPlanLanePlan = "flash.plan.lanePlan";
+    public const string FlashPlanLanePlanBundleNotInLaneStore = "flash.plan.lanePlan.bundleNotInLaneStore";
+    public const string FlashPlanLanePlanDeviceNotObserved = "flash.plan.lanePlan.deviceNotObserved";
+    public const string FlashPlanLanePlanLaneNotComposed = "flash.plan.lanePlan.laneNotComposed";
+    public const string FlashPlanLanePlanPending = "flash.plan.lanePlan.pending";
+    public const string FlashPlanLanePlanPlanNotExecutable = "flash.plan.lanePlan.planNotExecutable";
+    public const string FlashPlanLanePlanUnavailable = "flash.plan.lanePlan.unavailable";
+    public const string FlashPlanPartitionCount = "flash.plan.partitionCount";
+    public const string FlashPlanPreparing = "flash.plan.preparing";
+    public const string FlashPlanPrerequisites = "flash.plan.prerequisites";
+    public const string FlashPlanPrerequisitesAwaitPlan = "flash.plan.prerequisitesAwaitPlan";
+    public const string FlashPlanPrerequisitesNote = "flash.plan.prerequisitesNote";
+    public const string FlashPlanSize = "flash.plan.size";
+    public const string FlashPlanStepSetDigest = "flash.plan.stepSetDigest";
+    public const string FlashPlanTitle = "flash.plan.title";
+    public const string FlashPlanWriteForbidden = "flash.plan.writeForbidden";
+    public const string FlashPostflightBinding = "flash.postflight.binding";
+    public const string FlashPostflightBuild = "flash.postflight.build";
+    public const string FlashPostflightComparison = "flash.postflight.comparison";
+    public const string FlashPostflightMatch = "flash.postflight.match";
+    public const string FlashPostflightMismatch = "flash.postflight.mismatch";
+    public const string FlashPostflightTitle = "flash.postflight.title";
+    public const string FlashPrerequisiteLoader = "flash.prerequisite.loader";
+    public const string FlashPrerequisiteNotApplicable = "flash.prerequisite.notApplicable";
+    public const string FlashPrerequisiteOptional = "flash.prerequisite.optional";
+    public const string FlashPrerequisiteRecoveryPath = "flash.prerequisite.recoveryPath";
+    public const string FlashPrerequisiteRequired = "flash.prerequisite.required";
+    public const string FlashPrerequisiteStablePower = "flash.prerequisite.stablePower";
+    public const string FlashPrerequisiteStatusSatisfied = "flash.prerequisite.status.satisfied";
+    public const string FlashPrerequisiteStatusUnknown = "flash.prerequisite.status.unknown";
+    public const string FlashPrerequisiteStatusUnsatisfied = "flash.prerequisite.status.unsatisfied";
+    public const string FlashPrerequisiteUnlocked = "flash.prerequisite.unlocked";
+    public const string FlashProfileLabel = "flash.profile.label";
+    public const string FlashRuntimeCriticalWrite = "flash.runtime.criticalWrite";
+    public const string FlashRuntimeEmpty = "flash.runtime.empty";
+    public const string FlashRuntimeEmptyDescription = "flash.runtime.emptyDescription";
+    public const string FlashRuntimeJob = "flash.runtime.job";
+    public const string FlashRuntimeJobCount = "flash.runtime.jobCount";
+    public const string FlashRuntimeOpenRecord = "flash.runtime.openRecord";
+    public const string FlashRuntimeOutcomeUnknownGuidance = "flash.runtime.outcomeUnknownGuidance";
+    public const string FlashRuntimeReadOnly = "flash.runtime.readOnly";
+    public const string FlashRuntimeRecoveryTitle = "flash.runtime.recoveryTitle";
+    public const string FlashRuntimeResidue = "flash.runtime.residue";
+    public const string FlashRuntimeResultCancelled = "flash.runtime.result.cancelled";
+    public const string FlashRuntimeResultFailed = "flash.runtime.result.failed";
+    public const string FlashRuntimeResultInProgress = "flash.runtime.result.inProgress";
+    public const string FlashRuntimeResultInterrupted = "flash.runtime.result.interrupted";
+    public const string FlashRuntimeResultNeedsAction = "flash.runtime.result.needsAction";
+    public const string FlashRuntimeResultOutcomeUnknown = "flash.runtime.result.outcomeUnknown";
+    public const string FlashRuntimeResultPlanned = "flash.runtime.result.planned";
+    public const string FlashRuntimeResultSucceeded = "flash.runtime.result.succeeded";
+    public const string FlashRuntimeResultSupersededByRecovery = "flash.runtime.result.supersededByRecovery";
+    public const string FlashRuntimeResultTargetAliasResolved = "flash.runtime.result.targetAliasResolved";
+    public const string FlashRuntimeResultUnknown = "flash.runtime.result.unknown";
+    public const string FlashRuntimeTarget = "flash.runtime.target";
+    public const string FlashRuntimeTimeline = "flash.runtime.timeline";
+    public const string FlashRuntimeTitle = "flash.runtime.title";
+    public const string FlashRuntimeUnavailable = "flash.runtime.unavailable";
+    public const string FlashRuntimeUnavailableNote = "flash.runtime.unavailableNote";
+    public const string FlashRuntimeWaitingForHumanGuidance = "flash.runtime.waitingForHumanGuidance";
+    public const string FlashStateAwaitingRebindConfirmation = "flash.state.awaitingRebindConfirmation";
+    public const string FlashStateCancelRequested = "flash.state.cancelRequested";
+    public const string FlashStateCancelled = "flash.state.cancelled";
+    public const string FlashStateCancellingAtSafeBoundary = "flash.state.cancellingAtSafeBoundary";
+    public const string FlashStateFailed = "flash.state.failed";
+    public const string FlashStateFinalizing = "flash.state.finalizing";
+    public const string FlashStateInterrupted = "flash.state.interrupted";
+    public const string FlashStatePlanned = "flash.state.planned";
+    public const string FlashStatePlanning = "flash.state.planning";
+    public const string FlashStatePreflight = "flash.state.preflight";
+    public const string FlashStateQueued = "flash.state.queued";
+    public const string FlashStateReconciling = "flash.state.reconciling";
+    public const string FlashStateRecovered = "flash.state.recovered";
+    public const string FlashStateRecoveringByCompleteOverwrite = "flash.state.recoveringByCompleteOverwrite";
+    public const string FlashStateResumeAtConfirmedSafeBoundary = "flash.state.resumeAtConfirmedSafeBoundary";
+    public const string FlashStateRunning = "flash.state.running";
+    public const string FlashStateSucceeded = "flash.state.succeeded";
+    public const string FlashStateUserAbandonRequested = "flash.state.userAbandonRequested";
+    public const string FlashStateWaitingForDevice = "flash.state.waitingForDevice";
+    public const string FlashStateWaitingForRecovery = "flash.state.waitingForRecovery";
+    public const string FlashTargetBinding = "flash.target.binding";
+    public const string FlashTargetGuidance = "flash.target.guidance";
+    public const string FlashTargetHistoryMissing = "flash.target.historyMissing";
+    public const string FlashTargetLabel = "flash.target.label";
+    public const string FlashTargetNone = "flash.target.none";
+    public const string FlashTargetToolVersion = "flash.target.toolVersion";
+    public const string FlashTargetUnavailable = "flash.target.unavailable";
+    public const string FlashWorkspaceActionAuthority = "flash.workspace.action.authority";
+    public const string FlashWorkspaceActionBlocked = "flash.workspace.action.blocked";
+    public const string FlashWorkspaceActionImpact = "flash.workspace.action.impact";
+    public const string FlashWorkspaceActionPower = "flash.workspace.action.power";
+    public const string FlashWorkspaceActionSubmit = "flash.workspace.action.submit";
+    public const string FlashWorkspaceDetails = "flash.workspace.details";
+    public const string FlashWorkspaceDetailsConfiguration = "flash.workspace.details.configuration";
+    public const string FlashWorkspaceDetailsHide = "flash.workspace.details.hide";
+    public const string FlashWorkspaceDeviceDetail = "flash.workspace.device.detail";
+    public const string FlashWorkspaceDeviceNone = "flash.workspace.device.none";
+    public const string FlashWorkspaceImageChange = "flash.workspace.image.change";
+    public const string FlashWorkspaceImageChoose = "flash.workspace.image.choose";
+    public const string FlashWorkspaceImageChooseHelp = "flash.workspace.image.chooseHelp";
+    public const string FlashWorkspaceImageChooseTitle = "flash.workspace.image.chooseTitle";
+    public const string FlashWorkspaceImageRetry = "flash.workspace.image.retry";
+    public const string FlashWorkspaceImageValidating = "flash.workspace.image.validating";
+    public const string FlashWorkspacePlanEffect = "flash.workspace.plan.effect";
+    public const string FlashWorkspacePlanLoader = "flash.workspace.plan.loader";
+    public const string FlashWorkspacePlanPrepare = "flash.workspace.plan.prepare";
+    public const string FlashWorkspacePlanStage = "flash.workspace.plan.stage";
+    public const string FlashWorkspacePlanSteps = "flash.workspace.plan.steps";
+    public const string FlashWorkspacePlanSummary = "flash.workspace.plan.summary";
+    public const string FlashWorkspacePlanVerify = "flash.workspace.plan.verify";
+    public const string FlashWorkspacePlanWrite = "flash.workspace.plan.write";
+    public const string FlashWorkspaceProgressBootloader = "flash.workspace.progress.bootloader";
+    public const string FlashWorkspaceProgressExtracting = "flash.workspace.progress.extracting";
+    public const string FlashWorkspaceProgressImporting = "flash.workspace.progress.importing";
+    public const string FlashWorkspaceProgressIndeterminate = "flash.workspace.progress.indeterminate";
+    public const string FlashWorkspaceProgressKeepConnected = "flash.workspace.progress.keepConnected";
+    public const string FlashWorkspaceProgressPartition = "flash.workspace.progress.partition";
+    public const string FlashWorkspaceProgressPartitionDetail = "flash.workspace.progress.partitionDetail";
+    public const string FlashWorkspaceProgressPartitionUnknown = "flash.workspace.progress.partitionUnknown";
+    public const string FlashWorkspaceProgressRebooting = "flash.workspace.progress.rebooting";
+    public const string FlashWorkspaceProgressReconnecting = "flash.workspace.progress.reconnecting";
+    public const string FlashWorkspaceProgressRunning = "flash.workspace.progress.running";
+    public const string FlashWorkspaceProgressValidating = "flash.workspace.progress.validating";
+    public const string FlashWorkspaceProgressVerifyingPartitions = "flash.workspace.progress.verifyingPartitions";
+    public const string FlashWorkspaceProgressVerifyingSystem = "flash.workspace.progress.verifyingSystem";
+    public const string FlashWorkspaceReadinessBlocked = "flash.workspace.readiness.blocked";
+    public const string FlashWorkspaceReadinessBlockerCount = "flash.workspace.readiness.blockerCount";
+    public const string FlashWorkspaceReadinessCheckCount = "flash.workspace.readiness.checkCount";
+    public const string FlashWorkspaceReadinessChecking = "flash.workspace.readiness.checking";
+    public const string FlashWorkspaceReadinessCheckingDetail = "flash.workspace.readiness.checkingDetail";
+    public const string FlashWorkspaceReadinessChooseImage = "flash.workspace.readiness.chooseImage";
+    public const string FlashWorkspaceReadinessNoDevice = "flash.workspace.readiness.noDevice";
+    public const string FlashWorkspaceReadinessNoDeviceDetail = "flash.workspace.readiness.noDeviceDetail";
+    public const string FlashWorkspaceReadinessPlanFailedDetail = "flash.workspace.readiness.planFailedDetail";
+    public const string FlashWorkspaceReadinessReady = "flash.workspace.readiness.ready";
+    public const string FlashWorkspaceReadinessSelected = "flash.workspace.readiness.selected";
+    public const string FlashWorkspaceResultAgain = "flash.workspace.result.again";
+    public const string FlashWorkspaceResultHistory = "flash.workspace.result.history";
+    public const string FlashWorkspaceResultState = "flash.workspace.result.state";
+    public const string FlashWorkspaceResultStopped = "flash.workspace.result.stopped";
+    public const string FlashWorkspaceResultSuccess = "flash.workspace.result.success";
+    public const string FlashWorkspaceResultSuccessDetail = "flash.workspace.result.successDetail";
+    public const string FlashWorkspaceResultUnverified = "flash.workspace.result.unverified";
+    public const string FlashWorkspaceStagePrepare = "flash.workspace.stage.prepare";
+    public const string FlashWorkspaceStageVerify = "flash.workspace.stage.verify";
+    public const string FlashWorkspaceStageWrite = "flash.workspace.stage.write";
+    public const string FlashWorkspaceSubtitle = "flash.workspace.subtitle";
+    public const string FlashWorkspaceTitle = "flash.workspace.title";
     public const string WindowsRecoveryTitle = "windows.recovery.title";
     public const string WindowsRecoveryMessageNotRunning = "windows.recovery.message.notRunning";
     public const string WindowsRecoveryMessageImpostor = "windows.recovery.message.impostor";
@@ -431,6 +878,21 @@ public static class UiStrings
     public const string WindowsAgentsActionId = "windows.agents.action.id";
     public const string WindowsImportsId = "windows.imports.id";
     public const string WindowsImportsSha256 = "windows.imports.sha256";
+    public const string WindowsNavigationDebug = "windows.navigation.debug";
+    public const string WindowsDebugRemoteUnavailable = "windows.debug.remote.unavailable";
+    public const string WindowsDebugJobsCancelFailed = "windows.debug.jobs.cancelFailed";
+    public const string WindowsDebugNeedsTarget = "windows.debug.needsTarget";
+    public const string WindowsDebugNeedsInputs = "windows.debug.needsInputs";
+    public const string WindowsDebugOperationUnavailable = "windows.debug.operationUnavailable";
+    public const string WindowsDebugBusy = "windows.debug.busy";
+    public const string WindowsDebugRunning = "windows.debug.running";
+    public const string WindowsDebugSelectedTab = "windows.debug.selectedTab";
+    public const string WindowsNavigationFlash = "windows.navigation.flash";
+    public const string WindowsFlashActionPower = "windows.flash.action.power";
+    public const string WindowsFlashProgressKeepConnected = "windows.flash.progress.keepConnected";
+    public const string WindowsFlashRuntimeCriticalWrite = "windows.flash.runtime.criticalWrite";
+    public const string WindowsFlashChooseImageInvalid = "windows.flash.chooseImage.invalid";
+    public const string WindowsFlashTargetChanged = "windows.flash.targetChanged";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -623,6 +1085,453 @@ public static class UiStrings
         SettingsCommonCancel,
         JobRecoveryHumanRequiredTitle,
         JobRecoveryHumanRequiredGuidance,
+        DebugActionCancel,
+        DebugActionRefresh,
+        DebugAppsAbility,
+        DebugAppsActionStart,
+        DebugAppsActionStop,
+        DebugAppsActionUninstall,
+        DebugAppsAdditionalAdd,
+        DebugAppsAdditionalNote,
+        DebugAppsAdditionalRemove,
+        DebugAppsAdditionalRemoveNamed,
+        DebugAppsAdditionalTitle,
+        DebugAppsArtifactsTitle,
+        DebugAppsBundle,
+        DebugAppsCaptureDiagnostics,
+        DebugAppsChooseHAP,
+        DebugAppsCleanupRetain,
+        DebugAppsCleanupUninstall,
+        DebugAppsCleanupPolicy,
+        DebugAppsClearSelection,
+        DebugAppsDiagnosticsDuration,
+        DebugAppsIdentityNote,
+        DebugAppsIdentityTitle,
+        DebugAppsImporting,
+        DebugAppsInstallReplace,
+        DebugAppsInstallPolicy,
+        DebugAppsInventoryDebuggable,
+        DebugAppsInventoryEmpty,
+        DebugAppsInventoryEmptyDetail,
+        DebugAppsInventoryPackage,
+        DebugAppsInventoryPid,
+        DebugAppsInventoryTitle,
+        DebugAppsLifecycleTitle,
+        DebugAppsLocalOnly,
+        DebugAppsMutationDetail,
+        DebugAppsMutationScope,
+        DebugAppsNoHAP,
+        DebugAppsPackageTitle,
+        DebugAppsPlanTitle,
+        DebugAppsPostRun,
+        DebugAppsPostRunRunning,
+        DebugAppsPostRunStopped,
+        DebugAppsRun,
+        DebugAppsRunning,
+        DebugAppsRunningCleanupHint,
+        DebugAppsSelectionDuplicatePackage,
+        DebugAppsSelectionFailed,
+        DebugAppsSelectionInvalid,
+        DebugAppsSelectionInvalidAdditional,
+        DebugAppsSelectionInvalidEntry,
+        DebugAppsSelectionTooManyPackages,
+        DebugAppsTarget,
+        DebugArtifactsAbi,
+        DebugArtifactsAbiObserved,
+        DebugArtifactsAdvanced,
+        DebugArtifactsBrowseRemote,
+        DebugArtifactsBundle,
+        DebugArtifactsBundleInvalid,
+        DebugArtifactsChooseLibrary,
+        DebugArtifactsDestinationDetail,
+        DebugArtifactsDestinationTitle,
+        DebugArtifactsLogicalName,
+        DebugArtifactsLogicalNameInvalid,
+        DebugArtifactsNoLibrary,
+        DebugArtifactsNotVerified,
+        DebugArtifactsOpenLogs,
+        DebugArtifactsPlanReady,
+        DebugArtifactsPolicyRequired,
+        DebugArtifactsPreparing,
+        DebugArtifactsPreview,
+        DebugArtifactsProductionBoundary,
+        DebugArtifactsRemoteBindingFailed,
+        DebugArtifactsRemoteBrowserCancel,
+        DebugArtifactsRemoteBrowserChoose,
+        DebugArtifactsRemoteBrowserDetail,
+        DebugArtifactsRemoteBrowserDirectory,
+        DebugArtifactsRemoteBrowserEmptyDetail,
+        DebugArtifactsRemoteBrowserEmptyTitle,
+        DebugArtifactsRemoteBrowserLibrary,
+        DebugArtifactsRemoteBrowserNoArtifacts,
+        DebugArtifactsRemoteBrowserOpenSettings,
+        DebugArtifactsRemoteBrowserRefresh,
+        DebugArtifactsRemoteBrowserRoot,
+        DebugArtifactsRemoteBrowserServer,
+        DebugArtifactsRemoteBrowserTitle,
+        DebugArtifactsRemoteBrowserUp,
+        DebugArtifactsReopenPlan,
+        DebugArtifactsResultsTitle,
+        DebugArtifactsReviewDetail,
+        DebugArtifactsReviewTitle,
+        DebugArtifactsRollback,
+        DebugArtifactsRollbackAuto,
+        DebugArtifactsRunning,
+        DebugArtifactsRunningDetail,
+        DebugArtifactsSelectedLibrary,
+        DebugArtifactsSheetBack,
+        DebugArtifactsSheetBundle,
+        DebugArtifactsSheetDigest,
+        DebugArtifactsSheetLibrary,
+        DebugArtifactsSheetRollback,
+        DebugArtifactsSheetRun,
+        DebugArtifactsSheetSteps,
+        DebugArtifactsSheetTarget,
+        DebugArtifactsSheetTitle,
+        DebugArtifactsSheetVerification,
+        DebugArtifactsSheetWarning,
+        DebugArtifactsSourceDetail,
+        DebugArtifactsSourceKind,
+        DebugArtifactsSourceLocal,
+        DebugArtifactsSourceRemote,
+        DebugArtifactsSourceTitle,
+        DebugArtifactsSourceBoundary,
+        DebugArtifactsTarget,
+        DebugArtifactsTargetConfirmed,
+        DebugArtifactsVerification,
+        DebugArtifactsVerified,
+        DebugArtifactsVerifyMaps,
+        DebugAvailabilityAvailable,
+        DebugAvailabilityChecking,
+        DebugAvailabilityEffect,
+        DebugAvailabilityMissing,
+        DebugAvailabilityOperation,
+        DebugAvailabilityUnavailable,
+        DebugBlockedBufferOperation,
+        DebugBlockedPackageLifecycle,
+        DebugCommandsArgvNote,
+        DebugCommandsArgvTitle,
+        DebugCommandsArtifactsEmpty,
+        DebugCommandsArtifactsEmptyDetail,
+        DebugCommandsArtifactsTitle,
+        DebugCommandsCalloutTyped,
+        DebugCommandsEffect,
+        DebugCommandsFooterNoFreeText,
+        DebugCommandsJobId,
+        DebugCommandsJobKnown,
+        DebugCommandsJobLatest,
+        DebugCommandsJobOutcome,
+        DebugCommandsJobRunning,
+        DebugCommandsJobState,
+        DebugCommandsJobUnknown,
+        DebugCommandsNoPTY,
+        DebugCommandsNoParameters,
+        DebugCommandsResultNone,
+        DebugCommandsResultTitle,
+        DebugCommandsRun,
+        DebugCommandsSelect,
+        DebugCommandsTarget,
+        DebugFailureArtifactFinalizationFailed,
+        DebugFailureArtifactPublicationFailed,
+        DebugFailureCancelled,
+        DebugFailureExecutionConfirmedNotPerformed,
+        DebugFailureExecutionFailed,
+        DebugFailureInterrupted,
+        DebugFailureLegacyFailure,
+        DebugFailureOutcomeUnknown,
+        DebugFailureReconciliationConfirmedNotPerformed,
+        DebugJobsActive,
+        DebugJobsEmpty,
+        DebugJobsTitle,
+        DebugLogsCaptureTitle,
+        DebugLogsDestructiveClear,
+        DebugLogsDestructiveMenu,
+        DebugLogsDestructiveScope,
+        DebugLogsDestructiveTitle,
+        DebugLogsDomain,
+        DebugLogsDuration,
+        DebugLogsExport,
+        DebugLogsExportBoundary,
+        DebugLogsExportCancel,
+        DebugLogsExportConfirm,
+        DebugLogsExportPreviewMessage,
+        DebugLogsExportPreviewTitle,
+        DebugLogsExportSensitive,
+        DebugLogsExporting,
+        DebugLogsFiltersInvalid,
+        DebugLogsFiltersNote,
+        DebugLogsKeyword,
+        DebugLogsLevel,
+        DebugLogsLiveEmpty,
+        DebugLogsLiveEmptyDetail,
+        DebugLogsLiveTitle,
+        DebugLogsMarker,
+        DebugLogsPause,
+        DebugLogsPauseRequiresCapture,
+        DebugLogsPid,
+        DebugLogsRawSave,
+        DebugLogsRequestTitle,
+        DebugLogsResume,
+        DebugLogsShardsEmpty,
+        DebugLogsShardsEmptyDetail,
+        DebugLogsShardsHash,
+        DebugLogsShardsSequence,
+        DebugLogsShardsSize,
+        DebugLogsShardsTitle,
+        DebugLogsShowInFinder,
+        DebugLogsStart,
+        DebugLogsStorageTotalBudget,
+        DebugLogsTag,
+        DebugLogsTarget,
+        DebugLogsViewportBounded,
+        DebugNetworkAdd,
+        DebugNetworkDelete,
+        DebugNetworkDeleteScope,
+        DebugNetworkDirection,
+        DebugNetworkEditorTitle,
+        DebugNetworkForward,
+        DebugNetworkLocalPort,
+        DebugNetworkRemotePort,
+        DebugNetworkReverse,
+        DebugNetworkRulesAction,
+        DebugNetworkRulesDirection,
+        DebugNetworkRulesEmpty,
+        DebugNetworkRulesEmptyDetail,
+        DebugNetworkRulesLocal,
+        DebugNetworkRulesRemote,
+        DebugNetworkRulesState,
+        DebugNetworkRulesTitle,
+        DebugNetworkSafetyBinding,
+        DebugNetworkSafetyNoShell,
+        DebugNetworkSafetyTitle,
+        DebugNetworkSafetyTyped,
+        DebugNetworkTarget,
+        DebugNetworkTypedRule,
+        DebugNetworkValidationLocalPortNotNumeric,
+        DebugNetworkValidationLocalPortOutOfRange,
+        DebugNetworkValidationRemotePortNotNumeric,
+        DebugNetworkValidationRemotePortOutOfRange,
+        DebugNetworkValidationValid,
+        DebugOptional,
+        DebugScope,
+        DebugTabApps,
+        DebugTabArtifacts,
+        DebugTabCommands,
+        DebugTabLogs,
+        DebugTabNetwork,
+        DebugTabsLabel,
+        DebugTargetBinding,
+        DebugTargetLabel,
+        DebugTargetNone,
+        DebugTypedInvalidIdentifier,
+        FlashActionCancel,
+        FlashActionCancelHelp,
+        FlashActionRefresh,
+        FlashAvailabilityAvailable,
+        FlashAvailabilityChecking,
+        FlashAvailabilityScope,
+        FlashAvailabilityTitle,
+        FlashAvailabilityUnavailable,
+        FlashBindingUnpreparedHdcDetail,
+        FlashBindingUnpreparedHdcTitle,
+        FlashBootloaderBound,
+        FlashBootloaderUnboundDetail,
+        FlashBootloaderUnboundTitle,
+        FlashBootloaderUnpreparedDetail,
+        FlashDeviceAccessChecking,
+        FlashDeviceAccessNextStep,
+        FlashDeviceAccessObservationValue,
+        FlashDeviceAccessObservations,
+        FlashDeviceAccessRemediationChooseSupportedLoaderObservation,
+        FlashDeviceAccessRemediationInspectControlledDiagnostics,
+        FlashDeviceAccessRemediationReconnectOrEnterLoader,
+        FlashDeviceAccessRemediationRepairDriverOutsideArkDeck,
+        FlashDeviceAccessRemediationReviewDevicePermissionOutsideArkDeck,
+        FlashDeviceAccessReprobe,
+        FlashDeviceAccessResponsibility,
+        FlashDeviceAccessResponsibilityDeviceOrToolVendor,
+        FlashDeviceAccessResponsibilitySystemAdministrator,
+        FlashDeviceAccessResponsibilityUser,
+        FlashDeviceAccessTitle,
+        FlashDeviceAccessToolUnavailable,
+        FlashDeviceAccessVerdictAccessible,
+        FlashDeviceAccessVerdictDriverUnavailable,
+        FlashDeviceAccessVerdictMalformedOutput,
+        FlashDeviceAccessVerdictOffline,
+        FlashDeviceAccessVerdictPermissionDenied,
+        FlashDeviceAccessVerdictProbeFailed,
+        FlashDeviceAccessVerdictProtocolBlocked,
+        FlashEffectDestructive,
+        FlashEffectDeviceMutation,
+        FlashEffectHostOnly,
+        FlashEffectReadOnly,
+        FlashErrorFileAccess,
+        FlashErrorFormat,
+        FlashErrorInvalid,
+        FlashErrorPlan,
+        FlashErrorUnreadable,
+        FlashErrorUnsupported,
+        FlashExecutePlanRequired,
+        FlashExecutePrerequisiteBlocker,
+        FlashExecuteTerminal,
+        FlashImageChoose,
+        FlashImpactPartitions,
+        FlashImpactPreserved,
+        FlashImpactUserdata,
+        FlashPlanArchiveHash,
+        FlashPlanBuild,
+        FlashPlanDigest,
+        FlashPlanDigestMaterializedAtSubmission,
+        FlashPlanImageHash,
+        FlashPlanImageSize,
+        FlashPlanLanePlan,
+        FlashPlanLanePlanBundleNotInLaneStore,
+        FlashPlanLanePlanDeviceNotObserved,
+        FlashPlanLanePlanLaneNotComposed,
+        FlashPlanLanePlanPending,
+        FlashPlanLanePlanPlanNotExecutable,
+        FlashPlanLanePlanUnavailable,
+        FlashPlanPartitionCount,
+        FlashPlanPreparing,
+        FlashPlanPrerequisites,
+        FlashPlanPrerequisitesAwaitPlan,
+        FlashPlanPrerequisitesNote,
+        FlashPlanSize,
+        FlashPlanStepSetDigest,
+        FlashPlanTitle,
+        FlashPlanWriteForbidden,
+        FlashPostflightBinding,
+        FlashPostflightBuild,
+        FlashPostflightComparison,
+        FlashPostflightMatch,
+        FlashPostflightMismatch,
+        FlashPostflightTitle,
+        FlashPrerequisiteLoader,
+        FlashPrerequisiteNotApplicable,
+        FlashPrerequisiteOptional,
+        FlashPrerequisiteRecoveryPath,
+        FlashPrerequisiteRequired,
+        FlashPrerequisiteStablePower,
+        FlashPrerequisiteStatusSatisfied,
+        FlashPrerequisiteStatusUnknown,
+        FlashPrerequisiteStatusUnsatisfied,
+        FlashPrerequisiteUnlocked,
+        FlashProfileLabel,
+        FlashRuntimeCriticalWrite,
+        FlashRuntimeEmpty,
+        FlashRuntimeEmptyDescription,
+        FlashRuntimeJob,
+        FlashRuntimeJobCount,
+        FlashRuntimeOpenRecord,
+        FlashRuntimeOutcomeUnknownGuidance,
+        FlashRuntimeReadOnly,
+        FlashRuntimeRecoveryTitle,
+        FlashRuntimeResidue,
+        FlashRuntimeResultCancelled,
+        FlashRuntimeResultFailed,
+        FlashRuntimeResultInProgress,
+        FlashRuntimeResultInterrupted,
+        FlashRuntimeResultNeedsAction,
+        FlashRuntimeResultOutcomeUnknown,
+        FlashRuntimeResultPlanned,
+        FlashRuntimeResultSucceeded,
+        FlashRuntimeResultSupersededByRecovery,
+        FlashRuntimeResultTargetAliasResolved,
+        FlashRuntimeResultUnknown,
+        FlashRuntimeTarget,
+        FlashRuntimeTimeline,
+        FlashRuntimeTitle,
+        FlashRuntimeUnavailable,
+        FlashRuntimeUnavailableNote,
+        FlashRuntimeWaitingForHumanGuidance,
+        FlashStateAwaitingRebindConfirmation,
+        FlashStateCancelRequested,
+        FlashStateCancelled,
+        FlashStateCancellingAtSafeBoundary,
+        FlashStateFailed,
+        FlashStateFinalizing,
+        FlashStateInterrupted,
+        FlashStatePlanned,
+        FlashStatePlanning,
+        FlashStatePreflight,
+        FlashStateQueued,
+        FlashStateReconciling,
+        FlashStateRecovered,
+        FlashStateRecoveringByCompleteOverwrite,
+        FlashStateResumeAtConfirmedSafeBoundary,
+        FlashStateRunning,
+        FlashStateSucceeded,
+        FlashStateUserAbandonRequested,
+        FlashStateWaitingForDevice,
+        FlashStateWaitingForRecovery,
+        FlashTargetBinding,
+        FlashTargetGuidance,
+        FlashTargetHistoryMissing,
+        FlashTargetLabel,
+        FlashTargetNone,
+        FlashTargetToolVersion,
+        FlashTargetUnavailable,
+        FlashWorkspaceActionAuthority,
+        FlashWorkspaceActionBlocked,
+        FlashWorkspaceActionImpact,
+        FlashWorkspaceActionPower,
+        FlashWorkspaceActionSubmit,
+        FlashWorkspaceDetails,
+        FlashWorkspaceDetailsConfiguration,
+        FlashWorkspaceDetailsHide,
+        FlashWorkspaceDeviceDetail,
+        FlashWorkspaceDeviceNone,
+        FlashWorkspaceImageChange,
+        FlashWorkspaceImageChoose,
+        FlashWorkspaceImageChooseHelp,
+        FlashWorkspaceImageChooseTitle,
+        FlashWorkspaceImageRetry,
+        FlashWorkspaceImageValidating,
+        FlashWorkspacePlanEffect,
+        FlashWorkspacePlanLoader,
+        FlashWorkspacePlanPrepare,
+        FlashWorkspacePlanStage,
+        FlashWorkspacePlanSteps,
+        FlashWorkspacePlanSummary,
+        FlashWorkspacePlanVerify,
+        FlashWorkspacePlanWrite,
+        FlashWorkspaceProgressBootloader,
+        FlashWorkspaceProgressExtracting,
+        FlashWorkspaceProgressImporting,
+        FlashWorkspaceProgressIndeterminate,
+        FlashWorkspaceProgressKeepConnected,
+        FlashWorkspaceProgressPartition,
+        FlashWorkspaceProgressPartitionDetail,
+        FlashWorkspaceProgressPartitionUnknown,
+        FlashWorkspaceProgressRebooting,
+        FlashWorkspaceProgressReconnecting,
+        FlashWorkspaceProgressRunning,
+        FlashWorkspaceProgressValidating,
+        FlashWorkspaceProgressVerifyingPartitions,
+        FlashWorkspaceProgressVerifyingSystem,
+        FlashWorkspaceReadinessBlocked,
+        FlashWorkspaceReadinessBlockerCount,
+        FlashWorkspaceReadinessCheckCount,
+        FlashWorkspaceReadinessChecking,
+        FlashWorkspaceReadinessCheckingDetail,
+        FlashWorkspaceReadinessChooseImage,
+        FlashWorkspaceReadinessNoDevice,
+        FlashWorkspaceReadinessNoDeviceDetail,
+        FlashWorkspaceReadinessPlanFailedDetail,
+        FlashWorkspaceReadinessReady,
+        FlashWorkspaceReadinessSelected,
+        FlashWorkspaceResultAgain,
+        FlashWorkspaceResultHistory,
+        FlashWorkspaceResultState,
+        FlashWorkspaceResultStopped,
+        FlashWorkspaceResultSuccess,
+        FlashWorkspaceResultSuccessDetail,
+        FlashWorkspaceResultUnverified,
+        FlashWorkspaceStagePrepare,
+        FlashWorkspaceStageVerify,
+        FlashWorkspaceStageWrite,
+        FlashWorkspaceSubtitle,
+        FlashWorkspaceTitle,
         WindowsRecoveryTitle,
         WindowsRecoveryMessageNotRunning,
         WindowsRecoveryMessageImpostor,
@@ -858,5 +1767,20 @@ public static class UiStrings
         WindowsAgentsActionId,
         WindowsImportsId,
         WindowsImportsSha256,
+        WindowsNavigationDebug,
+        WindowsDebugRemoteUnavailable,
+        WindowsDebugJobsCancelFailed,
+        WindowsDebugNeedsTarget,
+        WindowsDebugNeedsInputs,
+        WindowsDebugOperationUnavailable,
+        WindowsDebugBusy,
+        WindowsDebugRunning,
+        WindowsDebugSelectedTab,
+        WindowsNavigationFlash,
+        WindowsFlashActionPower,
+        WindowsFlashProgressKeepConnected,
+        WindowsFlashRuntimeCriticalWrite,
+        WindowsFlashChooseImageInvalid,
+        WindowsFlashTargetChanged,
     ];
 }

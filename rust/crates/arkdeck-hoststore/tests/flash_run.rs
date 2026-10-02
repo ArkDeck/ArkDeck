@@ -9,7 +9,19 @@
 //!
 //! Every story the oracle recorded is replayed, the complete-overwrite
 //! recoveries (DEC-016) among them.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-010) the same stories replay over a fixed root below
+//! the temporary directory, laid down owner-only the Windows way (private
+//! directories, sealed 0400 payloads). Every answer, every call the fakes
+//! record, the Job index and every file's bytes must still be Swift's; each
+//! entry's kind too, but not its mode, which Windows does not have. A
+//! Session published on Windows names its platform in its Manifest
+//! (`PLATFORM-WINDOWS@0.2.0`, Swift's `PLATFORM-MACOS@0.2.0`), and so does
+//! every digest over it: the Manifest's wherever the Journal, the audit
+//! record, the marker and the answers name it, and the Journal seals and
+//! records over those. What this Runtime wrote is read back as Swift's
+//! platform wrote it (`AsSwift`) before it is compared; nothing else is.
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
@@ -23,15 +35,39 @@ use arkdeck_hoststore::{
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use support::OracleProbe;
 use support::flash_lane::{FakeHost, FakeLane, Fakes, Script, TOOLCHAIN};
 
+#[cfg(unix)]
 const ROOT: &str = "/private/tmp/arkdeck-flash-run-oracle";
 /// Serializes every user of the fixed root, Swift producers included.
+#[cfg(unix)]
 const LOCK: &str = "/private/tmp/arkdeck-flash-run-oracle.lock";
+
+#[cfg(unix)]
+fn root_path() -> PathBuf {
+    PathBuf::from(ROOT)
+}
+
+#[cfg(unix)]
+fn lock_path() -> PathBuf {
+    PathBuf::from(LOCK)
+}
+
+/// On Windows the fixed root is below the temporary directory.
+#[cfg(windows)]
+fn root_path() -> PathBuf {
+    support::fixture_fs::temporary_root().join("arkdeck-flash-run-oracle")
+}
+
+#[cfg(windows)]
+fn lock_path() -> PathBuf {
+    support::fixture_fs::temporary_root().join("arkdeck-flash-run-oracle.lock")
+}
 /// Every story the oracle recorded, in its order.
 const STORIES: [&str; 8] = [
     "admission",
@@ -62,7 +98,7 @@ fn exclusive() -> File {
         .write(true)
         .create(true)
         .truncate(false)
-        .open(LOCK)
+        .open(lock_path())
         .unwrap();
     lock.lock().unwrap();
     lock
@@ -70,8 +106,9 @@ fn exclusive() -> File {
 
 /// The root as every story finds it: the inputs laid down with their modes,
 /// the Job, Session and Session owner roots empty.
+#[cfg(unix)]
 fn lay_down() -> PathBuf {
-    let root = PathBuf::from(ROOT);
+    let root = root_path();
     let _ = fs::remove_dir_all(&root);
     for directory in [
         "",
@@ -110,6 +147,54 @@ fn lay_down() -> PathBuf {
     root
 }
 
+/// The same root on Windows: every directory created private, every file
+/// created in its private directory, and each 0400 payload sealed as the
+/// Artifact store seals one.
+#[cfg(windows)]
+fn lay_down() -> PathBuf {
+    fn private(path: &Path) {
+        if !path.exists() {
+            private(path.parent().unwrap());
+            support::fixture_fs::private_dir(path);
+        }
+    }
+    let root = root_path();
+    let _ = fs::remove_dir_all(&root);
+    for directory in [
+        "",
+        "targets-state",
+        "artifacts",
+        "store",
+        "Sessions",
+        "session-owner",
+    ] {
+        private(&root.join(directory));
+    }
+    for input in support::document(&fixture(), "inputs.json")
+        .as_array()
+        .unwrap()
+    {
+        let path = input["path"].as_str().unwrap();
+        let destination = root.join(path);
+        private(destination.parent().unwrap());
+        let directory =
+            arkdeck_platform::HostDirectory::open(destination.parent().unwrap()).unwrap();
+        let name = destination.file_name().unwrap().to_str().unwrap();
+        directory
+            .create_document(
+                name,
+                &fs::read(fixture().join("inputs").join(path)).unwrap(),
+            )
+            .unwrap();
+        match input["mode"].as_str().unwrap() {
+            "400" => directory.seal_document(name).unwrap(),
+            "600" => {}
+            other => panic!("no Windows form of mode {other}"),
+        }
+    }
+    root
+}
+
 /// Every entry below `root` by its relative path, sorted: its kind and mode.
 fn walk(root: &Path) -> Vec<(String, String, String)> {
     fn visit(root: &Path, directory: &Path, out: &mut Vec<(String, String, String)>) {
@@ -126,10 +211,12 @@ fn walk(root: &Path) -> Vec<(String, String, String)> {
             out.push((
                 path.strip_prefix(root)
                     .unwrap()
-                    .to_string_lossy()
-                    .into_owned(),
+                    .components()
+                    .map(|component| component.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/"),
                 kind.to_owned(),
-                format!("{:o}", metadata.mode() & 0o777),
+                support::mode(&metadata),
             ));
             if metadata.is_dir() {
                 visit(root, &path, out);
@@ -462,6 +549,133 @@ fn normalized_value(value: &Value) -> Value {
     serde_json::from_str(&normalized(&value.to_string())).unwrap()
 }
 
+/// What a replay wrote, read as it would read published on Swift's platform:
+/// the platform profile, and every digest over bytes that name it, taken as
+/// the digest of those bytes naming Swift's. On macOS it changes nothing of
+/// the platform.
+///
+/// On both hosts it also reads a Session publication's checkpoint seal the
+/// way the oracle labels the measured prewarm wait (`normalized`): the seal
+/// is the digest of the Job record the publication was given, whose timeline
+/// names that wait in milliseconds. A Job record that measured a wait other
+/// than 0 ms seals other bytes than Swift's; its seal is then read as
+/// Swift's, and so is every digest over a record that names it.
+#[derive(Default)]
+struct AsSwift {
+    /// Each digest over bytes that name this platform, and the digest of
+    /// those bytes naming Swift's.
+    digests: BTreeMap<String, String>,
+    /// Each Manifest's byte count here, and naming Swift's platform.
+    manifest_bytes: BTreeMap<usize, usize>,
+    /// The Sessions root a publication marker names, a host value: its JSON
+    /// spelling here, and the one Swift's oracle root has.
+    sessions: Option<(String, String)>,
+}
+
+impl AsSwift {
+    const WINDOWS: &'static str = "PLATFORM-WINDOWS@0.2.0";
+    const MACOS: &'static str = "PLATFORM-MACOS@0.2.0";
+
+    /// Every file below `root`, taken until no digest is left to learn.
+    #[cfg(windows)]
+    fn learn(root: &Path) -> Self {
+        let files: Vec<Vec<u8>> = walk(root)
+            .into_iter()
+            .filter(|(_, kind, _)| kind == "file")
+            .filter_map(|(path, _, _)| fs::read(root.join(path)).ok())
+            .collect();
+        let spelled = serde_json::to_string(root.join("Sessions").to_str().unwrap()).unwrap();
+        let mut learned = Self {
+            sessions: Some((
+                spelled.trim_matches('"').to_owned(),
+                r"\/tmp\/arkdeck-flash-run-oracle\/Sessions".to_owned(),
+            )),
+            ..Self::default()
+        };
+        loop {
+            let mut changed = false;
+            for bytes in &files {
+                let text = String::from_utf8_lossy(bytes);
+                let swift = learned.read(&text);
+                if swift != text {
+                    let (windows, macos) = (
+                        arkdeck_contract::sha256_hex(bytes),
+                        arkdeck_contract::sha256_hex(swift.as_bytes()),
+                    );
+                    changed |= learned.digests.insert(windows, macos).is_none();
+                }
+                if text.contains(Self::WINDOWS) {
+                    let swift = text.replace(Self::WINDOWS, Self::MACOS);
+                    learned.manifest_bytes.insert(bytes.len(), swift.len());
+                }
+            }
+            if !changed {
+                return learned;
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    fn learn(_root: &Path) -> Self {
+        Self::default()
+    }
+
+    /// The checkpoint seals of the Job records below `root` that measured a
+    /// prewarm wait other than 0 ms, each taken as the seal Swift's record
+    /// of the same Job has in `recorded`.
+    fn learn_measured_waits(mut self, root: &Path, recorded: &Path) -> Self {
+        let seal = |text: &str| {
+            serde_json::from_str::<Value>(text).ok().and_then(|record| {
+                record["sessionPublicationRecord"]["checkpointSeal"]["sha256"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        };
+        for (path, kind, _) in walk(root) {
+            if kind != "file" || !path.ends_with("/job-record.json") {
+                continue;
+            }
+            let Ok(bytes) = fs::read(root.join(&path)) else {
+                continue;
+            };
+            let text = String::from_utf8_lossy(&bytes);
+            if normalized(&text) == text.replace("consume wait 0 ms", "consume wait <ms> ms") {
+                continue;
+            }
+            let swift = fs::read_to_string(recorded.join("files").join(&path)).ok();
+            if let (Some(here), Some(swift)) = (seal(&text), swift.as_deref().and_then(seal))
+                && here != swift
+            {
+                self.digests.insert(here, swift);
+            }
+        }
+        self
+    }
+
+    fn read(&self, text: &str) -> String {
+        let mut text = text.replace(Self::WINDOWS, Self::MACOS);
+        if let Some((here, swift)) = &self.sessions {
+            text = text.replace(here.as_str(), swift);
+        }
+        for (windows, macos) in &self.digests {
+            text = text.replace(windows.as_str(), macos);
+        }
+        for (windows, macos) in &self.manifest_bytes {
+            for separator in [" : ", ":"] {
+                text = text.replace(
+                    &format!("\"manifestByteCount\"{separator}\"{windows}\""),
+                    &format!("\"manifestByteCount\"{separator}\"{macos}\""),
+                );
+            }
+        }
+        text
+    }
+
+    fn value(&self, value: &Value) -> Value {
+        serde_json::from_str(&self.read(&value.to_string())).unwrap()
+    }
+}
+
 /// Replays `story` and returns what differs from Swift, one line each.
 fn replay(story: &str) -> Vec<String> {
     let _lock = exclusive();
@@ -476,6 +690,7 @@ fn play(story: &str) -> Vec<String> {
     let fakes = Fakes::default();
     let mut owners = Owners::open(&root, &fakes);
     let mut differences = Vec::new();
+    let mut answers = Vec::new();
     for exchange in cases["exchanges"].as_array().unwrap() {
         let name = exchange["name"].as_str().unwrap();
         let method = exchange["method"].as_str().unwrap();
@@ -497,13 +712,10 @@ fn play(story: &str) -> Vec<String> {
         } else {
             owners.answer(&fakes, method, exchange["params"].as_object().unwrap())
         };
-        let answer = normalized_value(&support::legacy_plan_answer(answer));
-        if answer != exchange["answer"] {
-            differences.push(format!(
-                "{story}/{name}:\n  swift {}\n  rust  {answer}",
-                exchange["answer"]
-            ));
-        }
+        answers.push((
+            name.to_owned(),
+            normalized_value(&support::legacy_plan_answer(answer)),
+        ));
         let (lane, dispatch) = fakes.calls();
         if json!(lane) != exchange["laneCalls"] || json!(dispatch) != exchange["dispatchCalls"] {
             differences.push(format!(
@@ -513,7 +725,18 @@ fn play(story: &str) -> Vec<String> {
         }
     }
     drop(owners);
-    differences.extend(leftovers(story, &root));
+    let swift =
+        AsSwift::learn(&root).learn_measured_waits(&root, &fixture().join("stories").join(story));
+    for (exchange, (name, answer)) in cases["exchanges"].as_array().unwrap().iter().zip(answers) {
+        let answer = swift.value(&answer);
+        if answer != exchange["answer"] {
+            differences.push(format!(
+                "{story}/{name}:\n  swift {}\n  rust  {answer}",
+                exchange["answer"]
+            ));
+        }
+    }
+    differences.extend(leftovers(story, &root, &swift));
     differences
 }
 
@@ -572,11 +795,13 @@ fn rust_incidental(path: &str) -> bool {
 /// leaves that no story made is declared (`swift_incidental`,
 /// `rust_incidental`) and left out where only that daemon has it; the two
 /// pagers still made as many snapshots.
-fn leftovers(story: &str, root: &Path) -> Vec<String> {
+fn leftovers(story: &str, root: &Path, as_swift: &AsSwift) -> Vec<String> {
     let recorded = fixture().join("stories").join(story);
     let mut differences = Vec::new();
     let index = support::index_normalized(&root.join("store"), |bytes| {
-        normalized(&String::from_utf8_lossy(bytes)).into_bytes()
+        as_swift
+            .read(&normalized(&String::from_utf8_lossy(bytes)))
+            .into_bytes()
     });
     let swift_index = support::document(&recorded, "index.json");
     if index != swift_index {
@@ -588,6 +813,20 @@ fn leftovers(story: &str, root: &Path) -> Vec<String> {
         .map(|(path, kind, mode)| json!({"path": path, "kind": kind, "mode": mode}))
         .collect();
     let swift_tree = support::document(&recorded, "tree.json");
+    // Windows has no modes to compare (`support::mode`).
+    #[cfg(windows)]
+    let swift_tree = Value::Array(
+        swift_tree
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|entry| {
+                let mut entry = entry.clone();
+                entry["mode"] = json!("-");
+                entry
+            })
+            .collect(),
+    );
     let swift_tree = swift_tree.as_array().unwrap();
     let path = |entry: &Value| entry["path"].as_str().unwrap_or_default().to_owned();
     let rust: Vec<&Value> = tree
@@ -631,7 +870,10 @@ fn leftovers(story: &str, root: &Path) -> Vec<String> {
         } else {
             bytes
         };
-        files.insert(path, normalized(&String::from_utf8_lossy(&bytes)));
+        files.insert(
+            path,
+            as_swift.read(&normalized(&String::from_utf8_lossy(&bytes))),
+        );
     }
     let files_root = recorded.join("files");
     let mut swift_files = BTreeMap::new();
@@ -743,7 +985,7 @@ fn a_recovery_interrupted_after_its_epoch_completes_at_restart() {
     let _lock = exclusive();
     let differences = play("recovery");
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    let root = PathBuf::from(ROOT);
+    let root = root_path();
     let jobs = root.join("store/jobs");
     let recovery = fs::read_dir(&jobs)
         .unwrap()
@@ -901,7 +1143,7 @@ fn a_flash_after_an_unknown_one_is_admitted_only_as_its_complete_overwrite() {
     let _lock = exclusive();
     let differences = play("failures");
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    let root = PathBuf::from(ROOT);
+    let root = root_path();
     let fakes = Fakes::default();
     let owners = Owners::open(&root, &fakes);
     let index = support::index(&root.join("store"));

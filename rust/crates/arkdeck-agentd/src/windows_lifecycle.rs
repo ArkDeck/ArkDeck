@@ -15,8 +15,8 @@
 //!   a guard and a pipe named after the root's file identity. Beside the
 //!   lifecycle only the Job store and its capability store, the Target
 //!   owners, the Artifact read and export owner, the Session owner, the
-//!   workspace project owner, the Job planner and admitter and the Trace
-//!   cache owner are composed over it (see
+//!   History filter owner, the workspace project owner, the Job planner and
+//!   admitter and the Trace cache owner are composed over it (see
 //!   [`Authority::compose`]); every input that would compose another
 //!   owner on macOS is refused, not ignored, until its store is ported (G01),
 //!   and a development HDC is admitted only by a registered Windows HDC
@@ -165,6 +165,10 @@ impl Authority {
     /// * the Session owner and the Artifact usage owner
     ///   ([`Self::session_store`]): `runtime.storage.*`, `session.list|show|
     ///   pin|unpin`, `session.cleanup.*` and `session.export.*`;
+    /// * the History filter owner (`HistoryStore`, [`Self::history_store`]):
+    ///   `history.filter.list|save|delete` over `history-filter.json` under
+    ///   `.history-filter.lock`, the same document as on macOS, in the root's
+    ///   private `history-filter`;
     /// * the workspace project owner (`WorkspaceProjectStore`) in
     ///   `workspace-projects`, the name both macOS compositions give it:
     ///   `projects.json` under `.projects.lock`, the same document as on
@@ -190,17 +194,18 @@ impl Authority {
     ///   `trace-cache`, the layout the macOS isolated owner creates, or the
     ///   account's `%LOCALAPPDATA%\ArkDeck\Trace`, where the macOS App keeps
     ///   `ArkDeck/Trace` in its container caches. `trace.cache.status` reads
-    ///   the same inventory as on macOS. `trace.cache.purge` is refused before
-    ///   admission (`operationUnavailable`, ruling 18), as the macOS daemon
-    ///   refuses it without its retention owners: the Job owner's
-    ///   active-Session census, which alone proves that no Job's Session still
-    ///   needs the derived data, is not asked on Windows yet.
+    ///   the same inventory as on macOS, and `trace.cache.purge` purges as on
+    ///   macOS, under the Job owner's active-Session census and the Artifact
+    ///   owner's Trace retention census.
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each
     /// store, which reads its documents under its locks; a store it cannot
     /// open or read ends the start, as on macOS.
-    pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
+    pub(crate) fn compose(
+        &self,
+        host: crate::host::Host,
+    ) -> Result<(crate::host::Host, crate::arkforge_lane::Composed), String> {
         use crate::development_usb::{RelationSource, relation_source};
         let host = host
             .with_jobs(self.job_store()?)
@@ -267,6 +272,7 @@ impl Authority {
                 },
             )?
         });
+        let host = host.with_history(self.history_store()?);
         // Beside the Job state, as the macOS daemons keep their agent
         // executions, and the combined human-action owner in its own
         // directory beside them (over no control-action owner: none is built
@@ -345,11 +351,83 @@ impl Authority {
             "arkdeck-agentd composes no HDC: no Windows HDC tuple is registered; device \
              observation and target adoption are refused before any dispatch",
         );
+        let (host, composed) = self.compose_arkforge(host);
         report(&format!(
             "arkdeck-agentd owners: {}",
             host.owner_census().join(", ")
         ));
-        Ok(host)
+        Ok((host, composed))
+    }
+
+    /// The ArkForge lane (TASK-XPA-010), as the macOS compositions compose
+    /// it beside the Job state: the account's root (the macOS production
+    /// `Agentd`) or a development root's `jobs-state`, with the lane's
+    /// runtime directory `arkforge` in it and the facts' root its
+    /// Application Support (the account root's parent, or the development
+    /// root itself).
+    ///
+    /// One validated `ARKDECK_ARKFORGE_BUNDLE_PATH` bundle names the
+    /// `arkforged.exe` to start and pair, but its authority must name the
+    /// managed-control HDC's digest, and no HDC is composed until the Windows
+    /// HDC tuple is registered: the lane is refused before anything is
+    /// launched, and the start reports why. Its planning, its facts (over the
+    /// Windows USB census, which fails closed until the DAYU200 sample
+    /// confirms its mapping) and the device access observer of the lane's
+    /// directory are composed either way, as on macOS; no executable lane is
+    /// installed without an HDC, so an admissible Flash is refused before
+    /// admission with zero dispatch.
+    fn compose_arkforge(
+        &self,
+        host: crate::host::Host,
+    ) -> (crate::host::Host, crate::arkforge_lane::Composed) {
+        let root = self.root.path();
+        let (state, application_support) = if self.development {
+            (root.join("jobs-state"), root.to_path_buf())
+        } else {
+            (
+                root.to_path_buf(),
+                root.parent().unwrap_or(root).to_path_buf(),
+            )
+        };
+        let composed = crate::arkforge_lane::compose(&state, |key| std::env::var(key).ok(), None);
+        composed.report();
+        let host = host
+            .with_flash_planning(composed.planning(&state, false))
+            .with_flash_host_facts(
+                arkdeck_hoststore::FlashHostFacts::new(
+                    &application_support,
+                    arkdeck_platform::usb_host_devices,
+                )
+                .with_rockusb(composed.rockusb())
+                .with_arkforge_loader(&composed.runtime_directory),
+            )
+            .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
+                &composed.runtime_directory,
+            ))
+            .with_lane_plan_preview(composed.lane_plan_preview())
+            // The Loader binding coordinator, as the macOS compositions
+            // compose it: the same root and census, ArkForge's half of the
+            // Loader observation through the lane's directory, and the
+            // Runtime's records below the root.
+            .with_loader_binding(arkdeck_hoststore::LoaderBinding::new(
+                &application_support,
+                arkdeck_platform::usb_host_devices,
+                arkdeck_hoststore::ArkForgeLoader::new(
+                    arkdeck_platform::usb_host_devices,
+                    &composed.runtime_directory,
+                ),
+            ));
+        // The executable lane, installed only with a lane and a
+        // descriptor-bound HDC: neither exists on Windows until the managed
+        // HDC is composed, so nothing is installed yet.
+        let host = crate::arkforge_execution::install(
+            host,
+            &composed,
+            &state,
+            &application_support,
+            arkdeck_platform::usb_host_devices,
+        );
+        (host, composed)
     }
 
     /// The Job store owner over its private child of the root (created
@@ -498,6 +576,30 @@ impl Authority {
         Ok(path)
     }
 
+    /// The History filter owner over the root's private `history-filter`
+    /// (created owner-only when absent, an existing one opened as it is).
+    /// Both macOS compositions keep `history-filter.json` and its lock in
+    /// the state directory itself; the host store cannot open a Windows
+    /// root itself (a development root is any directory of this user, the
+    /// account's root grants SYSTEM, ruling 23), so the same document and
+    /// lock live one level down, as the Job store's do. The store reopens
+    /// its directory on every request, so a directory made unsafe later
+    /// fails that request only.
+    fn history_store(&self) -> Result<arkdeck_hoststore::HistoryStore, String> {
+        const NAME: &str = "history-filter";
+        let unusable = |path: &Path, error: std::io::Error| {
+            format!(
+                "the History filter store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let path = self
+            .root
+            .private_child(NAME)
+            .map_err(|error| unusable(&self.root.path().join(NAME), error))?;
+        arkdeck_hoststore::HistoryStore::open(&path).map_err(|error| unusable(&path, error))
+    }
+
     /// The Session storage owner: its settings in the private `session-state`
     /// and its default Sessions root, the Artifact usage owner (`artifacts`)
     /// the one the Artifact read owner reads.
@@ -558,6 +660,7 @@ impl Authority {
                     "control-action-snapshots",
                     "evolution-workspaces",
                     "workspace-projects",
+                    "history-filter",
                 ]
                 .into_iter()
                 .map(|name| root.join(name))

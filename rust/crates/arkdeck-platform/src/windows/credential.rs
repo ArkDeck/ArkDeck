@@ -38,18 +38,44 @@
 //! keep the written credential"), so a session that does not keep credentials
 //! is reported, not silently lost.
 //!
+//! - **One call at a time.** Credential Manager loses updates when one
+//!   user's credentials are changed concurrently. Measured on the Windows
+//!   reference host (TASK-XPA-005), each thread writing, reading back and
+//!   deleting its own credentials:
+//!   - 8 processes of 8 threads lost 28 written credentials and brought back
+//!     320 deleted ones in five runs;
+//!   - 8 threads of one process lost no written credential, but brought
+//!     back 12–14 deleted ones in two of three runs;
+//!   - with every call taking turns, nothing was lost or brought back.
+//!
+//!   Every call here therefore takes this user's Credential Manager turn, a
+//!   named mutex in the session namespace
+//!   (`Local\ArkDeck.CredentialManager.<user SID>`, owner-only, as the
+//!   daemon's single-instance guard). It serializes the threads of one
+//!   process and the ArkDeck processes alike. `set` holds it from the write
+//!   through the read-back, so no other ArkDeck call can undo the write or
+//!   answer between. Programs other than ArkDeck do not take the turn.
+//!
 //! Every error carries the Win32 error code or a fixed refusal, never a value.
 //! An absent credential is `Status(ERROR_NOT_FOUND)` on `read`,
 //! [`KeychainPresence::Absent`] on `presence` and `Ok(false)` on `remove`, as
 //! macOS answers `errSecItemNotFound`.
+use super::identity::{Token, owned_by_current_user};
+use super::{Handle, SecurityDescriptor};
 use crate::Secret;
 use std::fmt;
+use std::marker::PhantomData;
 use std::ptr;
-use windows_sys::Win32::Foundation::{ERROR_NOT_FOUND, GetLastError};
+use std::time::Duration;
+use windows_sys::Win32::Foundation::{
+    ERROR_NOT_FOUND, GetLastError, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT,
+};
+use windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT;
 use windows_sys::Win32::Security::Credentials::{
     CRED_MAX_CREDENTIAL_BLOB_SIZE, CRED_MAX_USERNAME_LENGTH, CRED_PERSIST_LOCAL_MACHINE,
     CRED_TYPE_GENERIC, CREDENTIALW, CredDeleteW, CredFree, CredReadW, CredWriteW,
 };
+use windows_sys::Win32::System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject};
 
 /// The macOS access group, kept as the namespace component of every
 /// production target name so that both platforms name one item alike. It must
@@ -187,6 +213,7 @@ impl KeychainItems {
             UserName: user.as_mut_ptr(),
             ..CREDENTIALW::default()
         };
+        let _turn = CredentialTurn::take()?;
         // SAFETY: the structure and every buffer it points to are live for
         // the call; no flags.
         if unsafe { CredWriteW(&credential, 0) } == 0 {
@@ -212,7 +239,7 @@ impl KeychainItems {
         let target = self.target_name(account)?.ok_or(KeychainError::Refused(
             "nothing is read outside the Data Protection Keychain",
         ))?;
-        let credential = ReadCredential::read(&target)?;
+        let credential = CredentialTurn::take().and_then(|_turn| ReadCredential::read(&target))?;
         credential.check(account)?;
         Ok(Secret::from_slice(credential.blob()))
     }
@@ -224,7 +251,7 @@ impl KeychainItems {
             Ok(None) => return KeychainPresence::Absent,
             Err(_) => return KeychainPresence::Unreadable(0),
         };
-        match ReadCredential::read(&target) {
+        match CredentialTurn::take().and_then(|_turn| ReadCredential::read(&target)) {
             Ok(credential) => match credential.check(account) {
                 Ok(()) => KeychainPresence::Present,
                 Err(_) => KeychainPresence::Unreadable(0),
@@ -248,13 +275,88 @@ impl KeychainItems {
             return Ok(false);
         };
         let target = wide(&target);
+        let turn = CredentialTurn::take()?;
         // SAFETY: a NUL-terminated target name live for the call.
-        if unsafe { CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0) } != 0 {
+        let deleted = unsafe { CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0) } != 0;
+        // Read before the turn's release can overwrite the last error.
+        let status = last_status();
+        drop(turn);
+        if deleted {
             return Ok(true);
         }
-        match last_status() {
+        match status {
             KeychainError::Status(CREDENTIAL_NOT_FOUND) => Ok(false),
             error => Err(error),
+        }
+    }
+}
+
+/// Runs `call` holding this user's Credential Manager turn (see the module
+/// notes), for code that must call Credential Manager itself, as a test
+/// writing a credential ArkDeck never writes.
+pub fn with_credential_manager_turn<R>(call: impl FnOnce() -> R) -> Result<R, KeychainError> {
+    let _turn = CredentialTurn::take()?;
+    Ok(call())
+}
+
+/// How long a call waits for another ArkDeck process's Credential Manager
+/// call; a turn lasts one call (a write and its read-back for `set`).
+const TURN_WAIT: Duration = Duration::from_secs(30);
+
+/// This user's Credential Manager turn, held by one thread of one ArkDeck
+/// process at a time. Thread-affine like every mutex, so neither sent nor
+/// shared; released when dropped, and a holder that died leaves it to the
+/// next.
+struct CredentialTurn {
+    mutex: Handle,
+    _thread: PhantomData<*const ()>,
+}
+
+impl CredentialTurn {
+    /// An existing object that is not this user's refuses, as the daemon's
+    /// single-instance guard does.
+    fn take() -> Result<Self, KeychainError> {
+        let unusable = |_| KeychainError::Refused("the Credential Manager turn is unusable");
+        let user = Token::current()
+            .and_then(|token| token.user())
+            .and_then(|sid| sid.text())
+            .map_err(unusable)?;
+        let security =
+            SecurityDescriptor::from_sddl(&format!("O:{user}D:P(A;;GA;;;{user})(A;;GA;;;SY)"))
+                .map_err(unusable)?;
+        let attributes = security.attributes();
+        let name = wide(&format!(r"Local\ArkDeck.CredentialManager.{user}"));
+        // SAFETY: NUL-terminated name and security attributes alive for the
+        // call; the handle is owned at once.
+        let mutex = Handle::new(unsafe { CreateMutexW(&attributes, 0, name.as_ptr()) })
+            .map_err(unusable)?;
+        if !owned_by_current_user(mutex.raw(), SE_KERNEL_OBJECT).map_err(unusable)? {
+            return Err(KeychainError::Refused(
+                "the Credential Manager turn is owned by another account",
+            ));
+        }
+        let millis = TURN_WAIT.as_millis() as u32;
+        // SAFETY: live mutex handle with SYNCHRONIZE access.
+        match unsafe { WaitForSingleObject(mutex.raw(), millis) } {
+            // A holder that died made at most one call, which is complete
+            // or was never made.
+            WAIT_OBJECT_0 | WAIT_ABANDONED => Ok(Self {
+                mutex,
+                _thread: PhantomData,
+            }),
+            WAIT_TIMEOUT => Err(KeychainError::Refused(
+                "another ArkDeck process held the Credential Manager turn too long",
+            )),
+            _ => Err(last_status()),
+        }
+    }
+}
+
+impl Drop for CredentialTurn {
+    fn drop(&mut self) {
+        // SAFETY: this thread owns the mutex (the turn cannot leave it).
+        unsafe {
+            ReleaseMutex(self.mutex.raw());
         }
     }
 }

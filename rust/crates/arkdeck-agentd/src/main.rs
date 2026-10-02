@@ -10,9 +10,9 @@ mod app_ingress;
 #[cfg(all(test, target_os = "macos"))]
 #[path = "app_ingress/tests.rs"]
 mod app_ingress_tests;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod arkforge_execution;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod arkforge_lane;
 #[cfg(any(target_os = "macos", windows))]
 mod bootstrap_readers;
@@ -307,7 +307,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // composed stops it on the way out, after the managed server
     // (`arkforge_lane::Composed`), in the order of Swift's failed start
     // (`main.swift` 1595-1602): declared first, it is dropped last.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
+    #[cfg_attr(windows, allow(unused_mut))]
     let mut arkforge: Option<arkforge_lane::Composed> = None;
     // The managed server the isolated or the production owner starts, which
     // it stops last after its drain; any failure once it is started stops it
@@ -344,7 +345,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // foundation owns no root and composes none.
     #[cfg(windows)]
     let host = match &authority {
-        Some(authority) => authority.compose(host)?,
+        Some(authority) => {
+            let (host, composed) = authority.compose(host)?;
+            arkforge = Some(composed);
+            host
+        }
         None => host,
     };
     #[cfg(target_os = "macos")]
@@ -861,6 +866,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
     {
         drop(socket_drain.listener_lock);
+        // The lane's daemon next, as on macOS (`main.swift` 1624-1627).
+        if let Some(arkforge) = &arkforge {
+            arkforge.stop();
+        }
         if socket_drain.complete
             && let Some(authority) = authority
         {
@@ -910,5 +919,5 @@ mod device_access_control;
 mod flash_host_reads_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_plan_control;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod loader_binding_control;

@@ -48,7 +48,7 @@ pub use code_signature::{
 pub use console_secret::{TerminalSecretError, read_terminal_secret};
 pub use credential::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
-    KeychainPresence,
+    KeychainPresence, with_credential_manager_turn,
 };
 pub use daemon_fingerprint::trusted_daemon_fingerprint;
 pub use daemon_start::{

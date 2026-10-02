@@ -678,7 +678,14 @@ impl HostDirectory {
         file.write_all(bytes)?;
         host_fs::flush(&file)?;
         checkpoint("beforeRename");
-        rename_replacing(&file, &self.0, &target).map_err(DocumentPublishError::OutcomeUnknown)?;
+        rename_replacing(&file, &self.0, &target).map_err(|error| {
+            // A rename refused because the target is held replaced nothing.
+            if held(&error) {
+                DocumentPublishError::BeforePublication(error)
+            } else {
+                DocumentPublishError::OutcomeUnknown(error)
+            }
+        })?;
         checkpoint("afterRename");
         host_fs::flush_directory(&self.0).map_err(DocumentPublishError::OutcomeUnknown)
     }
@@ -1316,39 +1323,53 @@ impl HostDirectory {
     }
 }
 
-/// Hash a file from its first byte to its end through one handle, calling
-/// `each` with every chunk and the running total after it.
 /// The atomic replacement of a published document. Replacing a name whose
-/// file another process holds open without delete sharing fails
-/// (`STATUS_ACCESS_DENIED` or `STATUS_SHARING_VIOLATION`), and on NTFS the
-/// holder is typically an anti-malware or indexing filter reading the
-/// document just published, for a moment. Such a failure replaced nothing,
-/// so the rename is retried a bounded number of times (about a second in
-/// all) before the failure is answered; any other failure is answered at
-/// once. Measured on the Windows reference host: a Job record persisted a
-/// dozen times in a row met one such failure in most runs of the recorded
-/// Job store corpus (`arkdeck-hoststore/tests/job_store_corpus.rs`).
+/// file another handle holds open without delete sharing fails
+/// (`STATUS_ACCESS_DENIED` or `STATUS_SHARING_VIOLATION`, [`held`]). On NTFS
+/// the holder is the anti-malware scan of the document the previous
+/// publication put there a moment before: the refusals end on their own,
+/// Restart Manager names no process holding the file (a kernel-mode handle,
+/// not one of this process's), and none of this process's handles is open
+/// on the target (a publication writes and flushes only its own `.part`
+/// file, and every reader shares delete). Measured on the Windows reference
+/// host with the recorded Job store corpus
+/// (`arkdeck-hoststore/tests/job_store_corpus.rs`, TASK-XPA-005, 25 runs
+/// under an 8.3 `TEMP`): 17 refusals, most over within tens of
+/// milliseconds, three lasting 1.1 to 1.2 s, beyond the second the retry
+/// used to allow. Such a refusal replaced nothing, so the rename is retried
+/// with a doubling pause (1 ms up to 250 ms) until [`REPLACE_PATIENCE`] has
+/// passed, and then answered; any other failure is answered at once.
 fn rename_replacing(file: &File, directory: &File, target: &[u16]) -> io::Result<()> {
-    const ACCESS_DENIED: i32 = 5;
-    const SHARING_VIOLATION: i32 = 32;
+    let deadline = std::time::Instant::now() + REPLACE_PATIENCE;
     let mut delay = std::time::Duration::from_millis(1);
-    for _ in 0..12 {
+    loop {
         match host_fs::rename(file, directory, target, true) {
-            Err(error)
-                if matches!(
-                    error.raw_os_error(),
-                    Some(ACCESS_DENIED | SHARING_VIOLATION)
-                ) =>
-            {
+            Err(error) if held(&error) && std::time::Instant::now() < deadline => {
                 std::thread::sleep(delay);
-                delay = (delay * 2).min(std::time::Duration::from_millis(200));
+                delay = (delay * 2).min(std::time::Duration::from_millis(250));
             }
             answer => return answer,
         }
     }
-    host_fs::rename(file, directory, target, true)
 }
 
+/// How long a replacement waits out a holder of the target: several times the
+/// longest refusal measured (about 1.2 s).
+const REPLACE_PATIENCE: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Whether a rename was refused because another handle holds its target
+/// (`ERROR_ACCESS_DENIED`, `ERROR_SHARING_VIOLATION`): nothing was replaced.
+fn held(error: &io::Error) -> bool {
+    const ACCESS_DENIED: i32 = 5;
+    const SHARING_VIOLATION: i32 = 32;
+    matches!(
+        error.raw_os_error(),
+        Some(ACCESS_DENIED | SHARING_VIOLATION)
+    )
+}
+
+/// Hash a file from its first byte to its end through one handle, calling
+/// `each` with every chunk and the running total after it.
 fn hash_to_end(file: &File, mut each: impl FnMut(&[u8], u64) -> io::Result<()>) -> io::Result<u64> {
     let mut buffer = [0_u8; 65536];
     let mut total = 0_u64;

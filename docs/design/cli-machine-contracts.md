@@ -124,14 +124,14 @@ named pipe (`doctor`, `runtime health`, `operation
 list|describe|example|validate`, `target list|show|display-name set|clear`,
 `workspace project register|list|show|update|remove`, `workspace preset
 list|show|update|remove`, `trace
-cache status`, `job list|show|status|events|timeline|result|evidence|wait|
+cache status|purge`, `diagnostics export`, `job list|show|status|events|timeline|result|evidence|wait|
 cancel|reconcile`, `agent list|status`, `human-action list|show`, `artifact
 list|inspect|read|export|quota`, `capability list|inspect`, `runtime storage
 status|policy|root`, `session list|show|pin|unpin|export preview|export
 apply|cleanup preview|cleanup apply`, `artifact import
-hap|native-library|workspace-patch|inspect|list|release|abort`, `recovery
-cleanup list` and its alias `cleanup-debt list`, `runtime bundle list`, `runtime
-tool list|inspect|remove`),
+hap|native-library|workspace-patch|flash-bundle|inspect|list|release|abort`, `recovery
+cleanup list` and its alias `cleanup-debt list`, `history filter
+list|save|delete`, `runtime bundle list`, `runtime tool list|inspect|remove`),
 `notImplemented` where a leaf it reaches is refused off macOS for a macOS host
 primitive (the macOS-only families below), and `partial` otherwise: the leaves
 parse, send their frames and render their envelopes on Windows, but the target

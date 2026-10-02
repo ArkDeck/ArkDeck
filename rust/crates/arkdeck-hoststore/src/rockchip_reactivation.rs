@@ -16,7 +16,9 @@ use crate::swift_decoding::swift_integer;
 use arkdeck_contract::{canonical_json, foundation_path::standardized, sha256_hex};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
+#[cfg(unix)]
 use std::io::Read;
+#[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 
@@ -308,8 +310,7 @@ impl ReactivationProofSource {
         if !self.root.is_absolute()
             || standardized(&self.root) != self.root
             || !metadata.is_dir()
-            || metadata.uid() != arkdeck_platform::effective_user_id()
-            || metadata.mode() & 0o077 != 0
+            || !owner_only_directory(&self.root)
         {
             return Err(refuse("Runtime reactivation record root is not owner-only"));
         }
@@ -323,8 +324,18 @@ fn file_name(path: &Path) -> String {
         .unwrap_or_default()
 }
 
+/// Swift `validateDirectory(_:)` on Windows (TASK-XPA-010): a directory
+/// reached through no link that `HostDirectory` opens as a private one, the
+/// user's and closed to everyone else.
+#[cfg(windows)]
+fn owner_only_directory(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir())
+        && arkdeck_platform::HostDirectory::open(path).is_ok()
+}
+
 /// Swift `validateDirectory(_:)`: an owner-only directory of this user, not
 /// through a link.
+#[cfg(unix)]
 fn owner_only_directory(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_ok_and(|metadata| {
         metadata.is_dir()
@@ -365,9 +376,22 @@ fn child_directories(
         .collect())
 }
 
+/// Swift `readOwnerOnlyRecord(_:)` on Windows: the owned, single-link
+/// regular file the owner alone may read and write that `HostDirectory`
+/// reads, not empty and at most 1 MiB, opened through no link.
+#[cfg(windows)]
+fn read_owner_only(path: &Path) -> Option<Vec<u8>> {
+    let directory = arkdeck_platform::HostDirectory::open(path.parent()?).ok()?;
+    directory
+        .read_owner_only_detailed(path.file_name()?.to_str()?, MAXIMUM_RECORD_BYTES as usize)
+        .ok()
+        .flatten()
+}
+
 /// Swift `readOwnerOnlyRecord(_:)`: a single-link regular file of this user,
 /// mode exactly 0600, not empty and at most 1 MiB, opened through no final
 /// link.
+#[cfg(unix)]
 fn read_owner_only(path: &Path) -> Option<Vec<u8>> {
     let mut file = std::fs::OpenOptions::new()
         .read(true)

@@ -352,10 +352,11 @@ const DIRECT_UNDER_LOCAL_GROUPS: &[&str] = &["runtime.tool.select"];
 /// host-specific families with no Windows form until a Windows profile is
 /// ratified (§11).
 const MACOS_ONLY_ROOTS: &[&str] = &["legacy", "agentd", "signing", "update-feed", "maintainer"];
-/// `bundle` and `tool` left it with their Windows owners (the Bootstrap
-/// registry at `%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`), as ruling 10 gives a
-/// macOS-only family its Windows counterpart.
-const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["service", "signing", "update", "support-bundle"];
+// `runtime service` is not one: its Windows counterpart is the
+// client-started daemon (maintainer ruling 10, launchd -> client-started
+// daemon), whose `status`, `verify`, `restart` and `uninstall` Windows serves;
+// `install` and `update` stay refused there (`MACOS_HOST_LEAVES`).
+const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["signing", "update", "support-bundle"];
 
 /// The Runtime leaves whose every method the Windows daemon answers, measured
 /// end to end on Windows: the CLI authenticates a daemon signed with a
@@ -446,15 +447,26 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.preset.show",
     "workspace.preset.update",
     "workspace.preset.remove",
-    // The Trace cache owner's inventory (TASK-XPA-021); not its purge.
+    // The Trace cache owner's inventory and purge (TASK-XPA-021;
+    // `windows_trace_export_process.rs`).
     "trace.cache.status",
+    "trace.cache.purge",
+    // The client-started service (TASK-XPA-002, decision 11), through the
+    // real CLI against a signed daemon it starts itself
+    // (`arkdeck-agentd/tests/windows_service_uninstall_process.rs`):
+    // `uninstall` is its stop, with `restart`'s current-Job refusal.
+    "runtime.service.status",
+    "runtime.service.verify",
+    "runtime.service.restart",
+    "runtime.service.uninstall",
     // The Import owner (TASK-XPA-008; `windows_import_owner_process.rs`):
-    // the HAP, native-library and workspace-patch uploads committed with
-    // their exact bytes, and the Import reads, release and abort. Not
-    // `artifact import flash-bundle`: its publication is refused on Windows
-    // while the owner's flash-bundle validator is macOS-only.
+    // the HAP, native-library, workspace-patch and DAYU200 flash-bundle
+    // uploads committed with their exact bytes (the flash bundle judged by
+    // the Flash archive reader, TASK-XPA-010), and the Import reads, release
+    // and abort.
     "artifact.import.hap",
     "artifact.import.native-library",
+    "artifact.import.flash-bundle",
     "artifact.import.workspace-patch",
     "artifact.import.inspect",
     "artifact.import.list",
@@ -474,6 +486,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "runtime.tool.list",
     "runtime.tool.inspect",
     "runtime.tool.remove",
+    // A diagnostics capture's Artifacts the macOS Runtime recorded, exported
+    // (`windows_diagnostics_export_process.rs`).
+    "diagnostics.export",
+    // The History filter owner over Swift's recorded filters (TASK-XPA-012;
+    // `windows_history_filter_process.rs`).
+    "history.filter.list",
+    "history.filter.save",
+    "history.filter.delete",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -484,12 +504,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
 /// Registry USB census (TASK-XPA-018). The Import uploads are served on
 /// Windows through the host store's `HostImportSource` (TASK-XPA-008).
 const MACOS_HOST_LEAVES: &[&str] = &[
+    // The LaunchAgent's own installation; the client-started daemon has none.
     "runtime.service.install",
     "runtime.service.update",
-    "runtime.service.restart",
-    "runtime.service.status",
-    "runtime.service.verify",
-    "runtime.service.uninstall",
     "agentd.install",
     "agentd.update",
     "agentd.restart",
@@ -1173,7 +1190,9 @@ mod tests {
             ("target.adopt", "partial"),
             ("workspace.project.update", "implemented"),
             ("workspace.preset.register", "partial"),
-            ("trace.cache.purge", "partial"),
+            ("trace.cache.purge", "implemented"),
+            ("diagnostics.export", "implemented"),
+            ("trace.inspect", "partial"),
             ("device.observations", "partial"),
             ("job.submit", "partial"),
             ("agent.run", "partial"),
@@ -1187,11 +1206,23 @@ mod tests {
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),
-            ("artifact.import.flash-bundle", "partial"),
+            ("artifact.import.flash-bundle", "implemented"),
         ] {
             assert_eq!(windows(&document, feature), status, "{feature}");
         }
-        assert_eq!(windows(&document, "runtime.service.status"), Value::Null);
+        // The client-started service: served but for its installation.
+        for (feature, status) in [
+            ("runtime.service.status", "implemented"),
+            ("runtime.service.verify", "implemented"),
+            ("runtime.service.restart", "implemented"),
+            ("runtime.service.uninstall", "implemented"),
+            ("runtime.service.install", "notImplemented"),
+            ("runtime.service.update", "notImplemented"),
+        ] {
+            assert_eq!(windows(&document, feature), status, "{feature}");
+        }
+        // The retired spellings stay a macOS-only family.
+        assert_eq!(windows(&document, "agentd.status"), Value::Null);
         for entry in document["entries"].as_array().unwrap() {
             let statuses = &entry["implementationStatusByPlatform"];
             if statuses["windows"] == "implemented" {

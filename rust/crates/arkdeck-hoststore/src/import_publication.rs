@@ -40,8 +40,7 @@ fn validate_content(
             json!({"kind":"workspace-patch","touchedFiles":patch_paths(&bytes)?})
         }
         // Swift's production policy registers the one DAYU200 profile and
-        // judges the archive by reading it.
-        #[cfg(target_os = "macos")]
+        // judges the archive by reading it (on Windows too, TASK-XPA-010).
         "flash-bundle" => {
             if intent.device_profile.as_deref() != Some("dayu200") {
                 return Err(failure(

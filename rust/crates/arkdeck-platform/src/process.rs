@@ -736,7 +736,14 @@ mod tool_process;
 /// records about the executable a lifecycle command is about to run through
 /// — its authorized path, the inode path it is launched by, and the retained
 /// file identity — read from the tool as it would be launched now.
-#[cfg(target_os = "macos")]
+///
+/// On Windows there is no launch by file id: the child is created from the
+/// authorized path and its image is proved to be the retained file while it
+/// is still suspended (`windows::process::spawn_in`). So its launch path is
+/// the authorized path, its device the volume serial, its inode the NTFS
+/// file id (refused when it does not fit 64 bits), and its mode the file
+/// attributes.
+#[cfg(any(target_os = "macos", windows))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ToolLaunchIdentity {
     pub authorized_path: PathBuf,
@@ -746,6 +753,34 @@ pub struct ToolLaunchIdentity {
     pub file_size: u64,
     pub mode: u32,
     pub sha256: String,
+}
+
+#[cfg(windows)]
+impl VerifiedTool {
+    /// The identity a launch would bind to now: refused when the tool no
+    /// longer verifies, its path is not text, or its file id is not a 64-bit
+    /// one.
+    pub fn launch_identity(&self) -> io::Result<ToolLaunchIdentity> {
+        use std::os::windows::fs::MetadataExt;
+        self.revalidate()?;
+        let inode_launch_path = self
+            .path
+            .to_str()
+            .ok_or_else(|| invalid("authorized executable path is not text"))?
+            .to_owned();
+        Ok(ToolLaunchIdentity {
+            authorized_path: self.path.clone(),
+            inode_launch_path,
+            device: self.identity.volume(),
+            inode: self
+                .identity
+                .index64()
+                .ok_or_else(|| invalid("executable file id does not fit 64 bits"))?,
+            file_size: self.initial.len(),
+            mode: self.initial.file_attributes(),
+            sha256: self.sha256.clone(),
+        })
+    }
 }
 
 #[cfg(target_os = "macos")]

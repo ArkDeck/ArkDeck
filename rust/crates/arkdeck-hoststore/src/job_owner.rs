@@ -39,11 +39,11 @@ pub(crate) use mutation_state_continuity::require_retained_sessions_without_owne
 #[path = "job_flash_state.rs"]
 mod flash_state;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "arkforge_job_state.rs"]
 pub(crate) mod arkforge_job_state;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "flash_recovery.rs"]
 pub(crate) mod flash_recovery;
 
@@ -81,15 +81,14 @@ const RECORD_BOUND: usize = 16 * 1024 * 1024;
 /// Exclusive ownership of the final HDC participant inventory. Keep this
 /// lease until the lifecycle has durably settled or recovered its boundary.
 /// Dropping it releases admission, including on a normal error return.
-/// (No HDC lifecycle is composed on Windows yet, so neither is its census.)
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[must_use = "keep the interlock until the lifecycle outcome or recovery is durable"]
 pub struct HdcLifecycleInterlock<'a> {
     _guard: std::sync::RwLockWriteGuard<'a, ()>,
     recomposition: &'a std::sync::atomic::AtomicBool,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl HdcLifecycleInterlock<'_> {
     /// A selected executable requires a new provider graph. This latch has
     /// no reset in this process; dropping the borrowed lock cannot reopen it.
@@ -169,7 +168,7 @@ impl JobStore {
     /// Freeze admission before reading current Jobs. The same gate covers
     /// final admission after materialization, so either the Job is visible
     /// to this census or its admission is refused. No caller-supplied census.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn acquire_hdc_lifecycle_interlock(&self) -> Result<HdcLifecycleInterlock<'_>, WireError> {
         let guard = self
             .hdc_lifecycle
@@ -577,7 +576,7 @@ impl JobStore {
     /// established recovery epoch or a Target alias resolution settle an
     /// unknown outcome; this owner holds neither index, so an outcome-unknown
     /// Job stays current. An unreadable row fails the whole read.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn current_jobs(&self) -> Result<Vec<crate::hdc_impact_source::CurrentJob>, WireError> {
         self.root.validate_path(&self.path).map_err(unreadable)?;
         let rows = self.repository.rows(None).map_err(unreadable)?;

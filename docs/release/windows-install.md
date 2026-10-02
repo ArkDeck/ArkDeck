@@ -81,7 +81,10 @@ pwsh -NoProfile -File .\windows\scripts\uninstall-rc.ps1 -PackageName <包名>  
 ```
 
 - 目录里必须有 `rc-manifest.json`，否则什么都不删。
-- 从该安装运行的 daemon 被要求停止并等待退出；从别的安装运行的 daemon 不受影响，答复里会写明。
+- 从该安装运行的 daemon 由该安装自己的 `bin\arkdeck.exe runtime service uninstall` 停止（钉住安装的
+  daemon 映像及其签名证书）：有活动或未关闭的 Runtime Job 时拒绝卸载（CLI 退出 75），CLI 的其他拒绝同样
+  拒绝卸载，什么都不删；未签名的映像无法由 CLI 证明身份，改为经它自己的停止事件请求停止并等待退出。
+  从别的安装运行的 daemon 不受影响，答复里会写明。
   App 或 CLI 仍在运行时拒绝卸载：先关闭它们。任何进程都不会被强杀。
 - 保留：`%LOCALAPPDATA%\ArkDeck` 下 daemon 的状态目录 `Agentd`、默认 Sessions 根 `Sessions`、Trace 缓存 `Trace`，
   以及签名预设目录 `Signing\OpenHarmony` 与其 Credential Manager 条目；答复里列出 `Agentd` 与签名预设目录是否存在。

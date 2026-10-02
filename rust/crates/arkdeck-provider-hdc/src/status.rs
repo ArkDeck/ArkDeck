@@ -21,9 +21,10 @@
 use crate::lifecycle::generation;
 use crate::live_mode::sha256_hex;
 use crate::provider::registered_version;
+#[cfg(target_os = "macos")]
+use arkdeck_platform::verifies_managed_process;
 use arkdeck_platform::{
     LoopbackServerLease, ServerIdentityReceipt, VerifiedTool, inspect_native_code_signature,
-    verifies_managed_process,
 };
 use serde_json::{Map, Value, json};
 use std::io;
@@ -425,8 +426,15 @@ impl CommandlessIdentity {
     }
 
     /// Swift's family selection: `3.2.0f` at the exact endpoint, `3.2.0d`
-    /// anywhere, nothing otherwise.
+    /// anywhere, nothing otherwise. On Windows a registered tuple
+    /// (CHG-2026-078) is its own family, observed only at its own endpoint;
+    /// no macOS digest selects one.
     pub fn family(executable_sha256: &str, endpoint: &str) -> Option<&'static str> {
+        if cfg!(windows) {
+            return crate::windows_tuple(executable_sha256)
+                .filter(|tuple| tuple.endpoint.to_string() == endpoint)
+                .map(|tuple| tuple.reported_version);
+        }
         match registered_version(std::env::consts::OS, executable_sha256) {
             Some("3.2.0f") if endpoint == EXACT_ENDPOINT => Some("3.2.0f"),
             Some("3.2.0d") => Some("3.2.0d"),
@@ -470,7 +478,14 @@ impl IdentityObserver for CommandlessIdentity {
             Ok(Err(error)) => return IdentityObservation::Unknown(error.to_string()),
             Ok(Ok(receipt)) => receipt,
         };
-        let selected = std::fs::canonicalize(&executable.path).ok();
+        // The selected tool's canonical path in the spelling a receipt names
+        // (Windows' plain `X:\…`, never its `\\?\` form).
+        let selected = std::fs::canonicalize(&executable.path).ok().map(|path| {
+            match path.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+                Some(plain) => std::path::PathBuf::from(plain),
+                None => path,
+            }
+        });
         let generation = generation(&receipt).and_then(|value| i64::try_from(value).ok());
         match generation {
             Some(generation)
@@ -513,9 +528,13 @@ impl SignatureInspector for NativeSignature {
 }
 
 /// Swift `HDCCommandlessServerIdentity.verifiesManagedProcess` over the
-/// kernel: `arkdeck_platform::verifies_managed_process`.
+/// kernel: `arkdeck_platform::verifies_managed_process`. Windows has no
+/// supported read of another process's argv; there the managed server that
+/// launched the process proves it (`arkdeck_platform::ManagedServer::verifies`).
+#[cfg(target_os = "macos")]
 pub struct SystemManagedProcess;
 
+#[cfg(target_os = "macos")]
 impl ManagedProcessVerifier for SystemManagedProcess {
     fn verifies(&self, receipt: &ServerIdentityReceipt, arguments: &[String]) -> bool {
         verifies_managed_process(receipt, arguments)
@@ -529,9 +548,18 @@ mod tests {
     use std::cell::Cell;
     use std::net::Ipv4Addr;
 
-    /// A tool the runner may pin: root-owned, not group/world-writable.
+    /// A tool the runner may pin: root-owned, not group/world-writable; on
+    /// Windows a system executable, in its plain canonical spelling.
     fn shell() -> StatusExecutable {
+        #[cfg(unix)]
         let path = std::fs::canonicalize("/bin/sh").unwrap();
+        #[cfg(windows)]
+        let path = {
+            let system = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap());
+            let path = std::fs::canonicalize(system.join("System32").join("whoami.exe")).unwrap();
+            let text = path.to_str().unwrap();
+            std::path::PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(text))
+        };
         let sha256 = format!("{:x}", Sha256::digest(std::fs::read(&path).unwrap()));
         StatusExecutable {
             path: path.to_string_lossy().into_owned(),
@@ -761,6 +789,27 @@ mod tests {
     fn the_identity_families_are_the_registered_digests() {
         let f = "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83";
         let d = "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260";
+        // On Windows only a registered Windows tuple is a family, at its own
+        // endpoint; the macOS digests are none.
+        if cfg!(windows) {
+            for digest in [f, d] {
+                for endpoint in [EXACT_ENDPOINT, "127.0.0.1:8711"] {
+                    assert_eq!(CommandlessIdentity::family(digest, endpoint), None);
+                }
+            }
+            for tuple in crate::WINDOWS_HDC_TUPLES {
+                let at = tuple.endpoint.to_string();
+                assert_eq!(
+                    CommandlessIdentity::family(tuple.executable_sha256, &at),
+                    Some(tuple.reported_version)
+                );
+            }
+            assert!(matches!(
+                CommandlessIdentity::default().observe(&shell(), EXACT_ENDPOINT),
+                IdentityObservation::Unsupported(_)
+            ));
+            return;
+        }
         assert_eq!(
             CommandlessIdentity::family(f, EXACT_ENDPOINT),
             Some("3.2.0f")

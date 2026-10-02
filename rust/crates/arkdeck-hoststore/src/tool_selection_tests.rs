@@ -10,10 +10,10 @@
 //! `rust/tests/fixtures/tool-selection-store-rust` for Swift to read back
 //! (`ToolSelectionStoreRustReadbackContractTests`).
 use super::*;
+use crate::test_private::{create_private_directory, owner_only_file, temporary_root};
 use arkdeck_contract::{canonical_json, strict_json};
 use std::collections::BTreeMap;
 use std::fs;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::PathBuf;
 
 /// 2026-09-01T00:00:00Z, the oracle's clock; its n-th timeline starts
@@ -80,15 +80,12 @@ struct Directory(PathBuf);
 
 impl Directory {
     fn new() -> Self {
-        let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let path = temporary_root().join(format!(
             "tool-selection-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(path.join("records"))
-            .unwrap();
+        create_private_directory(&path);
+        create_private_directory(&path.join("records"));
         Self(path)
     }
 
@@ -103,7 +100,7 @@ impl Directory {
             let entry = entry.unwrap();
             let target = directory.records().join(entry.file_name());
             fs::copy(entry.path(), &target).unwrap();
-            fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).unwrap();
+            owner_only_file(&target);
         }
         directory
     }
@@ -920,8 +917,9 @@ fn rust_written_records_are_the_checked_in_ones() {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_file() {
                 let relative = entry.path().strip_prefix(&checked_in).unwrap().to_owned();
+                // The fixture's names, `/`-separated on every platform.
                 expected.insert(
-                    relative.to_string_lossy().into_owned(),
+                    relative.to_string_lossy().replace('\\', "/"),
                     fs::read(entry.path()).unwrap(),
                 );
             }

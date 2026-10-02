@@ -54,6 +54,8 @@ INPUTS = (
     "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
     "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
     "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
+    "ArkDeckApp/Resources/DebugLocalizable.xcstrings",
+    "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
 )
 
 

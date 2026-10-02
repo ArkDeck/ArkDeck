@@ -4,7 +4,11 @@
 //! it yet, so such a Job refuses the binding before anything is written, and
 //! the Job's intent stays unresolved. A Job that awaits another Target or
 //! revision, or is not parked at that intent, does not stand in the way.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-010) the root is a plain-spelled directory below the
+//! temporary directory, every level of it the store's private directory, and
+//! each file inherits its owner-only access.
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
@@ -14,6 +18,7 @@ use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
 use arkdeck_provider_hdc::{LoaderIdentity, LoaderObserver};
 use serde_json::{Value, json};
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::PathBuf;
 
@@ -28,16 +33,23 @@ struct Root(PathBuf);
 
 impl Root {
     fn new() -> Self {
-        let root = PathBuf::from("/tmp").join(format!(
+        #[cfg(unix)]
+        let temporary = PathBuf::from("/tmp");
+        #[cfg(windows)]
+        let temporary = support::fixture_fs::temporary_root();
+        let root = temporary.join(format!(
             "arkdeck-loader-binding-jobs-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
         for directory in ["state/targets", "jobs-state"] {
+            #[cfg(unix)]
             fs::DirBuilder::new()
                 .recursive(true)
                 .mode(0o700)
                 .create(root.join(directory))
                 .unwrap();
+            #[cfg(windows)]
+            arkdeck_platform::HostDirectory::open_or_create_private(&root.join(directory)).unwrap();
         }
         Self(root)
     }
@@ -45,6 +57,7 @@ impl Root {
     fn write(&self, name: &str, bytes: &[u8]) {
         let path = self.0.join(name);
         fs::write(&path, bytes).unwrap();
+        #[cfg(unix)]
         fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     }
 }

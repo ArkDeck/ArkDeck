@@ -5,8 +5,8 @@
 //! holds, with the approval a restart requests read back, refused in Swift's
 //! order, expired with its action and listed for the human-action owner.
 use super::*;
+use crate::test_private::{create_private_directory, owner_only_file, temporary_root};
 use std::collections::VecDeque;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -14,6 +14,13 @@ use std::sync::{Arc, Mutex};
 /// 2026-09-01T00:00:00.000Z, the instant the committed frames name.
 const NOW: u64 = 1_788_220_800_000;
 const CATALOG: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+/// The launch path of the fixture's executable (device 1, inode 2) as each
+/// platform launches it: by its `/.vol` path on macOS, by its authorized
+/// path on Windows (`lifecycle::launch_path`).
+#[cfg(target_os = "macos")]
+const LAUNCH_PATH: &str = "/.vol/1/2";
+#[cfg(windows)]
+const LAUNCH_PATH: &str = "/fixture/hdc";
 
 fn reference(endpoint: &str) -> String {
     format!("hdc-endpoint:{}", sha256_hex(endpoint.as_bytes()))
@@ -73,14 +80,11 @@ struct Directory(PathBuf);
 
 impl Directory {
     fn new() -> Self {
-        let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let path = temporary_root().join(format!(
             "hdc-control-action-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&path)
-            .unwrap();
+        create_private_directory(&path);
         Self(path)
     }
 
@@ -538,11 +542,20 @@ fn the_store_keeps_one_record_per_request_and_replaces_it_by_generation_only() {
     // One owner-only record named by its request identity, beside the lock.
     let name = format!("action-{}.json", sha256_hex(b"request-one"));
     assert_eq!(directory.names(), [".lock".to_owned(), name.clone()]);
-    let mode = std::fs::metadata(directory.records().join(&name))
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(directory.records().join(&name))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
+    }
+    #[cfg(windows)]
+    HostDirectory::open(&directory.records())
         .unwrap()
-        .permissions()
-        .mode();
-    assert_eq!(mode & 0o777, 0o600);
+        .owner_only_document(&name)
+        .unwrap();
     // The record is its canonical bytes.
     let bytes = std::fs::read(directory.records().join(&name)).unwrap();
     assert_eq!(
@@ -599,13 +612,13 @@ fn interrupted_publications_are_removed_and_other_content_is_refused() {
     ] {
         let path = directory.records().join(&name);
         std::fs::write(&path, b"{").unwrap();
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        owner_only_file(&path);
         assert_eq!(store.list().unwrap().len(), 1);
         assert!(!path.exists(), "{name} was not removed");
     }
     let stray = directory.records().join("notes.txt");
     std::fs::write(&stray, b"x").unwrap();
-    std::fs::set_permissions(&stray, std::fs::Permissions::from_mode(0o600)).unwrap();
+    owner_only_file(&stray);
     assert_eq!(
         store.list().unwrap_err().message,
         "unexpected content in control-action directory"
@@ -1550,7 +1563,7 @@ impl HdcLifecycleDriver for LifecycleBoundaries<'_> {
             ),
             (
                 "launchWindowEntered",
-                json!({"stepId":step,"executable":"/fixture/hdc","argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"],"authorizedExecutable":"/fixture/hdc","inodeLaunchPath":"/.vol/1/2","executableDevice":"1","executableInode":"2","executableFileSize":1,"executableMode":"448","executableSha256":"b".repeat(64)}),
+                json!({"stepId":step,"executable":"/fixture/hdc","argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"],"authorizedExecutable":"/fixture/hdc","inodeLaunchPath":LAUNCH_PATH,"executableDevice":"1","executableInode":"2","executableFileSize":1,"executableMode":"448","executableSha256":"b".repeat(64)}),
             ),
             ("outcome", json!({"stepId":step,"outcome":outcome})),
             (

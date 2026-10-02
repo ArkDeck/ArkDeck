@@ -12,15 +12,15 @@
 //! * The real daemon over an isolated development root composes the Trace
 //!   cache owner over `trace-cache\traces`: `trace.cache.status` answers its
 //!   inventory, before and after a restart and a derived entry laid down in
-//!   the macOS layout; `trace.cache.purge` is refused before admission
-//!   (`operationUnavailable`, ruling 18: the Job owner's active-Session
-//!   census is not asked on Windows yet, so nothing proves that no Session
-//!   needs the entry) and removes nothing; a `trace-cache` that is not
-//!   owner-only refuses the start.
+//!   the macOS layout; `trace.cache.purge` removes that entry, which no
+//!   Job's Session and no Artifact retains (the Job owner's active-Session
+//!   census and the Artifact owner's Trace retention census, as on macOS),
+//!   and keeps it while a recorded Job's Artifacts are held; a
+//!   `trace-cache` that is not owner-only refuses the start.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
-//!   `trace cache status` answers, `trace cache purge` is reported as a
-//!   refusal (exit 69), and `trace export` is refused by the daemon's
+//!   `trace cache status` answers, `trace cache purge` keeps the entry the
+//!   recorded Job's Artifacts retain, and `trace export` is refused by the daemon's
 //!   Artifact owner (`resourceNotFound`: its Job store does not hold the
 //!   capture's Job) with nothing exported. Without that variable this test says so and
 //!   checks nothing.
@@ -530,7 +530,7 @@ fn status(pipe: &str) -> Value {
 }
 
 #[test]
-fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() {
+fn the_trace_cache_owner_answers_status_and_purges_what_nothing_retains() {
     let _turn = turn();
     let root = Root::new();
     let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
@@ -539,7 +539,7 @@ fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() 
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
                 .to_owned()
         ),
         "{:?}",
@@ -561,29 +561,57 @@ fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() 
     assert_eq!(counted["entryCount"], 1, "{counted}");
     assert_eq!(counted["inactiveEntryCount"], 1, "{counted}");
     assert_eq!(counted["activeEntryCount"], 0, "{counted}");
-    // Refused before admission (ruling 18): the Job owner's active-Session
-    // census is not asked on Windows yet, so nothing proves that no Session
-    // needs the entry.
-    let reply = refused(
-        &pipe,
-        "trace.cache.purge",
-        json!({}),
-        "operationUnavailable",
-    );
-    assert_eq!(
-        reply["error"],
-        json!({"code": "operationUnavailable",
-            "message": "Trace cache purge needs the Job and Artifact retention owners; nothing was purged",
-            "details": {"phase": "preAdmission", "newDispatchCount": 0,
-                "purgeScope": "inactiveDerivedDatabases"}}),
-        "{reply}"
-    );
     refused(
         &pipe,
         "trace.cache.status",
         json!({"path": "C:\\cache"}),
         "invalidParams",
     );
+    refused(
+        &pipe,
+        "trace.cache.purge",
+        json!({"path": "C:\\cache"}),
+        "invalidParams",
+    );
+    assert_eq!(Root::tree(&root.traces()), cache, "nothing was purged");
+    // No Job holds a Session and the Artifact root retains nothing: the
+    // inactive entry is removed.
+    let reply = request(&pipe, "trace.cache.purge", json!({}));
+    assert_eq!(reply["ok"], true, "{reply}");
+    let purged = &reply["result"];
+    assert_eq!(purged["removedEntryCount"], 1, "{purged}");
+    assert_eq!(purged["skippedActiveEntryCount"], 0, "{purged}");
+    assert_eq!(purged["originalTraceArtifactRemovalCount"], 0, "{purged}");
+    assert_eq!(purged["after"]["entryCount"], 0, "{purged}");
+    second.stop(&root.0);
+    assert!(!entry.exists());
+
+    // Restarted: the purge held, and a second purge removes nothing.
+    let mut third = Daemon::start(executable, &root.0);
+    let pipe = third.serving();
+    assert_eq!(status(&pipe)["entryCount"], 0);
+    let reply = request(&pipe, "trace.cache.purge", json!({}));
+    assert_eq!(reply["result"]["removedEntryCount"], 0, "{reply}");
+    third.stop(&root.0);
+}
+
+#[test]
+fn a_recorded_job_s_artifacts_retain_every_trace_cache_entry() {
+    let _turn = turn();
+    let root = Root::new().with_recorded_job(JOB);
+    let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
+    // The cache's directories come from the daemon's first start.
+    let mut first = Daemon::start(executable, &root.0);
+    first.serving();
+    first.stop(&root.0);
+    let entry = root.with_cache_entry();
+    let cache = Root::tree(&root.traces());
+    let mut second = Daemon::start(executable, &root.0);
+    let pipe = second.serving();
+    let reply = request(&pipe, "trace.cache.purge", json!({}));
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert_eq!(reply["result"]["removedEntryCount"], 0, "{reply}");
+    assert_eq!(reply["result"]["skippedActiveEntryCount"], 1, "{reply}");
     second.stop(&root.0);
     assert!(entry.join("database.sqlite").exists());
     assert_eq!(Root::tree(&root.traces()), cache, "nothing was purged");
@@ -651,15 +679,12 @@ fn trace_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     assert_eq!(status, Some(0), "{envelope}");
     assert_eq!(envelope["result"]["entryCount"], 0, "{envelope}");
     let (status, envelope) = cli(&daemon, &pin, &pipe, &["trace", "cache", "purge"]);
-    // The refusal before admission carries its proof: the CLI reports a
-    // refusal, not an unknown outcome.
-    assert_eq!(status, Some(69), "{envelope}");
+    assert_eq!(status, Some(0), "{envelope}");
     assert_eq!(
-        envelope["error"]["code"], "operationUnavailable",
+        envelope["result"]["schemaVersion"], "arkdeck.trace-cache-purge/1",
         "{envelope}"
     );
-    assert_eq!(envelope["error"]["details"]["phase"], "preAdmission");
-    assert_eq!(envelope["error"]["details"]["newDispatchCount"], 0);
+    assert_eq!(envelope["result"]["removedEntryCount"], 0, "{envelope}");
     // The daemon's Artifact owner refuses the inspection the export starts
     // with: its Job store does not hold the capture's Job.
     let argv = trace_export(JOB, TRACE, &exports);
@@ -685,4 +710,28 @@ fn trace_commands_run_through_the_cli_against_a_dev_signed_daemon() {
         0,
         "nothing was exported"
     );
+    assert_measured(&["trace.cache.status", "trace.cache.purge"]);
+}
+
+/// Every coverage entry for each of `leaves` is Windows `implemented` in the
+/// manifest this CLI renders.
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }

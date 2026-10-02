@@ -121,6 +121,7 @@ dependencies = [
  "arkdeck-provider-workspace",
  "arkdeck-rockchip-binding",
  "arkforge-ipc",
+ "arkforge-platform",
  "libc",
  "serde",
  "serde_json",

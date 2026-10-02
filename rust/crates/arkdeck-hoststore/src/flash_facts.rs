@@ -28,6 +28,7 @@ use arkdeck_provider_hdc::{
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -103,19 +104,31 @@ impl NativeRockUsbIdentity {
             return Err(failed("ArkForge native RockUSB lane is not configured"));
         };
         // Swift `FixedExecutableResolver.hashing(path:providerID:)`.
-        if !path.starts_with('/') {
+        #[cfg(unix)]
+        let absolute = path.starts_with('/');
+        #[cfg(windows)]
+        let absolute = Path::new(path).is_absolute();
+        if !absolute {
             return Err(failed(
                 "provider executable path must be explicit and absolute",
             ));
         }
+        #[cfg(unix)]
         let resolved = crate::workspace_support::foundation_resolved(path);
+        // On Windows the physical path, as the lane's bundle reader resolves
+        // it (TASK-XPA-010).
+        #[cfg(windows)]
+        let resolved = std::fs::canonicalize(path)
+            .ok()
+            .and_then(|physical| physical.to_str().map(str::to_owned))
+            .unwrap_or_else(|| path.to_owned());
         let regular = || {
             failed(&format!(
                 "provider executable must be a regular executable file: {resolved}"
             ))
         };
         let metadata = std::fs::metadata(&resolved).map_err(|error| error.to_string())?;
-        if !metadata.is_file() || metadata.permissions().mode() & 0o111 == 0 {
+        if !metadata.is_file() || !executable(&metadata, &resolved) {
             return Err(regular());
         }
         let measured = sha256_hex(&std::fs::read(&resolved).map_err(|error| error.to_string())?);
@@ -126,6 +139,20 @@ impl NativeRockUsbIdentity {
         }
         Ok(measured)
     }
+}
+
+/// An executable file: any execute bit on Unix; on Windows, the `.exe` image
+/// a Windows child must be.
+#[cfg(unix)]
+fn executable(metadata: &std::fs::Metadata, _path: &str) -> bool {
+    metadata.permissions().mode() & 0o111 != 0
+}
+
+#[cfg(windows)]
+fn executable(_metadata: &std::fs::Metadata, path: &str) -> bool {
+    Path::new(path)
+        .extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
 }
 
 /// The durable Target a read found, as Swift's `RuntimeTargetRecord`.

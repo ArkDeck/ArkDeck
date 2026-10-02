@@ -1,7 +1,7 @@
 //! Swift `recoveryEpochIndexes`: which superseding recovery epochs name a Job,
 //! as every Job read projects them (`job.status`, `job.show`, `job.list`).
-//! On Windows no Flash establishes an epoch; the reader is the same, so a
-//! state root that holds an epoch document reads as on macOS.
+//! On Windows the reader is the same, so an epoch a complete-overwrite Flash
+//! established (TASK-XPA-010) reads as on macOS.
 use super::JobStore;
 use crate::job_record::JobRecord;
 use arkdeck_platform::HostDirectory;

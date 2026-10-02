@@ -5,7 +5,6 @@ use super::*;
 use crate::rockchip_action::CaptureRequest;
 use arkdeck_contract::sha256_hex;
 use std::collections::VecDeque;
-use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -600,16 +599,13 @@ struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let path = crate::test_private::temporary_root().join(format!(
             "arkdeck-rockchip-executor-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         let _ = std::fs::remove_dir_all(&path);
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&path)
-            .unwrap();
+        crate::test_private::create_private_directory(&path);
         Self(path)
     }
 }

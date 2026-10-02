@@ -110,14 +110,14 @@ public sealed class AgentImportTests
     }
 
     [TestMethod]
-    public async Task AFlashBundleIsRefusedAtPublicationAndACancelledUploadIsAborted()
+    public async Task AFlashBundleThatIsNotAnImagesArchiveIsRefusedAndACancelledUploadIsAborted()
     {
         var channel = ScriptedDaemon.Channel(ScriptedDaemon.Jobs);
         using var directory = new TemporaryFolder();
         var flash = Path.Combine(directory.Path, "images.tar.gz");
         File.WriteAllBytes(flash, new byte[4096]);
         var refused = await new ImportUploader(channel).UploadAsync(flash, ImportKind.FlashBundle, Fixture, null, CancellationToken.None);
-        Assert.AreEqual($"unavailable(operationUnavailable): {ScriptedDaemon.FlashRefusal}", refused.Failure!.ReasonText(English));
+        Assert.AreEqual($"unavailable(invalidInput): {ScriptedDaemon.FlashContentRefusal}", refused.Failure!.ReasonText(English));
         Assert.AreEqual(CliCommands.ImportFlashBundle, refused.Failure.CliCommand);
 
         var hap = Path.Combine(directory.Path, "big.hap");

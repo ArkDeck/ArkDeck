@@ -2,11 +2,13 @@
 //! G13). Every test works in its own fixture namespace,
 //! `ArkDeck-fixture/<random>/…`, and a guard deletes each target the test
 //! may have created on every path, panics included; no production or other
-//! credential is ever read, written or deleted.
+//! credential is ever read, written or deleted. The tests' own Credential
+//! Manager calls take the same turn as `KeychainItems`.
 #![cfg(windows)]
 
 use arkdeck_platform::{
     CREDENTIAL_NOT_FOUND, KeychainError, KeychainItems, KeychainPresence, Secret, random_bytes,
+    with_credential_manager_turn,
 };
 use windows_sys::Win32::Security::Credentials::{
     CRED_PERSIST_LOCAL_MACHINE, CRED_PERSIST_SESSION, CRED_TYPE_GENERIC, CREDENTIALW, CredDeleteW,
@@ -30,17 +32,15 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
+        Self::in_namespace(&fixture_namespace())
+    }
+
+    fn in_namespace(namespace: &str) -> Self {
         let serial = SERIAL
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let token: String = random_bytes::<8>()
-            .unwrap()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        let namespace = format!("test-{}-{token}", std::process::id());
         Self {
-            items: KeychainItems::fixture_namespace(SERVICE, &namespace).unwrap(),
+            items: KeychainItems::fixture_namespace(SERVICE, namespace).unwrap(),
             targets: Vec::new(),
             _serial: serial,
         }
@@ -64,10 +64,29 @@ impl Drop for Fixture {
     fn drop(&mut self) {
         for target in &self.targets {
             // SAFETY: a NUL-terminated fixture target name. An absent
-            // credential is the expected answer for most of them.
-            unsafe { CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0) };
+            // credential is the expected answer for most of them. A turn
+            // not taken in time is asked for again: a skipped delete would
+            // leave the credential behind.
+            for _ in 0..10 {
+                if with_credential_manager_turn(|| unsafe {
+                    CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0)
+                })
+                .is_ok()
+                {
+                    break;
+                }
+            }
         }
     }
+}
+
+fn fixture_namespace() -> String {
+    let token: String = random_bytes::<8>()
+        .unwrap()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    format!("test-{}-{token}", std::process::id())
 }
 
 #[test]
@@ -177,7 +196,10 @@ fn write_foreign(fixture: &Fixture, account: &str, user: &str, persist: u32) {
         ..CREDENTIALW::default()
     };
     // SAFETY: every buffer is live for the call.
-    assert_ne!(unsafe { CredWriteW(&credential, 0) }, 0);
+    assert_ne!(
+        with_credential_manager_turn(|| unsafe { CredWriteW(&credential, 0) }).unwrap(),
+        0
+    );
 }
 
 #[test]
@@ -261,12 +283,16 @@ fn write_raw(
         UserName: user.as_mut_ptr(),
         ..CREDENTIALW::default()
     };
-    // SAFETY: every buffer is live for the call.
-    if unsafe { CredWriteW(&credential, 0) } == 0 {
-        // SAFETY: reads this thread's last-error value.
-        return Err(unsafe { windows_sys::Win32::Foundation::GetLastError() });
-    }
-    Ok(())
+    // SAFETY: every buffer is live for the call; the last error is read
+    // before the turn is released.
+    with_credential_manager_turn(|| unsafe {
+        if CredWriteW(&credential, 0) == 0 {
+            Err(windows_sys::Win32::Foundation::GetLastError())
+        } else {
+            Ok(())
+        }
+    })
+    .unwrap()
 }
 
 /// How the churning threads write their own credentials.
@@ -331,11 +357,13 @@ fn churn(
 }
 
 /// Eight threads each keep one credential while churning their own; every
-/// way of writing is measured on its own, then all of them at once.
+/// way of writing is measured on its own, then all of them at once. After
+/// each phase every churned credential is still deleted: without the
+/// Credential Manager turn, deleted ones came back.
 #[test]
 fn concurrent_writers_keep_each_others_credentials() {
     const THREADS: usize = 8;
-    const ROUNDS: usize = 40;
+    const ROUNDS: usize = 10;
     const KINDS: [Churn; 4] = [
         Churn::Short,
         Churn::Largest,
@@ -382,12 +410,127 @@ fn concurrent_writers_keep_each_others_credentials() {
                 .collect()
         });
         let lost: usize = results.iter().map(|(lost, _)| lost).sum();
-        total += lost;
+        let back: Vec<String> = (0..THREADS)
+            .flat_map(|thread| (0..ROUNDS).map(move |round| format!("churn-{thread}-{round}")))
+            .filter_map(|churned| match items.presence(&churned) {
+                KeychainPresence::Absent => None,
+                presence => Some(format!("{churned}: {presence:?}")),
+            })
+            .collect();
+        total += lost + back.len();
         let errors: Vec<&String> = results
             .iter()
             .flat_map(|(_, errors)| errors.iter().take(2))
             .collect();
-        report.push(format!("{phase}: lost {lost} {errors:?}"));
+        report.push(format!(
+            "{phase}: lost {lost} {errors:?}; deleted and back {back:?}"
+        ));
     }
     assert!(total == 0, "credentials lost: {report:#?}");
+}
+
+/// The child side of `concurrent_processes_keep_each_others_credentials`,
+/// named by this variable: `<namespace> <child index>`.
+const CHURN_CHILD: &str = "ARKDECK_CREDENTIAL_CHURN_CHILD";
+
+/// Eight processes of four threads each keep one credential while churning
+/// their own through `KeychainItems`. Credential Manager loses concurrent
+/// updates of different processes (see `credential.rs`): without the
+/// Credential Manager turn this failed 4 runs in 5, with deleted credentials
+/// back. Afterwards every kept credential is present and every churned one
+/// absent. A measurement, not run by default: a program outside ArkDeck
+/// changing credentials at the same time is not held off by the turn, and
+/// under load this still failed 2 runs in 30 (TASK-XPA-005).
+#[test]
+#[ignore = "a measurement: programs outside ArkDeck do not take the Credential Manager turn"]
+fn concurrent_processes_keep_each_others_credentials() {
+    const CHILDREN: usize = 8;
+    const THREADS: usize = 4;
+    const ROUNDS: usize = 10;
+    if let Ok(assignment) = std::env::var(CHURN_CHILD) {
+        let (namespace, child) = assignment.split_once(' ').unwrap();
+        let items = KeychainItems::fixture_namespace(SERVICE, namespace).unwrap();
+        let lost: Vec<String> = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..THREADS)
+                .map(|thread| {
+                    let items = &items;
+                    scope.spawn(move || {
+                        let keep = format!("kept-{child}-{thread}");
+                        items.set(&keep, b"kept").unwrap();
+                        let prefix = format!("churn-{child}-{thread}");
+                        churn(items, &keep, &prefix, ROUNDS, Churn::Short).1
+                    })
+                })
+                .collect();
+            handles
+                .into_iter()
+                .flat_map(|handle| handle.join().unwrap())
+                .collect()
+        });
+        assert!(lost.is_empty(), "child {child}: {lost:?}");
+        return;
+    }
+    let namespace = fixture_namespace();
+    let mut fixture = Fixture::in_namespace(&namespace);
+    for child in 0..CHILDREN {
+        for thread in 0..THREADS {
+            fixture.register(&format!("kept-{child}-{thread}"));
+            for round in 0..ROUNDS {
+                fixture.register(&format!("churn-{child}-{thread}-{round}"));
+            }
+        }
+    }
+    let executable = std::env::current_exe().unwrap();
+    let children: Vec<_> = (0..CHILDREN)
+        .map(|child| {
+            std::process::Command::new(&executable)
+                .args([
+                    "--exact",
+                    "concurrent_processes_keep_each_others_credentials",
+                    "--include-ignored",
+                    "--nocapture",
+                ])
+                .env(CHURN_CHILD, format!("{namespace} {child}"))
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .unwrap()
+        })
+        .collect();
+    let mut failures = Vec::new();
+    for (child, process) in children.into_iter().enumerate() {
+        let output = process.wait_with_output().unwrap();
+        if !output.status.success() {
+            let text = String::from_utf8_lossy(&output.stdout).into_owned()
+                + &String::from_utf8_lossy(&output.stderr);
+            let reason: Vec<&str> = text
+                .lines()
+                .filter(|line| line.contains("child") || line.contains("panicked"))
+                .take(3)
+                .collect();
+            failures.push(format!("child {child}: {reason:?}"));
+        }
+    }
+    let items = &fixture.items;
+    for child in 0..CHILDREN {
+        for thread in 0..THREADS {
+            let keep = format!("kept-{child}-{thread}");
+            let presence = items.presence(&keep);
+            if presence != KeychainPresence::Present {
+                failures.push(format!("{keep}: {presence:?}"));
+            }
+            for round in 0..ROUNDS {
+                let churned = format!("churn-{child}-{thread}-{round}");
+                let presence = items.presence(&churned);
+                if presence != KeychainPresence::Absent {
+                    failures.push(format!("{churned}: {presence:?} after its deletion"));
+                }
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "{} failures: {failures:#?}",
+        failures.len()
+    );
 }

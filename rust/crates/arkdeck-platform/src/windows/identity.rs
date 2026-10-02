@@ -52,6 +52,20 @@ impl FileIdentity {
             .collect();
         format!("{:016x}-{index}", self.volume)
     }
+
+    /// The volume serial number.
+    pub(crate) fn volume(&self) -> u64 {
+        self.volume
+    }
+
+    /// The file id as the 64-bit NTFS file reference it is on NTFS (the
+    /// high half zero), or `None` for a file id wider than 64 bits (ReFS).
+    pub(crate) fn index64(&self) -> Option<u64> {
+        let (low, high) = self.index.split_at(8);
+        high.iter()
+            .all(|byte| *byte == 0)
+            .then(|| u64::from_le_bytes(low.try_into().expect("eight bytes")))
+    }
 }
 
 pub(crate) fn reject_reparse_file(file: &File) -> io::Result<()> {
@@ -701,6 +715,31 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(self.0.parent().unwrap());
         }
+    }
+
+    /// On NTFS the 128-bit file id is the 64-bit file index the older query
+    /// answers, widened: what a launch identity records as its inode.
+    #[test]
+    fn an_ntfs_file_id_is_its_64_bit_file_index() {
+        let copy = Copy::new("fileid");
+        let file = File::open(&copy.0).unwrap();
+        let identity = file_identity(&file).unwrap();
+        let mut info = BY_HANDLE_FILE_INFORMATION::default();
+        // SAFETY: live file handle and initialized output storage.
+        bool_result(unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) })
+            .unwrap();
+        assert_eq!(
+            identity.index64(),
+            Some((u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow))
+        );
+        // The 64-bit volume serial `FileIdInfo` answers, not the older 32-bit
+        // one.
+        assert_ne!(identity.volume(), 0);
+        let wide = FileIdentity {
+            volume: 1,
+            index: [1; 16],
+        };
+        assert_eq!(wide.index64(), None);
     }
 
     #[test]

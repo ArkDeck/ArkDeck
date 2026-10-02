@@ -121,7 +121,7 @@ fn restart_refuses_a_service_that_is_not_ready_and_an_option_out_of_range() {
 fn the_launch_agent_leaves_and_verify_s_job_options_stay_macos_only() {
     let root = Root::new();
     for arguments in [
-        &["--output", "json", "runtime", "service", "uninstall"][..],
+        &["--output", "json", "runtime", "service", "update"][..],
         &[
             "--output", "json", "runtime", "service", "verify", "--job", "job-1",
         ][..],
@@ -134,4 +134,35 @@ fn the_launch_agent_leaves_and_verify_s_job_options_stay_macos_only() {
         );
         assert_eq!(output.status.code(), Some(69), "{arguments:?}");
     }
+}
+
+/// With no daemon running there is nothing to stop: `uninstall` answers what
+/// it kept, starts nothing and needs no verified image.
+#[test]
+fn uninstall_with_no_daemon_running_stops_and_starts_nothing() {
+    let root = Root::new();
+    let output = arkdeck(
+        &root,
+        &["--output", "json", "runtime", "service", "uninstall"],
+    );
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    let answer = document(&output);
+    let uninstall = &answer["result"]["uninstall"];
+    assert_eq!(
+        uninstall["schemaVersion"],
+        "arkdeck-windows-daemon-uninstall/v1"
+    );
+    assert_eq!(uninstall["stoppedPid"], Value::Null, "{answer}");
+    assert_eq!(uninstall["drain"], Value::Null, "{answer}");
+    assert_eq!(uninstall["removedRegistration"], false, "{answer}");
+    assert_eq!(
+        uninstall["preservedStateDirectory"],
+        root.0.to_str().unwrap(),
+        "{answer}"
+    );
+    assert_eq!(answer["result"]["daemonService"]["socketPresent"], false);
+    assert!(
+        !root.0.join("instance.json").exists(),
+        "nothing was started"
+    );
 }

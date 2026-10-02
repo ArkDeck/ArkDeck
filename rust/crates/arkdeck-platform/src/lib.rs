@@ -15,10 +15,12 @@ mod unix;
 #[cfg(windows)]
 mod windows;
 
+#[cfg(any(target_os = "macos", windows))]
+pub use process::ToolLaunchIdentity;
 #[cfg(target_os = "macos")]
 pub use process::{
     AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ManagedServer,
-    ToolLaunchIdentity, VerifiedNamespace, VerifiedResource, VerifiedSource,
+    VerifiedNamespace, VerifiedResource, VerifiedSource,
 };
 #[cfg(any(target_os = "macos", windows))]
 pub use process::{
@@ -57,6 +59,7 @@ pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
 pub use windows::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
     KeychainPresence, TerminalSecretError, read_terminal_secret, trusted_daemon_fingerprint,
+    with_credential_manager_turn,
 };
 // The Windows counterpart of the `/.vol`-bound source (a held file and
 // namespace) and the signing layer's private entries (TASK-XPA-011).
