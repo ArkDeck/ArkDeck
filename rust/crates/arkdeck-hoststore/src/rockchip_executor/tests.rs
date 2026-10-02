@@ -126,7 +126,7 @@ impl UsbProbe for Usb {
         self.loader_reads.fetch_add(1, Ordering::SeqCst);
         if self
             .loader_misses
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |misses| {
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |misses| {
                 misses.checked_sub(1)
             })
             .is_ok()

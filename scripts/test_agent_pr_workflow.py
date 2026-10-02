@@ -651,7 +651,7 @@ RUST_SHARED_JOB_TOKENS = (
     "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
     '          python-version: "3.14"\n',
     "run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0",
-    "rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update",
+    "rustup toolchain install stable --profile minimal --component rustfmt,clippy --no-self-update",
     "rustup show active-toolchain",
     RUST_FETCH_STEP,
 )
@@ -1481,6 +1481,9 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             rust.replace(bootstrap, "").replace(
                 "      - name: Format check", bootstrap + "      - name: Format check"
             ),
+            # Without an explicit channel, an already-installed stable may
+            # remain stale when the workspace raises its minimum Rust version.
+            rust.replace("rustup toolchain install stable --profile", "rustup toolchain install --profile"),
             rust.replace("  workflow_call:\n", "  push:\n"),
             rust.replace(
                 "os: [ubuntu-latest, xcode-27, windows-latest]",

@@ -655,7 +655,7 @@ fn cutover(
         }
         std::thread::sleep(host.poll_interval);
     };
-    refuse_unless_clear(&held, command, "the state was left as it is").map_err(&restore)?;
+    refuse_unless_clear(&held, command, "the state was left as it is").map_err(restore)?;
     let snapshot = &held["snapshot"];
     let present = snapshot["stateDirectoryPresent"].as_bool();
     if snapshot["schemaVersion"] != SNAPSHOT_SCHEMA

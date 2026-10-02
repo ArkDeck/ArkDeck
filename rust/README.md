@@ -11,7 +11,7 @@ acceptance and production Runtime migration remain separate requirements.
 ## Build and check
 
 From `rust/`, rustup selects the committed toolchain, the `stable` channel in
-`rust-toolchain.toml`:
+`rust-toolchain.toml`. The workspace requires Rust 1.99.0 or newer (Edition 2024):
 
 ```sh
 cargo fmt --all --check
