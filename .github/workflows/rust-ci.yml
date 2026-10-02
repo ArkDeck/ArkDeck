@@ -383,9 +383,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     # A change to the contract inputs builds, lints and tests both views, each
     # in its own target: 27.6 minutes on macOS from main's cache on #2311
-    # (run 36440456252), against 3.2 on Linux and 4.6 on Windows. So macOS
-    # gets 50 minutes and the other hosts 30, as the workspace job does.
-    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}
+    # (run 36440456252). Windows now needs 40 minutes for the cold-cache path:
+    # #2428 run 37009329715 passed both views' workspace tests and the
+    # published readonly matrix, then hit 30 minutes in the final candidate
+    # binary build. Each isolated view took about 14-15 minutes. PRs cannot
+    # seed the trusted cache, so leave room for setup and both complete views.
+    # Keep macOS at 50 and Linux at 30; no checks or view isolation are skipped.
+    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}
     defaults:
       run:
         shell: bash
