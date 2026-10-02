@@ -422,7 +422,7 @@ final class AppShellUITests: XCTestCase {
       app.typeKey("f", modifierFlags: .command)
       app.typeText("job-fixture-0001")
       XCTAssertEqual(search.value as? String, "job-fixture-0001")
-      assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-0001")
       app.typeKey("a", modifierFlags: .command)
       app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
 

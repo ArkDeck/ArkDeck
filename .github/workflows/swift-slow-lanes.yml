@@ -28,6 +28,12 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && format('Swift slow lan
 # a main run's Rust job waited two minutes for a runner those extra lanes held.
 
 on:
+  push:
+    branches: ["agent/**"]
+    paths:
+      - "ArkDeckApp/**"
+      - "ArkDeckAppUITests/**"
+      - ".github/workflows/swift-slow-lanes.yml"
   schedule:
     # 18:00 UTC nightly (02:00 UTC+8), off the interactive working day.
     - cron: "0 18 * * *"
@@ -52,7 +58,7 @@ concurrency:
 
 jobs:
   ui-tests:
-    if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'ui-tests'
+    if: github.event_name == 'push' || github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'ui-tests'
     runs-on: xcode-27
     concurrency:
       group: arkdeck-macos-background
@@ -68,15 +74,16 @@ jobs:
     timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      ARKDECK_UI_TEST_DERIVED_DATA: ${{ runner.temp }}/arkdeck-ui-tests
     steps:
       - name: Checkout default branch with runner Git
         run: |
           set -eu
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_SHA}"
           git checkout --detach FETCH_HEAD
-          git rev-parse HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Select the pinned toolchain
         run: |
           set -eu
@@ -146,6 +153,18 @@ jobs:
           else
             exit 1
           fi
+      - name: Keep UI test results and crash diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: macos-ui-tests-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ui-tests.log
+            ${{ runner.temp }}/arkdeck-ui-tests/Logs/Test/
+            ~/Library/Logs/DiagnosticReports/ArkDeck*.ips
+            ~/Library/Logs/DiagnosticReports/ArkDeck*.crash
+          if-no-files-found: warn
+          retention-days: 14
       - name: Summary
         if: always()
         run: |
