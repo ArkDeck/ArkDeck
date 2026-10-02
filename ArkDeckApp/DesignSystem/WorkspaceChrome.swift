@@ -537,18 +537,11 @@ struct WorkspaceFactRow: View {
   /// stays one hover away, and VoiceOver still reads all of it.
   var elidedValue: String?
   var identifier: String?
-  @State private var nativeValueRevision = 0
 
   var body: some View {
     GridRow(alignment: .firstTextBaseline) {
       nameText
-      valueText.id(nativeValueRevision)
-    }
-    .onChange(of: value) {
-      // A selectable Text can keep the previous record's native AX value.
-      // Recreate that native text when its content changes, without installing
-      // an AX value override that recurses through AppKit's label lookup.
-      if isSelectable { nativeValueRevision &+= 1 }
+      valueText
     }
   }
 
@@ -564,9 +557,9 @@ struct WorkspaceFactRow: View {
     return usesTabularDigits ? WorkspaceFont.tabularValue : WorkspaceFont.body
   }
 
-  // Keep native Text accessibility for both plain and selectable values.
-  // Explicit AX value/label overrides on the text bridge can recurse during
-  // a hierarchy snapshot (macOS 27 AccessibilityNode.accessibilityLabel).
+  // Selectable Text can redraw while its native AX value still describes
+  // the previous record. Bind that value explicitly for every fact update;
+  // keep the native label and text selection intact.
   @ViewBuilder
   private var valueText: some View {
     if let elidedValue {
@@ -579,6 +572,7 @@ struct WorkspaceFactRow: View {
         // before bridging selectable text can recurse through AppKit's AX
         // label lookup when a hierarchy snapshot visits the elided row.
         .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
+        .accessibilityValue(value)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier(identifier ?? "")
     } else {
@@ -586,8 +580,24 @@ struct WorkspaceFactRow: View {
         .font(valueFont)
         .fixedSize(horizontal: false, vertical: true)
         .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
+        .accessibilityValue(value)
         .accessibilityIdentifier(identifier ?? "")
     }
+  }
+}
+
+/// Preserve pointer/keyboard text selection while exposing the same full
+/// text through SwiftUI's static accessibility representation. Bridging a
+/// selectable AppKit text element into a changing SwiftUI hierarchy can
+/// recurse between AccessibilityNode.accessibilityLabel and AppKit AX role
+/// lookup on macOS 27. The representation has no native text bridge to query.
+struct WorkspaceTextSelection: ViewModifier {
+  func body(content: Content) -> some View {
+    content
+      .textSelection(.enabled)
+      .accessibilityRepresentation {
+        content.textSelection(.disabled)
+      }
   }
 }
 
@@ -599,7 +609,7 @@ private struct WorkspaceSelectableValue: ViewModifier {
   @ViewBuilder
   func body(content: Content) -> some View {
     if isEnabled {
-      content.textSelection(.enabled)
+      content.modifier(WorkspaceTextSelection())
     } else {
       content
     }

@@ -420,12 +420,9 @@ final class AppShellUITests: XCTestCase {
       let search = app.textFields["history.filter.search"]
       XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
       app.typeKey("f", modifierFlags: .command)
-      app.typeText("job-fixture-0001")
-      XCTAssertEqual(search.value as? String, "job-fixture-0001")
-      if !element("history.detail.job", in: app).exists {
-        print("History keyboard fixture hierarchy: \(app.debugDescription)")
-      }
-      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-0001")
+      app.typeText("job-fixture-diagnostics")
+      XCTAssertEqual(search.value as? String, "job-fixture-diagnostics")
+      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-diagnostics")
       app.typeKey("a", modifierFlags: .command)
       app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
 
@@ -457,8 +454,8 @@ final class AppShellUITests: XCTestCase {
       select("app.navigation.history", in: app)
       XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
       app.typeKey("f", modifierFlags: .command)
-      app.typeText("job-fixture-0001")
-      XCTAssertEqual(search.value as? String, "job-fixture-0001")
+      app.typeText("job-fixture-diagnostics")
+      XCTAssertEqual(search.value as? String, "job-fixture-diagnostics")
       app.terminate()
     }
   }

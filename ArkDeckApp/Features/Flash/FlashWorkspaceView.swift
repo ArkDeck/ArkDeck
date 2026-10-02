@@ -316,7 +316,7 @@ struct FlashWorkspaceView: View {
             Text(detail)
               .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
-              .textSelection(.enabled)
+              .modifier(WorkspaceTextSelection())
               .fixedSize(horizontal: false, vertical: true)
           }
           Button(flashText("flash.workspace.image.retry")) { model.preparePlan() }
@@ -756,7 +756,7 @@ struct FlashWorkspaceView: View {
             Text(submission.jobID)
               .font(WorkspaceFont.monospacedDense)
               .foregroundStyle(.secondary)
-              .textSelection(.enabled)
+              .modifier(WorkspaceTextSelection())
               .accessibilityIdentifier("flash.execute.jobId")
           }
           if let plan = model.plan, let evidence = model.postflightEvidence {
@@ -981,7 +981,7 @@ struct FlashWorkspaceView: View {
         ForEach(reasons.enumerated(), id: \.offset) { _, reason in
           Text(reason)
             .font(WorkspaceFont.monospacedValue)
-            .textSelection(.enabled)
+            .modifier(WorkspaceTextSelection())
             .fixedSize(horizontal: false, vertical: true)
         }
       }
@@ -1009,7 +1009,7 @@ struct FlashWorkspaceView: View {
         .accessibilityIdentifier("flash.deviceAccess.unavailable")
         Text(reason)
           .font(WorkspaceFont.monospacedValue)
-          .textSelection(.enabled)
+          .modifier(WorkspaceTextSelection())
       case .available:
         if let advice = model.deviceAccess.advice {
           Label(
@@ -1158,7 +1158,7 @@ struct FlashWorkspaceView: View {
         if let failure = model.workspace.targetLoadFailure {
           Text(failure)
             .font(.callout.monospaced())
-            .textSelection(.enabled)
+            .modifier(WorkspaceTextSelection())
             .fixedSize(horizontal: false, vertical: true)
         }
         Text(flashText("flash.target.guidance"))
@@ -1366,7 +1366,7 @@ struct FlashWorkspaceView: View {
               expected, observed))
         )
         .font(WorkspaceFont.monospacedDense)
-        .textSelection(.enabled)
+        .modifier(WorkspaceTextSelection())
       }
     }
     .accessibilityElement(children: .combine)
