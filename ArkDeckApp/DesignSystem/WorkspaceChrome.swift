@@ -537,11 +537,18 @@ struct WorkspaceFactRow: View {
   /// stays one hover away, and VoiceOver still reads all of it.
   var elidedValue: String?
   var identifier: String?
+  @State private var nativeValueRevision = 0
 
   var body: some View {
     GridRow(alignment: .firstTextBaseline) {
       nameText
-      valueText
+      valueText.id(nativeValueRevision)
+    }
+    .onChange(of: value) {
+      // A selectable Text can keep the previous record's native AX value.
+      // Recreate that native text when its content changes, without installing
+      // an AX value override that recurses through AppKit's label lookup.
+      if isSelectable { nativeValueRevision &+= 1 }
     }
   }
 
@@ -557,9 +564,9 @@ struct WorkspaceFactRow: View {
     return usesTabularDigits ? WorkspaceFont.tabularValue : WorkspaceFont.body
   }
 
-  // Selectable Text can redraw while its native AX value still describes
-  // the previous record. Bind that value explicitly for every fact update;
-  // keep the native label and text selection intact.
+  // Keep native Text accessibility for both plain and selectable values.
+  // Explicit AX value/label overrides on the text bridge can recurse during
+  // a hierarchy snapshot (macOS 27 AccessibilityNode.accessibilityLabel).
   @ViewBuilder
   private var valueText: some View {
     if let elidedValue {
@@ -572,7 +579,6 @@ struct WorkspaceFactRow: View {
         // before bridging selectable text can recurse through AppKit's AX
         // label lookup when a hierarchy snapshot visits the elided row.
         .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
-        .accessibilityValue(value)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier(identifier ?? "")
     } else {
@@ -580,7 +586,6 @@ struct WorkspaceFactRow: View {
         .font(valueFont)
         .fixedSize(horizontal: false, vertical: true)
         .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
-        .accessibilityValue(value)
         .accessibilityIdentifier(identifier ?? "")
     }
   }
