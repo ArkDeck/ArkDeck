@@ -80,24 +80,25 @@ DMG 布局与安装步骤见 `docs/release/macos-install.md`；helper 对由 `bu
 
 ## 1. 目的与范围
 
-一次切换窗口做这些事，顺序照 G5 队列第 20c 刀：
+软件收尾、相关 CI 和最终签名 RC 检查完成后，才由维护者进入本窗口；本轮软件准备不执行以下步骤：
 
 1. §G.4 切换预检（两遍）并记录快照摘要；
 2. LaunchAgent 改指向 standalone Rust daemon（`main.rs` 第三种模式，production 组合），被替换的
    Swift helper（Swift daemon + façade）保留一个周期作回滚；
 3. `runtime service verify`；
 4. 签名 App ↔ Rust Mach service 的正向与负向验收（SPK-8）；
-5. 用 Rust CLI 跑完整 headless runbook，拿 GJ-1…GJ-5 的 `REAL_DEVICE_PASS`（GJ-4 要维护者 go）；
+5. 在当前 Catalog digest 上用 Rust CLI 跑完整 headless runbook，按真实结果记录 GJ-1…GJ-5；
+   GJ-4 仅依现行 `POL-AGENT-002` / `POL-RECOVERY-001` Runtime authority 与安全规则执行，
+   人工确认不能替代或扩大准入证明；
 6. App 呈现检查（headless runbook §6b）；
-7. 回滚演练（XPA-AC-9）。
+7. 保存实际验收记录与必要发布状态；按文首裁决，不做同 release Swift 回滚演练。
 
 不在本窗口内做：
 
-- 删除 Swift target、Swift CLI、ArkForge Swift SDK、CI 车道同步、结构测试、traceability 与 lock 翻转
-  （第 20d 刀，TASK-XPA-017 收尾）；
+- Swift target、Swift CLI、旧 façade 的删除与软件/打包验证：这些必须在窗口前完成，已合并的迁移不重做；
 - Developer ID 签名与公证本身（第 20a 刀的发布动作，由维护者在窗口前完成，见 §2 P3）；
-- Rust 性能基线的测量（第 20b 刀，安静主机）；
-- ArkForge 摘要域（F1/F2）的修复、Swift 缺陷的过渡版本发布（只在 §2 核对其裁决）；
+- Rust 性能基线或 soak 重跑：文首裁决已取消其开窗前置地位；
+- Swift 过渡版本或新的 Swift 回滚构建：不发布，保留切换前真实安装包；
 - 任何 capability、trusted facts、reservation、hardware evidence 的手工创建或修改；
 - Windows。
 

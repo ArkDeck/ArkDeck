@@ -621,6 +621,15 @@ fn ledger_owners(root: &Root) -> Value {
 /// is signed. Removing the preset releases its pin.
 #[test]
 fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
+    registered_signing_preset(false);
+}
+
+#[test]
+fn a_registered_signing_project_need_not_be_the_first_project() {
+    registered_signing_preset(true);
+}
+
+fn registered_signing_preset(signing_last: bool) {
     let _held = exclusive();
     let fixture = support::fixture("workspace-sign-oracle");
     let root = Root::fixed();
@@ -673,8 +682,15 @@ fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
             .unwrap()
             .to_owned()
     };
-    let project = register("project", "source");
-    let other = register("other", "other");
+    let first = register("project", "source");
+    let second = register("other", "other");
+    // Startup records are sorted by project reference. Exercise both orders
+    // without weakening the foreign-project credential refusal below.
+    let (project, other) = if (first > second) == signing_last {
+        (first, second)
+    } else {
+        (second, first)
+    };
     // The installed receipt binds the credential to the registered project.
     let receipt = fs::read_to_string(root.join("preset/preset-v1.json")).unwrap();
     write(
