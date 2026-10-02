@@ -9,6 +9,65 @@ fn invocation(root: &str) -> arkdeck_cli::Invocation {
     ]))
     .unwrap()
 }
+/// Registration paths as this host spells an absolute local one, and paths it
+/// refuses before any request: Swift's `/…` grammar on macOS, `X:\…` on
+/// Windows.
+#[cfg(not(windows))]
+const ACCEPTED_ROOTS: &[&str] = &[
+    "/Applications/DevEco-Studio.app/Contents",
+    "/tmp/a b/",
+    "//tmp//root",
+];
+#[cfg(windows)]
+const ACCEPTED_ROOTS: &[&str] = &[
+    r"C:\Program Files\Huawei\DevEco Studio",
+    r"C:\a b\",
+    r"D:\\root",
+];
+#[cfg(not(windows))]
+const REFUSED_ROOTS: &[&str] = &[
+    "relative",
+    "~/root",
+    "file:///tmp/root",
+    "/tmp/../root",
+    "/tmp/./root",
+    "/tmp/\0root",
+];
+#[cfg(windows)]
+const REFUSED_ROOTS: &[&str] = &[
+    "relative",
+    "/Applications/DevEco-Studio.app/Contents",
+    r"\root",
+    r"C:\tmp\..\root",
+    r"C:\tmp\.\root",
+    "C:\\tmp\0root",
+];
+#[cfg(not(windows))]
+const ACCEPTED_FILES: &[&str] = &["/tmp/hdc", "/tmp/a b/hdc", "//tmp//hdc"];
+#[cfg(windows)]
+const ACCEPTED_FILES: &[&str] = &[r"C:\tools\hdc.exe", r"C:\a b\hdc.exe", r"D:\\hdc.exe"];
+#[cfg(not(windows))]
+const REFUSED_FILES: &[&str] = &[
+    "relative",
+    "~/hdc",
+    "file:///tmp/hdc",
+    "/tmp/../hdc",
+    "/tmp/./hdc",
+    "/tmp/\0hdc",
+];
+#[cfg(windows)]
+const REFUSED_FILES: &[&str] = &[
+    "relative",
+    "/tmp/hdc",
+    r"\hdc.exe",
+    r"C:\tmp\..\hdc.exe",
+    r"C:\tmp\.\hdc.exe",
+    "C:\\tmp\0hdc.exe",
+];
+#[cfg(not(windows))]
+const HOST_ROOT: &str = "/tmp/root";
+#[cfg(windows)]
+const HOST_ROOT: &str = r"C:\root";
 fn supported() -> bool {
     let available = arkdeck_contract::METHODS.contains(&"runtime.tool.register");
     let inputs: Value = serde_json::from_str(arkdeck_contract::CONTRACT_INPUTS).unwrap();
@@ -72,11 +131,7 @@ fn the_published_argv_fixture_replays() {
 }
 #[test]
 fn paths_match_swift_local_grammar_and_request_is_closed_before_connect() {
-    for root in [
-        "/Applications/DevEco-Studio.app/Contents",
-        "/tmp/a b/",
-        "//tmp//root",
-    ] {
+    for root in ACCEPTED_ROOTS {
         let parsed = invocation(root);
         assert_eq!(
             Value::Object(parsed.params.clone().unwrap()),
@@ -91,14 +146,7 @@ fn paths_match_swift_local_grammar_and_request_is_closed_before_connect() {
             );
         }
     }
-    for root in [
-        "relative",
-        "~/root",
-        "file:///tmp/root",
-        "/tmp/../root",
-        "/tmp/./root",
-        "/tmp/\0root",
-    ] {
+    for root in REFUSED_ROOTS {
         assert_eq!(
             refusal(&args(&[
                 "runtime", "tool", "register", "--kind", "deveco", "--root", root
@@ -112,19 +160,13 @@ fn paths_match_swift_local_grammar_and_request_is_closed_before_connect() {
         ["--kind", "deveco"],
     ] {
         let mut argv = args(&[
-            "runtime",
-            "tool",
-            "register",
-            "--kind",
-            "deveco",
-            "--root",
-            "/tmp/root",
+            "runtime", "tool", "register", "--kind", "deveco", "--root", HOST_ROOT,
         ]);
         argv.extend(args(&extra));
         assert!(parse(&argv).is_err());
     }
     if supported() {
-        let mut parsed = invocation("/tmp/root");
+        let mut parsed = invocation(HOST_ROOT);
         parsed
             .params
             .as_mut()
@@ -142,8 +184,16 @@ fn actual_registration_projection_has_content_identity_without_selection() {
     for frame in recordings()
         .into_iter()
         .filter(|v| v["ok"] == true && v["params"]["kind"] == "deveco")
+        .map(hosted)
     {
-        let parsed = invocation(frame["params"]["root"].as_str().unwrap());
+        // A recorded macOS root is not a local path on Windows, where the
+        // request names a root as this host spells one.
+        let root = if cfg!(windows) {
+            HOST_ROOT
+        } else {
+            frame["params"]["root"].as_str().unwrap()
+        };
+        let parsed = invocation(root);
         validate_bootstrap_request(&parsed).unwrap();
         validate_bootstrap_response(&parsed, &frame["result"]).unwrap();
         count += 1;
@@ -411,7 +461,7 @@ fn hdc_supported() -> bool {
 }
 #[test]
 fn hdc_request_rejects_wrong_kind_path_and_caller_owned_fields() {
-    for file in ["/tmp/hdc", "/tmp/a b/hdc", "//tmp//hdc"] {
+    for file in ACCEPTED_FILES {
         let invocation = parse(&args(&[
             "runtime", "tool", "register", "--kind", "hdc", "--file", file,
         ]))
@@ -432,14 +482,7 @@ fn hdc_request_rejects_wrong_kind_path_and_caller_owned_fields() {
             assert_eq!(result.unwrap_err().code, "controlMethodUnavailable");
         }
     }
-    for file in [
-        "relative",
-        "~/hdc",
-        "file:///tmp/hdc",
-        "/tmp/../hdc",
-        "/tmp/./hdc",
-        "/tmp/\0hdc",
-    ] {
+    for file in REFUSED_FILES {
         assert_eq!(
             refusal(&args(&[
                 "runtime", "tool", "register", "--kind", "hdc", "--file", file
@@ -509,4 +552,28 @@ fn hdc_registration_refuses_socket_as_swift_does() {
     ]))
     .unwrap();
     assert_eq!(deveco.socket.as_deref(), Some("/tmp/s"));
+}
+
+/// A recorded (macOS) Bootstrap record as this host's Runtime answers it: the
+/// CLI checks that a record names its host's platform, so on Windows the
+/// recorded `"platform": "macos"` reads `"windows"`; on macOS nothing changes.
+fn hosted(mut value: Value) -> Value {
+    fn host(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                if let Some(platform) = map.get_mut("platform")
+                    && *platform == "macos"
+                {
+                    *platform = json!("windows");
+                }
+                map.values_mut().for_each(host);
+            }
+            Value::Array(items) => items.iter_mut().for_each(host),
+            _ => {}
+        }
+    }
+    if cfg!(windows) {
+        host(&mut value);
+    }
+    value
 }

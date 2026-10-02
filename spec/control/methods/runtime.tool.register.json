@@ -121,7 +121,10 @@
                         "type": "string"
                       },
                       "teamIdentifier": {
-                        "type": "string"
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "toolVersion": {
                         "type": "null"

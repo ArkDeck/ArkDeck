@@ -56,6 +56,10 @@ use std::time::Duration;
 /// the names macOS gives `ArkDeck/Sessions` and the App's `ArkDeck/Trace`.
 const ACCOUNT_SESSIONS: &str = "Sessions";
 const ACCOUNT_TRACE: &str = "Trace";
+/// The account's Bootstrap registry, `%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`:
+/// the macOS `ArkDeck/Bootstrap/v1` below the product directory.
+const ACCOUNT_BOOTSTRAP: &str = "Bootstrap";
+const BOOTSTRAP_VERSION: &str = "v1";
 
 /// The account's product directory as this root spells it (its parent), for
 /// messages.
@@ -329,6 +333,13 @@ impl Authority {
             .with_workspace_projects(projects)
             .with_planning(self.root.path());
         let host = host.with_trace_cache(self.trace_cache()?);
+        let bootstrap = self.bootstrap_root()?;
+        let host = host.with_bootstrap(&bootstrap).map_err(|error| {
+            format!(
+                "the Bootstrap registry {} is unusable: {error}; nothing was started",
+                bootstrap.display()
+            )
+        })?;
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {
@@ -530,6 +541,39 @@ impl Authority {
         }
         let traces = parent.join("traces");
         arkdeck_hoststore::TraceCacheStore::open(&traces).map_err(|error| unusable(&traces, error))
+    }
+
+    /// The Bootstrap registry the bundle, HDC tool and DevEco toolchain owners
+    /// share (`runtime.bundle.*`, `runtime.tool.*`), created owner-only when
+    /// absent and opened as it is otherwise: a development root's private
+    /// `bootstrap`, the macOS isolated owner's name; the account's
+    /// `%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`, beside the state directory as
+    /// macOS keeps `ArkDeck/Bootstrap/v1` (the account location decision, see
+    /// [`Self::trace_cache`]). Its indexes are created by the owners' first
+    /// write or paged list, never here.
+    fn bootstrap_root(&self) -> Result<std::path::PathBuf, String> {
+        let unusable = |path: &Path, error: std::io::Error| {
+            format!(
+                "the Bootstrap registry {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        if self.development {
+            let name = "bootstrap";
+            return self
+                .root
+                .private_child(name)
+                .map_err(|error| unusable(&self.root.path().join(name), error));
+        }
+        let parent = self
+            .root
+            .product_child(ACCOUNT_BOOTSTRAP)
+            .map_err(|error| unusable(&product(&self.root).join(ACCOUNT_BOOTSTRAP), error))?;
+        let path = parent.join(BOOTSTRAP_VERSION);
+        arkdeck_platform::HostDirectory::open(&parent)
+            .and_then(|directory| directory.private_child(BOOTSTRAP_VERSION))
+            .map_err(|error| unusable(&path, error))?;
+        Ok(path)
     }
 
     /// The History filter owner over the root's private `history-filter`

@@ -781,7 +781,7 @@ fn deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner() {
         assert_eq!(error.code, "invalidParams");
         assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
     }
-    for file in ["/tmp/hdc", "/tmp/a b/hdc", "//tmp//hdc"] {
+    for file in HDC_FILES {
         let error = call(&control, method, json!({"kind":"hdc","file":file}))
             .outcome
             .unwrap_err();
@@ -791,7 +791,7 @@ fn deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner() {
             "bootstrapRegistryOwner"
         );
     }
-    for root in ["/A.app/Contents", "/A.app/Contents/", "/A.app//Contents"] {
+    for root in DEVECO_ROOTS {
         let error = call(&control, method, json!({"kind":"deveco","root":root}))
             .outcome
             .unwrap_err();
@@ -837,15 +837,15 @@ fn bootstrap_mutation_lost_classified_receipts_preserve_uncertainty_after_one_ow
     for (method, params) in [
         (
             "runtime.bundle.register",
-            json!({"kind":"daemon-bundle","file":"/Source.app"}),
+            json!({"kind":"daemon-bundle","file":SOURCE_FILE}),
         ),
         (
             "runtime.tool.register",
-            json!({"kind":"deveco","root":"/A.app/Contents"}),
+            json!({"kind":"deveco","root":DEVECO_ROOTS[0]}),
         ),
         (
             "runtime.tool.register",
-            json!({"kind":"hdc","file":"/tmp/hdc"}),
+            json!({"kind":"hdc","file":HDC_FILES[0]}),
         ),
         (
             "runtime.tool.remove",
@@ -1082,7 +1082,7 @@ fn bundle_registration_rejects_caller_authority_and_observes_nothing() {
     let error = call(
         &control,
         method,
-        json!({"kind":"daemon-bundle","file":"/Source.app"}),
+        json!({"kind":"daemon-bundle","file":SOURCE_FILE}),
     )
     .outcome
     .unwrap_err();
@@ -1874,3 +1874,26 @@ fn a_screen_sequence_job_show_passes_the_control_plane() {
         )
     );
 }
+
+/// Registration paths this host's control layer takes as absolute local ones
+/// and hands to the owner: Swift's `/…` grammar on macOS, `X:\…` on Windows.
+#[cfg(not(windows))]
+const HDC_FILES: [&str; 3] = ["/tmp/hdc", "/tmp/a b/hdc", "//tmp//hdc"];
+#[cfg(windows)]
+const HDC_FILES: [&str; 3] = [
+    r"C:\tmp\hdc.exe",
+    r"C:\tmp\a b\hdc.exe",
+    r"C:\\tmp\\hdc.exe",
+];
+#[cfg(not(windows))]
+const DEVECO_ROOTS: [&str; 3] = ["/A.app/Contents", "/A.app/Contents/", "/A.app//Contents"];
+#[cfg(windows)]
+const DEVECO_ROOTS: [&str; 3] = [
+    r"C:\DevEco Studio",
+    r"C:\DevEco Studio\",
+    r"C:\\DevEco Studio",
+];
+#[cfg(not(windows))]
+const SOURCE_FILE: &str = "/Source.app";
+#[cfg(windows)]
+const SOURCE_FILE: &str = r"C:\Source.app";

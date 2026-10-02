@@ -247,7 +247,7 @@ impl RetirementRoot<'_> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{

@@ -2,11 +2,15 @@
 //! or write. The Runtime's paged discovery (`arkdeck-hoststore`) holds this
 //! owner's lock through its frozen snapshot pager and may initialize a
 //! genuinely empty registry. No content is selected or run.
+#[cfg(windows)]
+use crate::bundle_content::no_windows_bundle_policy as validate_production_daemon_bundle;
 use crate::{
     bundle_content::{BundleContent, verify_bundle_content},
     decode_bundles,
 };
-use arkdeck_platform::{HostDirectory, HostFileIdentity, validate_production_daemon_bundle};
+#[cfg(target_os = "macos")]
+use arkdeck_platform::validate_production_daemon_bundle;
+use arkdeck_platform::{HostDirectory, HostFileIdentity};
 use serde_json::Value;
 use std::{
     io,

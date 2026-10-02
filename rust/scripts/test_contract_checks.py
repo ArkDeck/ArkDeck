@@ -43,6 +43,67 @@ run_directory = importlib.util.module_from_spec(RUN_DIRECTORY_SPEC)
 RUN_DIRECTORY_SPEC.loader.exec_module(run_directory)
 
 
+class ReadOnlyToolSelectionExpectationTests(unittest.TestCase):
+    def run_owner_matrix(self, system, selection_error):
+        methods = ["runtime.tool.select", "runtime.hdc.impact-preview", "runtime.hdc.restart",
+                   "control-action.list", "control-action.show", "control-action.reconcile"]
+        registry = dict(readonly.read_json(readonly.REGISTRY), methods=methods)
+        expectations = {}
+
+        class MatrixComplete(Exception):
+            pass
+
+        def invoke(*args, **kwargs):
+            name = args[4]
+            if name == "descriptor-source":
+                return {"result": [{"reference": "fixture@1"}]}
+            if name == "descriptor":
+                return {"result": {"reference": "fixture@1", "availability": "unavailable",
+                                   "exampleRequest": {}}}
+            return {"result": {}}
+
+        def exchange(endpoint, directory, rows, name, data, method, expected=None):
+            if name == "descriptor-success":
+                raise MatrixComplete
+            expectations[method] = expected
+            return {"ok": False, "error": selection_error if method == "runtime.tool.select" else {}}
+
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(readonly.platform, "system", return_value=system), \
+                patch.object(readonly, "invoke", side_effect=invoke), \
+                patch.object(readonly, "machine_output"), \
+                patch.object(readonly, "exchange", side_effect=exchange):
+            try:
+                readonly.full_matrix(Path("cli"), Path(temporary), [], {}, "endpoint", registry)
+            except MatrixComplete:
+                pass
+        return expectations
+
+    def test_tool_selection_uses_shared_owner_refusal_without_widening_neighbor_routes(self):
+        error = {"code": "operationUnavailable",
+                 "message": "the Runtime tool-selection owner is unavailable",
+                 "details": {"newDispatchCount": 0}}
+        for system in ("Windows", "Darwin", "Linux"):
+            with self.subTest(system=system):
+                expected = self.run_owner_matrix(system, error)
+                self.assertEqual(expected.pop("runtime.tool.select"),
+                                 "rejected" if system == "Linux" else "operationUnavailable")
+                for method, code in expected.items():
+                    self.assertEqual(code, ("invalidInput" if method in {
+                        "control-action.show", "control-action.reconcile"} else "operationUnavailable")
+                        if system == "Darwin" else "rejected", method)
+
+    def test_missing_tool_owner_requires_exact_zero_dispatch_refusal(self):
+        for system in ("Windows", "Darwin"):
+            for change in ({"code": "rejected"}, {"details": {"newDispatchCount": 1}},
+                           {"details": {}}, {"message": "another owner is unavailable"}):
+                error = {"code": "operationUnavailable",
+                         "message": "the Runtime tool-selection owner is unavailable",
+                         "details": {"newDispatchCount": 0}, **change}
+                with self.subTest(system=system, change=change), self.assertRaises(AssertionError):
+                    self.run_owner_matrix(system, error)
+
+
 class ReadOnlyImportExpectationTests(unittest.TestCase):
     def test_each_view_selects_one_exact_refusal_for_every_import_owner_route(self):
         with tempfile.TemporaryDirectory() as temporary:

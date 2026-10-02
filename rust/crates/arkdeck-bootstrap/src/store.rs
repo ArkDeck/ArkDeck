@@ -8,7 +8,9 @@
 use arkdeck_contract::WireError;
 use arkdeck_platform::{DocumentPublishError, HostDirectory, HostReadLock};
 use serde_json::{Map, json};
-use std::{io, os::unix::fs::DirBuilderExt, path::Path};
+#[cfg(target_os = "macos")]
+use std::os::unix::fs::DirBuilderExt;
+use std::{io, path::Path};
 
 pub(crate) const MAX_INDEX: usize = 4 * 1024 * 1024;
 pub(crate) const BUNDLES: &str = "bundles.json";
@@ -31,6 +33,7 @@ pub(crate) fn failure(code: &str, message: &str) -> WireError {
 /// that may be the store's first: every missing directory of `path` created
 /// owner-only; the store must then be the caller's own private directory,
 /// reached through no link.
+#[cfg(target_os = "macos")]
 pub fn create_store(path: &Path) -> Result<(), WireError> {
     if !path.is_absolute() {
         return Err(failure(

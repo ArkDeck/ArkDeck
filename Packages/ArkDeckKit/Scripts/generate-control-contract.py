@@ -100,6 +100,16 @@ TOOL_RETIREMENT_OWNER_ERROR_CODES = [
     "invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied",
     "recordUnreadable", "quotaExceeded", "ioFailure", "fileIdentityChanged", "inputTooLarge", "outcomeUnknown", "operationUnavailable",
 ]
+# The Bootstrap read owner's refusals of one exact reference (Swift's
+# `BootstrapResourceControlHandler.inspect`; the Rust `BootstrapReaders::
+# inspect`): an absent reference, the owner's lock held, the native trust
+# policy refusing, and the owner not composed. Recorded by the recording that
+# first published `runtime.tool.inspect`; kept so that a later derivation over
+# the committed corpus publishes them too.
+TOOL_INSPECT_OWNER_ERROR_CODES = [
+    "admissionDenied", "operationUnavailable", "recordUnreadable", "resourceConflict",
+    "resourceNotFound",
+]
 TOOL_LIST_OWNER_ERROR_CODES = [
     "invalidInput", "invalidCursor", "resourceConflict", "admissionDenied",
     "recordUnreadable", "operationUnavailable", "inputTooLarge", "fileIdentityChanged", "ioFailure", "outcomeUnknown",
@@ -160,8 +170,20 @@ ARTIFACT_EXPORT_OWNER_ERROR_CODES = [
 #   `{"type": "string", "enum": [...]}` for a choose-a-candidate action, in
 #   every method that answers an agent-owned human action. Control-action human
 #   actions (`HDCControlActionRecord`) always write null, so `control-action.*`,
-#   `runtime.hdc.*` and `runtime.tool.select` are not widened.
+#   `runtime.hdc.*` and `runtime.tool.select` are not widened;
+# - `teamIdentifier` of a registered tool's trust: the host tool inspection's
+#   one trust projection (`policy: arkdeck.host-tool-inspection/1`) writes the
+#   signer's team or null, for the tool itself and for each DevEco child tool.
+#   Only the top-level trust was recorded with null (an unsigned HDC); a
+#   child's null is what a Windows DevEco child answers, whose Authenticode
+#   signature has no team (TASK-XPA-011).
 SHARED_MEMBERS = {
+    ("runtime.tool.register", "result.trust.teamIdentifier"): [
+        ("runtime.tool.register", "result.childTools[].trust.teamIdentifier"),
+        ("runtime.tool.inspect", "result.childTools[].trust.teamIdentifier"),
+        ("runtime.tool.remove", "result.childTools[].trust.teamIdentifier"),
+        ("runtime.tool.list", "result.items[].childTools[].trust.teamIdentifier"),
+    ],
     ("agent.run", "result.failureCode"): [
         ("agent.status", "result.failureCode"),
         ("agent.resume", "result.failureCode"),
@@ -382,6 +404,7 @@ def derive_method_schemas(source):
                        | (set(BUNDLE_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.bundle.remove" else set())
                        | (set(TOOL_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.tool.remove" else set())
                        | (set(TOOL_LIST_OWNER_ERROR_CODES) if method == "runtime.tool.list" else set())
+                       | (set(TOOL_INSPECT_OWNER_ERROR_CODES) if method == "runtime.tool.inspect" else set())
                        | (set(AGENT_RESUME_OWNER_ERROR_CODES) if method in {"agent.resume", "human-action.resume"} else set())
                        | (set(TRACE_CACHE_PURGE_OWNER_ERROR_CODES) if method == "trace.cache.purge" else set())
                        | (set(TARGET_DISPLAY_NAME_OWNER_ERROR_CODES) if method in {

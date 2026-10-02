@@ -356,8 +356,7 @@ const MACOS_ONLY_ROOTS: &[&str] = &["legacy", "agentd", "signing", "update-feed"
 // client-started daemon (maintainer ruling 10, launchd -> client-started
 // daemon), whose `status`, `verify`, `restart` and `uninstall` Windows serves;
 // `install` and `update` stay refused there (`MACOS_HOST_LEAVES`).
-const MACOS_ONLY_RUNTIME_GROUPS: &[&str] =
-    &["signing", "bundle", "tool", "update", "support-bundle"];
+const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["signing", "update", "support-bundle"];
 
 /// The Runtime leaves whose every method the Windows daemon answers, measured
 /// end to end on Windows: the CLI authenticates a daemon signed with a
@@ -478,6 +477,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // without a registered HDC a debt is refused before its readback.
     "recovery.cleanup.list",
     "cleanup-debt.list",
+    // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
+    // the bundle inventory, and a DevEco toolchain's inspection, listing and
+    // retirement. Not the registrations, nor `runtime tool select`: a daemon
+    // Bundle and an HDC are not registered on Windows yet, so nothing is
+    // selected.
+    "runtime.bundle.list",
+    "runtime.tool.list",
+    "runtime.tool.inspect",
+    "runtime.tool.remove",
     // A diagnostics capture's Artifacts the macOS Runtime recorded, exported
     // (`windows_diagnostics_export_process.rs`).
     "diagnostics.export",

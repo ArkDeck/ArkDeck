@@ -47,7 +47,7 @@ fn actual_bootstrap_producer_results_preserve_exact_identity_and_no_execution_as
         let mut successes = 0;
         for row in corpus
             .lines()
-            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         {
             if row["ok"] != true {
                 continue;
@@ -184,7 +184,7 @@ fn actual_bundle_pages_preserve_snapshot_and_validate_every_row() {
     let mut rows = 0;
     for frame in corpus
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         .filter(|v| v["ok"] == true)
     {
         let mut invocation = bundle_list(&[]);
@@ -426,7 +426,7 @@ fn actual_retirement_receipts_match_the_requested_bundle_and_retain_content() {
     let mut receipts = 0;
     for frame in corpus
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         .filter(|v| v["ok"] == true)
     {
         let invocation = retirement(&[
@@ -518,7 +518,7 @@ fn in_memory_lost_retirement_receipt_is_unknown_and_the_client_never_replays() {
     let requests = String::from_utf8(before.clone())
         .unwrap()
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         .collect::<Vec<_>>();
     assert_eq!(requests.len(), 2);
     assert_eq!(requests[0]["method"], "health");
@@ -699,7 +699,7 @@ fn actual_tool_retirement_receipts_preserve_both_content_models() {
     let mut kinds = std::collections::BTreeSet::new();
     for frame in corpus
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         .filter(|frame| frame["ok"] == true)
     {
         let invocation = tool_retirement(&[
@@ -810,7 +810,7 @@ fn in_memory_tool_retirement_lost_receipt_cannot_replay() {
     let frames = String::from_utf8(original.clone())
         .unwrap()
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         .collect::<Vec<_>>();
     assert_eq!(frames.len(), 2);
     assert_eq!(frames[0]["method"], "health");
@@ -939,7 +939,7 @@ fn actual_tool_list_pages_validate_every_mixed_family_record_and_snapshot() {
     let mut pages = 0;
     for frame in corpus
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         .filter(|frame| frame["ok"] == true)
     {
         let mut invocation = tool_list(&[]).unwrap();
@@ -1022,4 +1022,28 @@ fn actual_tool_list_pages_validate_every_mixed_family_record_and_snapshot() {
         kinds,
         std::collections::BTreeSet::from(["hdc".into(), "deveco".into()])
     );
+}
+
+/// A recorded (macOS) Bootstrap record as this host's Runtime answers it: the
+/// CLI checks that a record names its host's platform, so on Windows the
+/// recorded `"platform": "macos"` reads `"windows"`; on macOS nothing changes.
+fn hosted(mut value: Value) -> Value {
+    fn host(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                if let Some(platform) = map.get_mut("platform")
+                    && *platform == "macos"
+                {
+                    *platform = json!("windows");
+                }
+                map.values_mut().for_each(host);
+            }
+            Value::Array(items) => items.iter_mut().for_each(host),
+            _ => {}
+        }
+    }
+    if cfg!(windows) {
+        host(&mut value);
+    }
+    value
 }

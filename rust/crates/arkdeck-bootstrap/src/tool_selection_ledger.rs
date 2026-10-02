@@ -737,6 +737,6 @@ impl Ledger<'_> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 #[path = "tool_selection_ledger_tests.rs"]
 mod tests;

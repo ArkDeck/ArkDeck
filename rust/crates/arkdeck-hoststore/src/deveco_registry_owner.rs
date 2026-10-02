@@ -854,6 +854,39 @@ mod windows_registration_tests {
         assert_eq!(scratch.index(), bytes);
     }
 
+    /// Retirement through the Bootstrap store's shared retirement binding, as
+    /// the HDC tool registry retires: metadata only, once, and the retired
+    /// record reads back; the DevEco content is not touched.
+    #[test]
+    fn a_registered_toolchain_retires_once_and_reads_back_removed() {
+        let scratch = Scratch::new("deveco-retirement");
+        let Some(root) = scratch.deveco(true) else {
+            return;
+        };
+        let _publisher = Publisher::development();
+        let store = scratch.store();
+        let value = store.register(&root, NOW).unwrap();
+        let reference = value["toolRef"].as_str().unwrap().to_owned();
+        let absent = format!("toolchain:sha256:{}", "0".repeat(64));
+        assert_eq!(
+            store.retire(&absent, "1").unwrap_err().code,
+            "resourceNotFound"
+        );
+        assert_eq!(
+            store.retire(&reference, "2").unwrap_err().code,
+            "resourceConflict"
+        );
+        let retired = store.retire(&reference, "1").unwrap();
+        assert_eq!(retired["state"], "removed");
+        assert_eq!(retired["generation"], "2");
+        let written = scratch.index();
+        // A retry answers the same receipt and writes nothing.
+        assert_eq!(store.retire(&reference, "1").unwrap(), retired);
+        assert_eq!(scratch.index(), written);
+        assert_eq!(store.inspect(&reference).unwrap(), retired);
+        assert!(root.join("tools").join("node").join("node.exe").is_file());
+    }
+
     #[test]
     fn an_unsigned_node_or_another_publisher_is_refused_before_anything_is_written() {
         let scratch = Scratch::new("deveco-registration-refusals");
@@ -975,5 +1008,10 @@ mod windows_registration_tests {
             value["trust"]["signingIdentifier"],
             arkdeck_platform::DEVECO_PUBLISHER
         );
+        for method in ["runtime.tool.register", "runtime.tool.inspect"] {
+            if let Err(error) = arkdeck_contract::validate_method_value(method, "result", &value) {
+                panic!("{method}: {error:?}\n{value:#}");
+            }
+        }
     }
 }

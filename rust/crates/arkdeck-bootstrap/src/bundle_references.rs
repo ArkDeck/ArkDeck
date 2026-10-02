@@ -273,6 +273,6 @@ impl Transaction<'_> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 #[path = "bundle_references_tests.rs"]
 mod tests;
