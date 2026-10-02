@@ -119,7 +119,7 @@ jobs:
       - name: Run the App UI tests
         env:
           ARKDECK_UI_TEST_DERIVED_DATA: ${{ runner.temp }}/arkdeck-ui-tests
-          UI_TEST_SCOPE: ${{ github.event_name == 'push' && 'runtime-migration' || inputs.scope || 'all' }}
+          UI_TEST_SCOPE: ${{ inputs.scope || 'all' }}
         run: |
           # pipefail matters here: the run is piped through tee for live
           # output, and without it the step would read tee's status instead of
@@ -152,8 +152,8 @@ jobs:
           set -- \
             -skip-testing:ArkDeckHDCUITests/HDCStatusUITests/testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe \
             -skip-testing:ArkDeckHDCUITests/ViewerUITests/testSelectingADeepWideRowCentersItInBothTreeAxes
-          # Branch pushes reproduce the three migration regressions. Nightly
-          # runs and the default manual scope retain the complete UI suite.
+          # App-change pushes, nightly runs and the default manual scope run
+          # the complete UI suite. Manual reproductions may select this scope.
           # These are selections, not exclusions or retries of failed tests.
           if [ "$UI_TEST_SCOPE" = runtime-migration ]; then
             set -- "$@" \
