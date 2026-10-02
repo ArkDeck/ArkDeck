@@ -176,6 +176,6 @@ fn list_page_with_checkpoint(
     result
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 #[path = "bundle_list_owner_tests.rs"]
 mod list_tests;

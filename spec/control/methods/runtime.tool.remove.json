@@ -120,7 +120,10 @@
                         "type": "string"
                       },
                       "teamIdentifier": {
-                        "type": "string"
+                        "type": [
+                          "null",
+                          "string"
+                        ]
                       },
                       "toolVersion": {
                         "type": "null"
@@ -429,8 +432,8 @@
   "x-arkdeck-method": "runtime.tool.remove",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 6,
-    "request": 10,
-    "result": 4
+    "error": 1,
+    "request": 3,
+    "result": 2
   }
 }

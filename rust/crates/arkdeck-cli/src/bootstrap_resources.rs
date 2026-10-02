@@ -74,11 +74,28 @@ pub(crate) fn configure(
     }
     Ok(())
 }
+/// A registration path as this host spells an absolute local one, with no
+/// `.` or `..` component: `/…` on macOS (Swift's grammar), a drive path
+/// `X:\…` on Windows, which the Runtime's owner then checks strictly.
+#[cfg(not(windows))]
 fn canonical_absolute(path: &str) -> bool {
     path.starts_with('/')
         && path.len() <= 16_384
         && !path.contains('\0')
         && !path.split('/').any(|part| matches!(part, "." | ".."))
+}
+#[cfg(windows)]
+fn canonical_absolute(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 3
+        && bytes.len() <= 16_384
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && bytes[2] == b'\\'
+        && !bytes.contains(&0)
+        && !path[3..]
+            .split(['\\', '/'])
+            .any(|part| matches!(part, "." | ".."))
 }
 
 /// A registration's path, judged before any connection as Swift's handler
@@ -298,6 +315,14 @@ fn validate_bootstrap_response_inner(
     Ok(())
 }
 
+/// The platform a Bootstrap record of this host's Runtime names: the one
+/// its registry holds (a Windows record is refused on macOS and a macOS one on
+/// Windows, by the registries themselves).
+#[cfg(not(windows))]
+const HOST_PLATFORM: &str = "macos";
+#[cfg(windows)]
+const HOST_PLATFORM: &str = "windows";
+
 fn unreadable() -> CliError {
     CliError::new(
         "recordUnreadable",
@@ -323,7 +348,7 @@ fn validate_record(
         || value["schemaVersion"] != schema
         || value["contentSchemaVersion"] != content_schema
         || value["digestAlgorithm"] != "sha256-jcs"
-        || value["platform"] != "macos"
+        || value["platform"] != HOST_PLATFORM
         || !value["generation"].as_str().is_some_and(|v| {
             v.parse::<u64>()
                 .is_ok_and(|n| n > 0 && n <= i64::MAX as u64 && n.to_string() == v)

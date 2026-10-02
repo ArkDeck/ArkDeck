@@ -4,10 +4,15 @@
 //! (`arkdeck_bootstrap::RetirementRoot`), as the HDC tool registry retires.
 use crate::{DevEcoRegistryStore, decode_bundles};
 use arkdeck_bootstrap::RetirementRoot;
-use arkdeck_contract::{WireError, canonical_json};
+use arkdeck_contract::WireError;
+#[cfg(target_os = "macos")]
+use arkdeck_contract::canonical_json;
 use arkdeck_platform::DocumentPublishError;
 use serde_json::{Value, json};
 use std::io;
+// A workspace preset's pin on a toolchain: the workspace composition that
+// takes it is macOS-only.
+#[cfg(target_os = "macos")]
 #[path = "deveco_pins.rs"]
 pub(crate) mod pins;
 const MAX_INDEX: usize = 4 * 1024 * 1024;
@@ -134,8 +139,15 @@ impl DevEcoRegistryStore {
         record.state = "removed".into();
         record.generation = 2;
         let value = record.value();
+        // macOS writes the canonical form, as Swift's retirement does. On
+        // Windows a root's or child's NTFS file id may exceed the exact integer
+        // range canonical JSON admits, so the index is encoded as its
+        // registration encodes it; its decoder reads either form.
+        #[cfg(target_os = "macos")]
         let encoded = canonical_json(&serde_json::to_value(&index).map_err(unreadable)?)
             .map_err(unreadable)?;
+        #[cfg(windows)]
+        let encoded = serde_json::to_vec(&index).map_err(unreadable)?;
         if encoded.len() > MAX_INDEX {
             return Err(failure(
                 "quotaExceeded",
@@ -162,7 +174,7 @@ impl DevEcoRegistryStore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{

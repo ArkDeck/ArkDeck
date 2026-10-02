@@ -1,9 +1,13 @@
 //! Owner for Bootstrap Tool metadata and immutable registered content.
 //! Every returned row has undergone fresh content and native signing checks.
 //! This API neither selects tools nor admits execution.
+#[cfg(target_os = "macos")]
+use crate::registry::published_identity;
+#[cfg(windows)]
+use crate::windows_registration::windows_published_identity as published_identity;
 use crate::{
     decode_bundles,
-    registry::{published_identity, read_tools, tool_projection},
+    registry::{read_tools, tool_projection},
     tool_content::{ToolContent, inspect_tool_content},
 };
 use arkdeck_platform::{HostDirectory, NativeCodeSignature};
@@ -199,7 +203,7 @@ impl ToolRegistryStore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use serde_json::json;

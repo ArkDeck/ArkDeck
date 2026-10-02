@@ -125,7 +125,7 @@ pub struct Host {
     /// where no analyzer is composed (G20).
     #[cfg(windows)]
     planning: Option<std::path::PathBuf>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     pub(crate) provider: Option<HdcReadOnlyProvider>,
     #[cfg(any(target_os = "macos", windows))]
@@ -971,7 +971,7 @@ impl Host {
         self.trace_cache = Some(cache);
         self
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_bootstrap(mut self, root: &std::path::Path) -> io::Result<Self> {
         self.bootstrap = Some(crate::bootstrap_readers::BootstrapReaders::open_existing(
             root,
@@ -1447,6 +1447,7 @@ impl Host {
             ("storage", self.storage.is_some()),
             ("history", self.history.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
+            ("bootstrap", self.bootstrap.is_some()),
             ("planning", self.planning.is_some()),
             ("agentExecutions", self.agents.is_some()),
             ("humanActions", self.human_actions.is_some()),
@@ -1495,7 +1496,7 @@ impl Host {
             capabilities: None,
             #[cfg(any(target_os = "macos", windows))]
             planning: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             bootstrap: None,
             provider,
             #[cfg(any(target_os = "macos", windows))]
@@ -2249,6 +2250,27 @@ impl HostServices for Host {
         self.with_hdc_impact(|source| owner.answer(method, params, source))
     }
 
+    /// `runtime.tool.select` on Windows, as Swift's handler answers it with no
+    /// tool-selection owner: no Windows HDC can be registered while no Windows
+    /// HDC tuple is (CHG-2026-078), so there is nothing to select. The HDC
+    /// lifecycle's and the control actions' methods keep the read-only
+    /// foundation's refusal until their owners are built.
+    #[cfg(windows)]
+    fn control_action(
+        &self,
+        method: &str,
+        _params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        if method == "runtime.tool.select" {
+            return arkdeck_hoststore::control_action_without_owner(method, _params);
+        }
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
+
     #[cfg(any(target_os = "macos", windows))]
     fn job_resource(
         &self,
@@ -2955,7 +2977,7 @@ impl HostServices for Host {
             flash_reconciler.reconciler.status(params)
         })
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_register_bundle(&self, source: &str) -> Result<serde_json::Value, WireError> {
         self.bootstrap
             .as_ref()
@@ -2969,7 +2991,7 @@ impl HostServices for Host {
             })?
             .register_bundle(std::path::Path::new(source), &utc_now())
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_register_deveco(&self, source: &str) -> Result<serde_json::Value, WireError> {
         self.bootstrap
             .as_ref()
@@ -2983,7 +3005,7 @@ impl HostServices for Host {
             })?
             .register_deveco(std::path::Path::new(source), &utc_now())
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_register_hdc(&self, source: &str) -> Result<serde_json::Value, WireError> {
         self.bootstrap
             .as_ref()
@@ -3042,7 +3064,7 @@ impl HostServices for Host {
             })?
             .status()
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_tool_remove(
         &self,
         reference: &str,
@@ -3060,7 +3082,7 @@ impl HostServices for Host {
             })?
             .tool_remove(reference, generation)
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_tool_list(
         &self,
         page_size: usize,
@@ -3078,7 +3100,7 @@ impl HostServices for Host {
             })?
             .tool_list(page_size, cursor)
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_bundle_list(
         &self,
         page_size: usize,
@@ -3096,7 +3118,7 @@ impl HostServices for Host {
             })?
             .bundle_list(page_size, cursor)
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_bundle_remove(
         &self,
         reference: &str,
@@ -3114,7 +3136,7 @@ impl HostServices for Host {
             })?
             .bundle_remove(reference, generation)
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn bootstrap_inspect(
         &self,
         kind: arkdeck_control::BootstrapRegistryKind,

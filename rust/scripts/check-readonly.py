@@ -448,7 +448,12 @@ def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpo
             expected = None
         # Keeping no state, it composes no control-action owner either: it answers as
         # Swift's handler without one, which wants an exact identity for show and reconcile.
-        if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "runtime.tool.select", "control-action.list"} and platform.system() == "Darwin":
+        if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "control-action.list"} and platform.system() == "Darwin":
+            expected = "operationUnavailable"
+        # Windows also routes tool selection through the shared missing-owner
+        # handler. Its HDC lifecycle and other control-action routes still use
+        # the foundation refusal; do not widen the macOS override to those.
+        if method == "runtime.tool.select" and platform.system() in {"Darwin", "Windows"}:
             expected = "operationUnavailable"
         if method in {"control-action.show", "control-action.reconcile"} and platform.system() == "Darwin":
             expected = "invalidInput"
@@ -483,7 +488,13 @@ def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpo
             expected = "operationUnavailable" if error_schema.is_valid("operationUnavailable") and detail_schema.is_valid({"phase": "workspaceProjectOwner", "newDispatchCount": 0}) else "internalError"
         if method in IMPORT_OWNER_METHODS:
             expected = missing_import_owner_error(method)
-        exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
+        answer = exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
+        if method == "runtime.tool.select" and platform.system() in {"Darwin", "Windows"}:
+            assert answer["error"] == {
+                "code": "operationUnavailable",
+                "message": "the Runtime tool-selection owner is unavailable",
+                "details": {"newDispatchCount": 0},
+            }, (method, answer)
     wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",
         encode(request(registry, "operation.describe", "descriptor-success", {"reference": reference})),
         "operation.describe")
