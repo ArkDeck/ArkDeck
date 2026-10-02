@@ -132,7 +132,7 @@ struct FlashRuntimeActivityView: View {
       .accessibilityIdentifier("flash.runtime.unavailable")
       Text(reason)
         .font(WorkspaceFont.monospacedValue)
-        .modifier(WorkspaceTextSelection())
+        .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
       Text(flashText("flash.runtime.unavailableNote"))
         .font(WorkspaceFont.caption)
@@ -271,7 +271,7 @@ struct FlashRuntimeActivityView: View {
         .accessibilityHidden(true)
       Text(entry)
         .font(.callout.monospaced())
-        .modifier(WorkspaceTextSelection())
+        .textSelection(.enabled)
         .fixedSize(horizontal: false, vertical: true)
     }
   }

@@ -586,21 +586,6 @@ struct WorkspaceFactRow: View {
   }
 }
 
-/// Preserve pointer/keyboard text selection while exposing the same full
-/// text through SwiftUI's static accessibility representation. Bridging a
-/// selectable AppKit text element into a changing SwiftUI hierarchy can
-/// recurse between AccessibilityNode.accessibilityLabel and AppKit AX role
-/// lookup on macOS 27. The representation has no native text bridge to query.
-struct WorkspaceTextSelection: ViewModifier {
-  func body(content: Content) -> some View {
-    content
-      .textSelection(.enabled)
-      .accessibilityRepresentation {
-        content.textSelection(.disabled)
-      }
-  }
-}
-
 /// `.textSelection(.enabled)` and `.textSelection(.disabled)` are different
 /// types, so the choice cannot be a ternary.
 private struct WorkspaceSelectableValue: ViewModifier {
@@ -609,7 +594,7 @@ private struct WorkspaceSelectableValue: ViewModifier {
   @ViewBuilder
   func body(content: Content) -> some View {
     if isEnabled {
-      content.modifier(WorkspaceTextSelection())
+      content.textSelection(.enabled)
     } else {
       content
     }
