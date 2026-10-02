@@ -74,7 +74,6 @@ jobs:
     timeout-minutes: 45
     env:
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
-      ARKDECK_UI_TEST_DERIVED_DATA: ${{ runner.temp }}/arkdeck-ui-tests
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -110,6 +109,8 @@ jobs:
           echo "runner display: $resolution"
           test "$resolution" = "1920x1080"
       - name: Run the App UI tests
+        env:
+          ARKDECK_UI_TEST_DERIVED_DATA: ${{ runner.temp }}/arkdeck-ui-tests
         run: |
           # pipefail matters here: the run is piped through tee for live
           # output, and without it the step would read tee's status instead of
