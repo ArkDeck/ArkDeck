@@ -201,8 +201,8 @@ design §G.4 也写明：快照恢复不能当作真实设备副作用的常规�
     在跑或停过都会留下）时用只读连接，可能在 `-shm` 里记下读标记（触碰）；没有 `-shm` 时用一条不写的读写连接，可能在
     索引旁新建空的 `-wal` 与新的 `-shm`（创建，与数据库同权限）；两种情况数据库字节都不变（run 记录 :111-115；
     `rust/crates/arkdeck-agentd/tests/cutover_preflight.rs:862`）。#2142、#2255 记录里「两遍都不写」说的是 owner 数据
-    （record、journal、索引行），不含这里的 `-wal`/`-shm`。能否接受由维护者判断（附录 B 第 19 条）；若要真正零写入
-    （例如以 immutable 方式打开、或先复制一份再读），是另一刀的设计取舍，列为待定。
+    （record、journal、索引行），不含这里的 `-wal`/`-shm`。文首 2026-09-28 裁决已接受这项行为；
+    本窗口不追加 immutable 打开或复制数据库的前置要求。
   - SQLite 报忙时不等待（busy timeout 为 0），直接记为 `unreadable` 的 `jobIndex`。
 - 停止判据：exit 非 0；`clear: false`；两遍之间 `blocks` 不同且差异不能由「刚好在跑的 Job 已结束」解释。
 - 失败时：按下表逐项处理，处理后重跑 1a，直到两遍都 `clear: true`。**`carriedOver` 里的 Job 不处理**：
