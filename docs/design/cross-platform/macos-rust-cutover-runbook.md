@@ -22,7 +22,7 @@ standalone Rust daemon，然后做正式验收。本文不另立验收规则，�
 |---|---|---|
 | P3 / Q11：发布包是否公证 | 需要 | 取代 09-24 受托裁决 Q11。App、Rust helper 对、ArkForge.bundle 与 DMG 全部 Developer ID 签名、hardened runtime、timestamp，经 `notarytool` 公证并 staple；签名与公证由维护者用自己的凭据执行。P3 的 `stapler validate` 与 `spctl` 从「仅在要求公证时」改为必做。 |
 | P4 / P5：Rust 性能基线、4h soak 是否为开窗条件 | 都不是 | 不因基线或 soak 推迟开窗；不在窗口所用提交上重跑 soak。 |
-| P7：ArkForge 摘要域 F1/F2 | 交 Agent 决定（无发布版本） | 决定：跟随 pinned ArkForge（`c1dc0553b42627581583abfba3fec34d13343282`）的 `arkforge/v1/usb-topology\0` 与 `arkforge/v1/admission-device-facts\0`，退役的 `device-facts` 域不保留、不做兼容。切换时**改用发布包里由同一 pin 构建的 ArkForge.bundle**（先复制出 DMG 到稳定路径，再显式传 `--arkforge-bundle`），不再沿用 live plist 的旧 bundle；回滚时旧 plist 带回旧 bundle 路径。 |
+| P7：ArkForge 摘要域 F1/F2 | 交 Agent 决定（无发布版本） | 决定：跟随 pinned ArkForge（`c1dc0553b42627581583abfba3fec34d13343282`）的 `arkforge/v1/usb-topology\0` 与 `arkforge/v1/admission-device-facts\0`，退役的 `device-facts` 域不保留、不做兼容。切换时**改用发布包里由同一 pin 构建的 ArkForge.bundle**（先复制出 DMG 到稳定路径，再显式传 `--arkforge-bundle`），不再沿用 live plist 的旧 bundle；故障恢复时显式传入留存的旧 bundle 路径（§4），update 不保留旧 plist。 |
 | P8：Swift 过渡版本与回滚包 | 都不需要 | 不发 Swift 过渡版，不另建 Swift 回滚构建。`$ROLLBACK` = 首次切换前由维护者 `ditto` 留存的安装态 helper（façade + Swift daemon）；`runtime service update` 另会把被替换的一代留在 `Helpers/.rollback`（`runtime_service_install.rs:1056-1091`，路径写进回执的 `cutover.rollbackBundlePath`，`:590-594`）。留存到 G5 报告为止（第 13 条）。 |
 | P9：新 App 的交付方式 | 发 DMG | DMG 含 `ArkDeck.app`、`ArkDeckCLI.app`（内含 Rust daemon helper）与 ArkForge.bundle；App 与 helper 同一版本号。 |
 | P10 / Q6、P11 / Q3：`REAL_DEVICE_PASS` 与 SPK-8 的环境 | 所有软件完成后，最后做真机验收 | 只有在阶段 S（全部软件，含删除 Swift runtime/CLI 与 façade，设计 r10 路线 C）完成、用公证发布候选版切换后的安装态纯 Rust daemon + Rust CLI 上的结果才算；SPK-8 在切换后的本机上做。开发根上的真机证据不计数。 |
@@ -43,12 +43,12 @@ standalone Rust daemon，然后做正式验收。本文不另立验收规则，�
 
 | 标记 | 谁 | 允许做什么 |
 |---|---|---|
-| 【维护者】 | 维护者本人 | 一切改动安装态的动作：`runtime service update`（内部会 `launchctl bootout/bootstrap`）、手工 `launchctl`、Developer ID 签名与公证、GJ-4 的 go、所有「窗口前必须裁决」的事项 |
+| 【维护者】 | 维护者本人 | 一切改动安装态的动作：`runtime service update`（内部会 `launchctl bootout/bootstrap`）、手工 `launchctl`、Developer ID 签名与公证、安排最终验收窗口及尚未裁决的事项 |
 | 【协调会话】 | Claude 协调会话 | 只读核实（git、源码、已提交记录）、比对输出、整理窗口记录；不改安装态、不跑 launchctl、不做设备 mutation |
 | 【Agent】 | 被派的子代理 | 同协调会话；另可在窗口后按记录起草 evidence 文件的 PR |
 
 Agent 与协调会话在窗口内**不执行**任何 `runtime service update|install|uninstall|restart`、`launchctl`，
-不执行设备 `agent run`（除非维护者当场授权，见第 5 步），也不改 trusted facts、capability、reservation、evidence
+本轮不执行设备 `agent run`；最终窗口按第 5 步与现行 Runtime authority 执行，不另设聊天确认。任何执行者都不改 trusted facts、capability、reservation、evidence
 记录（`AGENTS.md`「Agent 禁令与设备执行边界」）。本文里凡是这些命令，执行者一律是【维护者】。
 
 ### 0.2 变量
@@ -115,14 +115,14 @@ DMG 布局与安装步骤见 `docs/release/macos-install.md`；helper 对由 `bu
 | P1 | 切换所需 PR 已合入 protected `main`：production 组合 #2136/#2137、`runtime service status/verify --job/restart` #2141、§G.4 预检 #2142、`update/install/uninstall` 与无 `--job` 的 `verify` #2143、Rust `--analyze-crash-ledger` #2144、Bootstrap 注册表 #2216/#2217、Rust helper 打包 #2218、entitlements 口径 #2219、App 脱离 `ArkDeckWorkflows` #2139；GJ-4 用到的 M4 Flash 链（含 `flash install-binding` #2245、执行授权 #2252 等） | 【协调会话】`git fetch origin main && git log --oneline origin/main \| grep -E '\(#(2136\|2137\|2139\|2141\|2142\|2143\|2144\|2216\|2217\|2218\|2219\|2245\|2252\|2255)\)'`，逐条命中；M4 其余 PR 以 `evidence/macos-remaining.md` 仪表盘 M4 行为准 | 起草时列出的 14 个 PR 均已在 `main`（#2136 `51f8009df`、#2137 `86ea4d839`、#2139 `1267e465d`、#2141 `5b1df34ee`、#2142 `d41cc1fb1`、#2143 `527459240`、#2144 `ae404cc5c`、#2216 `c3c120513`、#2217 `3315a9cba`、#2218 `1dbe5acd0`、#2219 `167783bb1`、#2245 `61d95b10d`、#2252 `f9d6cac06`、#2255 `8acfe6900`）；窗口前按此重核，并补上之后合入的 M4/CLI 车道 PR |
 | P2 | #2255（S36：预检的 `loaderTransitionAwaitingBinding` 与 `retainedSessions` 两条拒绝）与 #2302（TASK-XPA-017 S3：`loaderTransitionsCoverTarget`）已合入 | 同上 grep `(#2255)`、`(#2302)` | #2255 已合入（`8acfe6900`），#2302 已合入（`092b45eb8`）。#2255 那条拒绝只拦 Swift 的 `bind-current-loader` 能结算的那一类（判据见其 run 记录 :79-86）；判据之外、停在 Loader 过渡上的 parked Flash Job 照旧原样带进 Rust，Rust daemon 启动时对单个这种过渡只打印一行「Loader transition … awaits settlement … its outcome stays unknown」并继续（`rust/crates/arkdeck-agentd/src/main.rs:385-395`，`rust/crates/arkdeck-hoststore/src/rockchip_startup.rs:86-90`）。**同一 target 上两个及以上会让 Rust daemon 起不来**（`rockchip_startup.rs:69-97`）的那一类，已由 #2302 的预检块 `loaderTransitionsCoverTarget` 按记录级谓词在切换前拒绝（exit 75，零改动，点名 Job；见第 1 步拒绝表与 `evidence/runs/TASK-XPA-017/preflight-loader-transitions-run.md`），不再需要窗口前逐个 `job show` 手工核对。被拒时照第 1 步表中该行处理 |
 | P3 | RC：维护者用 `scripts/release/build_macos_release.py release` 从**窗口所用 `main` 提交**构建、Developer ID 签名、公证并 staple 的 DMG（App、Rust helper 对、ArkForge.bundle；`docs/release/macos-install.md`），附 `release-receipt.json` | 【维护者】构建命令与只读验收命令照 `evidence/runs/TASK-XPA-017/rust-helper-packaging-run.md` §5：`codesign --verify --strict --deep`、`codesign -dv`（Identifier `com.arkdeck.agentd`、Team `8AQTYW5FKR`、hardened runtime、有 Timestamp）、`-R` 要求、`codesign -d --entitlements`（恰为 `ArkDeckAgent.entitlements` 三键，#2219）、`stapler validate` 与 `spctl`（必做；脚本在挂载的 DMG 上已跑一遍，receipt 记公证 submission id）、以及临时 home + 记录型 launchctl 下的 `runtime service update` 自检。注意 `check-rust-helpers.py` **只检查无签名的结构产物**（要求 ad hoc 签名与 `UNSIGNED-STRUCTURE-CHECK-ONLY.txt`），对签名发布包必然失败，不能当发布验收 | 维护者执行；Q11 已由 2026-09-28 裁决取代：必须公证（文首裁决节） |
-| P4 | 20b：Rust 性能基线 `perf-baseline-<date>-rust.json` 已在安静主机上采集并提交，两级 RSS 分开记，预算不提 | 【协调会话】`ls scripts/bench/baselines/` 有该文件且已在 `main` | 起草时只有 `perf-baseline-2026-09-04.json`（Swift）。是否以「基线已提交」为开窗条件，**窗口前必须由维护者裁决** |
-| P5 | 4h soak 绿 | 托管 4 小时 Rust soak run `36130214960`（#2185 之后），记录 `evidence/runs/TASK-XPA-025/snapshot-pager-bounded-run.md`；仪表盘 `evidence/macos-remaining.md` 的 Performance 行 | 已绿，但跑在较早的 `main` 上；是否要求在窗口所用提交上重跑，**窗口前必须由维护者裁决** |
+| P4 | Rust 性能基线 | 非开窗前置条件 | 2026-09-28 已决；不补跑已取消的前置门 |
+| P5 | 4h soak | 既有 run `36130214960` 仅保留历史结果 | 2026-09-28 已决；不要求在窗口所用提交上重跑 |
 | P6 | 签名 S-1/S-2 裁决与安装态签名预设 | 【维护者】只读检查 `test -e "$SUPPORT/Signing/OpenHarmony/preset-v1.json" && echo present`；`"$ARKDECK" runtime signing status --output json`。Rust CLI 已有凭据 owner；`install/update` 在任何安装改动前验证预设公开材料，在已安装 helper 验签后、bootstrap 前持锁刷新 daemon 指纹。缺失 envelope 或不能证明 helper 身份时刷新失败；不可读 envelope 不阻止仅写公开指纹，实际签名仍须读到 secret | 不再因存在预设而一律拒绝；无效材料仍 exit 69 且安装态不变，刷新失败则按 Swift 行为尝试启动已验证的新 helper 后 exit 1；恢复启动也失败时服务停着并报告两项错误，按下文失败阶段处理。`status|remove|install|migrate-deveco|install-sdk-release` 与身份刷新已有隔离测试；签名替换发布结果未知时保留 `replacingSecrets`/`removingSecrets` 与 pending account 跟踪，Rust/旧 Swift 均拒绝自动恢复；须通过 Rust 显式安装或移除恢复，不能删除 ledger 强制采用。SDK release 材料发布失败也保留有界目录跟踪并显式收尾；S-1/S-2 与真实 Keychain/GJ-5 验收仍待完成。见 `evidence/runs/TASK-XPA-017/signing-identity-refresh-run.md`；本项不构成安装窗口或设备操作批准 |
 | P7 | F1/F2（ArkForge 摘要域）与随包 `arkforged` 版本一致 | 已由 #2303（`e2f96a29b`）修复：Rust 改用 pinned `arkforge_core` 的 `Domain::UsbTopology` 与 `Domain::AdmissionDeviceFacts`（`rust/crates/arkdeck-provider-arkforge/src/loader.rs:38`、`authority.rs:428`），固定向量测试 `rust/crates/arkdeck-provider-arkforge/tests/digest_domain_vectors.rs`；Swift 的 `ArkForgeObservationSelection.swift`、`ArkForgeExecutionAuthority.swift` 同车改成新域；退役的 `arkforge/v1/device-facts` 域不保留（`evidence/runs/TASK-XPA-017/arkforge-digest-domains-run.md`）。源码 pin 为 `c1dc0553…`（`rust/Cargo.toml` 的 `arkforge-*` 行；`Packages/ArkDeckKit/Package.swift:46-48`）。**仓内没有 `arkforged` 二进制或版本的 pin**：daemon 用的是 `--arkforge-bundle` 指向的 `ArkForge.bundle`（`Contents/MacOS/arkforged`，manifest `version` 非空，`rust/crates/arkdeck-contract/src/arkforge_bundle.rs:295-296`、`:337`）。【维护者】用 RC DMG 里由同一 pin 构建的 bundle（`release-receipt.json` 的 `arkforge.builtRevision` 等于 pin），先复制出 DMG 再传路径 | 2026-09-28 已决（文首裁决节）并已实现。旧 bundle（如 `3f5b48cd` 编出、仍是 device-facts 域）与新 ArkDeck 不一致，Flash 选择与准入会 fail closed，切换时不得沿用 |
-| P8 | 过渡版本：是否先发一个带 #2204（workspace 墓碑，先删 preset 再删 project 后 daemon 起不来）、#2221（xcrun tool-shim 钉错工具）、#2227（macOS 27 上 update-feed 写入 EPERM）等已发布 Swift 缺陷修复的 Swift 版本 | 【协调会话】三者均已在 `main`（`9bd452b55`、`a9d840f0d`、`33c161b19`）；【维护者】核对 `$ROLLBACK` 的 Swift helper 是哪个提交构建的 | **窗口前必须由维护者裁决**。影响回滚：若 `$ROLLBACK` 不含 #2204，而 state 里已有「preset 已删、所指 project 也已删」的墓碑，回滚到它的 Swift daemon 会起不来（见 §3 第 7 步「不可逆与特别注意」） |
-| P9 | 新 App：脱离 `ArkDeckWorkflows` 的签名 App 构建已安装，版本与 helper 同一 release | 【维护者】App 的 `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` 与 helper Info.plist 一致（`check-rust-helpers.py:157-162` 对结构产物比的就是这对值）；App 与 daemon 同 release 才配对 | 由谁安装、是否嵌入 App / 发 DMG 属产品决策，**窗口前必须由维护者裁决**（`rust-helper-packaging-run.md` §6 第 3 条） |
-| P10 | Q6：只有 M5 切换之后、安装态纯 Rust daemon 上、用 Rust CLI 跑完整 runbook 的结果才算 `REAL_DEVICE_PASS` | 【协调会话】查维护者裁决记录 | G5 队列建议 A；未见裁决记录则**窗口前必须由维护者裁决** |
-| P11 | Q3：SPK-8 正向验收在什么环境做 | 同上 | 本 runbook 按「M5 切换之后在本机做」写（队列选项 C）；未裁决则**窗口前必须由维护者裁决** |
+| P8 | 保留切换前真实安装态 App、CLI、helper 与配套依赖 | 按 §4 离线核对来源、摘要、身份和旧版本的 state 兼容性 | 2026-09-28 已决：不发 Swift 过渡版、不另建回滚包。若旧 helper 不含 #2204 且已有相应墓碑，不能通过删记录让回滚通过 |
+| P9 | 新 App：脱离 `ArkDeckWorkflows` 的签名 App 构建已安装，版本与 helper 同一 release | 【维护者】App 的 `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` 与 helper Info.plist 一致（`check-rust-helpers.py:157-162` 对结构产物比的就是这对值）；App 与 daemon 同 release 才配对 | 2026-09-28 已决：发公证 DMG，由维护者在最终窗口安装 |
+| P10 | 当前 Catalog digest 上的安装态纯 Rust GJ-1～5 | 第 5 步与验收指南 | 2026-09-28 已决；软件和 RC 完成之后才执行，不把先前开发根或模拟结果计入 |
+| P11 | SPK-8 正向、负向及 App 呈现 | 第 4 步的已签名 App 与安装态 Rust daemon | 2026-09-28 已决：在最终切换后的本机执行 |
 | P12 | 备份 | 见下方「备份建议」 | 维护者执行 |
 | P13 | 窗口条件：本机无其他 UI 跑道、无重构建（`cargo`、`xcodebuild`、`plan.py`）；DAYU200 已连且处于 hdc-normal；GJ 输入物料就位（headless runbook §1）；无阻断态 Job | 【维护者】`pgrep -fl 'xcodebuild\|cargo\|plan.py'` 为空；headless runbook §1 的前置命令；§3 第 1 步的预检 | — |
 
@@ -424,8 +424,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 App 冒烟（Overview/History）与 headless CLI 演练；另一 release 的 daemon 应报不匹配与补救、不挂起」。
 r10/r11 的 `verification.md:43`、`:73` 把 XPA-AC-9 解释为「在 M5 一次切换中满足（§G.4 预检、快照摘要、
 façade bundle 保留一个周期）」，并写明「no same-release Swift rollback」；design §G.4「故障退出」也写明开发版本
-修复后重启即可、不要求切回 Swift。两者对「本窗口是否真的切回 Swift 再切回来」不一致：**演练做不做、做到哪一层，
-窗口前必须由维护者裁决**。下面给出完整做法，供裁决后执行。
+修复后重启即可、不要求切回 Swift。早期文字的冲突已由 2026-09-28 裁决解决：本演练不执行。以下保留历史故障分析参考。
 
 - 执行者：【维护者】本人（两次安装态切换）。
 - 前提：第 5、6 步的记录已落盘；1a 手工预检（此时用 `$HELPER` 里的 Rust agentd）`clear: true`。Rust→Swift 的
@@ -522,7 +521,7 @@ App 与旧版 daemon 通过版本绑定。先检查旧 helper 能否读取现有
     `$HELPER`、`$ROLLBACK` 可执行文件的 SHA-256 与 `codesign -dv` 的 Identifier/TeamIdentifier；
   - P1–P13 的核实结果与各项裁决的出处；
   - 每个 `BLOCKED_BY_PRODUCT_DEFECT` 的脱敏原文、Runtime 引用与复现 argv；
-  - 回滚演练的每项核实结果。
+  - 若实际触发故障恢复，记录每项核实结果；未执行的回滚演练不记为通过。
 - 不写：secret、钥匙串条目、provisioning profile 内容、notarytool 凭据名以外的账户信息；设备序列号、connectKey、
   原始设备输出；个人路径。原始输出留在 `$OUT`，不入仓。
 

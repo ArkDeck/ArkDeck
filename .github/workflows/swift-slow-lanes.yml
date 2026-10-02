@@ -33,6 +33,7 @@ on:
     paths:
       - "ArkDeckApp/**"
       - "ArkDeckAppUITests/**"
+      - "ArkDeck.xcodeproj/**"
       - ".github/workflows/swift-slow-lanes.yml"
   schedule:
     # 18:00 UTC nightly (02:00 UTC+8), off the interactive working day.
@@ -48,6 +49,13 @@ on:
         options:
           - ui-tests
           - all
+      scope:
+        description: UI test selection; scheduled runs always run the full lane.
+        type: choice
+        default: all
+        options:
+          - all
+          - runtime-migration
 
 permissions:
   contents: read
@@ -111,6 +119,7 @@ jobs:
       - name: Run the App UI tests
         env:
           ARKDECK_UI_TEST_DERIVED_DATA: ${{ runner.temp }}/arkdeck-ui-tests
+          UI_TEST_SCOPE: ${{ github.event_name == 'push' && 'runtime-migration' || inputs.scope || 'all' }}
         run: |
           # pipefail matters here: the run is piped through tee for live
           # output, and without it the step would read tee's status instead of
@@ -143,6 +152,16 @@ jobs:
           set -- \
             -skip-testing:ArkDeckHDCUITests/HDCStatusUITests/testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe \
             -skip-testing:ArkDeckHDCUITests/ViewerUITests/testSelectingADeepWideRowCentersItInBothTreeAxes
+          # Branch pushes reproduce the three migration regressions. Nightly
+          # runs and the default manual scope retain the complete UI suite.
+          # These are selections, not exclusions or retries of failed tests.
+          if [ "$UI_TEST_SCOPE" = runtime-migration ]; then
+            set -- "$@" \
+              -only-testing:ArkDeckHDCUITests/AppShellUITests/testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment \
+              -only-testing:ArkDeckHDCUITests/AppShellUITests/testEnglishSweepOfEveryWorkspace \
+              -only-testing:ArkDeckHDCUITests/AppShellUITests/testHistoryKeyboardCommandsFollowVisibleWorkspace
+          fi
+          echo "UI test scope: $UI_TEST_SCOPE" >> "$GITHUB_STEP_SUMMARY"
           log="$RUNNER_TEMP/ui-tests.log"
           if sh scripts/ci/run-ui-tests.sh "$@" 2>&1 | tee "$log"; then
             exit 0
@@ -154,16 +173,24 @@ jobs:
           else
             exit 1
           fi
-      - name: Keep UI test results and crash diagnostics
+      - name: Keep UI crash diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: macos-ui-diagnostics-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/ui-tests.log
+            ~/Library/Logs/DiagnosticReports/ArkDeck*.ips
+            ~/Library/Logs/DiagnosticReports/ArkDeck*.crash
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Keep full UI test results
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
         with:
           name: macos-ui-tests-${{ github.sha }}-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/ui-tests.log
             ${{ runner.temp }}/arkdeck-ui-tests/Logs/Test/
-            ~/Library/Logs/DiagnosticReports/ArkDeck*.ips
-            ~/Library/Logs/DiagnosticReports/ArkDeck*.crash
           if-no-files-found: warn
           retention-days: 14
       - name: Summary
@@ -174,5 +201,5 @@ jobs:
           echo "gate only builds this target, so this is the only place its" >> "$GITHUB_STEP_SUMMARY"
           echo "assertions run — minus two cases that need a real display and" >> "$GITHUB_STEP_SUMMARY"
           echo "a real HDC toolchain, which stay local. Red here = file a" >> "$GITHUB_STEP_SUMMARY"
-          echo "assertions run. Red here = file a product defect; this job is" >> "$GITHUB_STEP_SUMMARY"
+          echo "product defect; this job is" >> "$GITHUB_STEP_SUMMARY"
           echo "not a merge gate. Reproduce with scripts/ci/run-ui-tests.sh." >> "$GITHUB_STEP_SUMMARY"
