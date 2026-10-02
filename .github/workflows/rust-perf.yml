@@ -134,7 +134,7 @@ jobs:
         working-directory: rust
         run: |
           set -eu
-          rustup toolchain install --profile minimal --no-self-update
+          rustup toolchain install stable --profile minimal --no-self-update
           rustup show active-toolchain
           rustc --version
           cargo --version
@@ -229,7 +229,7 @@ jobs:
         working-directory: rust
         run: |
           set -eu
-          rustup toolchain install --profile minimal --no-self-update
+          rustup toolchain install stable --profile minimal --no-self-update
           rustup show active-toolchain
           rustc --version
           cargo --version

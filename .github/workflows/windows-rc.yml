@@ -75,7 +75,7 @@ jobs:
         working-directory: rust
         run: |
           set -eu
-          rustup toolchain install --profile minimal --no-self-update
+          rustup toolchain install stable --profile minimal --no-self-update
           rustc --version
           cargo --version
 

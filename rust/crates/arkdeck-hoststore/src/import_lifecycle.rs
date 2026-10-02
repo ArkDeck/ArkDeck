@@ -94,7 +94,7 @@ impl ImportUploadStore {
                 .map_err(|_| released())?;
         }
         let token = NEXT_USE
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
             .map_err(unreadable)?
             .to_string();
         uses.insert(token.clone(), references.to_vec());

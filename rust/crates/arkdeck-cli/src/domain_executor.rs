@@ -477,10 +477,8 @@ impl Pending {
             {
                 return None;
             }
-            for key in ["resolvedAtUTC"] {
-                if let Some(Some(value)) = optional(action, key) {
-                    value.as_str()?;
-                }
+            if let Some(Some(value)) = optional(action, "resolvedAtUTC") {
+                value.as_str()?;
             }
             if let Some(Some(options)) = optional(action, "selectionOptions")
                 && !options.as_array()?.iter().all(Value::is_string)

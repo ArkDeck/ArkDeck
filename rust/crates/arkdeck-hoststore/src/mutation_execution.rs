@@ -65,7 +65,7 @@ impl JobRunner<'_> {
             .authority
             .holds
             .mutation_reservation_guard()
-            .map_err(&reject)?;
+            .map_err(reject)?;
         let dispatcher = self
             .hdc
             .ok_or_else(|| reject("Runtime HDC owner unavailable".into()))?;
@@ -237,7 +237,7 @@ impl JobRunner<'_> {
             .authority
             .holds
             .mutation_reservation_guard()
-            .map_err(&reject)?;
+            .map_err(reject)?;
         owner
             .authority
             .require_state(self.jobs)
@@ -617,7 +617,7 @@ impl<'a> JobRunner<'a> {
             .authority
             .holds
             .mutation_reservation_guard()
-            .map_err(&reject)?;
+            .map_err(reject)?;
         let dispatcher = self
             .hdc
             .ok_or_else(|| reject("Runtime HDC owner unavailable".into()))?;
