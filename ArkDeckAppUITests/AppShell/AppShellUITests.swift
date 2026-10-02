@@ -422,6 +422,9 @@ final class AppShellUITests: XCTestCase {
       app.typeKey("f", modifierFlags: .command)
       app.typeText("job-fixture-0001")
       XCTAssertEqual(search.value as? String, "job-fixture-0001")
+      if !element("history.detail.job", in: app).exists {
+        print("History keyboard fixture hierarchy: \(app.debugDescription)")
+      }
       assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-0001")
       app.typeKey("a", modifierFlags: .command)
       app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
@@ -3302,7 +3305,11 @@ final class AppShellUITests: XCTestCase {
   /// SwiftUI renders most of these strings into the accessibility *value*, and
   /// section headings into the label, so both are considered.
   private func displayedValues(for element: XCUIElement) -> [String] {
-    [element.label, element.value as? String].compactMap { $0 }
+    // A filtered detail can leave the hierarchy before its replacement is
+    // inserted. Reading label/value on a missing element raises an XCTest
+    // snapshot failure before assertDisplayed can evaluate its predicate.
+    guard element.exists else { return [] }
+    return [element.label, element.value as? String].compactMap { $0 }
   }
 
   private func displayedText(for element: XCUIElement) -> String {
