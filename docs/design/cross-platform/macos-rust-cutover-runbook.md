@@ -61,6 +61,9 @@ ARKDECK="$RUST_OUT/ArkDeckCLI.app/Contents/MacOS/arkdeck"            # Rust CLI
 HELPER="$RUST_OUT/ArkDeckCLI.app/Contents/Helpers/ArkDeckAgent.app"  # Rust daemon bundle
 ROLLBACK=<首次切换前维护者 ditto 留存的安装态 helper>                 # Swift daemon + façade；见文首裁决节 P8
 OLD_ARKDECK=<当前安装态配套的 Swift CLI>          # 例如 Toolchains/arkdeck-helpers-main-<sha>/ArkDeckCLI.app/Contents/MacOS/arkdeck
+FORGE=<从最终 RC 复制到稳定版本目录的 ArkForge.bundle 绝对路径>
+ROLLBACK_FORGE=<切换前 ArkForge.bundle 的稳定路径或 none>
+ROLLBACK_TRACE=<切换前 ArkTrace descriptor 的绝对路径或 none>
 HDC=<当前已验证 HDC 的绝对路径>                    # 从切换前的 runtime hdc status 的 executablePath 读
 OUT=/private/tmp/arkdeck-cutover-<YYYYMMDD>        # 原始输出目录，不入仓
 SUPPORT="$HOME/Library/Application Support/ArkDeck"
@@ -247,7 +250,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 
   ```sh
   "$ARKDECK" runtime service update --daemon "$HELPER" --hdc "$HDC" \
-    --arktrace-descriptor <现值的绝对路径或 none> --output json \
+    --arktrace-descriptor <现值的绝对路径或 none> --arkforge-bundle "$FORGE" --output json \
     > "$OUT/02-update.json" 2> "$OUT/02-update.err"; echo "exit=$?"
   ```
 
@@ -382,7 +385,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 
 ### 第 5 步：GJ-1…GJ-5 `REAL_DEVICE_PASS`（约 70 分钟）
 
-- 执行者：【维护者】执行设备命令（或维护者当场授权的执行方式）；GJ-4 需维护者明确的 go；【协调会话】核对判据与整理记录。
+- 执行者：【维护者】安排最终验收窗口；操作通过已发布 typed Runtime 入口执行，【协调会话】核对判据与整理记录。GJ-4 不额外引入聊天确认或人工 grant，准入依现行 Runtime authority。
 - 做法：照 [headless GJ runbook](../cli-golden-journey-headless-runbook.md) §1–§6 原样执行，`arkdeck` 一律是
   `$ARKDECK`（Rust CLI），不用 Swift CLI；每条 Journey 用 `agent run --operation <id@version>`，人工动作后
   `agent resume`（[验收指南](../../../scripts/agent-guides/acceptance.md)）。headless 路径缺失或失败即
@@ -393,7 +396,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 - GJ-1：runbook §2 与 §2.1（HAR crash-resume）；成功后 `"$ARKDECK" runtime service verify --job <observe-job-id> --output json`
   读回同一份结果（runbook §1 最后一段）。
 - GJ-2、GJ-3：runbook §3、§4。
-- GJ-4：runbook §5，**维护者 go 之后**才开始；P7 裁决未放行时不开始。若需要命名 campaign，runbook §5 的
+- GJ-4：runbook §5；须满足当前 Catalog policy、fresh trusted facts、完整 materialized plan 与 RuntimeCapability，缺证明时零新 dispatch。若需要命名 campaign，runbook §5 的
   `runtime service update … --arkforge-campaign` 在 Rust daemon 上也会重跑预检（每次装 Rust daemon 都跑，含 Rust→Rust）
   并重启 daemon，前提是没有在途 Job，且须通过 P6 的预设公开材料校验与 helper 身份刷新。这里的 `--daemon` 传已安装 helper 本身
   `"$SUPPORT/Helpers/ArkDeckAgent.app"`（与 `$HELPER` 同一份已验证字节），`.rollback` 里的 Swift helper 才不会被 Rust helper
@@ -410,7 +413,9 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
   GJ-1 的 Job ID）。缺前提得到的 `XCTSkip` 记「未执行」。
 - 记录：逐测试 `pass` / `fail` / `未执行`，附完整命令与 `xcresult` 路径；不套用 Journey 四态。
 
-### 第 7 步：回滚演练（XPA-AC-9，约 30 分钟）
+### 第 7 步：历史回滚演练（不执行）
+
+文首裁决已取消该演练；以下旧步骤仅供故障分析，不是验收窗口清单。故障恢复以 §4 的输入物料与显式配置为准。
 
 > 2026-09-28 裁决后本步**不执行**（见文首裁决节，附录 B 第 10 条）。下文保留作切换失败时回到 `$ROLLBACK` 的参考。
 
@@ -433,7 +438,7 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 
   ```sh
   "$ARKDECK" runtime service update --daemon "$ROLLBACK" --hdc "$HDC" \
-    --arktrace-descriptor <同第 2 步> --output json \
+    --arktrace-descriptor "$ROLLBACK_TRACE" --arkforge-bundle "$ROLLBACK_FORGE" --output json \
     > "$OUT/07-rollback.json" 2> "$OUT/07-rollback.err"; echo "exit=$?"
   ```
 
@@ -475,14 +480,27 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 
 ## 4. 回滚预案（窗口中任一步失败时）
 
+切换前由维护者在离线可用的位置保留旧 App、CLI、独立的 `$ROLLBACK` helper 副本、旧 ArkForge bundle、
+ArkTrace descriptor 及其引用的发行物、原 plist 和 install receipt，并保存其摘要、版本、Identifier 与 Team。
+保存目录不能位于会被下一次 update 轮换的 `Helpers/.rollback` 内；只留快照摘要不构成备份。
+新 RC 按安装说明的 `build_macos_release.py verify` 核对可信 run 的 revision/DMG 摘要，再在 Mac 上验签与
+检查 staple。旧 helper 用 `codesign --verify --strict --deep` 及原先记录的身份要求离线复核；源文件、
+摘要或身份不一致即停止，不下载或临时构建一个替代回滚包。
+
+恢复命令必须显式传 `$ROLLBACK_TRACE`、`$ROLLBACK_FORGE`，不能省略后沿用已经切换过的 live plist。
+如切换前配置含 ArkForge campaign，核对旧配置与现行 Runtime 安全条件后，同传
+`--arkforge-campaign <原值>`；未知值不得猜测。App 也须恢复到与旧 helper 匹配的保留版本，不能期待新版
+App 与旧版 daemon 通过版本绑定。先检查旧 helper 能否读取现有 durable 状态：已知不兼容或设备 outcome
+不确定时停止新 dispatch，保持记录，不用 state 备份覆盖真实事实。临时 home 的 bootstrap 失败与显式
+恢复测试只证明软件路径；真实安装态恢复尚未验收。
+
 | 失败发生在 | 状态 | 做什么 |
 |---|---|---|
 | 第 0、1 步 | 什么都没改 | 按表处理后重来，或关窗口 |
 | 第 2 步 update 非 0 退出 | 取决于失败阶段，见第 2 步「失败时」表 | 读 `02-update.err` 原文，按该表判断阶段；`"$ARKDECK" runtime service status` 看 `launchAgent.ready` 与 `ProgramArguments`；旧服务健康则按原文处理后重跑第 1、2 步或关窗口；旧服务停着且 plist 未改则由【维护者】bootstrap 旧 plist；中间态见下一行 |
-| 第 2 步成功，但 Rust daemon 起不来（第 3 步 `socket_absent`、崩溃循环）；或第 2 步在快照之后失败（中间态） | 安装态已是 Rust，或处于中间态 | 【维护者】先 `launchctl bootout gui/$(id -u)/com.arkdeck.agentd` 止住循环；读 `agentd.error.log`；用 `"$ARKDECK" runtime service update --daemon "$ROLLBACK" --hdc "$HDC" --arktrace-descriptor <同第 2 步> --output json` 回到 Swift（`$ROLLBACK` 的 Swift daemon 在解析参数时就以 exit 64 拒绝 `--cutover-preflight`，不碰 state，update 据此判为 Swift、不走预检门：`Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift:183-203`、`rust/crates/arkdeck-cli/src/runtime_service_install.rs:837`；第 7 步的前提、签名预设限制与核实同样适用；这条路径是按源码推出的，见附录 B 第 18 条）；不改 state |
+| 第 2 步成功，但 Rust daemon 起不来（第 3 步 `socket_absent`、崩溃循环）；或第 2 步在快照之后失败（中间态） | 安装态已是 Rust，或处于中间态 | 【维护者】先 `launchctl bootout gui/$(id -u)/com.arkdeck.agentd` 止住循环；读 `agentd.error.log`；用 `"$ARKDECK" runtime service update --daemon "$ROLLBACK" --hdc "$HDC" --arktrace-descriptor "$ROLLBACK_TRACE" --arkforge-bundle "$ROLLBACK_FORGE" --output json` 回到 Swift（`$ROLLBACK` 的 Swift daemon 在解析参数时就以 exit 64 拒绝 `--cutover-preflight`，不碰 state，update 据此判为 Swift、不走预检门：`Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift:183-203`、`rust/crates/arkdeck-cli/src/runtime_service_install.rs:837`；第 7 步的前提、签名预设限制与核实同样适用；这条路径是按源码推出的，见附录 B 第 18 条）；不改 state |
 | 第 3–6 步功能缺陷 | 安装态 Rust，daemon 健康 | 记 `BLOCKED_BY_PRODUCT_DEFECT`（原文、Runtime 引用、复现 argv）。两种走法由维护者当场定：(a) 停在 Rust，停止新执行、保留状态，修复后更新 Rust helper 再验（design §G.4「故障退出」）；(b) 回到 Swift（同上一行命令） |
 | 任何一步出现真实设备不确定状态 | — | 只读回；只有 `POL-RECOVERY-001` 的完整机械证明成立时 Runtime 才能独立完整覆写恢复；缺证明时零新 dispatch。**不**为此回滚、不换 state 目录、不从备份恢复 |
-| 第 7 步回滚演练失败 | 安装态 Swift 或半途 | 切回 Rust（第 2 步命令），不改 state，记录原文，交维护者裁决 |
 
 任何情况下都不做：删除或手改 state 目录里的记录；用 Time Machine/拷贝恢复 state 去「撤销」设备副作用；手工创建或
 修改 capability、trusted facts、reservation、evidence；绕过 Provider 的 raw HDC 或刷机命令。
