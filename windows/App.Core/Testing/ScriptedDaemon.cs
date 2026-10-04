@@ -261,8 +261,8 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     "runtime.hdc.status" => Success(request, Parse(HdcStatusJson)),
                     "runtime.tool.list" => Success(request, Parse(ToolPageJson)),
-                    "runtime.storage.status" => Success(request, Parse(StorageJson)),
-                    "trace.cache.status" => Success(request, Parse(TraceCacheJson)),
+                    _ when method.StartsWith("runtime.storage.", StringComparison.Ordinal) || method.StartsWith("trace.cache.", StringComparison.Ordinal) =>
+                        SettingsRoute(request, method) ?? Failure(request, "rejected", "not scripted"),
                     _ => Failure(request, "rejected", "not scripted"),
                 },
             };
@@ -973,13 +973,6 @@ public static partial class ScriptedDaemon
         {"hasMore":false,"items":[{"contentDigest":"2222222222222222222222222222222222222222222222222222222222222222","contentRetained":true,"contentSchemaVersion":"1","digestAlgorithm":"sha256","generation":"1","kind":"hdc","platform":"windows-x64","references":[],"schemaVersion":"arkdeck.runtime-tool/1","selected":true,"source":"registered","state":"active","toolRef":"tool-hdc-3.2.0f","trust":{"codeDirectoryIdentitySHA256":null,"executionAssessment":"accepted","platformTrust":"trusted","policy":"registered","profileReferences":[],"registeredIdentity":true,"signature":"valid","signingIdentifier":null,"teamIdentifier":null,"toolVersion":"3.2.0f","versionSource":"probe"}}],"nextCursor":null,"order":"registeredAtAscToolRefAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"0f5e0c1a-0000-4000-8000-000000000002"}
         """;
 
-    private const string StorageJson = """
-        {"artifactDomain":{"policy":"runtimeManaged","remainingBytes":"9663676416","rootReference":"runtime-artifacts","schemaVersion":"arkdeck.runtime-artifact-storage/1","totalBytes":"10737418240","usedBytes":"1073741824"},"schemaVersion":"arkdeck.runtime-storage-status/1","sessionDomain":{"catalogGeneration":null,"generation":"1","policy":{"retentionDays":"30","safetyMarginBytes":"1073741824","totalQuotaBytes":"21474836480"},"rootKind":"default","rootPath":"C:\\Users\\Example\\AppData\\Local\\ArkDeck\\Sessions","schemaVersion":"arkdeck.session-storage/1","usage":{"measurementIncomplete":false,"pinnedBytes":"4096","pinnedSessionCount":"1","sessionCount":"3","unaccountedSessionCount":"0","usedBytes":"123456"}}}
-        """;
-
-    private const string TraceCacheJson = """
-        {"activeEntryCount":1,"entryCount":2,"inactiveEntryCount":1,"purgeScope":"inactiveDerivedEntries","schemaVersion":"arkdeck.trace-cache-status/1","totalByteCount":"65536"}
-        """;
 
     private static string Sha256Hex(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 

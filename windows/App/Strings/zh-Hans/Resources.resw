@@ -6238,4 +6238,120 @@ SHA-256：%4$@</value>
     <value>用只读窗口清单检查 hidumper</value>
     <comment>windows.overview.hdc.checkHidumper (Windows only)</comment>
   </data>
+  <data name="settings_storage_chooseRoot" xml:space="preserve">
+    <value>选择目录…</value>
+    <comment>settings.storage.chooseRoot (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_days" xml:space="preserve">
+    <value>天</value>
+    <comment>settings.storage.days (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_futureJobs" xml:space="preserve">
+    <value>更换根目录只影响新任务；已有 Session 不会被移动或删除。</value>
+    <comment>settings.storage.futureJobs (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_gib" xml:space="preserve">
+    <value>GiB</value>
+    <comment>settings.storage.gib (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_location" xml:space="preserve">
+    <value>Session 位置</value>
+    <comment>settings.storage.location (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_policy" xml:space="preserve">
+    <value>保留策略</value>
+    <comment>settings.storage.policy (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_policyDetail" xml:space="preserve">
+    <value>安全余量必须小于总配额；策略保存前会校验配置代次。</value>
+    <comment>settings.storage.policyDetail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_resetRoot" xml:space="preserve">
+    <value>恢复默认</value>
+    <comment>settings.storage.resetRoot (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_rootSource" xml:space="preserve">
+    <value>来源</value>
+    <comment>settings.storage.rootSource (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_rootSource_custom" xml:space="preserve">
+    <value>用户选择的目录</value>
+    <comment>settings.storage.rootSource.custom (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_save" xml:space="preserve">
+    <value>保存策略</value>
+    <comment>settings.storage.save (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_selectionError" xml:space="preserve">
+    <value>无法选择存储目录，请重新选择。</value>
+    <comment>settings.storage.selectionError (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_validationError" xml:space="preserve">
+    <value>请输入大于零的整数，并确保总配额大于安全余量。</value>
+    <comment>settings.storage.validationError (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_saving" xml:space="preserve">
+    <value>正在保存</value>
+    <comment>settings.common.saving (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_working" xml:space="preserve">
+    <value>正在处理</value>
+    <comment>settings.common.working (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_settings_storage_rootSource_default" xml:space="preserve">
+    <value>本地应用数据默认位置</value>
+    <comment>windows.settings.storage.rootSource.default (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_alreadyDefault" xml:space="preserve">
+    <value>会话根目录已是默认位置。</value>
+    <comment>windows.settings.storage.alreadyDefault (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_confirmPolicy" xml:space="preserve">
+    <value>保存总配额 %1$@、安全余量 %2$@、保留 %3$lld 天？Runtime 会对照它上次报告的设置检查。</value>
+    <comment>windows.settings.storage.confirmPolicy (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_confirmRoot" xml:space="preserve">
+    <value>将新会话存放在 %@？Runtime 会在使用前检查该文件夹。</value>
+    <comment>windows.settings.storage.confirmRoot (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_confirmReset" xml:space="preserve">
+    <value>重新将新会话存放在默认位置？</value>
+    <comment>windows.settings.storage.confirmReset (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_useFolder" xml:space="preserve">
+    <value>使用此文件夹</value>
+    <comment>windows.settings.storage.useFolder (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_refused" xml:space="preserve">
+    <value>Runtime 未保存此项</value>
+    <comment>windows.settings.storage.refused (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_superseded" xml:space="preserve">
+    <value>其他写入方先修改了存储设置。未保存任何内容；现显示 Runtime 当前的设置。</value>
+    <comment>windows.settings.storage.superseded (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_saved" xml:space="preserve">
+    <value>已由 Runtime 保存。</value>
+    <comment>windows.settings.storage.saved (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purge" xml:space="preserve">
+    <value>清除未使用的条目</value>
+    <comment>windows.settings.trace.purge (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeConfirm" xml:space="preserve">
+    <value>移除 %lld 个未在使用的派生 Trace 数据库？正在使用的条目和原始 Trace 文件不会被移除。</value>
+    <comment>windows.settings.trace.purgeConfirm (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeDone" xml:space="preserve">
+    <value>已移除 %lld 个未使用的条目。</value>
+    <comment>windows.settings.trace.purgeDone (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeFailed" xml:space="preserve">
+    <value>Runtime 未清除缓存</value>
+    <comment>windows.settings.trace.purgeFailed (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeNote" xml:space="preserve">
+    <value>只清除未在使用的派生数据库。原始 Trace 文件从不是缓存对象。</value>
+    <comment>windows.settings.trace.purgeNote (Windows only)</comment>
+  </data>
 </root>
