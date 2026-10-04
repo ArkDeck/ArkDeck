@@ -957,6 +957,42 @@ fn already_running(root: &StateRoot) -> Result<Start, String> {
     }
 }
 
+/// The guard is held by another daemon: Swift's second instance answer when
+/// this root's instance document names it. When it does not (a daemon of
+/// another root that shares this guard and pipe, as the account's daemon of
+/// another profile does), the start is refused naming the guard, the pipe
+/// and the process that serves it, so the holder can be found.
+fn guard_held(
+    root: &StateRoot,
+    scope: &arkdeck_platform::InstanceScope,
+    endpoint: &LocalEndpoint,
+) -> Result<Start, String> {
+    if let Some(instance) = read_instance(root) {
+        return Ok(Start::AlreadyRunning(instance));
+    }
+    let served = match arkdeck_platform::pipe_server_pid(endpoint) {
+        Ok(Some(pid)) => format!(
+            ", and its pipe {} is served by pid {pid}",
+            endpoint.as_path().display()
+        ),
+        Ok(None) => format!(
+            ", and its pipe {} is not served",
+            endpoint.as_path().display()
+        ),
+        Err(error) => format!(
+            ", and the process serving its pipe {} is unknown: {error}",
+            endpoint.as_path().display()
+        ),
+    };
+    Err(format!(
+        "another Runtime holds this daemon's single-instance guard {}{served}; it left no \
+         instance document in the state root {}, so it serves another root; nothing was \
+         started",
+        scope.guard_name(),
+        root.path().display()
+    ))
+}
+
 /// Decides the composition and, for one that owns a state root, takes it
 /// (see the module's documentation).
 pub(crate) fn start(
@@ -1017,7 +1053,7 @@ pub(crate) fn start(
         .map_err(|error| unusable("the single-instance guard", error))?
     {
         GuardAcquisition::Owned { guard, abandoned } => (guard, abandoned),
-        GuardAcquisition::Held => return already_running(&root),
+        GuardAcquisition::Held => return guard_held(&root, &scope, &expected),
     };
     let Some(owner) = root
         .lock_owner()

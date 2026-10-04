@@ -128,7 +128,7 @@ pub use windows::{
     Latch, ListenerLock, LocalConnection, LocalListener, LoopbackServerLease, ManagedServer,
     OWNER_ONLY_REMEDY, OwnerLock, PortHolder, Readiness, SingleInstanceGuard, StarterLock,
     StateRoot, StopSignal, await_pipe_instance, default_user_endpoint, end_proved_process,
-    pipe_present, port_holders, send_console_break, verify_daemon_image,
+    pipe_present, pipe_server_pid, port_holders, send_console_break, verify_daemon_image,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
