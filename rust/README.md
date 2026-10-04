@@ -48,6 +48,10 @@ On Windows two things run there:
   the Windows lifecycle and composition (`windows_lifecycle`) and is copied and
   signed with the development signer. It serves a development root on its pipe,
   and the real `arkdeck.exe` drives it with the production peer check.
+  `gj23_replay.rs` drives both GJ-2/3 oracles (63 and 40 exchanges) through it.
+  For that, the test daemon alone takes three inputs: the oracle's clock, the
+  replay root's own Job state as the mutation root, and the recorded code-sign
+  helper's facts.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
@@ -1557,8 +1561,16 @@ oracle's, and the plan digests and every value derived from them (capability
 IDs and fingerprints, receipts, outcome and record hashes, Journal seals,
 manifest digests) through the same one-to-one relabelling; an entry's mode is
 read from its DACL (`700` for a private directory, `600` for an owner-only
-document). The Windows daemon still composes no HDC and admits none of these
-Jobs: this is host code against a test fake, never the daemon's dispatch.
+document).
+
+The same two oracles also replay end to end through the daemon. In agentd's
+`tests/spawning/gj23_replay.rs`, the real signed `arkdeck.exe` sends every
+recorded exchange to the signed test daemon. That daemon is the production
+Windows development-root composition, with the fake given through a seam that
+exists in test builds only. The test reads the same things with the same
+relabelling, and both replays match. The production Windows daemon composes an
+HDC only for a registered Windows HDC tuple. Until one is registered, it still
+refuses these Jobs before admission.
 
 ## Job run (TASK-XPA-014)
 
@@ -2646,11 +2658,8 @@ well.
   observations stay `unknown`. `healthyCheckserver` is no
   registered Windows probe (`checkserver` starts a server when none runs);
   Windows server health is the commandless `runtime.hdc.status` observation.
-  Catalog lowering is unchanged here: `observe.device`'s `probeHDCServer`
-  still lowers to `checkserver`, and on Windows it reaches only the managed
-  development HDC, whose dispatch first proves its own launched server is
-  current. Porting that step to the commandless observation is
-  TASK-XPA-005's adoption. `tests/windows_hdc_registration.rs`
+  `observe.device`'s `probeHDCServer` lowers to that commandless
+  observation on a registered Windows tuple (TASK-XPA-005, below). `tests/windows_hdc_registration.rs`
   closes the table and grammar on `openspec/integrations/openharmony/
   windows-probes.yaml`, `rust/tests/fixtures/hdc-windows/` and the lock. No
   consumer reads the Windows grammar yet (CHG-2026-074 TASK-XPA-004/005);
@@ -2674,8 +2683,19 @@ well.
   mutex file and exits 0), and a server receipt's `\\?\` image path is
   compared in the plain spelling. `windows_hdc_live_process.rs` runs the
   real daemon and CLI over the registered `hdc.exe`
-  (`ARKDECK_LIVE_WINDOWS_HDC`). Jobs still reach no HDC on Windows, so
-  `probeHDCServer`'s commandless lowering waits for Windows Job execution.
+  (`ARKDECK_LIVE_WINDOWS_HDC`).
+- `probeHDCServer` on a registered Windows tuple (TASK-XPA-005, WHR-002's open
+  point): the step is the commandless server observation
+  (`serverIdentityGeneration`, `HdcDispatch::observe_server`), never
+  `checkserver`. `ProcessDispatch` observes its pinned executable's own
+  listener at the tuple's endpoint (`CommandlessIdentity`), and
+  `DevelopmentHdc` does so only while its launched server is current. The plan
+  names the step `"processKind": "commandless"` with no argv, the run launches
+  nothing, and the step verifies the tuple's version as the client's and the
+  server's once that server is observed, or is unknown otherwise. A dispatch
+  pinned to no Windows tuple keeps Swift's `checkserver`
+  (`hoststore/tests/windows_observe_device_commandless.rs`,
+  `provider-hdc/tests/windows_hdc_adoption.rs`).
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
@@ -3667,6 +3687,11 @@ lane's to serve over `arkforged discoverDevices` (ArkDeck no longer owns the
 USB enumeration), as is the facts port that encodes "not observable" as
 `deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
 fake HDC driver as real subprocesses and asserts the argv from the fake's log.
+A dispatch pinned to a registered Windows HDC tuple (CHG-2026-078) reads the
+list by that tuple's own family (`parse_host_target_list` at its version: the
+six-column `USB` rows, UART rows excluded), where a zero-byte list is not
+observable rather than absence; every other dispatch keeps Swift's `3.2.0f`
+family. The module's Windows unit tests replay the c2 captures.
 ## Post-flash HDC alias store (TASK-XPA-016, M4)
 
 Swift's post-flash HDC alias store (`RockchipPostFlashHDCBindingStore`, the
@@ -3737,7 +3762,10 @@ it (`output_excerpt` is its last-output line). The `UsbProbe` port gains
 functions beside the observer. The durable alias store, the Target lineage
 advance and the executor's observation-reuse cache are other owners'.
 `tests/rockchip_hdc.rs` drives the shared fake HDC driver with its own
-answers fragment and asserts the argv from the driver's log.
+answers fragment and asserts the argv from the driver's log. Its waits read a
+registered Windows HDC tuple's list by that tuple's own family, as the live
+probe does; an empty or unregistered read never proves a reconnect or a
+disconnect.
 ## Rockchip Loader transition (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::RockchipLoaderTransition` is the Loader side of
@@ -3958,6 +3986,29 @@ trusts them, and the table is `CodeOwnedTools` in `workspace_profile.rs`:
   their Authenticode publisher at their registered absolute path, never by a
   PATH lookup.
 
+With these tools a registered OpenHarmony project resolves to its profile.
+`external_tools` fills the archive slot with `trusted_system(Tar)` and, inside a
+git working copy, the source-control slot with `trusted_system(Git)`. Git runs
+with `GIT_CONFIG_NOSYSTEM=1`: a verified launch does not name the image Git
+derives its system configuration from, and the Runtime's git reads no host-wide
+configuration. A tool that does not verify resolves the project to no profile.
+
+The profile-served reads (`read-source-range`, `inspect-git-status`,
+`inspect-diff`), the isolated copy and the sweep run end to end on Windows. Three
+changes in the hoststore make this work:
+
+- A relative path below a Windows root is joined with `support::join`, so the
+  patch validation no longer refuses every path as escaping the root.
+- A spawn's working directory is its verbatim spelling.
+- A staged file is closed before it is renamed.
+
+The workspace mutations (`apply-patch`, `revert-patch`, `create-checkpoint`)
+need the device-mutation authority, which a development root does not hold.
+`windows_workspace_provider_process` and
+`windows_signed_runtime::workspace_profile_leaves_run_end_to_end_through_the_pipe`
+measure the rest, and `workspace read|status|diff|isolate|sweep` are in
+`WINDOWS_MEASURED_LEAVES`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-lanes-run.md)).
 Until the trusted system tools are composed, a registered project resolves to
 no profile. Every profile-served workspace operation is unavailable with
 `workspace.toolchainUnavailable: no trusted system archive (tar) or

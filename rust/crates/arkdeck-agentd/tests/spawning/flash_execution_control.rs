@@ -149,9 +149,14 @@ fn control(host: crate::host::Host) -> Control<crate::host::Host> {
 
 // Reuse the Swift oracle's fake lane and receipts. Only the Host/control and
 // durable Runtime owners are real; the fixture shell never reaches a device.
+#[cfg(not(windows))]
 #[path = "../../../arkdeck-hoststore/tests/support/flash_lane.rs"]
 #[allow(dead_code)]
 pub(crate) mod execution_fakes;
+// On Windows this binary already compiles the hoststore replays' support,
+// which holds the same module (`crate::support`).
+#[cfg(windows)]
+pub(crate) use crate::support::flash_lane as execution_fakes;
 
 #[test]
 fn flash_execution_reaches_the_runtime_owner_in_a_separate_process() {

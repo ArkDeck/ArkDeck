@@ -246,6 +246,146 @@ fn request(value: &Value) -> ExecutionRequest {
     }
 }
 
+/// A fresh directory below the temporary directory, in its canonical
+/// spelling: on Windows the plain long one, which the executor's owner-only
+/// state directory is bound to (an 8.3 `TEMP` names it otherwise).
+fn scratch(prefix: &str) -> std::path::PathBuf {
+    let temporary = std::env::temp_dir().canonicalize().unwrap();
+    let temporary = temporary
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+        .map_or(temporary.clone(), std::path::PathBuf::from);
+    temporary.join(format!(
+        "{prefix}-{}",
+        arkdeck_platform::random_bytes::<8>()
+            .unwrap()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    ))
+}
+
+/// The scripted Runtime over `entries` of a recorded script.
+fn scripted(entries: &Value) -> (Scripted, Rc<Shared>) {
+    let script = entries
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            let method = entry["method"].as_str().unwrap().to_owned();
+            let reply = if let Some(result) = entry.get("result") {
+                Reply::Result(result.clone())
+            } else if let Some(error) = entry.get("error") {
+                Reply::Error(error.clone())
+            } else {
+                Reply::Close
+            };
+            (method, reply)
+        })
+        .collect();
+    let shared = Rc::new(Shared {
+        script: RefCell::new(script),
+        sent: RefCell::new(Vec::new()),
+        connections: Cell::new(0),
+    });
+    (
+        Scripted {
+            shared: shared.clone(),
+            absent: false,
+        },
+        shared,
+    )
+}
+
+/// A paused run keeps its pending record in the executor's state directory
+/// and a resume continues it from there, as Swift's `AgentRuntimeExecutor`
+/// does (the recorded `reconnectResumesAndCompletes`): the record is written
+/// once, and removed once the resumed run completes. On Windows the
+/// directory is created owner-only and must open as a private one.
+#[test]
+fn a_paused_run_is_kept_and_resumed_from_its_state_directory() {
+    let scenario = serde_json::from_slice::<Value>(
+        &std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/domain-executor-resume/scenarios.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+    .as_array()
+    .unwrap()
+    .iter()
+    .find(|scenario| scenario["name"] == "reconnectResumesAndCompletes")
+    .unwrap()
+    .clone();
+    let root = scratch("arkdeck-paused-run");
+    let state = root.join("agent-runtime");
+    let clock = || "2026-09-25T00:00:01Z".to_owned();
+    let (runtime, _) = scripted(&scenario["pauseScript"]);
+    let token = match Executor::new(runtime, clock, state.clone())
+        .run(&request(&scenario["request"]))
+        .unwrap()
+    {
+        Outcome::Paused { action, .. } => action["resumeToken"].as_str().unwrap().to_owned(),
+        _ => panic!("the run pauses"),
+    };
+    let record = state.join(format!("{token}.json"));
+    assert!(record.is_file(), "the pending record is kept");
+    #[cfg(windows)]
+    arkdeck_platform::HostDirectory::open(&state).expect("an owner-only state directory");
+    let (runtime, _) = scripted(&scenario["resumeScript"]);
+    match Executor::new(runtime, clock, state.clone())
+        .resume(&token, None)
+        .unwrap()
+    {
+        Outcome::Completed(_) => {}
+        _ => panic!("the resumed run completes"),
+    }
+    assert!(!record.exists(), "the pending record is removed");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// On Windows a Runtime endpoint is a pipe, which has no directory beside
+/// it: a paused run is kept below the account's local application data, one
+/// directory per pipe, its name kept to safe characters; without that folder,
+/// or for a name of dots only, there is none.
+#[cfg(windows)]
+#[test]
+fn a_windows_pipe_keeps_its_paused_runs_below_the_accounts_local_application_data() {
+    use arkdeck_cli::domain_leaves::{state_directory, windows_state_directory};
+    use std::path::PathBuf;
+    let product = Some(PathBuf::from(r"C:\Users\u\AppData\Local\ArkDeck"));
+    assert_eq!(
+        windows_state_directory(
+            Path::new(r"\\.\pipe\arkdeck-agentd-S-1-5-21-7"),
+            product.clone()
+        ),
+        PathBuf::from(r"C:\Users\u\AppData\Local\ArkDeck\agent-runtime\arkdeck-agentd-S-1-5-21-7")
+    );
+    assert_eq!(
+        windows_state_directory(Path::new(r"\\.\pipe\a b:c"), product.clone()),
+        PathBuf::from(r"C:\Users\u\AppData\Local\ArkDeck\agent-runtime\a_b_c")
+    );
+    for refused in [r"\\.\pipe\..", r"\\.\pipe\"] {
+        assert_eq!(
+            windows_state_directory(Path::new(refused), product.clone()),
+            PathBuf::new(),
+            "{refused}"
+        );
+    }
+    assert_eq!(
+        windows_state_directory(Path::new(r"\\.\pipe\arkdeck"), None),
+        PathBuf::new()
+    );
+    let account = arkdeck_platform::arkdeck_application_support_root().unwrap();
+    assert_eq!(
+        state_directory(&arkdeck_platform::LocalEndpoint::new(
+            r"\\.\pipe\arkdeck-agentd-test"
+        )),
+        account.join("agent-runtime").join("arkdeck-agentd-test")
+    );
+}
+
 /// The port's run of one scenario, as the oracle records Swift's.
 fn replay(scenario: &Value) -> Map<String, Value> {
     let script = scenario["script"]
@@ -277,14 +417,7 @@ fn replay(scenario: &Value) -> Map<String, Value> {
             format!("2026-09-25T00:00:{:02}Z", reads.get())
         }
     };
-    let state = std::env::temp_dir().join(format!(
-        "arkdeck-domain-executor-{}",
-        arkdeck_platform::random_bytes::<8>()
-            .unwrap()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>()
-    ));
+    let state = scratch("arkdeck-domain-executor");
     let mut executor = Executor::new(
         Scripted {
             shared: shared.clone(),

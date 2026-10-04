@@ -215,6 +215,11 @@ first, `ControlResult` back.
   names are each planned for the current Target and bundle, reviewed together, and deployed one at a
   time, stopping at the first failure or uncertainty; nothing is retried, and changing the Target,
   bundle or queue invalidates a review.
+- **Job Inspector facts (TASK-XPA-020).** Ctrl+Shift+J shows or hides the inspector (macOS
+  Command-Shift-J); a Job with a later established epoch names the recovery or alias resolution
+  that established it and asks for no one; the device cleanup items left are counted; a Job whose
+  operation declares a log (the Catalog's `log` role) offers Read log locally for a
+  standard-privacy log, checked against its digest, at most 2 MiB, showing its last 200 lines.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for

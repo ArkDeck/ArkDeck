@@ -7925,6 +7925,66 @@
       "table": "DebugLocalizable",
       "en": "Choose folder / mounted SMB…",
       "zh-Hans": "选择文件夹 / 已挂载 SMB…"
+    },
+    {
+      "key": "jobInspector.fact.recoveryRelation",
+      "table": "JobsLocalizable",
+      "en": "Recovery relation",
+      "zh-Hans": "恢复关系"
+    },
+    {
+      "key": "jobInspector.progress",
+      "table": "JobsLocalizable",
+      "en": "Job in progress",
+      "zh-Hans": "Job 正在进行"
+    },
+    {
+      "key": "jobInspector.residue",
+      "table": "JobsLocalizable",
+      "en": "%d cleanup items remain on the device.",
+      "zh-Hans": "设备上仍有 %d 个清理项。"
+    },
+    {
+      "key": "jobInspector.result.supersededByRecovery",
+      "table": "JobsLocalizable",
+      "en": "This Job's outcome remains unknown, but a later confirmed complete-overwrite recovery established the current target state.",
+      "zh-Hans": "此 Job 的结果仍未知，但后续已确认的完整覆写恢复已建立当前目标状态。"
+    },
+    {
+      "key": "jobInspector.result.targetAliasResolved",
+      "table": "JobsLocalizable",
+      "en": "This Job's outcome remains unknown, but a later confirmed full Flash proved its target was an alias and established the current device state.",
+      "zh-Hans": "此 Job 的结果仍未知，但后续已确认的完整刷机证明其目标是别名，并建立了当前设备状态。"
+    },
+    {
+      "key": "jobInspector.state.currentEpochEstablished",
+      "table": "JobsLocalizable",
+      "en": "Current state established",
+      "zh-Hans": "当前状态已建立"
+    },
+    {
+      "key": "jobInspector.action.readLog",
+      "table": "JobsLocalizable",
+      "en": "Read log locally",
+      "zh-Hans": "在本机读取日志"
+    },
+    {
+      "key": "jobInspector.log.tail",
+      "table": "JobsLocalizable",
+      "en": "Showing at most the last 200 lines. Open this record for all artifacts.",
+      "zh-Hans": "最多显示末尾 200 行。打开此记录可查看全部产物。"
+    },
+    {
+      "key": "jobInspector.log.privacy",
+      "table": "JobsLocalizable",
+      "en": "Only standard logs are previewed here. Read sensitive artifacts explicitly in History.",
+      "zh-Hans": "此处仅预览标准日志。敏感产物需在 History 中显式读取。"
+    },
+    {
+      "key": "jobInspector.log.notText",
+      "table": "JobsLocalizable",
+      "en": "The log is not valid UTF-8 text.",
+      "zh-Hans": "日志不是有效的 UTF-8 文本。"
     }
   ]
 }
