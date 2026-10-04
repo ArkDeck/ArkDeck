@@ -347,7 +347,18 @@ mod windows {
     fn a_server_whose_versions_disagree_is_never_ready_and_is_stopped() {
         let fake = FakeHdc::new("hdc-mismatch");
         let endpoint = free_endpoint();
-        let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(3)))
+        // The reason is the last `checkserver` the deadline let run. On a
+        // loaded runner a probe of this test binary (a large copy) can take
+        // longer than the default 2 s to start and answer, and is then cut
+        // off (`exit=unknown`), and the listener itself can take seconds to
+        // appear: the budget gives the start room for both, so the last
+        // probe is always a complete answer, which must still disagree.
+        let budget = StartBudget {
+            readiness: Duration::from_secs(10),
+            probe_timeout: Duration::from_secs(30),
+            ..StartBudget::default()
+        };
+        let error = ManagedHdcServer::start(&fake.tool, endpoint, budget)
             .err()
             .expect("disagreeing versions are not ready");
         let StartFailure::NotReady(reason) = error else {
