@@ -14,6 +14,11 @@
 //!   (`assembleHap`) in the copy, its search path led by the toolchain's
 //!   pinned JDK, landing its unsigned HAP as the Job's verified Artifact.
 //!
+//! Commands Hvigor and Node run by bare name (`java`, `cmd.exe`, `wmic`)
+//! are planted at the project's root as images and scripts; the build
+//! succeeds through the pinned JDK and the system's tools, and none of them
+//! runs (`NoDefaultCurrentDirectoryInExePath`).
+//!
 //! The fake account's profile is empty, so Hvigor's wrapper bootstraps
 //! itself on its first run (`npm install pnpm`, over the network), as it does
 //! for a person who has never built with DevEco Studio.
@@ -256,6 +261,42 @@ fn copy_demo(source: &Path, destination: &Path) {
     }
 }
 
+/// The bare command names Hvigor and Node run by name (`java` for
+/// packaging, `cmd.exe` for the wrapper's `npm.cmd`, `wmic` for the locale),
+/// planted at the project's root, which the copy keeps and Hvigor runs in.
+/// An image is the system's `whoami.exe`, which packaging or the wrapper
+/// bootstrap would fail on; a script leaves a marker beside itself. None may
+/// run: the pinned JDK and the system's own tools do.
+const PLANTED_IMAGES: [&str; 4] = ["java.exe", "java.com", "cmd.exe", "wmic.exe"];
+const PLANTED_SCRIPTS: [&str; 4] = ["java.cmd", "java.bat", "cmd.cmd", "wmic.bat"];
+
+fn plant_commands(project: &Path) {
+    let whoami = PathBuf::from(std::env::var_os("SystemRoot").expect("SystemRoot"))
+        .join("System32")
+        .join("whoami.exe");
+    for image in PLANTED_IMAGES {
+        std::fs::copy(&whoami, project.join(image)).unwrap();
+    }
+    for script in PLANTED_SCRIPTS {
+        std::fs::write(
+            project.join(script),
+            format!("@echo planted> \"%~dp0PLANTED-{script}\"\r\n@exit /b 0\r\n"),
+        )
+        .unwrap();
+    }
+}
+
+/// No planted script ran below `root`.
+fn assert_nothing_planted_ran(root: &Path) {
+    for script in PLANTED_SCRIPTS {
+        assert!(
+            !root.join(format!("PLANTED-{script}")).exists(),
+            "the planted {script} ran in {}",
+            root.display()
+        );
+    }
+}
+
 /// Every regular file below `root`, as `/`-separated relative paths.
 fn files(root: &Path, relative: &str, found: &mut Vec<String>) {
     for entry in std::fs::read_dir(root.join(relative)).unwrap() {
@@ -366,6 +407,7 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/waterflow-demo"),
         &project,
     );
+    plant_commands(&project);
 
     let cli = |pipe: &str, arguments: &[&str]| -> (Option<i32>, Value) {
         let cli = Path::new(DAEMON).with_file_name("arkdeck.exe");
@@ -564,6 +606,13 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
         !project.join(PRODUCT).exists(),
         "the person's own tree is never built"
     );
+    // Packaging ran the pinned JDK and the wrapper the system's `cmd.exe`:
+    // a planted image would have failed them, and no planted script ran.
+    for image in PLANTED_IMAGES {
+        assert!(copy_root.join(image).is_file(), "the copy keeps {image}");
+    }
+    assert_nothing_planted_ran(&copy_root);
+    assert_nothing_planted_ran(&project);
     running.stop();
     assert_account_released();
     drop(account);
