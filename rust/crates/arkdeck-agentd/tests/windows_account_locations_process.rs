@@ -12,7 +12,10 @@
 //! directory owns `<it>\AppData\Local\ArkDeck` and nothing of the account's
 //! own. Its single-instance guard and pipe are still the account's (they are
 //! named after the user and logon SIDs), so the test refuses to run while an
-//! account daemon serves. Each scenario runs with the fake account spelled
+//! account daemon serves. Every test here holds the account's daemon
+//! starters' turn ([`StarterLock`]) for as long as it runs, so no client
+//! starts the account's daemon meanwhile and no other run of these tests (in
+//! another worktree of the same user) starts one over its own fake account. Each scenario runs with the fake account spelled
 //! as the file system spells it and with its 8.3 short name (as a hosted
 //! runner's `TEMP`, `C:\Users\RUNNER~1\…`, spells it):
 //!
@@ -33,7 +36,9 @@
 #![cfg(windows)]
 
 use arkdeck_hoststore::SessionStore;
-use arkdeck_platform::{HostDirectory, InstanceScope, default_user_endpoint, pipe_present};
+use arkdeck_platform::{
+    HostDirectory, InstanceScope, StarterLock, default_user_endpoint, pipe_present,
+};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::windows::process::CommandExt;
@@ -45,8 +50,24 @@ use std::time::{Duration, Instant};
 
 /// One test at a time: they share the account's guard and pipe.
 static TURN: Mutex<()> = Mutex::new(());
-fn turn() -> MutexGuard<'static, ()> {
-    TURN.lock().unwrap_or_else(PoisonError::into_inner)
+
+/// This process's turn, then the account's daemon starters' turn, held
+/// until the test ends: every client that would start the account's daemon,
+/// and every other process running these tests, waits for it.
+struct Turn {
+    _starters: StarterLock,
+    _process: MutexGuard<'static, ()>,
+}
+
+fn turn() -> Turn {
+    let process = TURN.lock().unwrap_or_else(PoisonError::into_inner);
+    let starters = StarterLock::acquire(&InstanceScope::account().unwrap(), DEADLINE * 10)
+        .unwrap()
+        .expect("another process held the account's daemon starters' turn for ten minutes");
+    Turn {
+        _starters: starters,
+        _process: process,
+    }
 }
 
 const DEADLINE: Duration = Duration::from_secs(60);
@@ -237,11 +258,23 @@ struct Daemon {
     child: Option<Child>,
     lines: Receiver<String>,
     seen: Vec<String>,
+    /// Its stderr, as it comes.
+    errors: std::sync::Arc<Mutex<String>>,
 }
 
 impl Daemon {
     fn start(account: &Account, executable: &Path) -> Self {
         let mut child = account.daemon(executable).spawn().unwrap();
+        let errors = std::sync::Arc::new(Mutex::new(String::new()));
+        let mut stderr = child.stderr.take().unwrap();
+        let sink = errors.clone();
+        std::thread::spawn(move || {
+            let mut text = String::new();
+            let _ = stderr.read_to_string(&mut text);
+            sink.lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push_str(&text);
+        });
         let stdout = child.stdout.take().unwrap();
         let (sender, lines) = mpsc::channel();
         std::thread::spawn(move || {
@@ -256,6 +289,7 @@ impl Daemon {
             child: Some(child),
             lines,
             seen: Vec::new(),
+            errors,
         }
     }
 
@@ -270,10 +304,20 @@ impl Daemon {
                         return line;
                     }
                 }
-                Err(error) => panic!(
-                    "no line starting {prefix:?} ({error}); stdout so far {:?}",
-                    self.seen
-                ),
+                Err(error) => {
+                    // A daemon that ended: its status and every stderr line.
+                    let status = self
+                        .child
+                        .as_mut()
+                        .and_then(|child| child.try_wait().ok().flatten());
+                    std::thread::sleep(Duration::from_millis(200));
+                    panic!(
+                        "no line starting {prefix:?} ({error}); exit {status:?}; stdout so far \
+                         {:?}; stderr {:?}",
+                        self.seen,
+                        self.errors.lock().unwrap_or_else(PoisonError::into_inner)
+                    )
+                }
             }
         }
     }
@@ -524,6 +568,48 @@ fn an_earlier_root_beside_sessions_is_removed_when_empty_and_refuses_otherwise()
             before
         );
     }
+}
+
+/// The account's guard and pipe held by the daemon of another profile: a
+/// second daemon, over a second fake account, composes nothing and says
+/// which guard is held and which process serves the account's pipe; the
+/// first serves on, and stops as always.
+#[test]
+fn a_held_account_guard_names_the_process_serving_its_pipe() {
+    let _turn = turn();
+    if !account_free() {
+        return;
+    }
+    let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
+    let first = Account::new(false);
+    let mut serving = Daemon::start(&first, executable);
+    let pipe = serving.serving();
+    let pid = serving.child.as_ref().unwrap().id();
+    let second = Account::new(false);
+    let output = second.daemon(executable).output().unwrap();
+    assert_ne!(output.status.code(), Some(0), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let guard = InstanceScope::account().unwrap().guard_name();
+    assert!(
+        stderr.contains(&format!("single-instance guard {guard}"))
+            && stderr.contains(&format!("its pipe {pipe} is served by pid {pid}"))
+            && stderr.contains("nothing was started"),
+        "{stderr}"
+    );
+    assert!(
+        !String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("listening on"),
+        "nothing served"
+    );
+    assert!(!second.state().join("instance.json").exists());
+    let status = answered(&pipe, "runtime.storage.status", json!({}));
+    assert_eq!(
+        status["sessionDomain"]["rootPath"],
+        first.sessions().to_str().unwrap(),
+        "{status}"
+    );
+    serving.stop();
 }
 
 /// PowerShell 7, which signs the development daemon.
