@@ -66,6 +66,7 @@ public sealed partial class DebugPage
         sourcePanel.Children.Add(_remoteSource
             ? Ui.Row(Ui.Button("debug.artifacts.browseRemote", S.Text(UiStrings.DebugArtifactsBrowseRemote), async (_, _) => await RemoteBrowserAsync()))
             : Ui.Row(Ui.Button("debug.artifacts.chooseLibrary", S.Text(UiStrings.DebugArtifactsChooseLibrary), async (_, _) => await ChooseLibraryAsync())));
+        if (!_remoteSource) AddFolderSources(sourcePanel);
         sourcePanel.Children.Add(Ui.Fact("debug.artifacts.selectedLibrary", S.Text(UiStrings.DebugArtifactsSelectedLibrary),
             _remoteLibrary is { } remoteLibrary ? remoteLibrary.Name
             : _libraryPath is null ? S.Text(UiStrings.DebugArtifactsNoLibrary) : Path.GetFileName(_libraryPath)));
@@ -73,6 +74,7 @@ public sealed partial class DebugPage
         {
             sourcePanel.Children.Add(Ui.Text("debug.artifacts.selectedLibrary.source", $"{chosenRemote.SourceName} · {chosenRemote.RelativePath}", "ArkDeckMonoStyle"));
         }
+        AddQueueControls(sourcePanel);
         sourcePanel.Children.Add(Ui.Text("debug.artifacts.sourceBoundary", S.Text(UiStrings.DebugArtifactsSourceBoundary), "ArkDeckCaptionStyle"));
 
         // Deployment inputs.
@@ -80,6 +82,7 @@ public sealed partial class DebugPage
         {
             _targetBundle = value;
             _preparation = null;
+            if (_batch is { Phase: not NativeLibraryBatchPhase.Idle, IsBusy: false }) _batch.Invalidate();
         });
         var logical = Field("debug.artifacts.logicalName", S.Text(UiStrings.DebugArtifactsLogicalName), _libraryName, "libfeature_debug.so", value =>
         {
@@ -103,6 +106,7 @@ public sealed partial class DebugPage
 
         _tab.Children.Add(Section("debug.artifacts.source", UiStrings.DebugArtifactsSourceTitle, operation, true, sourcePanel));
         _tab.Children.Add(Section("debug.artifacts.destination", UiStrings.DebugArtifactsDestinationTitle, null, false, inputs));
+        QueueSections(operation);
 
         // Review and run.
         var review = Ui.Stack(8, Ui.Text("debug.artifacts.review.detail", S.Text(UiStrings.DebugArtifactsReviewDetail), "ArkDeckCaptionStyle"));

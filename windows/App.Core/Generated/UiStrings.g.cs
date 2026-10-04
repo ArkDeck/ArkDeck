@@ -1299,6 +1299,35 @@ public static class UiStrings
     public const string JobRecoveryResumeSafeTitle = "jobRecovery.resumeSafe.title";
     public const string JobRecoveryWaitingGuidance = "jobRecovery.waiting.guidance";
     public const string JobRecoveryWaitingTitle = "jobRecovery.waiting.title";
+    public const string DebugArtifactsBatchPhaseFailed = "debug.artifacts.batch.phase.failed";
+    public const string DebugArtifactsBatchPhaseSucceeded = "debug.artifacts.batch.phase.succeeded";
+    public const string DebugArtifactsBatchPhaseStopped = "debug.artifacts.batch.phase.stopped";
+    public const string DebugArtifactsBatchPhaseRunning = "debug.artifacts.batch.phase.running";
+    public const string DebugArtifactsBatchPhaseReview = "debug.artifacts.batch.phase.review";
+    public const string DebugArtifactsBatchPhasePreparing = "debug.artifacts.batch.phase.preparing";
+    public const string DebugArtifactsBatchPhaseIdle = "debug.artifacts.batch.phase.idle";
+    public const string DebugArtifactsBatchRowFailed = "debug.artifacts.batch.row.failed";
+    public const string DebugArtifactsBatchRowSucceeded = "debug.artifacts.batch.row.succeeded";
+    public const string DebugArtifactsBatchRowRunning = "debug.artifacts.batch.row.running";
+    public const string DebugArtifactsBatchRowSubmitting = "debug.artifacts.batch.row.submitting";
+    public const string DebugArtifactsBatchRowPrepared = "debug.artifacts.batch.row.prepared";
+    public const string DebugArtifactsBatchRowPreparing = "debug.artifacts.batch.row.preparing";
+    public const string DebugArtifactsBatchRowPending = "debug.artifacts.batch.row.pending";
+    public const string DebugArtifactsBatchRun = "debug.artifacts.batch.run";
+    public const string DebugArtifactsBatchWarning = "debug.artifacts.batch.warning";
+    public const string DebugArtifactsBatchReview = "debug.artifacts.batch.review";
+    public const string DebugArtifactsBatchStop = "debug.artifacts.batch.stop";
+    public const string DebugArtifactsBatchPrepare = "debug.artifacts.batch.prepare";
+    public const string DebugArtifactsBatchLimit = "debug.artifacts.batch.limit";
+    public const string DebugArtifactsBatchRemove = "debug.artifacts.batch.remove";
+    public const string DebugArtifactsBatchAdd = "debug.artifacts.batch.add";
+    public const string DebugArtifactsBatchDetail = "debug.artifacts.batch.detail";
+    public const string DebugArtifactsBatchTitle = "debug.artifacts.batch.title";
+    public const string DebugArtifactsDirectoryEmpty = "debug.artifacts.directory.empty";
+    public const string DebugArtifactsDirectoryDetail = "debug.artifacts.directory.detail";
+    public const string DebugArtifactsDirectoryTitle = "debug.artifacts.directory.title";
+    public const string DebugArtifactsWslSource = "debug.artifacts.wslSource";
+    public const string DebugArtifactsChooseDirectory = "debug.artifacts.chooseDirectory";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2594,5 +2623,34 @@ public static class UiStrings
         JobRecoveryResumeSafeTitle,
         JobRecoveryWaitingGuidance,
         JobRecoveryWaitingTitle,
+        DebugArtifactsBatchPhaseFailed,
+        DebugArtifactsBatchPhaseSucceeded,
+        DebugArtifactsBatchPhaseStopped,
+        DebugArtifactsBatchPhaseRunning,
+        DebugArtifactsBatchPhaseReview,
+        DebugArtifactsBatchPhasePreparing,
+        DebugArtifactsBatchPhaseIdle,
+        DebugArtifactsBatchRowFailed,
+        DebugArtifactsBatchRowSucceeded,
+        DebugArtifactsBatchRowRunning,
+        DebugArtifactsBatchRowSubmitting,
+        DebugArtifactsBatchRowPrepared,
+        DebugArtifactsBatchRowPreparing,
+        DebugArtifactsBatchRowPending,
+        DebugArtifactsBatchRun,
+        DebugArtifactsBatchWarning,
+        DebugArtifactsBatchReview,
+        DebugArtifactsBatchStop,
+        DebugArtifactsBatchPrepare,
+        DebugArtifactsBatchLimit,
+        DebugArtifactsBatchRemove,
+        DebugArtifactsBatchAdd,
+        DebugArtifactsBatchDetail,
+        DebugArtifactsBatchTitle,
+        DebugArtifactsDirectoryEmpty,
+        DebugArtifactsDirectoryDetail,
+        DebugArtifactsDirectoryTitle,
+        DebugArtifactsWslSource,
+        DebugArtifactsChooseDirectory,
     ];
 }
