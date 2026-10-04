@@ -21,7 +21,7 @@ SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
 RUST_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "rust-ci.yml"
 RELEASE_RC_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "release-rc.yml"
 SWIFTPM_CACHE_KEY = (
-    "          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0"
+    "          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0"
     "-image-${{ steps.runner-image.outputs.version }}"
     "-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}\n"
 )
@@ -279,34 +279,17 @@ def validate_automatic_check_contract(
         "    permissions:\n      contents: read\n      pull-requests: write\n",
         "    outputs:\n      pr-number: ${{ steps.validate.outputs.pr-number }}\n",
         "          fetch-depth: 0\n",
-        "python scripts/agent_pr_identity.py",
-        '--commit-task "$HEAD_SHA"',
-        'none|TASK-*)',
-        'if [ "$TASK_ID" != "none" ]; then',
-        "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"",
-        "gh api --method GET --paginate --slurp",
-        "--pull-list \"$CANDIDATES\"",
-        "--allow-zero",
-        "--pull-request \"$PULL_REQUEST\"",
-        "--expected-head-oid \"$HEAD_SHA\"",
-        "--expected-author 'github-actions[bot]'",
-        'if [ "$VALIDATED_NUMBER" != "$PR_NUMBER" ]; then',
-        'echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"',
+        "python3 scripts/ci/agent_pr.py",
+        '--repository "$GITHUB_REPOSITORY"',
+        '--branch "$BRANCH"',
+        '--head-sha "$HEAD_SHA"',
+        '--github-output "$GITHUB_OUTPUT"',
     )
     for token in required_open:
         if token not in open_job:
             raise WorkflowContractError(f"open-pr job missing contract token: {token}")
-    task_read_index = open_job.index("--commit-task")
-    task_body_index = open_job.index("printf 'Task: %s\\n\\n'")
-    create_index = open_job.index("--body-file")
-    if not task_read_index < task_body_index < create_index:
-        raise WorkflowContractError(
-            "Agent PR must read the commit Task and write it before creating the PR"
-        )
-    if open_job.rindex("--allow-zero") > create_index:
-        raise WorkflowContractError(
-            "Agent PR may tolerate zero candidates only before creating the PR"
-        )
+    if "concurrency:\n  group: agent-pr-stacks\n  queue: max\n  cancel-in-progress: false\n" not in agent_text:
+        raise WorkflowContractError("Agent PR metadata writes must retain every pending push")
     # The PR allowed-paths guard was retired by CHG-2026-077. Its names must
     # not come back into either workflow without this contract being rewritten
     # on purpose.
@@ -353,16 +336,19 @@ def validate_automatic_check_contract(
         if token in capability_text:
             raise WorkflowContractError(f"forbidden workflow capability: {token}")
 
-    if extract_event_names(sdd_text) != ("push", "pull_request"):
-        raise WorkflowContractError("SDD Guard event set must be push + pull_request")
+    if extract_event_names(sdd_text) != ("push", "merge_group", "pull_request"):
+        raise WorkflowContractError("SDD Guard event set must be push + merge_group + pull_request")
     if EXPECTED_PUSH_FLOW not in sdd_text:
         raise WorkflowContractError("SDD Guard push branches drifted")
     if extract_pull_request_types(sdd_text) != ("reopened", "edited"):
         raise WorkflowContractError(
             "SDD Guard pull_request types must be reopened + edited"
         )
-    if extract_event_names(swift_text) != ("push",):
-        raise WorkflowContractError("Swift CI must be push-only")
+    if extract_event_names(swift_text) != ("push", "merge_group"):
+        raise WorkflowContractError("Swift CI must run on push + merge_group")
+    for text in (swift_text, sdd_text):
+        if "  merge_group:\n    types: [checks_requested]\n" not in text:
+            raise WorkflowContractError("required checks must handle merge_group checks_requested")
     if EXPECTED_PUSH_FLOW not in swift_text:
         raise WorkflowContractError("Swift CI push branches drifted")
     if "\n    paths:" in swift_text or "\n    paths-ignore:" in swift_text:
@@ -401,6 +387,8 @@ def validate_automatic_check_contract(
         ("plan", plan_job), ("swift-tests", swift_tests_job),
         ("app-build", app_build_job), ("ds-interactions", ds_job),
         ("windows-clientkit", windows_job),
+        ("sdd-guard", _job_block(sdd_text, "guard")),
+        ("sdd-tokens", _job_block(sdd_text, "ds-tokens")),
     ):
         for required in (
             "ARKDECK_CI_SHA: ${{ github.sha }}",
@@ -419,6 +407,7 @@ def validate_automatic_check_contract(
         '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
         "python3 scripts/ci/test_plan.py",
         "python3 scripts/ci/test_event_checkout.py",
+        "python3 scripts/ci/test_cache_scope.py",
         "python3 scripts/test_agent_pr_workflow.py",
         "python3 scripts/ci/plan.py",
         '--event "$GITHUB_EVENT_PATH"',
@@ -455,6 +444,9 @@ def validate_automatic_check_contract(
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         SWIFTPM_CACHE_KEY,
         "          restore-keys: |\n"
+        "            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
+        "image-${{ steps.runner-image.outputs.version }}-"
+        "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
         "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "image-${{ steps.runner-image.outputs.version }}-"
         "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
@@ -465,7 +457,7 @@ def validate_automatic_check_contract(
         "--num-workers 8",
         "        if: >-\n"
         "          success() &&\n"
-        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.cache-scope.outputs.can-save == 'true' &&\n"
         "          steps.swift-build-cache.outputs.cache-hit != 'true'\n",
         "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     )
@@ -477,13 +469,15 @@ def validate_automatic_check_contract(
         "python3 scripts/ci/test_run_xcodebuild.py",
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         "          restore-keys: |\n"
+        "            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
+        "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
         "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
         "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
         "sh scripts/ci/run-xcodebuild.sh",
         "        if: >-\n"
         "          success() &&\n"
-        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.cache-scope.outputs.can-save == 'true' &&\n"
         "          steps.app-build-cache.outputs.cache-hit != 'true'\n",
         "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     )
@@ -562,6 +556,12 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(
                 f"Swift test job missing contract token: {token}"
             )
+    for kind, block in (("swiftpm", swift_tests_job), ("xcode", app_build_job)):
+        expected = f'run: python3 scripts/ci/cache_scope.py --kind {kind} --github-output "$GITHUB_OUTPUT"'
+        if expected not in block or block.index(expected) > block.index("actions/cache/restore@"):
+            raise WorkflowContractError("build caches must choose their scope before restoring")
+        if block.count("          key: ${{ steps.cache-scope.outputs.prefix }}-") != 2:
+            raise WorkflowContractError("build cache restore/save must share a scoped key")
     if swift_tests_job.count(SWIFTPM_CACHE_KEY) != 2:
         raise WorkflowContractError(
             "Swift test job must restore and save the SwiftPM cache under one exact key"
@@ -645,7 +645,8 @@ RUST_SECRET_DECLARATION = (
 RUST_SHARED_JOB_TOKENS = (
     "        shell: bash\n        working-directory: rust\n",
     "git config core.autocrlf false",
-    '"+refs/heads/main:refs/remotes/origin/main"',
+    '"+${ARKDECK_CI_BASE}:refs/remotes/origin/main"',
+    "ARKDECK_CI_BASE: ${{ github.event.merge_group.base_sha || 'refs/heads/main' }}",
     '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
     'test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"',
     "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
@@ -928,7 +929,8 @@ def validate_cache_retention_contract(text: str) -> None:
         "permissions:\n  contents: read\n",
         "      github.event.workflow_run.conclusion == 'success' &&\n",
         "      github.event.workflow_run.event == 'push' &&\n",
-        "      github.event.workflow_run.head_branch == 'main' &&\n",
+        "      (github.event.workflow_run.head_branch == 'main' ||\n"
+        "        startsWith(github.event.workflow_run.head_branch, 'agent/')) &&\n",
         "      github.event.workflow_run.head_repository.full_name == github.repository\n",
         "    permissions:\n      contents: read\n      actions: write\n",
         "          ARKDECK_CI_SHA: ${{ github.sha }}\n",
@@ -1831,7 +1833,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             (
                 "retired guard script",
                 agent.replace(
-                    "python scripts/agent_pr_identity.py",
+                    "python3 scripts/ci/agent_pr.py",
                     "python scripts/check_pr_paths.py",
                 ),
                 sdd,
@@ -1852,11 +1854,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift,
             ),
             (
-                "Task line dropped",
-                agent.replace(
-                    "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"\n",
-                    "true\n",
-                ),
+                "event SHA dropped",
+                agent.replace('--head-sha "$HEAD_SHA"', '--head-sha HEAD'),
                 sdd,
                 swift,
             ),
@@ -2136,12 +2135,12 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 ),
             ),
             (
-                "Agent branch cache write",
+                "unscoped cache write",
                 agent,
                 sdd,
                 swift.replace(
-                    "          github.ref == 'refs/heads/main' &&\n",
-                    "          startsWith(github.ref, 'refs/heads/agent/') &&\n",
+                    "          steps.cache-scope.outputs.can-save == 'true' &&\n",
+                    "          true &&\n",
                     1,
                 ),
             ),

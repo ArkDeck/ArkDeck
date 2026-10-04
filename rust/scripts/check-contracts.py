@@ -29,6 +29,10 @@ REVIEW_PROJECTION = "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogG
 # (arkdeck-agentd's code-sign helper process test, the provider's helper
 # facts): a checked-in package resource beside rust/, not a protocol input.
 CODE_SIGN_HELPER = "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
+# The OpenHarmony integration registries, profile and lock that
+# arkdeck-provider-hdc's registration tests read (CHG-2026-078): checked-in
+# integration inputs beside rust/, not protocol inputs.
+INTEGRATIONS = "openspec/integrations"
 
 
 def review_projection() -> bytes:
@@ -147,6 +151,13 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
         copied = destination / CODE_SIGN_HELPER
         copied.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(helper, copied)
+    # The integration registries, profiles and lock the provider's
+    # registration tests close their hashes over (windows_hdc_registration:
+    # the Windows registry beside the macOS ones, the OpenHarmony profile and
+    # INTEGRATION-PROFILES.lock.yaml), at their repository paths.
+    integrations = ROOT / INTEGRATIONS
+    if integrations.is_dir():
+        shutil.copytree(integrations, destination / INTEGRATIONS, dirs_exist_ok=True)
     write_json(destination / "spec/baselines/swift-single-v1.json", published_info)
     if info["kind"] == "candidate":
         write_json(destination / "spec/baselines/swift-candidate-inputs.json", info)

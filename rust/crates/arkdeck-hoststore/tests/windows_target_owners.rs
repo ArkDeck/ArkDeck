@@ -117,10 +117,35 @@ impl Scripted {
         }
     }
 }
+/// The registered Windows tuple's capture of 2026-10-04 (CHG-2026-078, c2),
+/// redacted: its `-v` bytes and a `list targets -v` file.
+fn c2_capture(name: &str) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/hdc-windows/c2")
+        .join(name);
+    String::from_utf8(std::fs::read(path).unwrap()).unwrap()
+}
+
 impl HdcDispatch for Scripted {
+    /// In the `c2` modes, the executable stands for the registered Windows
+    /// tuple, as `ProcessDispatch` names it for the real `hdc.exe`.
+    fn registered_windows_tuple(&self) -> Option<&'static arkdeck_provider_hdc::WindowsHdcTuple> {
+        self.mode.get().starts_with("c2").then(|| {
+            arkdeck_provider_hdc::windows_tuple(
+                "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            )
+            .unwrap()
+        })
+    }
+
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
         self.calls.set(self.calls.get() + 1);
         let stdout = match (plan.arguments.join(" ").as_str(), self.mode.get()) {
+            ("-v", "c2" | "c2-uart") => c2_capture("no-board/version.stdout.bin"),
+            ("list targets -v", "c2") => {
+                c2_capture("board-connected/list-targets-board-connected.stdout.bin")
+            }
+            ("list targets -v", "c2-uart") => c2_capture("no-board/list-targets-empty.stdout.bin"),
             ("-v", _) => "Ver: 3.2.0d\n".to_owned(),
             ("list targets -v", "unauthorized") => {
                 format!("{KEY}\t\tUSB\tUnauthorized\tlocalhost\n")
@@ -253,6 +278,33 @@ fn the_oracle_board_is_adopted_once_as_the_target_macos_adopts() {
         )
         .unwrap();
     assert_eq!(shown["stablePhysicalIdentitySha256"], identity.as_str());
+}
+
+/// XPA-005 over CHG-2026-078: the registered Windows tuple's own capture,
+/// six CR LF columns with the host's UART rows, is observed and adopted by
+/// the same owner; the UART rows are never candidates.
+#[test]
+fn the_registered_windows_tuple_capture_is_observed_and_adopted() {
+    let owner = Owner::new();
+    owner.hdc.mode.set("c2-uart");
+    let snapshot = owner.observations.snapshot(&owner.sources(), None).unwrap();
+    assert!(snapshot.observations.is_empty(), "UART rows are no device");
+
+    owner.hdc.mode.set("c2");
+    let (continuity, reference) = owner.observe();
+    assert_eq!(continuity, "relationProven");
+    let adopted = owner.adopt(&reference).unwrap();
+    assert_eq!(adopted["outcome"], "adopted", "{adopted}");
+    assert_eq!(adopted["targetId"], "TGT-3ba3f5f43b92", "{adopted}");
+    let listed = owner
+        .targets
+        .handle("target.list", &Map::new(), NOW)
+        .unwrap();
+    assert_eq!(listed[0]["toolVersion"], "3.2.0g", "{listed}");
+    // Repeated: the same receipt, nothing rewritten.
+    let written = owner.root.targets().unwrap();
+    assert_eq!(owner.adopt(&reference).unwrap(), adopted);
+    assert_eq!(owner.root.targets().unwrap(), written);
 }
 
 #[test]

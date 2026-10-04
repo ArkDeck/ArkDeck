@@ -101,6 +101,8 @@ public sealed partial class DebugPage() : SurfacePage<DebugState>(
             var chosen = id.Length == 0 ? null : id;
             if (chosen == _targetId) return;
             _targetId = chosen;
+            // A new Target invalidates the queue's review (macOS invalidatePreparations).
+            _batch?.Invalidate();
             _targetChosen = true;
             await RefreshAsync();
         };

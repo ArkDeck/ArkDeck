@@ -156,6 +156,11 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// Authenticated App recovery may reopen only an App-originated durable Job
+    /// at the exact permitted state. This is a transport gate, never authority.
+    fn app_job_recovery_allowed(&self, _job_id: &str, _resume: bool) -> bool {
+        false
+    }
     /// `job.run` runs an admitted Job. A host without a Job owner that runs
     /// answers as the read-only foundation always has.
     fn job_run(&self, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
@@ -826,6 +831,10 @@ impl<H: HostServices> Control<H> {
     /// the frame, supplies this origin, and it never holds a foreground
     /// console. Only its Import methods answer differently from a local
     /// client's: they reach `HostServices::app_import_resource`.
+    pub fn app_job_recovery_allowed(&self, job_id: &str, resume: bool) -> bool {
+        self.host.app_job_recovery_allowed(job_id, resume)
+    }
+
     pub fn handle_app_frame(&self, bytes: &[u8]) -> Vec<u8> {
         self.handle_frame_from(bytes, Origin::App)
     }

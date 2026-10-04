@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use arkdeck_platform::{LoopbackServerLease, ProcessLimits, VerifiedTool};
 
-use crate::{DeviceCandidate, ObservationFailure, ParseError, parse_target_list};
+use crate::{DeviceCandidate, ObservationFailure, ParseError, parse_host_target_list};
 
 const ENDPOINT: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8710);
 const MAX_OUTPUT_BYTES: usize = 1_048_576;
@@ -169,7 +169,7 @@ fn observe_candidates(
         ));
     }
     let candidates =
-        parse_target_list(&captured.stdout, version, false).map_err(|error| match error {
+        parse_host_target_list(&captured.stdout, version, false).map_err(|error| match error {
             ParseError::UnsupportedVersion(_) => {
                 ObservationFailure::Unavailable("unregistered HDC observation version")
             }

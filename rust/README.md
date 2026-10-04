@@ -1024,6 +1024,18 @@ checks the daemon over its pipe and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`,
 through `arkdeck job plan|submit` against a dev-signed daemon, before and
 after a restart.
 
+GJ-1's two device operations run on Windows host code too:
+`arkdeck-hoststore/tests/windows_gj1_replays.rs` replays the Swift
+`observe.device@1` and `capture.diagnostics@1` oracles (28 exchanges each)
+through the planner, admitter, runner, result reader and Artifact pager over
+the shared fake's two tables ported in process (`oracle_fake.rs`'s
+`ObserveDevice` and `CaptureDiagnostics` arms). Every answer is Swift's (a
+refusal's wording T2), the fake receives Swift's 11 and 16 calls in order,
+and the Jobs' index, records, Journals, Artifacts and Sessions are Swift's
+byte for byte, read with the host paths in the oracle's spelling, the
+Session platform as the oracle's and a manifest's derived values relabelled
+(`hdc_oracle::assert_read_only_replays`).
+
 ## Windows Session owner, publication and snapshot pages (TASK-XPA-005/014)
 
 `arkdeck-hoststore` builds on Windows the snapshot pager (`snapshot_pager`,
@@ -2650,6 +2662,20 @@ well.
   server, so `runtime.hdc.impact-preview` and `runtime.hdc.restart` answer
   `operationUnavailable` without one, as on macOS. Tool selection's restart
   stays macOS-only.
+- Its consumers (TASK-XPA-005): a dispatch names the registered Windows
+  tuple its executable is pinned to (`HdcDispatch::registered_windows_tuple`;
+  `ProcessDispatch` by its digest, on Windows only), and the candidate list,
+  the identity readback and `observe.device`'s confirmation read that tuple's
+  listing with `parse_windows_target_list`, its `-v` with
+  `parse_host_client_version` and the managed start's readiness with
+  `parse_host_server_check` (the CR LF forms the Swift-parity splitter cannot
+  read); every other dispatch keeps the macOS grammars. The managed server is
+  named `TEMP`/`TMP` on Windows (without them `3.2.0g` cannot create its
+  mutex file and exits 0), and a server receipt's `\\?\` image path is
+  compared in the plain spelling. `windows_hdc_live_process.rs` runs the
+  real daemon and CLI over the registered `hdc.exe`
+  (`ARKDECK_LIVE_WINDOWS_HDC`). Jobs still reach no HDC on Windows, so
+  `probeHDCServer`'s commandless lowering waits for Windows Job execution.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider

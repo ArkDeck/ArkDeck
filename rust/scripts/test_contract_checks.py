@@ -403,6 +403,22 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual((candidate / "rust/tests/fixtures/example/cases.json").read_bytes(), b"new plan digest\n")
         self.assertEqual((candidate / runner.REVIEW_PROJECTION).read_bytes(), b"new Catalog projection\n")
 
+    def test_views_carry_the_integration_registries_when_the_checkout_has_them(self):
+        current = contract.working_inputs()
+        candidate = contract.candidate(current, self.commit, self.commit)
+        absent = self.root / "view-without-integrations"
+        runner.materialize(absent, current, candidate, self.published_info)
+        self.assertFalse((absent / runner.INTEGRATIONS).exists())
+        registry = f"{runner.INTEGRATIONS}/openharmony/windows-probes.yaml"
+        lock = f"{runner.INTEGRATIONS}/INTEGRATION-PROFILES.lock.yaml"
+        self.write(registry, b'{"registryId": "OPENHARMONY-HDC-WINDOWS-PROBES"}\n')
+        self.write(lock, b"lock: INTEGRATION-PROFILES-0.8.0\n")
+        view = self.root / "view-with-integrations"
+        runner.materialize(view, current, candidate, self.published_info)
+        self.assertEqual((view / registry).read_bytes(),
+                         b'{"registryId": "OPENHARMONY-HDC-WINDOWS-PROBES"}\n')
+        self.assertEqual((view / lock).read_bytes(), b"lock: INTEGRATION-PROFILES-0.8.0\n")
+
     def test_candidate_new_keywords_stay_isolated_from_the_published_baseline(self):
         before_pin = contract.BASELINE.read_bytes()
         before_generated = contract.GENERATED.read_bytes()
