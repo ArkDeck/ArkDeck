@@ -186,7 +186,7 @@ pub use arktrace_profile::{
 pub use operation_availability::{
     OperationAvailabilityContext, hdc_operation_runs, operation_unavailability,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod debug_read;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
@@ -296,8 +296,12 @@ mod job_result;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_result::JobResultReader;
 #[cfg(any(target_os = "macos", windows))]
+mod job_archive;
+#[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_cancel;
+#[cfg(any(target_os = "macos", windows))]
+pub use job_archive::JobArchiver;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_cancel::{CancelledRun, JobCanceller, RunCancellation, cancel_running};
 #[cfg(any(target_os = "macos", windows))]

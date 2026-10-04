@@ -2143,3 +2143,18 @@ test('recovery controls keep unknown work parked and bind only the exact Flash t
   h.run("S.jobs[0].supersededByRecoveryEpochID='epoch-fixture'");
   assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),null);
 });
+
+
+test('archive preview never changes Job state or grants archive without Runtime proof', () => {
+  const h=harness('?page=overview&jobState=unknown');
+  const before=h.run('JSON.stringify(inspectorJobs())');
+  assert.equal(h.run('inspectorCanArchive(inspectorJobs()[0])'),true);
+  assert.match(h.run('inspectorRecoveryHTML(inspectorJobs()[0])'),/jobRecovery.archive.review/);
+  h.run("requestInspectorArchive('job-demo-global')");
+  assert.equal(h.run('JSON.stringify(inspectorJobs())'),before);
+  assert.match(h.run('$("modalHost").innerHTML'),/jobRecovery.archive.confirm" disabled/);
+  for(const state of ['running','succeeded','resumeAtConfirmedSafeBoundary']) {
+    h.run(`S.jobs=[{id:'changed',state:'${state}'}]`);
+    assert.equal(h.run('inspectorCanArchive(inspectorJobs()[0])'),false);
+  }
+});

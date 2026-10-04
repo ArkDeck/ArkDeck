@@ -26,7 +26,7 @@
 | Diagnostics | 精确 History Session reader、显式读取文本/JSON、Trace Viewer；CHG-2026-079 接通有界 Start/Mark/Stop 和 Runtime 状态，完成后打开同一 Job 的 Session | 新 operation 待维护者 review 并发布 protected main；anchor 写入的主机时间观测已接通；会话内截图/视频与时钟校准仍未接通。HiLog 为结束后的回顾性采集；无校准/事件时间时明确无法对齐/未记录时刻 |
 | History | 八类筛选、保存/分页、证据、参数、导出与精确来源上下文；Diagnostics 历史 Session 已加载并保留来源 | 不重放；未知 operation 不猜类型；Flash 来源目标已消失时显示缺失，不静默换设备 |
 | Settings | 独立七标签：General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics；Trace 内 Cache / Licenses | 不再内嵌完整更新设置；当前 App 诊断包不提供 device raw 勾选，敏感 Artifact 从 History 单独导出 |
-| Job Inspector / recovery | job.list/status/evidence/artifact.list 精确详情；标准 published 日志显式读取（最多 2 MiB，末 200 行）；已知活动 Job 取消请求先核对 fresh identity | 取消请求不代表终态；敏感产物走 History。Inspector 可重新核对 waitingForRecovery、继续 confirmed safe boundary，并核验精确 Flash 目标的 Loader 绑定；unknown 不重放。archive 与 TCP/UART 人工 rebind 仍有缺口 |
+| Job Inspector / recovery | job.list/status/evidence/artifact.list 精确详情；标准 published 日志显式读取（最多 2 MiB，末 200 行）；已知活动 Job 取消请求先核对 fresh identity | 取消请求不代表终态；敏感产物走 History。Inspector 可重新核对 waitingForRecovery、继续 confirmed safe boundary，并核验精确 Flash 目标的 Loader 绑定；unknown 不重放。已接通带 Runtime 证明的只读／主机 Job 归档；设备变更／unknown 归档与 TCP/UART 人工 rebind 仍待进程和保留风险证明 |
 
 `prototype.html` 默认展示当前边界。`?page=diagnostics&concept=diagnostics` 仅用于未来会话探索；
 `?page=automation` 解释退役旧链接，不显示任务控制。保存会话状态用 `diagnosticsState=loaded|partial|trace|failed`，
@@ -117,7 +117,13 @@ Job Inspector 对 `waitingForRecovery` 提供 `job.reconcile`，对 fresh status
 不会自动重试、重新提交或清除 unknown。Flash 恢复记录另可从 fresh adopted targets 中
 精确选取相同 target，调用已有 `flash.bind-current-loader` 核验 Loader；不回退到首台设备，
 不隐式继续刷机，不把身份关联称为效果已确认。UI fixture 与原型不调用真实 Runtime。
-archive、TCP/UART 人工 rebind confirm/abort 与 human resolution 仍未提供 App 动作；
+归档通过 `job.archive.preview` 展示精确 Job／Journal 的 review SHA-256 和阻塞原因，
+用户显式确认后由 `job.archive` 重读并核对相同快照。当前仅接纳已确认、无残留、
+无 capability 且全部已执行步骤具备同步终止证明的 observe／diagnostics／analyzer Job。
+unknown、设备变更、托管进程或补偿缺少证明时保留占用并拒绝归档，不以用户确认替代证明。
+归档按 durable abandon intent → requested → durable outcome → interrupted 写入；崩溃恢复仅补齐
+原用户决策，不 dispatch。Session 发布失败单独显示，后续操作沿用原确认 ID，保留 Journal／Artifacts。
+TCP/UART 人工 rebind confirm/abort 与 human resolution 仍未提供 App 动作；
 保留 accepted spec 与剩余实现，不能用 UI 确认代替 Runtime 的完整证明。
 
 主窗口恢复区最多占当前 detail 可用高度的 45%，超出后独立纵向滚动；按内容实测高度

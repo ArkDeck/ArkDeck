@@ -94,6 +94,8 @@
     "argv/input.long-press.json",
     "argv/input.swipe.json",
     "argv/input.tap.json",
+    "argv/job.archive.apply.json",
+    "argv/job.archive.preview.json",
     "argv/job.cancel.json",
     "argv/job.events.json",
     "argv/job.evidence.json",

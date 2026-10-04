@@ -1,0 +1,172 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "job",
+        "archive",
+        "apply",
+        "--job",
+        "sample",
+        "--user-confirmation-id",
+        "sample",
+        "--expected-review-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "expected": {
+        "command": "job.archive.apply",
+        "handlerArguments": [
+          "job",
+          "archive",
+          "apply",
+          "--job",
+          "sample",
+          "--user-confirmation-id",
+          "sample",
+          "--expected-review-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "apply",
+        "--help"
+      ],
+      "expected": {
+        "command": "job.archive.apply",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "apply",
+        "--job",
+        "sample",
+        "--user-confirmation-id",
+        "sample",
+        "--expected-review-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "apply",
+        "--job",
+        "sample",
+        "--user-confirmation-id",
+        "sample",
+        "--expected-review-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "apply"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "apply",
+        "--job",
+        "sample",
+        "--user-confirmation-id",
+        "sample",
+        "--expected-review-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "apply",
+        "--job",
+        "sample",
+        "--user-confirmation-id",
+        "sample",
+        "--expected-review-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.archive.apply",
+        "handlerArguments": [
+          "job",
+          "archive",
+          "apply",
+          "--job",
+          "sample",
+          "--user-confirmation-id",
+          "sample",
+          "--expected-review-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "job.archive.apply",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "job",
+    "archive",
+    "apply"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

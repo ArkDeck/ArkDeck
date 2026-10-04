@@ -2156,7 +2156,7 @@
       "feature": "debug.evaluate",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2192,7 +2192,7 @@
       "feature": "debug.probe",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2212,7 +2212,7 @@
       "feature": "debug.start",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2232,7 +2232,7 @@
       "feature": "debug.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2487,7 +2487,7 @@
       "feature": "flash.bootloader-status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2576,7 +2576,7 @@
       "feature": "flash.full-restore@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2662,7 +2662,7 @@
       "feature": "flash.prerequisites",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2923,6 +2923,42 @@
       "source": "catalog:input.tap@1",
       "targetClassification": "direct",
       "targetCommand": "arkdeck input tap"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.archive.apply.json",
+      "equivalentCommands": [],
+      "feature": "job.archive",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.archive",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job archive apply --job <job-id> --user-confirmation-id <id> --expected-review-sha256 <sha256>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.archive.preview.json",
+      "equivalentCommands": [],
+      "feature": "job.archive.preview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.archive.preview",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job archive preview --job <job-id>"
     },
     {
       "classification": "direct",
@@ -3229,7 +3265,7 @@
       "feature": "observe.device@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3355,7 +3391,7 @@
       "feature": "recovery.flash-invocation.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4782,7 +4818,7 @@
   "summary": {
     "blocked": [],
     "byClassification": {
-      "direct": 127,
+      "direct": 129,
       "generic": 2,
       "internal": 4,
       "local": 93,
@@ -4794,9 +4830,9 @@
       "app": 68,
       "catalog": 32,
       "cli": 53,
-      "daemon": 108
+      "daemon": 110
     },
-    "entries": 261,
+    "entries": 263,
     "fullFunction": true
   }
 }

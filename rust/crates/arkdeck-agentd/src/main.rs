@@ -965,9 +965,9 @@ fn main() {
 mod debug_invocation_control;
 #[cfg(all(test, target_os = "macos"))]
 mod device_access_control;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod flash_host_reads_control;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod flash_plan_control;
 #[cfg(all(test, any(target_os = "macos", windows)))]
 mod loader_binding_control;
