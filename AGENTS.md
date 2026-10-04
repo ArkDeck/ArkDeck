@@ -51,6 +51,11 @@ Golden Journey 风险最小的解释并说明。旧 E0/E1/E2 或确认流程不�
   与预算；不绕过 Provider 执行 raw HDC、刷机命令、raw shell 或任意远端路径。此限制针对
   设备执行面，不禁止 Repo Agent 使用本地主机命令编辑、构建和测试。Provider lowering
   使用 executable + argument array；device-scoped HDC 绑定精确目标。
+- Repo Agent 可直接运行 `hdc`（executable + argument array），对已连接的板子做只读观察、
+  采样、穿刺与诊断，并启动、停止自己启动的 HDC server；不停止 external/unknown server
+  （`POL-HDC-001`），设备修改、安装、刷机与 destructive 动作仍只经 Runtime 的 typed
+  operation。产出不构成 `REAL_DEVICE_PASS` 或 hardware evidence；入仓前去除序列号、
+  connect key、机器名、账户名与用户目录。
 - `hostOnly`/`readOnly` 使用 bounded 默认只读准入；`deviceMutation`/`destructive` 仅由
   protected-main Runtime 根据 fresh trusted facts 与完整 materialized plan 生成、reserve、
   consume 精确匹配的 RuntimeCapability。Agent、caller、candidate、repairer 不得创建、修改、
