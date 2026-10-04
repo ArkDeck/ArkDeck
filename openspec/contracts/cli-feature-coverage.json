@@ -2467,7 +2467,7 @@
       "feature": "flash.bind-current-loader",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

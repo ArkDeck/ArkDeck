@@ -10,16 +10,30 @@
 //! Swift answered it, the receipt or the refusal as its CLI interpolates it,
 //! and the root left as Swift left it: every entry's kind and mode, a file's
 //! size, a link's destination, and every file byte for byte.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-010) the same steps replay over a root of their own
+//! below the temporary directory, with no Swift producer to serialize with:
+//! an owner-only (0600/0700) entry is the store's private DACL, a shared mode
+//! is a read entry for the local Users group (removed again when the oracle
+//! restores an owner-only mode), and a symbolic link is a file or directory
+//! link to the same relative destination. Every answer and every byte must
+//! still be Swift's; each entry's kind, size and link destination too, but
+//! not its mode, which Windows does not have.
+#![cfg(any(target_os = "macos", windows))]
 
 use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
 use arkdeck_rockchip_binding::{RockchipBindingStore, install_current_target};
 use serde_json::{Value, json};
-use std::fs::{self, OpenOptions};
+use std::fs;
+#[cfg(unix)]
+use std::fs::OpenOptions;
+#[cfg(unix)]
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
 const ROOT: &str = "/private/tmp/arkdeck-binding-install-oracle";
+#[cfg(unix)]
 const LOCK: &str = "/private/tmp/arkdeck-binding-install-oracle.lock";
 
 fn fixture() -> PathBuf {
@@ -38,8 +52,81 @@ fn device(value: &Value) -> UsbHostDevice {
     }
 }
 
-fn mode(action: &Value) -> fs::Permissions {
-    fs::Permissions::from_mode(u32::from_str_radix(action["mode"].as_str().unwrap(), 8).unwrap())
+#[cfg(unix)]
+fn set_mode(path: &Path, action: &Value) {
+    fs::set_permissions(
+        path,
+        fs::Permissions::from_mode(
+            u32::from_str_radix(action["mode"].as_str().unwrap(), 8).unwrap(),
+        ),
+    )
+    .unwrap();
+}
+
+/// A recorded mode, the Windows way: owner-only is the private DACL an entry
+/// inherits from its private directory; anything wider gives the local Users
+/// group read access, which owner-only takes away again.
+#[cfg(windows)]
+fn set_mode(path: &Path, action: &Value) {
+    let text = action["mode"].as_str().unwrap();
+    let arguments: &[&str] = if text == "600" || text == "700" {
+        &["/remove:g", "*S-1-5-32-545"]
+    } else {
+        &["/grant", "*S-1-5-32-545:(R)"]
+    };
+    let status = std::process::Command::new("icacls")
+        .arg(path)
+        .args(arguments)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert!(status.success(), "icacls {}", path.display());
+}
+
+/// A link to `destination`, relative to the link's directory.
+#[cfg(windows)]
+fn symlink(destination: &str, path: PathBuf) -> std::io::Result<()> {
+    let directory = path.parent().unwrap().join(destination).is_dir();
+    if directory {
+        std::os::windows::fs::symlink_dir(destination, path)
+    } else {
+        std::os::windows::fs::symlink_file(destination, path)
+    }
+}
+
+/// Removes a file; on Windows one the store wrote read-only is made
+/// writable first, as `unlink` ignores the mode on macOS.
+fn remove_file(path: &Path) {
+    // A Windows directory link is removed as a directory.
+    #[cfg(windows)]
+    if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
+        && fs::metadata(path).is_ok_and(|metadata| metadata.is_dir())
+    {
+        fs::remove_dir(path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+        return;
+    }
+    #[cfg(windows)]
+    if let Ok(metadata) = fs::symlink_metadata(path)
+        && metadata.is_file()
+        && metadata.permissions().readonly()
+    {
+        let mut permissions = metadata.permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        fs::set_permissions(path, permissions).unwrap();
+    }
+    fs::remove_file(path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+}
+
+/// An entry's mode as the oracle records it (Windows has none).
+fn mode_of(metadata: &fs::Metadata) -> String {
+    #[cfg(unix)]
+    return format!("{:o}", metadata.permissions().mode() & 0o777);
+    #[cfg(windows)]
+    {
+        let _ = metadata;
+        "-".to_owned()
+    }
 }
 
 /// Every entry below `root` in path order without following a link, as the
@@ -67,7 +154,7 @@ fn entries(
             format!("{relative}/{name}")
         };
         let metadata = fs::symlink_metadata(root.join(&path)).unwrap();
-        let mode = format!("{:o}", metadata.permissions().mode() & 0o777);
+        let mode = mode_of(&metadata);
         if metadata.file_type().is_symlink() {
             let destination = fs::read_link(root.join(&path)).unwrap();
             listing.push(json!({"path": path, "kind": "link",
@@ -92,8 +179,10 @@ impl Drop for Root {
     }
 }
 
-#[test]
-fn every_install_step_is_swifts() {
+/// The oracle's root, owner-only: on macOS its fixed path, serialized with
+/// the Swift producer by one `flock`; on Windows a root of its own.
+#[cfg(unix)]
+fn oracle_root() -> (Root, Option<fs::File>) {
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
@@ -106,6 +195,43 @@ fn every_install_step_is_swifts() {
     let _ = fs::remove_dir_all(&root.0);
     fs::create_dir(&root.0).unwrap();
     fs::set_permissions(&root.0, fs::Permissions::from_mode(0o700)).unwrap();
+    (root, Some(lock))
+}
+
+#[cfg(windows)]
+fn oracle_root() -> (Root, Option<fs::File>) {
+    let temporary = std::env::temp_dir().canonicalize().unwrap();
+    let temporary = temporary
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+        .map_or(temporary.clone(), PathBuf::from);
+    let root = Root(temporary.join(format!(
+        "arkdeck-binding-install-oracle-{:x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    )));
+    arkdeck_platform::HostDirectory::open_or_create_private(&root.0).unwrap();
+    (root, None)
+}
+
+/// The entries as this host lists them: on Windows each mode is `-`.
+fn recorded_entries(entries: &Value) -> Value {
+    #[cfg(unix)]
+    return entries.clone();
+    #[cfg(windows)]
+    {
+        let mut entries = entries.clone();
+        for entry in entries.as_array_mut().unwrap() {
+            if entry.get("mode").is_some() {
+                entry["mode"] = json!("-");
+            }
+        }
+        entries
+    }
+}
+
+#[test]
+fn every_install_step_is_swifts() {
+    let (root, _lock) = oracle_root();
     let store = RockchipBindingStore::new(&root.0.join("ArkDeck"));
     let cases: Value =
         serde_json::from_slice(&fs::read(fixture().join("cases.json")).unwrap()).unwrap();
@@ -126,21 +252,23 @@ fn every_install_step_is_swifts() {
                 "write" => {
                     let bytes =
                         fs::read(fixture().join(action["input"].as_str().unwrap())).unwrap();
-                    let _ = fs::remove_file(path());
+                    if fs::symlink_metadata(path()).is_ok() {
+                        remove_file(&path());
+                    }
                     fs::write(path(), bytes).unwrap();
-                    fs::set_permissions(path(), mode(action)).unwrap();
+                    set_mode(&path(), action);
                 }
                 "remove" => {
                     if fs::symlink_metadata(path()).unwrap().is_dir() {
                         fs::remove_dir_all(path()).unwrap();
                     } else {
-                        fs::remove_file(path()).unwrap();
+                        remove_file(&path());
                     }
                 }
-                "chmod" => fs::set_permissions(path(), mode(action)).unwrap(),
+                "chmod" => set_mode(&path(), action),
                 "mkdir" => {
                     fs::create_dir(path()).unwrap();
-                    fs::set_permissions(path(), mode(action)).unwrap();
+                    set_mode(&path(), action);
                 }
                 "symlink" => symlink(action["destination"].as_str().unwrap(), path()).unwrap(),
                 "link" => {
@@ -168,8 +296,9 @@ fn every_install_step_is_swifts() {
         let (mut listing, mut files) = (Vec::new(), Vec::new());
         entries(&root.0, "", &mut listing, &mut files);
         let listing = Value::Array(listing);
-        if listing != step["entries"] {
-            differences.push(format!("{name}: swift {} rust {listing}", step["entries"]));
+        let recorded = recorded_entries(&step["entries"]);
+        if listing != recorded {
+            differences.push(format!("{name}: swift {recorded} rust {listing}"));
         }
         let prefix = format!("steps/{:02}-{name}", step["index"].as_u64().unwrap());
         for (path, bytes) in files {

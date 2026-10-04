@@ -2989,6 +2989,15 @@ lane-preview` through the CLI against the signed test daemon, over that
 stand-in and a stand-in plan previewer in the test binary; the daemon binary
 has no seam for either.
 
+`flash install-binding [--rebind]` runs on Windows as on macOS: the CLI
+installs the DAYU200 cross-mode binding in its own process from one census of
+the Windows USB registry into the Rockchip binding store of
+`%LOCALAPPDATA%\ArkDeck`, the Application Support root the Windows daemon
+composes; the Swift install oracle (`rockchip-binding-install`, 35 steps)
+replays on Windows in `arkdeck-rockchip-binding`. `flash bind-loader` is
+driven through the CLI against the signed test daemon over the Swift Loader
+binding oracle's state, answering exchanges 15 and 16 as Swift did.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in
