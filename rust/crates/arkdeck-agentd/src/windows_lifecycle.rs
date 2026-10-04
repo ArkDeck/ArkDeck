@@ -1134,7 +1134,8 @@ fn signing_store() -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     Ok((root, image))
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
 
@@ -1333,4 +1334,5 @@ fn main() {
             );
         }
     }
+}
 }
