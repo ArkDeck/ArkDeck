@@ -41,6 +41,10 @@ APP_REQUIREMENT = (f'anchor apple generic and certificate leaf[subject.OU] = "{T
 # appends the release pin.
 SERVER_IDENTITY = (f'anchor apple generic and certificate leaf[subject.OU] = "{TEAM}" '
                    'and identifier "com.arkdeck.agentd"')
+# Only the pre-cutover negative case observes this retired identity. The App
+# and the pure-Rust positive/foreign-client cases still admit SERVER_IDENTITY only.
+LEGACY_FACADE_IDENTITY = (f'anchor apple generic and certificate leaf[subject.OU] = "{TEAM}" '
+                          'and identifier "com.arkdeck.agentd.facade"')
 MISMATCH_WORDS = "Runtime release does not match this App"
 REMEDY = "run runtime service update"
 REPORT_BUDGET_SECONDS = 20
@@ -219,11 +223,18 @@ def version_mismatch(output):
     version, build = info["CFBundleShortVersionString"], info["CFBundleVersion"]
     before = installed_service()
     bundle = before["bundle"]
+    name = Path(before["executable"]).name
+    require(name in ("arkdeck-agentd", "arkdeck-facade"), "unrecognized installed Runtime executable")
+    identity = LEGACY_FACADE_IDENTITY if name == "arkdeck-facade" else SERVER_IDENTITY
     run("/usr/bin/codesign", "--verify", "--strict", "-R", "=" + SERVER_IDENTITY, bundle)
-    run("/usr/bin/codesign", "--verify", "-R", "=" + SERVER_IDENTITY, str(before["pid"]))
-    # What libxpc evaluates for the App is the live process, so pin that.
+    # The old bundle's principal executable is the Swift daemon, but launchd
+    # runs its separately signed facade. Verify the actual live owner, including
+    # its release, before testing a mismatch; a failed identity check is not one.
+    run("/usr/bin/codesign", "--verify", "-R",
+        "=" + release_requirement(identity, before["version"], before["build"]), str(before["pid"]))
+    ui.verify_live_code(before["pid"], Path(before["executable"]))
     pinned = run("/usr/bin/codesign", "--verify", "-R",
-                 "=" + release_requirement(SERVER_IDENTITY, version, build), str(before["pid"]), check=False)
+                 "=" + release_requirement(identity, version, build), str(before["pid"]), check=False)
     if pinned.returncode == 0:
         return {"status": "BLOCKED", "reason": "installed daemon is this App's release; no mismatch to observe",
                 "app": {"version": version, "build": build}, "service": before}
@@ -231,9 +242,12 @@ def version_mismatch(output):
     reports, exited = smoke_app(executable)
     after = installed_service()
     require(after == before, "installed service changed while the App was refused")
+    ui.verify_live_code(after["pid"], Path(after["executable"]))
     judge_mismatch(reports, exited)
     return {"status": "PASS", "reason": "App reported the release mismatch and its remedy without hanging",
             "app": {"version": version, "build": build, "sha256": os.environ["ARKDECK_SPK8_APP_SHA256"]},
+            "acceptanceScope": "pre-cutover-legacy-facade" if name == "arkdeck-facade"
+            else "installed-daemon-release-mismatch",
             "service": before, "reports": reports}
 
 
