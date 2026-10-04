@@ -71,6 +71,10 @@ public static class CliCommands
     public const string DebugPortForward = "arkdeck port-forward create --inputs-file <path>"; // port-forward.create|remove@1
     public const string DebugPortForwardRemove = "arkdeck port-forward remove --inputs-file <path>";
     public const string JobRun = "arkdeck job run --job <job-id>";                // job.run
+    public const string TraceProbe = "arkdeck trace probe --target <id>";                // trace.probe, app.trace.runtime
+    public const string TraceCapture = "arkdeck trace capture --inputs-file <path>";     // capture.diagnostics@1 (the Trace preset), app.trace.capture
+    public const string UiDumpCapture = "arkdeck ui-dump capture";                        // capture.diagnostics@1 (the UI dump preset), app.viewer.main
+    public const string UiDumpComponentDetail = "arkdeck ui-dump component-detail --inputs-file <path>"; // app.viewer.advanced
     public const string FlashDeviceAccess = "arkdeck flash device-access";                // flash.device-access
     public const string FlashBootloaderStatus = "arkdeck flash bootloader-status";        // flash.bootloader-status
     public const string FlashPrerequisites = "arkdeck flash prerequisites --target <target-id> --device-profile <dayu200>"; // flash.prerequisites

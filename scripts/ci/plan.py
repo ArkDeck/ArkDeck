@@ -109,6 +109,16 @@ WINDOWS_INPUT_PREFIXES = (
     "rust/tests/fixtures/target-adoption/",
     # The Flash host review is checked against the Swift archive oracle (TASK-XPA-020).
     "rust/tests/fixtures/flash-archive/",
+    # The Trace probe checks and the UI dump parser are checked against the Swift oracles
+    # (TASK-XPA-020/021).
+    "rust/tests/fixtures/trace-probe/",
+    "rust/tests/fixtures/ui-dump-inspect/",
+    # The App's tests also read the recorded human-action corpus, the Debug probe oracle, the
+    # observe-device Sessions and the Import upload fixture.
+    "rust/tests/fixtures/agent-human-action/",
+    "rust/tests/fixtures/debug-probe/",
+    "rust/tests/fixtures/observe-device/",
+    "rust/tests/fixtures/import-upload-current/",
     # The App's icon and MSIX assets are the macOS AppIcon (generate-app-icons.py).
     "ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
 )
@@ -125,6 +135,9 @@ WINDOWS_INPUT_FILES = frozenset({
     "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
     "ArkDeckApp/Resources/DebugLocalizable.xcstrings",
     "ArkDeckApp/Resources/FlashLocalizable.xcstrings",
+    "ArkDeckApp/Resources/TraceLocalizable.xcstrings",
+    "ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings",
+    "ArkDeckApp/Resources/UIDumpLocalizable.xcstrings",
     # The App's theme is generated from the design tokens (generate-xaml-tokens.py).
     "docs/design/arkdeck-ds/src/tokens.css",
     # The App's tests read the Job state classes and the CLI coverage commands.

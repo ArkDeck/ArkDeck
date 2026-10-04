@@ -16,10 +16,15 @@ public sealed class SemanticSnapshotTests
 {
     public TestContext TestContext { get; set; } = null!;
 
-    public static IEnumerable<object[]> Scenarios() =>
-        from scenario in new[] { "foundation", "unavailable", "contract-mismatch", "jobs", "targets", "inspector" }
-        from language in new[] { "en-US", "zh-Hans" }
-        select new object[] { scenario, language };
+    /// <summary>Every scenario some snapshot names (so none goes unchecked), in each language.</summary>
+    public static IEnumerable<object[]> Scenarios()
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(RepoPaths.At("spec", "ui-semantics", "surfaces.json")));
+        var scenarios = doc.RootElement.GetProperty("snapshots").EnumerateArray().Select(s => s.GetProperty("scenario").GetString()!).Distinct().ToArray();
+        return from scenario in scenarios
+               from language in new[] { "en-US", "zh-Hans" }
+               select new object[] { scenario, language };
+    }
 
     [TestMethod]
     [DynamicData(nameof(Scenarios))]
