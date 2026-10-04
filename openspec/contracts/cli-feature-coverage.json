@@ -249,7 +249,7 @@
       "feature": "analyzer.extract-crash-signature@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -267,7 +267,7 @@
       "feature": "analyzer.summarize-hilog@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

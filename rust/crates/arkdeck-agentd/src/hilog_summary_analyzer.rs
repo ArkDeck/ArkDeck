@@ -13,14 +13,21 @@
 //! summary is written to stdout, exit 0. Anything else is one of Swift's two
 //! fixed lines, which never name the path or the bytes: a usage refusal and
 //! exit 64 before anything is read, or a failure and exit 1.
+//!
+//! On Windows (TASK-XPA-011) the one path is the canonical path the Runtime
+//! holds the source Artifact at, read as the host store reads a pinned file
+//! (`read_host_file`: through no reparse point, unchanged while it is read,
+//! at most 512 MiB).
+use arkdeck_hoststore::{AnalyzerProfile, AnalyzerProfiles};
+#[cfg(target_os = "macos")]
 use arkdeck_hoststore::{
-    AnalyzerProfile, AnalyzerProfiles, ArkTraceProfileLoader, ProductionDistributionTrust,
-    ProductionDoctorProbe,
+    ArkTraceProfileLoader, ProductionDistributionTrust, ProductionDoctorProbe,
 };
-use std::ffi::{OsStr, OsString};
+#[cfg(target_os = "macos")]
+use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, Write};
-use std::os::fd::AsFd;
 use std::path::Path;
 
 pub(crate) const FLAG: &str = "--summarize-hilog";
@@ -34,19 +41,26 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
         let _ = io::stderr().write_all(INVALID_ARGUMENTS.as_bytes());
         return 64;
     };
-    let answered = arkdeck_hoststore::profile_path(&path, true)
+    #[cfg(target_os = "macos")]
+    let bytes = arkdeck_hoststore::profile_path(&path, true)
         .and_then(|path| {
             arkdeck_platform::read_profile_file(&path, arkdeck_hoststore::HILOG_MAXIMUM_INPUT_BYTES)
         })
         .ok()
-        .and_then(|snapshot| arkdeck_hoststore::analyze_hilog(&snapshot.bytes).ok())
+        .map(|snapshot| snapshot.bytes);
+    #[cfg(windows)]
+    let bytes = arkdeck_platform::read_host_file(
+        Path::new(&path),
+        arkdeck_hoststore::HILOG_MAXIMUM_INPUT_BYTES,
+    )
+    .ok();
+    let answered = bytes
+        .and_then(|bytes| arkdeck_hoststore::analyze_hilog(&bytes).ok())
         .and_then(|document| {
             // Delivered, or the mode fails: written through its own handle on
             // stdout, where the standard library's would take a stdout that
             // is not open for writing as a stream to discard.
-            File::from(io::stdout().as_fd().try_clone_to_owned().ok()?)
-                .write_all(&document)
-                .ok()
+            own_stdout().ok()?.write_all(&document).ok()
         });
     match answered {
         Some(()) => 0,
@@ -55,6 +69,41 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
             1
         }
     }
+}
+
+/// This process's stdout as a file of its own handle.
+pub(crate) fn own_stdout() -> io::Result<File> {
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::fd::AsFd;
+        Ok(File::from(io::stdout().as_fd().try_clone_to_owned()?))
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsHandle;
+        Ok(File::from(io::stdout().as_handle().try_clone_to_owned()?))
+    }
+}
+
+/// On Windows: the host's analyzers from `ARKDECK_ANALYZER_PATH`, as the
+/// macOS composition below composes them, and the two ArkTrace analyzers
+/// unavailable as `analyzer.arktraceNotFound`: no ArkTrace distribution is
+/// reviewed for Windows (TASK-XPA-021), and `ARKDECK_ARKTRACE_DESCRIPTOR`
+/// refuses the start.
+#[cfg(windows)]
+pub(crate) fn composed(path: Option<&Path>) -> io::Result<AnalyzerProfiles> {
+    let profiles = match path {
+        None => AnalyzerProfiles::default(),
+        Some(path) => {
+            let analyzer = AnalyzerProfile::crash_signature(path)?;
+            let own = std::env::current_exe()
+                .ok()
+                .and_then(|own| AnalyzerProfile::hilog_summary(&own).ok())
+                .map(|own| own.executable_sha256);
+            AnalyzerProfiles::for_daemon_analyzer(analyzer, own.as_deref())
+        }
+    };
+    Ok(profiles.without_arktrace())
 }
 
 /// Swift's daemon composition of its analyzers from `ARKDECK_ANALYZER_PATH`:
@@ -72,6 +121,7 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
 /// profiles; one that does not leaves both unavailable for the loader's
 /// reason, and no descriptor for `analyzer.arktraceNotFound`. The load runs
 /// the reviewed CLI's own self-test, so a named descriptor spawns a child.
+#[cfg(target_os = "macos")]
 pub(crate) fn composed(
     path: Option<&Path>,
     arktrace_descriptor: Option<&OsStr>,
@@ -114,6 +164,7 @@ pub(crate) fn composed(
     }))
 }
 
+#[cfg(target_os = "macos")]
 /// Swift `URL(filePath:).path` of a daemon setting: `~/` names the home
 /// directory `NSHomeDirectory()` reports, a relative path is resolved against
 /// the current directory with its `.` and `..` segments removed, and no
@@ -152,7 +203,7 @@ fn file_url_path(value: &str, current: &str, home: Option<&str>) -> String {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::file_url_path;
 

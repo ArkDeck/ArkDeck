@@ -93,11 +93,18 @@ pub fn crash_ledger_source(values: &[OsString]) -> Option<PathBuf> {
         return None;
     };
     let value = value.to_string_lossy();
-    if graphemes(&value).next() != Some("/") {
-        return None;
+    // On Windows the one path is a local drive's absolute path (`D:\…`),
+    // taken as it is.
+    #[cfg(windows)]
+    return crate::session::absolute_root(&value).then(|| PathBuf::from(value.as_ref()));
+    #[cfg(target_os = "macos")]
+    {
+        if graphemes(&value).next() != Some("/") {
+            return None;
+        }
+        let path = value.trim_end_matches('/');
+        Some(PathBuf::from(if path.is_empty() { "/" } else { path }))
     }
-    let path = value.trim_end_matches('/');
-    Some(PathBuf::from(if path.is_empty() { "/" } else { path }))
 }
 
 /// Swift `HarnessFaultLogLedger.readIndex`.
@@ -382,6 +389,7 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn the_arguments_are_taken_as_swift_takes_them() {
         use std::os::unix::ffi::OsStringExt;
@@ -418,6 +426,29 @@ mod tests {
                 "{argument:?}"
             );
         }
+    }
+
+    /// On Windows the one argument is a local drive's absolute path, taken
+    /// as it is spelled.
+    #[cfg(windows)]
+    #[test]
+    fn the_windows_argument_is_one_local_absolute_path() {
+        for values in [
+            &[][..],
+            &[r"C:\a", r"C:\b"],
+            &["/a/b"],
+            &[r"a\b"],
+            &[r"\\server\share\x"],
+            &[r"C:a"],
+            &[""],
+        ] {
+            let values: Vec<OsString> = values.iter().map(OsString::from).collect();
+            assert_eq!(crash_ledger_source(&values), None, "{values:?}");
+        }
+        assert_eq!(
+            crash_ledger_source(&[OsString::from(r"C:\ledgers\faultlog.txt")]),
+            Some(PathBuf::from(r"C:\ledgers\faultlog.txt"))
+        );
     }
 
     #[test]

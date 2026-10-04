@@ -13,17 +13,32 @@
 //! the server facts, which `flash.prerequisites` does not project. Host tests
 //! only: the fake reaches no device, and nothing installed is read or
 //! written.
+//!
+//! On Windows (TASK-XPA-010) the same exchanges replay over the fake's
+//! answers in process (`oracle_fake.rs`, its own root below `TEMP`), which
+//! the Host probes through its test-only seam; the production Windows daemon
+//! composes no HDC. A recorded mode is the DACL the host store reads: owner
+//! only below the private root, and a group-readable mode grants the local
+//! Users group read access. `arkforged` is written `arkforged.exe`, the image
+//! a Windows lane measures. Every answer and every HDC call is still Swift's,
+//! byte for byte.
+#[cfg(target_os = "macos")]
+use arkdeck_contract::sha256_hex;
 use arkdeck_contract::{
-    CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION, sha256_hex, strict_json,
-    validate_method_value,
+    CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION, strict_json, validate_method_value,
 };
 use arkdeck_control::Control;
 use arkdeck_hoststore::{FlashHostFacts, NativeRockUsbIdentity, TargetStore};
-use arkdeck_platform::{RegistryUnavailable, UsbHostDevice, VerifiedTool};
-use arkdeck_provider_hdc::{LoaderIdentity, LoaderObserver, ProcessDispatch};
+#[cfg(target_os = "macos")]
+use arkdeck_platform::VerifiedTool;
+use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
+#[cfg(target_os = "macos")]
+use arkdeck_provider_hdc::ProcessDispatch;
+use arkdeck_provider_hdc::{LoaderIdentity, LoaderObserver};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -34,22 +49,97 @@ type Census = Arc<Mutex<Option<Vec<UsbHostDevice>>>>;
 
 /// The fake HDC's fixed root, which its driver names, shared with every
 /// oracle replay under one lock.
+#[cfg(target_os = "macos")]
 const HDC_ROOT: &str = "/private/tmp/arkdeck-hdc-oracle";
+
+/// A fresh directory below `TEMP`, in its canonical spelling: on Windows a
+/// local drive's plain, long spelling (`C:\…`), which the stores compare
+/// their roots with.
+fn temporary(prefix: &str) -> PathBuf {
+    let base = std::env::temp_dir().canonicalize().unwrap();
+    #[cfg(windows)]
+    let base = match base.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+        Some(plain) => PathBuf::from(plain),
+        None => base,
+    };
+    base.join(format!(
+        "{prefix}-{:x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    ))
+}
 
 struct Root(PathBuf);
 
 impl Root {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
-            "flash-host-facts-{:x}",
-            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
-        ));
+        let root = temporary("flash-host-facts");
+        #[cfg(target_os = "macos")]
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
             .create(root.join("state/targets"))
             .unwrap();
+        // Every level the host store's private directory.
+        #[cfg(windows)]
+        for directory in [root.clone(), root.join("state"), root.join("state/targets")] {
+            arkdeck_platform::HostDirectory::open_or_create_private(&directory).unwrap();
+        }
         Self(root)
+    }
+}
+
+/// A recorded path below the Application Support root as this host writes
+/// it: on Windows `arkforged` is the `.exe` image its lane measures.
+fn host_path(path: &str) -> String {
+    #[cfg(windows)]
+    if path == "arkforged" {
+        return "arkforged.exe".to_owned();
+    }
+    path.to_owned()
+}
+
+/// A recorded file's mode, set as this host keeps it.
+#[cfg(target_os = "macos")]
+fn set_mode(file: &Path, mode: u32) {
+    fs::set_permissions(file, fs::Permissions::from_mode(mode)).unwrap();
+}
+
+/// On Windows owner-only is the private DACL the file inherits; a wider
+/// mode gives the local Users group read access.
+#[cfg(windows)]
+fn set_mode(file: &Path, mode: u32) {
+    if mode & 0o077 != 0 {
+        let status = std::process::Command::new("icacls")
+            .arg(file)
+            .args(["/grant", "*S-1-5-32-545:(R)"])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "icacls {}", file.display());
+    }
+}
+
+/// A file's mode as the oracle records it: its permission bits on macOS; on
+/// Windows `600` for a document the host store reads as owner-only, and what
+/// the store refused otherwise. Only owner-only modes are compared there.
+#[cfg(target_os = "macos")]
+fn oracle_mode(file: &Path, _recorded: &str) -> String {
+    format!(
+        "{:o}",
+        fs::metadata(file).unwrap().permissions().mode() & 0o777
+    )
+}
+
+#[cfg(windows)]
+fn oracle_mode(file: &Path, recorded: &str) -> String {
+    let owner_only = arkdeck_platform::HostDirectory::open(file.parent().unwrap())
+        .and_then(|parent| parent.owner_only_document(file.file_name().unwrap().to_str().unwrap()));
+    let wider = u32::from_str_radix(recorded, 8).unwrap() & 0o077 != 0;
+    match (owner_only, wider) {
+        (Ok(_), false) => recorded.to_owned(),
+        (Err(_), true) => recorded.to_owned(),
+        (Ok(_), true) => "owner-only".to_owned(),
+        (Err(error), false) => format!("not owner-only: {error}"),
     }
 }
 
@@ -62,10 +152,33 @@ impl Drop for Root {
 /// `HDCOracleFake.install` with the oracle's answers, held under its lock.
 struct Hdc {
     root: PathBuf,
+    #[cfg(target_os = "macos")]
     _lock: fs::File,
+    #[cfg(windows)]
+    fake: Arc<crate::oracle_fake::OracleFake>,
 }
 
 impl Hdc {
+    /// On Windows, the fake's answers in process over a root of its own:
+    /// the same mode file and call log, and the fragment's answers.
+    #[cfg(windows)]
+    fn install(fixtures: &Path) -> Self {
+        let root = temporary("arkdeck-hdc-oracle");
+        fs::create_dir_all(&root).unwrap();
+        let answers = crate::oracle_fake::Answers::of(
+            &fs::read_to_string(fixtures.join("hdc-answers.sh")).unwrap(),
+        );
+        assert_eq!(answers, crate::oracle_fake::Answers::FlashHostFacts);
+        let fake = Arc::new(crate::oracle_fake::OracleFake::new(&root, answers));
+        Self { root, fake }
+    }
+
+    #[cfg(windows)]
+    fn dispatch(&self) -> Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync> {
+        self.fake.clone()
+    }
+
+    #[cfg(target_os = "macos")]
     fn install(fixtures: &Path) -> Self {
         let lock = fs::OpenOptions::new()
             .read(true)
@@ -85,6 +198,7 @@ impl Hdc {
         Self { root, _lock: lock }
     }
 
+    #[cfg(target_os = "macos")]
     fn dispatch(&self) -> ProcessDispatch {
         let digest = sha256_hex(&fs::read(self.root.join("hdc")).unwrap());
         ProcessDispatch::new(
@@ -211,12 +325,19 @@ impl Scene {
         } else {
             host.with_flash_host_facts(facts)
         };
-        Control::new(if self.probe {
+        #[cfg(target_os = "macos")]
+        let host = if self.probe {
             host.with_development_hdc(Some(hdc.dispatch()))
         } else {
             host
-        })
-        .unwrap()
+        };
+        #[cfg(windows)]
+        let host = if self.probe {
+            host.with_flash_test_hdc(hdc.dispatch())
+        } else {
+            host
+        };
+        Control::new(host).unwrap()
     }
 }
 
@@ -258,22 +379,21 @@ fn perform(root: &Path, fixtures: &Path, hdc: &Hdc, scene: &mut Scene, action: &
     let text = |key: &str| action[key].as_str().map(str::to_owned);
     match action["action"].as_str().unwrap() {
         "write" => {
-            let target = root.join(action["path"].as_str().unwrap());
+            let target = root.join(host_path(action["path"].as_str().unwrap()));
             let _ = fs::remove_file(&target);
             fs::write(
                 &target,
                 fs::read(fixtures.join(action["input"].as_str().unwrap())).unwrap(),
             )
             .unwrap();
-            fs::set_permissions(
+            set_mode(
                 &target,
-                fs::Permissions::from_mode(
-                    u32::from_str_radix(action["mode"].as_str().unwrap(), 8).unwrap(),
-                ),
-            )
-            .unwrap();
+                u32::from_str_radix(action["mode"].as_str().unwrap(), 8).unwrap(),
+            );
         }
-        "remove" => fs::remove_file(root.join(action["path"].as_str().unwrap())).unwrap(),
+        "remove" => {
+            fs::remove_file(root.join(host_path(action["path"].as_str().unwrap()))).unwrap();
+        }
         "usb" => {
             *scene.census.lock().unwrap() = action["devices"]
                 .as_array()
@@ -282,7 +402,7 @@ fn perform(root: &Path, fixtures: &Path, hdc: &Hdc, scene: &mut Scene, action: &
         "rockusb" => {
             let daemon = text("daemon").map(|daemon| {
                 if action["underRoot"] == true {
-                    root.join(daemon).to_str().unwrap().to_owned()
+                    root.join(host_path(&daemon)).to_str().unwrap().to_owned()
                 } else {
                     daemon
                 }
@@ -342,6 +462,8 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
     let mut scene = Scene::new();
     let mut compared = 0;
     let mut reached_lane = 0;
+    #[cfg(windows)]
+    let mut unprobed = 0;
     // What the setup last wrote to each path, or `None` once it removed it.
     let mut written: BTreeMap<String, Option<(String, String)>> = BTreeMap::new();
     for exchange in cases["exchanges"].as_array().unwrap() {
@@ -388,9 +510,27 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
             exchange["hdcCalls"],
             "{index} {name}: HDC calls"
         );
+        // The production Windows composition has no HDC: the same exchange
+        // over it reaches none.
+        #[cfg(windows)]
+        if exchange["hdcCalls"] != json!([]) {
+            let probe = std::mem::replace(&mut scene.probe, false);
+            let control = scene.control(
+                &root.0,
+                &hdc,
+                exchange["composition"].as_str().unwrap_or("lane"),
+            );
+            call(&control, index, method, exchange["params"].clone());
+            scene.probe = probe;
+            scene.lane_calls.lock().unwrap().clear();
+            assert_eq!(hdc.calls(), json!([]), "{index} {name}: no HDC composed");
+            unprobed += 1;
+        }
         compared += 1;
     }
     assert!(compared >= 74, "every recorded exchange replays");
+    #[cfg(windows)]
+    assert_eq!(unprobed, 19, "the exchanges that reached the fake HDC");
     assert_eq!(reached_lane, 8, "the previews that reached the lane");
     // The reads wrote nothing: the Application Support root holds what the
     // setup last wrote, byte for byte and in its mode, and nothing else.
@@ -402,34 +542,24 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
     let mut expected: Vec<String> = written
         .iter()
         .filter(|(_, input)| input.is_some())
-        .map(|(path, _)| path.split('/').next().unwrap().to_owned())
+        .map(|(path, _)| host_path(path.split('/').next().unwrap()))
         .chain(["state".to_owned()])
         .collect();
     expected.sort();
     expected.dedup();
     assert_eq!(left, expected);
     for (path, input) in &written {
+        let file = root.0.join(host_path(path));
         let Some((input, mode)) = input else {
-            assert!(!root.0.join(path).exists(), "{path} was removed");
+            assert!(!file.exists(), "{path} was removed");
             continue;
         };
         assert_eq!(
-            fs::read(root.0.join(path)).unwrap(),
+            fs::read(&file).unwrap(),
             fs::read(fixtures.join(input)).unwrap(),
             "{path}"
         );
-        assert_eq!(
-            format!(
-                "{:o}",
-                fs::metadata(root.0.join(path))
-                    .unwrap()
-                    .permissions()
-                    .mode()
-                    & 0o777
-            ),
-            *mode,
-            "{path}"
-        );
+        assert_eq!(oracle_mode(&file, mode), *mode, "{path}");
     }
 }
 

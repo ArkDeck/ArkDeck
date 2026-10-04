@@ -130,27 +130,25 @@ mod job_plan;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod operation_availability;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_plan::AnalyzerProfile;
 // The Flash planner on macOS and Windows (TASK-XPA-010).
 #[cfg(any(target_os = "macos", windows))]
 pub use job_plan::{FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable};
 #[cfg(any(target_os = "macos", windows))]
 pub use job_plan::{JobPlanner, PlanRefusal};
-// The analyzer operations' fixed facts, read on every host.
-#[cfg(target_os = "macos")]
+// The analyzers a host composes (TASK-XPA-011 on Windows): the crash-ledger
+// and HiLog summary analyzers everywhere; the ArkTrace analyzers only where a
+// reviewed distribution loads, which is macOS alone (TASK-XPA-021).
+#[cfg(any(target_os = "macos", windows))]
 mod analyzer_composition;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod arktrace_pins;
+// The analyzer operations' fixed facts, read on every host.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod analyzer_operations;
-// No analyzer exists on Windows yet (its ArkTrace profiles pin a
-// trace_streamer Windows does not have); the Job planner is the same code
-// with none.
-#[cfg(windows)]
-#[path = "absent_analyzer_composition.rs"]
-mod analyzer_composition;
-#[cfg(windows)]
-pub use analyzer_composition::AnalyzerComposition;
 #[cfg(target_os = "macos")]
 mod arktrace_doctor;
 #[cfg(target_os = "macos")]
@@ -177,7 +175,7 @@ mod arktrace_trust;
 pub use arktrace_trust::ProductionDistributionTrust;
 #[cfg(target_os = "macos")]
 mod arktrace_profile;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use analyzer_composition::{AnalyzerComposition, AnalyzerProfiles};
 #[cfg(target_os = "macos")]
 pub use arktrace_profile::{
@@ -267,17 +265,19 @@ pub use tool_selection::{ToolSelectionAudit, ToolSelectionRegistry};
 mod hdc_impact_source;
 #[cfg(any(target_os = "macos", windows))]
 pub use hdc_impact_source::{CurrentJob, DeviceReading, DeviceRow, ManagedServerImpact};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod analyzer_output;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod crash_ledger;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use crash_ledger::{analyze_crash_ledger, crash_ledger_source};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod hilog_summary;
 #[cfg(target_os = "macos")]
+pub use hilog_summary::profile_path;
+#[cfg(any(target_os = "macos", windows))]
 pub use hilog_summary::{
-    MAXIMUM_INPUT_BYTES as HILOG_MAXIMUM_INPUT_BYTES, analyze_hilog, hilog_source, profile_path,
+    MAXIMUM_INPUT_BYTES as HILOG_MAXIMUM_INPUT_BYTES, analyze_hilog, hilog_source,
 };
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]

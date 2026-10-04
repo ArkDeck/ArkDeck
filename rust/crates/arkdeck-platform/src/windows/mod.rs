@@ -65,7 +65,7 @@ pub use inflate::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
 pub use inspected_directory::InspectedDirectory;
 pub use managed::ManagedServer;
 pub use pinned_file::{
-    HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file,
+    HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
 };
 pub(crate) use process::spawn;
 pub use server::{LoopbackServerLease, end_proved_process};

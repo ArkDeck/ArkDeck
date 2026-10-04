@@ -24,7 +24,7 @@ mod code_sign_helper;
 mod control_action_control;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_host_control;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod crash_ledger_analyzer;
 #[cfg(target_os = "macos")]
 mod crash_symbolizer_mode;
@@ -41,7 +41,7 @@ mod development_mutation;
 mod development_usb;
 #[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod hilog_summary_analyzer;
 mod host;
 #[cfg(test)]
@@ -918,6 +918,18 @@ fn main() {
         }
         if first.is_some_and(|argument| argument == cutover_preflight::FLAG) {
             std::process::exit(cutover_preflight::run(&arguments));
+        }
+    }
+    // The two analyzer modes on Windows too (TASK-XPA-011).
+    #[cfg(windows)]
+    {
+        let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        let first = arguments.first();
+        if first.is_some_and(|argument| argument == hilog_summary_analyzer::FLAG) {
+            std::process::exit(hilog_summary_analyzer::run(&arguments));
+        }
+        if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
+            std::process::exit(crash_ledger_analyzer::run(&arguments));
         }
     }
     if let Err(error) = serve() {

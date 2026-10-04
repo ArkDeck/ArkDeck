@@ -14,8 +14,8 @@ use std::collections::BTreeMap;
 
 const CRASH_SIGNATURE: &str = "crash-signature@1";
 const HILOG_SUMMARY: &str = crate::hilog_summary::ANALYZER_REF;
-const TRACE_SUMMARY: &str = crate::arktrace_profile::SUMMARY_REF;
-const TRACE_ANALYSIS: &str = crate::arktrace_profile::ANALYSIS_REF;
+const TRACE_SUMMARY: &str = crate::arktrace_pins::SUMMARY_REF;
+const TRACE_ANALYSIS: &str = crate::arktrace_pins::ANALYSIS_REF;
 /// `HarnessCrashLedgerAnalysis.schemaVersion`.
 pub(crate) const SCHEMA_VERSION: &str = "1.0.0";
 /// `HarnessCrashLedgerAnalysis.analyzerRef` and `analyzerVersion`, which the
@@ -37,6 +37,8 @@ pub(crate) struct Source<'a> {
     pub artifact_id: &'a str,
     pub sha256: &'a str,
     pub byte_count: u64,
+    /// Read by the ArkTrace dispatch alone, which is macOS-only.
+    #[cfg_attr(windows, allow(dead_code))]
     pub path: &'a str,
 }
 
@@ -673,7 +675,7 @@ mod tests {
             executable_sha256: text(&invocation["executableSHA256"]),
             fixed_arguments: fixed.to_vec(),
             output_byte_budget: 8 * 1024 * 1024,
-            arktrace_summary: Some(crate::arktrace_profile::ArkTraceContract {
+            arktrace_summary: Some(crate::arktrace_envelope::ArkTraceContract {
                 tool_version: text(&contract["toolVersion"]),
                 parser_version: text(&contract["parserVersion"]),
                 parser_upstream_revision: text(&contract["parserUpstreamRevision"]),

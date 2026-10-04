@@ -208,6 +208,28 @@ class HdcProcessing(unittest.TestCase):
         with self.assertRaises(processing.Leak):
             redactor.scan(directory, ["0" * 64])
 
+    def test_uart_rows_are_kept_and_only_the_board_key_is_redacted(self) -> None:
+        # Windows hdc lists the host's serial ports as UART targets, in six CRLF columns.
+        uart = b"COM1\t\tUART\tReady\tunknown...\thdc\r\nCOM2\t\tUART\tReady\tunknown...\thdc\r\n"
+        board = f"{KEY}\t\tUSB\tConnected\tlocalhost\thdc\r\n".encode()
+        sample = Sample(self.base)
+        sample.phase("no-board", [
+            ("version", ["-v"], b"Ver: 3.2.0x\r\n", b"", False, False),
+            ("list-targets-first", ["list", "targets", "-v"], uart, b"", True, True),
+        ])
+        sample.phase("board-connected", [
+            ("list-targets-board-connected", ["list", "targets", "-v"], board + uart, b"", True, True),
+        ])
+        out = self.base / "out"
+        summary = processing.process_hdc(sample.root, "c1", TOOL_DIR, out, ENVIRONMENT)
+        self.assertEqual((out / "no-board" / "list-targets-first.stdout.bin").read_bytes(), uart)
+        self.assertEqual((out / "board-connected" / "list-targets-board-connected.stdout.bin").read_bytes(),
+                         ("a" * 32 + "\t\tUSB\tConnected\tlocalhost\thdc\r\n").encode() + uart)
+        self.assertEqual(summary["connectKeys"], {"count": 1, "lengths": [32],
+                                                  "characterClasses": ["digit", "lower"]})
+        record = json.loads((out / "no-board" / "sample.json").read_text(encoding="utf-8"))
+        self.assertFalse(record["commands"][1]["keyRedacted"])
+
     def test_an_existing_output_is_never_overwritten(self) -> None:
         out = self.base / "out"
         out.mkdir()
@@ -289,6 +311,67 @@ class UsbProcessing(unittest.TestCase):
         self.assertTrue(summary["locationSurvivesReplugSamePort"])
         self.assertEqual(summary["phases"]["after"]["interfaceNodes"], 1)
         self.assertEqual(summary["phases"]["replugged"]["arrivalOrder"], {"order": 2})
+
+    def test_the_hub_chain_is_kept_when_windows_lower_cases_its_id(self) -> None:
+        # As sampled: the hub's own instance ID spells its suffix `4&1A2B3C4D&0&0`, while the
+        # board's `Parent` and the hub's `Children` spell suffixes in lower case.
+        root = usb_sample(self.base)
+        hub = r"USB\ROOT_HUB30\4&1A2B3C4D&0&0"
+        parent = r"USB\ROOT_HUB30\4&1a2b3c4d&0&0"
+        board_upper = rf"USB\VID_2207&PID_5000\{SERIAL.upper()}"
+        for path in root.glob("usb-*.json"):
+            record = json.loads(path.read_text(encoding="utf-8"))
+            for n in record["rockchipNodes"] + record["presentUsbNodes"]:
+                if n["instanceId"] == HUB:
+                    n["instanceId"] = hub
+                    n["properties"]["DEVPKEY_Device_Children"]["data"] = [BOARD, r"USB\VID_046D&PID_C52B\5&2c3d&0&5"]
+                elif n["properties"].get("DEVPKEY_Device_Parent", {}).get("data") == HUB:
+                    n["properties"]["DEVPKEY_Device_Parent"]["data"] = parent
+                if n["instanceId"] == BOARD:
+                    n["instanceId"] = board_upper
+                elif n["properties"].get("DEVPKEY_Device_Parent", {}).get("data") == BOARD:
+                    n["properties"]["DEVPKEY_Device_Parent"]["data"] = board_upper
+            path.write_text(json.dumps(record), encoding="utf-8")
+        hdc = standard_sample(self.base)
+        out = self.base / "usb-out"
+        summary = processing.process_usb(root, [hdc.root], out, ENVIRONMENT)
+        self.assertEqual(summary["serials"], [{"length": 32, "characterClasses": ["digit", "upper"],
+                                               "equalsConnectKey": False, "equalsConnectKeyIgnoringCase": True}])
+        after = json.loads((out / "usb-after.json").read_text(encoding="utf-8"))
+        nodes = {n["instanceId"]: n for n in after["nodes"]}
+        self.assertIn(hub, nodes)
+        board = nodes[r"USB\VID_2207&PID_5000" + "\\" + "a" * 32]
+        self.assertEqual(board["properties"]["DEVPKEY_Device_Parent"]["data"], parent)
+        self.assertEqual(nodes[hub]["properties"]["DEVPKEY_Device_Children"]["data"],
+                         [r"USB\VID_2207&PID_5000" + "\\" + "a" * 32])
+        self.assertNotIn(b"5&2c3d&0&5", (out / "usb-after.json").read_bytes().lower())
+
+    def test_hardware_and_compatible_ids_are_kept(self) -> None:
+        root = usb_sample(self.base)
+        for path in root.glob("usb-*.json"):
+            record = json.loads(path.read_text(encoding="utf-8"))
+            for n in record["rockchipNodes"] + record["presentUsbNodes"]:
+                if n["instanceId"] == BOARD:
+                    n["properties"]["DEVPKEY_Device_CompatibleIds"] = {
+                        "type": "StringList", "data": [r"USB\MS_COMP_WINUSB", r"USB\Class_FF&SubClass_50"]}
+            path.write_text(json.dumps(record), encoding="utf-8")
+        out = self.base / "usb-out"
+        summary = processing.process_usb(root, [], out, ENVIRONMENT)
+        self.assertEqual(summary["phases"]["after"]["hardwareIds"],
+                         [r"USB\VID_2207&PID_5000&REV_0100", r"USB\VID_2207&PID_5000"])
+        after = json.loads((out / "usb-after.json").read_text(encoding="utf-8"))
+        board = next(n for n in after["nodes"] if n["instanceId"].startswith(r"USB\VID_2207&PID_5000" + "\\"))
+        self.assertEqual(board["properties"]["DEVPKEY_Device_CompatibleIds"]["data"],
+                         [r"USB\MS_COMP_WINUSB", r"USB\Class_FF&SubClass_50"])
+
+    def test_guid_labels_are_closed(self) -> None:
+        out = self.base / "usb-out"
+        processing.process_usb(usb_sample(self.base), [], out, ENVIRONMENT)
+        after = json.loads((out / "usb-after.json").read_text(encoding="utf-8"))
+        board = next(n for n in after["nodes"] if n["instanceId"].startswith(r"USB\VID_2207&PID_5000" + "\\"))
+        self.assertRegex(board["properties"]["DEVPKEY_Device_ContainerId"]["data"], r"^<container-\d+>$")
+        labels = processing.Labels("pid")
+        self.assertEqual(labels(5150), "pid-1")
 
     def test_a_port_derived_suffix_is_no_serial(self) -> None:
         root = usb_sample(self.base)

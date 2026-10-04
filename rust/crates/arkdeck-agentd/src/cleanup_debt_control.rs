@@ -68,7 +68,7 @@ impl Root {
         // The Windows runner is composed over the state root the Job planner
         // plans against, which the Windows daemon composes with the Job owner.
         #[cfg(windows)]
-        let host = host.with_planning(&self.0);
+        let host = host.with_planning(&self.0, None);
         Control::new(host).unwrap()
     }
     /// The ledger as the Runtime writes it: owner-only, as the host store
