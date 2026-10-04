@@ -22,8 +22,15 @@
 //! `src/main.rs` alone. Host tests only: every HDC here is a fake, and
 //! nothing installed is read or written.
 //!
-//! On Windows two things run here:
+//! On Windows three things run here:
 //! - the Flash host facts replay (TASK-XPA-010);
+//! - a Flash Job planned, admitted, run and reconciled through the Host and
+//!   Control over the Swift Flash run oracle's fake lane, with the fake HDC
+//!   given through the test seam (`flash_execution_control.rs`, TASK-XPA-010),
+//!   and the same Flash driven by the real CLI over the control pipe of a
+//!   signed copy of this binary (`flash_socket_control.rs`);
+//! - the protected Flash recovery broker's pinned request executed through the
+//!   same Host (`flash_broker_control.rs`);
 //! - the signed test daemon (`signed_daemon.rs`, TASK-XPA-009), which this
 //!   binary serves on a development root's pipe for the real CLI.
 //!
@@ -105,12 +112,9 @@ mod windows_lifecycle;
 mod app_ingress_fake_hdc;
 #[cfg(target_os = "macos")]
 mod debug_read_control;
-#[cfg(target_os = "macos")]
 mod flash_broker_control;
-#[cfg(target_os = "macos")]
 mod flash_execution_control;
 mod flash_host_facts_control;
-#[cfg(target_os = "macos")]
 mod flash_socket_control;
 #[cfg(windows)]
 mod gj1_device_leaves;

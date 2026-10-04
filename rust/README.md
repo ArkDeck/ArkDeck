@@ -2937,6 +2937,36 @@ composed on Windows. So a verified bundle is refused before its
 `job.submit` is refused before admission with that reason and zero
 dispatch (`windows_flash_lane_process.rs`).
 
+Over a composed HDC (TASK-XPA-005's Job composition) a Flash runs end to end
+on Windows against fakes: the Swift Flash run oracle's fake lane and
+Rockchip host (`arkdeck-hoststore/tests/support/flash_lane.rs`) and an
+in-process fake HDC given through the test seam (`Host::with_test_hdc`).
+`tests/spawning/flash_execution_control.rs` plans, admits, runs and
+reconciles `flash.full-restore@1` through the Host and Control; an unknown
+outcome stays unknown and is never replayed. `flash_socket_control.rs` drives
+the same Flash with the real CLI (`flash run`, `agent run`, `job plan|submit|
+run`, and `flash bootloader-status|prerequisites` over the same
+composition) against a copy of the test binary signed with the development
+signer, serving on a private pipe, which the CLI verifies as it verifies an
+installed daemon. An agent execution admits its Flash through the Flash
+admission on Windows too, as on macOS (`Host::agent_execution`).
+`flash_plan_control.rs` answers a Flash `job.plan` and `job.submit` in each
+composition as Swift's daemon does, on Windows as on macOS. No board is
+flashed and no `arkforged` runs.
+
+The Windows daemon composes Swift's Flash invocation owner beside the Job
+state it plans in, and the post-flash alias reconciler over its Application
+Support root and the Windows USB census, as the macOS compositions do; the
+census names `flashAliasReconciler` and `flashInvocations` at their macOS
+positions. `flash_host_reads_control.rs` replays the Swift flash-host-reads
+oracle (`flash.reconcile-alias`, `debug.status`,
+`recovery.flash-invocation.list`, 61 exchanges) through the Windows Host,
+`tests/spawning/flash_broker_control.rs` executes the recovery broker's
+pinned full restore through it, and `flash_socket_control.rs` drives
+`recovery flash-invocation start|evaluate|status|list` (and the `debug`
+spellings) and `flash reconcile-alias` through the real CLI against the
+signed test daemon.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in

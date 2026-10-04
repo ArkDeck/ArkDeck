@@ -200,6 +200,8 @@ const RULINGS: &[(&str, Ruling)] = &[
     ("human-action.list", leaf("human-action.list")),
     ("human-action.resume", leaf("human-action.resume")),
     ("human-action.show", leaf("human-action.show")),
+    ("job.archive", leaf("job.archive.apply")),
+    ("job.archive.preview", leaf("job.archive.preview")),
     ("job.cancel", leaf("job.cancel")),
     ("job.events", leaf("job.events")),
     ("job.evidence", leaf("job.evidence")),
@@ -558,6 +560,33 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.diff",
     "workspace.isolate",
     "workspace.sweep",
+    // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
+    // state through `flash run`, and the Flash host reads over the same
+    // composition, by the real CLI against a signed copy of the daemon's test
+    // build over its control pipe, with the Swift Flash run oracle's fake lane
+    // and Rockchip host and an in-process fake HDC
+    // (`tests/spawning/flash_socket_control.rs`). No board is flashed. The
+    // shared generic leaves the same test drives (`agent run`, `job plan|
+    // submit|run`) are not counted until every operation they reach on
+    // Windows answers as Swift does (the lead's ruling of 2026-10-04 for
+    // GJ-2/3).
+    "flash.run",
+    "flash.bootloader-status",
+    "flash.prerequisites",
+    // The protected Flash recovery broker over the Flash invocation owner
+    // (TASK-XPA-010): an invocation started, its pinned full restore executed
+    // to a terminal state, shown and listed (`recovery flash-invocation …`
+    // and `debug …`), by the same CLI against the same signed test daemon. Not `flash reconcile-alias`, whose reconciler the
+    // CLI reaches but whose repair no fake lineage exercises there (the
+    // flash-host-reads oracle replays it through the Windows Host).
+    "recovery.flash-invocation.start",
+    "recovery.flash-invocation.evaluate",
+    "recovery.flash-invocation.status",
+    "recovery.flash-invocation.list",
+    // Their `debug start|evaluate|status` spellings, the same handlers.
+    "debug.start",
+    "debug.evaluate",
+    "debug.status",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -1268,6 +1297,7 @@ mod tests {
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
+            // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),
@@ -1320,16 +1350,16 @@ mod tests {
             document["summary"]["bySource"]["daemon"],
             serde_json::json!(METHODS.len() - 1)
         );
-        let mut expected = vec![
-            "daemon method job.unruled has no coverage ruling".to_owned(),
-            "coverage names a daemon method the registry does not classify: job.status".to_owned(),
-        ];
+        let mut expected = vec!["daemon method job.unruled has no coverage ruling".to_owned()];
         for method in [
+            "job.archive",
+            "job.archive.preview",
+            "job.status",
             "diagnostic.session.status",
             "diagnostic.session.mark",
             "diagnostic.session.stop",
         ] {
-            if !METHODS.contains(&method) {
+            if !methods.contains(&method) {
                 expected.push(format!(
                     "coverage names a daemon method the registry does not classify: {method}"
                 ));
