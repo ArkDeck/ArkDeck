@@ -3817,6 +3817,930 @@
       "zh-Hans": "刷机"
     },
     {
+      "key": "trace.action.cancel",
+      "table": "TraceLocalizable",
+      "en": "Cancel capture",
+      "zh-Hans": "取消抓取"
+    },
+    {
+      "key": "trace.action.openViewer",
+      "table": "TraceLocalizable",
+      "en": "Open trace viewer",
+      "zh-Hans": "打开 Trace 查看器"
+    },
+    {
+      "key": "trace.action.refresh",
+      "table": "TraceLocalizable",
+      "en": "Refresh devices",
+      "zh-Hans": "刷新设备"
+    },
+    {
+      "key": "trace.action.running",
+      "table": "TraceLocalizable",
+      "en": "Capturing…",
+      "zh-Hans": "正在抓取…"
+    },
+    {
+      "key": "trace.action.start",
+      "table": "TraceLocalizable",
+      "en": "Start capture",
+      "zh-Hans": "开始抓取"
+    },
+    {
+      "key": "trace.availability.available",
+      "table": "TraceLocalizable",
+      "en": "Ready",
+      "zh-Hans": "可以抓取"
+    },
+    {
+      "key": "trace.availability.checking",
+      "table": "TraceLocalizable",
+      "en": "Checking…",
+      "zh-Hans": "正在检查…"
+    },
+    {
+      "key": "trace.availability.unavailable",
+      "table": "TraceLocalizable",
+      "en": "Unavailable",
+      "zh-Hans": "暂时无法抓取"
+    },
+    {
+      "key": "trace.blocker.adapterUnsupported",
+      "table": "TraceLocalizable",
+      "en": "This device's hitrace category list is not supported by this ArkDeck version. Update ArkDeck or use a supported device.",
+      "zh-Hans": "当前 ArkDeck 版本尚未支持此设备的 hitrace 分类列表。请更新 ArkDeck 或使用已支持的设备。"
+    },
+    {
+      "key": "trace.blocker.buffer",
+      "table": "TraceLocalizable",
+      "en": "The default trace buffer is unavailable for this device.",
+      "zh-Hans": "当前设备不支持默认 Trace 缓冲区。"
+    },
+    {
+      "key": "trace.blocker.capability",
+      "table": "TraceLocalizable",
+      "en": "Trace capability check is incomplete for this device. Refresh and try again.",
+      "zh-Hans": "当前设备的 Trace 能力检查尚未完成，请刷新后重试。"
+    },
+    {
+      "key": "trace.blocker.checking",
+      "table": "TraceLocalizable",
+      "en": "Wait for the device check to finish.",
+      "zh-Hans": "请等待设备检查完成。"
+    },
+    {
+      "key": "trace.blocker.duration",
+      "table": "TraceLocalizable",
+      "en": "Enter a duration inside the allowed range.",
+      "zh-Hans": "请输入允许范围内的时长。"
+    },
+    {
+      "key": "trace.blocker.noTags",
+      "table": "TraceLocalizable",
+      "en": "Choose a capture profile.",
+      "zh-Hans": "请选择抓取场景。"
+    },
+    {
+      "key": "trace.blocker.operation",
+      "table": "TraceLocalizable",
+      "en": "Trace capture is unavailable. Refresh and try again.",
+      "zh-Hans": "Trace 抓取暂不可用，请刷新后重试。"
+    },
+    {
+      "key": "trace.blocker.tags",
+      "table": "TraceLocalizable",
+      "en": "This profile is not supported by the selected device. Choose another profile.",
+      "zh-Hans": "所选设备不支持这个抓取场景，请选择其他场景。"
+    },
+    {
+      "key": "trace.blocker.target",
+      "table": "TraceLocalizable",
+      "en": "Select an adopted device.",
+      "zh-Hans": "请选择已接管的设备。"
+    },
+    {
+      "key": "trace.bounds.duration",
+      "table": "TraceLocalizable",
+      "en": "Duration",
+      "zh-Hans": "时长"
+    },
+    {
+      "key": "trace.cancel.failed",
+      "table": "TraceLocalizable",
+      "en": "Unable to cancel this capture. Wait for the current safe step to finish and try again.",
+      "zh-Hans": "无法取消此次抓取。请等待当前安全步骤结束后重试。"
+    },
+    {
+      "key": "trace.capture.device",
+      "table": "TraceLocalizable",
+      "en": "Device",
+      "zh-Hans": "设备"
+    },
+    {
+      "key": "trace.capture.finished",
+      "table": "TraceLocalizable",
+      "en": "Capture complete.",
+      "zh-Hans": "抓取完成。"
+    },
+    {
+      "key": "trace.capture.localOnly",
+      "table": "TraceLocalizable",
+      "en": "The trace stays on this Mac and opens automatically.",
+      "zh-Hans": "Trace 只保存在这台 Mac，并会在完成后自动打开。"
+    },
+    {
+      "key": "trace.capture.notCompleted",
+      "table": "TraceLocalizable",
+      "en": "Capture ended without a viewable trace. Open History for details.",
+      "zh-Hans": "抓取已结束，但没有可查看的 Trace。请打开历史记录了解详情。"
+    },
+    {
+      "key": "trace.capture.outcomeUnknown",
+      "table": "TraceLocalizable",
+      "en": "Capture outcome is unknown. Check History before starting another capture.",
+      "zh-Hans": "抓取结果未知。再次抓取前请先查看历史记录。"
+    },
+    {
+      "key": "trace.capture.profile",
+      "table": "TraceLocalizable",
+      "en": "Profile",
+      "zh-Hans": "抓取场景"
+    },
+    {
+      "key": "trace.capture.title",
+      "table": "TraceLocalizable",
+      "en": "Capture trace",
+      "zh-Hans": "抓取 Trace"
+    },
+    {
+      "key": "trace.duration.minutes",
+      "table": "TraceLocalizable",
+      "en": "Minutes",
+      "zh-Hans": "分钟"
+    },
+    {
+      "key": "trace.duration.quick",
+      "table": "TraceLocalizable",
+      "en": "Quick duration",
+      "zh-Hans": "快捷时长"
+    },
+    {
+      "key": "trace.duration.seconds",
+      "table": "TraceLocalizable",
+      "en": "Seconds",
+      "zh-Hans": "秒"
+    },
+    {
+      "key": "trace.duration.set10Seconds",
+      "table": "TraceLocalizable",
+      "en": "Set duration to 10 seconds",
+      "zh-Hans": "将时长设为 10 秒"
+    },
+    {
+      "key": "trace.duration.set15Seconds",
+      "table": "TraceLocalizable",
+      "en": "Set duration to 15 seconds",
+      "zh-Hans": "将时长设为 15 秒"
+    },
+    {
+      "key": "trace.duration.set1Minute",
+      "table": "TraceLocalizable",
+      "en": "Set duration to 1 minute",
+      "zh-Hans": "将时长设为 1 分钟"
+    },
+    {
+      "key": "trace.duration.set2Minutes",
+      "table": "TraceLocalizable",
+      "en": "Set duration to 2 minutes",
+      "zh-Hans": "将时长设为 2 分钟"
+    },
+    {
+      "key": "trace.duration.set30Seconds",
+      "table": "TraceLocalizable",
+      "en": "Set duration to 30 seconds",
+      "zh-Hans": "将时长设为 30 秒"
+    },
+    {
+      "key": "trace.duration.set3Minutes",
+      "table": "TraceLocalizable",
+      "en": "Set duration to 3 minutes",
+      "zh-Hans": "将时长设为 3 分钟"
+    },
+    {
+      "key": "trace.duration.set5Seconds",
+      "table": "TraceLocalizable",
+      "en": "Set duration to 5 seconds",
+      "zh-Hans": "将时长设为 5 秒"
+    },
+    {
+      "key": "trace.duration.setCustom",
+      "table": "TraceLocalizable",
+      "en": "Set a custom duration",
+      "zh-Hans": "设置自定义时长"
+    },
+    {
+      "key": "trace.duration.unit",
+      "table": "TraceLocalizable",
+      "en": "Duration unit",
+      "zh-Hans": "时长单位"
+    },
+    {
+      "key": "trace.preset.arkuiDeep",
+      "table": "TraceLocalizable",
+      "en": "App responsiveness",
+      "zh-Hans": "应用响应"
+    },
+    {
+      "key": "trace.preset.arkuiDeep.detail",
+      "table": "TraceLocalizable",
+      "en": "Best for slow interactions, layout work and ArkUI jank.",
+      "zh-Hans": "适合分析交互迟缓、布局耗时和 ArkUI 卡顿。"
+    },
+    {
+      "key": "trace.preset.attachmentPanorama",
+      "table": "TraceLocalizable",
+      "en": "System overview",
+      "zh-Hans": "系统概览"
+    },
+    {
+      "key": "trace.preset.attachmentPanorama.detail",
+      "table": "TraceLocalizable",
+      "en": "Captures the broadest system activity and produces the largest trace.",
+      "zh-Hans": "覆盖最广的系统活动，生成的 Trace 也最大。"
+    },
+    {
+      "key": "trace.preset.io",
+      "table": "TraceLocalizable",
+      "en": "I/O",
+      "zh-Hans": "I/O"
+    },
+    {
+      "key": "trace.preset.io.detail",
+      "table": "TraceLocalizable",
+      "en": "Best for file, storage and work-queue investigations.",
+      "zh-Hans": "适合分析文件、存储和工作队列问题。"
+    },
+    {
+      "key": "trace.preset.renderAnimation",
+      "table": "TraceLocalizable",
+      "en": "Rendering and animation",
+      "zh-Hans": "渲染与动画"
+    },
+    {
+      "key": "trace.preset.renderAnimation.detail",
+      "table": "TraceLocalizable",
+      "en": "Best for frame production, graphics and animation issues.",
+      "zh-Hans": "适合分析出帧、图形和动画问题。"
+    },
+    {
+      "key": "trace.preset.schedulingIpc",
+      "table": "TraceLocalizable",
+      "en": "CPU scheduling",
+      "zh-Hans": "CPU 调度"
+    },
+    {
+      "key": "trace.preset.schedulingIpc.detail",
+      "table": "TraceLocalizable",
+      "en": "Best for thread scheduling, contention and IPC investigations.",
+      "zh-Hans": "适合分析线程调度、资源争用和 IPC 问题。"
+    },
+    {
+      "key": "trace.target.empty",
+      "table": "TraceLocalizable",
+      "en": "No adopted devices. Connect and adopt a device, then refresh.",
+      "zh-Hans": "没有已接管的设备。请连接并接管设备，然后刷新。"
+    },
+    {
+      "key": "trace.validation.decimal",
+      "table": "TraceLocalizable",
+      "en": "Use whole numbers only.",
+      "zh-Hans": "只能输入整数。"
+    },
+    {
+      "key": "trace.validation.missing",
+      "table": "TraceLocalizable",
+      "en": "Enter a duration.",
+      "zh-Hans": "请输入抓取时长。"
+    },
+    {
+      "key": "trace.validation.range",
+      "table": "TraceLocalizable",
+      "en": "Enter a value from %1$d through %2$d.",
+      "zh-Hans": "请输入 %1$d 到 %2$d 之间的值。"
+    },
+    {
+      "key": "trace.viewer.artifactInvalid",
+      "table": "TraceLocalizable",
+      "en": "Capture completed, but no valid raw trace was published. Open History to inspect the job.",
+      "zh-Hans": "抓取已完成，但没有发布有效的原始 Trace。请打开历史记录检查任务。"
+    },
+    {
+      "key": "trace.viewer.artifactListUnavailable",
+      "table": "TraceLocalizable",
+      "en": "Capture completed, but its trace is unavailable. Refresh and try opening it again.",
+      "zh-Hans": "抓取已完成，但 Trace 暂不可用。请刷新后重试。"
+    },
+    {
+      "key": "trace.viewer.description",
+      "table": "TraceLocalizable",
+      "en": "Open a local trace or choose a recent trace in the viewer.",
+      "zh-Hans": "在查看器中打开本地 Trace，或继续查看最近的 Trace。"
+    },
+    {
+      "key": "trace.viewer.latest",
+      "table": "TraceLocalizable",
+      "en": "Latest captured trace is ready",
+      "zh-Hans": "最新抓取的 Trace 已就绪"
+    },
+    {
+      "key": "trace.viewer.preparing",
+      "table": "TraceLocalizable",
+      "en": "Verifying and opening the captured trace…",
+      "zh-Hans": "正在校验并打开抓取的 Trace…"
+    },
+    {
+      "key": "trace.viewer.readFailed",
+      "table": "TraceLocalizable",
+      "en": "Capture completed, but the trace could not be read. Refresh and try again.",
+      "zh-Hans": "抓取已完成，但无法读取 Trace。请刷新后重试。"
+    },
+    {
+      "key": "trace.viewer.stagingUnavailable",
+      "table": "TraceLocalizable",
+      "en": "Unable to prepare the trace for viewing. Check available storage and try again.",
+      "zh-Hans": "无法准备要查看的 Trace。请检查可用存储空间后重试。"
+    },
+    {
+      "key": "trace.viewer.title",
+      "table": "TraceLocalizable",
+      "en": "View traces",
+      "zh-Hans": "查看 Trace"
+    },
+    {
+      "key": "trace.viewer.tryAgain",
+      "table": "TraceLocalizable",
+      "en": "Try opening trace again",
+      "zh-Hans": "重试打开 Trace"
+    },
+    {
+      "key": "trace.workspace.summary",
+      "table": "TraceLocalizable",
+      "en": "Capture a trace from an adopted OpenHarmony device, then inspect it in the built-in viewer.",
+      "zh-Hans": "从已接管的 OpenHarmony 设备抓取 Trace，然后在内置查看器中分析。"
+    },
+    {
+      "key": "viewer.action.show",
+      "table": "UIDumpLocalizable",
+      "en": "Show %1$@",
+      "zh-Hans": "显示%1$@"
+    },
+    {
+      "key": "viewer.advancedDump.search",
+      "table": "UIDumpLocalizable",
+      "en": "Search Advanced Dump",
+      "zh-Hans": "搜索 Advanced Dump"
+    },
+    {
+      "key": "viewer.advancedDump.search.clear",
+      "table": "UIDumpLocalizable",
+      "en": "Clear search",
+      "zh-Hans": "清除搜索"
+    },
+    {
+      "key": "viewer.advancedDump.search.noResults",
+      "table": "UIDumpLocalizable",
+      "en": "No matching fields or values",
+      "zh-Hans": "没有匹配的字段或值"
+    },
+    {
+      "key": "viewer.advancedDump.search.placeholder",
+      "table": "UIDumpLocalizable",
+      "en": "Search fields or values",
+      "zh-Hans": "搜索字段或值"
+    },
+    {
+      "key": "viewer.advancedDump.search.results",
+      "table": "UIDumpLocalizable",
+      "en": "Advanced Dump search results",
+      "zh-Hans": "Advanced Dump 搜索结果"
+    },
+    {
+      "key": "viewer.advancedDump.search.shortcut",
+      "table": "UIDumpLocalizable",
+      "en": "Search Advanced Dump (⌘F)",
+      "zh-Hans": "搜索 Advanced Dump（⌘F）"
+    },
+    {
+      "key": "viewer.advancedDump.unavailable",
+      "table": "UIDumpLocalizable",
+      "en": "Select this tab to capture componentDetail fields",
+      "zh-Hans": "选择此标签以采集 componentDetail 字段"
+    },
+    {
+      "key": "viewer.chip.interactive",
+      "table": "UIDumpLocalizable",
+      "en": "Interactive",
+      "zh-Hans": "可交互"
+    },
+    {
+      "key": "viewer.chip.visible",
+      "table": "UIDumpLocalizable",
+      "en": "Visible",
+      "zh-Hans": "可见"
+    },
+    {
+      "key": "viewer.empty.explain",
+      "table": "UIDumpLocalizable",
+      "en": "Capture View creates a typed Runtime Job and shows only verified, same-Job Artifacts.",
+      "zh-Hans": "「抓取视图」会创建一个 typed Runtime Job，并且只展示同一个 Job 里通过校验的 Artifact。"
+    },
+    {
+      "key": "viewer.empty.selectTarget",
+      "table": "UIDumpLocalizable",
+      "en": "Select an adopted target with a complete binding, then capture the view.",
+      "zh-Hans": "先选择一个绑定完整的已纳管目标，再抓取视图。"
+    },
+    {
+      "key": "viewer.empty.targetBlocked",
+      "table": "UIDumpLocalizable",
+      "en": "%1$@ cannot capture a view: %2$@. Select a Connected target.",
+      "zh-Hans": "%1$@ 无法抓取视图：%2$@。请选择一个「已连接」的目标。"
+    },
+    {
+      "key": "viewer.empty.title",
+      "table": "UIDumpLocalizable",
+      "en": "No verified capture",
+      "zh-Hans": "没有已验证的 capture"
+    },
+    {
+      "key": "viewer.field.accessibleLabel",
+      "table": "UIDumpLocalizable",
+      "en": "accessible label",
+      "zh-Hans": "无障碍名称"
+    },
+    {
+      "key": "viewer.field.description",
+      "table": "UIDumpLocalizable",
+      "en": "description",
+      "zh-Hans": "描述"
+    },
+    {
+      "key": "viewer.field.hitTest",
+      "table": "UIDumpLocalizable",
+      "en": "hit test",
+      "zh-Hans": "命中测试"
+    },
+    {
+      "key": "viewer.field.screenshotMapping",
+      "table": "UIDumpLocalizable",
+      "en": "screenshot mapping",
+      "zh-Hans": "截图映射"
+    },
+    {
+      "key": "viewer.footer.nodes",
+      "table": "UIDumpLocalizable",
+      "en": "%1$d nodes",
+      "zh-Hans": "%1$d 个节点"
+    },
+    {
+      "key": "viewer.footer.notMeasured",
+      "table": "UIDumpLocalizable",
+      "en": "not measured",
+      "zh-Hans": "未测量"
+    },
+    {
+      "key": "viewer.group.focus",
+      "table": "UIDumpLocalizable",
+      "en": "Focus",
+      "zh-Hans": "焦点"
+    },
+    {
+      "key": "viewer.group.geometry",
+      "table": "UIDumpLocalizable",
+      "en": "Geometry",
+      "zh-Hans": "几何"
+    },
+    {
+      "key": "viewer.group.identity",
+      "table": "UIDumpLocalizable",
+      "en": "Identity",
+      "zh-Hans": "身份"
+    },
+    {
+      "key": "viewer.group.paint",
+      "table": "UIDumpLocalizable",
+      "en": "Paint",
+      "zh-Hans": "绘制"
+    },
+    {
+      "key": "viewer.group.semantics",
+      "table": "UIDumpLocalizable",
+      "en": "Semantics",
+      "zh-Hans": "语义"
+    },
+    {
+      "key": "viewer.group.state",
+      "table": "UIDumpLocalizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "viewer.pane.coordinatesUnverified",
+      "table": "UIDumpLocalizable",
+      "en": "Coordinates cannot be verified",
+      "zh-Hans": "坐标系无法证明"
+    },
+    {
+      "key": "viewer.pane.screenshot",
+      "table": "UIDumpLocalizable",
+      "en": "Device screenshot",
+      "zh-Hans": "设备截图"
+    },
+    {
+      "key": "viewer.pane.showBounds",
+      "table": "UIDumpLocalizable",
+      "en": "Show component bounds",
+      "zh-Hans": "显示组件边界"
+    },
+    {
+      "key": "viewer.pane.tree",
+      "table": "UIDumpLocalizable",
+      "en": "UI tree",
+      "zh-Hans": "UI 树"
+    },
+    {
+      "key": "viewer.properties.rawUnavailable",
+      "table": "UIDumpLocalizable",
+      "en": "Raw fields are unavailable",
+      "zh-Hans": "原始字段不可用"
+    },
+    {
+      "key": "viewer.properties.selectPrompt",
+      "table": "UIDumpLocalizable",
+      "en": "Select a component",
+      "zh-Hans": "选择一个组件"
+    },
+    {
+      "key": "viewer.screenshot.selectHint",
+      "table": "UIDumpLocalizable",
+      "en": "Use the UI tree to select a component with the keyboard.",
+      "zh-Hans": "用 UI 树可以通过键盘选择组件。"
+    },
+    {
+      "key": "viewer.screenshot.selectLabel",
+      "table": "UIDumpLocalizable",
+      "en": "Select component in screenshot",
+      "zh-Hans": "在截图中选择组件"
+    },
+    {
+      "key": "viewer.screenshot.unavailable",
+      "table": "UIDumpLocalizable",
+      "en": "Screenshot is unavailable",
+      "zh-Hans": "截图不可用"
+    },
+    {
+      "key": "viewer.screenshot.unverifiedDetail",
+      "table": "UIDumpLocalizable",
+      "en": "The tree bounds do not prove this screenshot's coordinate space. Tree and Raw dump remain available, but screenshot selection is disabled.",
+      "zh-Hans": "树的 bounds 无法证明这张截图的坐标系。树和 Raw dump 仍然可读，但截图选择已禁用。"
+    },
+    {
+      "key": "viewer.search.matchCount",
+      "table": "UIDumpLocalizable",
+      "en": "Search results",
+      "zh-Hans": "搜索结果"
+    },
+    {
+      "key": "viewer.search.next",
+      "table": "UIDumpLocalizable",
+      "en": "Next search result",
+      "zh-Hans": "下一个搜索结果"
+    },
+    {
+      "key": "viewer.search.previous",
+      "table": "UIDumpLocalizable",
+      "en": "Previous search result",
+      "zh-Hans": "上一个搜索结果"
+    },
+    {
+      "key": "viewer.separator.label",
+      "table": "UIDumpLocalizable",
+      "en": "Resize UI tree and node properties",
+      "zh-Hans": "调整 UI 树和节点属性的高度"
+    },
+    {
+      "key": "viewer.separator.value",
+      "table": "UIDumpLocalizable",
+      "en": "UI tree uses %1$d percent of the inspector",
+      "zh-Hans": "UI 树占检查器高度 %1$d%%"
+    },
+    {
+      "key": "viewer.tab.accessibility",
+      "table": "UIDumpLocalizable",
+      "en": "Accessibility",
+      "zh-Hans": "无障碍"
+    },
+    {
+      "key": "viewer.tab.layout",
+      "table": "UIDumpLocalizable",
+      "en": "Layout",
+      "zh-Hans": "布局"
+    },
+    {
+      "key": "viewer.tab.properties",
+      "table": "UIDumpLocalizable",
+      "en": "Properties",
+      "zh-Hans": "属性"
+    },
+    {
+      "key": "viewer.tab.rawDump",
+      "table": "UIDumpLocalizable",
+      "en": "Raw dump",
+      "zh-Hans": "Raw dump"
+    },
+    {
+      "key": "viewer.toolbar.capture",
+      "table": "UIDumpLocalizable",
+      "en": "Capture View",
+      "zh-Hans": "抓取视图"
+    },
+    {
+      "key": "viewer.toolbar.capturing",
+      "table": "UIDumpLocalizable",
+      "en": "Capturing…",
+      "zh-Hans": "抓取中…"
+    },
+    {
+      "key": "viewer.toolbar.currentScreen",
+      "table": "UIDumpLocalizable",
+      "en": "Current screen",
+      "zh-Hans": "当前屏幕"
+    },
+    {
+      "key": "viewer.toolbar.device",
+      "table": "UIDumpLocalizable",
+      "en": "Device",
+      "zh-Hans": "设备"
+    },
+    {
+      "key": "viewer.toolbar.noDevice",
+      "table": "UIDumpLocalizable",
+      "en": "No device",
+      "zh-Hans": "无设备"
+    },
+    {
+      "key": "viewer.toolbar.recapture",
+      "table": "UIDumpLocalizable",
+      "en": "Recapture",
+      "zh-Hans": "重新抓取"
+    },
+    {
+      "key": "viewer.toolbar.refresh",
+      "table": "UIDumpLocalizable",
+      "en": "Refresh Viewer",
+      "zh-Hans": "刷新 Viewer"
+    },
+    {
+      "key": "viewer.toolbar.search",
+      "table": "UIDumpLocalizable",
+      "en": "Search component, ID, or text",
+      "zh-Hans": "搜索组件 / ID / 文本"
+    },
+    {
+      "key": "viewer.tree.collapse",
+      "table": "UIDumpLocalizable",
+      "en": "Collapse",
+      "zh-Hans": "折叠"
+    },
+    {
+      "key": "viewer.tree.expand",
+      "table": "UIDumpLocalizable",
+      "en": "Expand",
+      "zh-Hans": "展开"
+    },
+    {
+      "key": "viewer.tree.label",
+      "table": "UIDumpLocalizable",
+      "en": "Complete UI tree",
+      "zh-Hans": "完整 UI 树"
+    },
+    {
+      "key": "viewer.tree.matchCount",
+      "table": "UIDumpLocalizable",
+      "en": "%1$@ / %2$@",
+      "zh-Hans": "%1$@ / %2$@"
+    },
+    {
+      "key": "viewer.tree.noMatches",
+      "table": "UIDumpLocalizable",
+      "en": "No matching components. The current selection is unchanged.",
+      "zh-Hans": "没有匹配的组件。当前选中项未改变。"
+    },
+    {
+      "key": "viewer.tree.notSelected",
+      "table": "UIDumpLocalizable",
+      "en": "Not selected",
+      "zh-Hans": "未选中"
+    },
+    {
+      "key": "viewer.tree.selected",
+      "table": "UIDumpLocalizable",
+      "en": "Selected",
+      "zh-Hans": "已选中"
+    },
+    {
+      "key": "viewer.value.available",
+      "table": "UIDumpLocalizable",
+      "en": "Available",
+      "zh-Hans": "可用"
+    },
+    {
+      "key": "viewer.value.no",
+      "table": "UIDumpLocalizable",
+      "en": "No",
+      "zh-Hans": "否"
+    },
+    {
+      "key": "viewer.value.unavailable",
+      "table": "UIDumpLocalizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "viewer.value.verified",
+      "table": "UIDumpLocalizable",
+      "en": "Verified",
+      "zh-Hans": "已验证"
+    },
+    {
+      "key": "viewer.value.yes",
+      "table": "UIDumpLocalizable",
+      "en": "Yes",
+      "zh-Hans": "是"
+    },
+    {
+      "key": "a11y.announce.openingCancelled",
+      "table": "TraceViewerLocalizable",
+      "en": "Opening cancelled",
+      "zh-Hans": "已取消打开"
+    },
+    {
+      "key": "a11y.announce.openingTrace",
+      "table": "TraceViewerLocalizable",
+      "en": "Opening trace",
+      "zh-Hans": "正在打开 Trace"
+    },
+    {
+      "key": "a11y.announce.operationFailed",
+      "table": "TraceViewerLocalizable",
+      "en": "Operation failed",
+      "zh-Hans": "操作失败"
+    },
+    {
+      "key": "a11y.announce.rangeAnalysisComplete",
+      "table": "TraceViewerLocalizable",
+      "en": "Range analysis complete",
+      "zh-Hans": "范围分析完成"
+    },
+    {
+      "key": "a11y.announce.searchFoundAtLeastResults",
+      "table": "TraceViewerLocalizable",
+      "en": "Search found at least %lld results",
+      "zh-Hans": "搜索找到至少 %lld 个结果"
+    },
+    {
+      "key": "a11y.announce.searchFoundResults",
+      "table": "TraceViewerLocalizable",
+      "en": "Search found %lld results",
+      "zh-Hans": "搜索找到 %lld 个结果"
+    },
+    {
+      "key": "a11y.announce.traceCloseFailed",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace close failed",
+      "zh-Hans": "关闭 Trace 失败"
+    },
+    {
+      "key": "a11y.announce.traceClosed",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace closed",
+      "zh-Hans": "已关闭 Trace"
+    },
+    {
+      "key": "a11y.announce.traceLoadedWithVisibleTracks",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace loaded, %lld visible tracks",
+      "zh-Hans": "Trace 已加载，有 %lld 个可见轨道"
+    },
+    {
+      "key": "a11y.announce.traceLoadedWithoutTimedEvents",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace loaded, no timed events",
+      "zh-Hans": "Trace 已加载，没有带时刻的事件"
+    },
+    {
+      "key": "a11y.announce.traceOpenFailed",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace failed",
+      "zh-Hans": "Trace 加载失败"
+    },
+    {
+      "key": "a11y.timeline.label",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace Timeline",
+      "zh-Hans": "Trace 时间轴"
+    },
+    {
+      "key": "error.reason.cache",
+      "table": "TraceViewerLocalizable",
+      "en": "The derived trace cache needs attention. Inspect it in Trace settings; the original trace is not a cache target.",
+      "zh-Hans": "Trace 派生缓存需要处理。请在 Trace 设置中检查；原始 Trace 不属于缓存清理范围。"
+    },
+    {
+      "key": "error.reason.cancelled",
+      "table": "TraceViewerLocalizable",
+      "en": "Opening was cancelled. No new trace was opened.",
+      "zh-Hans": "打开操作已取消，没有打开新的 Trace。"
+    },
+    {
+      "key": "error.reason.chooseFile",
+      "table": "TraceViewerLocalizable",
+      "en": "The source could not be read or validated. Choose an accessible trace file.",
+      "zh-Hans": "源文件无法读取或校验。请选择一个可访问的 Trace 文件。"
+    },
+    {
+      "key": "error.reason.operation",
+      "table": "TraceViewerLocalizable",
+      "en": "The trace operation did not finish. Review the diagnostic details and the available recovery action.",
+      "zh-Hans": "Trace 操作未完成。请查看诊断详情和当前可用的处理方式。"
+    },
+    {
+      "key": "error.reason.parser",
+      "table": "TraceViewerLocalizable",
+      "en": "The bundled parser could not be verified or started. Check the diagnostic details before retrying.",
+      "zh-Hans": "内置解析器未通过校验或无法启动。请查看诊断详情后重试。"
+    },
+    {
+      "key": "error.title.bundledParserUnavailable",
+      "table": "TraceViewerLocalizable",
+      "en": "Bundled parser is unavailable",
+      "zh-Hans": "内置解析器不可用"
+    },
+    {
+      "key": "error.title.cacheNeedsAttention",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace cache needs attention",
+      "zh-Hans": "Trace 缓存需要处理"
+    },
+    {
+      "key": "error.title.couldNotFinish",
+      "table": "TraceViewerLocalizable",
+      "en": "ArkTrace could not finish",
+      "zh-Hans": "ArkTrace 未能完成操作"
+    },
+    {
+      "key": "error.title.openingCancelled",
+      "table": "TraceViewerLocalizable",
+      "en": "Opening was cancelled",
+      "zh-Hans": "已取消打开"
+    },
+    {
+      "key": "error.title.traceCouldNotBeOpened",
+      "table": "TraceViewerLocalizable",
+      "en": "Trace could not be opened",
+      "zh-Hans": "无法打开 Trace"
+    },
+    {
+      "key": "viewer.eventType",
+      "table": "TraceViewerLocalizable",
+      "en": "Type",
+      "zh-Hans": "类型"
+    },
+    {
+      "key": "viewer.openPanel.title",
+      "table": "TraceViewerLocalizable",
+      "en": "Open Trace",
+      "zh-Hans": "打开 Trace"
+    },
+    {
+      "key": "viewer.searchEvents.menu",
+      "table": "TraceViewerLocalizable",
+      "en": "Search Trace Events",
+      "zh-Hans": "搜索 Trace 事件"
+    },
+    {
+      "key": "app.navigation.trace",
+      "table": "Localizable",
+      "en": "Trace",
+      "zh-Hans": "Trace"
+    },
+    {
+      "key": "app.navigation.uiDump",
+      "table": "Localizable",
+      "en": "Viewer",
+      "zh-Hans": "Viewer"
+    },
+    {
       "key": "windows.recovery.title",
       "table": null,
       "en": "ArkDeck Runtime unavailable",
@@ -5315,6 +6239,228 @@
       "table": null,
       "en": "The selected target changed; the exact plan is prepared again.",
       "zh-Hans": "所选 Target 已变更，将重新准备精确计划。"
+    },
+    {
+      "key": "windows.traceViewer.capture",
+      "table": null,
+      "en": "Capture",
+      "zh-Hans": "采集"
+    },
+    {
+      "key": "windows.traceViewer.captureHelp",
+      "table": null,
+      "en": "Capture a trace from a connected OpenHarmony device",
+      "zh-Hans": "从已连接的 OpenHarmony 设备采集 Trace"
+    },
+    {
+      "key": "windows.traceViewer.open",
+      "table": null,
+      "en": "Open",
+      "zh-Hans": "打开"
+    },
+    {
+      "key": "windows.traceViewer.openTrace",
+      "table": null,
+      "en": "Open Trace…",
+      "zh-Hans": "打开 Trace…"
+    },
+    {
+      "key": "windows.traceViewer.captureTrace",
+      "table": null,
+      "en": "Capture Trace…",
+      "zh-Hans": "采集 Trace…"
+    },
+    {
+      "key": "windows.traceViewer.reload",
+      "table": null,
+      "en": "Reload",
+      "zh-Hans": "重新加载"
+    },
+    {
+      "key": "windows.traceViewer.recent",
+      "table": null,
+      "en": "Recent",
+      "zh-Hans": "最近打开"
+    },
+    {
+      "key": "windows.traceViewer.removeRecent",
+      "table": null,
+      "en": "Remove from Recent",
+      "zh-Hans": "从最近记录移除"
+    },
+    {
+      "key": "windows.traceViewer.missingName",
+      "table": null,
+      "en": "%1$@, missing",
+      "zh-Hans": "%1$@，文件缺失"
+    },
+    {
+      "key": "windows.traceViewer.missingPath",
+      "table": null,
+      "en": "Missing — %1$@",
+      "zh-Hans": "文件缺失 — %1$@"
+    },
+    {
+      "key": "windows.traceViewer.idleTitle",
+      "table": null,
+      "en": "Open a trace",
+      "zh-Hans": "打开 Trace"
+    },
+    {
+      "key": "windows.traceViewer.idleDetail",
+      "table": null,
+      "en": "Open, drop, or choose a recent .htrace/.ftrace/.systrace file.",
+      "zh-Hans": "打开或拖入 .htrace/.ftrace/.systrace 文件，也可选择最近打开的文件。"
+    },
+    {
+      "key": "windows.traceViewer.unavailable",
+      "table": null,
+      "en": "Trace unavailable",
+      "zh-Hans": "Trace 不可用"
+    },
+    {
+      "key": "windows.traceViewer.diagnostics",
+      "table": null,
+      "en": "Diagnostics",
+      "zh-Hans": "诊断详情"
+    },
+    {
+      "key": "windows.traceViewer.retry",
+      "table": null,
+      "en": "Retry",
+      "zh-Hans": "重试"
+    },
+    {
+      "key": "windows.traceViewer.chooseAnother",
+      "table": null,
+      "en": "Choose Another File…",
+      "zh-Hans": "选择其他文件…"
+    },
+    {
+      "key": "windows.traceViewer.inspector",
+      "table": null,
+      "en": "Inspector",
+      "zh-Hans": "检查器"
+    },
+    {
+      "key": "windows.traceViewer.duration",
+      "table": null,
+      "en": "Duration",
+      "zh-Hans": "时长"
+    },
+    {
+      "key": "windows.traceViewer.sourceBytes",
+      "table": null,
+      "en": "Source bytes",
+      "zh-Hans": "源文件大小"
+    },
+    {
+      "key": "windows.traceViewer.schema",
+      "table": null,
+      "en": "Schema",
+      "zh-Hans": "Schema 指纹"
+    },
+    {
+      "key": "windows.traceViewer.cache",
+      "table": null,
+      "en": "Cache",
+      "zh-Hans": "缓存"
+    },
+    {
+      "key": "windows.traceViewer.hit",
+      "table": null,
+      "en": "Hit",
+      "zh-Hans": "命中"
+    },
+    {
+      "key": "windows.traceViewer.miss",
+      "table": null,
+      "en": "Miss",
+      "zh-Hans": "未命中"
+    },
+    {
+      "key": "windows.traceViewer.nothingSelected",
+      "table": null,
+      "en": "Select an event or drag a time range.",
+      "zh-Hans": "选择事件或拖动选取时间范围。"
+    },
+    {
+      "key": "windows.traceViewer.title",
+      "table": null,
+      "en": "Trace Viewer",
+      "zh-Hans": "Trace 查看器"
+    },
+    {
+      "key": "windows.traceViewer.back",
+      "table": null,
+      "en": "Back to Trace",
+      "zh-Hans": "返回 Trace"
+    },
+    {
+      "key": "windows.traceViewer.noParser",
+      "table": null,
+      "en": "No ArkTrace parser is distributed for Windows, so this PC cannot draw the timeline. The file's size and SHA-256 are shown; for a captured Trace, the Runtime's Trace inspector is asked.",
+      "zh-Hans": "Windows 版未分发 ArkTrace 解析器，本机无法绘制时间线。此处显示文件大小和 SHA-256；对于采集得到的 Trace，会询问 Runtime 的 Trace 检查器。"
+    },
+    {
+      "key": "windows.traceViewer.sha256",
+      "table": null,
+      "en": "SHA-256",
+      "zh-Hans": "SHA-256"
+    },
+    {
+      "key": "windows.traceViewer.runtimeInspection",
+      "table": null,
+      "en": "Runtime inspection",
+      "zh-Hans": "Runtime 检查"
+    },
+    {
+      "key": "windows.traceViewer.engine",
+      "table": null,
+      "en": "Engine",
+      "zh-Hans": "引擎"
+    },
+    {
+      "key": "windows.traceViewer.dataQuality",
+      "table": null,
+      "en": "Data quality",
+      "zh-Hans": "数据质量"
+    },
+    {
+      "key": "windows.traceViewer.chooseInvalid",
+      "table": null,
+      "en": "Choose a .htrace, .ftrace, .systrace or .trace file.",
+      "zh-Hans": "请选择 .htrace、.ftrace、.systrace 或 .trace 文件。"
+    },
+    {
+      "key": "windows.trace.capture.localOnly",
+      "table": null,
+      "en": "The trace stays on this PC and opens automatically.",
+      "zh-Hans": "Trace 只保存在这台 电脑，并会在完成后自动打开。"
+    },
+    {
+      "key": "windows.viewer.advancedDump.search.shortcut",
+      "table": null,
+      "en": "Search Advanced Dump (Ctrl+F)",
+      "zh-Hans": "搜索 Advanced Dump（Ctrl+F）"
+    },
+    {
+      "key": "windows.viewer.tab.advancedDump",
+      "table": null,
+      "en": "Advanced Dump",
+      "zh-Hans": "高级转储"
+    },
+    {
+      "key": "windows.viewer.advancedDump.loading",
+      "table": null,
+      "en": "Capturing componentDetail…",
+      "zh-Hans": "正在采集 componentDetail…"
+    },
+    {
+      "key": "windows.viewer.advancedDump.noIds",
+      "table": null,
+      "en": "This component has no numeric hostWindowId/componentId pair in the current capture",
+      "zh-Hans": "当前采集中，此组件没有数字形式的 hostWindowId/componentId 组合"
     }
   ]
 }

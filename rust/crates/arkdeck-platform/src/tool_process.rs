@@ -53,6 +53,17 @@ impl VerifiedTool {
         })
     }
 
+    /// `run_tool` for the HDC lifecycle client. On macOS it is `run_tool`:
+    /// the client's process group is ended, and the server `hdc kill -r`
+    /// starts in a session of its own is no member of it.
+    pub fn run_lifecycle_tool(
+        &self,
+        request: &ToolRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<ToolExecution, ToolRunError> {
+        self.run_tool(request, cancelled)
+    }
+
     /// `run_tool` as Swift's `.verifiedCanonicalPath` launch runs a signed
     /// bundle's tool: the child is spawned suspended at the tool's canonical
     /// path, which its bundle needs to find its resources, and runs only once

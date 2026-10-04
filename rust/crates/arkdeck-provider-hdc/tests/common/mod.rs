@@ -4,18 +4,58 @@
 //! fragment it needs — the observe fixture's recorded one, or its own — and
 //! reads the argv the driver logged (one call per line, U+001F after every
 //! argument).
+//!
+//! On Windows the driver's shell fragment cannot run: the fake is the same
+//! answers ported in process (`oracle_fake.rs`), over the same layout below
+//! the temporary directory, and the recorded host paths are read with
+//! [`oracle_fake::oracle_spelling`].
 #![allow(dead_code)]
 
+pub mod oracle_fake;
+
+#[cfg(unix)]
 use arkdeck_platform::VerifiedTool;
+#[cfg(unix)]
 use arkdeck_provider_hdc::ProcessDispatch;
+#[cfg(unix)]
 use sha2::{Digest, Sha256};
 use std::fs::{self, File, OpenOptions};
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 /// `HDCOracleFake`'s fixed root and lock, which the fake's driver names.
+#[cfg(unix)]
 pub const ROOT: &str = "/private/tmp/arkdeck-hdc-oracle";
+#[cfg(unix)]
 pub const LOCK: &str = "/private/tmp/arkdeck-hdc-oracle.lock";
+
+/// The fake's root: the fixed one on macOS; on Windows the same name below
+/// the temporary directory, in the plain spelling the host resolves.
+pub fn root() -> PathBuf {
+    #[cfg(unix)]
+    let root = PathBuf::from(ROOT);
+    #[cfg(windows)]
+    let root = {
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        match temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+        {
+            Some(plain) => PathBuf::from(plain),
+            None => temporary,
+        }
+        .join("arkdeck-hdc-oracle")
+    };
+    root
+}
+
+/// What dispatches to the fake: the driver as a real subprocess on macOS;
+/// on Windows the answers in process.
+#[cfg(unix)]
+pub type FakeDispatch = ProcessDispatch;
+#[cfg(windows)]
+pub type FakeDispatch = oracle_fake::OracleFake;
 /// The observe fixture's one device.
 pub const CONNECT_KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -28,7 +68,7 @@ pub fn observe_fixture() -> PathBuf {
 pub struct SharedFake {
     _lock: File,
     pub root: PathBuf,
-    pub dispatch: ProcessDispatch,
+    pub dispatch: FakeDispatch,
 }
 
 impl SharedFake {
@@ -41,28 +81,34 @@ impl SharedFake {
     /// An answers fragment of the test's own (sourced by the driver with
     /// `$root`, `$mode` and `"$@"` set).
     pub fn with_answers(answers: &str, mode: Option<&str>) -> Self {
+        let root = root();
         let lock = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .truncate(false)
-            .open(LOCK)
+            .open(root.with_extension("lock"))
             .unwrap();
         lock.lock().unwrap();
-        let root = PathBuf::from(ROOT);
         let _ = fs::remove_dir_all(&root);
         fs::create_dir(&root).unwrap();
+        #[cfg(unix)]
         fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
         fs::copy(observe_fixture().join("hdc"), root.join("hdc")).unwrap();
+        #[cfg(unix)]
         fs::set_permissions(root.join("hdc"), fs::Permissions::from_mode(0o700)).unwrap();
         fs::write(root.join("hdc-answers.sh"), answers).unwrap();
         File::create(root.join("hdc-invocations.log")).unwrap();
         if let Some(mode) = mode {
             fs::write(root.join("hdc-mode"), format!("{mode}\n")).unwrap();
         }
-        let digest = format!("{:x}", Sha256::digest(fs::read(root.join("hdc")).unwrap()));
-        let dispatch =
-            ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
+        #[cfg(unix)]
+        let dispatch = {
+            let digest = format!("{:x}", Sha256::digest(fs::read(root.join("hdc")).unwrap()));
+            ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None)
+        };
+        #[cfg(windows)]
+        let dispatch = oracle_fake::OracleFake::new(&root, oracle_fake::Answers::of(answers));
         Self {
             _lock: lock,
             root,

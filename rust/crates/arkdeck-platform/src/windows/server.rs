@@ -50,6 +50,16 @@ impl std::fmt::Debug for LoopbackServerLease {
 }
 
 impl LoopbackServerLease {
+    /// Whether any process holds a TCP listener on the endpoint's port bound
+    /// to the loopback or a wildcard, read from the kernel's listener table:
+    /// what is left open when `acquire` finds no process of the tool there
+    /// (`NotFound`). Nothing is connected, and no owner is named or proved.
+    pub fn endpoint_held(endpoint: SocketAddrV4) -> io::Result<bool> {
+        Ok(listeners(endpoint.port())?
+            .iter()
+            .any(|listener| is_loopback_or_wildcard(listener.address)))
+    }
+
     /// Swift `observe`: the endpoint must be the exact IPv4 loopback, the tool
     /// must still verify, and two consecutive scans must name the same
     /// process.

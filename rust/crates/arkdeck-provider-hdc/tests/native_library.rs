@@ -7,7 +7,7 @@
 //! the unattested publish, the cleanup that leaves debt with its readback —
 //! and the debt continuation, every verdict checked and every argv the
 //! driver logged compared with the oracle's 225 recorded lines.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 
 mod common;
 
@@ -35,12 +35,16 @@ fn string(value: &Value, key: &str) -> String {
     value[key].as_str().unwrap().to_owned()
 }
 
+/// The argv the driver logged, its host paths spelled as the oracle recorded
+/// them (unchanged on macOS, whose root is the oracle's).
 fn logged(fake: &SharedFake) -> Vec<String> {
-    String::from_utf8(fake.invocations())
-        .unwrap()
-        .lines()
-        .map(str::to_owned)
-        .collect()
+    common::oracle_fake::oracle_spelling(
+        &String::from_utf8(fake.invocations()).unwrap(),
+        &fake.root,
+    )
+    .lines()
+    .map(str::to_owned)
+    .collect()
 }
 
 fn verified_summary<'a>(outcome: &'a Outcome, step: &str) -> &'a BTreeMap<String, String> {
@@ -109,7 +113,7 @@ fn every_oracle_job_replays_argv_for_argv_over_the_shared_fake() {
     let fake = SharedFake::with_answers(&answers, None);
     assert_eq!(
         provenance["root"].as_str().unwrap(),
-        fake.root.to_string_lossy(),
+        common::oracle_fake::ORACLE_ROOT,
         "the oracle was recorded at the shared fake's root"
     );
     // The two host files the argv names: the leased library's bytes as the
@@ -125,7 +129,12 @@ fn every_oracle_job_replays_argv_for_argv_over_the_shared_fake() {
         &library_path,
     )
     .unwrap();
-    let helper_path = PathBuf::from(string(&cases["codeSignHelper"], "path"));
+    // The helper at the path the oracle used, below the fake's root.
+    let helper_path = fake.root.join("host").join("arkdeck-code-sign-enable");
+    assert_eq!(
+        common::oracle_fake::oracle_spelling(&helper_path.to_string_lossy(), &fake.root),
+        string(&cases["codeSignHelper"], "path")
+    );
     fs::create_dir_all(helper_path.parent().unwrap()).unwrap();
     fs::write(&helper_path, b"not the helper's bytes").unwrap();
     let library = fs::read(&library_path).unwrap();

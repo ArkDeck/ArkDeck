@@ -1502,9 +1502,26 @@ relabelled. With no HDC composition (the Windows daemon's until the Windows HDC
 tuple is registered) an admitted HAP or deployment is refused before its first
 step with zero dispatch and no use consumed, and the daemon refuses every
 recorded `debug.hap@1` plan and submission before admission
-(`windows_job_admission_process.rs`). The runs themselves (`debug_hap_run.rs`,
-`native_library_run.rs`) stay macOS-only: they dispatch to the shared fake HDC,
-a POSIX shell script.
+(`windows_job_admission_process.rs`).
+
+The runs replay on Windows host code too (TASK-XPA-009): `debug_hap_run.rs` and
+`native_library_run.rs`, both oracles' full replays (every run, result,
+evidence, Artifact list, capability read and cleanup-debt continuation), the
+compensations and the native rollback, and provider-hdc's `debug_hap.rs` and
+`native_library.rs` argv-for-argv replays. The shared fake's driver is a POSIX
+shell script, so on Windows its debug-hap and deploy-native-library answers are
+ported in process (`arkdeck-provider-hdc/tests/common/oracle_fake.rs`, a
+test-only `HdcDispatch` over the same root, mode file, marker files and call
+log). What a replay leaves is compared with the oracle's as on macOS, with
+three readings: each host path below the replay's root in the oracle's
+spelling (its fixed root; the Sessions root as Foundation spells it, without
+`/private`), the Session manifest's platform (`PLATFORM-WINDOWS@0.2.0`) as the
+oracle's, and the plan digests and every value derived from them (capability
+IDs and fingerprints, receipts, outcome and record hashes, Journal seals,
+manifest digests) through the same one-to-one relabelling; an entry's mode is
+read from its DACL (`700` for a private directory, `600` for an owner-only
+document). The Windows daemon still composes no HDC and admits none of these
+Jobs: this is host code against a test fake, never the daemon's dispatch.
 
 ## Job run (TASK-XPA-014)
 

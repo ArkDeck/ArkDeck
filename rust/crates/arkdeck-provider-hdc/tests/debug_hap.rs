@@ -7,7 +7,7 @@
 //! compensate, and the argv the driver logged compared line for line with
 //! the oracle's recorded log — T1 argv parity for eight Jobs and the two
 //! cleanup-debt continuations.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 
 mod common;
 
@@ -41,12 +41,16 @@ fn verified(facts: &[(&str, &str)]) -> Outcome {
     )
 }
 
+/// The argv the driver logged, its host paths spelled as the oracle recorded
+/// them (unchanged on macOS, whose root is the oracle's).
 fn logged(fake: &SharedFake) -> Vec<String> {
-    String::from_utf8(fake.invocations())
-        .unwrap()
-        .lines()
-        .map(str::to_owned)
-        .collect()
+    common::oracle_fake::oracle_spelling(
+        &String::from_utf8(fake.invocations()).unwrap(),
+        &fake.root,
+    )
+    .lines()
+    .map(str::to_owned)
+    .collect()
 }
 
 /// The device as the oracle left it between Jobs: no bundle installed, no
@@ -222,7 +226,7 @@ fn every_oracle_job_replays_argv_for_argv_over_the_shared_fake() {
     let fake = SharedFake::with_answers(&answers, None);
     assert_eq!(
         provenance["root"].as_str().unwrap(),
-        fake.root.to_string_lossy(),
+        common::oracle_fake::ORACLE_ROOT,
         "the oracle was recorded at the shared fake's root"
     );
     let root = fake.root.clone();

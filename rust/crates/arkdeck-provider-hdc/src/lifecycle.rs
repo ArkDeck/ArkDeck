@@ -110,6 +110,10 @@ pub enum LifecycleOutcome {
 pub struct LifecycleReceipt {
     pub outcome: LifecycleOutcome,
     pub observation: Option<PostDispatchObservation>,
+    /// A listener held the endpoint at the re-observation's end that the
+    /// commandless proof could not bind to this tool: never adopted, never
+    /// signalled, left for the owner to report and reconcile.
+    pub unproved_listener: bool,
     pub termination: Option<ToolTermination>,
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
@@ -169,8 +173,10 @@ impl<'a> PreparedLifecycle<'a> {
                 capture_bytes: CAPTURE_BYTES,
             },
         };
+        let unproved = std::cell::Cell::new(false);
         let probe = || {
             probe(
+                &unproved,
                 self.tool,
                 self.command.action,
                 self.command.endpoint,
@@ -181,11 +187,14 @@ impl<'a> PreparedLifecycle<'a> {
         let unknown = |reason: &str, observation, termination, stdout, stderr| LifecycleReceipt {
             outcome: LifecycleOutcome::OutcomeUnknown(reason.to_owned()),
             observation,
+            unproved_listener: unproved.get(),
             termination,
             stdout,
             stderr,
         };
-        let execution = match self.tool.run_tool(&request, &|| false) {
+        // The client alone is ended with its run: the server `kill -r`
+        // starts outlives it, as in its own session on macOS.
+        let execution = match self.tool.run_lifecycle_tool(&request, &|| false) {
             Ok(execution) => execution,
             Err(_) => {
                 let observation = probe();
@@ -269,6 +278,7 @@ impl<'a> PreparedLifecycle<'a> {
         LifecycleReceipt {
             outcome,
             observation: Some(observed),
+            unproved_listener: unproved.get(),
             termination,
             stdout,
             stderr,
@@ -280,11 +290,26 @@ impl<'a> PreparedLifecycle<'a> {
 /// managed server, which also builds on Windows.
 pub use crate::managed_server::generation;
 
+/// On Windows a `kill -r` replacement breaks away from the client's Job
+/// (`VerifiedTool::run_lifecycle_tool`), so one the proof cannot bind to the
+/// tool may be left listening: it is reported, never adopted or signalled.
+/// On macOS it is in a session of its own, as in Swift, which reports none.
+#[cfg(windows)]
+fn held_by_another(endpoint: SocketAddrV4) -> bool {
+    LoopbackServerLease::endpoint_held(endpoint).unwrap_or(true)
+}
+
+#[cfg(target_os = "macos")]
+fn held_by_another(_: SocketAddrV4) -> bool {
+    false
+}
+
 /// Swift `postDispatchProbe`: the commandless identity read again until the
 /// deadline — a restart is observed only as a strictly newer generation, a
 /// stop only as no server at the endpoint; anything else keeps looking, and
 /// the deadline reports nothing.
 fn probe(
+    unproved: &std::cell::Cell<bool>,
     tool: &VerifiedTool,
     action: LifecycleAction,
     endpoint: SocketAddrV4,
@@ -293,7 +318,14 @@ fn probe(
 ) -> Option<PostDispatchObservation> {
     let deadline = Instant::now() + budget.probe_deadline;
     while Instant::now() < deadline {
-        match (action, LoopbackServerLease::acquire(tool, endpoint)) {
+        let acquired = LoopbackServerLease::acquire(tool, endpoint);
+        // Whatever holds the endpoint and is not this tool's proved server.
+        unproved.set(match &acquired {
+            Ok(_) => false,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => held_by_another(endpoint),
+            Err(_) => true,
+        });
+        match (action, acquired) {
             (LifecycleAction::Restart, Ok(lease)) => {
                 if let Some(generation) = generation(lease.identity())
                     && generation > expected_generation

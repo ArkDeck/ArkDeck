@@ -435,9 +435,11 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "target.display-name.clear",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
-    // admits (`windows_workspace_projects_process.rs`). Not preset
-    // registration: a build, test or signing preset pins a DevEco toolchain
-    // or credential the Windows daemon does not yet register.
+    // admits (`windows_workspace_projects_process.rs`), and the preset
+    // registration: a build or test preset pins the host's DevEco toolchain
+    // in the daemon's Bootstrap registry, measured over the host's DevEco
+    // Studio (`ARKDECK_LIVE_DEVECO_ROOT`); a signing preset's credential
+    // owner is composed by the account's daemon, as on macOS.
     "workspace.project.register",
     "workspace.project.list",
     "workspace.project.show",
@@ -447,6 +449,7 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.preset.show",
     "workspace.preset.update",
     "workspace.preset.remove",
+    "workspace.preset.register",
     // The Trace cache owner's inventory and purge (TASK-XPA-021;
     // `windows_trace_export_process.rs`).
     "trace.cache.status",
@@ -1194,7 +1197,7 @@ mod tests {
             ("target.availability", "partial"),
             ("target.adopt", "partial"),
             ("workspace.project.update", "implemented"),
-            ("workspace.preset.register", "partial"),
+            ("workspace.preset.register", "implemented"),
             ("trace.cache.purge", "implemented"),
             ("diagnostics.export", "implemented"),
             ("trace.inspect", "partial"),

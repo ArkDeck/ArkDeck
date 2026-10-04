@@ -125,6 +125,45 @@ public sealed class ArtifactExporter(IControlChannel channel)
         }
     }
 
+    /// <summary>Reads one published Artifact of a Job into memory through the same checked
+    /// chunks (the macOS Viewer's <c>readArtifact</c>): the bytes, whose SHA-256 is the
+    /// Artifact's digest, or why not.</summary>
+    public async Task<(byte[]? Bytes, Unavailable? Failure)> ReadAsync(string jobId, ArtifactSummary artifact, bool allowSensitive,
+        CancellationToken cancellation = default)
+    {
+        var cli = CliCommands.ArtifactReadForJob(jobId, artifact.ArtifactId);
+        if (!artifact.IsPublished || artifact.Digest is null) return (null, new Unavailable(NotPublishedCode, "Only a published Artifact can be read", cli, null));
+        if (artifact.IsSensitive && !allowSensitive) return (null, new Unavailable(SensitiveCode, "Sensitive Artifact read requires explicit opt-in", cli, null));
+        using var buffer = new MemoryStream();
+        using var digest = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        try
+        {
+            long offset = 0;
+            while (offset < artifact.ByteCount)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                var result = await channel.RequestAsync("artifact.read", SurfaceLoader.Params(
+                    ("owner", SurfaceLoader.JobOwner(jobId)),
+                    ("artifactId", new JsonString(artifact.ArtifactId)),
+                    ("offset", JsonNumber.FromInt64(offset)),
+                    ("maxBytes", JsonNumber.FromInt64(ChunkBytes)),
+                    ("allowSensitive", JsonBool.Of(allowSensitive)))).ConfigureAwait(false);
+                if (result.Failure is { } failure) return (null, Unavailable.From(failure, cli));
+                var bytes = Chunk(result.Value!, artifact, offset, out var next);
+                buffer.Write(bytes);
+                digest.AppendData(bytes);
+                offset = next;
+            }
+        }
+        catch (ChunkException error)
+        {
+            return (null, new Unavailable(IntegrityCode, error.Message, cli, null));
+        }
+        return Convert.ToHexStringLower(digest.GetHashAndReset()) == artifact.Digest
+            ? (buffer.ToArray(), null)
+            : (null, new Unavailable(IntegrityCode, "Artifact SHA-256 does not match Runtime metadata", cli, null));
+    }
+
     /// <summary>One <c>artifact.read</c> chunk, checked as the CLI checks it.</summary>
     internal static byte[] Chunk(JsonValue value, ArtifactSummary artifact, long expectedOffset, out long nextOffset)
     {

@@ -23,3 +23,9 @@ workspace = true
 [[test]]
 name = "windows_managed_hdc"
 harness = false
+
+# The fake `hdc` of the Windows lifecycle tests is the test binary itself,
+# which starts its replacement server detached as HDC does.
+[[test]]
+name = "windows_lifecycle"
+harness = false
