@@ -120,8 +120,13 @@ ARKDECK_SPK8_APP=/Applications/ArkDeck.app ARKDECK_SPK8_APP_SHA256=<its executab
 It checks the App's team signature, production sandbox and Mach exception and its
 pin, reads the live launchd owner of `com.arkdeck.agentd` (plist, `launchctl
 print`, process path, bundle version), and verifies that owner is the ArkDeck
-daemon or façade by team and identifier. If the owner also satisfies this App's
-release pin there is no mismatch and the result is `BLOCKED`, not a pass. It then
+daemon or façade by team, its exact executable identifier, release and live
+CodeDirectory hash. The retired façade is signed as `com.arkdeck.agentd.facade`,
+although its enclosing bundle identifies the Swift daemon as `com.arkdeck.agentd`.
+Only this negative case observes that retired identity; the App's requirement and
+the installed pure-Rust cases remain unchanged. If that same owner identity also
+satisfies the App's version/build pin there is no release mismatch and the result
+is `BLOCKED`, not a pass. It then
 starts the App's `--runtime-readonly-smoke` entry (production ClientKit, no
 fixtures) and asks for two refreshes, each within 20 s. `PASS` requires both
 reports to be disconnected with `unavailableReason` naming "Runtime release does
@@ -130,6 +135,8 @@ end of input, and the launchd owner to be unchanged. The App's own transport
 bounds the health exchange at 5 s; libxpc reports the failed release pin within
 milliseconds. After the cutover the installed Rust daemon matches the RC App, so
 a rerun then needs an older signed App build that has the smoke entry point.
+The result identifies a pre-cutover façade run separately from an installed
+daemon release-mismatch run; neither establishes the positive pure-Rust case.
 
 **Self-test (no Runtime contact).** `python3 scripts/ci/installed_spk8_negatives.py
 self-test /absolute/new/dir` compiles and signs the same client and runs it only
