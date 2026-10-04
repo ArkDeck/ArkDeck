@@ -14,9 +14,11 @@
 //!   `windows_trace_export_process.rs`): `trace.cache.status` answers the
 //!   empty cache, and `trace.cache.purge` purges it, removing nothing, as
 //!   the macOS daemon does with its Job and Artifact owners;
-//! * `operation.list` names both ArkTrace analyzers unavailable, with a
-//!   typed reason code (`provider_not_registered`: the Windows daemon
-//!   composes no analyzer provider);
+//! * `operation.list` names both ArkTrace analyzers unavailable as the Swift
+//!   daemon without a distribution names them (`rust/tests/fixtures/
+//!   arktrace-absent`): `provider_tool_unavailable` from the
+//!   `host_configuration`, `analyzer.arktraceNotFound` (TASK-XPA-011: the
+//!   Windows analyzer provider composes no ArkTrace profile);
 //! * a development root that names an ArkTrace descriptor is refused before
 //!   anything is opened, read or started: the Windows daemon loads no
 //!   distribution, pinned or not.
@@ -285,10 +287,11 @@ fn the_windows_daemon_answers_the_offline_trace_surface_without_a_distribution()
         assert_eq!(operation["availability"], "unavailable", "{operation}");
         assert_eq!(
             operation["reasonCodes"],
-            json!(["provider_not_registered"]),
+            json!(["provider_tool_unavailable"]),
             "{operation}"
         );
-        assert_eq!(operation["reasonOrigins"], json!(["product_build"]));
+        assert_eq!(operation["reasonOrigins"], json!(["host_configuration"]));
+        assert_eq!(operation["reasons"], json!(["analyzer.arktraceNotFound"]));
     }
 
     drop(connection);

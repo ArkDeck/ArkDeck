@@ -119,12 +119,11 @@ pub struct Host {
     agents: Option<std::sync::Arc<arkdeck_hoststore::AgentExecutionStore>>,
     #[cfg(any(target_os = "macos", windows))]
     capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
-    #[cfg(target_os = "macos")]
+    /// The state root `job.plan` and `job.submit` plan against, and the
+    /// analyzers the host composed (on Windows the crash-ledger and HiLog
+    /// summary ones; no ArkTrace analyzer loads there, TASK-XPA-021).
+    #[cfg(any(target_os = "macos", windows))]
     planning: Option<(std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles)>,
-    /// The state root `job.plan` and `job.submit` plan against on Windows,
-    /// where no analyzer is composed (G20).
-    #[cfg(windows)]
-    planning: Option<std::path::PathBuf>,
     #[cfg(any(target_os = "macos", windows))]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     pub(crate) provider: Option<HdcReadOnlyProvider>,
@@ -348,7 +347,7 @@ impl Host {
     }
     /// `job.plan` reads the Artifact owner, the configured analyzer and the
     /// state root's Runtime debug attempt permits.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_planning(
         mut self,
         state_root: &std::path::Path,
@@ -357,25 +356,19 @@ impl Host {
         self.planning = Some((state_root.to_owned(), analyzer.unwrap_or_default()));
         self
     }
-    /// `job.plan` and `job.submit` on Windows: the same planner and
-    /// admitter over the Job store, with no provider, Artifact, Import or
-    /// capability owner composed beside them, so every operation is refused
-    /// before admission as macOS refuses it without that owner.
-    #[cfg(windows)]
-    pub fn with_planning(mut self, state_root: &std::path::Path) -> Self {
-        self.planning = Some(state_root.to_owned());
-        self
-    }
     /// The Job planner over this Windows composition's owners, as macOS
-    /// builds it: the Artifact and Import owners, and no workspace or HDC
-    /// provider (none is composed on Windows yet; the HDC waits for the
-    /// Windows HDC tuple's registration) and no analyzer.
+    /// builds it: the Artifact and Import owners and the analyzers, and no
+    /// workspace or HDC provider (none is composed on Windows yet; the HDC
+    /// waits for the Windows HDC tuple's registration).
     #[cfg(windows)]
     fn planner<'a>(&'a self, state_root: &'a std::path::Path) -> arkdeck_hoststore::JobPlanner<'a> {
         arkdeck_hoststore::JobPlanner {
             imports: self.imports.as_deref(),
             artifacts: self.artifacts.as_deref(),
-            analyzer: None,
+            analyzer: self
+                .planning
+                .as_ref()
+                .map(|(_, analyzers)| analyzers as &dyn arkdeck_hoststore::AnalyzerComposition),
             state_root,
             hdc: None,
             workspace: None,
@@ -838,11 +831,12 @@ impl Host {
     }
     /// Swift `startJob` on Windows: the owned Job runs in the background in
     /// the slot every `job.run` and `job.cancel` of it meets, through the
-    /// runner `job.run` composes here (no HDC, analyzer, workspace provider
-    /// or Flash lane), and its end is reported to the execution.
+    /// runner `job.run` composes here (the composed analyzers, and no HDC,
+    /// workspace provider or Flash lane), and its end is reported to the
+    /// execution.
     #[cfg(windows)]
     fn start_agent_run(&self, start: arkdeck_hoststore::AgentStart) {
-        let (Some(agents), Some(jobs), Some(artifacts), Some(state_root)) = (
+        let (Some(agents), Some(jobs), Some(artifacts), Some(planning)) = (
             self.agents.clone(),
             self.jobs.clone(),
             self.artifacts.clone(),
@@ -924,7 +918,7 @@ impl Host {
                     );
                 arkdeck_hoststore::FlashRunner {
                     runner: windows_runner(
-                        &state_root,
+                        &planning,
                         &jobs,
                         &artifacts,
                         imports.as_deref(),
@@ -1301,7 +1295,7 @@ impl Host {
         &self,
         run: impl FnOnce(&arkdeck_hoststore::FlashPlanner<'_>) -> T,
     ) -> Option<T> {
-        let state_root = self.planning.as_ref()?;
+        let (state_root, _) = self.planning.as_ref()?;
         let facts = self.flash_facts_port();
         Some(run(&arkdeck_hoststore::FlashPlanner {
             planner: self.planner(state_root),
@@ -1468,6 +1462,12 @@ impl Host {
             ("workspaceProjects", self.workspace_projects.is_some()),
             ("bootstrap", self.bootstrap.is_some()),
             ("planning", self.planning.is_some()),
+            (
+                "analyzer",
+                self.planning
+                    .as_ref()
+                    .is_some_and(|(_, analyzer)| !analyzer.profiles().is_empty()),
+            ),
             ("agentExecutions", self.agents.is_some()),
             ("humanActions", self.human_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
@@ -1645,14 +1645,15 @@ impl Host {
 
 /// The Job runner a Windows composition runs a Job with (`job.run`, an
 /// agent execution's owned Job and `job.reconcile`'s finalization): the Job,
-/// Artifact and Import owners, the Session publication writer and the
-/// mutation authority, with no HDC composition (no Windows HDC tuple is
-/// registered), analyzer or workspace provider. One argument per owner, as
-/// the runner's own fields are: the background run passes its own clones.
+/// Artifact and Import owners, the analyzers the planning composed, the
+/// Session publication writer and the mutation authority, with no HDC
+/// composition (no Windows HDC tuple is registered) or workspace provider.
+/// One argument per owner, as the runner's own fields are: the background
+/// run passes its own clones.
 #[cfg(windows)]
 #[allow(clippy::too_many_arguments)]
 fn windows_runner<'a>(
-    state_root: &'a std::path::Path,
+    (state_root, analyzers): &'a (std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles),
     jobs: &'a arkdeck_hoststore::JobStore,
     artifacts: &'a arkdeck_hoststore::ArtifactReadStore,
     imports: Option<&'a arkdeck_hoststore::ImportUploadStore>,
@@ -1669,7 +1670,7 @@ fn windows_runner<'a>(
         }),
         jobs,
         artifacts,
-        analyzer: None,
+        analyzer: Some(analyzers),
         quota: ARTIFACT_QUOTA,
         home,
         now: arkdeck_hoststore::runtime_now,
@@ -1684,21 +1685,14 @@ fn windows_runner<'a>(
 
 impl HostServices for Host {
     /// `operation.list` on Windows: the macOS report with this composition's
-    /// owners — the planner, the Job and Artifact owners, and no HDC,
-    /// analyzer, workspace provider or mutation authority.
+    /// owners — the planner, the Job and Artifact owners and the composed
+    /// analyzers, and no HDC, workspace provider or mutation authority.
     #[cfg(windows)]
     fn operation_availability(
         &self,
         reference: &str,
         provider: &str,
     ) -> Option<Vec<(&'static str, String)>> {
-        // No analyzer provider is built on Windows (its profiles pin
-        // ArkTrace's trace_streamer): it is not registered, as the offline
-        // Trace surface reports it (`provider_not_registered`), rather than a
-        // provider a host left unconfigured.
-        if provider == "analyzer" {
-            return None;
-        }
         arkdeck_hoststore::operation_unavailability(
             reference,
             provider,
@@ -1706,7 +1700,10 @@ impl HostServices for Host {
                 planning_owner: self.planning.is_some(),
                 job_owner: self.jobs.is_some(),
                 artifacts: self.artifacts.is_some(),
-                analyzer: None,
+                analyzer: self
+                    .planning
+                    .as_ref()
+                    .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
                 // No Windows HDC tuple is registered.
                 hdc_registered: false,
                 mutation_owner: self
@@ -2079,7 +2076,7 @@ impl HostServices for Host {
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let (Some(agents), Some(state_root), Some(jobs), Some(artifacts), Some(targets)) = (
+        let (Some(agents), Some((state_root, _)), Some(jobs), Some(artifacts), Some(targets)) = (
             &self.agents,
             &self.planning,
             &self.jobs,
@@ -2362,7 +2359,7 @@ impl HostServices for Host {
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let (Some(state_root), Some(jobs)) = (&self.planning, &self.jobs) else {
+        let (Some((state_root, _)), Some(jobs)) = (&self.planning, &self.jobs) else {
             return Err(WireError {
                 code: "rejected".into(),
                 message: "this method is unavailable in the read-only Rust foundation".into(),
@@ -2463,7 +2460,7 @@ impl HostServices for Host {
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let (Some(state_root), Some(jobs), Some(artifacts)) =
+        let (Some(planning), Some(jobs), Some(artifacts)) =
             (&self.planning, &self.jobs, &self.artifacts)
         else {
             return Err(WireError {
@@ -2488,7 +2485,7 @@ impl HostServices for Host {
             let flash = facts.as_ref().and_then(|facts| self.flash_execution(facts));
             arkdeck_hoststore::FlashRunner {
                 runner: windows_runner(
-                    state_root,
+                    planning,
                     jobs,
                     artifacts,
                     self.imports.as_deref(),
@@ -2968,9 +2965,9 @@ impl HostServices for Host {
                     claims: &self.claims,
                     probe: &probe,
                 });
-        let runner = self.planning.as_deref().map(|state_root| {
+        let runner = self.planning.as_ref().map(|planning| {
             windows_runner(
-                state_root,
+                planning,
                 jobs,
                 artifacts,
                 self.imports.as_deref(),
