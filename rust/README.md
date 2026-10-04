@@ -3586,6 +3586,11 @@ lane's to serve over `arkforged discoverDevices` (ArkDeck no longer owns the
 USB enumeration), as is the facts port that encodes "not observable" as
 `deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
 fake HDC driver as real subprocesses and asserts the argv from the fake's log.
+A dispatch pinned to a registered Windows HDC tuple (CHG-2026-078) reads the
+list by that tuple's own family (`parse_host_target_list` at its version: the
+six-column `USB` rows, UART rows excluded), where a zero-byte list is not
+observable rather than absence; every other dispatch keeps Swift's `3.2.0f`
+family. The module's Windows unit tests replay the c2 captures.
 ## Post-flash HDC alias store (TASK-XPA-016, M4)
 
 Swift's post-flash HDC alias store (`RockchipPostFlashHDCBindingStore`, the
@@ -3656,7 +3661,10 @@ it (`output_excerpt` is its last-output line). The `UsbProbe` port gains
 functions beside the observer. The durable alias store, the Target lineage
 advance and the executor's observation-reuse cache are other owners'.
 `tests/rockchip_hdc.rs` drives the shared fake HDC driver with its own
-answers fragment and asserts the argv from the driver's log.
+answers fragment and asserts the argv from the driver's log. Its waits read a
+registered Windows HDC tuple's list by that tuple's own family, as the live
+probe does; an empty or unregistered read never proves a reconnect or a
+disconnect.
 ## Rockchip Loader transition (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::RockchipLoaderTransition` is the Loader side of
