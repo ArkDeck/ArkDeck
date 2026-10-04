@@ -2,6 +2,210 @@
   "sourceLanguage": "en",
   "version": "1.0",
   "strings": {
+    "device.keyboard.focus": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move pointer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动指针"
+          }
+        }
+      }
+    },
+    "device.keyboard.swipeEnd": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Swipe to pointer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "滑动到指针"
+          }
+        }
+      }
+    },
+    "device.keyboard.swipeStart": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set swipe start"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置滑动起点"
+          }
+        }
+      }
+    },
+    "device.keyboard.help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focus the picture with Tab. Arrows move the pointer; Shift moves faster. Return or Space taps; Option-Return holds. Shift-Return sets a swipe start, then sends at the new position. Escape clears the start."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按 Tab 聚焦画面。方向键移动指针，Shift 加速；回车或空格点击，Option-回车长按；Shift-回车设置滑动起点，移动后再按一次发送；Esc 清除起点。"
+          }
+        }
+      }
+    },
+    "device.keyboard.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device keyboard pointer"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备键盘指针"
+          }
+        }
+      }
+    },
+    "device.preview.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to 60 seconds / 30 frames, with 2 seconds between captures. Stop preview before sending input or recording."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最多 60 秒／30 帧，每次截图间隔 2 秒。操作设备或录屏前请停止预览。"
+          }
+        }
+      }
+    },
+    "device.preview.contextChanged": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview stopped · device or binding changed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览已停止 · 设备或绑定发生变化"
+          }
+        }
+      }
+    },
+    "device.preview.limit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview finished · 60 seconds or 30 frames reached"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览结束 · 已达 60 秒或 30 帧上限"
+          }
+        }
+      }
+    },
+    "device.preview.stopping": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopping · waiting for the current capture"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止 · 等待本次截图结束"
+          }
+        }
+      }
+    },
+    "device.preview.running": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refreshing screenshots"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在刷新截图"
+          }
+        }
+      }
+    },
+    "device.preview.stop": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止预览"
+          }
+        }
+      }
+    },
+    "device.preview.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始预览"
+          }
+        }
+      }
+    },
     "device.screen.picture": {
       "extractionState": "manual",
       "localizations": {
@@ -19,13 +223,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A still, not a live view. Each gesture is one typed operation; an unknown outcome is never resent."
+            "value": "Preview refreshes still images. Each gesture is one typed operation; an unknown outcome is never resent."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这是静止画面，不是实时预览。每个手势都是一次 typed operation；结果未知时绝不重发。"
+            "value": "预览按次刷新静止画面。每个手势都是一次 typed operation；结果未知时绝不重发。"
           }
         }
       }
@@ -920,13 +1124,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nothing captures on its own."
+            "value": "Capture affects device load"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "不会自行取帧。"
+            "value": "截图会影响设备负载"
           }
         }
       }
@@ -937,13 +1141,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Every picture is one you asked for, and a recording is a bounded run of stills. Capturing raises the device's load while it runs, so what you are watching can move with it. The rate shown is the one that was measured, never a promised one."
+            "value": "Preview and recording add device load. Stop capture before measuring baseline performance."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "每张画面都是你要来的，录屏是一段有限的连拍。采集期间会抬高设备负载，你正在观察的东西可能随之变化。显示的帧率是实测值，不是承诺值。"
+            "value": "预览和录屏都会增加设备负载。测量基线性能前请停止采集。"
           }
         }
       }

@@ -42,10 +42,14 @@ final class DeviceWorkspaceViewModel {
     }
   }
 
+  let preview: DevicePreviewSession
+  private(set) var keyboardPointer = DeviceKeyboardPointer()
+  private var frameTarget: DeviceTargetPresentation?
   private(set) var frame: DeviceScreenFrame?
   private(set) var isCapturing = false
   private(set) var isOpeningHistoryScreen = false
   private(set) var isSendingGesture = false
+  private(set) var isRecording = false
   private(set) var pendingMarker: Marker?
   private(set) var lastMarker: Marker?
   private(set) var log: [LogEntry] = []
@@ -68,6 +72,7 @@ final class DeviceWorkspaceViewModel {
 
   init(provider: any DeviceControlProviding) {
     self.provider = provider
+    preview = DevicePreviewSession(provider: provider)
   }
 
   // MARK: - Target
@@ -96,11 +101,32 @@ final class DeviceWorkspaceViewModel {
     return "\(target.id) · binding r\(revision)"
   }
 
-  var canCapture: Bool { target != nil && !isOpeningHistoryScreen }
+  var canCapture: Bool {
+    target != nil && !isOpeningHistoryScreen && !isCapturing && !isSendingGesture
+      && !isRecording && !preview.isBusy
+  }
+
+  var canSendInput: Bool {
+    target != nil && frameTarget == target && !frameIsStale && !isSendingGesture
+      && !isCapturing && !isOpeningHistoryScreen && !isRecording && !preview.isBusy
+  }
+
+  var previewStatus: String {
+    if preview.isRunning {
+      return "\(deviceText("device.preview.running")) · \(preview.frameCount)/30"
+    }
+    if preview.isBusy { return deviceText("device.preview.stopping") }
+    switch preview.stopReason {
+    case .limit: return deviceText("device.preview.limit")
+    case .failed(let reason): return "\(deviceText("device.log.captureFailed")) · \(reason)"
+    case .contextChanged: return deviceText("device.preview.contextChanged")
+    default: return deviceText("device.preview.detail")
+    }
+  }
 
   var emptyMessage: String {
     if let captureFailure { return captureFailure }
-    return canCapture
+    return target != nil
       ? deviceText("device.screen.empty.ready") : deviceText("device.screen.empty.noTarget")
   }
 
@@ -118,30 +144,75 @@ final class DeviceWorkspaceViewModel {
   }
 
   func publish(deviceObservation: DeviceListPresentation) {
+    let previousTarget = target
     self.deviceObservation = deviceObservation
+    guard previousTarget != target else { return }
+    // An immutable historical image remains inspectable when its device leaves.
+    if historyPinnedTargetID != nil, frameTarget == nil, !preview.isBusy { return }
+    preview.stop(.contextChanged)
+    screenGeneration &+= 1
+    isOpeningHistoryScreen = false
+    frame = nil
+    frameTarget = nil
+    liveness = DeviceFrameLiveness()
+    keyboardPointer = DeviceKeyboardPointer()
+    pendingMarker = nil
+    lastMarker = nil
+    pressStartedAt = nil
   }
 
   func refresh() async {}
 
+  func recordScreen(using recording: DeviceRecordingViewModel) async {
+    guard !isCapturing, !isSendingGesture, !preview.isBusy, !isRecording else { return }
+    isRecording = true
+    defer { isRecording = false }
+    await recording.record(target: target)
+  }
+
+  func startPreview() async {
+    guard canCapture, let target else { return }
+    screenGeneration &+= 1
+    let generation = screenGeneration
+    await preview.run(target: target) { [weak self] frame in
+      guard let self, self.screenGeneration == generation, self.target == target else { return }
+      self.accept(frame, from: target)
+    }
+  }
+
+  func deactivate() {
+    preview.stop(.hidden)
+    screenGeneration &+= 1
+    isOpeningHistoryScreen = false
+    pendingMarker = nil
+    pressStartedAt = nil
+    keyboardPointer.cancelSwipe()
+    liveness = DeviceFrameLiveness()
+  }
+
+  private func accept(_ frame: DeviceScreenFrame, from target: DeviceTargetPresentation) {
+    self.frame = frame
+    frameTarget = target
+    captureFailure = nil
+    pendingMarker = nil
+    lastMarker = nil
+    keyboardPointer.cancelSwipe()
+    liveness.captured()
+  }
+
   // MARK: - Screenshot
 
   func captureScreen() async {
-    guard let target, !isCapturing, !isOpeningHistoryScreen else { return }
+    guard canCapture, let target else { return }
     isCapturing = true
     screenGeneration &+= 1
     let generation = screenGeneration
     defer { isCapturing = false }
     let result = await provider.captureScreen(target: target)
-    guard !Task.isCancelled, screenGeneration == generation else { return }
+    guard !Task.isCancelled, screenGeneration == generation, self.target == target else { return }
     switch result {
     case .captured(let frame):
-      self.frame = frame
-      captureFailure = nil
-      pendingMarker = nil
-      lastMarker = nil
-      // A fresh picture is the only thing that clears staleness. There is no
-      // way to un-change a screen.
-      liveness.captured()
+      accept(frame, from: target)
       append(
         title: deviceText("device.log.captured"),
         detail: "\(frame.width)×\(frame.height)", systemImage: "camera", tint: "neutral")
@@ -160,6 +231,9 @@ final class DeviceWorkspaceViewModel {
   /// stale and therefore cannot be used as authority for a new gesture.
   func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
     guard context.workspaceKind == .device else { return }
+    preview.stop(.contextChanged)
+    frameTarget = nil
+    keyboardPointer = DeviceKeyboardPointer()
     screenGeneration &+= 1
     let generation = screenGeneration
     historyPinnedTargetID = context.targetID
@@ -198,6 +272,10 @@ final class DeviceWorkspaceViewModel {
   }
 
   func dismissHistoryContext() {
+    preview.stop(.contextChanged)
+    frameTarget = nil
+    liveness = DeviceFrameLiveness()
+    keyboardPointer = DeviceKeyboardPointer()
     screenGeneration &+= 1
     isOpeningHistoryScreen = false
     historyPinnedTargetID = nil
@@ -206,6 +284,7 @@ final class DeviceWorkspaceViewModel {
   // MARK: - Gestures
 
   func pointerMoved(to location: CGPoint, rendered: CGSize) {
+    guard !isCapturing, !preview.isBusy, !isSendingGesture else { return }
     if pressStartedAt == nil { pressStartedAt = .now }
     guard rendered.width > 0, rendered.height > 0 else { return }
     pendingMarker = Marker(
@@ -218,14 +297,16 @@ final class DeviceWorkspaceViewModel {
   ) async {
     let heldFor = pressStartedAt.map { Date.now.timeIntervalSince($0) } ?? 0
     pressStartedAt = nil
-    guard rendered.width > 0, rendered.height > 0, !isSendingGesture else {
+    guard rendered.width > 0, rendered.height > 0, !isSendingGesture,
+      !isCapturing, !preview.isBusy, self.frame?.jobID == frame.jobID
+    else {
       pendingMarker = nil
       return
     }
     // Refused here rather than sent and explained afterwards: the point is
     // that this press never reaches the device, and saying why is what makes
     // the refusal act on instead of merely be complained about.
-    guard !frameIsStale else {
+    guard canSendInput else {
       pendingMarker = nil
       append(
         title: deviceText("device.stale.refused"),
@@ -244,22 +325,48 @@ final class DeviceWorkspaceViewModel {
     pendingMarker = Marker(
       unitX: min(max(start.x / rendered.width, 0), 1),
       unitY: min(max(start.y / rendered.height, 0), 1))
-    guard let target else {
-      pendingMarker = nil
-      return
-    }
+    await send(request)
+  }
 
+  func moveKeyboardPointer(dx: Double, dy: Double) {
+    guard canSendInput else { return }
+    keyboardPointer.move(dx: dx, dy: dy)
+  }
+
+  func beginKeyboardSwipe() {
+    guard canSendInput else { return }
+    keyboardPointer.beginSwipe()
+  }
+
+  func cancelKeyboardSwipe() { keyboardPointer.cancelSwipe() }
+
+  func sendKeyboardGesture(_ gesture: DeviceGesture) async {
+    guard canSendInput, let frame,
+      let request = keyboardPointer.request(gesture, frame: frame)
+    else { return }
+    pendingMarker = Marker(unitX: keyboardPointer.x, unitY: keyboardPointer.y)
+    keyboardPointer.cancelSwipe()
+    await send(request)
+  }
+
+  private func send(_ request: DeviceGestureRequest) async {
+    guard canSendInput, let target else { pendingMarker = nil; return }
+    let generation = screenGeneration
     isSendingGesture = true
     defer { isSendingGesture = false }
     let outcome = await provider.send(request, to: target)
-    lastMarker = pendingMarker
-    pendingMarker = nil
+    let sameContext = screenGeneration == generation && self.target == target
+    if sameContext {
+      lastMarker = pendingMarker
+      pendingMarker = nil
+      liveness.settled(outcome)
+    }
     // Confirmed and unknown both change the screen as far as anyone here can
     // tell: one is known to have landed and the other may have. Only a clean
     // failure leaves the picture still true.
-    liveness.settled(outcome)
-
-    let coordinates = Self.describe(request)
+    // Keep the receipt visible even if the user navigated away while awaiting
+    // it. A late receipt cannot change another target's frame or liveness.
+    let coordinates = (sameContext ? "" : "\(target.id) · ") + Self.describe(request)
     switch outcome {
     case .confirmed(let summary):
       append(
