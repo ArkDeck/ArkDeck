@@ -10,7 +10,7 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -75,7 +75,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-da0cc195f8f07f98fad60c5ef2a96030",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "5d8f5754654da3ac516ea53542f8ed65f0d3ffab5c9d1faa1ffcfe2a3b125f0f",
+  "materializedPlanDigest" : "af94ece4fe22f5bf081c37fc3be78a0621ff74eef2290efb37f98c67d967c228",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "capture.diagnostics@1",
   "originalSubmissionRequest" : {
@@ -127,11 +127,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "6952",
       "lastSequence" : 12,
-      "sha256" : "64743648505019f1f8c24b62c1822a3f78f83118181f4eac24a5aec2a636bad2"
+      "sha256" : "bc68441da215ef7ea63390c3fa6483950c9381d7aa9d942d53e739d0c35a2b07"
     },
     "claims" : [
       {
@@ -147,20 +147,20 @@
     "journalSeal" : {
       "byteCount" : "7338",
       "lastSequence" : 13,
-      "sha256" : "5d07fd6cd9960e0d416266b90ceded1d6aaa6893cdc19747d5161454863930d1"
+      "sha256" : "b21f67058e13811587e60b4111277b8aa22268e4abd11bed8004d3057138cb44"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "4231",
-      "manifestSHA256" : "7f105f2ce2acd2aeda4c365c86e60bfcaabdb23aa22be8f19332ca28ad90a840",
+      "manifestSHA256" : "fae21f83fffeb01ffbc7abd7629a327a525bdd46b40fd524a6750ff8e0fa567c",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "succeeded"
     },
     "receipt" : {
       "catalogGeneration" : "5",
-      "manifestSHA256" : "7f105f2ce2acd2aeda4c365c86e60bfcaabdb23aa22be8f19332ca28ad90a840",
+      "manifestSHA256" : "fae21f83fffeb01ffbc7abd7629a327a525bdd46b40fd524a6750ff8e0fa567c",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-da0cc195f8f07f98fad60c5ef2a96030",

@@ -8,11 +8,11 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
-  "materializedPlanDigest" : "24de1b638cf8ed1167c388347309be06fcc8697f6022f6e73a4116193e3ba71f",
+  "materializedPlanDigest" : "6d5feab9c4b10c5a2d2fab62d0415136f4d1df268b30f280fb9aa5350fbd7153",
   "operationFailure" : {
     "category" : "cancelled",
     "code" : "cancelled",
@@ -62,11 +62,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "3308",
       "lastSequence" : 7,
-      "sha256" : "2bce6196fdc321715f18bee223fcf0b243ccb13880b98fcd779861a012c3afa4"
+      "sha256" : "df302bd9c4648bffa6413b6ea497748a0e4cafd869a0f685ff2fa42ddfd5baf9"
     },
     "claims" : [
       {
@@ -82,20 +82,20 @@
     "journalSeal" : {
       "byteCount" : "3693",
       "lastSequence" : 8,
-      "sha256" : "6a3bee7b980f4cfee36eec83f504501c1961c9e96376de30b8c24f0f2d2c000b"
+      "sha256" : "4c4ed47f96e7200d2d64e5bb9fc5a1610a4e26d67e5e9f5dde489b9e48373d3d"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "1593",
-      "manifestSHA256" : "77d5134e8ed679713facdabbb4e3c7bcfa69d37ee1452ca7cbac967c4b2048e4",
+      "manifestSHA256" : "62869ceb88e3f1ee9d8fc6c9489ccb5b765b196eea3c2e0c96d7265d71d02bd4",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "cancelled"
     },
     "receipt" : {
       "catalogGeneration" : "1",
-      "manifestSHA256" : "77d5134e8ed679713facdabbb4e3c7bcfa69d37ee1452ca7cbac967c4b2048e4",
+      "manifestSHA256" : "62869ceb88e3f1ee9d8fc6c9489ccb5b765b196eea3c2e0c96d7265d71d02bd4",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",

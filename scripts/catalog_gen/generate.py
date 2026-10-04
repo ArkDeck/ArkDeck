@@ -924,7 +924,7 @@ def generate_swift(operations: list[dict], digest: str) -> str:
     lines.append("  ]")
     lines.append("}")
     lines.append("")
-    return "\n".join(lines)
+    return "\n".join(line.rstrip() for line in "\n".join(lines).split("\n"))
 
 
 def generate_matrix(operations: list[dict], profiles: list[dict], digest: str) -> str:

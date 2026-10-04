@@ -92,6 +92,47 @@ fn tree(path: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 }
 
 #[test]
+fn app_private_keyboard_upload_keeps_its_sensitive_owner_and_rejects_a_renamed_payload() {
+    let root = uploads();
+    let (control, _) = compose(&root, None);
+    let ingress = AppIngress::new(control, root.peer().euid);
+    let call = |method, params| ingress.handle(&frame(method, params), root.peer());
+    let bytes = br#"{"kind":"key","key":"enter"}"#;
+    let metadata = json!({"schemaVersion":"arkdeck.import-intent/1", "importRequestId":"app-keyboard",
+        "kind":"keyboard-input", "targetId":TARGET, "bindingRevision":"1", "deviceProfile":null,
+        "name":"keyboard-input.json", "byteCount":bytes.len().to_string(), "sha256":sha256_hex(bytes)});
+    let mut invalid = metadata.clone();
+    invalid["name"] = json!("caller-chosen.json");
+    assert_eq!(
+        code(&call("artifact.import.begin", invalid)),
+        "methodNotAllowlisted"
+    );
+    let started = result(
+        &call("artifact.import.begin", metadata),
+        "artifact.import.begin",
+    );
+    let id = started["importId"].as_str().unwrap();
+    assert_eq!(record(&root, "app-keyboard")["appOwned"], true);
+    let appended = result(
+        &call(
+            "artifact.import.append",
+            json!({"importId":id, "generation":"1",
+        "offset":"0", "byteCount":bytes.len().to_string(), "sha256":sha256_hex(bytes),
+        "base64":encode_import_chunk(bytes).unwrap()}),
+        ),
+        "artifact.import.append",
+    );
+    assert_eq!(appended["nextOffset"], bytes.len().to_string());
+    let committed = result(
+        &call("artifact.import.commit", selector(id)),
+        "artifact.import.commit",
+    );
+    assert_eq!(committed["state"], "committed");
+    assert_eq!(committed["receipt"]["privacy"], "sensitive");
+    assert_eq!(committed["receipt"]["validation"]["kind"], "keyboard-input");
+}
+
+#[test]
 fn app_uploads_publish_once_as_app_owned_and_keep_their_owner_across_restart() {
     let root = uploads();
     let (control, reached) = compose(&root, None);

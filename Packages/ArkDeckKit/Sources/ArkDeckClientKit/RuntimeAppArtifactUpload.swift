@@ -15,6 +15,31 @@ package enum RuntimeAppArtifactUpload {
     fileURL: URL, kind: String, targetID: String, bindingRevision: Int,
     name: String, byteCount: Int, sha256: String, send: Send
   ) async throws -> [String: JSONValue] {
+    try await uploadSource(
+      fileURL: fileURL, data: nil, kind: kind, targetID: targetID,
+      bindingRevision: bindingRevision, name: name, byteCount: byteCount,
+      sha256: sha256, send: send)
+  }
+
+  /// A small private input need not first be copied to an App temporary file.
+  @concurrent
+  package static func uploadKeyboard(
+    data: Data, targetID: String, bindingRevision: Int, send: Send
+  ) async throws -> [String: JSONValue] {
+    guard !data.isEmpty, data.count <= 4096 else {
+      throw AgentExecutionControlFailure("invalidInput", "Keyboard input exceeds its bounded format")
+    }
+    return try await uploadSource(
+      fileURL: nil, data: data, kind: "keyboard-input", targetID: targetID,
+      bindingRevision: bindingRevision, name: "keyboard-input.json", byteCount: data.count,
+      sha256: SHA256Hex.string(of: data), send: send)
+  }
+
+  @concurrent
+  private static func uploadSource(
+    fileURL: URL?, data: Data?, kind: String, targetID: String, bindingRevision: Int,
+    name: String, byteCount: Int, sha256: String, send: Send
+  ) async throws -> [String: JSONValue] {
     let requestID = "app-import-\(UUID().uuidString.lowercased())"
     let fields: [String: JSONValue] = [
       "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
@@ -59,12 +84,18 @@ package enum RuntimeAppArtifactUpload {
       "importId": .string(began.id), "generation": .string(String(began.generation)),
     ]
     do {
-      let file = try FileHandle(forReadingFrom: fileURL)
-      defer { try? file.close() }
+      let file = try fileURL.map { try FileHandle(forReadingFrom: $0) }
+      defer { try? file?.close() }
       var offset = 0
       while offset < byteCount {
         try Task.checkCancellation()
-        let chunk = try file.read(upToCount: min(began.maximumChunkBytes, 512 * 1024)) ?? Data()
+        let limit = min(began.maximumChunkBytes, 512 * 1024)
+        let chunk: Data
+        if let data {
+          chunk = data.subdata(in: offset..<min(data.count, offset + limit))
+        } else {
+          chunk = try file?.read(upToCount: limit) ?? Data()
+        }
         guard !chunk.isEmpty, chunk.count <= byteCount - offset else {
           throw invalid("Selected file changed during Import")
         }
@@ -80,7 +111,7 @@ package enum RuntimeAppArtifactUpload {
         }
         offset = advanced.nextOffset
       }
-      guard (try file.read(upToCount: 1) ?? Data()).isEmpty else {
+      guard (try file?.read(upToCount: 1) ?? Data()).isEmpty else {
         throw invalid("Selected file changed during Import")
       }
       try Task.checkCancellation()

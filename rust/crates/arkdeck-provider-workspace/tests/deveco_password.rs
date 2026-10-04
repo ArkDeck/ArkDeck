@@ -7,12 +7,19 @@
 //! `ascii` makes it plain text. A decoder that re-encoded the key material
 //! differently from Swift would derive another root key and fail to open the
 //! work key.
-#![cfg(unix)]
+//!
+//! On Windows (TASK-XPA-011) the same vectors run over the same layout:
+//! the material tree is created owner-only below the temporary directory in
+//! its spelling on disk, a directory others may change grants the local
+//! Users group write, and a second name of a material file is a hard link
+//! (a symbolic link needs a privilege there).
+#![cfg(any(unix, windows))]
 
 use arkdeck_provider_workspace::SigningError;
 use arkdeck_provider_workspace::deveco_password::{
     decode_if_needed, decode_with_material, pbkdf2_sha256,
 };
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
@@ -143,9 +150,10 @@ struct Material {
 
 impl Material {
     fn new(name: &str, vector: &Vector) -> Self {
-        let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-            .join(format!("deveco-{name}-{}", std::process::id()));
+        let root = scratch().join(format!("deveco-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
+        #[cfg(windows)]
+        arkdeck_platform::HostDirectory::open_or_create_private(&root).unwrap();
         let material = root.join("material");
         for (index, part) in vector.parts.iter().enumerate() {
             let slot = material.join("fd").join(index.to_string());
@@ -160,6 +168,7 @@ impl Material {
             bytes(vector.work_key_envelope),
         )
         .unwrap();
+        #[cfg(unix)]
         for directory in walk_directories(&root) {
             std::fs::set_permissions(&directory, std::fs::Permissions::from_mode(0o700)).unwrap();
         }
@@ -175,6 +184,48 @@ impl Drop for Material {
     }
 }
 
+/// Where the material trees go: Cargo's test directory on Unix; on Windows
+/// the temporary directory in its plain spelling on disk, which the
+/// material reads require.
+fn scratch() -> PathBuf {
+    #[cfg(unix)]
+    let base = PathBuf::from(env!("CARGO_TARGET_TMPDIR"));
+    #[cfg(windows)]
+    let base = {
+        let base = std::env::temp_dir().canonicalize().unwrap();
+        let text = base.to_str().unwrap().to_owned();
+        PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text))
+    };
+    base
+}
+
+/// The directory made writable by others: mode 0777 on Unix; on Windows
+/// write granted to the local Users group.
+fn widen(directory: &Path) {
+    #[cfg(unix)]
+    std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o777)).unwrap();
+    #[cfg(windows)]
+    {
+        let status = std::process::Command::new("icacls")
+            .arg(directory)
+            .args(["/grant", "*S-1-5-32-545:(M)"])
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+}
+
+/// A second name of `target` at `path`: a symbolic link on Unix; on Windows
+/// a hard link.
+fn link(target: &Path, path: &Path) {
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(target, path).unwrap();
+    #[cfg(windows)]
+    std::fs::hard_link(target, path).unwrap();
+}
+
+#[cfg_attr(windows, allow(dead_code))]
 fn walk_directories(root: &Path) -> Vec<PathBuf> {
     let mut directories = vec![root.to_owned()];
     let mut index = 0;
@@ -279,11 +330,7 @@ fn material_that_is_absent_unsafe_or_tampered_is_refused() {
     );
 
     let material = Material::new("writable", &SWIFT_TEST);
-    std::fs::set_permissions(
-        material.root.join("material/fd"),
-        std::fs::Permissions::from_mode(0o777),
-    )
-    .unwrap();
+    widen(&material.root.join("material").join("fd"));
     assert_eq!(
         decode(&material),
         invalid("DevEco signing material directory is absent or unsafe")
@@ -292,7 +339,7 @@ fn material_that_is_absent_unsafe_or_tampered_is_refused() {
     let material = Material::new("symlink", &SWIFT_TEST);
     let salt = material.root.join("material/ac/salt");
     std::fs::rename(&salt, material.root.join("salt-target")).unwrap();
-    std::os::unix::fs::symlink(material.root.join("salt-target"), &salt).unwrap();
+    link(&material.root.join("salt-target"), &salt);
     assert_eq!(
         decode(&material),
         invalid("DevEco signing material file is absent or unsafe")
@@ -305,7 +352,7 @@ fn material_that_is_absent_unsafe_or_tampered_is_refused() {
         invalid("DevEco signing material file is absent or unsafe")
     );
 
-    let absent = Path::new(env!("CARGO_TARGET_TMPDIR")).join("no-deveco-material/release.p12");
+    let absent = scratch().join("no-deveco-material").join("release.p12");
     assert_eq!(
         decode_if_needed(SWIFT_TEST.encrypted.as_bytes(), &absent).err(),
         invalid("DevEco signing material directory is absent or unsafe")

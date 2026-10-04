@@ -1,7 +1,7 @@
 {
   "appCapabilityRegistrySchemaVersion": "arkdeck.app-product-capability-registry/1",
   "bundleVersion": "arkdeck.cli.contracts/1",
-  "catalogDigest": "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "classificationVocabulary": [
     "direct",
     "generic",
@@ -491,14 +491,16 @@
       "conformanceFixture": "argv/input.tap.json",
       "equivalentCommands": [
         "arkdeck input long-press ...",
-        "arkdeck input swipe ..."
+        "arkdeck input swipe ...",
+        "arkdeck artifact import keyboard-input ...",
+        "arkdeck input keyboard --inputs-file <path>"
       ],
       "feature": "app.device.control",
       "implementationStatusByPlatform": {
         "macos": "implemented"
       },
       "lifecycle": "current",
-      "note": "Typed pointer input",
+      "note": "Typed pointer and private keyboard input",
       "owner": "Device",
       "requiredPlatforms": [
         "macos"
@@ -2467,7 +2469,7 @@
       "feature": "flash.bind-current-loader",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2539,7 +2541,7 @@
       "feature": "flash.device-access",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2608,7 +2610,7 @@
       "feature": "flash.lanePlanPreview",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2849,6 +2851,24 @@
       "source": "daemon:human-action.show",
       "targetClassification": "direct",
       "targetCommand": "arkdeck human-action show --human-action <id>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/input.keyboard.json",
+      "equivalentCommands": [],
+      "feature": "input.keyboard@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:input.keyboard@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck input keyboard"
     },
     {
       "classification": "direct",
@@ -4340,7 +4360,7 @@
       "feature": "workspace.apply-patch@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4412,7 +4432,7 @@
       "feature": "workspace.create-checkpoint@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4700,7 +4720,7 @@
       "feature": "workspace.revert-patch@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4798,7 +4818,7 @@
   "summary": {
     "blocked": [],
     "byClassification": {
-      "direct": 128,
+      "direct": 129,
       "generic": 2,
       "internal": 4,
       "local": 93,
@@ -4808,11 +4828,11 @@
     },
     "bySource": {
       "app": 68,
-      "catalog": 31,
+      "catalog": 32,
       "cli": 53,
       "daemon": 110
     },
-    "entries": 262,
+    "entries": 263,
     "fullFunction": true
   }
 }

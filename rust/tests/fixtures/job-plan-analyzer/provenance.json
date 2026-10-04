@@ -4,14 +4,15 @@
     "artifacts/job-oracle-source/ART-24be29d93f921d13584e7be5ca071f2a": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "artifacts/job-oracle-source/ART-cf645cc2f23c16cf9965b179bcb35b5e": "d00960e959e3e9e022f914b985cf9d834e5800b17ecab4c07a29834b211c5035",
     "artifacts/job-oracle-source/index.json": "e46785c83df623c2927ff7ce0304d5fcf915bb094db6ffe48ead5f2a477750cf",
-    "cases.json": "a21196156a3bd383fedea5ca534d0013c56f70fb447853fb965ebfd10e70b19c"
+    "cases.json": "0ddb0b69f9c032147556b7144313ebab447a6c9ba55d37576db75a6216ec9892"
   },
   "nowUTC": "2026-09-14T00:00:00Z",
   "producer": "JobPlanAnalyzerOracleContractTests/testSwiftPlansTheSharedAnalyzerOracle",
   "root": "/private/tmp/arkdeck-job-plan-oracle",
+  "catalogRegeneration": "../catalog-extension-recording.json",
   "selection": {
-    "planResults": "Current-Catalog Swift recording described in ../catalog-extension-recording.json",
-    "refusals": "Original Swift recording retained; this Catalog extension does not update incidental Foundation DecodingError wording. Exact Rust equality assertions are unchanged.",
+    "planResults": "Current-Catalog Swift recording",
+    "refusals": "Original Swift recording retained; no incidental Foundation diagnostic wording changes.",
     "retainedDiagnosticCases": [
       "notAnObject",
       "topLevelString",

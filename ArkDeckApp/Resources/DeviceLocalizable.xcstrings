@@ -210,10 +210,16 @@
       "extractionState": "manual",
       "localizations": {
         "en": {
-          "stringUnit": { "state": "translated", "value": "Device screenshot" }
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device screenshot"
+          }
         },
         "zh-Hans": {
-          "stringUnit": { "state": "translated", "value": "设备截图" }
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备截图"
+          }
         }
       }
     },
@@ -1148,6 +1154,342 @@
           "stringUnit": {
             "state": "translated",
             "value": "预览和录屏都会增加设备负载。测量基线性能前请停止采集。"
+          }
+        }
+      }
+    },
+    "device.input.accepted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyboard input accepted by injector"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "键盘输入已被注入器接受"
+          }
+        }
+      }
+    },
+    "device.input.clipboardConsent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow this text to replace the device clipboard"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许这段文字替换设备剪贴板"
+          }
+        }
+      }
+    },
+    "device.input.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyboard input not confirmed · inspect Job"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "键盘输入未确认 · 查看 Job"
+          }
+        }
+      }
+    },
+    "device.input.focusHelp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send one key or text to the current focus on the default display. Refresh the picture after each input."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向默认屏幕当前焦点发送一个按键或一段文字。每次输入后请刷新画面。"
+          }
+        }
+      }
+    },
+    "device.input.key": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按键"
+          }
+        }
+      }
+    },
+    "device.input.key.arrowDown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Down arrow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下方向键"
+          }
+        }
+      }
+    },
+    "device.input.key.arrowLeft": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left arrow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左方向键"
+          }
+        }
+      }
+    },
+    "device.input.key.arrowRight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right arrow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右方向键"
+          }
+        }
+      }
+    },
+    "device.input.key.arrowUp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up arrow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上方向键"
+          }
+        }
+      }
+    },
+    "device.input.key.back": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device Back"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备返回"
+          }
+        }
+      }
+    },
+    "device.input.key.backspace": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Backspace"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退格"
+          }
+        }
+      }
+    },
+    "device.input.key.enter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "回车"
+          }
+        }
+      }
+    },
+    "device.input.key.escape": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escape"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escape"
+          }
+        }
+      }
+    },
+    "device.input.key.home": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device Home"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备主页"
+          }
+        }
+      }
+    },
+    "device.input.key.tab": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "制表键"
+          }
+        }
+      }
+    },
+    "device.input.privacyHelp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text is retained as a sensitive local Artifact. Some input, including Chinese, uses the device clipboard. Success confirms injector acceptance; check the device for the result."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字保存为本地敏感 Artifact。中文等输入会使用设备剪贴板。成功仅表示注入器已接受，请查看设备确认结果。"
+          }
+        }
+      }
+    },
+    "device.input.sendKey": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send key"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送按键"
+          }
+        }
+      }
+    },
+    "device.input.sendText": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Send text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送文字"
+          }
+        }
+      }
+    },
+    "device.input.text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text · up to 512 UTF-8 bytes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字 · 最多 512 个 UTF-8 字节"
+          }
+        }
+      }
+    },
+    "device.input.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device keyboard"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备键盘"
+          }
+        }
+      }
+    },
+    "device.input.unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyboard outcome unknown · no automatic resend"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "键盘结果未知 · 不会自动重发"
           }
         }
       }
