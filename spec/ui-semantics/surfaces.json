@@ -728,7 +728,7 @@
       "id": "diagnostics.hilog",
       "scenario": "diagnostics",
       "page": "history",
-      "steps": [{"select": "history.row.job-ce57f7b014978fe39492cf64043a8fc9"}, {"invoke": "history.openDiagnostics"}],
+      "steps": [{"select": "history.row.job-ce57f7b014978fe39492cf64043a8fc9"}, {"invoke": "history.openWorkspace"}],
       "elements": [
         {"automationId": "diagnostics.workspace.title", "origin": "macos", "role": "text", "name": ["@diagnostics.hilog.title"]},
         {"automationId": "diagnostics.hilog.job", "origin": "macos", "role": "text", "name": ["job-ce57f7b014978fe39492cf64043a8fc9"]},

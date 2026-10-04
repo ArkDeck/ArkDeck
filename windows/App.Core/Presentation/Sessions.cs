@@ -183,7 +183,8 @@ public sealed record JobEvidenceFacts(
     IReadOnlyList<string> Blockers,
     IReadOnlyList<string> MissingRequiredArtifacts,
     string? ObservedFirmware = null,
-    long? ObservedBindingRevision = null)
+    long? ObservedBindingRevision = null,
+    JsonObject? Parameters = null)
 {
     public static JobEvidenceFacts Parse(JsonValue value)
     {
@@ -206,7 +207,8 @@ public sealed record JobEvidenceFacts(
             TypedJson.Required(o, "missingRequiredArtifacts", v => TypedJson.List(v, TypedJson.String)),
             observation is null ? null : Json.OptionalString(observation, "firmware"),
             observation is not null && observation.TryGetValue("bindingRevision", out var observed) && observed is JsonNumber n && n.TryGetInt64(out var revision)
-                ? revision : null);
+                ? revision : null,
+            o.TryGetValue("parameters", out var p) && p is JsonObject parameters ? parameters : null);
     }
 }
 

@@ -131,15 +131,7 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             if (value is not null) _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
         }
 
-        // macOS "Open Diagnostics": the record's read-only context in Diagnostics (the other
-        // workspaces' hand-off is not ported yet).
-        if (DiagnosticsState.ContextOf(job) is { } context)
-        {
-            var open = Ui.Button("history.openDiagnostics", S.Text(UiStrings.HistoryActivityOpenDiagnostics), (_, _) => MainWindow.Instance.OpenDiagnostics(context));
-            ToolTipService.SetToolTip(open, S.Text(UiStrings.HistoryContextReadOnly));
-            AutomationProperties.SetHelpText(open, S.Text(UiStrings.HistoryContextReadOnly));
-            _detail.Children.Add(Ui.Row(open));
-        }
+        OpenWorkspace(state, job);
 
         Evidence(state.Evidence);
 
@@ -168,6 +160,33 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
         {
             _detail.Children.Add(Ui.Text("history.artifacts.traceViewerDeferred", S.Text(UiStrings.WindowsTraceViewerDeferred), "ArkDeckCaptionStyle"));
         }
+    }
+
+    /// <summary>macOS's detail header actions: Open the workspace that produced the Job with the
+    /// record's read-only context (and, for a <c>capture.diagnostics@1</c> Job of another
+    /// workspace, Open Diagnostics too); "no workspace" for other records.</summary>
+    private void OpenWorkspace(HistoryDetailState state, JobSummary job)
+    {
+        var context = HistoryWorkspaceContext.Of(job, state.Evidence.Value, state.Artifacts.Value);
+        if (context is null)
+        {
+            _detail.Children.Add(Ui.Text("history.openWorkspace.unsupported", S.Text(UiStrings.HistoryActivityOpenUnsupported), "ArkDeckCaptionStyle"));
+            return;
+        }
+        var open = Ui.Button("history.openWorkspace", S.Text("history.activity.open." + HistoryWorkspaceContext.Name(context.Kind)),
+            (_, _) => MainWindow.Instance.OpenHistoryWorkspace(context), accent: true);
+        ToolTipService.SetToolTip(open, S.Text(UiStrings.HistoryContextReadOnly));
+        AutomationProperties.SetHelpText(open, S.Text(UiStrings.HistoryContextReadOnly));
+        var row = Ui.Row(open);
+        if (context.OperationReference == HistoryWorkspaceContext.CaptureDiagnostics && context.Kind != WorkspaceKind.Diagnostics)
+        {
+            var diagnostics = Ui.Button("history.openDiagnostics", S.Text(UiStrings.HistoryActivityOpenDiagnostics),
+                (_, _) => MainWindow.Instance.OpenHistoryWorkspace(context, inDiagnostics: true));
+            ToolTipService.SetToolTip(diagnostics, S.Text(UiStrings.HistoryContextReadOnly));
+            AutomationProperties.SetHelpText(diagnostics, S.Text(UiStrings.HistoryContextReadOnly));
+            row.Children.Add(diagnostics);
+        }
+        _detail.Children.Add(row);
     }
 
     /// <summary>The macOS History evidence section (<c>job.evidence</c>): the Runtime's record

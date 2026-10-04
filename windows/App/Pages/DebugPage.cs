@@ -20,7 +20,7 @@ namespace ArkDeck.App.Pages;
 /// </summary>
 public sealed partial class DebugPage() : SurfacePage<DebugState>(
     "debug", "debug.title", UiStrings.WindowsNavigationDebug,
-    "debug.refresh", UiStrings.DebugActionRefresh, "debug.loading", UiStrings.SettingsCommonLoading)
+    "debug.refresh", UiStrings.DebugActionRefresh, "debug.loading", UiStrings.SettingsCommonLoading), IHistoryContextPage
 {
     private static readonly string[] TabOrder = ["artifacts", "logs", "apps", "network", "commands"];
 
@@ -31,6 +31,17 @@ public sealed partial class DebugPage() : SurfacePage<DebugState>(
     private string _selectedTab = "artifacts";
     private string? _targetId;
     private bool _targetChosen;
+    private HistoryWorkspaceContext? _history;
+
+    /// <summary>macOS <c>rememberHistoryContext</c>: the record's Target is selected and the tab
+    /// that ran its operation is shown; nothing is planned or submitted.</summary>
+    public void OpenHistoryContext(HistoryWorkspaceContext context)
+    {
+        _history = context;
+        _targetId = context.TargetId;
+        _targetChosen = true;
+        _selectedTab = context.DebugTab;
+    }
 
     protected override Task<DebugState> LoadAsync() => App.Loader.DebugAsync(_targetId);
 
@@ -42,11 +53,19 @@ public sealed partial class DebugPage() : SurfacePage<DebugState>(
         // macOS DebugWorkspaceRefreshState: the first Target once the list loads, until the
         // person picks another (or none); a Target that disappears is dropped.
         var targets = state.Targets.Value ?? [];
-        if (!_targetChosen || (_targetId is not null && targets.All(t => t.TargetId != _targetId)))
+        if (!_targetChosen || (_targetId is not null && _history?.TargetId != _targetId && targets.All(t => t.TargetId != _targetId)))
         {
             _targetId = targets.FirstOrDefault()?.TargetId;
         }
         _tab = new StackPanel { Spacing = 14 };
+        if (_history is { } history)
+        {
+            body.Children.Add(HistoryContextBanner.Create(history, async () =>
+            {
+                _history = null;
+                await RefreshAsync();
+            }));
+        }
         body.Children.Add(Ui.Text("debug.scope", S.Text(UiStrings.DebugScope), "ArkDeckCaptionStyle"));
         body.Children.Add(TargetRow(state));
         if (state.Targets.Unavailable is { } why) body.Children.Add(Ui.Card(Ui.UnavailableNotice("debug.target.failure", UiStrings.DebugTargetLabel, why)));

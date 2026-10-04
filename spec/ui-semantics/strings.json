@@ -7499,6 +7499,90 @@
       "table": null,
       "en": "The remote build source could not be saved safely.",
       "zh-Hans": "无法安全保存远端构建源。"
+    },
+    {
+      "key": "history.activity.open.flash",
+      "table": "HistoryLocalizable",
+      "en": "Open Flash",
+      "zh-Hans": "打开 Flash"
+    },
+    {
+      "key": "history.activity.open.viewer",
+      "table": "HistoryLocalizable",
+      "en": "Open Viewer",
+      "zh-Hans": "打开 Viewer"
+    },
+    {
+      "key": "history.activity.open.trace",
+      "table": "HistoryLocalizable",
+      "en": "Open Trace",
+      "zh-Hans": "打开 Trace"
+    },
+    {
+      "key": "history.activity.open.debug",
+      "table": "HistoryLocalizable",
+      "en": "Open Debug",
+      "zh-Hans": "打开 Debug"
+    },
+    {
+      "key": "history.activity.open.device",
+      "table": "HistoryLocalizable",
+      "en": "Open Device",
+      "zh-Hans": "打开 Device"
+    },
+    {
+      "key": "history.activity.open.detailUnavailable",
+      "table": "HistoryLocalizable",
+      "en": "Job details are unavailable, so ArkDeck cannot reopen this context.",
+      "zh-Hans": "Job 详情不可用，ArkDeck 无法重新打开此上下文。"
+    },
+    {
+      "key": "history.activity.open.unsupported",
+      "table": "HistoryLocalizable",
+      "en": "This record has no workspace that can be reopened.",
+      "zh-Hans": "此记录没有可重新打开的工作区。"
+    },
+    {
+      "key": "history.context.title",
+      "table": "HistoryLocalizable",
+      "en": "Opened from History",
+      "zh-Hans": "从 History 打开"
+    },
+    {
+      "key": "history.context.dismiss",
+      "table": "HistoryLocalizable",
+      "en": "Close history context",
+      "zh-Hans": "关闭历史上下文"
+    },
+    {
+      "key": "history.context.job",
+      "table": "HistoryLocalizable",
+      "en": "Job",
+      "zh-Hans": "Job"
+    },
+    {
+      "key": "history.context.target",
+      "table": "HistoryLocalizable",
+      "en": "Target",
+      "zh-Hans": "目标"
+    },
+    {
+      "key": "history.context.operation",
+      "table": "HistoryLocalizable",
+      "en": "Operation",
+      "zh-Hans": "操作"
+    },
+    {
+      "key": "history.context.state",
+      "table": "HistoryLocalizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "history.context.artifacts",
+      "table": "HistoryLocalizable",
+      "en": "Artifacts",
+      "zh-Hans": "Artifacts"
     }
   ]
 }

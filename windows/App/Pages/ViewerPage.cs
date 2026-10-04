@@ -25,8 +25,59 @@ namespace ArkDeck.App.Pages;
 /// </summary>
 public sealed partial class ViewerPage() : SurfacePage<ViewerState>(
     "viewer", "viewer.title", UiStrings.AppNavigationUiDump,
-    "viewer.refresh", UiStrings.ViewerToolbarRefresh, "viewer.loading", UiStrings.SettingsCommonLoading)
+    "viewer.refresh", UiStrings.ViewerToolbarRefresh, "viewer.loading", UiStrings.SettingsCommonLoading), IHistoryContextPage
 {
+    private HistoryWorkspaceContext? _history;
+    private string? _historyJob;
+
+    /// <summary>macOS <c>openHistoryContext</c>: the record's Target is pinned, the shown capture
+    /// cleared, and the record's own screenshot, tree and dump are read and verified (no new
+    /// capture is made).</summary>
+    public void OpenHistoryContext(HistoryWorkspaceContext context)
+    {
+        _history = context;
+        _targetId = context.TargetId;
+        _captured = null;
+        _captureFailure = null;
+        _root = null;
+        _selected = null;
+        _query = "";
+        _expanded.Clear();
+        _dump = null;
+        _dumpFor = null;
+        _historyJob = context.OperationReference == HistoryWorkspaceContext.CaptureDiagnostics ? context.JobId : null;
+    }
+
+    private async Task LoadHistoryAsync(HistoryWorkspaceContext context)
+    {
+        if (_capturing) return;
+        _capturing = true;
+        _captureFailure = null;
+        RenderContent();
+        Ui.Say(_status, S.Text(UiStrings.HistoryLoading));
+        try
+        {
+            var target = Target?.Target ?? new TargetSummary(context.TargetId, null, "0", context.BindingRevision ?? 0, "", "");
+            var outcome = await Task.Run(() => App.Loader.LoadViewCaptureAsync(context.JobId, target));
+            MainWindow.Instance.Report(outcome);
+            if (!ReferenceEquals(_history, context)) return;
+            if (outcome.Capture is { } capture)
+            {
+                Show(outcome, capture);
+            }
+            else
+            {
+                _captureFailure = outcome.Failure;
+                Ui.Say(_status, outcome.Failure ?? "");
+            }
+        }
+        finally
+        {
+            _capturing = false;
+            RenderContent();
+        }
+    }
+
     private static readonly string[] Tabs = ["properties", "layout", "accessibility", "rawDump", "advancedDump"];
 
     private StackPanel _content = new() { Spacing = 12 };
@@ -57,15 +108,29 @@ public sealed partial class ViewerPage() : SurfacePage<ViewerState>(
     protected override void Render(ViewerState state, StackPanel body)
     {
         _state = state;
-        if (_targetId.Length > 0 && state.JoinedTargets.All(t => t.TargetId != _targetId)) _targetId = "";
+        if (_targetId.Length > 0 && _history?.TargetId != _targetId && state.JoinedTargets.All(t => t.TargetId != _targetId)) _targetId = "";
         if (_targetId.Length == 0 && state.JoinedTargets.FirstOrDefault(t => t.Connected) is { } connected) _targetId = connected.TargetId;
         var said = _status.Text;
         _status = Ui.Status("viewer.status");
         Ui.SetText(_status, said);
+        if (_history is { } history)
+        {
+            body.Children.Add(HistoryContextBanner.Create(history, async () =>
+            {
+                _history = null;
+                _historyJob = null;
+                await RefreshAsync();
+            }));
+        }
         _content = new StackPanel { Spacing = 12 };
         body.Children.Add(_content);
         body.Children.Add(_status);
         RenderContent();
+        if (_historyJob is not null && _history is { } reopened)
+        {
+            _historyJob = null;
+            DispatcherQueue.TryEnqueue(async () => await LoadHistoryAsync(reopened));
+        }
     }
 
     private void RenderContent()
@@ -644,6 +709,22 @@ public sealed partial class ViewerPage() : SurfacePage<ViewerState>(
 
     // ---- capture ----
 
+    /// <summary>Shows a capture: the unique focused root, else the first; the search cleared, the
+    /// root expanded.</summary>
+    private void Show(ViewerCaptureOutcome outcome, ViewerCapture capture)
+    {
+        _captured = outcome;
+        var focusedRoots = capture.Roots.Where(r => capture.SubtreeNodes(r).Any(n => n.Focused == true)).ToArray();
+        _root = focusedRoots.Length == 1 ? focusedRoots[0] : capture.PrimaryRootIdentity ?? capture.Roots.FirstOrDefault();
+        _selected = _root;
+        _query = "";
+        _expanded.Clear();
+        if (_root is not null) _expanded.Add(_root);
+        _dump = null;
+        _dumpFor = null;
+        Ui.Say(_status, S.Format(UiStrings.ViewerFooterNodes, (long)capture.Nodes.Count));
+    }
+
     private async Task CaptureAsync()
     {
         if (_capturing || _state is null) return;
@@ -668,17 +749,7 @@ public sealed partial class ViewerPage() : SurfacePage<ViewerState>(
             MainWindow.Instance.Report(outcome);
             if (outcome.Capture is { } capture)
             {
-                _captured = outcome;
-                // The unique focused root, else the first; the search cleared, the root expanded.
-                var focusedRoots = capture.Roots.Where(r => capture.SubtreeNodes(r).Any(n => n.Focused == true)).ToArray();
-                _root = focusedRoots.Length == 1 ? focusedRoots[0] : capture.PrimaryRootIdentity ?? capture.Roots.FirstOrDefault();
-                _selected = _root;
-                _query = "";
-                _expanded.Clear();
-                if (_root is not null) _expanded.Add(_root);
-                _dump = null;
-                _dumpFor = null;
-                Ui.Say(_status, S.Format(UiStrings.ViewerFooterNodes, (long)capture.Nodes.Count));
+                Show(outcome, capture);
             }
             else
             {
