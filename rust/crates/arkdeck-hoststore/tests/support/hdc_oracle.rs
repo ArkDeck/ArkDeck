@@ -95,6 +95,9 @@ pub struct Owners {
     pub claims: StorageClaims,
     pub probe: OracleProbe,
     pub helper: Option<CodeSignHelper>,
+    /// Where received files land, when the oracle fixed a host receive root
+    /// (`provenance.json`'s `receiveRoot`, the fake's root's `receive`).
+    pub receive_root: Option<PathBuf>,
 }
 
 impl Owners {
@@ -104,6 +107,18 @@ impl Owners {
         let provenance = document(fixture, "provenance.json");
         let cases = document(fixture, "cases.json");
         let root = debug_hap::rebuild(fixture);
+        // The resources the oracle's answers read beside them.
+        if fixture.join("resources").is_dir() {
+            debug_hap::private_dir(&root.join("resources"));
+            for resource in fs::read_dir(fixture.join("resources")).unwrap() {
+                let resource = resource.unwrap().path();
+                fs::copy(
+                    &resource,
+                    root.join("resources").join(resource.file_name().unwrap()),
+                )
+                .unwrap();
+            }
+        }
         let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
         assert_eq!(provenance["hdcSHA256"], digest.as_str());
         let default_root = root.join("store");
@@ -136,6 +151,7 @@ impl Owners {
             helper: cases
                 .get("codeSignHelper")
                 .map(|_| code_sign_helper(&cases, &root)),
+            receive_root: provenance.get("receiveRoot").map(|_| root.join("receive")),
             provenance,
             digest,
             default_root,
@@ -147,7 +163,7 @@ impl Owners {
         HdcComposition {
             targets: &self.targets,
             dispatch,
-            receive_root: None,
+            receive_root: self.receive_root.as_deref(),
             tool_sha256: &self.digest,
             now: fixed_now,
             code_sign_helper: self.helper.as_ref(),
@@ -299,6 +315,20 @@ enum Mutations {
     /// oracle ran them (`observe.device@1`, `capture.diagnostics@1`), and a
     /// refusal's message is Swift's wording (T2): reported, not compared.
     ReadOnly,
+    /// The Jobs are admitted and run under the durable mutation authority, as
+    /// the oracle ran them, and every answer is Swift's, message included;
+    /// a Job may end before its first write, so none is required to have
+    /// consumed a use (`capture.diagnostics@1`'s file and Trace legs).
+    Authorized,
+}
+
+/// [`assert_replays`] for an oracle run under the mutation authority whose
+/// Jobs need not each consume a use ([`Mutations::Authorized`]). Where the
+/// oracle's calls ran concurrently it recorded each call's own line in
+/// `hdc-calls.log`; those are compared exchange by exchange, sorted, and
+/// `calls` counts them.
+pub fn assert_authorized_replays(name: &str, exchanges: usize, calls: usize) {
+    replay(name, exchanges, calls, Mutations::Authorized);
 }
 
 /// [`assert_replays`] for an oracle of read-only Jobs ([`Mutations::ReadOnly`]):
@@ -308,7 +338,7 @@ pub fn assert_read_only_replays(name: &str, exchanges: usize, calls: usize) {
 }
 
 fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
-    let owned = mutations == Mutations::Owned;
+    let owned = mutations != Mutations::ReadOnly;
     let _lock = debug_hap::exclusive();
     let fixture = super::fixture(name);
     let cases = document(&fixture, "cases.json");
@@ -371,6 +401,9 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         Value::Null
     };
     let (mut answers, mut replayed) = (Vec::new(), 0);
+    // The concurrent calls' own log, each exchange's read sorted.
+    let concurrent = fixture.join("hdc-calls.log").is_file();
+    let (mut sorted_calls, mut seen) = (Vec::new(), 0);
     for exchange in cases["exchanges"].as_array().unwrap() {
         let (name, method) = (&exchange["name"], exchange["method"].as_str().unwrap());
         replayed += 1;
@@ -405,12 +438,18 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
                 if let Some(mode) = exchange["mode"].as_str() {
                     owners.mode(mode);
                 }
+                // What the oracle's fake keeps of an earlier Job's calls.
+                let _ = fs::remove_file(owners.root.join("tag-list-read"));
                 match runner.handle(params) {
                     Ok(result) => json!({"ok": true, "result": result}),
                     Err(refusal) => refused(refusal.code, refusal.message, Some(refusal.details)),
                 }
             }
             "job.result" | "job.evidence" => match reader.handle(method, params) {
+                Ok(result) => json!({"ok": true, "result": result}),
+                Err(error) => refused(&error.code, error.message, error.details),
+            },
+            "job.show" => match owners.jobs.handle_resource(method, params) {
                 Ok(result) => json!({"ok": true, "result": result}),
                 Err(error) => refused(&error.code, error.message, error.details),
             },
@@ -460,6 +499,17 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         if method.starts_with("cleanupDebt.") {
             assert_conforms(method, &actual);
         }
+        if concurrent {
+            let log = fs::read_to_string(owners.root.join("hdc-calls.log")).unwrap_or_default();
+            let lines: Vec<&str> = log.lines().collect();
+            let mut exchange_calls: Vec<String> = lines[seen..]
+                .iter()
+                .map(|line| String::from_utf8(spelled(line.as_bytes())).unwrap())
+                .collect();
+            exchange_calls.sort_unstable();
+            sorted_calls.extend(exchange_calls.into_iter().map(|line| format!("{line}\n")));
+            seen = lines.len();
+        }
         // Compared once every derived value is learned, below.
         answers.push((
             name.clone(),
@@ -469,14 +519,21 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
     }
     assert_eq!(replayed, exchanges, "every exchange");
 
-    // The fake received Swift's calls, in order.
-    let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
-    assert_eq!(swift.lines().count(), calls);
-    assert_eq!(
-        String::from_utf8(spelled(owners.calls().as_bytes())).unwrap(),
-        swift,
-        "the fake's calls"
-    );
+    // The fake received Swift's calls, in order (where they ran
+    // concurrently, each exchange's sorted).
+    if concurrent {
+        let swift = fs::read_to_string(fixture.join("hdc-calls.log")).unwrap();
+        assert_eq!(swift.lines().count(), calls);
+        assert_eq!(sorted_calls.concat(), swift, "each exchange's calls");
+    } else {
+        let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
+        assert_eq!(swift.lines().count(), calls);
+        assert_eq!(
+            String::from_utf8(spelled(owners.calls().as_bytes())).unwrap(),
+            swift,
+            "the fake's calls"
+        );
+    }
     assert_eq!(
         fs::read(owners.root.join("targets-state/targets.json")).unwrap(),
         fs::read(fixture.join("targets-state/targets.json")).unwrap(),
@@ -485,7 +542,13 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
 
     // Each Job consumed its one use before its first mutation; every later
     // mutation of its run, and a continuation's retry, continued under it.
-    for (case, job) in cases["jobs"].as_object().unwrap().iter().filter(|_| owned) {
+    let consumes = mutations == Mutations::Owned;
+    for (case, job) in cases["jobs"]
+        .as_object()
+        .unwrap()
+        .iter()
+        .filter(|_| consumes)
+    {
         let timeline = owners.record(job.as_str().unwrap())["timeline"].clone();
         let consumed = timeline
             .as_array()
