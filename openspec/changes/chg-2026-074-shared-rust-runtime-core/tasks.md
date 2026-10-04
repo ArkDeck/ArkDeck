@@ -746,7 +746,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   ```
 
 - Applicable failure patterns:AF-002, AF-003, AF-007, AF-011
-- Production reachability:workspace provider (git / node+hvigor / hap-sign-tool through registered toolchain references; keystore password in Credential Manager; presence gate through the HAR console challenge) and analyzer provider (crash signature, hilog summary) → `agent run` budgets → negative `revisionConflict` with zero dispatch
+- Production reachability:workspace provider (git / node+hvigor / hap-sign-tool through registered toolchain references; keystore password in Credential Manager, read without interaction and with no presence gate, as the shipped macOS Runtime reads the Keychain; see `evidence/runs/TASK-XPA-011/windows-workspace-sign-oracle-run.md`) and analyzer provider (crash signature, hilog summary) → `agent run` budgets → negative `revisionConflict` with zero dispatch
 - Trusted fact sources:toolchain identity from registered references, never from PATH; secrets never in argv/env/receipts
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
@@ -1042,7 +1042,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   ```
 
 - Applicable failure patterns:AF-003, AF-004, AF-007, AF-011
-- Production reachability:Rust analyzer and workspace providers replace the sidecar for those families; Keychain through the `SecItem*` C API; presence gate through the HAR console challenge; `/usr/bin/git` replaced by a registered toolchain reference
+- Production reachability:Rust analyzer and workspace providers replace the sidecar for those families; Keychain through the `SecItem*` C API, Runtime reads never interactive (`LAContext.interactionNotAllowed`) and no presence gate; `/usr/bin/git` replaced by a registered toolchain reference
 - Trusted fact sources:toolchain identity from registered references; secrets never leave the credential store into argv/env/receipts
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`

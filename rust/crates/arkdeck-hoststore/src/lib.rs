@@ -58,6 +58,14 @@ pub use workspace_signing::{credential_pinning, keychain_credential_pinning};
 mod workspace_read;
 #[cfg(any(target_os = "macos", windows))]
 mod workspace_support;
+// The code-owned grep, sed and patch a Windows workspace profile pins: the
+// daemon's own image runs them (TASK-XPA-011, ruling of 2026-10-04).
+#[cfg(any(target_os = "macos", windows))]
+mod workspace_text_tools;
+#[cfg(any(target_os = "macos", windows))]
+pub use workspace_text_tools::{
+    TEXT_TOOLS, TextToolOutput, WORKSPACE_TOOL_FLAG, run_text_tool, workspace_tool_main,
+};
 #[cfg(any(target_os = "macos", windows))]
 mod workspace_sweep;
 #[cfg(any(target_os = "macos", windows))]
