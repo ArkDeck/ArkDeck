@@ -2619,6 +2619,12 @@ well.
   consumer reads the Windows grammar yet (CHG-2026-074 TASK-XPA-004/005);
   until then a Windows device listing read by the macOS grammars is
   `unknown`.
+  (`windows_lifecycle::tests`). Swift's union control-action owner is
+  composed on every Windows root (`control-action-snapshots`), over the HDC
+  control-action owner (`hdc-control-actions`) only beside that managed
+  server, so `runtime.hdc.impact-preview` and `runtime.hdc.restart` answer
+  `operationUnavailable` without one, as on macOS. Tool selection's restart
+  stays macOS-only.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
@@ -2830,8 +2836,8 @@ composes, as the macOS compositions do:
 
 - the lane from `ARKDECK_ARKFORGE_BUNDLE_PATH`, with Swift's absences;
 - the Flash planning over it;
-- the Flash facts over the Windows USB census, which fails closed until the
-  DAYU200 sample confirms its mapping;
+- the Flash facts over the Windows USB census (open since the DAYU200 sample
+  confirmed its mapping);
 - the device access observer.
 
 The lane's authority binds the managed-control HDC's digest, and no HDC is
@@ -2940,24 +2946,42 @@ do, over the registry of a development root's private `bootstrap`, or the accoun
 `%LOCALAPPDATA%\ArkDeck\Bootstrap\v1` (the macOS `ArkDeck/Bootstrap/v1` below the product
 directory), created owner-only at the start. The census names `bootstrap` after
 `workspaceProjects`, the macOS order.
-- **Served.** `runtime.bundle.list|inspect|remove` and `runtime.tool.list|inspect|remove` over
+- **Served.** `runtime.bundle.register|list|inspect|remove` and `runtime.tool.list|inspect|remove` over
   `arkdeck-bootstrap`'s store, index, retirement, reference and selection-ledger owners, which
   build on Windows on the NTFS host store; `runtime.tool.register --kind deveco` and a DevEco
   toolchain's inspection, listing and retirement over the DevEco registry. The control layer and
   the CLI take a registration path as the host spells an absolute one (`X:\…` on Windows), and the
   CLI expects the host's `platform` in a returned record.
-- **Refused on Windows**, before the store is locked: registering a daemon Bundle (no Windows
-  daemon-bundle form; the daemon is installed as the signed package) or an HDC (no Windows HDC
-  tuple is registered, CHG-2026-078); a retained record of either is refused as failing its
-  native trust policy. With no HDC to select, `runtime.tool.select` answers Swift's no-owner
-  refusal.
+- **The Windows daemon Bundle** is a release-candidate package tree (`package-rc.ps1`'s xcopy
+  form): it holds exactly the files its `rc-manifest.json` names with their sizes and SHA-256s,
+  and its `arkdeck-agentd.exe` is signed as the running Runtime is (the same development leaf,
+  or the same production publisher, ruling 17). `arkdeck-platform`'s `windows::bootstrap_tree`
+  reads the tree handle-relative on NTFS (no reparse point; nothing another principal may
+  change) and captures it through a private staging directory as `bundle-<digest>.rc`. The
+  record adds `"platform":"windows"` and the signer, and the projection names
+  `arkdeck.windows-daemon-package/1` with the signer as `teamIdentifier`; the content digest is
+  host-tagged. `runtime service update` stays macOS-only (the open question is in
+  `evidence/runs/TASK-XPA-012/windows-daemon-bundle-run.md`).
+- **An HDC on Windows** is `hdc.exe` and, exactly when it imports it, the sibling
+  `libusb_shared.dll`: bounded x64 PE images (`arkdeck-bootstrap`'s `tool_pe`, in place of
+  `tool_macho`), captured by `windows::bootstrap_tree`'s `BootstrapToolCapture` as
+  `tool-<digest>.hdc`, with their Authenticode signatures recorded as integrity and a host-tagged
+  content digest and record (`"platform":"windows"`). Registration admits only an executable a
+  registered Windows HDC tuple names: the daemon composes `arkdeck-provider-hdc`'s
+  `WINDOWS_HDC_TUPLES` into the store's identities, checked on the source before the store is
+  locked and again on the captured bytes before anything is published. **The table is empty
+  (CHG-2026-078), so every `hdc.exe` is refused** (`admissionDenied`) and nothing is written;
+  with no HDC to select, `runtime.tool.select` answers Swift's no-owner refusal.
 - **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
   team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
   `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.
 
 Tests on Windows: `arkdeck-hoststore`'s `windows_registration_tests` (a fixture toolchain retires
 once; the installed DevEco Studio's record conforms to the published schemas, ignored unless
-`ARKDECK_LIVE_DEVECO_ROOT` names it), and `arkdeck-agentd/tests/windows_bootstrap_owners_process.rs`
+`ARKDECK_LIVE_DEVECO_ROOT` names it), `arkdeck-bootstrap/tests/windows_tool_registration.rs`
+(an `hdc.exe` refused with no identity, writing nothing; refused again from its captured bytes,
+retaining nothing; admitted only under an injected fixture identity, then registered, inspected,
+listed and retired), and `arkdeck-agentd/tests/windows_bootstrap_owners_process.rs`
 (Swift's recorded empty-registry answers byte for byte and the Windows refusals over the pipe
 across a restart; with `ARKDECK_DEV_SIGNER_THUMBPRINT`, the leaves through the signed CLI, and
 with `ARKDECK_LIVE_DEVECO_ROOT` the DevEco registration, inspection, listing and retirement
@@ -3282,25 +3306,36 @@ DeviceSet` / `Enumeration`), never a shorter list.
 
 `UsbHostDevice::from_device_node` is the per-node rule, failing closed as the
 macOS per-entry rule does. The property choice lives there and in
-`NodeProperty` only, and is **provisional** until the maintainer's DAYU200
-sample (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`)
-confirms it:
+`NodeProperty` only. It is CHG-2026-078 design §4 (the Windows profile's USB
+census row, TASK-WHR-003), confirmed by the maintainer's DAYU200 sample of
+2026-10-04 (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`)
+and maintainer ruling 2026-10-04, items 4 and 5; every `CENSUS_MAPPING` row is
+`Confirmed`, so `usb_host_devices()` is open (a row set back to `Tbd` closes it
+with `RegistryUnavailable::MappingUnconfirmed`):
 
-- entry: a device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`; interface nodes
-  (`&MI_xx`), hubs without numbers and other enumerators are passed over;
+- entry: a present device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`
+  (`DEVPKEY_Device_IsPresent` true, besides `DIGCF_PRESENT`); phantom nodes,
+  which keep their last attachment's properties, interface nodes (`&MI_xx`),
+  hubs without numbers and other enumerators are passed over;
 - vendor and product: the first `USB\VID_…&PID_…` entry of
   `DEVPKEY_Device_HardwareIds`, which must name the instance ID's numbers;
-- serial: the instance ID's suffix, taken as it is; a suffix holding `&` is a
-  Windows-generated, port-derived ID, so the node has no serial and is passed
-  over;
+- serial: the instance ID's suffix, ASCII-lowercase folded (the instance ID
+  spells the board's serial in upper case, the HDC connect key is lower case);
+  a suffix holding `&` is a Windows-generated, port-derived ID, so the node has
+  no serial and no identity and is passed over. The long-term device identity
+  is the folded serial;
 - topology: the first `DEVPKEY_Device_LocationPaths` entry, spelled as the
   decimal of the first eight bytes (big-endian) of its SHA-256 (the relation
-  rule accepts only a canonical decimal location; it is stable per port and
-  never equal to a macOS `locationID`);
+  rule accepts only a canonical decimal location; never equal to a macOS
+  `locationID`). It is valid only within one attachment: the sample's board
+  moved from `USB(10)` (USB 2) to `USB(26)` (USB 3) on a replug into the same
+  connector, which is the same identity in a new attachment;
 - product name: `DEVPKEY_Device_BusReportedDeviceDesc` (optional; without it
   the board is not the registered HDC-normal DAYU200 and proves nothing);
 - attachment: `DEVPKEY_Device_LastArrivalDate` (a `FILETIME`; none when absent
-  or zero, and then no relation is formed).
+  or zero, and then no relation is formed). One attachment is the pair
+  (instance ID, arrival), which a relation carries as its numbers and serial
+  with its attachment ID.
 
 `UsbRegistryRelations::system()` reads this census on Windows. The Windows
 daemon composes the Target observation owner it feeds (see
@@ -3309,11 +3344,15 @@ macOS rule: only beside a registered HDC the composition started as its managed
 server. No Windows HDC tuple is registered yet, so it reads no relation.
 
 Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
-sets, and this host's census answering with well-formed entries, shape only);
-the provider's `tests/windows_usb_census.rs` (a synthetic node through the
-Windows rule proving a scripted HDC's candidate and holding the adoption's final
-check, a replug or a missing name, arrival or serial proving nothing, and on
-Windows this host's tree through `system()`). None of it is device evidence.
+sets: the upper-case suffix folded, a phantom passed over, a new arrival a new
+attachment of the same identity; and this host's census answering with
+well-formed entries, shape only); the provider's `tests/windows_usb_census.rs`
+(a synthetic node with an upper-case suffix proving a scripted HDC's
+lower-case candidate and holding the adoption's final check; a phantom board, a
+port-derived suffix, a topology moving within one attachment, a replug between
+the brackets or a missing name, arrival or serial proving nothing; a USB 2 to
+USB 3 replug proving the same identity in a new attachment; and on Windows this
+host's tree through `system()`). None of it is device evidence.
 
 ## Windows Target owners (TASK-XPA-004)
 

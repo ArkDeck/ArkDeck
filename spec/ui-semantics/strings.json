@@ -6157,12 +6157,6 @@
       "zh-Hans": "调试"
     },
     {
-      "key": "windows.debug.remote.unavailable",
-      "table": null,
-      "en": "Remote build servers are configured in the macOS App's Settings; the Windows App has none yet. Choose a local library.",
-      "zh-Hans": "远程构建服务器在 macOS App 的设置中配置；Windows App 暂无。请选择本地库。"
-    },
-    {
       "key": "windows.debug.jobs.cancelFailed",
       "table": null,
       "en": "Runtime refused the cancellation request",
@@ -6935,6 +6929,576 @@
       "table": null,
       "en": "Mark (Ctrl+M)",
       "zh-Hans": "打标记（Ctrl+M）"
+    },
+    {
+      "key": "settings.remoteSources.add",
+      "table": "SettingsLocalizable",
+      "en": "Add server",
+      "zh-Hans": "添加服务器"
+    },
+    {
+      "key": "settings.remoteSources.auth.password",
+      "table": "SettingsLocalizable",
+      "en": "Password",
+      "zh-Hans": "密码"
+    },
+    {
+      "key": "settings.remoteSources.auth.privateKey",
+      "table": "SettingsLocalizable",
+      "en": "OpenSSH private key",
+      "zh-Hans": "OpenSSH 私钥"
+    },
+    {
+      "key": "settings.remoteSources.choosePrivateKey",
+      "table": "SettingsLocalizable",
+      "en": "Choose private key…",
+      "zh-Hans": "选择私钥…"
+    },
+    {
+      "key": "settings.remoteSources.credentialSystemDefault",
+      "table": "SettingsLocalizable",
+      "en": "System SSH",
+      "zh-Hans": "系统 SSH"
+    },
+    {
+      "key": "settings.remoteSources.credentialStored",
+      "table": "SettingsLocalizable",
+      "en": "Keychain",
+      "zh-Hans": "Keychain"
+    },
+    {
+      "key": "settings.remoteSources.edit",
+      "table": "SettingsLocalizable",
+      "en": "Edit",
+      "zh-Hans": "编辑"
+    },
+    {
+      "key": "settings.remoteSources.editor.addTitle",
+      "table": "SettingsLocalizable",
+      "en": "Add server",
+      "zh-Hans": "添加服务器"
+    },
+    {
+      "key": "settings.remoteSources.editor.credential",
+      "table": "SettingsLocalizable",
+      "en": "Credential",
+      "zh-Hans": "凭据"
+    },
+    {
+      "key": "settings.remoteSources.editor.detail",
+      "table": "SettingsLocalizable",
+      "en": "ArkDeck will only browse below the verified build root and import a selected lib*.so file.",
+      "zh-Hans": "ArkDeck 只会浏览已验证编译根目录以内的内容，并导入选中的 lib*.so 文件。"
+    },
+    {
+      "key": "settings.remoteSources.editor.editTitle",
+      "table": "SettingsLocalizable",
+      "en": "Edit server",
+      "zh-Hans": "编辑服务器"
+    },
+    {
+      "key": "settings.remoteSources.editor.server",
+      "table": "SettingsLocalizable",
+      "en": "SSH server",
+      "zh-Hans": "SSH 服务器"
+    },
+    {
+      "key": "settings.remoteSources.editor.verify",
+      "table": "SettingsLocalizable",
+      "en": "Verify and trust",
+      "zh-Hans": "验证与信任"
+    },
+    {
+      "key": "settings.remoteSources.empty.detail",
+      "table": "SettingsLocalizable",
+      "en": "Add an SSH server before browsing remote build artifacts in Debug.",
+      "zh-Hans": "先添加 SSH 服务器，随后即可在 Debug 中浏览远端编译产物。"
+    },
+    {
+      "key": "settings.remoteSources.empty.title",
+      "table": "SettingsLocalizable",
+      "en": "No servers",
+      "zh-Hans": "尚未配置服务器"
+    },
+    {
+      "key": "settings.remoteSources.field.authentication",
+      "table": "SettingsLocalizable",
+      "en": "Authentication",
+      "zh-Hans": "认证方式"
+    },
+    {
+      "key": "settings.remoteSources.field.host",
+      "table": "SettingsLocalizable",
+      "en": "Host or IP",
+      "zh-Hans": "主机名或 IP"
+    },
+    {
+      "key": "settings.remoteSources.field.name",
+      "table": "SettingsLocalizable",
+      "en": "Display name",
+      "zh-Hans": "显示名称"
+    },
+    {
+      "key": "settings.remoteSources.field.passphrase",
+      "table": "SettingsLocalizable",
+      "en": "Private-key passphrase (optional)",
+      "zh-Hans": "私钥口令（可选）"
+    },
+    {
+      "key": "settings.remoteSources.field.password",
+      "table": "SettingsLocalizable",
+      "en": "Password",
+      "zh-Hans": "密码"
+    },
+    {
+      "key": "settings.remoteSources.field.passwordOptional",
+      "table": "SettingsLocalizable",
+      "en": "New password (leave empty to use Keychain)",
+      "zh-Hans": "新密码（留空则使用 Keychain）"
+    },
+    {
+      "key": "settings.remoteSources.field.port",
+      "table": "SettingsLocalizable",
+      "en": "Port",
+      "zh-Hans": "端口"
+    },
+    {
+      "key": "settings.remoteSources.field.root",
+      "table": "SettingsLocalizable",
+      "en": "Build root (absolute path)",
+      "zh-Hans": "编译根目录（绝对路径）"
+    },
+    {
+      "key": "settings.remoteSources.field.username",
+      "table": "SettingsLocalizable",
+      "en": "Username",
+      "zh-Hans": "用户名"
+    },
+    {
+      "key": "settings.remoteSources.noPrivateKey",
+      "table": "SettingsLocalizable",
+      "en": "No replacement key selected",
+      "zh-Hans": "尚未选择替换私钥"
+    },
+    {
+      "key": "settings.remoteSources.privateKeyReadFailed",
+      "table": "SettingsLocalizable",
+      "en": "The private key could not be read. Choose the file again.",
+      "zh-Hans": "无法读取该私钥，请重新选择文件。"
+    },
+    {
+      "key": "settings.remoteSources.privateKeyInvalid",
+      "table": "SettingsLocalizable",
+      "en": "Choose a non-empty OpenSSH private key no larger than 256 KiB.",
+      "zh-Hans": "请选择不超过 256 KiB 的非空 OpenSSH 私钥。"
+    },
+    {
+      "key": "settings.remoteSources.refresh",
+      "table": "SettingsLocalizable",
+      "en": "Refresh",
+      "zh-Hans": "刷新"
+    },
+    {
+      "key": "settings.remoteSources.remove",
+      "table": "SettingsLocalizable",
+      "en": "Remove server",
+      "zh-Hans": "移除服务器"
+    },
+    {
+      "key": "settings.remoteSources.remove.detail",
+      "table": "SettingsLocalizable",
+      "en": "The server profile and its Keychain credential will be removed from this Mac.",
+      "zh-Hans": "服务器配置及其 Keychain 凭据将从这台 Mac 上移除。"
+    },
+    {
+      "key": "settings.remoteSources.remove.title",
+      "table": "SettingsLocalizable",
+      "en": "Remove this server?",
+      "zh-Hans": "移除此服务器？"
+    },
+    {
+      "key": "settings.remoteSources.save",
+      "table": "SettingsLocalizable",
+      "en": "Save verified server",
+      "zh-Hans": "保存已验证服务器"
+    },
+    {
+      "key": "settings.remoteSources.security.hostKey",
+      "table": "SettingsLocalizable",
+      "en": "Pinned SSH host key",
+      "zh-Hans": "固定 SSH 主机密钥"
+    },
+    {
+      "key": "settings.remoteSources.security.hostKey.detail",
+      "table": "SettingsLocalizable",
+      "en": "The first verified fingerprint is saved explicitly. A changed host key is rejected on every later connection.",
+      "zh-Hans": "首次验证的指纹需显式保存；后续连接若主机密钥变化将直接拒绝。"
+    },
+    {
+      "key": "settings.remoteSources.security.keychain",
+      "table": "SettingsLocalizable",
+      "en": "Credential secrets stay protected",
+      "zh-Hans": "凭据秘密始终受保护"
+    },
+    {
+      "key": "settings.remoteSources.security.keychain.detail",
+      "table": "SettingsLocalizable",
+      "en": "Imported secrets stay in Keychain. System default reads only owner-private id_rsa and id_ed25519 files; secrets never enter profiles, logs, command lines, or Runtime XPC.",
+      "zh-Hans": "导入的凭据只存入 Keychain；系统默认仅只读当前用户私有的 id_rsa 与 id_ed25519，秘密不会进入配置、日志、命令行或 Runtime XPC。"
+    },
+    {
+      "key": "settings.remoteSources.security.readOnly",
+      "table": "SettingsLocalizable",
+      "en": "Read-only SFTP surface",
+      "zh-Hans": "只读 SFTP 能力"
+    },
+    {
+      "key": "settings.remoteSources.security.readOnly.detail",
+      "table": "SettingsLocalizable",
+      "en": "ArkDeck exposes no SSH command, shell, upload, delete, rename, or arbitrary path API.",
+      "zh-Hans": "ArkDeck 不开放 SSH 命令、Shell、上传、删除、重命名或任意路径接口。"
+    },
+    {
+      "key": "settings.remoteSources.security.title",
+      "table": "SettingsLocalizable",
+      "en": "Security boundary",
+      "zh-Hans": "安全边界"
+    },
+    {
+      "key": "settings.remoteSources.subtitle",
+      "table": "SettingsLocalizable",
+      "en": "Manage SSH servers used to browse and import remote build artifacts.",
+      "zh-Hans": "管理用于浏览和导入远端编译产物的 SSH 服务器。"
+    },
+    {
+      "key": "settings.remoteSources.systemDefaultHint",
+      "table": "SettingsLocalizable",
+      "en": "If no file is selected, ArkDeck tries ~/.ssh/id_rsa, then ~/.ssh/id_ed25519. SSH config, known_hosts, and other files are not read.",
+      "zh-Hans": "不选择文件时，ArkDeck 依次尝试 ~/.ssh/id_rsa、~/.ssh/id_ed25519；不会读取 SSH config、known_hosts 或其他文件。"
+    },
+    {
+      "key": "settings.remoteSources.systemDefaultIdentity",
+      "table": "SettingsLocalizable",
+      "en": "System default (id_rsa → id_ed25519)",
+      "zh-Hans": "系统默认（id_rsa → id_ed25519）"
+    },
+    {
+      "key": "settings.remoteSources.testConnection",
+      "table": "SettingsLocalizable",
+      "en": "Test connection and inspect host key",
+      "zh-Hans": "测试连接并检查主机密钥"
+    },
+    {
+      "key": "settings.remoteSources.testing",
+      "table": "SettingsLocalizable",
+      "en": "Connecting through SSH/SFTP…",
+      "zh-Hans": "正在通过 SSH/SFTP 连接……"
+    },
+    {
+      "key": "settings.remoteSources.title",
+      "table": "SettingsLocalizable",
+      "en": "Saved servers",
+      "zh-Hans": "已保存服务器"
+    },
+    {
+      "key": "settings.remoteSources.trustOnSave",
+      "table": "SettingsLocalizable",
+      "en": "Review this fingerprint. Saving will trust this exact host key for later connections.",
+      "zh-Hans": "请核对该指纹；保存后只信任这一枚主机密钥。"
+    },
+    {
+      "key": "settings.remoteSources.useSystemDefault",
+      "table": "SettingsLocalizable",
+      "en": "Use system default",
+      "zh-Hans": "使用系统默认"
+    },
+    {
+      "key": "settings.remoteSources.usingStoredCredential",
+      "table": "SettingsLocalizable",
+      "en": "The saved Keychain credential will be used for this test.",
+      "zh-Hans": "本次测试将使用 Keychain 中已保存的凭据。"
+    },
+    {
+      "key": "settings.remoteSources.verified",
+      "table": "SettingsLocalizable",
+      "en": "Connection, credential, SFTP root, and host key verified",
+      "zh-Hans": "连接、凭据、SFTP 根目录与主机密钥均已验证"
+    },
+    {
+      "key": "settings.tab.remoteSources",
+      "table": "SettingsLocalizable",
+      "en": "Servers",
+      "zh-Hans": "服务器"
+    },
+    {
+      "key": "overview.record.remoteServer.label",
+      "table": "Localizable",
+      "en": "Remote build server",
+      "zh-Hans": "远端构建服务器"
+    },
+    {
+      "key": "overview.record.remoteServer.loading",
+      "table": "Localizable",
+      "en": "Checking binding…",
+      "zh-Hans": "正在读取绑定…"
+    },
+    {
+      "key": "overview.record.remoteServer.unbound",
+      "table": "Localizable",
+      "en": "Not bound",
+      "zh-Hans": "未绑定"
+    },
+    {
+      "key": "overview.record.remoteServer.unboundDetail",
+      "table": "Localizable",
+      "en": "Choose a remote artifact in Debug to bind a verified server to this target.",
+      "zh-Hans": "在 Debug 中选择远端产物后，会把已验证服务器绑定到当前目标。"
+    },
+    {
+      "key": "overview.record.remoteServer.bound",
+      "table": "Localizable",
+      "en": "Bound",
+      "zh-Hans": "已绑定"
+    },
+    {
+      "key": "overview.record.remoteServer.stale",
+      "table": "Localizable",
+      "en": "Binding needs attention",
+      "zh-Hans": "绑定需要处理"
+    },
+    {
+      "key": "overview.record.remoteServer.staleDetail",
+      "table": "Localizable",
+      "en": "The bound server was removed. Choose another remote artifact in Debug.",
+      "zh-Hans": "已绑定的服务器已被删除，请在 Debug 中重新选择远端产物。"
+    },
+    {
+      "key": "overview.record.remoteServer.unavailable",
+      "table": "Localizable",
+      "en": "Binding unavailable",
+      "zh-Hans": "无法读取绑定"
+    },
+    {
+      "key": "windows.remoteSources.credentialStored",
+      "table": null,
+      "en": "Credential Manager",
+      "zh-Hans": "凭据管理器"
+    },
+    {
+      "key": "windows.remoteSources.security.credentials.detail",
+      "table": null,
+      "en": "Imported secrets stay in Windows Credential Manager. System default reads only owner-private id_rsa and id_ed25519 in %USERPROFILE%\\.ssh; secrets never enter profiles, logs, command lines, or Runtime calls.",
+      "zh-Hans": "导入的密钥仅保存在 Windows 凭据管理器中。系统默认仅读取 %USERPROFILE%\\.ssh 中仅所有者可访问的 id_rsa 与 id_ed25519；密钥不会进入配置文件、日志、命令行或 Runtime 调用。"
+    },
+    {
+      "key": "windows.remoteSources.field.passwordOptional",
+      "table": null,
+      "en": "New password (leave empty to use Credential Manager)",
+      "zh-Hans": "新密码（留空则使用凭据管理器中的密码）"
+    },
+    {
+      "key": "windows.remoteSources.usingStoredCredential",
+      "table": null,
+      "en": "The saved Credential Manager credential will be used for this test.",
+      "zh-Hans": "本次测试将使用凭据管理器中已保存的凭据。"
+    },
+    {
+      "key": "windows.remoteSources.remove.detail",
+      "table": null,
+      "en": "The server profile and its Credential Manager credential will be removed from this PC.",
+      "zh-Hans": "将从此电脑移除该服务器配置及其凭据管理器中的凭据。"
+    },
+    {
+      "key": "windows.remoteSources.systemDefaultHint",
+      "table": null,
+      "en": "If no file is selected, ArkDeck tries %USERPROFILE%\\.ssh\\id_rsa, then id_ed25519. SSH config, known_hosts, and other files are not read.",
+      "zh-Hans": "未选择文件时，ArkDeck 依次尝试 %USERPROFILE%\\.ssh\\id_rsa 与 id_ed25519。不会读取 SSH 配置、known_hosts 或其他文件。"
+    },
+    {
+      "key": "windows.remoteSources.systemDefaultIdentity",
+      "table": null,
+      "en": "System default (id_rsa → id_ed25519)",
+      "zh-Hans": "系统默认（id_rsa → id_ed25519）"
+    },
+    {
+      "key": "windows.remoteSources.client",
+      "table": null,
+      "en": "Connections use Windows' built-in OpenSSH client with ArkDeck's own pinned host key; your known_hosts file and SSH config are not used.",
+      "zh-Hans": "连接使用 Windows 内置的 OpenSSH 客户端与 ArkDeck 自己固定的主机密钥；不会使用你的 known_hosts 文件与 SSH 配置。"
+    },
+    {
+      "key": "windows.remoteSources.saveNeedsProbe",
+      "table": null,
+      "en": "Test the connection first: saving trusts only a host key that was just verified.",
+      "zh-Hans": "请先测试连接：保存时只信任刚刚验证过的主机密钥。"
+    },
+    {
+      "key": "windows.remoteSources.privateKeyChosen",
+      "table": null,
+      "en": "Chosen key: %@",
+      "zh-Hans": "已选择私钥：%@"
+    },
+    {
+      "key": "windows.remoteSources.endpoint",
+      "table": null,
+      "en": "Endpoint",
+      "zh-Hans": "连接地址"
+    },
+    {
+      "key": "windows.remoteSources.root",
+      "table": null,
+      "en": "Build root",
+      "zh-Hans": "编译根目录"
+    },
+    {
+      "key": "windows.remoteSources.canonicalRoot",
+      "table": null,
+      "en": "Verified root",
+      "zh-Hans": "已验证根目录"
+    },
+    {
+      "key": "windows.remoteSources.fingerprint",
+      "table": null,
+      "en": "Host key fingerprint",
+      "zh-Hans": "主机密钥指纹"
+    },
+    {
+      "key": "windows.remoteSources.loading",
+      "table": null,
+      "en": "Loading servers…",
+      "zh-Hans": "正在加载服务器…"
+    },
+    {
+      "key": "windows.remoteSources.removed",
+      "table": null,
+      "en": "Server removed.",
+      "zh-Hans": "服务器已移除。"
+    },
+    {
+      "key": "windows.remoteSources.saved",
+      "table": null,
+      "en": "Server saved.",
+      "zh-Hans": "服务器已保存。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidName",
+      "table": null,
+      "en": "The server name must not be empty and may have at most 80 characters.",
+      "zh-Hans": "服务器名称不能为空，且最多 80 个字符。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidHost",
+      "table": null,
+      "en": "The host name or IP address is not valid.",
+      "zh-Hans": "主机名或 IP 地址格式无效。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidPort",
+      "table": null,
+      "en": "The SSH port must be between 1 and 65535.",
+      "zh-Hans": "SSH 端口必须在 1 到 65535 之间。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidUsername",
+      "table": null,
+      "en": "An SSH user name may contain only letters, digits, dots, underscores and hyphens.",
+      "zh-Hans": "SSH 用户名只能包含字母、数字、点、下划线和连字符。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidRoot",
+      "table": null,
+      "en": "The build root must be an absolute POSIX path other than /, without . or .. segments.",
+      "zh-Hans": "编译根目录必须是非根级的绝对 POSIX 路径，且不能包含 . 或 ..。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidCredential",
+      "table": null,
+      "en": "The credential is empty, too large, or a private key of an unsupported type.",
+      "zh-Hans": "凭据为空、过大或私钥格式不受支持。"
+    },
+    {
+      "key": "windows.remoteSources.error.systemCredentialUnavailable",
+      "table": null,
+      "en": "No usable system-default OpenSSH private key was found. Keep an owner-only %USERPROFILE%\\.ssh\\id_rsa or id_ed25519, or choose a private key.",
+      "zh-Hans": "未找到可用的系统默认 OpenSSH 私钥。请配置仅所有者可访问的 %USERPROFILE%\\.ssh\\id_rsa 或 id_ed25519，或手动选择私钥。"
+    },
+    {
+      "key": "windows.remoteSources.error.sourceNotFound",
+      "table": null,
+      "en": "The remote build source does not exist or was removed.",
+      "zh-Hans": "远端构建源不存在或已被删除。"
+    },
+    {
+      "key": "windows.remoteSources.error.credentialUnavailable",
+      "table": null,
+      "en": "Credential Manager holds no usable credential. Test and save the server again in Settings.",
+      "zh-Hans": "凭据管理器中没有可用凭据，请在设置中重新测试并保存。"
+    },
+    {
+      "key": "windows.remoteSources.error.probeExpired",
+      "table": null,
+      "en": "The connection test has expired. Test again before saving.",
+      "zh-Hans": "连接测试已过期，请重新测试后再保存。"
+    },
+    {
+      "key": "windows.remoteSources.error.hostKeyChanged",
+      "table": null,
+      "en": "The SSH host key does not match the saved fingerprint. The connection was refused.",
+      "zh-Hans": "SSH 主机密钥与已保存的指纹不一致，连接已拒绝。"
+    },
+    {
+      "key": "windows.remoteSources.error.rootChanged",
+      "table": null,
+      "en": "The real path of the remote build root changed. The connection was refused.",
+      "zh-Hans": "远端编译根目录的真实路径已变化，连接已拒绝。"
+    },
+    {
+      "key": "windows.remoteSources.error.pathOutsideRoot",
+      "table": null,
+      "en": "The remote path is outside the saved build root.",
+      "zh-Hans": "远端路径超出已保存的编译根目录。"
+    },
+    {
+      "key": "windows.remoteSources.error.tooManyEntries",
+      "table": null,
+      "en": "The directory has more than 500 visible entries. Configure a more specific build root.",
+      "zh-Hans": "目录包含超过 500 个可见条目，请配置更具体的编译根目录。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidLibraryName",
+      "table": null,
+      "en": "Only a remote file named lib<name>.so can be imported.",
+      "zh-Hans": "只能导入名称为 lib<name>.so 的远端文件。"
+    },
+    {
+      "key": "windows.remoteSources.error.invalidLibrarySize",
+      "table": null,
+      "en": "A remote native library must be between 64 bytes and 64 MiB.",
+      "zh-Hans": "远端动态库必须在 64 字节到 64 MiB 之间。"
+    },
+    {
+      "key": "windows.remoteSources.error.fileChanged",
+      "table": null,
+      "en": "The remote file changed while it was read. Choose it again.",
+      "zh-Hans": "远端文件在读取期间发生变化，请重新选择。"
+    },
+    {
+      "key": "windows.remoteSources.error.connectionFailed",
+      "table": null,
+      "en": "SSH/SFTP connection failed: %@",
+      "zh-Hans": "SSH/SFTP 连接失败：%@"
+    },
+    {
+      "key": "windows.remoteSources.error.credentialStoreFailed",
+      "table": null,
+      "en": "Credential Manager operation failed (%@).",
+      "zh-Hans": "凭据管理器操作失败（%@）。"
+    },
+    {
+      "key": "windows.remoteSources.error.storageFailed",
+      "table": null,
+      "en": "The remote build source could not be saved safely.",
+      "zh-Hans": "无法安全保存远端构建源。"
     }
   ]
 }

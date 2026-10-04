@@ -146,14 +146,32 @@ Windows 平台决定，每条指向其证据。上文 W0 段列为「后续任�
    **managed**；其余一律 **external**，从不接管或停止（fail closed；daemon 重启后前一实例的 server
    视为 external）。不使用跨重启的命名 Job，不读未公开的命令行。另：映像被改名移走报 `NotFound`，
    无法打开的监听 owner 使证明为 `PermissionDenied`（裁决 3）。实现与证据同上（#2341）。
-7. **USB census 与 topology 拼写（DeviceAccessAdvisor 相关；暂定）。** 只读 SetupAPI census：
-   `USB` 枚举器下在场的设备级节点，instance ID 后缀为 serial（含 `&` 的 Windows 生成 ID 不取），
-   `DEVPKEY_Device_HardwareIds` 取 VID/PID，`DEVPKEY_Device_BusReportedDeviceDesc` 为产品名，
-   `DEVPKEY_Device_LastArrivalDate` 为 attachment。topology = 首个 `DEVPKEY_Device_LocationPaths`
-   条目 SHA-256 前 8 字节（大端）的十进制：同一端口稳定、从不等于 macOS 值（裁决 11）。整个属性映射
-   在维护者的 DAYU200 USB 属性采样（`EV/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`）
-   确认前均为暂定；仅当该采样显示不稳定时重议。不静默提权、不装 driver、不改系统策略。证据：
-   `EV/runs/TASK-XPA-004/windows-usb-census-run.md`（无板，host-only）。
+7. **USB census 映射（DeviceAccessAdvisor / Target observation 相关；CHG-2026-078 TASK-WHR-003）。**
+   只读 SetupAPI census，不静默提权、不装 driver、不改系统策略。各字段依据维护者 2026-10-04 的
+   DAYU200 USB 属性采样（`EV/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md` 及同名目录下
+   的 sanitized `usb-*.json`；下称“采样记录”）与维护者裁决 2026-10-04 第 4、5 项
+   （[CHG-2026-078](../../changes/chg-2026-078-windows-hdc-registration/design.md) §4）：
+   - **条目 = 在场的设备级节点。** `USB` 枚举器下 `USB\VID_xxxx&PID_xxxx\<后缀>`（无 `&MI_xx`）且
+     在场的节点；接口节点（如有）归入其设备、从不计数。不在场的 phantom 节点保留上次 attachment 的
+     陈旧属性，从不成为条目（采样记录 “Nodes the board creates”：phantom `PID_350A` loader 节点）。
+   - **VID/PID** 取 `DEVPKEY_Device_HardwareIds`，按十六进制解析为与 macOS 相同的数值
+     （采样记录 mapping 表 `idVendor`/`idProduct` 行）。
+   - **serial 与身份。** instance ID 第三段为 serial。含 `&` 的后缀为 Windows 生成的端口派生 ID：
+     无 serial、无身份，fail closed。其余后缀先做**显式 ASCII 小写折叠**再与 HDC connect key 比较或
+     用作身份 serial；connect key 本身不改写。长期设备身份 = 折叠后的 serial（与已小写化的
+     `stable_identity_sha256_for_serial` 一致）。采样中后缀为 32 位大写十六进制、connect key 为
+     小写，仅在折叠后相等（采样记录 “Serial and the connect key”）。
+   - **attachment = (instance ID, `DEVPKEY_Device_LastArrivalDate`)。** 两者单独都不构成 attachment；
+     instance ID 与 `PDOName` 跨 attachment 重复，`LastArrivalDate` 每次接入都更新、单次接入内不变；
+     缺失或为零的 arrival 不形成 relation（采样记录 mapping 表 attachment 行）。
+   - **topology 仅在单个 attachment 内有效。** topology = 首个 `DEVPKEY_Device_LocationPaths` 条目
+     SHA-256 前 8 字节（大端）的十进制，从不等于 macOS 值（裁决 11）；它不进入长期身份。采样中同一
+     物理接口重插后从 `USB(10)`/`HS10` 变为 `USB(26)`/`SS10`，`LocationInfo`、地址与 `ContainerId`
+     同样改变（采样记录 “Topology”）；因此 USB 2→USB 3 重新枚举是同一设备身份、新的 attachment。
+   - **产品名** 取 `DEVPKEY_Device_BusReportedDeviceDesc`（采样为带双引号的 `"HDC Device"`，与 macOS
+     fixture 相同）；`FriendlyName`/`DeviceDesc` 为 INF 文本，不作设备事实。
+   - **driver** 记录 `DEVPKEY_Device_Service`（采样为 `WINUSB`），从不修改。
+   早先无板的 host-only census 见 `EV/runs/TASK-XPA-004/windows-usb-census-run.md`。
 8. **MSIX 关闭写虚拟化（裁决 8）。** 包声明 `unvirtualizedResources`，关闭文件系统与注册表写虚拟化，
    使 App、daemon 与 xcopy 形态的 CLI 共用同一物理 `%LOCALAPPDATA%\ArkDeck\Agentd`。分发形态本身
    （MSIX 打包 + self-contained Windows App SDK，Azure Artifact Signing，App Installer 更新，

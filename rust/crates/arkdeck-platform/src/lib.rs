@@ -378,6 +378,15 @@ pub use distribution_tree::{
     tree_snapshot_at,
 };
 
+// The Windows content tree and Bundle and HDC captures on NTFS (TASK-XPA-012): the
+// same API over held directory handles.
+#[cfg(windows)]
+pub use windows::{
+    BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublication,
+    BootstrapBundlePublishError, BootstrapEntry, BootstrapToolCapture, BootstrapToolCaptureError,
+    BootstrapToolPublication, BootstrapToolPublishError, BootstrapTree, inspect_bootstrap_tree,
+};
+
 #[cfg(target_os = "macos")]
 mod bootstrap_bundle_capture;
 #[cfg(target_os = "macos")]
@@ -414,7 +423,7 @@ pub use windows::{
 #[cfg(windows)]
 pub use windows::{
     DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,
-    inspect_native_code_signature, inspect_publisher,
+    inspect_native_code_signature, inspect_publisher, same_signer,
 };
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;

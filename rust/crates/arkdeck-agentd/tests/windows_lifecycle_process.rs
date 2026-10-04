@@ -385,14 +385,14 @@ fn a_development_root_names_its_own_endpoint() {
     assert!(!root.0.join("instance.json").exists());
 }
 
-/// One exchange of `method` with empty parameters on an open pipe handle.
-fn call(pipe: &mut std::fs::File, method: &str) -> Value {
+/// One exchange of `method` on an open pipe handle.
+fn call(pipe: &mut std::fs::File, method: &str, params: Value) -> Value {
     let request = serde_json::json!({
         "protocolVersion": arkdeck_contract::PROTOCOL_VERSION,
         "contractIdentity": arkdeck_contract::CONTRACT_IDENTITY,
         "id": method,
         "method": method,
-        "params": {},
+        "params": params,
     });
     let mut frame = serde_json::to_vec(&request).unwrap();
     frame.push(b'\n');
@@ -436,7 +436,7 @@ fn a_development_root_without_a_registered_hdc_composes_no_managed_server() {
         "{owners:?}"
     );
     let mut connection = open_pipe(&pipe);
-    let status = call(&mut connection, "runtime.hdc.status");
+    let status = call(&mut connection, "runtime.hdc.status", serde_json::json!({}));
     assert_eq!(status["ok"], true, "{status}");
     assert_eq!(
         status["result"],
@@ -450,4 +450,106 @@ fn a_development_root_without_a_registered_hdc_composes_no_managed_server() {
         tail.last().map(String::as_str),
         Some("arkdeck-agentd stopped")
     );
+}
+
+/// Swift's union control-action owner on the Windows daemon (TASK-XPA-005),
+/// beside no managed HDC server while no Windows HDC tuple is registered
+/// (CHG-2026-078), answers as the macOS isolated owner answers without one
+/// (`control_action_process.rs`): the impact preview and the restart are
+/// refused with zero dispatch, an unknown action does not exist, the empty
+/// listing is a snapshot page stored owner-only in
+/// `control-action-snapshots`, a restarted daemon reads it back through its
+/// token, and no `hdc-control-actions` exists.
+#[test]
+fn a_development_root_answers_control_actions_without_a_managed_hdc_server() {
+    use serde_json::json;
+    let _turn = turn();
+    let root = Root::new();
+    let snapshots = root.0.join("control-action-snapshots");
+    let names = || {
+        let mut names: Vec<String> = std::fs::read_dir(&snapshots)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        names
+    };
+    let empty_page = |connection: &mut std::fs::File, params: Value| {
+        let answer = call(connection, "control-action.list", params);
+        assert_eq!(answer["ok"], true, "{answer}");
+        let revision = answer["result"]["snapshotRevision"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            answer["result"],
+            json!({
+                "schemaVersion": "arkdeck.cli.page/1", "pageKind": "snapshot", "items": [],
+                "order": "createdAtThenControlActionId", "snapshotRevision": revision,
+                "hasMore": false, "nextCursor": null,
+            })
+        );
+        revision
+    };
+    let mut daemon = Daemon::start(&root.0);
+    let pipe = daemon.serving();
+    assert!(snapshots.is_dir());
+    assert!(names().is_empty());
+    assert!(!root.0.join("hdc-control-actions").exists());
+    let owners = daemon
+        .seen
+        .iter()
+        .find(|line| line.starts_with("arkdeck-agentd owners: "))
+        .unwrap()
+        .clone();
+    assert!(
+        owners.contains(", humanActions, controlActions, traceCache, "),
+        "{owners}"
+    );
+    let mut connection = open_pipe(&pipe);
+    let refusal = |code: &str, message: &str| json!({"code": code, "message": message, "details": {"newDispatchCount": 0}});
+    for method in ["runtime.hdc.impact-preview", "runtime.hdc.restart"] {
+        let answer = call(&mut connection, method, json!({}));
+        assert_eq!(
+            answer["error"],
+            refusal(
+                "operationUnavailable",
+                "the Runtime HDC control-action owner is unavailable"
+            ),
+            "{answer}"
+        );
+    }
+    for method in ["control-action.show", "control-action.reconcile"] {
+        let answer = call(
+            &mut connection,
+            method,
+            json!({"controlAction": "control-action-5f0c1a52-0b4e-4c8a-9d2e-2b7f3c6a9e10"}),
+        );
+        assert_eq!(
+            answer["error"],
+            refusal("resourceNotFound", "control action does not exist"),
+            "{answer}"
+        );
+    }
+    assert!(names().is_empty());
+    let revision = empty_page(&mut connection, json!({}));
+    let name = format!("snapshot-{revision}.json");
+    assert_eq!(names(), std::slice::from_ref(&name));
+    let snapshot: Value =
+        serde_json::from_slice(&std::fs::read(snapshots.join(&name)).unwrap()).unwrap();
+    let token = snapshot["tokens"][0].as_str().unwrap().to_owned();
+    drop(connection);
+    daemon.stop(&root.0);
+
+    let mut restarted = Daemon::start(&root.0);
+    let pipe = restarted.serving();
+    let mut connection = open_pipe(&pipe);
+    assert_eq!(
+        empty_page(&mut connection, json!({"cursor": token})),
+        revision
+    );
+    assert_eq!(names(), [name]);
+    drop(connection);
+    restarted.stop(&root.0);
+    assert!(!root.0.join("hdc-control-actions").exists());
 }

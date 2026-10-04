@@ -131,6 +131,15 @@ public sealed partial class MainWindow : Window
         Select("diagnostics");
     }
 
+    /// <summary>Settings, on one of its tabs (the remote browser's Open Server Settings).</summary>
+    public void OpenSettings(string tab)
+    {
+        if (!_pages.TryGetValue("settings", out var page)) _pages["settings"] = page = new SettingsPage();
+        ((SettingsPage)page).ShowTab(tab);
+        if (ReferenceEquals(NavView.SelectedItem, NavSettings)) _ = ((SettingsPage)page).RefreshAsync();
+        else Select("settings");
+    }
+
     public void Select(string tag)
     {
         foreach (var item in NavView.MenuItems.Concat(NavView.FooterMenuItems).OfType<NavigationViewItem>())

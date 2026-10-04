@@ -336,6 +336,7 @@ impl Authority {
         let host = host
             .with_agent_executions(agents)
             .with_human_actions(humans);
+        let host = host.with_control_actions(self.control_actions()?);
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(
@@ -461,8 +462,8 @@ impl Authority {
     /// managed-control HDC's digest (`hdc_sha256`, the managed server's), and
     /// no HDC is composed without the registered Windows HDC tuple: the lane
     /// is refused before anything is launched, and the start reports why. Its planning, its facts (over the
-    /// Windows USB census, which fails closed until the DAYU200 sample
-    /// confirms its mapping) and the device access observer of the lane's
+    /// Windows USB census, open since the DAYU200 sample confirmed its
+    /// mapping) and the device access observer of the lane's
     /// directory are composed either way, as on macOS; no executable lane is
     /// installed without an HDC, so an admissible Flash is refused before
     /// admission with zero dispatch.
@@ -520,6 +521,44 @@ impl Authority {
             arkdeck_platform::usb_host_devices,
         );
         (host, composed)
+    }
+
+    /// Swift's union control-action owner (`ControlActionResources`) in
+    /// `control-action-snapshots`, the name both macOS compositions give it:
+    /// `control-action.list`, `.show` and `.reconcile` page and look up its
+    /// actions, and `runtime.hdc.impact-preview` and `runtime.hdc.restart`
+    /// are answered through it. It is over no tool-selection owner (the
+    /// Bootstrap selection is macOS-only), and over the HDC control-action
+    /// owner (`HdcControlActions`, in `hdc-control-actions`) only beside the
+    /// managed server a registered HDC tuple admits, as the macOS isolated
+    /// owner composes it only beside its own; both directories are created
+    /// before that server is launched. No Windows HDC tuple is registered
+    /// yet, so the union owner pages no action, and an impact preview or
+    /// restart is refused as Swift's daemon refuses it with no HDC host.
+    fn control_actions(&self) -> Result<arkdeck_hoststore::ControlActionResources, String> {
+        let unusable = |path: &Path, error: &dyn std::fmt::Display| {
+            format!(
+                "the control-action store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let child = |name: &str| {
+            self.root
+                .private_child(name)
+                .map_err(|error| unusable(&self.root.path().join(name), &error))
+        };
+        let path = child("control-action-snapshots")?;
+        let resources = arkdeck_hoststore::ControlActionResources::open(&path)
+            .map_err(|error| unusable(&path, &error))?;
+        if self.hdc.is_none() {
+            return Ok(resources);
+        }
+        let path = child("hdc-control-actions")?;
+        let context = arkdeck_hoststore::OwnerContext::production()
+            .map_err(|error| unusable(&path, &error.message))?;
+        let actions = arkdeck_hoststore::HdcControlActions::open(&path, context)
+            .map_err(|error| unusable(&path, &error))?;
+        Ok(resources.with_hdc(actions))
     }
 
     /// The Job store owner over its private child of the root (created
@@ -777,6 +816,8 @@ impl Authority {
                     "history-filter",
                 ]
                 .into_iter()
+                // The HDC control-action owner's, beside a managed server.
+                .chain(self.hdc.is_some().then_some("hdc-control-actions"))
                 .map(|name| root.join(name))
                 .collect(),
             )

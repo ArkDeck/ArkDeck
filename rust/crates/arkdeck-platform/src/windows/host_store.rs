@@ -802,7 +802,40 @@ impl HostDirectory {
     }
 
     pub(super) fn open_at(&self, name: &str) -> io::Result<File> {
-        self.open_at_access(name, READ)
+        let file = self.open_at_access(name, READ)?;
+        self.drop_kept_link(name, &file);
+        Ok(file)
+    }
+
+    /// The recovery of [`replacing_kept`]'s crash window: when `file`, just
+    /// opened at `name`, has exactly two names and the other is
+    /// `.<name>.replaced` linking the same file, that second name is removed,
+    /// leaving the document single-linked as readers require. Anything else
+    /// is left as it is, for the checks that follow to refuse as before.
+    fn drop_kept_link(&self, name: &str, file: &File) {
+        if !matches!(self.1, Ownership::Private) {
+            return;
+        }
+        let Ok(stat) = Stat::of(file) else { return };
+        if !stat.regular() || stat.links != 2 {
+            return;
+        }
+        let Some(kept) = segment(name).ok().and_then(|target| kept_name(&target)) else {
+            return;
+        };
+        let Ok(second) = host_fs::open_relative(
+            &self.0,
+            &kept,
+            host_fs::INSPECT | DELETE,
+            FILE_OPEN,
+            Kind::NonDirectory,
+            None,
+        ) else {
+            return;
+        };
+        if Stat::of(&second).is_ok_and(|second| second.same_file(&stat)) {
+            let _ = host_fs::delete(&second);
+        }
     }
 
     pub(super) fn open_at_access(&self, name: &str, access: u32) -> io::Result<File> {
@@ -854,7 +887,9 @@ impl HostDirectory {
     /// An entry opened for its attributes and security only. A reparse point
     /// is opened as itself, so its own attributes are reported.
     fn inspect_entry(&self, name: &str) -> io::Result<File> {
-        host_fs::inspect_relative(&self.0, &segment(name)?)
+        let entry = host_fs::inspect_relative(&self.0, &segment(name)?)?;
+        self.drop_kept_link(name, &entry);
+        Ok(entry)
     }
 
     pub fn read(&self, name: &str, maximum: usize) -> io::Result<Vec<u8>> {
@@ -1323,24 +1358,74 @@ impl HostDirectory {
     }
 }
 
-/// The atomic replacement of a published document. Replacing a name whose
-/// file another handle holds open without delete sharing fails
-/// (`STATUS_ACCESS_DENIED` or `STATUS_SHARING_VIOLATION`, [`host_fs::held`]). On NTFS
-/// the holder is the anti-malware scan of the document the previous
-/// publication put there a moment before: the refusals end on their own,
-/// Restart Manager names no process holding the file (a kernel-mode handle,
-/// not one of this process's), and none of this process's handles is open
-/// on the target (a publication writes and flushes only its own `.part`
-/// file, and every reader shares delete). Measured on the Windows reference
-/// host with the recorded Job store corpus
-/// (`arkdeck-hoststore/tests/job_store_corpus.rs`, TASK-XPA-005, 25 runs
-/// under an 8.3 `TEMP`): 17 refusals, most over within tens of
-/// milliseconds, three lasting 1.1 to 1.2 s, beyond the second the retry
-/// used to allow. Such a refusal replaced nothing, so the rename waits the
-/// holder out ([`host_fs::waiting_out_holders`]); any other failure is
-/// answered at once.
+/// The atomic replacement of a published document. A replace refused because
+/// the target is held ([`host_fs::held`]) replaced nothing, so it is tried
+/// again until [`host_fs::REPLACE_PATIENCE`] has passed
+/// ([`host_fs::waiting_out_holders`]); any other failure is answered at once.
+///
+/// Two refusals look alike and are not. A handle open on the target without
+/// delete sharing refuses it with `STATUS_SHARING_VIOLATION` until it closes.
+/// But NTFS on the Windows reference host also refuses, with
+/// `STATUS_ACCESS_DENIED`, to replace a document published a moment before
+/// while no handle at all is open on it (TASK-XPA-005): it opens exclusively,
+/// truncates, renames and gains a second name, and nothing names a holder;
+/// only the replace, which would remove its file, is refused, under ordinary
+/// load for milliseconds to over 20 s. A replace whose target file keeps another name
+/// removes no file, and is not refused: so on that refusal the replaced file
+/// is given a second name for the moment of the replace
+/// ([`replacing_kept`]).
 fn rename_replacing(file: &File, directory: &File, target: &[u16]) -> io::Result<()> {
-    host_fs::waiting_out_holders(|| host_fs::rename(file, directory, target, true))
+    const ACCESS_DENIED: i32 = 5;
+    host_fs::waiting_out_holders(|| match host_fs::rename(file, directory, target, true) {
+        Err(error) if error.raw_os_error() == Some(ACCESS_DENIED) => {
+            replacing_kept(file, directory, target).unwrap_or(Err(error))
+        }
+        answer => answer,
+    })
+}
+
+/// The replace again while the replaced file also has the name
+/// `.<target>.replaced` ([`kept_name`]), which goes again afterwards: once
+/// the replace is done it is the old file's last name, and after a refusal
+/// its removal leaves the document single-linked, as readers require. `None`
+/// when the file cannot be given the name: a handle holds it without delete
+/// sharing (another name would not get past that), or the name is taken.
+///
+/// Readers refuse a document with two names, so a read that opens the target
+/// in the moment between the link and the replace is refused like any read
+/// of a document being changed; once the second name is gone it reads again.
+/// A crash in that moment leaves both names; the next read or inspection of
+/// the document removes the second ([`HostDirectory::drop_kept_link`]). A
+/// crash after the replace leaves the second name alone on the replaced
+/// file, as a crash leaves a `.part` file; it is not removed, and while it
+/// stays this fallback is not taken for that document.
+fn replacing_kept(file: &File, directory: &File, target: &[u16]) -> Option<io::Result<()>> {
+    // DELETE access: refused while a handle holds the file without delete
+    // sharing.
+    let replaced = host_fs::open_relative(
+        directory,
+        target,
+        host_fs::INSPECT | DELETE,
+        FILE_OPEN,
+        Kind::NonDirectory,
+        None,
+    )
+    .ok()?;
+    let kept = kept_name(target)?;
+    host_fs::link(&replaced, directory, &kept).ok()?;
+    drop(replaced);
+    let answer = host_fs::rename(file, directory, target, true);
+    let _ = host_fs::waiting_out_holders(|| host_fs::unlink(directory, &kept, Kind::NonDirectory));
+    Some(answer)
+}
+
+/// `.<target>.replaced`, when that is still a valid name.
+fn kept_name(target: &[u16]) -> Option<Vec<u16>> {
+    let name: Vec<u16> = std::iter::once(u16::from(b'.'))
+        .chain(target.iter().copied())
+        .chain(".replaced".encode_utf16())
+        .collect();
+    segment(&String::from_utf16(&name).ok()?).ok()
 }
 
 /// Hash a file from its first byte to its end through one handle, calling
@@ -1586,6 +1671,98 @@ mod publication_tests {
                 b"recovered\n"
             );
             drop((root, reopened, _lock));
+            std::fs::remove_dir_all(path).unwrap();
+        }
+    }
+
+    /// The replace with the replaced file kept under a second name: the
+    /// document is replaced, a reader keeps the replaced bytes, and only the
+    /// document's own name is left, linking one file. While a handle holds
+    /// the document without delete sharing it is not attempted at all.
+    #[test]
+    fn a_replace_with_the_replaced_file_kept_leaves_one_single_linked_document() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let path = scratch("replace-kept");
+        let root = HostDirectory::open_or_create_private(&path).unwrap();
+        let path = path.canonicalize().unwrap();
+        root.publish_document("document.json", b"old", 16).unwrap();
+        let reader = root.open_document("document.json", 16).unwrap();
+        let target = segment("document.json").unwrap();
+        {
+            let (_temporary, mut file) =
+                Temporary::create(&root.0, ".document.json.kept.part").unwrap();
+            file.write_all(b"new").unwrap();
+            host_fs::flush(&file).unwrap();
+            assert!(matches!(
+                replacing_kept(&file, &root.0, &target),
+                Some(Ok(()))
+            ));
+        }
+        assert_eq!(root.read("document.json", 16).unwrap(), b"new");
+        let mut held = Vec::new();
+        reader.pass().read_to_end(&mut held).unwrap();
+        assert_eq!(held, b"old");
+        drop(reader);
+        assert_eq!(root.names(8).unwrap(), vec!["document.json".to_owned()]);
+
+        let holder = std::fs::OpenOptions::new()
+            .read(true)
+            // FILE_SHARE_READ | FILE_SHARE_WRITE, no FILE_SHARE_DELETE.
+            .share_mode(0x1 | 0x2)
+            .open(path.join("document.json"))
+            .unwrap();
+        {
+            let (_temporary, mut file) =
+                Temporary::create(&root.0, ".document.json.held.part").unwrap();
+            file.write_all(b"newer").unwrap();
+            assert!(replacing_kept(&file, &root.0, &target).is_none());
+        }
+        drop(holder);
+        assert_eq!(root.read("document.json", 16).unwrap(), b"new");
+        assert_eq!(root.names(8).unwrap(), vec!["document.json".to_owned()]);
+        drop(root);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    /// A crash inside [`replacing_kept`]: the document linked as
+    /// `.document.json.replaced`, with the replace either not done (both
+    /// names link the document) or done (the second name holds the replaced
+    /// file). The next read finds the document single-linked: the second
+    /// name of the same file is removed; one of another file is left.
+    #[test]
+    fn a_crash_inside_the_kept_replace_leaves_a_readable_document() {
+        for replaced in [false, true] {
+            let path = scratch("replace-kept-crash");
+            let root = HostDirectory::open_or_create_private(&path).unwrap();
+            let path = path.canonicalize().unwrap();
+            root.publish_document("document.json", b"old", 16).unwrap();
+            let target = segment("document.json").unwrap();
+            let kept = kept_name(&target).unwrap();
+            let document = root
+                .open_at_access("document.json", host_fs::INSPECT | DELETE)
+                .unwrap();
+            host_fs::link(&document, &root.0, &kept).unwrap();
+            drop(document);
+            if replaced {
+                let (temporary, mut file) =
+                    Temporary::create(&root.0, ".document.json.crash.part").unwrap();
+                file.write_all(b"new").unwrap();
+                host_fs::rename(&file, &root.0, &target, true).unwrap();
+                std::mem::forget(temporary);
+            }
+            let (expected, left): (&[u8], &[&str]) = if replaced {
+                (b"new", &[".document.json.replaced", "document.json"])
+            } else {
+                (b"old", &["document.json"])
+            };
+            assert_eq!(root.read("document.json", 16).unwrap(), expected);
+            assert_eq!(root.stat_at("document.json").unwrap().links, 1);
+            let mut names = root.names(8).unwrap();
+            names.sort();
+            assert_eq!(names, left);
+            root.publish_document("document.json", b"next", 16).unwrap();
+            assert_eq!(root.read("document.json", 16).unwrap(), b"next");
+            drop(root);
             std::fs::remove_dir_all(path).unwrap();
         }
     }

@@ -28,6 +28,7 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
         ("general", UiStrings.SettingsTabGeneral),
         ("runtime", UiStrings.WindowsSettingsTabRuntime),
         ("toolchains", UiStrings.SettingsTabToolchains),
+        ("remoteSources", UiStrings.SettingsTabRemoteSources),
         ("storage", UiStrings.SettingsTabStorage),
         ("trace", UiStrings.SettingsTabTrace),
         ("workspace", UiStrings.WindowsSettingsTabWorkspace),
@@ -73,6 +74,9 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
 
     protected override Task<SettingsState> LoadAsync() => App.Loader.SettingsAsync();
 
+    /// <summary>The tab the next render shows.</summary>
+    public void ShowTab(string tab) => _selectedTab = Tabs.Any(t => t.Tag == tab) ? tab : _selectedTab;
+
     protected override void Render(SettingsState state, StackPanel body)
     {
         _state = state;
@@ -90,6 +94,7 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
         {
             case "runtime": Runtime(state); break;
             case "toolchains": Toolchains(state); break;
+            case "remoteSources": RemoteSourcesTab(); break;
             case "storage": Storage(state); break;
             case "trace": Trace(state); break;
             case "workspace": Workspace(state); break;
