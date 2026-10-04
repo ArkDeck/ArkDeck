@@ -184,7 +184,10 @@ public sealed record JobEvidenceFacts(
     IReadOnlyList<string> MissingRequiredArtifacts,
     string? ObservedFirmware = null,
     long? ObservedBindingRevision = null,
-    JsonObject? Parameters = null)
+    JsonObject? Parameters = null,
+    string? ObservedModel = null,
+    string? ObservedTransport = null,
+    IReadOnlyList<TraceParameterChange>? TraceParameters = null)
 {
     public static JobEvidenceFacts Parse(JsonValue value)
     {
@@ -208,7 +211,71 @@ public sealed record JobEvidenceFacts(
             observation is null ? null : Json.OptionalString(observation, "firmware"),
             observation is not null && observation.TryGetValue("bindingRevision", out var observed) && observed is JsonNumber n && n.TryGetInt64(out var revision)
                 ? revision : null,
-            o.TryGetValue("parameters", out var p) && p is JsonObject parameters ? parameters : null);
+            o.TryGetValue("parameters", out var p) && p is JsonObject parameters ? parameters : null,
+            observation is null ? null : Json.OptionalString(observation, "model"),
+            observation is null ? null : Json.OptionalString(observation, "transport"),
+            TraceParameterChange.FromEvidence(o));
+    }
+
+    /// <summary>macOS <c>displayValue</c> of a typed input, by name in order.</summary>
+    public IReadOnlyList<(string Name, string Value)> DisplayParameters =>
+        Parameters is null ? [] : Parameters.Members.OrderBy(m => m.Key, StringComparer.Ordinal)
+            .Select(m => (m.Key, m.Value switch
+            {
+                JsonNull => "null",
+                JsonString s => s.Value,
+                JsonBool b => b.Value ? "true" : "false",
+                _ => m.Value.ToString(),
+            })).ToArray();
+}
+
+/// <summary>One Trace debug parameter before and after a capture (macOS
+/// <c>RuntimeTraceParameterPresentation</c>): a comparison, not a restore verdict.</summary>
+public sealed record TraceParameterChange(string Name, string BeforeState, string? BeforeValue, string AfterState, string? AfterValue)
+{
+    /// <summary>Unverified when either side is unreadable or of an unknown state; else changed or
+    /// unchanged.</summary>
+    public string Comparison =>
+        BeforeState is not ("value" or "missing") || AfterState is not ("value" or "missing") ? "unverified"
+        : BeforeState == AfterState && BeforeValue == AfterValue ? "unchanged" : "changed";
+
+    /// <summary>macOS <c>decodeTraceEvidence</c>: both probes of the same Target and binding, each
+    /// with exactly the nine parameters; otherwise none.</summary>
+    public static IReadOnlyList<TraceParameterChange> FromEvidence(JsonObject evidence)
+    {
+        if (!evidence.TryGetValue("traceProbeBefore", out var b) || b is not JsonObject before
+            || !evidence.TryGetValue("traceProbeAfter", out var a) || a is not JsonObject after)
+        {
+            return [];
+        }
+        string? Text(JsonObject o, string key) => o.TryGetValue(key, out var v) && v is JsonString s ? s.Value : null;
+        long? Number(JsonObject o, string key) => o.TryGetValue(key, out var v) && v is JsonNumber n && n.TryGetInt64(out var x) ? x : null;
+        if (Text(before, "targetId") != Text(after, "targetId") || Number(before, "bindingRevision") != Number(after, "bindingRevision")
+            || !before.TryGetValue("supportedTags", out var tags) || tags is not JsonArray)
+        {
+            return [];
+        }
+        Dictionary<string, JsonObject>? Rows(JsonObject probe)
+        {
+            if (!probe.TryGetValue("parameters", out var p) || p is not JsonArray rows) return null;
+            var named = new Dictionary<string, JsonObject>(StringComparer.Ordinal);
+            foreach (var row in rows.Items.OfType<JsonObject>())
+            {
+                if (Text(row, "name") is { } name && !named.TryAdd(name, row)) return null;
+            }
+            return named;
+        }
+        var beforeRows = Rows(before);
+        var afterRows = Rows(after);
+        var names = TraceOperations.ParameterNames;
+        if (beforeRows is null || afterRows is null || !beforeRows.Keys.ToHashSet().SetEquals(names) || !afterRows.Keys.ToHashSet().SetEquals(names)) return [];
+        var changes = new List<TraceParameterChange>();
+        foreach (var name in names)
+        {
+            if (Text(beforeRows[name], "state") is not { } beforeState || Text(afterRows[name], "state") is not { } afterState) return [];
+            changes.Add(new(name, beforeState, Text(beforeRows[name], "value"), afterState, Text(afterRows[name], "value")));
+        }
+        return changes;
     }
 }
 

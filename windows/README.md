@@ -220,6 +220,15 @@ first, `ControlResult` back.
   that established it and asks for no one; the device cleanup items left are counted; a Job whose
   operation declares a log (the Catalog's `log` role) offers Read log locally for a
   standard-privacy log, checked against its digest, at most 2 MiB, showing its last 200 lines.
+- **History filters (TASK-XPA-020).** The macOS History list: the activity (with counts), a search
+  over Job, Session, operation, Target, state and mode, state, mode, Session, device and time
+  filters, quick filters (needs attention, failures in the last week, the selected record's
+  device), the match count and an empty match with Reset; Load Older reads the next `job.list` page;
+  the Runtime's one saved filter (`history.filter.list|save|delete`, generation-guarded) is saved,
+  applied and deleted, and a stale generation re-reads it.
+  A record's detail adds macOS's summary, journal (`job.show`), correlation with Show related Jobs,
+  observed device facts, the Trace parameters before and after a capture and the typed inputs,
+  and its recovery state.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for

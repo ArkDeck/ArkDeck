@@ -62,6 +62,10 @@ On Windows two things run there:
   owner-only below the account's local application data, and resumes after a
   restart with the board (`agent resume --resume-token`). `target observe` and
   `diagnostics capture` complete, and each Job's calls are the Swift oracle's.
+  The operation's other leaves (`screen capture`, `ui-dump capture`,
+  `ui-dump component-detail`, `debug logs`, `trace capture`) complete there
+  too, over the Trace legs' fake, their device mutations proved against the
+  test daemon's own Job state (`MUTATION_ROOT`).
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
@@ -1054,7 +1058,13 @@ refusal's wording T2), the fake receives Swift's 11 and 16 calls in order,
 and the Jobs' index, records, Journals, Artifacts and Sessions are Swift's
 byte for byte, read with the host paths in the oracle's spelling, the
 Session platform as the oracle's and a manifest's derived values relabelled
-(`hdc_oracle::assert_read_only_replays`).
+(`hdc_oracle::assert_read_only_replays`). The same file replays the rest of
+`capture.diagnostics@1`'s oracles: the read legs (66 exchanges, read-only),
+and the file legs (77) and the Trace legs (72) under the mutation authority
+(`hdc_oracle::assert_authorized_replays`), with the fake's read-, file- and
+Trace-leg tables in process, received files landing under the replay's
+`receive` root, and the Trace probe's concurrent calls compared exchange by
+exchange, sorted.
 
 ## Windows Session owner, publication and snapshot pages (TASK-XPA-005/014)
 
@@ -3135,6 +3145,14 @@ macOS replay's checks: a parked Job is never signed again, a drifted
 certificate refuses before the signer runs, attempt directories are removed,
 neither password reaches any file, and results read back after the owners
 close.
+
+The same test also ports the macOS registered-preset replay over the
+Windows profile, in both project orders. It registers the project, pins the
+credential, composes after a restart, signs and releases the pin.
+`arkdeck-cli/tests/windows_signed_runtime.rs` shows that a development root
+reports signing unavailable and refuses `workspace preset register --kind
+signing` and `workspace sign` with nothing dispatched. Only an installed daemon
+signs, so `workspace.sign` stays Windows `partial` in the coverage.
 
 Signing has no presence gate on either platform. Runtime reads are never
 interactive: `interactionNotAllowed` on macOS, and `CredReadW` never prompts

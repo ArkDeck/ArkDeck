@@ -146,7 +146,7 @@ public sealed record TargetDetailState(string TargetId, Loaded<TargetDetail> Det
 public sealed record DisplayNameState(Loaded<DisplayNameChange> Change, ControlFailure? DaemonFailure, bool Reached)
     : SurfaceState(DaemonFailure, Reached);
 
-public sealed record HistoryState(Loaded<IReadOnlyList<JobSummary>> Jobs, ControlFailure? DaemonFailure, bool Reached)
+public sealed record HistoryState(Loaded<IReadOnlyList<JobSummary>> Jobs, ControlFailure? DaemonFailure, bool Reached, string? NextCursor = null)
     : SurfaceState(DaemonFailure, Reached);
 
 public sealed record JobDetailState(string JobId, Loaded<JobSummary> Status, Loaded<IReadOnlyList<JobEvent>> Events,
@@ -187,7 +187,7 @@ public static class JobLogArtifacts
 
 /// <summary>The History detail of one Job: its status and its Artifacts.</summary>
 public sealed record HistoryDetailState(string JobId, Loaded<JobSummary> Status, Loaded<IReadOnlyList<ArtifactSummary>> Artifacts,
-    Loaded<JobEvidenceFacts> Evidence, ControlFailure? DaemonFailure, bool Reached) : SurfaceState(DaemonFailure, Reached);
+    Loaded<JobEvidenceFacts> Evidence, ControlFailure? DaemonFailure, bool Reached, Loaded<JobShown>? Shown = null) : SurfaceState(DaemonFailure, Reached);
 
 /// <summary>What <c>trace.inspect</c> answered for one Job's raw Trace.</summary>
 public sealed record TraceInspectionState(string JobId, string ArtifactId, Loaded<TraceInspection> Inspection,
@@ -265,13 +265,7 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
         return new(change, run.DaemonFailure, run.Reached);
     }
 
-    public async Task<HistoryState> HistoryAsync()
-    {
-        var run = new Run(channel);
-        var jobs = await run.Load(c => c.RequestAsync("job.list", Params(("pageSize", JsonNumber.FromInt64(HistoryPageSize)))),
-            JobSummary.ParsePage, CliCommands.JobList);
-        return new(jobs, run.DaemonFailure, run.Reached);
-    }
+    public Task<HistoryState> HistoryAsync() => HistoryPageAsync(null);
 
     public async Task<JobDetailState> JobAsync(string jobId)
     {
@@ -299,7 +293,9 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
         var artifacts = await run.LoadPages(c => ArtifactPagesAsync(c, jobId), CliCommands.ArtifactListForJob(jobId));
         var evidence = await run.Load(c => c.RequestAsync("job.evidence", Params(("jobId", new JsonString(jobId)))), JobEvidenceFacts.Parse,
             CliCommands.ForJob(CliCommands.JobEvidence, jobId));
-        return new(jobId, status, artifacts, evidence, run.DaemonFailure, run.Reached);
+        // The journal summary and correlation (macOS jobDetail: job.show, its timeline paged).
+        var shown = run.DaemonFailure is null ? await ShowAsync(jobId, CliCommands.ForJob(CliCommands.JobStatus, jobId)) : null;
+        return new(jobId, status, artifacts, evidence, run.DaemonFailure ?? shown?.DaemonFailure, run.Reached, shown?.Answer);
     }
 
     /// <summary>Asks the Runtime's Trace inspector about a Job's raw Trace (<c>trace.inspect</c>):

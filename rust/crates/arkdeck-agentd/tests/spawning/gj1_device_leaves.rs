@@ -213,7 +213,134 @@ fn diagnostics_capture_completes_over_the_signed_test_daemon() {
     assert_oracle_job(&fake_root, 0, &fixture, 6);
     daemon.stop();
     let _ = std::fs::remove_dir_all(&scratch);
-    // `diagnostics capture` is measured; the operation's other leaves (the
-    // trace, screen, UI-dump and log presets) need the file and trace legs.
-    assert_windows_status(&["capture.diagnostics@1"], "partial");
+    assert_windows_status(&["capture.diagnostics@1"], "implemented");
+}
+
+/// The other leaves of `capture.diagnostics@1`, each a preset of its inputs
+/// (`domain_leaves::preset`), against one signed test daemon whose fake HDC
+/// answers as the Trace legs' oracle (`capture-diagnostics-trace`), the table
+/// that answers every leg: `screen capture`, `ui-dump capture` and
+/// `trace capture` write, read back, receive and remove a provider-owned
+/// file under the Runtime's mutation authority; `ui-dump component-detail`
+/// and `debug logs` only read. Each completes with no pause, every Artifact
+/// read back, its legs' commands sent, and every owned file it wrote on the
+/// device removed. The test daemon's device mutations are proved against its
+/// own Job state (`MUTATION_ROOT`, as #2505's replays prove theirs): a
+/// development root otherwise names the account's, and refuses them.
+#[test]
+fn every_capture_preset_completes_over_the_signed_test_daemon() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-presets");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let fixture = fixtures("capture-diagnostics-trace");
+    let (root, fake_root) = roots(&scratch, &fixture);
+    // The resources the Trace legs' answers read.
+    std::fs::create_dir_all(fake_root.join("resources")).unwrap();
+    for resource in std::fs::read_dir(fixture.join("resources")).unwrap() {
+        let resource = resource.unwrap().path();
+        std::fs::copy(
+            &resource,
+            fake_root
+                .join("resources")
+                .join(resource.file_name().unwrap()),
+        )
+        .unwrap();
+    }
+    let daemon = SignedDaemon::start_with(
+        &executable,
+        &pin,
+        &root,
+        &fixture,
+        &fake_root,
+        &[
+            (crate::signed_daemon::BOARD, KEY.to_owned()),
+            (
+                crate::signed_daemon::MUTATION_ROOT,
+                root.join("jobs-state").to_str().unwrap().to_owned(),
+            ),
+        ],
+    );
+    let shell = format!("-t {KEY} shell ");
+    for (leaf, inputs, artifacts, legs) in [
+        (
+            ["screen", "capture"],
+            "{}",
+            5,
+            vec!["snapshot_display -t png -f /data/local/tmp/arkdeck-"],
+        ),
+        (
+            ["ui-dump", "capture"],
+            "{}",
+            7,
+            vec![
+                "hidumper -s WindowManagerService -a -a",
+                "uitest dumpLayout -p /data/local/tmp/arkdeck-",
+                "snapshot_display -t png -f /data/local/tmp/arkdeck-",
+            ],
+        ),
+        (
+            ["ui-dump", "component-detail"],
+            r#"{"windowId":"7","componentId":"42"}"#,
+            5,
+            vec!["hidumper -s WindowManagerService -a -w 7 -element -lastpage 42"],
+        ),
+        (
+            ["debug", "logs"],
+            r#"{"durationSeconds":5}"#,
+            5,
+            vec!["hilog -x"],
+        ),
+        (
+            ["trace", "capture"],
+            r#"{"durationSeconds":5,"traceCategories":["ability","ace","graphic"],"traceBufferKB":8192}"#,
+            6,
+            vec!["hitrace -t 5 -b 8192 ability ace graphic -o /data/local/tmp/arkdeck-"],
+        ),
+    ] {
+        let file = scratch.join("inputs.json");
+        std::fs::write(&file, inputs).unwrap();
+        let before = calls(&fake_root).len();
+        let mut arguments = leaf.to_vec();
+        arguments.extend(["--target", TARGET, "--inputs-file", file.to_str().unwrap()]);
+        let (status, envelope) = daemon.cli(&arguments);
+        assert_eq!(status, Some(0), "{leaf:?}: {envelope}");
+        assert_completed(
+            &envelope,
+            &leaf.join("."),
+            "capture.diagnostics@1",
+            artifacts,
+        );
+        assert_eq!(envelope["result"]["humanActions"], json!([]), "{envelope}");
+        let sent = calls(&fake_root)[before..].to_vec();
+        for leg in legs {
+            let command = format!("{shell}{leg}");
+            assert!(
+                sent.iter().any(|call| call.starts_with(&command)),
+                "{leaf:?} sent no {command}: {sent:?}"
+            );
+        }
+        // Every owned file a leg wrote on the device was received and then
+        // removed: none is left in the fake's device storage.
+        for call in sent.iter().filter(|call| call.contains("-owned.")) {
+            let owned = call
+                .split(' ')
+                .find(|word| word.starts_with("/data/local/tmp/arkdeck-"))
+                .unwrap();
+            assert!(
+                sent.contains(&format!("{shell}rm -f {owned}")),
+                "{leaf:?} left {owned}: {sent:?}"
+            );
+        }
+        let device = fake_root.join("device-tmp");
+        let left: Vec<_> = std::fs::read_dir(&device)
+            .map(|entries| entries.map(|entry| entry.unwrap().file_name()).collect())
+            .unwrap_or_default();
+        assert!(left.is_empty(), "{leaf:?} left {left:?} on the device");
+    }
+    daemon.stop();
+    let _ = std::fs::remove_dir_all(&scratch);
+    // Every leaf of the operation is measured now.
+    assert_windows_status(&["capture.diagnostics@1"], "implemented");
 }

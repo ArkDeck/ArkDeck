@@ -371,10 +371,11 @@ jobs:
     # it. check-contracts.py builds the published and candidate views from
     # isolated copies of the sources in their own Cargo targets and reads
     # none of the workspace job's products. When the inputs equal the
-    # published base it runs only the candidate view and skips the lint and
-    # workspace tests that the `workspace` job runs on the same revision in
-    # the same Rust CI run; this workflow's result, which the swift aggregate
-    # requires, needs both jobs. On macOS the candidate view also runs the
+    # published base it runs only the candidate view. The candidate view
+    # never repeats the lint and workspace tests that the `workspace` job runs
+    # on the same revision in the same Rust CI run (only the contract and CLI
+    # tests that read the candidate kind); this workflow's result, which the
+    # swift aggregate requires, needs both jobs. On macOS the candidate view also runs the
     # Rust owner checks (darwin only in check-contracts.py), so every host
     # keeps its own job.
     needs: policy
@@ -390,6 +391,10 @@ jobs:
     # published readonly matrix, then hit 30 minutes in the final candidate
     # binary build. Each isolated view took about 14-15 minutes. PRs cannot
     # seed the trusted cache, so leave room for setup and both complete views.
+    # #2545 run 37224202133 (warm cache) hit the 40 minutes while the
+    # candidate view repeated the workspace tests: each view's tests ran
+    # 15 minutes on Windows. The candidate view no longer repeats them, which
+    # leaves the published view's ~20 minutes and the candidate's ~6.
     # Keep macOS at 50 and Linux at 30; no checks or view isolation are skipped.
     timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}
     defaults:

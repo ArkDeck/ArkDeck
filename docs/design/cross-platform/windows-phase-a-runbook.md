@@ -1,8 +1,8 @@
 # Windows phase A runbook (maintainer)
 
-- **Version:** 2026-10-04. Written against protected `main` `982d4e6d` (#2518). The first version
-  (2026-09-30, `565f8b1d`) is superseded. §2 is done, and §4 is rewritten for what `main` composes
-  now.
+- **Version:** 2026-10-05. §4 brought up to date with protected `main` `162c94f3` (#2536): G1, G3,
+  G4, G6, G8 and G9 are closed. The 2026-10-04 version (`982d4e6d`, #2518) and the first version
+  (2026-09-30, `565f8b1d`) are superseded. §2 is done.
 - **Scope:** CHG-2026-074 r12/r13, Windows phase A. This runbook is the maintainer's ordered
   checklist. Phase S (software) is the agents'.
 - **Status:** a runbook, not a run record. Nothing here is evidence until a step is run and
@@ -315,22 +315,42 @@ preconditions). That is the account daemon of an installed RC, started by the CL
 `%LOCALAPPDATA%\ArkDeck\Agentd`, not a development root. A development root's evidence is never
 `REAL_DEVICE_PASS` (`rust/crates/arkdeck-agentd/src/main.rs`, `development_usb.rs`).
 
-On protected `main` `982d4e6d` the two compose different things:
+On protected `main` `162c94f3` the two compose different things:
 
 | | Account daemon (installed RC) | Development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`) |
 | --- | --- | --- |
-| Managed registered HDC (`c2`, 8710) | **no** (`windows_lifecycle.rs`: the HDC gate runs only for a development root) | yes, with `ARKDECK_DEVELOPMENT_HDC_PATH=<DevEco hdc.exe>` and `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` |
-| Read-only HDC observer (`ARKDECK_HDC_PATH` + `ARKDECK_HDC_SHA256`) | yes. It observes an existing server and answers `device candidates`; `target adopt` and every Job need the managed HDC | refused beside a development root |
+| Managed registered HDC (`c2`, 8710) | **yes** (#2524), from `ARKDECK_HDC_PATH` → the account's Bootstrap selection (§4.0.2 step 3) | yes, with `ARKDECK_DEVELOPMENT_HDC_PATH=<DevEco hdc.exe>` and `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` |
+| `ARKDECK_HDC_SHA256` | refused at the start: the Bootstrap registry pins the identity, as macOS production does | refused beside a development root |
+| Tool-selection owner (`runtime tool select`) | composed (#2524); answered, never the no-owner refusal | no |
 | Device mutation authority (`deviceMutation`, `destructive`) | yes, over its own `jobs-state` | **no**. Its proof is pinned to the account's `jobs-state`, and `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY` refuses the start |
 | Signing credential owner (GJ-5) | yes, Credential Manager bound to the daemon image | no |
 | Counts as phase A evidence | yes | no (rehearsal only) |
 
-So every WIN-GJ row waits for **gap G1**: the account daemon must select the registered HDC and
-start it as its managed server. That is the Windows tool-selection owner port, which is in
-flight. The `runtime tool register --kind hdc` registry already admits the `c2` digest into
-`%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`; nothing selects it into a running daemon yet. When G1
-lands, §4.0.3 step 3 below is how the HDC is selected. Until then, a Journey may be rehearsed on
-a development root (§4.0.5), but that rehearsal is never a row result.
+**Gap G1 is closed.** The account daemon composes the registered HDC from its Bootstrap selection
+and starts the retained copy as its managed server:
+
+- #2524 is the composition and the tool-selection owner.
+- #2526 drives it through the real signed CLI over a fake account.
+- #2536 makes `runtime tool list` show the registered identity.
+- The live run with the registered `c2` `hdc.exe` is
+  `runs/TASK-XPA-012/windows-account-hdc-live-c2-20261005-run.md` (#2530). It covers start,
+  adoption with `libusb_shared.dll`, `runtime hdc status` `available`/`arkDeckManaged`, and
+  `device candidates`. That run is not device acceptance.
+
+**Remaining caveat.** On Windows the HDC server's health is not proved: `serverHealth` is
+`unknown`, with `hdc.commandlessIdentityDoesNotProveHealth`. So the awaiting-approval paths on the
+account daemon are not reachable yet:
+
+- `runtime hdc impact-preview --action restart` answers `blocked`
+  (`hdc.serverIdentityUnproven`), with no dispatch.
+- `runtime tool select` has no second registered Windows tuple to select.
+
+These paths need #2501 (the commandless health proof; in CI), and, for a selection, a second
+tuple. No WIN-GJ step uses either path. A Journey step that ends up needing an HDC restart stops
+there and is recorded; it is not forced.
+
+A blocked or drifted `runtime tool select` is currently answered as `outcomeUnknown` /
+`internalError` by the CLI. That contract follow-up is recorded in the live run's finding 2.
 
 #### 4.0.2 Install and configure (agent; maintainer gate for the pin)
 
@@ -351,6 +371,8 @@ a development root (§4.0.5), but that rehearsal is never a row result.
    $env:ARKDECK_DAEMON_SIGNER_SHA256 = '<pin>'
    # or production RC (§1.3): both, never one
    # $env:ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = '<O=>'; $env:ARKDECK_DAEMON_PUBLISHER_EKU = '1.3.6.1.4.1.311.97.<profile>'
+   # the registered HDC (step 3); ARKDECK_HDC_SHA256 stays unset
+   $env:ARKDECK_HDC_PATH = '<DevEco>\sdk\default\openharmony\toolchains\hdc.exe'
    Set-Alias arkdeck "$rc\bin\arkdeck.exe"
    ```
 
@@ -359,19 +381,26 @@ a development root (§4.0.5), but that rehearsal is never a row result.
 3. **The registered HDC.** The DevEco Studio 26.0.0.43 `sdk\default\openharmony\toolchains\hdc.exe`
    is the only registered Windows tuple (CHG-2026-078; `c2`, 3.2.0g, SHA-256
    `c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e`, `127.0.0.1:8710`).
-   - Register it once into the account's Bootstrap registry:
+   - The daemon adopts it from `ARKDECK_HDC_PATH` (below), so registering it by hand is optional.
+     After the first start, read the selection back:
 
      ```powershell
-     arkdeck runtime tool register --kind hdc --file '<DevEco>\sdk\default\openharmony\toolchains\hdc.exe' --output json
      arkdeck runtime tool list --output json
      ```
 
    - Any other `hdc.exe` is `admissionDenied`, including the one on `PATH` (c1, 3.2.0x).
-   - **G1:** the selection into the account daemon goes here once the tool-selection port lands
-     (`runtime tool select --tool <ref> --expected-active-generation <n> --action-request-id <id>`,
-     today Swift's no-owner refusal on every Rust composition, or the composition that port
-     defines). Until then, `runtime hdc status` answers `unconfigured` on the account daemon, and
-     the rows stop at §4.0.3.
+   - **Selection into the account daemon (G1, closed).**
+     - Set `ARKDECK_HDC_PATH` to the DevEco `hdc.exe` (an explicit absolute path) in the
+       daemon-starting session (step 2), and leave `ARKDECK_HDC_SHA256` unset.
+     - Set `OHOS_HDC_SERVER_PORT` only if it is set at all, and then it must be `8710`.
+     - While the account's registry holds no selection, the daemon adopts that file as the first
+       selection (active generation 1), with its sibling `libusb_shared.dll`.
+     - From then on it starts the retained copy below `Bootstrap\v1` as its managed server, never
+       the DevEco file.
+     - The start line reads `arkdeck-agentd composes the selected registered Windows HDC c2 (…) as
+       its managed server on 127.0.0.1:8710`.
+     - `runtime tool list` shows that row `selected: true`.
+     - Without `ARKDECK_HDC_PATH` the account daemon composes no HDC, and the rows stop at §4.0.3.
 4. **Paths.** Raw outputs go in `$out` (§0), and inputs in `$out\inputs\`. `--file`,
    `--destination` and every path in an inputs file take `X:\…` drive paths.
 
@@ -415,8 +444,9 @@ Expected:
 
 #### 4.0.5 Rehearsal on a development root (agent; not row evidence)
 
-Until G1 lands, a read-only Journey step can be rehearsed against the registered `hdc.exe` with a
-development-signed daemon. This is the `windows_hdc_live_process.rs` setup, run on 2026-10-04 for
+A read-only Journey step can still be rehearsed against the registered `hdc.exe` with a
+development-signed daemon. Since G1 closed this is optional: the account daemon is the row's
+daemon. This is the `windows_hdc_live_process.rs` setup, run on 2026-10-04 for
 `device candidates` and `target adopt`:
 
 ```powershell
@@ -472,7 +502,7 @@ Never:
 
 ### 4.1 GJ-1 Device Observe (WIN-GJ1-001)
 
-- **Gates:** §4.0 complete. G1.
+- **Gates:** §4.0 complete (G1 is closed).
 - **Maintainer:** board connected (§4.0.4). Unplug and replug **at the agent's call** for §2.1
   of the headless runbook, into the **same** port.
 - **Agent, in order** (headless runbook §2 and §2.1; commands unchanged):
@@ -508,15 +538,14 @@ Never:
 - **Software readiness:** `device candidates` and `target adopt` were measured live on a
   development root (2026-10-04). `target observe` and `diagnostics capture` were measured against
   the fake HDC (#2518).
-- **Blocking gaps:** G1. G2 for `observe.device@1` on the real tuple: `probeHDCServer` lowers to
-  the commandless observation (#2509), and `observe.device@1` and `capture.diagnostics@1` have
-  not yet run once against the real `hdc.exe`.
+- **Blocking gaps:** none in software. G2 is a risk: `probeHDCServer` lowers to the commandless
+  observation (#2509), and `observe.device@1` and `capture.diagnostics@1` have not yet run once
+  against the real `hdc.exe`. The first window is that run.
 
 ### 4.2 GJ-2 HAP Debug (WIN-GJ2-001)
 
 - **Gates:**
   - WIN-GJ1-001 passed on the same digest.
-  - G1.
   - `debug.hap@1` `available` on the account daemon.
 - **Input (maintainer supplies):** the same signed single-entry HAP as the macOS round, plus its
   `bundleName` and `abilityName`, in `$out\inputs\`.
@@ -534,13 +563,13 @@ Never:
   maintainer's device window.
 - **Software readiness:** 63/63 Swift exchanges and 108 HDC calls replayed end to end through
   the real CLI and the signed test daemon (#2505), against the fake HDC.
-- **Blocking gaps:** G1 (the account daemon has the mutation authority but no HDC).
+- **Blocking gaps:** none in software (G1 closed: the account daemon now has both the mutation
+  authority and the managed HDC).
 
 ### 4.3 GJ-3 Native Debug (WIN-GJ3-001)
 
 - **Gates:**
   - WIN-GJ2-001 passed on the same digest.
-  - G1.
   - `deploy.native-library.app-owned@1` `available`.
   - The code-sign helper is composed: the census line includes `codeSignHelper`, and `doctor`
     does not print `native deployment stays unavailable`.
@@ -579,9 +608,8 @@ Never:
 - **Destructive:** no (app-owned library). The rollback leg is a device mutation that the
   Runtime itself reverts.
 - **Software readiness:** 40/40 exchanges and 225 HDC calls replayed end to end (#2505).
-- **Blocking gaps:**
-  - G1.
-  - G3 is closed: `gj_record` checks the fixture's applicability (step 3 above).
+- **Blocking gaps:** none in software. G1 is closed, and G3 is closed: `gj_record` checks the
+  fixture's applicability (step 3 above).
 
 ### 4.4 GJ-4 Flash Recovery (WIN-GJ4-001) — **destructive**
 
@@ -634,19 +662,18 @@ Never:
   - The recovery broker is composed (#2519).
   - No real `arkforged.exe` has run.
 - **Blocking gaps:**
-  - G1.
-  - G4: `flash install-binding` is macOS-only (`flash_leaves.rs` `cfg(target_os = "macos")`), so
-    the cross-mode binding cannot be established on Windows. This blocks a first takeover. A board
-    whose binding already exists on this host is not a Windows case.
+  - G1 is closed.
+  - G4 is closed (#2535): `flash install-binding` is served on Windows, and the Swift install
+    oracle replays there.
   - G5: AF-W1.
-  - G6: `flash device-access`, `flash lane-preview` and `flash bind-loader` have not been
-    measured through the CLI on Windows.
+  - G6 is closed (#2531, #2535): `flash device-access`, `flash lane-preview` and `flash
+    bind-loader` are measured through the CLI on Windows, over test-only stand-ins. No board was
+    used.
 
 ### 4.5 GJ-5 Bounded AI Debug Loop (WIN-GJ5-001)
 
 - **Gates:**
   - WIN-GJ2-001 passed on the same digest.
-  - G1.
   - The workspace Jobs `available` on the account daemon. Workspace mutations, build, test and
     signing need the account daemon: a development root composes neither mutation authority nor
     signing.
@@ -710,13 +737,13 @@ Never:
   mutations need the account daemon's authority.
 - **Destructive:** none.
 - **Software readiness:**
-  - The reads, isolate and sweep are measured (#2500), and patch, checkpoint and revert are in
-    flight (#2506).
+  - The reads, isolate and sweep are measured (#2500), and patch, checkpoint and revert are
+    measured (#2506).
   - The sign Job replays the Swift oracle (#2495), and signing through a registered preset is
-    measured (#2508, open).
+    measured (#2508).
   - The hvigor build has not run on Windows.
 - **Blocking gaps:**
-  - G1.
+  - G1 is closed.
   - G7: the hvigor build and test Jobs have not been measured on Windows.
   - G8 is closed (#2532): `--build-profile` decodes DevEco's stored passwords on Windows.
   - `hap-sign-tool.jar` carries Mark-of-the-Web (ZoneId=3) in the sampled install. Whether it
@@ -726,27 +753,28 @@ Never:
 
 | Gap | What | Blocks | Owner |
 | --- | --- | --- | --- |
-| G1 | The account daemon does not select and start the registered `c2` HDC (the Windows tool-selection owner); only a development root composes the managed HDC, and it holds no mutation authority | WIN-GJ1..5 | tool-selection port, in flight |
-| G2 | `observe.device@1` and `capture.diagnostics@1` not yet run once against the real `hdc.exe` (fake only; `probeHDCServer` lowered to the commandless observation, #2509) | WIN-GJ1 (risk, not a stop) | first rehearsal after G1 |
+| G1 | **Closed** (#2524, #2526, #2536; live `c2` run #2530): the account daemon composes the registered HDC from `ARKDECK_HDC_PATH` → its Bootstrap selection and starts it as its managed server. Caveat: the awaiting-approval HDC restart and tool-selection paths need #2501's health proof (in CI); no WIN-GJ step uses them | none | done |
+| G2 | `observe.device@1` and `capture.diagnostics@1` not yet run once against the real `hdc.exe` (fake only; `probeHDCServer` lowered to the commandless observation, #2509) | WIN-GJ1 (risk, not a stop) | the first GJ-1 window |
 | G3 | **Closed** by `scripts/gj_record`: the rollback fixture's pinned digest, Target, binding revision, ABI and lease are checked against the current Target (§4.3 step 3) | none | done |
-| G4 | `flash install-binding` is macOS-only | WIN-GJ4 first takeover | TASK-XPA-010 |
+| G4 | **Closed** (#2535): `flash install-binding` is served on Windows | none | done |
 | G5 | AF-W1 (ArkForge Windows acceptance) | WIN-GJ4 | external, maintainer |
-| G6 | `flash device-access`, `lane-preview`, `bind-loader` not measured through the CLI on Windows | WIN-GJ4 (risk) | TASK-XPA-010 |
-| G7 | hvigor build and test Jobs not measured on Windows; workspace mutations in flight (#2506) | WIN-GJ5 | TASK-XPA-011 |
+| G6 | **Closed** (#2531, #2535): `flash device-access`, `lane-preview`, `bind-loader` measured through the CLI on Windows over stand-ins | none | done |
+| G7 | hvigor build and test Jobs not measured on Windows (workspace mutations are measured, #2506) | WIN-GJ5 | TASK-XPA-011 |
 | G8 | **Closed** (#2532): `runtime signing install --build-profile` and `migrate-deveco` decode DevEco's stored passwords on Windows | none | done |
 | G9 | **Closed** by `scripts/gj_record`: it assembles the redacted `gj-headless-rerun` record from the captured CLI JSON and applies each row's criteria (§4.0.6) | none | done |
 
-### 4.7 Readiness per row (main `982d4e6d`)
+### 4.7 Readiness per row (main `162c94f3`)
 
 | Row | Software path on Windows | Real-device blockers | Maintainer gate | Destructive |
 | --- | --- | --- | --- | --- |
-| WIN-GJ1-001 | candidates and adopt live on a development root; observe and capture on the fake (#2518) | G1 (G2 risk) | board window; unplug and replug | no |
-| WIN-GJ2-001 | full oracle replay end to end (#2505) | G1 | device window; HAP input | no (device mutation) |
-| WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged | G1 | device window; `.so` and rollback fixture | no (device mutation) |
-| WIN-GJ4-001 | lane, plan, run, reconcile on fakes (#2504); broker (#2519) | G1, G4, G5, G6 | HardwareCampaign go; ArkForge bundle; image archive | **yes** (`flash.full-restore@1`) |
-| WIN-GJ5-001 | reads, isolate, sweep measured; sign replayed; patch (#2506) and registered signing (#2508) in flight | G1, G7 | DevEco install; signing install from the build profile; inputs | no (device mutation) |
+| WIN-GJ1-001 | account daemon composes the `c2` managed HDC (#2524; live start, status and candidates #2530); observe and capture on the fake (#2518, #2528) | none (G2 risk) | board window; unplug and replug | no |
+| WIN-GJ2-001 | full oracle replay end to end (#2505) | none | device window; HAP input | no (device mutation) |
+| WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged; fixture check (G3) | none | device window; `.so` and rollback fixture | no (device mutation) |
+| WIN-GJ4-001 | lane, plan, run, reconcile on fakes (#2504); broker (#2519); install-binding, device-access, lane-preview, bind-loader (#2531, #2535) | G5 | HardwareCampaign go; ArkForge bundle; image archive | **yes** (`flash.full-restore@1`) |
+| WIN-GJ5-001 | reads, isolate, sweep, patch, checkpoint and revert measured (#2500, #2506); sign replayed and registered signing measured (#2495, #2508) | G7 | DevEco install; signing install from the build profile; inputs | no (device mutation) |
 
-None of the rows can produce `REAL_DEVICE_PASS` before G1 is on `main`.
+With G1 closed, WIN-GJ1..3 can be run in the next device window. Nothing has run on the board
+yet, so no row is `REAL_DEVICE_PASS`.
 
 ## 5. Clean-host smoke
 
@@ -814,16 +842,16 @@ Nothing flips on hosted CI, fixtures or plan-only runs (AGENTS.md "什么不算�
 
 ## 7. Order at a glance
 
-| # | Step | State on `main` `982d4e6d` | Blocked on |
+| # | Step | State on `main` `162c94f3` | Blocked on |
 | --- | --- | --- | --- |
 | 1 | §1.1 dev signer check | open (maintainer) | — |
 | 2 | §2 HDC and USB samples, WHR-001..003 | **done** | — |
 | 3 | §1.2 dev MSIX publisher, §3 SPK-3 rows 1–5 | open (maintainer) | certificate creation, second account, elevated terminal, second host |
-| 4 | G1: the account daemon selects and starts the registered HDC | in flight (agents) | the Windows tool-selection port |
-| 5 | §4.1 GJ-1, §3 row 6 | blocked | step 4 |
-| 6 | §4.2 GJ-2, §4.3 GJ-3 | blocked | step 4 |
-| 7 | §4.5 GJ-5 | blocked | step 4, G7 (agents) |
+| 4 | G1: the account daemon selects and starts the registered HDC | **done** (#2524, #2526, #2536; live #2530) | — (awaiting-approval paths: #2501) |
+| 5 | §4.1 GJ-1, §3 row 6 | open (agent + maintainer) | the maintainer's board window |
+| 6 | §4.2 GJ-2, §4.3 GJ-3 | open after step 5 | WIN-GJ1-001 on the same digest |
+| 7 | §4.5 GJ-5 | blocked | G7 (agents) |
 | 8 | §1.3 production signing | open (maintainer) | Artifact Signing account |
-| 9 | §4.4 GJ-4 | blocked | step 4, G4 (agents), G5 AF-W1, the maintainer's HardwareCampaign go |
+| 9 | §4.4 GJ-4 | blocked | G5 AF-W1, the maintainer's HardwareCampaign go |
 | 10 | §5 clean-host smoke | open | step 8 |
 | 11 | §6 flip | blocked | everything above recorded |
