@@ -3,6 +3,7 @@ using ArkDeck.App.Core.Presentation;
 using ArkDeck.App.Core.Strings;
 using ArkDeck.App.Core.RemoteSources;
 using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
 using Microsoft.UI.Xaml.Controls;
 
 namespace ArkDeck.App.Pages;
@@ -22,7 +23,7 @@ public sealed partial class OverviewPage() : SurfacePage<OverviewState>(
     private string? _resumingJobId;
     private readonly HashSet<string> _expanded = new(StringComparer.Ordinal);
 
-    protected override Task<OverviewState> LoadAsync() => App.Loader.OverviewAsync();
+    protected override Task<OverviewState> LoadAsync() => App.Loader.OverviewAsync(_preferredTarget);
 
     protected override void Render(OverviewState state, StackPanel body)
     {
@@ -157,9 +158,158 @@ public sealed partial class OverviewPage() : SurfacePage<OverviewState>(
         }
     }
 
-    private static StackPanel Environment(OverviewState state)
+    // ---- the HDC environment (macOS HDCStatusView) ----
+
+    private bool _hdcExpanded;
+    private CapabilityMatrix? _probed;
+
+    /// <summary>macOS <c>environmentSection</c>: four summary facts, and behind the disclosure the
+    /// server and toolchain, the capability matrix, the device and channel, what needs attention
+    /// and the advanced facts. Read only: the Runtime owns HDC selection and recovery.</summary>
+    private StackPanel HdcBlock(OverviewState state)
+    {
+        var hdc = state.Hdc!;
+        var matrix = _probed is { } probed && probed.TargetId == state.Capabilities?.TargetId && probed.BindingRevision == state.Capabilities?.BindingRevision
+            ? probed : state.Capabilities!;
+        var attention = hdc.TrustReady ? 0 : 1;
+        var panel = Ui.Stack(8);
+        var toggle = Ui.Button("overview.advanced.toggle",
+            $"{S.Text(UiStrings.OverviewEnvironmentTitle)} · {S.Text(_hdcExpanded ? UiStrings.OverviewEnvironmentExpanded : UiStrings.OverviewEnvironmentCollapsed)}", (_, _) =>
+            {
+                _hdcExpanded = !_hdcExpanded;
+                Rerender();
+            });
+        toggle.KeyboardAccelerators.Add(new Microsoft.UI.Xaml.Input.KeyboardAccelerator
+        {
+            Key = Windows.System.VirtualKey.D,
+            Modifiers = Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift,
+        });
+        panel.Children.Add(toggle);
+        panel.Children.Add(Ui.Row(
+            Ui.Text("overview.status.server.value", S.Text("overview.serverHealth." + hdc.Health), "ArkDeckCaptionStyle"),
+            Ui.Text("overview.status.trust.value", S.Text(hdc.Trust switch
+            {
+                "ready" => UiStrings.OverviewTrustReady,
+                "waiting" => UiStrings.OverviewTrustWaiting,
+                _ => UiStrings.OverviewTrustUnavailable,
+            }), "ArkDeckCaptionStyle"),
+            Ui.Text("overview.status.channel.value", S.Text(UiStrings.OverviewChannelUnverified), "ArkDeckCaptionStyle"),
+            Ui.Text("overview.status.needsAttention.value", attention == 0 ? S.Text(UiStrings.OverviewStatusNeedsAttentionNone) : S.Text(UiStrings.OverviewStatusNeedsAttentionOne), "ArkDeckCaptionStyle")));
+        if (!_hdcExpanded) return panel;
+
+        panel.Children.Add(Ui.Heading("overview.section.serverToolchain", S.Text(UiStrings.OverviewSectionServerToolchain), AutomationHeadingLevel.Level3));
+        foreach (var (id, key, value) in new[]
+                 {
+                     ("hdc.health", UiStrings.OverviewFieldServerHealth, hdc.Health),
+                     ("hdc.endpoint", UiStrings.OverviewFieldEndpoint, hdc.Endpoint),
+                     ("hdc.toolchain.clientVersion", UiStrings.OverviewFieldClientVersion, hdc.ClientVersion),
+                     ("hdc.toolchain.serverVersion", UiStrings.OverviewFieldServerVersion, hdc.ServerVersion),
+                     ("hdc.toolchain.daemonVersion", UiStrings.OverviewFieldDaemonVersion, hdc.DaemonVersion),
+                     ("hdc.toolchain.source", UiStrings.OverviewFieldSource, HdcEnvironment.Source),
+                     ("hdc.toolchain.trust", UiStrings.OverviewFieldPlatformTrust, HdcEnvironment.PlatformTrust),
+                 })
+        {
+            panel.Children.Add(Ui.Fact(id, S.Text(key), value));
+        }
+
+        panel.Children.Add(Ui.Heading("overview.section.capabilities", S.Text(UiStrings.OverviewSectionCapabilities), AutomationHeadingLevel.Level3));
+        panel.Children.Add(Ui.Fact("hdc.ownership", S.Text(UiStrings.OverviewFieldOwnership), hdc.Ownership));
+        panel.Children.Add(Ui.Fact("hdc.subserver", S.Text(UiStrings.OverviewFieldSubserver), HdcEnvironment.Subserver));
+        panel.Children.Add(Ui.Fact("hdc.lifecycle.availability", S.Text(UiStrings.OverviewFieldLifecycleAvailability), HdcEnvironment.LifecycleAvailability));
+        panel.Children.Add(Ui.Text("overview.capabilities.matrixTitle", matrix.TargetId is { } target
+            ? S.Format(UiStrings.OverviewCapabilitiesTitleTarget, target, matrix.BindingRevision ?? 0)
+            : S.Text(UiStrings.OverviewCapabilitiesTitleNoTarget), "ArkDeckCaptionStyle"));
+        if (matrix.Failure is { } failure && matrix.Items.Count == 0)
+        {
+            panel.Children.Add(Ui.Text("overview.capabilities.failure", failure, "ArkDeckCaptionStyle"));
+        }
+        else
+        {
+            if (matrix.Failure is { } why) panel.Children.Add(Ui.Text("overview.capabilities.failure", why, "ArkDeckCaptionStyle"));
+            var rows = Ui.List("overview.capabilities.matrix", matrix.TargetId is { } t
+                ? S.Format(UiStrings.OverviewCapabilitiesTitleTarget, t, matrix.BindingRevision ?? 0)
+                : S.Text(UiStrings.OverviewCapabilitiesTitleNoTarget));
+            foreach (var item in matrix.Items)
+            {
+                var stateText = S.Text("overview.capabilities.state." + item.State);
+                rows.Items.Add(Ui.Item("overview.capabilities." + item.Id, $"{item.Name}: {stateText} · {item.Evidence}", Ui.Stack(2,
+                    Ui.Row(Ui.Text($"overview.capabilities.{item.Id}.name", item.Name, "ArkDeckMonoStyle"),
+                        Ui.Text($"overview.capabilities.{item.Id}.state", stateText)),
+                    Ui.Text($"overview.capabilities.{item.Id}.evidence", item.Evidence, "ArkDeckMonoStyle"))));
+            }
+            panel.Children.Add(rows);
+            if (matrix.TargetId is { } scopedTarget && matrix.BindingRevision is { } binding)
+            {
+                // The hidumper row is proved by a read-only Job, run when asked (each run is a
+                // new Job in History), not on every refresh.
+                var status = Ui.Status("overview.capabilities.hidumper.status");
+                panel.Children.Add(Ui.Row(Ui.Button("overview.capabilities.hidumper.check", S.Text(UiStrings.WindowsOverviewHdcCheckHidumper),
+                    async (_, _) => await CheckHidumperAsync(matrix, scopedTarget, binding, status)), status));
+            }
+        }
+
+        panel.Children.Add(Ui.Heading("overview.section.deviceChannel", S.Text(UiStrings.OverviewSectionDeviceChannel), AutomationHeadingLevel.Level3));
+        panel.Children.Add(Ui.Fact("hdc.authorization", S.Text(UiStrings.OverviewFieldAuthorization), hdc.AuthorizationText));
+        panel.Children.Add(Ui.Fact("hdc.channelProtection", S.Text(UiStrings.OverviewFieldChannelProtection), HdcEnvironment.ChannelProtection));
+        panel.Children.Add(Ui.Fact("hdc.devices.events", S.Text(UiStrings.OverviewFieldDeviceEvents), HdcEnvironment.DeviceEvents));
+
+        panel.Children.Add(Ui.Heading("hdc.section.needsAttention", S.Text(UiStrings.OverviewSectionNeedsAttention), AutomationHeadingLevel.Level3));
+        if (attention == 0)
+        {
+            panel.Children.Add(Ui.Text("hdc.attention.clear", S.Text(UiStrings.OverviewAttentionClear), "ArkDeckCaptionStyle"));
+        }
+        else
+        {
+            panel.Children.Add(Ui.Text("overview.attention.trust", S.Text(UiStrings.OverviewAttentionTrust), "ArkDeckSectionTitleStyle"));
+            panel.Children.Add(Ui.Text("overview.attention.trust.reason", hdc.AuthorizationText));
+            panel.Children.Add(Ui.Text("overview.attention.trust.nextStep", S.Text(UiStrings.OverviewAttentionNextStepRefresh), "ArkDeckCaptionStyle"));
+        }
+        panel.Children.Add(Ui.Text("hdc.lifecycle.recoveryUnavailable", HdcEnvironment.RecoveryUnavailable, "ArkDeckCaptionStyle"));
+        panel.Children.Add(Ui.Text("hdc.lifecycle.previewRequirement", HdcEnvironment.RecoveryRequirement, "ArkDeckCaptionStyle"));
+
+        panel.Children.Add(Ui.Heading("overview.section.advanced", S.Text(UiStrings.OverviewSectionAdvanced), AutomationHeadingLevel.Level3));
+        foreach (var (id, key, value) in new[]
+                 {
+                     ("hdc.toolchain.path", UiStrings.OverviewFieldPath, HdcEnvironment.AbsolutePath),
+                     ("hdc.toolchain.hash", UiStrings.OverviewFieldHash, hdc.Hash),
+                     ("hdc.generation", UiStrings.OverviewFieldGeneration, hdc.Generation),
+                     ("hdc.endpoint.source", UiStrings.OverviewFieldEndpointSource, hdc.EndpointSource ?? "unknown"),
+                     ("hdc.ownership.basis", UiStrings.OverviewFieldOwnershipBasis, HdcEnvironment.OwnershipBasis),
+                     ("hdc.counters.autoLifecycle", UiStrings.OverviewFieldAutoLifecycleDispatches, HdcEnvironment.Counter),
+                     ("hdc.counters.autoSubserver", UiStrings.OverviewFieldAutoSubserverDispatches, HdcEnvironment.Counter),
+                 })
+        {
+            panel.Children.Add(Ui.Fact(id, S.Text(key), value));
+        }
+        return panel;
+    }
+
+    /// <summary>macOS <c>DebugWindowInventoryJobRunner</c>: one read-only
+    /// <c>debug.template@1</c> window inventory on the device in scope, run to its end.</summary>
+    private async Task CheckHidumperAsync(CapabilityMatrix matrix, string targetId, long binding, TextBlock status)
+    {
+        Ui.Say(status, S.Text(UiStrings.OverviewCapabilitiesLoading));
+        var target = new TargetSummary(targetId, null, "0", binding, "", "");
+        var submitted = await Task.Run(() => App.Loader.SubmitTemplateAsync(target, "device.windowInventory"));
+        MainWindow.Instance.Report(submitted);
+        if (submitted.JobId is not { } jobId)
+        {
+            _probed = matrix.WithWindowInventoryFailure(submitted.Failure is { } f ? $"{f.ReasonCode}: {f.Detail}" : "debug.template@1 was not admitted");
+            Rerender();
+            return;
+        }
+        var ran = await Task.Run(() => App.Loader.RunJobAsync(jobId, CliCommands.ForJob(CliCommands.JobRun, jobId)));
+        MainWindow.Instance.Report(ran);
+        _probed = ran.Answer.Value is { } terminal
+            ? matrix.WithWindowInventory(jobId, terminal.State, terminal.OutcomeUnknown)
+            : matrix.WithWindowInventoryFailure($"{ran.Answer.Unavailable!.ReasonCode}: {ran.Answer.Unavailable.Detail}");
+        Rerender();
+    }
+
+    private StackPanel Environment(OverviewState state)
     {
         var panel = Ui.Stack(8, Ui.Heading("overview.environment", S.Text(UiStrings.OverviewEnvironmentTitle)));
+        if (state.Hdc is not null && state.Capabilities is not null) panel.Children.Add(HdcBlock(state));
         if (state.Doctor.Unavailable is { } why)
         {
             panel.Children.Add(Ui.UnavailableNotice("overview.doctor.unavailable", UiStrings.WindowsOverviewDoctorUnavailable, why));

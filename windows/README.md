@@ -215,6 +215,11 @@ first, `ControlResult` back.
   what the source recorded and prepares a read-only draft (`observe.device@1` or
   `capture.diagnostics@1`, same Target and binding, inputs as reported), shown above its
   workspace and started once as a new Job after fresh checks and the Runtime's read-only plan.
+- **Overview HDC environment (TASK-XPA-020).** The macOS environment block: server health, device
+  trust, channel and what needs attention, and behind Ctrl+Shift+D the Runtime's HDC server and
+  toolchain facts (shown only when its status is complete), the device capability matrix of the
+  device in scope (hitrace and bytrace from `trace.probe`, RockUSB Flash from the Catalog, hidumper
+  proved on request by a read-only window inventory Job), device and channel, and advanced facts.
 - **Debug deployment queue (TASK-XPA-020).** macOS #2466 in Debug › Artifacts: choose up to four
   folders (a mapped or UNC share works as any folder) and tick lib*.so files found in them
   (subfolders searched, hidden entries and reparse points skipped, at most 500 entries and 100

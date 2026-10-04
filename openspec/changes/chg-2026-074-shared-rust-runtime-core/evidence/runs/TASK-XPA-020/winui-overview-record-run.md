@@ -35,7 +35,7 @@ Delegated minor decisions (pending the next rulings batch):
 
 ## Checks on the reference host
 
-Local targeted checks (2026-10-04, on `1ca50d80c`; logs in the session scratchpad `x3/ovnext-full.log`):
+Local targeted checks (2026-10-05, on `1ca50d80c`; logs in the session scratchpad `x3/ovnext-full.log`):
 
 | Check | Result |
 | --- | --- |

@@ -183,7 +183,7 @@ public static partial class ScriptedDaemon
                 Recovery => Jobs,
                 History => Jobs,
                 Continue => Jobs,
-                Outage => connection <= 5 ? Foundation : Unavailable,
+                Outage => connection <= 7 ? Foundation : Unavailable,
                 _ => scenario,
             };
             return new Peer(request =>
@@ -966,7 +966,7 @@ public static partial class ScriptedDaemon
         """;
 
     private const string HdcStatusJson = """
-        {"availability":"available","clientVersion":"3.2.0f","clientVersionSource":"probe","configuredExecutableSHA256":null,"daemonVersion":"3.2.0f","endpoint":"127.0.0.1:8710","endpointSource":"default","executablePath":"C:\\Tools\\hdc\\hdc.exe","executableSHA256":"1111111111111111111111111111111111111111111111111111111111111111","executableSource":"registered","generation":"1","healthReasonCode":"hdc.healthy","newDispatchCount":0,"observedAt":"2026-09-30T08:00:00Z","ownership":"managed","processId":4242,"reasonCode":"hdc.available","schemaVersion":"arkdeck.runtime-hdc-status/1","serverEndpointRef":null,"serverHealth":"healthy","serverVersion":null,"signature":null,"startupVersions":null}
+        {"availability":"available","clientVersion":"3.2.0f","clientVersionSource":"probe","configuredExecutableSHA256":null,"daemonVersion":"3.2.0f","endpoint":"127.0.0.1:8710","endpointSource":"default","executablePath":"C:\\Tools\\hdc\\hdc.exe","executableSHA256":"1111111111111111111111111111111111111111111111111111111111111111","executableSource":"registered","generation":"1","healthReasonCode":"hdc.healthy","newDispatchCount":0,"observedAt":"2026-09-30T08:00:00Z","ownership":"arkDeckManaged","processId":4242,"reasonCode":"hdc.available","schemaVersion":"arkdeck.runtime-hdc-status/1","serverEndpointRef":null,"serverHealth":"healthy","serverVersion":null,"signature":null,"startupVersions":null}
         """;
 
     private const string ToolPageJson = """

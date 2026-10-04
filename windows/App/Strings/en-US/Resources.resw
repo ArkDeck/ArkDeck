@@ -6022,4 +6022,220 @@ SHA-256: %4$@</value>
     <value>This draft was already started once and is not started again.</value>
     <comment>windows.overview.continuation.attempted (Windows only)</comment>
   </data>
+  <data name="overview_attention_trust" xml:space="preserve">
+    <value>Device trust is not ready</value>
+    <comment>overview.attention.trust (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_attention_nextStep_refresh" xml:space="preserve">
+    <value>Unlock and trust the device, then refresh the overview to re-read the current state.</value>
+    <comment>overview.attention.nextStep.refresh (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_capability" xml:space="preserve">
+    <value>Capability</value>
+    <comment>overview.capabilities.column.capability (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_evidence" xml:space="preserve">
+    <value>Probe evidence</value>
+    <comment>overview.capabilities.column.evidence (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_state" xml:space="preserve">
+    <value>State</value>
+    <comment>overview.capabilities.column.state (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_loading" xml:space="preserve">
+    <value>Probing device capabilities…</value>
+    <comment>overview.capabilities.loading (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_available" xml:space="preserve">
+    <value>Available</value>
+    <comment>overview.capabilities.state.available (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_limited" xml:space="preserve">
+    <value>Limited</value>
+    <comment>overview.capabilities.state.limited (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>overview.capabilities.state.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>overview.capabilities.state.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_title_noTarget" xml:space="preserve">
+    <value>Device capability matrix</value>
+    <comment>overview.capabilities.title.noTarget (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_title_target" xml:space="preserve">
+    <value>Device capability matrix (%1$@ · binding %2$lld)</value>
+    <comment>overview.capabilities.title.target (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_channel_encryptedVerified" xml:space="preserve">
+    <value>Encrypted, verified</value>
+    <comment>overview.channel.encryptedVerified (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_channel_unverified" xml:space="preserve">
+    <value>Unverified</value>
+    <comment>overview.channel.unverified (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_environment_collapsed" xml:space="preserve">
+    <value>Collapsed</value>
+    <comment>overview.environment.collapsed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_environment_expanded" xml:space="preserve">
+    <value>Expanded</value>
+    <comment>overview.environment.expanded (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_authorization" xml:space="preserve">
+    <value>Authorization</value>
+    <comment>overview.field.authorization (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_autoLifecycleDispatches" xml:space="preserve">
+    <value>Automatic lifecycle dispatches</value>
+    <comment>overview.field.autoLifecycleDispatches (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_autoSubserverDispatches" xml:space="preserve">
+    <value>Automatic subserver dispatches</value>
+    <comment>overview.field.autoSubserverDispatches (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_channelProtection" xml:space="preserve">
+    <value>Channel protection</value>
+    <comment>overview.field.channelProtection (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_clientVersion" xml:space="preserve">
+    <value>Client version</value>
+    <comment>overview.field.clientVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_daemonVersion" xml:space="preserve">
+    <value>Daemon version</value>
+    <comment>overview.field.daemonVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_deviceEvents" xml:space="preserve">
+    <value>Recent device events</value>
+    <comment>overview.field.deviceEvents (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_endpoint" xml:space="preserve">
+    <value>Endpoint</value>
+    <comment>overview.field.endpoint (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_endpointSource" xml:space="preserve">
+    <value>Endpoint source</value>
+    <comment>overview.field.endpointSource (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_generation" xml:space="preserve">
+    <value>Server generation</value>
+    <comment>overview.field.generation (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_hash" xml:space="preserve">
+    <value>Hash</value>
+    <comment>overview.field.hash (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_lifecycleAvailability" xml:space="preserve">
+    <value>Server recovery</value>
+    <comment>overview.field.lifecycleAvailability (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_ownership" xml:space="preserve">
+    <value>Ownership</value>
+    <comment>overview.field.ownership (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_ownershipBasis" xml:space="preserve">
+    <value>Ownership basis</value>
+    <comment>overview.field.ownershipBasis (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_path" xml:space="preserve">
+    <value>Absolute path</value>
+    <comment>overview.field.path (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_platformTrust" xml:space="preserve">
+    <value>Platform trust</value>
+    <comment>overview.field.platformTrust (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_serverHealth" xml:space="preserve">
+    <value>Server health</value>
+    <comment>overview.field.serverHealth (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_serverVersion" xml:space="preserve">
+    <value>Server version</value>
+    <comment>overview.field.serverVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_source" xml:space="preserve">
+    <value>HDC source</value>
+    <comment>overview.field.source (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_subserver" xml:space="preserve">
+    <value>Subserver capability</value>
+    <comment>overview.field.subserver (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_advanced" xml:space="preserve">
+    <value>Advanced Diagnostics</value>
+    <comment>overview.section.advanced (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_capabilities" xml:space="preserve">
+    <value>Capabilities</value>
+    <comment>overview.section.capabilities (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_deviceChannel" xml:space="preserve">
+    <value>Selected Device &amp; Channel</value>
+    <comment>overview.section.deviceChannel (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_serverToolchain" xml:space="preserve">
+    <value>Server &amp; Toolchain</value>
+    <comment>overview.section.serverToolchain (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_healthy" xml:space="preserve">
+    <value>Healthy</value>
+    <comment>overview.serverHealth.healthy (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>overview.serverHealth.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>overview.serverHealth.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_none" xml:space="preserve">
+    <value>None</value>
+    <comment>overview.status.needsAttention.none (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_one" xml:space="preserve">
+    <value>1 item</value>
+    <comment>overview.status.needsAttention.one (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_other" xml:space="preserve">
+    <value>%lld items</value>
+    <comment>overview.status.needsAttention.other (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+    <comment>overview.trust.cancelled (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_denied" xml:space="preserve">
+    <value>Denied</value>
+    <comment>overview.trust.denied (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_keyAccessDenied" xml:space="preserve">
+    <value>Key access denied</value>
+    <comment>overview.trust.keyAccessDenied (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_ready" xml:space="preserve">
+    <value>Ready</value>
+    <comment>overview.trust.ready (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_timedOut" xml:space="preserve">
+    <value>Timed out</value>
+    <comment>overview.trust.timedOut (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>overview.trust.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_waiting" xml:space="preserve">
+    <value>Waiting for trust</value>
+    <comment>overview.trust.waiting (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_overview_hdc_checkHidumper" xml:space="preserve">
+    <value>Check hidumper with a read-only window inventory</value>
+    <comment>windows.overview.hdc.checkHidumper (Windows only)</comment>
+  </data>
 </root>
