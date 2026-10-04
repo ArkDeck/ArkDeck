@@ -95,3 +95,10 @@
 - `PYTHONUTF8=1 python scripts/test_agent_pr_workflow.py`: OK. Without `PYTHONUTF8` it fails on
   `main` too (`gbk` decoding on this host).
 - `PYTHONUTF8=1 sh scripts/check-sdd.sh`, and `git diff --check`.
+
+## Follow-up: the headless runbook's digest source
+
+The headless runbook previously read the Catalog digest from `operation list` → `result.catalogDigest`. The
+Rust CLI's `operation list` result is a bare array of operations, so §0's fixed-fact table and §1
+now read the digest from `runtime health` → `result.catalogDigest` and the operation set from
+`operation list`. §7's record template names `runtime health` as the digest's source.
