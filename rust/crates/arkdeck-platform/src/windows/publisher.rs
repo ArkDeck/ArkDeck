@@ -165,6 +165,18 @@ pub(crate) fn signer_name(der: &[u8]) -> io::Result<String> {
     }
 }
 
+/// Every subject `O=` and every subject `CN=` of the certificate `der`
+/// (TASK-XPA-011's system tool publisher pins).
+pub(crate) fn subject_organizations_and_names(
+    der: &[u8],
+) -> io::Result<(Vec<String>, Vec<String>)> {
+    let certificate = Certificate::decode(der)?;
+    Ok((
+        certificate.subject_organizations()?,
+        certificate.subject_values(b"2.5.4.3")?,
+    ))
+}
+
 struct Certificate(*const CERT_CONTEXT);
 
 impl Drop for Certificate {

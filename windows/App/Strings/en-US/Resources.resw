@@ -5066,4 +5066,68 @@ SHA-256: %4$@</value>
     <value>Artifacts</value>
     <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="overview_record_device_label" xml:space="preserve">
+    <value>Device this page describes</value>
+    <comment>overview.record.device.label (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_none" xml:space="preserve">
+    <value>No online device</value>
+    <comment>overview.record.device.none (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_noneDetail" xml:space="preserve">
+    <value>Connect an adopted device, then refresh.</value>
+    <comment>overview.record.device.noneDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_choose" xml:space="preserve">
+    <value>Choose a device…</value>
+    <comment>overview.record.device.choose (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_binding" xml:space="preserve">
+    <value>binding %lld</value>
+    <comment>overview.record.binding (Localizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_openHistory" xml:space="preserve">
+    <value>Review in History</value>
+    <comment>jobRecovery.action.openHistory (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_count" xml:space="preserve">
+    <value>%d records need review</value>
+    <comment>jobRecovery.count (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_list" xml:space="preserve">
+    <value>Recovery records</value>
+    <comment>jobRecovery.list (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_guidance" xml:space="preserve">
+    <value>Runtime is waiting for a safe boundary before the recovery record can finish. This App cannot force the current step to stop.</value>
+    <comment>jobRecovery.archivePending.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_title" xml:space="preserve">
+    <value>Recovery archive is pending</value>
+    <comment>jobRecovery.archivePending.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_guidance" xml:space="preserve">
+    <value>Keep the device unchanged when possible. Do not start another device operation until the outstanding effect is reconciled through an approved Runtime path.</value>
+    <comment>jobRecovery.outcomeUnknown.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_title" xml:space="preserve">
+    <value>Device effect is unknown</value>
+    <comment>jobRecovery.outcomeUnknown.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_guidance" xml:space="preserve">
+    <value>Runtime recorded a confirmed safe boundary. Review the record before resuming through an approved Runtime path.</value>
+    <comment>jobRecovery.resumeSafe.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_title" xml:space="preserve">
+    <value>A safe recovery boundary is available</value>
+    <comment>jobRecovery.resumeSafe.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_guidance" xml:space="preserve">
+    <value>Keep the current device state unchanged and review the Runtime record for the required recovery step.</value>
+    <comment>jobRecovery.waiting.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_title" xml:space="preserve">
+    <value>Recovery is waiting</value>
+    <comment>jobRecovery.waiting.title (JobsLocalizable.xcstrings)</comment>
+  </data>
 </root>

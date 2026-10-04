@@ -50,8 +50,8 @@ mod windows {
     const DAEMON: &str = env!("CARGO_BIN_EXE_arkdeck-agentd");
     const INDEX: &str = "entry/src/main/ets/pages/Index.ets";
     const INDEX_SOURCE: &str = "@Entry\n@Component\nstruct Index {\n  build() {}\n}\n";
-    const TOOLS_REASON: &str = "workspace.toolchainUnavailable: no code-owned source tool \
-        (grep, sed, patch, bsdtar, git or SwiftPM) is trusted on Windows";
+    const TOOLS_REASON: &str = "workspace.toolchainUnavailable: no trusted system archive \
+        (tar) or source-control (git) tool is composed on Windows yet";
 
     /// `grep -r -n --include <glob> -- <symbol> <root>` over a tree of plain
     /// files: every line holding `symbol` in a file whose name `glob`
@@ -108,6 +108,10 @@ mod windows {
         (
             "an_inspector_that_is_no_executable_refuses_the_start",
             an_inspector_that_is_no_executable_refuses_the_start,
+        ),
+        (
+            "the_daemon_image_is_the_code_owned_grep_sed_and_patch",
+            the_daemon_image_is_the_code_owned_grep_sed_and_patch,
         ),
     ];
 
@@ -561,6 +565,93 @@ mod windows {
             .to_owned();
         assert_eq!(again, job);
         third.stop(&root.0);
+    }
+
+    /// `arkdeck-agentd --workspace-tool <tool> <argv>`, with no environment
+    /// and no stdin as the workspace dispatch runs it, answers exactly what
+    /// the reimplemented tool answers, and its tree is the one the tool left.
+    fn the_daemon_image_is_the_code_owned_grep_sed_and_patch() {
+        let root = Root::new("tools");
+        let project = root.project();
+        let index = format!("{project}\\entry\\src\\main\\ets\\pages\\Index.ets");
+        let patch_file = root.0.join("change.patch");
+        std::fs::write(
+            &patch_file,
+            "--- a/entry/src/main/ets/pages/Index.ets\n+++ b/entry/src/main/ets/pages/Index.ets\n@@ -3,3 +3,3 @@\n struct Index {\n-  build() {}\n+  build() { }\n }\n",
+        )
+        .unwrap();
+        let patch_file = patch_file.to_str().unwrap().to_owned();
+        for (tool, arguments) in [
+            ("sed", vec!["-n", "2,4p", index.as_str()]),
+            (
+                "grep",
+                vec![
+                    "-r",
+                    "-n",
+                    "--include",
+                    "*.ets",
+                    "--",
+                    "build",
+                    project.as_str(),
+                ],
+            ),
+            (
+                "patch",
+                vec![
+                    "-f",
+                    "-p1",
+                    "-d",
+                    project.as_str(),
+                    "-i",
+                    patch_file.as_str(),
+                ],
+            ),
+            ("sed", vec!["-n", "4,4p", index.as_str()]),
+            ("sed", vec!["-n", "1,1p", "Z:\\no\\such\\file"]),
+        ] {
+            // The reimplementation's answer first, over a copy of the tree,
+            // when the tool writes.
+            let expected = if tool == "patch" {
+                let copy = root.0.join("copy");
+                std::fs::create_dir_all(copy.join("entry/src/main/ets/pages")).unwrap();
+                std::fs::copy(&index, copy.join("entry/src/main/ets/pages/Index.ets")).unwrap();
+                let copy = copy.to_str().unwrap().to_owned();
+                let mut moved: Vec<String> = arguments.iter().map(|&a| a.to_owned()).collect();
+                moved[3] = copy;
+                arkdeck_hoststore::run_text_tool(tool, &moved)
+            } else {
+                arkdeck_hoststore::run_text_tool(
+                    tool,
+                    &arguments.iter().map(|&a| a.to_owned()).collect::<Vec<_>>(),
+                )
+            };
+            let output = Command::new(DAEMON)
+                .arg(arkdeck_hoststore::WORKSPACE_TOOL_FLAG)
+                .arg(tool)
+                .args(&arguments)
+                .env_clear()
+                .stdin(Stdio::null())
+                .output()
+                .unwrap();
+            assert_eq!(
+                output.status.code(),
+                Some(expected.status),
+                "{tool} {arguments:?}"
+            );
+            assert_eq!(output.stdout, expected.stdout, "{tool} {arguments:?}");
+            assert_eq!(output.stderr, expected.stderr, "{tool} {arguments:?}");
+        }
+        // The patch was applied in place, and the second read shows it.
+        assert_eq!(
+            std::fs::read_to_string(&index).unwrap(),
+            INDEX_SOURCE.replace("build() {}", "build() { }")
+        );
+        let refused = Command::new(DAEMON)
+            .args([arkdeck_hoststore::WORKSPACE_TOOL_FLAG, "awk"])
+            .env_clear()
+            .output()
+            .unwrap();
+        assert_eq!(refused.status.code(), Some(2), "{refused:?}");
     }
 
     fn an_inspector_that_is_no_executable_refuses_the_start() {
