@@ -280,9 +280,10 @@ fn pwsh() -> PathBuf {
 }
 
 /// The signed test daemon, running over a development root, its stdout read
-/// line by line as it comes and its stderr kept in `daemon-stderr.log`
-/// beside the root.
+/// line by line as it comes and its stderr kept in `daemon-stderr-<pid>.log`
+/// beside the root, removed when the daemon is dropped unless a test failed.
 pub(crate) struct SignedDaemon {
+    stderr_log: PathBuf,
     executable: PathBuf,
     pin: String,
     root: PathBuf,
@@ -343,12 +344,11 @@ impl SignedDaemon {
                 command.env_remove(key);
             }
         }
-        let stderr = std::fs::File::create(
-            root.parent()
-                .unwrap()
-                .join(format!("daemon-stderr-{}.log", std::process::id())),
-        )
-        .unwrap();
+        let stderr_log = root
+            .parent()
+            .unwrap()
+            .join(format!("daemon-stderr-{}.log", std::process::id()));
+        let stderr = std::fs::File::create(&stderr_log).unwrap();
         let mut child = command
             .args(["--exact", CHILD, "--nocapture", "--test-threads=1"])
             .env("ARKDECK_DEVELOPMENT_STATE_ROOT", root)
@@ -371,6 +371,7 @@ impl SignedDaemon {
             }
         });
         let mut daemon = Self {
+            stderr_log,
             executable: executable.to_owned(),
             pin: pin.to_owned(),
             root: root.to_owned(),
@@ -476,6 +477,11 @@ impl Drop for SignedDaemon {
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
             let _ = child.wait();
+        }
+        // Kept for a failed test to read; otherwise nothing is left beside
+        // the root, which may be the temporary directory itself.
+        if !std::thread::panicking() {
+            let _ = std::fs::remove_file(&self.stderr_log);
         }
     }
 }

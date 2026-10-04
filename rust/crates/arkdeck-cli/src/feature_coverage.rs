@@ -550,10 +550,23 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "artifact.import.release",
     "artifact.import.abort",
     // The cleanup debt ledger over Swift's recorded debug HAP debts
-    // (`windows_cleanup_debt_process.rs`). Not `recovery cleanup continue`:
-    // without a registered HDC a debt is refused before its readback.
+    // (`windows_cleanup_debt_process.rs`), and its continuation: every debt
+    // the Swift debug HAP and native library oracles continued, through both
+    // spellings, by the real CLI against the signed test daemon over the
+    // shared fake HDC, answered and left as Swift answered and left it
+    // (`tests/spawning/gj23_replay.rs`, TASK-XPA-009).
     "recovery.cleanup.list",
     "cleanup-debt.list",
+    "recovery.cleanup.continue",
+    "cleanup-debt.continue",
+    // GJ-2/GJ-3's domain leaves (TASK-XPA-009): `debug hap` and `debug native
+    // deploy` observe the board the synthetic census names, submit and run
+    // the oracle's first Job, and read its evidence and Artifacts, by the
+    // real CLI against the same signed test daemon; the fake HDC receives,
+    // after the leaf's observation reads, exactly the oracle Job's calls
+    // (`tests/spawning/gj23_replay.rs`).
+    "debug.hap",
+    "debug.native.deploy",
     // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
     // a release-candidate package tree registered, inspected, listed and
     // retired as a daemon Bundle, and a DevEco toolchain's inspection,

@@ -54,19 +54,15 @@ fn launch_path_form(payload: &Value) -> bool {
         && payload["inodeLaunchPath"] == payload["authorizedExecutable"];
 }
 /// An executable a lifecycle command names: an absolute path, `/`-rooted on
-/// macOS; on Windows a drive-absolute `X:\…` path too, the spelling the
-/// Windows managed server's verified tool has (`VerifiedTool`).
+/// macOS; on Windows any absolute path too: drive-absolute `X:\…`, the
+/// spelling the account daemon's selected tool has, its verbatim `\\?\X:\…`
+/// form, which a verified tool opened by its canonical path names (the
+/// development root's managed server), or UNC. A drive-relative `X:…` or a
+/// relative path is none.
 fn absolute_executable(path: &str) -> bool {
     #[cfg(windows)]
-    {
-        let bytes = path.as_bytes();
-        if bytes.len() > 3
-            && bytes[0].is_ascii_alphabetic()
-            && bytes[1] == b':'
-            && bytes[2] == b'\\'
-        {
-            return true;
-        }
+    if std::path::Path::new(path).is_absolute() {
+        return true;
     }
     path.starts_with('/')
 }
@@ -942,13 +938,17 @@ mod tests {
                 "argv": ["-s", "127.0.0.1:8710", "kill", "-r"], "endpoint": "127.0.0.1:8710"})
         };
         assert!(valid_payload("actualCommand", &command("/retained/hdc")));
-        assert_eq!(
-            valid_payload(
-                "actualCommand",
-                &command(r"C:\Bootstrap\tool-a.hdc\hdc.exe")
-            ),
-            cfg!(windows)
-        );
+        for absolute in [
+            r"C:\Bootstrap\tool-a.hdc\hdc.exe",
+            r"\\?\C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe",
+            r"\\server\share\hdc.exe",
+        ] {
+            assert_eq!(
+                valid_payload("actualCommand", &command(absolute)),
+                cfg!(windows),
+                "{absolute}"
+            );
+        }
         for relative in ["hdc", r"Bootstrap\hdc.exe", r"C:hdc.exe", ""] {
             assert!(
                 !valid_payload("actualCommand", &command(relative)),

@@ -27,14 +27,46 @@ fn fixtures() -> PathBuf {
 
 pub(crate) struct Root(pub(crate) PathBuf);
 
+/// The root a subprocess fixture lays down, named by the parent test that
+/// runs it: the parent removes it once the child has exited. A child cannot
+/// always remove its own root, as its background Job threads may still hold
+/// the root's stores open when the fixture returns (on Windows nothing open
+/// can be removed), and the child then exits, leaving the root behind.
+const CHILD_ROOT: &str = "ARKDECK_TEST_FLASH_ROOT";
+
+/// A fresh root path for a subprocess fixture, removed when dropped (after
+/// the child that laid it down has exited). Pass it with [`ChildRoot::env`].
+pub(crate) struct ChildRoot(PathBuf);
+
+impl ChildRoot {
+    pub(crate) fn new() -> Self {
+        Self(fresh_root())
+    }
+    /// The environment entry that names this root to the child.
+    pub(crate) fn env(&self) -> (&'static str, &Path) {
+        (CHILD_ROOT, &self.0)
+    }
+}
+
+impl Drop for ChildRoot {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn fresh_root() -> PathBuf {
+    temporary().join(format!(
+        "flash-plan-control-{:x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    ))
+}
+
 impl Root {
     /// The oracle's Artifact root and Target store, laid down as Swift left
-    /// them, beside an empty Job state.
+    /// them, beside an empty Job state: in the root the parent named for a
+    /// subprocess fixture ([`ChildRoot`]), else in a fresh one.
     pub(crate) fn new() -> Self {
-        let root = temporary().join(format!(
-            "flash-plan-control-{:x}",
-            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
-        ));
+        let root = std::env::var_os(CHILD_ROOT).map_or_else(fresh_root, PathBuf::from);
         for name in ["artifacts", "targets", "jobs"] {
             directory(&root.join(name));
         }
@@ -170,8 +202,11 @@ fn flash_unknown_outcome_reconciles_passively_without_replay() {
 
 fn flash_execution_fixture(outcome: &str) {
     let _turn = crate::turn();
+    let root = ChildRoot::new();
+    let (key, path) = root.env();
     let output = std::process::Command::new(std::env::current_exe().unwrap())
         .env("ARKDECK_TEST_FLASH_OWNER_OUTCOME", outcome)
+        .env(key, path)
         .args([
             "--exact",
             "flash_execution_control::flash_execution_process_fixture",

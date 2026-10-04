@@ -19,6 +19,7 @@
 //! names the account's), and composes the code-sign helper the native oracle
 //! recorded; each is an input of the test daemon alone (`signed_daemon.rs`).
 //! Host tests only: nothing reaches a device or an installed Runtime.
+use crate::gj1_device_leaves;
 use crate::signed_daemon::{self, SignedDaemon};
 use crate::support::{self, debug_hap, document, hdc_oracle, legacy_plan_answer, oracle_fake};
 use serde_json::{Value, json};
@@ -156,12 +157,15 @@ fn arguments(exchange: &Value, requests: &Path, labels: &debug_hap::HostLabels) 
         ],
         "cleanupDebt.list" => owned(&["cleanup-debt", "list"]),
         "cleanupDebt.continue" => {
-            let mut arguments: Vec<String> = vec![
-                "cleanup-debt".into(),
-                "continue".into(),
-                "--job".into(),
-                text("jobId"),
-            ];
+            // Both spellings of the leaf: a remote path's debt through
+            // `recovery cleanup continue`, a bundle's through `cleanup-debt
+            // continue`.
+            let mut arguments: Vec<String> = if params["remotePath"].is_string() {
+                owned(&["recovery", "cleanup", "continue"])
+            } else {
+                owned(&["cleanup-debt", "continue"])
+            };
+            arguments.extend(["--job".into(), text("jobId")]);
             if let Some(path) = params["remotePath"].as_str() {
                 arguments.extend(["--remote-path".into(), path.into()]);
             }
@@ -340,9 +344,193 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
 #[test]
 fn the_real_cli_runs_every_swift_debug_hap_through_the_signed_test_daemon() {
     replay("debug-hap", 63, 108);
+    gj1_device_leaves::assert_windows_status(&["cleanupDebt.continue"], "implemented");
 }
 
 #[test]
 fn the_real_cli_runs_every_swift_native_deployment_through_the_signed_test_daemon() {
     replay("deploy-native-library", 40, 225);
+}
+
+/// The oracle's connect key, which the synthetic census's board serial
+/// equals (the fixture's adopted Target).
+const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+/// The Target the oracles adopted.
+const TARGET: &str = "TGT-3ba3f5f43b92";
+
+/// `text` with every Job identity replaced by one label, so a Job this run
+/// minted compares with the oracle's.
+fn unlabelled_jobs(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find("job-") {
+        out.push_str(&rest[..at]);
+        let tail = &rest[at + 4..];
+        let hex = tail
+            .bytes()
+            .take_while(|byte| byte.is_ascii_hexdigit())
+            .count();
+        if hex == 32 {
+            out.push_str("job-<id>");
+            rest = &tail[32..];
+        } else {
+            out.push_str("job-");
+            rest = tail;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The oracle's domain leaf (`debug hap`, `debug native deploy`) run by the
+/// real signed CLI against the signed test daemon over the oracle's root,
+/// with the board the oracle's Target names in the synthetic census: the
+/// leaf observes the board, submits and runs the operation's Job with the
+/// inputs of the oracle's first case, reads its evidence and Artifacts, and
+/// completes; the fake HDC must have received, after the leaf's observation
+/// reads, exactly the calls the oracle's first Job made (its Job identity
+/// aside, which this run mints).
+fn domain_leaf(fixture_name: &str, leaf: &[&str], command: &str, operation: &str) {
+    let _turn = crate::turn();
+    let scratch = support::fixture_fs::temporary_root().join(format!(
+        "gj23-leaf-{fixture_name}-{:x}",
+        u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap())
+    ));
+    let Some((executable, pin)) = signed_daemon::signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture(fixture_name);
+    let cases = document(&fixture, "cases.json");
+    let provenance = document(&fixture, "provenance.json");
+    let exchanges = cases["exchanges"].as_array().unwrap();
+    let submit = exchanges
+        .iter()
+        .find(|exchange| exchange["method"] == "job.submit")
+        .unwrap();
+    let request: Value =
+        serde_json::from_str(submit["params"]["requestJson"].as_str().unwrap()).unwrap();
+    assert_eq!(request["target"]["targetId"], TARGET);
+    let run = exchanges
+        .iter()
+        .find(|exchange| exchange["method"] == "job.run")
+        .unwrap();
+    let root = debug_hap::rebuild(&fixture);
+    rename(&root, true);
+    mode(&root, run["mode"].as_str().unwrap());
+    let inputs = scratch.join("inputs.json");
+    fs::write(&inputs, serde_json::to_vec(&request["inputs"]).unwrap()).unwrap();
+    let mut variables = vec![
+        (
+            signed_daemon::CLOCK,
+            format!(
+                "{}|{}",
+                provenance["nowUTC"].as_str().unwrap(),
+                provenance["nowPreciseUTC"].as_str().unwrap()
+            ),
+        ),
+        (
+            signed_daemon::MUTATION_ROOT,
+            root.join("jobs-state").to_str().unwrap().to_owned(),
+        ),
+        (signed_daemon::BOARD, KEY.to_owned()),
+    ];
+    if cases.get("codeSignHelper").is_some() {
+        variables.push((
+            signed_daemon::HELPER,
+            fixture.join("cases.json").to_str().unwrap().to_owned(),
+        ));
+    }
+    let daemon = SignedDaemon::start_with(&executable, &pin, &root, &fixture, &root, &variables);
+    let mut arguments: Vec<&str> = leaf.to_vec();
+    arguments.extend([
+        "--target",
+        TARGET,
+        "--inputs-file",
+        inputs.to_str().unwrap(),
+    ]);
+    let (status, envelope) = daemon.cli(&arguments);
+    daemon.stop();
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["ok"], true, "{envelope}");
+    assert_eq!(envelope["command"], command, "{envelope}");
+    let receipt = &envelope["result"];
+    assert_eq!(receipt["operationReference"], operation, "{receipt}");
+    assert_eq!(receipt["outcomeUnknown"], false, "{receipt}");
+    // The evidence observation as the oracle's first Job result carries it
+    // (`debug.hap@1` binds the Target's observation; the native library
+    // deploy's evidence has none).
+    let result = exchanges
+        .iter()
+        .find(|exchange| exchange["method"] == "job.result")
+        .unwrap();
+    let observation = &result["answer"]["result"]["evidence"]["observation"];
+    if observation.is_null() {
+        assert!(receipt["evidenceObservation"].is_null(), "{receipt}");
+    } else {
+        assert_eq!(observation["targetId"], TARGET);
+        assert_eq!(
+            receipt["evidenceObservation"]["targetId"], TARGET,
+            "{receipt}"
+        );
+    }
+    assert!(
+        receipt["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|artifact| artifact["bytesVerified"] == true),
+        "{receipt}"
+    );
+
+    // The oracle's first Job: its calls up to the next Job's observation,
+    // or (a Job that observes nothing, as the native library deploy) up to
+    // the first call naming another Job.
+    let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
+    let swift: Vec<&str> = swift.lines().collect();
+    let first_job = result["answer"]["result"]["evidence"]["jobId"]
+        .as_str()
+        .unwrap();
+    let next = swift[1..]
+        .iter()
+        .position(|line| {
+            line.starts_with("list\u{1f}targets\u{1f}-v\u{1f}")
+                || (line.contains("job-") && !line.contains(first_job))
+        })
+        .map_or(swift.len(), |at| at + 1);
+    let job: Vec<String> = swift[..next]
+        .iter()
+        .map(|line| unlabelled_jobs(line))
+        .collect();
+    let ours = String::from_utf8(fs::read(root.join("hdc-invocations.log")).unwrap()).unwrap();
+    let ours = oracle_fake::oracle_spelling(&oracle_names(&ours, &root), &root);
+    let ours: Vec<String> = ours.lines().map(unlabelled_jobs).collect();
+    assert!(ours.len() >= job.len(), "{ours:#?}");
+    let observations = ours.len() - job.len();
+    assert!(
+        ours[..observations]
+            .iter()
+            .all(|call| call.starts_with("list\u{1f}targets\u{1f}-v\u{1f}")),
+        "the leaf's observation reads: {ours:#?}"
+    );
+    assert_eq!(ours[observations..], job[..], "the oracle's Job calls");
+    rename(&root, false);
+    let _ = fs::remove_dir_all(&scratch);
+}
+
+#[test]
+fn the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job() {
+    domain_leaf("debug-hap", &["debug", "hap"], "debug.hap", "debug.hap@1");
+    gj1_device_leaves::assert_windows_status(&["debug.hap@1"], "implemented");
+}
+
+#[test]
+fn the_real_cli_debug_native_deploy_leaf_runs_the_swift_oracle_s_job() {
+    domain_leaf(
+        "deploy-native-library",
+        &["debug", "native", "deploy"],
+        "debug.native.deploy",
+        "deploy.native-library.app-owned@1",
+    );
+    gj1_device_leaves::assert_windows_status(&["deploy.native-library.app-owned@1"], "implemented");
 }

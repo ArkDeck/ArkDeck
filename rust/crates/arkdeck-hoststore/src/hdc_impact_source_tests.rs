@@ -544,6 +544,89 @@ fn the_registered_family_proves_health_through_a_bracketed_checkserver() {
     assert!(legs.dispatch.arguments().is_empty());
 }
 
+/// On Windows a registered Windows HDC tuple's server health is its
+/// commandless identity generation (CHG-2026-078 `serverIdentityGeneration`,
+/// maintainer ruling 2026-10-04 item 3): the same identity observed twice,
+/// with nothing run (`checkserver` can start a server there). Another
+/// identity across the bracket, none at all, or the tuple's executable on
+/// another endpoint prove no health. A receipt naming the image in its
+/// verbatim `\\?\` spelling is the same file as the configured plain path.
+#[cfg(windows)]
+#[test]
+fn a_registered_windows_tuple_proves_health_by_its_identity_generation() {
+    let tuple = &arkdeck_provider_hdc::WINDOWS_HDC_TUPLES[0];
+    let registered = || {
+        let mut legs = Legs::new();
+        legs.executable.sha256 = tuple.executable_sha256.into();
+        legs
+    };
+    let identity = receipt(&registered().executable, 42);
+    let mut legs = registered();
+    legs.identity = Identity::new(vec![observed(&identity), observed(&identity)]);
+    assert_eq!(
+        legs.server(),
+        ServerObservation {
+            identity: Some(identity.clone()),
+            health: "healthy",
+            version: Some(tuple.reported_version.into()),
+            reason: None,
+        }
+    );
+    assert!(legs.dispatch.arguments().is_empty(), "nothing is run");
+    let unavailable = ServerObservation {
+        identity: None,
+        health: "unknown",
+        version: None,
+        reason: Some("hdc.registeredHealthObservationUnavailable"),
+    };
+    for second in [
+        Some(observed(&receipt(&registered().executable, 43))),
+        Some(IdentityObservation::Unavailable("gone".into())),
+        None,
+    ] {
+        let mut legs = registered();
+        legs.identity = Identity::new(std::iter::once(observed(&identity)).chain(second).collect());
+        assert_eq!(legs.server(), unavailable);
+        assert!(legs.dispatch.arguments().is_empty());
+    }
+
+    // The managed launch owns a receipt in the verbatim spelling.
+    let verbatim = ServerIdentityReceipt {
+        executable_path: format!(r"\\?\{}", identity.executable_path.display()).into(),
+        ..identity.clone()
+    };
+    let facts = |receipt: &ServerIdentityReceipt| {
+        let legs = registered();
+        let launch_record = launch(&legs.executable);
+        let launch = || Some(launch_record.clone());
+        let none = || -> Result<Vec<CurrentJob>, String> { Err("unused".into()) };
+        let empty = || -> Result<Vec<Value>, String> { Err("unused".into()) };
+        let devices = || -> Result<DeviceReading, String> { Err("unused".into()) };
+        let source = ManagedServerImpact {
+            executable: legs.executable.clone(),
+            endpoint: ENDPOINT.into(),
+            launch: &launch,
+            supervisor: None,
+            identity: &legs.identity,
+            signature: &Signed,
+            verifier: &legs.verifier,
+            dispatch: &legs.dispatch,
+            jobs: &none,
+            targets: &empty,
+            devices: &devices,
+        };
+        let server = ServerObservation {
+            identity: Some(receipt.clone()),
+            health: "healthy",
+            version: None,
+            reason: None,
+        };
+        source.server_facts(true, &server, None, None, None).0
+    };
+    assert_eq!(facts(&verbatim), facts(&identity));
+    assert_ne!(facts(&identity), Value::Null);
+}
+
 /// Swift's `RegisteredHealthyServer` (`ControlActionWithHostContractTests`),
 /// the seam its with-host restart frames were recorded through: the
 /// production reading of everything else, then what only the registered
