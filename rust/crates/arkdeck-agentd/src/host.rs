@@ -223,6 +223,11 @@ pub struct Host {
     /// the native RockUSB identity and the live probe over this host's HDC.
     #[cfg(any(target_os = "macos", windows))]
     flash_facts: Option<std::sync::Arc<arkdeck_hoststore::FlashHostFacts>>,
+    /// Test builds on Windows only: the in-process fake HDC the Flash host
+    /// facts oracle replay probes over (`tests/spawning`). No Windows daemon
+    /// composes an HDC until its tuple is registered.
+    #[cfg(all(windows, test))]
+    flash_test_hdc: Option<std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>>,
     /// What a Flash `job.plan` reads beyond the Artifact and Import owners
     /// and those facts: the ArkForge provider's availability, the Rockchip
     /// dispatcher's reason and the lane's toolchain, as Swift's daemon
@@ -1338,11 +1343,36 @@ impl Host {
 
     /// The HDC the Flash facts probe over: this host's (on Windows none
     /// until its HDC tuple is registered).
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(any(target_os = "macos", all(windows, not(test))))]
     fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
         self.hdc
             .as_deref()
             .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
+    }
+
+    /// In a Windows test build, the fake HDC the Flash host facts replay
+    /// composed (`tests/spawning`), else this host's.
+    #[cfg(all(windows, test))]
+    fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
+        match &self.flash_test_hdc {
+            Some(fake) => Some(fake.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch),
+            None => self
+                .hdc
+                .as_deref()
+                .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
+        }
+    }
+
+    /// Test builds on Windows only: the Flash facts probe over `hdc`, a fake
+    /// (TASK-XPA-010). The production Windows daemon has no such seam.
+    #[cfg(all(windows, test))]
+    #[allow(dead_code)]
+    pub fn with_flash_test_hdc(
+        mut self,
+        hdc: std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+    ) -> Self {
+        self.flash_test_hdc = Some(hdc);
+        self
     }
 
     /// `flash.bind-current-loader` binds through this owner, against this
@@ -1546,6 +1576,8 @@ impl Host {
             flash_invocations: None,
             #[cfg(any(target_os = "macos", windows))]
             flash_facts: None,
+            #[cfg(all(windows, test))]
+            flash_test_hdc: None,
             #[cfg(any(target_os = "macos", windows))]
             flash_planning: None,
             #[cfg(any(target_os = "macos", windows))]
