@@ -1,7 +1,7 @@
 {
   "artifacts" : [
     {
-      "artifactID" : "ART-2211334fb5e9c050bf4b47910e6a8b13",
+      "artifactID" : "ART-2d3de5f74db3b78aa13346d34cc03621",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -25,7 +25,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-b89f96da3deec3ec65deda2e635e7dea",
-      "sha256" : "052da504d246215250ce6d6a32a1db17816594d9ef2b78bd1725fe3676fcd96b",
+      "sha256" : "050e243513f55251f7c6d593cf315057111fd2718696d3a1eb1a942730109038",
       "sourceOperation" : "debug.hap@1",
       "status" : {
         "published" : {
@@ -35,7 +35,7 @@
       "stepID" : "package-readback"
     },
     {
-      "artifactID" : "ART-0a861c1efc5bed8351abd798d7b728ea",
+      "artifactID" : "ART-ae3ad3e17a781f7ffd33033ce277bb11",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -59,7 +59,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-b89f96da3deec3ec65deda2e635e7dea",
-      "sha256" : "7899971f8e9e776693fe6bf87dc9fa79cf065ee306d36b40aff6fb9a67b5d2cf",
+      "sha256" : "dfe859f11d0cc40ad9602b6785b79c54eca2aaf5af5e5c4efadef5b9df3580b9",
       "sourceOperation" : "debug.hap@1",
       "status" : {
         "published" : {

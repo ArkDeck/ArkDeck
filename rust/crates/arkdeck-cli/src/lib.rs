@@ -477,6 +477,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 "--import-request-id"
                 | "--device-profile"
                 | "--name"
+                | "--marker-id"
+                | "--label"
                 | "--candidate"
                 | "--observation"
                 | "--observation-generation"
@@ -620,6 +622,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
                         "--job" => "jobId",
+                        "--marker-id" => "markerId",
+                        "--label" => "label",
                         "--capability" => "capabilityId",
                         "--after-cursor" => "afterCursor",
                         "--artifact" => "artifactId",
@@ -762,6 +766,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "export"] => "artifact.export",
         ["trace", "export"] => "trace.export",
         ["diagnostics", "export"] => "diagnostics.export",
+        ["diagnostics", "session", "status"] => "diagnostics.session.status",
+        ["diagnostics", "session", "mark"] => "diagnostics.session.mark",
+        ["diagnostics", "session", "stop"] => "diagnostics.session.stop",
         ["diagnostics", "inspect"] => "diagnostics.inspect",
         ["diagnostics", "preview"] => "diagnostics.preview",
         ["recovery", "cleanup", "list"] => "recovery.cleanup.list",
@@ -1154,7 +1161,10 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             &["contractsDirectory", "fixturesDirectory"]
         }
         "trace.inspect" => &["jobId", "artifactId", "allowSensitive", "timeout"],
-        "diagnostics.inspect" => &["jobId", "timeout"],
+        "diagnostics.inspect" | "diagnostics.session.status" | "diagnostics.session.stop" => {
+            &["jobId", "timeout"]
+        }
+        "diagnostics.session.mark" => &["jobId", "markerId", "label", "timeout"],
         "diagnostics.preview" => &[
             "jobId",
             "artifactId",
@@ -1775,7 +1785,13 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         .or(continuation_timeout);
     Ok(Invocation {
         command,
-        method: if command == "device.candidates" {
+        method: if command == "diagnostics.session.status" {
+            "diagnostic.session.status"
+        } else if command == "diagnostics.session.mark" {
+            "diagnostic.session.mark"
+        } else if command == "diagnostics.session.stop" {
+            "diagnostic.session.stop"
+        } else if command == "device.candidates" {
             "device.observations"
         } else if command == "artifact.import.inspect" {
             "artifact.import.inspection"

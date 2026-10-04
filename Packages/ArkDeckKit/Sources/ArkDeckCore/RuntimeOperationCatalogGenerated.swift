@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684"
+  public static let catalogDigest = "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -132,6 +132,57 @@ extension RuntimeOperationCatalog {
         CatalogArtifactDescriptor(name: "trace-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
       ],
       profiles: ["workspace-host@1"]
+    ),
+    CatalogOperationDescriptor(
+      id: "capture.diagnostic-session",
+      version: 1,
+      title: "Capture an interactive bounded trace session with Runtime-timed markers",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "durationSeconds", type: .integer, isRequired: true, minimum: 1, maximum: 120, summary: "Maximum host monotonic wait after a verified trace-ring anchor; an explicit stop may end the wait earlier."),
+        CatalogFieldDescriptor(name: "hilogFilters", type: .stringArray, isRequired: false, maxLength: 200, maxItems: 16, summary: "Typed HiLog filter expressions; no shell fragments."),
+        CatalogFieldDescriptor(name: "maximumMarkers", type: .integer, isRequired: false, minimum: 1, maximum: 200, summary: "Maximum Runtime-timed host annotations accepted while this session is recording. Markers do not dispatch screenshots or device input.", defaultValue: .integer(50)),
+        CatalogFieldDescriptor(name: "redactionProfile", type: .string, isRequired: false, enumValues: ["standard"], summary: "Redaction applied to published text. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `standard`. Stronger redaction is not published until its implementation exists.", defaultValue: .string("standard")),
+        CatalogFieldDescriptor(name: "totalArtifactByteBudget", type: .integer, isRequired: false, minimum: 1048576, maximum: 536870912, summary: "Ceiling on the total bytes this job may publish across all of its artifacts. Reaching it ends collection rather than silently dropping a product.", defaultValue: .integer(134217728)),
+        CatalogFieldDescriptor(name: "traceBufferKB", type: .integer, isRequired: false, minimum: 1024, maximum: 65536, summary: "Per-capture trace buffer size in KiB. Only consulted when traceCategories selects the trace leg; ignored otherwise.", defaultValue: .integer(8192)),
+        CatalogFieldDescriptor(name: "traceCategories", type: .stringArray, isRequired: true, maxLength: 64, maxItems: 24, summary: "Required bounded trace categories. Runtime verifies the target supports every category before arming.")
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "artifactIndex", type: .artifactReference, isRequired: true),
+        CatalogFieldDescriptor(name: "captureSummary", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "preflight-host-storage", kind: .preflightHostStorage, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "preflight-device-storage", kind: .preflightDeviceStorage, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "capture-session-trace", kind: .captureRemoteFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .bestEffortCleanup),
+        CatalogStepDescriptor(stepID: "capture-hilog", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")),
+        CatalogStepDescriptor(stepID: "receive-trace-artifact", kind: .receiveFile, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "cleanup-remote-temp", kind: .cleanupOwnedRemotePath, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .bestEffortCleanup),
+        CatalogStepDescriptor(stepID: "postprocess-index", kind: .postprocessArtifact, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 600,
+      outputByteBudget: 536870912,
+      preflightAttempts: 2,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "trace.htrace", role: .raw, mediaType: "application/octet-stream", privacy: .sensitive, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "capture.log", role: .log, mediaType: "text/plain", privacy: .standard, isRequired: false, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "markers.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "artifact-index.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "capture-summary.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "diagnostic-session.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["openharmony-standard@1", "dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "capture.diagnostics",

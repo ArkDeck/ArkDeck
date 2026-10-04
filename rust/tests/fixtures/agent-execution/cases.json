@@ -5,7 +5,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "gj1-observe",
@@ -70,7 +70,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "gj1-observe",
@@ -132,8 +132,8 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-              "sha256" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-cc17cce228efb0b2dede1e317c032ad8",
+              "sha256" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -143,8 +143,8 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e04cd422be1334393565566a35c7ff20",
-              "sha256" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
+              "sha256" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -154,14 +154,14 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e52440fb7438dd09bd82755af4c243a9",
-              "sha256" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-dc8395dbde1f380eefee56b16d4f9dec",
+              "sha256" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             }
           ],
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "evidence" : {
@@ -179,8 +179,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-                "sha256" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-cc17cce228efb0b2dede1e317c032ad8",
+                "sha256" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -190,8 +190,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e04cd422be1334393565566a35c7ff20",
-                "sha256" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
+                "sha256" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -201,8 +201,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e52440fb7438dd09bd82755af4c243a9",
-                "sha256" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-dc8395dbde1f380eefee56b16d4f9dec",
+                "sha256" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               }
@@ -219,7 +219,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -274,7 +274,7 @@
             "outstandingResidueCount" : null,
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "74bca77fba71a11b341a8df4c961a144897daa7308dea3b745fd41b351019bc4",
+              "manifestSha256" : "fe0ea6cc6d353af85e62f8b74df17e36232940a8d8dfb2781ef513772bb329fe",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -321,8 +321,8 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-              "sha256" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-cc17cce228efb0b2dede1e317c032ad8",
+              "sha256" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -332,8 +332,8 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e04cd422be1334393565566a35c7ff20",
-              "sha256" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
+              "sha256" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -343,14 +343,14 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e52440fb7438dd09bd82755af4c243a9",
-              "sha256" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-dc8395dbde1f380eefee56b16d4f9dec",
+              "sha256" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             }
           ],
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "evidence" : {
@@ -368,8 +368,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-                "sha256" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-cc17cce228efb0b2dede1e317c032ad8",
+                "sha256" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -379,8 +379,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e04cd422be1334393565566a35c7ff20",
-                "sha256" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
+                "sha256" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -390,8 +390,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e52440fb7438dd09bd82755af4c243a9",
-                "sha256" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-dc8395dbde1f380eefee56b16d4f9dec",
+                "sha256" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               }
@@ -408,7 +408,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -463,7 +463,7 @@
             "outstandingResidueCount" : null,
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "74bca77fba71a11b341a8df4c961a144897daa7308dea3b745fd41b351019bc4",
+              "manifestSha256" : "fe0ea6cc6d353af85e62f8b74df17e36232940a8d8dfb2781ef513772bb329fe",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -541,7 +541,7 @@
         "result" : {
           "artifacts" : [
             {
-              "artifactId" : "ART-e52440fb7438dd09bd82755af4c243a9",
+              "artifactId" : "ART-dc8395dbde1f380eefee56b16d4f9dec",
               "byteCount" : "529",
               "bytesVerified" : true,
               "mediaType" : "application/json",
@@ -551,12 +551,12 @@
                 "kind" : "job"
               },
               "privacy" : "sensitive",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e52440fb7438dd09bd82755af4c243a9",
-              "sha256" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-dc8395dbde1f380eefee56b16d4f9dec",
+              "sha256" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
               "status" : "published"
             },
             {
-              "artifactId" : "ART-e04cd422be1334393565566a35c7ff20",
+              "artifactId" : "ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
               "byteCount" : "457",
               "bytesVerified" : true,
               "mediaType" : "application/json",
@@ -566,12 +566,12 @@
                 "kind" : "job"
               },
               "privacy" : "sensitive",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e04cd422be1334393565566a35c7ff20",
-              "sha256" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
+              "sha256" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
               "status" : "published"
             },
             {
-              "artifactId" : "ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
+              "artifactId" : "ART-cc17cce228efb0b2dede1e317c032ad8",
               "byteCount" : "240",
               "bytesVerified" : true,
               "mediaType" : "application/json",
@@ -581,8 +581,8 @@
                 "kind" : "job"
               },
               "privacy" : "standard",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-              "sha256" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-cc17cce228efb0b2dede1e317c032ad8",
+              "sha256" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
               "status" : "published"
             }
           ],
@@ -604,8 +604,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-                "sha256" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-cc17cce228efb0b2dede1e317c032ad8",
+                "sha256" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -615,8 +615,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e04cd422be1334393565566a35c7ff20",
-                "sha256" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
+                "sha256" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -626,8 +626,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e52440fb7438dd09bd82755af4c243a9",
-                "sha256" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
+                "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-dc8395dbde1f380eefee56b16d4f9dec",
+                "sha256" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               }
@@ -644,7 +644,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -728,7 +728,7 @@
             "sessionId" : "session-job-73b1cb9a96d12a0ea736a065afdf5abd",
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "74bca77fba71a11b341a8df4c961a144897daa7308dea3b745fd41b351019bc4",
+              "manifestSha256" : "fe0ea6cc6d353af85e62f8b74df17e36232940a8d8dfb2781ef513772bb329fe",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -770,8 +770,8 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-              "sha256" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-cc17cce228efb0b2dede1e317c032ad8",
+              "sha256" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -781,8 +781,8 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e04cd422be1334393565566a35c7ff20",
-              "sha256" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
+              "sha256" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -792,8 +792,8 @@
               "bytesVerified" : true,
               "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-e52440fb7438dd09bd82755af4c243a9",
-              "sha256" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
+              "reference" : "arkdeck-artifact://job-73b1cb9a96d12a0ea736a065afdf5abd/ART-dc8395dbde1f380eefee56b16d4f9dec",
+              "sha256" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             }
@@ -810,7 +810,7 @@
           "blockers" : [
 
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -878,8 +878,8 @@
           "hasMore" : false,
           "items" : [
             {
-              "artifactDigest" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
-              "artifactId" : "ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
+              "artifactDigest" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
+              "artifactId" : "ART-cc17cce228efb0b2dede1e317c032ad8",
               "binding" : {
                 "bindingRevision" : 1,
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -887,7 +887,7 @@
               },
               "byteCount" : 240,
               "createdAtUtc" : "2026-09-14T00:00:00Z",
-              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
+              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-cc17cce228efb0b2dede1e317c032ad8",
               "mediaType" : "application/json",
               "name" : "tool-facts.json",
               "observationWindow" : {
@@ -911,18 +911,18 @@
               "status" : "published"
             },
             {
-              "artifactDigest" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
-              "artifactId" : "ART-e04cd422be1334393565566a35c7ff20",
+              "artifactDigest" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
+              "artifactId" : "ART-dc8395dbde1f380eefee56b16d4f9dec",
               "binding" : {
                 "bindingRevision" : 1,
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
-              "byteCount" : 457,
+              "byteCount" : 529,
               "createdAtUtc" : "2026-09-14T00:00:00Z",
-              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-e04cd422be1334393565566a35c7ff20",
+              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-dc8395dbde1f380eefee56b16d4f9dec",
               "mediaType" : "application/json",
-              "name" : "device-facts.json",
+              "name" : "binding-snapshot.json",
               "observationWindow" : {
                 "endUtc" : "2026-09-14T00:00:00.000Z",
                 "startUtc" : "2026-09-14T00:00:00.000Z"
@@ -944,18 +944,18 @@
               "status" : "published"
             },
             {
-              "artifactDigest" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
-              "artifactId" : "ART-e52440fb7438dd09bd82755af4c243a9",
+              "artifactDigest" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
+              "artifactId" : "ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
               "binding" : {
                 "bindingRevision" : 1,
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
-              "byteCount" : 529,
+              "byteCount" : 457,
               "createdAtUtc" : "2026-09-14T00:00:00Z",
-              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-e52440fb7438dd09bd82755af4c243a9",
+              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
               "mediaType" : "application/json",
-              "name" : "binding-snapshot.json",
+              "name" : "device-facts.json",
               "observationWindow" : {
                 "endUtc" : "2026-09-14T00:00:00.000Z",
                 "startUtc" : "2026-09-14T00:00:00.000Z"
@@ -999,7 +999,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "gj1-capture",
@@ -1064,7 +1064,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "gj1-capture",
@@ -1188,7 +1188,7 @@
             }
           ],
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "evidence" : {
@@ -1279,7 +1279,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -1334,7 +1334,7 @@
             "outstandingResidueCount" : null,
             "sessionPublication" : {
               "catalogGeneration" : "2",
-              "manifestSha256" : "c1fbe32f1446d7feaef758811e08111c9647b9c722d2e4c4a728e24f2d36b9bf",
+              "manifestSha256" : "d4170defa65e491aa0f3d18a722d1613f1dbf3e5ee8fc91d8641adc1971b8371",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -1443,7 +1443,7 @@
             }
           ],
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "evidence" : {
@@ -1534,7 +1534,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -1589,7 +1589,7 @@
             "outstandingResidueCount" : null,
             "sessionPublication" : {
               "catalogGeneration" : "2",
-              "manifestSha256" : "c1fbe32f1446d7feaef758811e08111c9647b9c722d2e4c4a728e24f2d36b9bf",
+              "manifestSha256" : "d4170defa65e491aa0f3d18a722d1613f1dbf3e5ee8fc91d8641adc1971b8371",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -1968,7 +1968,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -2052,7 +2052,7 @@
             "sessionId" : "session-job-faaf218e97baeee54efaa063e9ade05b",
             "sessionPublication" : {
               "catalogGeneration" : "2",
-              "manifestSha256" : "c1fbe32f1446d7feaef758811e08111c9647b9c722d2e4c4a728e24f2d36b9bf",
+              "manifestSha256" : "d4170defa65e491aa0f3d18a722d1613f1dbf3e5ee8fc91d8641adc1971b8371",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -2167,7 +2167,7 @@
           "blockers" : [
 
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -2685,8 +2685,8 @@
           "hasMore" : true,
           "items" : [
             {
-              "artifactDigest" : "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
-              "artifactId" : "ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
+              "artifactDigest" : "35ee688b19863e1578e1b658fb7ed6273f85bcc07669cf0f2c92e3cf9aeed50f",
+              "artifactId" : "ART-cc17cce228efb0b2dede1e317c032ad8",
               "binding" : {
                 "bindingRevision" : 1,
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -2694,7 +2694,7 @@
               },
               "byteCount" : 240,
               "createdAtUtc" : "2026-09-14T00:00:00Z",
-              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
+              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-cc17cce228efb0b2dede1e317c032ad8",
               "mediaType" : "application/json",
               "name" : "tool-facts.json",
               "observationWindow" : {
@@ -2742,18 +2742,18 @@
           "hasMore" : true,
           "items" : [
             {
-              "artifactDigest" : "5e14e647bbe73f24e98cb8eb234e5e8cba094dee058a0f5b114e05d4bd984f86",
-              "artifactId" : "ART-e04cd422be1334393565566a35c7ff20",
+              "artifactDigest" : "f876a79011fc153b192da2c23e4c5b4f4935e21db7b0ab65efb401c4f54de4fe",
+              "artifactId" : "ART-dc8395dbde1f380eefee56b16d4f9dec",
               "binding" : {
                 "bindingRevision" : 1,
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
-              "byteCount" : 457,
+              "byteCount" : 529,
               "createdAtUtc" : "2026-09-14T00:00:00Z",
-              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-e04cd422be1334393565566a35c7ff20",
+              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-dc8395dbde1f380eefee56b16d4f9dec",
               "mediaType" : "application/json",
-              "name" : "device-facts.json",
+              "name" : "binding-snapshot.json",
               "observationWindow" : {
                 "endUtc" : "2026-09-14T00:00:00.000Z",
                 "startUtc" : "2026-09-14T00:00:00.000Z"
@@ -2800,18 +2800,18 @@
           "hasMore" : false,
           "items" : [
             {
-              "artifactDigest" : "54f28a268dfb8bf0b4db64464ba9d73a1f5fd70fc230b4fda87ae2767db849a1",
-              "artifactId" : "ART-e52440fb7438dd09bd82755af4c243a9",
+              "artifactDigest" : "d553389541f607f599b62ac1cd448676f2816bab26ab73d65e37ccb8f8ef423c",
+              "artifactId" : "ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
               "binding" : {
                 "bindingRevision" : 1,
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
-              "byteCount" : 529,
+              "byteCount" : 457,
               "createdAtUtc" : "2026-09-14T00:00:00Z",
-              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-e52440fb7438dd09bd82755af4c243a9",
+              "lease" : "lease-v1:job-73b1cb9a96d12a0ea736a065afdf5abd:ART-fe7c6f4cae95dc23bc7f2fe38af3aac1",
               "mediaType" : "application/json",
-              "name" : "binding-snapshot.json",
+              "name" : "device-facts.json",
               "observationWindow" : {
                 "endUtc" : "2026-09-14T00:00:00.000Z",
                 "startUtc" : "2026-09-14T00:00:00.000Z"

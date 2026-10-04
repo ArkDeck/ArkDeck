@@ -1238,6 +1238,10 @@ fn sample(grammar: &Value) -> String {
         Some("pattern") if grammar["pattern"] == CONTROL_REQUEST_ID_PATTERN => {
             FIXTURE_CONTROL_REQUEST_ID.into()
         }
+        Some("pattern") if grammar["pattern"] == "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" => {
+            "marker-1".into()
+        }
+        Some("pattern") if grammar["pattern"] == "^[A-Za-z0-9 ._-]{1,64}$" => "slow frame".into(),
         Some("duration") if number("maximumMilliseconds") >= 1000 => "1s".into(),
         Some("duration") => "1ms".into(),
         _ => panic!("no sample for the grammar {grammar}"),

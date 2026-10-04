@@ -9,7 +9,7 @@
       "result" : {
         "authorizationPolicy" : "defaultReadOnly",
         "bindingRevision" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "dispatchDisposition" : "notDispatched",
         "effectiveEffect" : "hostOnly",
         "executionMode" : "planOnly",
@@ -17,7 +17,7 @@
           "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602"
         },
         "jobAdmitted" : false,
-        "materializedPlanDigest" : "a1e2c6fa72be5f25b7519a06e898556cd57c63d745f74fd43740918d56669d04",
+        "materializedPlanDigest" : "1bc4a5bb4c49cb13f76a668d883340144fe831a2e89400909b2bf333b166756f",
         "operation" : "analyzer.summarize-trace@1",
         "providerAdmissionBlocker" : null,
         "providerId" : "analyzer",
@@ -99,7 +99,7 @@
       "result" : {
         "authorizationPolicy" : "defaultReadOnly",
         "bindingRevision" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "dispatchDisposition" : "notDispatched",
         "effectiveEffect" : "hostOnly",
         "executionMode" : "planOnly",
@@ -107,7 +107,7 @@
           "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602"
         },
         "jobAdmitted" : false,
-        "materializedPlanDigest" : "a1e2c6fa72be5f25b7519a06e898556cd57c63d745f74fd43740918d56669d04",
+        "materializedPlanDigest" : "1bc4a5bb4c49cb13f76a668d883340144fe831a2e89400909b2bf333b166756f",
         "operation" : "analyzer.summarize-trace@1",
         "providerAdmissionBlocker" : null,
         "providerId" : "analyzer",

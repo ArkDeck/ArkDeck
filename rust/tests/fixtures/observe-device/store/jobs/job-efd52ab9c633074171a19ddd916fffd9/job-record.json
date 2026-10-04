@@ -9,12 +9,12 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-efd52ab9c633074171a19ddd916fffd9",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "79fe36f61a71d4852c51b00f784085ec0139b552191bd2b89d6060bec49b3d6a",
+  "materializedPlanDigest" : "6108a1cd694306f9ac6aeb18f5a7f95c1a8a4a1d1a81a758374d2ec329bc70fe",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationFailure" : {
     "category" : "execution",
@@ -67,11 +67,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
     "checkpointSeal" : {
       "byteCount" : "3941",
       "lastSequence" : 8,
-      "sha256" : "ba7df820f0b379aca12b932d4df1e0d5fefbb8cb983d4b399b059771632a8d91"
+      "sha256" : "740a2e88f8ae26dba9d79c1784be8056a2f2f159ebcb8c8bd03e3161c33e0d56"
     },
     "claims" : [
       {
@@ -87,20 +87,20 @@
     "journalSeal" : {
       "byteCount" : "4323",
       "lastSequence" : 9,
-      "sha256" : "7ab5b68b07f356dadd129e8adf97de4e6f1c6b8f8c92feafc04e0db5f112ce48"
+      "sha256" : "bc5f1b52b6decc9d90161f171f45ab4d1e311a362ab819e6b8ff52fe3fc01837"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "2053",
-      "manifestSHA256" : "25a764b8647cfa1bd749a41f46a062c03ac013c2a9bc9f064f530df54671ed1d",
+      "manifestSHA256" : "c19b0db5cb7783526e748de184cc7513ac27ad2c74a3d471096ca5b42f8ac836",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "failed"
     },
     "receipt" : {
       "catalogGeneration" : "2",
-      "manifestSHA256" : "25a764b8647cfa1bd749a41f46a062c03ac013c2a9bc9f064f530df54671ed1d",
+      "manifestSHA256" : "c19b0db5cb7783526e748de184cc7513ac27ad2c74a3d471096ca5b42f8ac836",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-efd52ab9c633074171a19ddd916fffd9",
@@ -128,7 +128,7 @@
     "reason: steps-start",
     "intent probe-host-tool",
     "verified probe-host-tool [\"toolVersion\"]",
-    "artifact tool-facts.json -> ART-63c82e050bba706e7dfa70fda0e3f32d",
+    "artifact tool-facts.json -> ART-3ce2a607dafcc986e13ed6c5a96d9b24",
     "intent probe-hdc-server",
     "failed probe-hdc-server: serverVersionMismatch: client 3.2.0d vs server 3.2.0f",
     "running->finalizing",

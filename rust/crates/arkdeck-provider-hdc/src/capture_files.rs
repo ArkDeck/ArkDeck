@@ -545,6 +545,12 @@ pub enum FileAction {
         request: TraceRequest,
         path: OwnedRemotePath,
     },
+    /// A reviewed interactive session. Its host wait requires a live Runtime
+    /// owner; generic process-sequence execution refuses it before dispatch.
+    CaptureDiagnosticTrace {
+        request: TraceRequest,
+        path: OwnedRemotePath,
+    },
     CaptureComponentTree {
         path: OwnedRemotePath,
     },
@@ -749,6 +755,15 @@ impl FileAction {
                 )))
             }
             "captureRemoteFile" => match step_id {
+                "capture-session-trace" => {
+                    let mut request = trace_request(inputs, job_id)?;
+                    request.ring_buffered = true;
+                    request.coverage_anchor = Some(TraceRequest::anchor(job_id, step_id));
+                    Ok(Some(Self::CaptureDiagnosticTrace {
+                        request,
+                        path: OwnedRemotePath::stable(job_id, "capture-trace", ImageType::Png)?,
+                    }))
+                }
                 "capture-screen-sequence" => Ok(Some(Self::CaptureScreenSequence {
                     request: screen_sequence_request(inputs)?,
                     frames: OwnedRemoteDirectory::stable_frames(job_id, "capture-screen-sequence")?,
@@ -840,6 +855,7 @@ impl FileAction {
             | Self::ObserveApplicationLiveness(_)
             | Self::ReceiveOwnedArtifact(_) => "readOnly",
             Self::CaptureTrace { .. }
+            | Self::CaptureDiagnosticTrace { .. }
             | Self::CaptureComponentTree { .. }
             | Self::CaptureScreenshot { .. }
             | Self::CaptureScreenSequence { .. }
@@ -989,7 +1005,8 @@ impl FileAction {
                 }
                 ("hdc.observeApplicationLiveness", arguments)
             }
-            Self::CaptureTrace { request, path } => {
+            Self::CaptureTrace { request, path }
+            | Self::CaptureDiagnosticTrace { request, path } => {
                 let mut arguments = path_arguments(path);
                 arguments.push((
                     "durationSeconds",
@@ -997,7 +1014,14 @@ impl FileAction {
                 ));
                 arguments.push(("categories", Persisted::Texts(request.categories.clone())));
                 arguments.push(("bufferKB", Persisted::Integer(request.buffer_kb)));
-                ("hdc.captureTrace", arguments)
+                if matches!(self, Self::CaptureDiagnosticTrace { .. }) {
+                    if let Some(anchor) = &request.coverage_anchor {
+                        arguments.push(("coverageAnchor", text(anchor)));
+                    }
+                    ("hdc.captureDiagnosticTrace", arguments)
+                } else {
+                    ("hdc.captureTrace", arguments)
+                }
             }
             Self::CaptureComponentTree { path } => {
                 ("hdc.captureComponentTree", path_arguments(path))
@@ -1136,6 +1160,14 @@ impl FileAction {
             ),
             Self::ObserveApplicationLiveness(request) => {
                 process(owned(&["shell", "pidof", &request.process_name]), 30)
+            }
+            Self::CaptureDiagnosticTrace { request, path } => {
+                return crate::diagnostic_trace::lower(
+                    request,
+                    path,
+                    connect_key,
+                    host_receive_root,
+                );
             }
             Self::CaptureTrace { request, path } if request.ring_buffered => {
                 // Arm, let the window pass, snapshot, stop. `--overwrite` is
@@ -1429,10 +1461,13 @@ impl FileAction {
                 verified([("byteCount", process.stdout.len().to_string())])
             }
             Self::ObserveApplicationLiveness(request) => liveness(request, receipt, now_utc),
-            Self::CaptureTrace { request, path } => {
+            Self::CaptureTrace { request, path }
+            | Self::CaptureDiagnosticTrace { request, path } => {
                 // begin, [write anchor, read anchor,] window, dump, stop,
                 // readback — or the blocking capture and its readback.
-                let expected = if request.ring_buffered {
+                let expected = if matches!(self, Self::CaptureDiagnosticTrace { .. }) {
+                    6
+                } else if request.ring_buffered {
                     if request.coverage_anchor.is_none() {
                         5
                     } else {
@@ -1915,6 +1950,13 @@ impl HostLanding {
 pub enum FilePlan {
     Process(ProcessPlan),
     Sequence(Vec<Invocation>),
+    /// All device invocations are materialized before admission. Only the
+    /// intervening host wait can be shortened by a Runtime stop request.
+    DiagnosticTrace {
+        arm: Vec<Invocation>,
+        finalize: Vec<Invocation>,
+        maximum_seconds: u64,
+    },
     Receive {
         process: ProcessPlan,
         landing: HostLanding,
@@ -1938,6 +1980,9 @@ pub struct FileReceipt {
 /// a clean exit is not evidence that anything landed.
 pub fn run(plan: &FilePlan, dispatch: &dyn HdcDispatch) -> Result<FileReceipt, DispatchFailure> {
     match plan {
+        FilePlan::DiagnosticTrace { .. } => Err(DispatchFailure::Refused(
+            "interactive trace requires its live Runtime session owner".into(),
+        )),
         FilePlan::Process(process) => Ok(FileReceipt {
             subprocesses: vec![dispatch.dispatch(process)?],
             landed: None,
@@ -2220,6 +2265,9 @@ mod tests {
 
     fn arguments(plan: &FilePlan) -> Vec<Vec<String>> {
         match plan {
+            FilePlan::DiagnosticTrace { .. } => {
+                panic!("legacy capture must not use interactive session lowering")
+            }
             FilePlan::Process(process) | FilePlan::Receive { process, .. } => {
                 vec![process.arguments.clone()]
             }

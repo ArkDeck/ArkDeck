@@ -8,11 +8,11 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-14T00:00:00Z",
-    "consumptionFingerprintSHA256" : "4fb43ec693484f344c4e90f528d90a3e1d375f3f65a8d7c0fa1e049355f1f613",
+    "consumptionFingerprintSHA256" : "758e395aafc2ee7b55c4e0c246e6a87ba88f896beafbb62fcb17103882e33e52",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-B37795A1F67EDD9D19B7AA389F40D11C8C16EB5E-G1",
+    "reference" : "CAP-RT-POLICY-940E23EAF59E9E265C9B5B3A7BC46343F93EDF79-G1",
     "runtimeCapabilityCorrelation" : {
-      "planDigestSHA256" : "16ec839eade2e6a79636947ccdc59bf4e3e9bba6cb6f99467be66749a9041216",
+      "planDigestSHA256" : "7e2baff998fb2b3210f15e520a1b7ea06784369acb2cfede4cde6964eb9ed391",
       "reservationID" : "idem-mutation-create",
       "stepSetDigestSHA256" : "068433ae9d92331b016464f50ab9e956c2c8423491fc97b453527e0d04916072",
       "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
@@ -20,7 +20,7 @@
     },
     "validUntilUTC" : "2026-10-14T00:00:00Z"
   },
-  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -85,7 +85,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-a698aa1a3cd135705e7c507b8c7cf27a",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "16ec839eade2e6a79636947ccdc59bf4e3e9bba6cb6f99467be66749a9041216",
+  "materializedPlanDigest" : "7e2baff998fb2b3210f15e520a1b7ea06784369acb2cfede4cde6964eb9ed391",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "port-forward.create@1",
   "originalSubmissionRequest" : {
@@ -114,7 +114,7 @@
   "providerID" : "hdc",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-B37795A1F67EDD9D19B7AA389F40D11C8C16EB5E-G1"
+      "capabilityId" : "CAP-RT-POLICY-940E23EAF59E9E265C9B5B3A7BC46343F93EDF79-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-mutation-create",
@@ -138,11 +138,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
     "checkpointSeal" : {
       "byteCount" : "10860",
       "lastSequence" : 20,
-      "sha256" : "ac78be5f5d30196d584fe255d00b2250c5f7a69989d4037c474330e056b702c7"
+      "sha256" : "51c772660815298e7f8ef3c170dbe0c0a8377a1f7516986f4e794bdc0c65235d"
     },
     "claims" : [
       {
@@ -158,20 +158,20 @@
     "journalSeal" : {
       "byteCount" : "11246",
       "lastSequence" : 21,
-      "sha256" : "32524f0d6b14151f7755d9df50040b7c5e1e93766180324299bb8f94eecf9f29"
+      "sha256" : "83abdf293c9b1cfd4768d34ec89ea243bcb6a82d541d50f71b8ddb25e7e8bdc5"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "5073",
-      "manifestSHA256" : "0a880b2ef401b32c908fff1092bc8d1437ff309f072c6da8fca745e549d3d0dd",
+      "manifestSHA256" : "80e4cf25cdc7386dd738893018072b89f328c39bad7a3897a22a42bea6d55bc4",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "succeeded"
     },
     "receipt" : {
       "catalogGeneration" : "1",
-      "manifestSHA256" : "0a880b2ef401b32c908fff1092bc8d1437ff309f072c6da8fca745e549d3d0dd",
+      "manifestSHA256" : "80e4cf25cdc7386dd738893018072b89f328c39bad7a3897a22a42bea6d55bc4",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-a698aa1a3cd135705e7c507b8c7cf27a",
@@ -227,7 +227,7 @@
     "resume skipped journal-confirmed step create-port-rule",
     "intent verify-port-rule",
     "verified verify-port-rule [\"present\"]",
-    "artifact port-rule-readback.json -> ART-12147a80c59beb44fa66e29c95f47e51",
+    "artifact port-rule-readback.json -> ART-557b74006b5c818c0fabf4aa4965116c",
     "host-step finalize-session",
     "running->finalizing",
     "reason: steps-complete",

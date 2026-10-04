@@ -179,6 +179,19 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// Runtime-owned bounded host annotations and stop signalling. No method
+    /// here admits or starts a device operation.
+    fn diagnostic_session_control(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "Diagnostic Session control is unavailable in this composition".into(),
+            details: None,
+        })
+    }
     /// `job.reconcile` reconciles a Job whose outcome is unknown against its
     /// durable intent. A host without a Job owner that reconciles answers as
     /// the read-only foundation always has.
@@ -1201,6 +1214,14 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.job_cancel(&params),
             },
+            "diagnostic.session.status" | "diagnostic.session.mark" | "diagnostic.session.stop" => {
+                Response {
+                    id: request.id.clone(),
+                    outcome: self
+                        .host
+                        .diagnostic_session_control(&request.method, &params),
+                }
+            }
             "job.reconcile" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_reconcile(&params),

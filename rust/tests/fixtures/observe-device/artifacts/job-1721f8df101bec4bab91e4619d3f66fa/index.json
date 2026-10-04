@@ -1,7 +1,7 @@
 {
   "artifacts" : [
     {
-      "artifactID" : "ART-1908ae395d242542eaf36e6a196d217f",
+      "artifactID" : "ART-bf021de4e9cd3a274bdeaea0aeec6efe",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -25,7 +25,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-1721f8df101bec4bab91e4619d3f66fa",
-      "sha256" : "7e95f1bca39de970e898f58f94b41d32b261958f94096a4d70e446e4a8049dd6",
+      "sha256" : "474fdc9fcb352b89a93feed345c0dacbcf801ec80df075282fdb8e53c4eec71e",
       "sourceOperation" : "observe.device@1",
       "status" : {
         "published" : {

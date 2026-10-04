@@ -120,3 +120,22 @@ values. The three Windows resource consumers are regenerated. The 29-line
 Logs remain under `/tmp/arkdeck-macos-closeout-20261004/`. The compatibility
 commit is not an amendment of the green head; fresh CI and maintainer review are
 required for its combined tree.
+
+## Conflict resolution after Diagnostic Session publication
+
+Main `535f0de85` includes Diagnostic Session and Windows History handoff. The
+merge keeps both the recovery test module and the new diagnostic ingress test,
+and combines all 12 recovery resource keys with main before regenerating the
+three Windows consumers. No recovery admission or continuation logic changed.
+
+### Local targeted checks
+
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd --bin arkdeck-agentd app_ingress_tests::`: 40 tests passed, exit 0 (`/tmp/arkdeck-macos-closeout-20261004/recovery-main3-rust.log`).
+- `CARGO_BUILD_JOBS=2 cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-agentd --all-targets -- -D warnings`: exit 0 (`recovery-main3-clippy.log`).
+- String generation and consumer checks: 1,275 resources, 46 snapshots and 286 references pass (`recovery-main3-strings.log`). The initial invocation used a nonexistent generator filename and wrote nothing; the documented `generate-ui-strings.py` invocation succeeded.
+- Rust formatting, SDD and diff checks: exit 0 (`recovery-main3-sdd.log`, zero errors/warnings). The App/recovery Swift sources were not manually changed, so their checks were not repeated locally for the test/resource-only conflict resolution. Full selected validation runs in PR CI.
+
+### CI
+
+PR #2467 receives a new merge commit and fresh CI. Prior results are not claimed
+for the new head. No device operation or runtime-authority write was performed.

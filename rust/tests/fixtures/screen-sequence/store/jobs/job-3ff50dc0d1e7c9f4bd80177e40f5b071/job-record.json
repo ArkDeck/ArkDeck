@@ -8,11 +8,11 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-14T00:00:00Z",
-    "consumptionFingerprintSHA256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+    "consumptionFingerprintSHA256" : "6350ddb49b198320d6539bdaa94d5326c69b92dfe0569b00ba16ececf2397cdb",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+    "reference" : "CAP-RT-POLICY-89611507948F6C0E0B8099F0E2A7D5B7DDC7902B-G1",
     "runtimeCapabilityCorrelation" : {
-      "planDigestSHA256" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+      "planDigestSHA256" : "cef47cf62e1202fb871234820f8bd7e4c746357d4999dfd5be068fdea2bbdc3b",
       "reservationID" : "idem-sequence-missingArchive",
       "stepSetDigestSHA256" : "230da2ccfdced221f7c0251792a33dfb4555dff58670a887d3e534b419583cd8",
       "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
@@ -20,13 +20,13 @@
     },
     "validUntilUTC" : "2026-10-14T00:00:00Z"
   },
-  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-3ff50dc0d1e7c9f4bd80177e40f5b071",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+  "materializedPlanDigest" : "cef47cf62e1202fb871234820f8bd7e4c746357d4999dfd5be068fdea2bbdc3b",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationFailure" : {
     "category" : "unknownOutcome",
@@ -74,7 +74,7 @@
   "recoveryStepID" : "capture-screen-sequence",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1"
+      "capabilityId" : "CAP-RT-POLICY-89611507948F6C0E0B8099F0E2A7D5B7DDC7902B-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-sequence-missingArchive",
