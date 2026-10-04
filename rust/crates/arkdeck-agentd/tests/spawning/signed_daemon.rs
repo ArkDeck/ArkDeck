@@ -59,6 +59,11 @@ pub(crate) const HELPER: &str = "ARKDECK_TEST_SIGNED_DAEMON_HELPER";
 /// observation of the fake's device is proved the adopted Target's, as a
 /// registered HDC's composition proves it over the Runtime's own census.
 pub(crate) const BOARD: &str = "ARKDECK_TEST_SIGNED_DAEMON_BOARD";
+/// Set (to anything) for the diagnostic-session oracle's fake: the Trace
+/// legs' answers, with the long recording's start and finish answered in the
+/// ring lifecycle vocabulary the oracle's producer adapted them to
+/// ([`RingVocabulary`]).
+pub(crate) const RING_VOCABULARY: &str = "ARKDECK_TEST_SIGNED_DAEMON_RING_VOCABULARY";
 /// The child's test, by its full name.
 const CHILD: &str = "signed_daemon::the_signed_test_daemon";
 /// As `arkdeck-agentd`'s (`src/main.rs`).
@@ -142,10 +147,14 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
     let answers =
         oracle_fake::Answers::of(&std::fs::read_to_string(fixture.join("hdc-answers.sh"))?);
     let tool_sha256 = arkdeck_contract::sha256_hex(&std::fs::read(fixture.join("hdc"))?);
-    let host = host.with_test_hdc(
-        Arc::new(oracle_fake::OracleFake::new(fake_root, answers)),
-        &tool_sha256,
-    );
+    let fake = oracle_fake::OracleFake::new(fake_root, answers);
+    let fake: Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync> =
+        if std::env::var_os(RING_VOCABULARY).is_some() {
+            Arc::new(RingVocabulary(fake))
+        } else {
+            Arc::new(fake)
+        };
+    let host = host.with_test_hdc(fake, &tool_sha256);
     // The board the fake's device is, in its HDC-normal personality on one
     // port with one attachment, as the census reads a present DAYU200.
     let host = match std::env::var(BOARD) {
@@ -197,6 +206,37 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
     println!("arkdeck-agentd stopped");
     let _ = std::io::Write::flush(&mut std::io::stdout());
     Ok(())
+}
+
+/// The shared fake, with the long recording's start and finish answered as
+/// the diagnostic-session oracle's producer answered them
+/// (`arkdeck-hoststore/tests/capture_diagnostics.rs`,
+/// `diagnostic_session_publishes_host_marks_and_stops_after_an_unknown_anchor`):
+/// the Swift fake's Trace answers predate the observed ring lifecycle
+/// vocabulary. Every call is still the fake's, logged and answered by it.
+struct RingVocabulary(oracle_fake::OracleFake);
+
+impl arkdeck_provider_hdc::HdcDispatch for RingVocabulary {
+    fn mutation_identity_current(&self) -> bool {
+        arkdeck_provider_hdc::HdcDispatch::mutation_identity_current(&self.0)
+    }
+
+    fn dispatch(
+        &self,
+        plan: &arkdeck_provider_hdc::ProcessPlan,
+    ) -> Result<arkdeck_provider_hdc::Receipt, arkdeck_provider_hdc::DispatchFailure> {
+        let mut receipt = arkdeck_provider_hdc::HdcDispatch::dispatch(&self.0, plan)?;
+        if plan.arguments.iter().any(|arg| arg == "--trace_begin") {
+            receipt.stdout = b"OpenRecording done\n".to_vec();
+        } else if plan
+            .arguments
+            .iter()
+            .any(|arg| arg == "--trace_finish_nodump")
+        {
+            receipt.stdout = b"end capture trace.\n".to_vec();
+        }
+        Ok(receipt)
+    }
 }
 
 /// The helper `cases.json` recorded, at the replay root's
@@ -406,8 +446,41 @@ impl SignedDaemon {
     /// its signer pin (or `pin`, when given) as it verifies an installed
     /// daemon: its exit status and its JSON envelope.
     pub(crate) fn cli_pinned(&self, pin: &str, arguments: &[&str]) -> (Option<i32>, Value) {
-        let cli = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")).with_file_name("arkdeck.exe");
-        let mut command = Command::new(&cli);
+        let output = self
+            .command(pin, arguments)
+            .output()
+            .unwrap_or_else(|error| {
+                panic!(
+                    "the arkdeck CLI beside the daemon ({}): {error}; run the workspace tests, \
+                 or `cargo build -p arkdeck-cli` before testing this crate alone",
+                    cli().display()
+                )
+            });
+        envelope(arguments, &output)
+    }
+
+    /// [`Self::cli`], started and left running: its exit status and its
+    /// envelope are read by [`Running::finish`], while other requests are
+    /// sent to the same daemon.
+    pub(crate) fn cli_running(&self, arguments: &[&str]) -> Running {
+        let child = self
+            .command(&self.pin, arguments)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap_or_else(|error| panic!("the arkdeck CLI ({}): {error}", cli().display()));
+        Running {
+            arguments: arguments
+                .iter()
+                .map(|argument| (*argument).to_owned())
+                .collect(),
+            child,
+        }
+    }
+
+    /// The real CLI's invocation against this daemon's pipe, under `pin`.
+    fn command(&self, pin: &str, arguments: &[&str]) -> Command {
+        let mut command = Command::new(cli());
         for (key, _) in std::env::vars_os() {
             if key
                 .to_string_lossy()
@@ -417,24 +490,14 @@ impl SignedDaemon {
                 command.env_remove(key);
             }
         }
-        let output = command
+        command
             .args(arguments)
             .args(["--output", "json"])
             .env("ARKDECK_ENDPOINT", &self.pipe)
             .env("ARKDECK_DAEMON_PATH", &self.executable)
             .env("ARKDECK_DAEMON_SIGNER_SHA256", pin)
-            .stdin(Stdio::null())
-            .output()
-            .unwrap_or_else(|error| {
-                panic!(
-                    "the arkdeck CLI beside the daemon ({}): {error}; run the workspace tests, \
-                     or `cargo build -p arkdeck-cli` before testing this crate alone",
-                    cli.display()
-                )
-            });
-        let envelope = serde_json::from_slice(&output.stdout)
-            .unwrap_or_else(|_| panic!("{arguments:?}: {output:?}"));
-        (output.status.code(), envelope)
+            .stdin(Stdio::null());
+        command
     }
 
     /// The pipe it serves, as it printed it.
@@ -468,6 +531,35 @@ impl SignedDaemon {
             std::thread::sleep(Duration::from_millis(50));
         };
         assert!(status.success(), "{status:?}");
+    }
+}
+
+/// The real CLI beside the daemon's test build.
+fn cli() -> PathBuf {
+    Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")).with_file_name("arkdeck.exe")
+}
+
+/// A finished CLI's exit status and its JSON envelope.
+fn envelope(
+    arguments: &[impl std::fmt::Debug],
+    output: &std::process::Output,
+) -> (Option<i32>, Value) {
+    let envelope = serde_json::from_slice(&output.stdout)
+        .unwrap_or_else(|_| panic!("{arguments:?}: {output:?}"));
+    (output.status.code(), envelope)
+}
+
+/// A CLI left running ([`SignedDaemon::cli_running`]).
+pub(crate) struct Running {
+    arguments: Vec<String>,
+    child: Child,
+}
+
+impl Running {
+    /// Waits for its end: its exit status and its envelope.
+    pub(crate) fn finish(self) -> (Option<i32>, Value) {
+        let output = self.child.wait_with_output().unwrap();
+        envelope(&self.arguments, &output)
     }
 }
 

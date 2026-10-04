@@ -118,6 +118,8 @@ mod debug_leaves_cli;
 mod debug_probe_replay;
 #[cfg(target_os = "macos")]
 mod debug_read_control;
+#[cfg(windows)]
+mod diagnostic_session_cli;
 mod flash_broker_control;
 mod flash_execution_control;
 mod flash_host_facts_control;
