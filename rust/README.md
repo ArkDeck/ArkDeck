@@ -2924,11 +2924,38 @@ signing pin (`ARKDECK_DAEMON_SIGNER_SHA256` or the publisher identity) before
 Credential Manager is opened. `migrate-deveco` and `install --build-profile`,
 which read DevEco's encrypted password material, are `unsupportedOnPlatform`
 on Windows. The installed Windows daemon composes the workspace presets'
-credential pinning over the account's preset root, bound to its own image; the
-signing dispatch (the workspace composition) stays macOS-only, and Windows
-attempts go under `SigningPresetStore::attempts_root` (`<preset root>\Attempts`).
+credential pinning over the account's preset root, bound to its own image, and
+Windows attempts go under `SigningPresetStore::attempts_root`
+(`<preset root>\Attempts`).
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-leaves-run.md`.
+
+`workspace.sign-openharmony-hap@1` runs end to end on Windows through the
+planner, admitter, runner, reconciler and result reader. `cargo test -p
+arkdeck-hoststore --test windows_workspace_sign_oracle` (`harness = false`)
+replays the Swift sign oracle (`tests/fixtures/workspace-sign-oracle`, 19
+frames), with the same root layout under the temporary directory. The test
+binary plays `hap-signer.sh` as `tools\java.exe` on a pseudo console.
+
+Every answer must be Swift's, and so must the two parked records, the
+credential owner's ledger and the signed HAPs and reports. Before comparing,
+the test relabels what differs only because of the host (rulings 48 and 61):
+
+- the stand-in Java's SHA-256 and byte count;
+- the 9 digests derived from them: the credential reference, three plan
+  digests, two signing reports and their Artifact IDs;
+- the root's spelling;
+- the console's `observedOutputBytes`.
+
+No material, input or signed-HAP digest is relabelled. The test also covers the
+macOS replay's checks: a parked Job is never signed again, a drifted
+certificate refuses before the signer runs, attempt directories are removed,
+neither password reaches any file, and results read back after the owners
+close.
+
+Signing has no presence gate on either platform. Runtime reads are never
+interactive: `interactionNotAllowed` on macOS, and `CredReadW` never prompts
+on Windows.
 
 ## Windows DevEco toolchain registration (TASK-XPA-011)
 

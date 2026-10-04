@@ -51,3 +51,9 @@ arkforge-platform.workspace = true
 
 [lints]
 workspace = true
+
+# The Windows replay of the signing oracle runs this test binary as the
+# stand-in Java launcher (TASK-XPA-011).
+[[test]]
+name = "windows_workspace_sign_oracle"
+harness = false
