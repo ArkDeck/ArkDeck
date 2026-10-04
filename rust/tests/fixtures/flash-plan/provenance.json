@@ -1,10 +1,29 @@
 {
-  "producer" : "FlashPlanOracleContractTests",
-  "root" : "/private/tmp/arkdeck-flash-plan-oracle",
-  "steps" : [
+  "producer": "FlashPlanOracleContractTests",
+  "root": "/private/tmp/arkdeck-flash-plan-oracle",
+  "steps": [
     "artifact.import (flash-bundle, production policy)",
     "RuntimeControlPlaneHandler job.plan",
     "RuntimeJobEngine.planOnly",
     "ArkForgeNativeRockchipControlDispatcher.unavailableReason (dispatch.json)"
-  ]
+  ],
+  "catalogRegeneration": "../catalog-extension-recording.json",
+  "files": {
+    "cases.json": "e1b09627223c8cfd6f6e679cd9b0c6f30622c8b4621dc6790c0b7a505eb93130",
+    "dispatch.json": "ec188b02d9da21a2fef79736de34de500593ac26a5b347284289c7aa2503f46f",
+    "inputs/artifacts/.imports-v1/identities/imp-2f8a673f-e23d-46c4-900c-f0b7703a0958.json": "8838d058f478f846e2403ceebabdc436a1c43b4e03d8b9fd6dd21c34eb06b337",
+    "inputs/artifacts/.imports-v1/identities/imp-b4d63b95-1aab-424e-ad67-69c9efe730b7.json": "6916723160bb9ac31e63b61fcd43d706fd559e20bbc10a673439c10c45684ffb",
+    "inputs/artifacts/.imports-v1/records/a395fa591aee0d71c83dfa0d5e8e101b9724a798df010c1176553e8723fc44de.json": "e965e4f5f259f3a69cf19129fc3d17d564dd28acda34d5b470ea1697e028ed64",
+    "inputs/artifacts/.imports-v1/records/c9fb7ddac13d397e993e9adc231b0c276f673f514b60f4c8d5eca446aa06cdc6.json": "5235a8b59569ce806805d94af34d011f00b4693bacf1eaaaa997b0f93cca68a4",
+    "inputs/artifacts/imp-2f8a673f-e23d-46c4-900c-f0b7703a0958/.payload-verification-v1.json": "ca2677a8572ae10701f5714b3732c128bf05fc35b53f68c598669072729a539c",
+    "inputs/artifacts/imp-2f8a673f-e23d-46c4-900c-f0b7703a0958/ART-cb0055510a6e851728044f19ae2d72d3": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "inputs/artifacts/imp-2f8a673f-e23d-46c4-900c-f0b7703a0958/index.json": "85828239717019a778af13d67a572eeabf0cd43f3c4938f5d7040619e673013a",
+    "inputs/artifacts/imp-b4d63b95-1aab-424e-ad67-69c9efe730b7/.payload-verification-v1.json": "4cbcab9f19fe7b92e163f967c6149e0fdf55217c1985db8197ada3a45d07a756",
+    "inputs/artifacts/imp-b4d63b95-1aab-424e-ad67-69c9efe730b7/ART-9203009a92c0e6e7aa3476a8296af142": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "inputs/artifacts/imp-b4d63b95-1aab-424e-ad67-69c9efe730b7/index.json": "0c73e7fa7fe6442dc784fdfca9cede64408c56b8f3e111ebf2dc0a9223503943",
+    "inputs/targets/.target-display-names.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inputs/targets/.targets.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inputs/targets/target-display-names.json": "75b50df5a3c0623ccfd44fb9f522003c4dfafb7e07a98a34f91ce96b8150d36d",
+    "inputs/targets/targets.json": "1b7a8921bd260a26bb5385dc82d73130366f7404b73e3faf8be0e66447798ee6"
+  }
 }

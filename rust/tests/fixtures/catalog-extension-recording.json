@@ -1,8 +1,8 @@
 {
   "scope": "Synthetic provider fixtures only; no hardware acceptance or usable Runtime authority.",
   "sourceCommit": "2f75ae8e51b1f16bc293186683c2e592abd97e89",
-  "sourceChange": "Only Catalog/ and the generated RuntimeOperationCatalogGenerated.swift are overlaid from CHG-2026-079. All Swift Runtime implementation and producer assertions are unchanged.",
-  "catalogDigest": "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "sourceChange": "Catalog/, RuntimeOperationCatalogGenerated.swift and the shared WorkflowStep.swift contract are overlaid from combined CHG-2026-079 and CHG-2026-080. The historical HostStoreStepShadowFixtures switch adds a fail-fast branch for the new keyboard case solely to compile; this test is not recorded. All Runtime, Provider and selected producer test implementations are unchanged.",
+  "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "recordedOn": "2026-10-04",
   "producerTestsPassed": 40,
   "fixtures": [
@@ -161,20 +161,20 @@
   ],
   "producers": [
     {
-      "testClass": "AgentExecutionAnalyzerOracleContractTests",
-      "outputs": [
-        {
-          "environment": "ARKDECK_RUST_AGENT_EXECUTION_ANALYZER_RECORD",
-          "fixture": "agent-execution-analyzer"
-        }
-      ]
-    },
-    {
       "testClass": "AgentExecutionOracleContractTests",
       "outputs": [
         {
           "environment": "ARKDECK_RUST_AGENT_EXECUTION_RECORD",
           "fixture": "agent-execution"
+        }
+      ]
+    },
+    {
+      "testClass": "AgentExecutionAnalyzerOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_AGENT_EXECUTION_ANALYZER_RECORD",
+          "fixture": "agent-execution-analyzer"
         }
       ]
     },
@@ -197,20 +197,20 @@
       ]
     },
     {
-      "testClass": "CaptureDiagnosticsFileLegsOracleContractTests",
-      "outputs": [
-        {
-          "environment": "ARKDECK_RUST_CAPTURE_FILE_LEGS_RECORD",
-          "fixture": "capture-diagnostics-file-legs"
-        }
-      ]
-    },
-    {
       "testClass": "CaptureDiagnosticsOracleContractTests",
       "outputs": [
         {
           "environment": "ARKDECK_RUST_CAPTURE_DIAGNOSTICS_RECORD",
           "fixture": "capture-diagnostics"
+        }
+      ]
+    },
+    {
+      "testClass": "CaptureDiagnosticsFileLegsOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_CAPTURE_FILE_LEGS_RECORD",
+          "fixture": "capture-diagnostics-file-legs"
         }
       ]
     },
@@ -305,6 +305,15 @@
       ]
     },
     {
+      "testClass": "JobSubmitAnalyzerOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_JOB_SUBMIT_RECORD",
+          "fixture": "job-submit-analyzer"
+        }
+      ]
+    },
+    {
       "testClass": "JobRunAnalyzerOracleContractTests",
       "outputs": [
         {
@@ -338,15 +347,6 @@
         {
           "environment": "ARKDECK_RUST_JOB_RECONCILE_RECORD",
           "fixture": "job-reconcile-analyzer"
-        }
-      ]
-    },
-    {
-      "testClass": "JobSubmitAnalyzerOracleContractTests",
-      "outputs": [
-        {
-          "environment": "ARKDECK_RUST_JOB_SUBMIT_RECORD",
-          "fixture": "job-submit-analyzer"
         }
       ]
     },
@@ -468,12 +468,25 @@
       ]
     }
   ],
-  "corpusSelection": {
-    "job-plan-analyzer": "The four plan results come from the current recording; original recorded refusal cases remain unchanged, preserving the original Foundation diagnostic spelling. Selection is documented in its provenance.json."
+  "sourceValidation": {
+    "unchangedSwiftSourceAndTestFiles": 667,
+    "overlays": [
+      {
+        "path": "Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift",
+        "sha256": "6e2170d0db1cba7e7d2ff1e3b459c33fcf6e7854047a539024a5263581346244"
+      },
+      {
+        "path": "Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift",
+        "sha256": "e84e2bacc7d79894cd00d330850bd7eb91f2d09382b0e757c7c2045b1f423672"
+      },
+      {
+        "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/HostStoreStepShadowFixtures.swift",
+        "sha256": "d5e8773f229cda3a3223c21c85b86e0a05f1abab17322314f6ca2c9628144b50"
+      }
+    ]
   },
-  "additionalFrameRecording": {
-    "test": "WorkspaceIsolationOracleContractTests/testTheControlPlanePreparesOneIsolatedCopyAsRecorded",
-    "environment": "ARKDECK_CONTROL_FRAME_LOG=<directory>",
-    "selection": "The four frames from this single test in execution order; the existing snapshot recorder records only tree.json and workspace.json."
+  "corpusSelection": {
+    "job-plan-analyzer": "Successful plan results come from the current recording; original recorded refusals retain their diagnostic wording.",
+    "workspace-isolation-oracle": "Four actual frames selected by isolation-request and its returned jobId from the same successful producer run, in request order."
   }
 }

@@ -27,10 +27,10 @@
 //!
 //! The fake HDC is the oracle's table (`hdc-answers.sh`) answered in process,
 //! by mode, every call logged as the fake logs it; the owners are laid down
-//! owner-only on NTFS. No `hdc` runs and no Windows HDC tuple is registered
-//! or needed: the owners are fed a dispatch directly. The Windows daemon
-//! composes none, so over the wire an execution that must observe a device
-//! is refused before admission (`windows_reconcile_agent_process.rs` reads
+//! owner-only on NTFS. No `hdc` runs and no registered Windows HDC is
+//! needed: the owners are fed a dispatch directly. Over the wire, a Windows
+//! daemon without a composed HDC refuses an execution that must observe a
+//! device before admission (`windows_reconcile_agent_process.rs` reads
 //! the recorded executions there).
 #![cfg(windows)]
 

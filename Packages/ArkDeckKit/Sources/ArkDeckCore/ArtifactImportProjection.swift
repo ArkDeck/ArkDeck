@@ -37,8 +37,9 @@ package struct ArtifactImportProjection: Sendable {
         receipt["generation"] == .string("2"), case .object(let validation)? = receipt["validation"],
         validation["kind"] == .string(intent.kind),
         receipt["mediaType"] == .string(intent.kind == "hap" ? (intent.name.hasSuffix(".hsp") ? "application/vnd.openharmony.hsp" : "application/vnd.openharmony.hap")
+          : intent.kind == "keyboard-input" ? "application/vnd.arkdeck.keyboard-input+json"
           : intent.kind == "workspace-patch" ? "text/x-diff" : intent.kind == "native-library" ? "application/x-elf" : "application/gzip"),
-        receipt["privacy"] == .string(intent.kind == "workspace-patch" ? "sensitive" : "standard") else { throw invalid() }
+        receipt["privacy"] == .string(["workspace-patch", "keyboard-input"].contains(intent.kind) ? "sensitive" : "standard") else { throw invalid() }
     } else { guard fields["receipt"] == .null else { throw invalid() } }
     self.value = value; self.intent = intent; self.id = id; self.generation = generation
     self.state = state; nextOffset = offset; maximumChunkBytes = chunk

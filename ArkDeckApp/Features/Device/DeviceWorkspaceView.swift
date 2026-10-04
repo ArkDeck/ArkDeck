@@ -20,6 +20,9 @@ struct DeviceWorkspaceView: View {
   @State private var isSavingRecording = false
   @State private var workspaceSize = CGSize.zero
   @State private var screenAvailableSize = CGSize.zero
+  @State private var keyboardText = ""
+  @State private var clipboardAllowed = false
+  @State private var selectedDeviceKey: DeviceKeyboardKey = .enter
 
   var body: some View {
     VStack(spacing: 0) {
@@ -56,7 +59,8 @@ struct DeviceWorkspaceView: View {
     }
     .onGeometryChange(for: CGSize.self, of: { $0.size }) { workspaceSize = $0 }
     .task { await model.refresh() }
-    .onDisappear { model.deactivate() }
+    .onDisappear { clearKeyboardDraft(); model.deactivate() }
+    .onChange(of: model.target) { _, _ in clearKeyboardDraft() }
     .alert(
       deviceText("device.record.saveFailed"),
       isPresented: $isSaveErrorPresented
@@ -284,6 +288,8 @@ struct DeviceWorkspaceView: View {
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(16)
       Divider()
+      deviceKeyboardPane
+      Divider()
       recordingPane
       Divider()
       VStack(alignment: .leading, spacing: 8) {
@@ -312,6 +318,54 @@ struct DeviceWorkspaceView: View {
       let request = model.keyboardPointer.request(.tap, frame: frame)
     else { return deviceText("device.frame.none") }
     return "X \(request.x) · Y \(request.y)"
+  }
+
+  private var deviceKeyboardPane: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Text(deviceText("device.input.title")).font(WorkspaceFont.sectionTitle)
+      Text(deviceText("device.input.focusHelp"))
+        .font(WorkspaceFont.caption).foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      Picker(deviceText("device.input.key"), selection: $selectedDeviceKey) {
+        ForEach(DeviceKeyboardKey.allCases, id: \.self) { key in
+          Text(deviceText("device.input.key.\(key.rawValue)")).tag(key)
+        }
+      }
+      .accessibilityIdentifier("device.input.key")
+      Button(deviceText("device.input.sendKey")) {
+        let command = DeviceKeyboardCommand.key(selectedDeviceKey)
+        Task { await model.sendDeviceKeyboard(command) }
+      }
+      .disabled(!model.canSendInput || recording.isBusy)
+      .accessibilityIdentifier("device.input.sendKey")
+      SecureField(deviceText("device.input.text"), text: $keyboardText)
+        .textFieldStyle(.roundedBorder)
+        .privacySensitive()
+        .accessibilityIdentifier("device.input.text")
+      Text("\(keyboardText.utf8.count)/512 UTF-8")
+        .font(WorkspaceFont.caption).monospacedDigit().foregroundStyle(.secondary)
+      Toggle(deviceText("device.input.clipboardConsent"), isOn: $clipboardAllowed)
+        .toggleStyle(.checkbox)
+        .accessibilityIdentifier("device.input.clipboardConsent")
+      Text(deviceText("device.input.privacyHelp"))
+        .font(WorkspaceFont.caption).foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      Button(deviceText("device.input.sendText")) {
+        let command = DeviceKeyboardCommand.text(keyboardText, allowDeviceClipboard: clipboardAllowed)
+        clearKeyboardDraft()
+        Task { await model.sendDeviceKeyboard(command) }
+      }
+      .disabled(!model.canSendInput || recording.isBusy
+        || !DeviceKeyboardCommand.text(keyboardText, allowDeviceClipboard: clipboardAllowed).isValid)
+      .accessibilityIdentifier("device.input.sendText")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(16)
+  }
+
+  private func clearKeyboardDraft() {
+    keyboardText = ""
+    clipboardAllowed = false
   }
 
   private func focusPointer() {

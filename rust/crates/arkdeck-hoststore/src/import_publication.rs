@@ -33,6 +33,13 @@ fn validate_content(
                 .map_err(|_| content_invalid())?;
             json!({"kind":"native-library","abi":facts.abi.raw(),"elfClassBits":facts.elf_class_bits,"machine":facts.machine,"buildId":facts.build_id})
         }
+        "keyboard-input" => {
+            let bytes = file
+                .validator_bytes(arkdeck_contract::KEYBOARD_PAYLOAD_MAX_BYTES, false)
+                .map_err(unreadable)?;
+            arkdeck_contract::KeyboardPayload::decode(&bytes).map_err(|_| content_invalid())?;
+            json!({"kind":"keyboard-input"})
+        }
         "workspace-patch" => {
             let bytes = file
                 .validator_bytes(512 * 1024, false)
@@ -167,7 +174,7 @@ impl ImportUploadStore {
             && (record.app_owned != Some(true)
                 || !matches!(
                     record.intent.kind.as_str(),
-                    "hap" | "native-library" | "flash-bundle"
+                    "hap" | "native-library" | "flash-bundle" | "keyboard-input"
                 ))
         {
             return Err(failure(
@@ -194,7 +201,7 @@ impl ImportUploadStore {
         }
         if !matches!(
             record.intent.kind.as_str(),
-            "hap" | "native-library" | "workspace-patch" | "flash-bundle"
+            "hap" | "native-library" | "workspace-patch" | "flash-bundle" | "keyboard-input"
         ) {
             return Err(failure(
                 "operationUnavailable",

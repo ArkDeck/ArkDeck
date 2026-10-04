@@ -122,19 +122,44 @@ public sealed class PipeAuthenticationTests
         var busy = Assert.ThrowsExactly<ServerAuthenticationException>(() => PipeConnector.Connect(new PipeEndpoint(endpoint), OwnImage()));
         StringAssert.Contains(busy.Message, "(Win32 error 231)", "without a wait, a busy pipe is refused at once");
 
-        // The server offers its next instance a moment later: the waiting open gets it and the
-        // connection proceeds to authentication (which refuses this unsigned test process).
+        // The server offers its next instance only once the client says it is waiting for one
+        // (not after a guessed delay): the waiting open gets it and the connection proceeds to
+        // authentication, which refuses this unsigned test process. The budget is the client's
+        // own: the signal carries what is left of it, and it must be within what was given.
+        // The instance is offered from another thread, so the kernel wait may or may not have
+        // begun by then; both orders must end on the offered instance.
+        var budget = TimeSpan.FromSeconds(30);
+        var waits = new List<long>();
+        var waiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var offered = Task.Run(async () =>
         {
-            await Task.Delay(300);
-            var next = new NamedPipeServerStream(name, PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-            await next.WaitForConnectionAsync();
-            return next;
+            await waiting.Task;
+            return new NamedPipeServerStream(name, PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
         });
         var waited = Assert.ThrowsExactly<ServerAuthenticationException>(() =>
-            PipeConnector.Connect(new PipeEndpoint(endpoint), OwnImage(new string('0', 64)), TimeSpan.FromSeconds(5)));
+            PipeConnector.Connect(new PipeEndpoint(endpoint), OwnImage(new string('0', 64)), ProcessToken.Owner(), budget, left =>
+            {
+                waits.Add(left);
+                waiting.TrySetResult();
+            }));
         Assert.AreEqual(DaemonUnavailableReason.InstanceMismatch, waited.Reason, waited.Message);
-        await (await offered).DisposeAsync();
+        Assert.AreEqual(1, waits.Count, "one busy wait, then the offered instance");
+        Assert.IsTrue(waits[0] > 0 && waits[0] <= (long)budget.TotalMilliseconds, $"{waits[0]} ms left of {budget}");
+
+        // The client took the offered instance and left after refusing it, possibly before the
+        // server's ConnectNamedPipe was issued (ERROR_NO_DATA): either way it was this instance,
+        // the only one not held.
+        var next = await offered;
+        await using (next)
+        {
+            try
+            {
+                await next.WaitForConnectionAsync();
+            }
+            catch (IOException error) when (error.HResult == unchecked((int)0x800700E8))
+            {
+            }
+        }
     }
 
     [TestMethod]
