@@ -636,20 +636,30 @@ Never:
   - The DevEco launcher must be Huawei-signed, and `node.exe` OpenJS-signed. Node and hvigor
     are never taken from `PATH`.
 - **Signing credential: maintainer gate.**
-  - It is installed **at the console**, because the secret is typed by the maintainer. The
-    agent never sees it, and it never goes in argv or the environment.
-  - `--build-profile` and `migrate-deveco` are `unsupportedOnPlatform` on Windows (they would read
-    DevEco's encrypted password material). The maintainer therefore gives the explicit paths:
+  - The passwords never go in argv or the environment, and the agent never sees them.
+  - `--build-profile` reads DevEco's encrypted passwords from the project's `build-profile.json5`
+    and the material DevEco keeps beside the keystore, decoding them in memory, at macOS parity
+    (#2532). No password is typed. This is the headless runbook §6 install:
 
     ```powershell
-    arkdeck runtime signing install --java '<DevEco>\jbr\bin\java.exe' `
+    arkdeck runtime signing install --build-profile '<project>\build-profile.json5' `
+      --java '<DevEco>\jbr\bin\java.exe' `
       --jar '<DevEco>\sdk\default\openharmony\toolchains\lib\hap-sign-tool.jar' `
-      --keystore '<storeFile .p12>' --certificate '<certpath .cer>' --profile '<profile .p7b>' `
+      --keystore '<the build profile''s storeFile .p12>' --certificate '<certpath .cer>' --profile '<profile .p7b>' `
       --key-alias debugKey --project-ref <ref> --output json
-    # prompts: Keystore password, Key password (echo off)
     arkdeck workspace preset register --registration-request-id gj5-<date>-sign --project <ref> --kind signing --template openharmony.local-sign@1 --credential <credential> --timeout-seconds 600 --output json
     arkdeck runtime service restart --output json
     ```
+
+    - `--keystore` must be the build profile's single `storeFile`, or the install is refused.
+    - The build profile and the material directories must be trusted-write-only and in their
+      spelling on disk, and each material file must have a single link (`rust/README.md`,
+      Windows signing).
+    - Without `--build-profile`, the same command prompts for the keystore and key passwords at
+      the console (echo off).
+    - A credential installed from typed passwords moves onto the build profile's encrypted ones
+      with `runtime signing migrate-deveco --build-profile <…> --daemon <the installed, pinned
+      arkdeck-agentd.exe>`.
 
   - The material is the DevEco **debug** signing of this board (device-ids include its UDID). The
     sample `install-sdk-release` material is rejected by the board (`9568329`).
@@ -676,9 +686,7 @@ Never:
 - **Blocking gaps:**
   - G1.
   - G7: the hvigor build and test Jobs have not been measured on Windows.
-  - G8: the signing passwords must be known in plaintext. Windows cannot decode DevEco's stored
-    ones (`migrate-deveco` is unsupported), so the maintainer must know the debug keystore's
-    passwords or re-create the debug signing material in DevEco with known ones.
+  - G8 is closed (#2532): `--build-profile` decodes DevEco's stored passwords on Windows.
   - `hap-sign-tool.jar` carries Mark-of-the-Web (ZoneId=3) in the sampled install. Whether it
     affects the signer has not been observed; record it.
 
@@ -693,7 +701,7 @@ Never:
 | G5 | AF-W1 (ArkForge Windows acceptance) | WIN-GJ4 | external, maintainer |
 | G6 | `flash device-access`, `lane-preview`, `bind-loader` not measured through the CLI on Windows | WIN-GJ4 (risk) | TASK-XPA-010 |
 | G7 | hvigor build and test Jobs not measured on Windows; workspace mutations in flight (#2506) | WIN-GJ5 | TASK-XPA-011 |
-| G8 | Signing passwords must be known in plaintext; `--build-profile`/`migrate-deveco` unsupported | WIN-GJ5 | maintainer (material), or a ruling |
+| G8 | **Closed** (#2532): `runtime signing install --build-profile` and `migrate-deveco` decode DevEco's stored passwords on Windows | none | done |
 | G9 | No generator assembles the redacted `gj-headless-rerun` record from saved CLI JSON; the agent applies the criteria by hand (§4.0.6) | none (process) | optional tooling |
 
 ### 4.7 Readiness per row (main `982d4e6d`)
@@ -704,7 +712,7 @@ Never:
 | WIN-GJ2-001 | full oracle replay end to end (#2505) | G1 | device window; HAP input | no (device mutation) |
 | WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged | G1, G3 | device window; `.so` and rollback fixture | no (device mutation) |
 | WIN-GJ4-001 | lane, plan, run, reconcile on fakes (#2504); broker (#2519) | G1, G4, G5, G6 | HardwareCampaign go; ArkForge bundle; image archive | **yes** (`flash.full-restore@1`) |
-| WIN-GJ5-001 | reads, isolate, sweep measured; sign replayed; patch (#2506) and registered signing (#2508) in flight | G1, G7, G8 | DevEco install; console secret entry; inputs | no (device mutation) |
+| WIN-GJ5-001 | reads, isolate, sweep measured; sign replayed; patch (#2506) and registered signing (#2508) in flight | G1, G7 | DevEco install; signing install from the build profile; inputs | no (device mutation) |
 
 None of the rows can produce `REAL_DEVICE_PASS` before G1 is on `main`.
 
@@ -782,7 +790,7 @@ Nothing flips on hosted CI, fixtures or plan-only runs (AGENTS.md "什么不算�
 | 4 | G1: the account daemon selects and starts the registered HDC | in flight (agents) | the Windows tool-selection port |
 | 5 | §4.1 GJ-1, §3 row 6 | blocked | step 4 |
 | 6 | §4.2 GJ-2, §4.3 GJ-3 | blocked | step 4 (GJ-3 also G3) |
-| 7 | §4.5 GJ-5 | blocked | step 4, G7 (agents), G8 (maintainer material) |
+| 7 | §4.5 GJ-5 | blocked | step 4, G7 (agents) |
 | 8 | §1.3 production signing | open (maintainer) | Artifact Signing account |
 | 9 | §4.4 GJ-4 | blocked | step 4, G4 (agents), G5 AF-W1, the maintainer's HardwareCampaign go |
 | 10 | §5 clean-host smoke | open | step 8 |
