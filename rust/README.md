@@ -1129,7 +1129,7 @@ owner (`session-state`, and `sessions` in a development root or
 section) and `operation.list` (the HDC operations `provider_not_registered`,
 the analyzer operations as the composed analyzers leave them), and recovers the active Jobs at its start
 (`recover_active_jobs`, then the staged Sessions) as the macOS daemon does.
-No HDC provider is composed until the Windows HDC tuple is registered, so a
+No HDC provider is composed without the registered Windows HDC tuple, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
 `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
@@ -2565,7 +2565,8 @@ membership, declared endpoint, listener) where macOS reads argv
 (`verifies_managed_process`). `arkdeck_provider_hdc::ProcessDispatch` and
 `ManagedHdcServer` now build on Windows; `mutation_identity_current()` stays
 `false` there (no Windows launch identity is published), and only a registered
-Windows HDC tuple composes them (below), of which there is none yet.
+Windows HDC tuple composes them (below): DevEco Studio 26.0.0.43's `hdc.exe`
+(CHG-2026-078, `3.2.0g`, `127.0.0.1:8710`) only.
 `tests/windows_tool_dispatch.rs` (platform) and `tests/windows_managed_hdc.rs`
 (provider) are `harness = false` targets whose fake tool and fake `hdc` are the
 test binary itself; no real HDC is launched. The run record is
@@ -2595,12 +2596,29 @@ well.
   answer from it, and the daemon stops it after the drain and before
   releasing the root (exit 70 when the owner must be recomposed). The
   status verifies the process by provenance (`ManagedHdcServer::verifies`).
-  `WINDOWS_HDC_TUPLES` is empty, so today every such input is refused before
+  `WINDOWS_HDC_TUPLES` holds only DevEco's `hdc.exe`, so every other input is refused before
   the root is opened and a root without one answers `runtime.hdc.status` as
   unconfigured (`windows_lifecycle_process.rs`); the composed path is
   exercised with an injected tuple and a stand-in compiled at test time
   (`windows_lifecycle::tests`). Tool selection's restart and the HDC
   control-action owner stay macOS-only.
+- The registration itself (CHG-2026-078 TASK-WHR-002): the c2 tuple in
+  `WINDOWS_HDC_TUPLES`, the registered `deviceObservationSnapshot` grammar
+  `parse_registered_windows_presence` (six columns; only `USB` rows are
+  devices; the sampled `COM<n>`/`UART`/`Ready` rows are excluded; `[Empty]`,
+  zero bytes and every other form `unknown`). `healthyCheckserver` is no
+  registered Windows probe (`checkserver` starts a server when none runs);
+  Windows server health is the commandless `runtime.hdc.status` observation.
+  Catalog lowering is unchanged here: `observe.device`'s `probeHDCServer`
+  still lowers to `checkserver`, and on Windows it reaches only the managed
+  development HDC, whose dispatch first proves its own launched server is
+  current. Porting that step to the commandless observation is
+  TASK-XPA-005's adoption. `tests/windows_hdc_registration.rs`
+  closes the table and grammar on `openspec/integrations/openharmony/
+  windows-probes.yaml`, `rust/tests/fixtures/hdc-windows/` and the lock. No
+  consumer reads the Windows grammar yet (CHG-2026-074 TASK-XPA-004/005);
+  until then a Windows device listing read by the macOS grammars is
+  `unknown`.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider

@@ -14,8 +14,8 @@
 //! Windows), so a Windows plan of an analyzer operation is refused as macOS
 //! refuses it without an analyzer. The Import and workspace owners have no
 //! value on Windows yet either (`ImportUploadStore`, `WorkspaceComposition`),
-//! so both members are `None` there, and the daemon composes no HDC provider
-//! until the Windows HDC tuple is registered.
+//! so both members are `None` there, and the daemon composes an HDC provider
+//! only for the registered Windows HDC tuple's executable.
 use crate::ArtifactReadStore;
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
 use crate::device_facts::{self, HdcComposition};

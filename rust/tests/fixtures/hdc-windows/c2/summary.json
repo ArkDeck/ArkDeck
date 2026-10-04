@@ -1,0 +1,116 @@
+{
+  "schema": "arkdeck-windows-hdc-sample-summary/v1",
+  "label": "c2",
+  "tuple": {
+    "executableSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+    "versionBytes": "Ver: 3.2.0g\r\n",
+    "versionTerminator": "CRLF",
+    "sourcePath": "<candidate-2-dir>\\sdk\\default\\openharmony\\toolchains\\hdc.exe",
+    "authenticode": "NotSigned",
+    "markOfTheWeb": true
+  },
+  "phases": [
+    "board-connected",
+    "board-removed",
+    "no-board",
+    "stop-server"
+  ],
+  "comparison": [
+    {
+      "topic": "`-v` stdout form",
+      "windows": "Ver: X ('Ver: 3.2.0g')",
+      "macos": "Ver: X",
+      "sameAsMacos": true
+    },
+    {
+      "topic": "`-v` terminator / stderr / exit",
+      "windows": "CRLF / 0 B / 0",
+      "macos": "registered bytes / empty / 0",
+      "sameAsMacos": null
+    },
+    {
+      "topic": "`checkserver-no-server`",
+      "windows": "Client version:Ver: X, server version:Ver: X ('Client version:Ver: 3.2.0g, server version:Ver: 3.2.0g'); listeners 0\u21921",
+      "macos": "Client version:Ver: X, server version:Ver: X",
+      "sameAsMacos": true
+    },
+    {
+      "topic": "`checkserver-server-up`",
+      "windows": "Client version:Ver: X, server version:Ver: X ('Client version:Ver: 3.2.0g, server version:Ver: 3.2.0g'); listeners 1\u21921",
+      "macos": "Client version:Ver: X, server version:Ver: X",
+      "sameAsMacos": true
+    },
+    {
+      "topic": "`list-targets-first` (no board)",
+      "windows": "rows / CRLF / 66 B",
+      "macos": "`[Empty]` CRLF (9 B); zero bytes is unknown",
+      "sameAsMacos": false
+    },
+    {
+      "topic": "`list-targets-empty` (no board)",
+      "windows": "rows / CRLF / 66 B",
+      "macos": "`[Empty]` CRLF (9 B); zero bytes is unknown",
+      "sameAsMacos": false
+    },
+    {
+      "topic": "`list targets -v`, board connected",
+      "windows": "rows; columns [6]; row terminators ['CRLF']; states ['Connected', 'Ready']; transports ['UART', 'USB']; row bytes [63, 33, 33]; CR in field False",
+      "macos": "5 tab columns, LF, `Connected`, `USB`, 58 B (32-character key)",
+      "sameAsMacos": false
+    },
+    {
+      "topic": "`list targets -v`, board removed",
+      "windows": "rows; states ['Offline', 'Ready']; row bytes [61, 33, 33]",
+      "macos": "row kept with `Offline` (56 B); no `[Empty]` marker",
+      "sameAsMacos": false
+    },
+    {
+      "topic": "server identity",
+      "windows": "listener owners ['pid-1']; addresses ['127.0.0.1:8710']; started by no-board/checkserver-no-server; owner is selected tool: [True]",
+      "macos": "exactly one listener on 127.0.0.1:8710 owned by the selected executable",
+      "sameAsMacos": true
+    }
+  ],
+  "anomalies": [],
+  "samplingServer": {
+    "listeners8710": [
+      {
+        "localAddress": "127.0.0.1",
+        "localPort": 8710,
+        "pid": "pid-1"
+      }
+    ],
+    "listenerOwners": [
+      {
+        "pid": "pid-1",
+        "alive": true,
+        "name": "hdc",
+        "parentPid": null,
+        "imageIsSelectedTool": true,
+        "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "startSeconds": 0.0
+      }
+    ],
+    "hdcProcesses": [
+      {
+        "pid": "pid-1",
+        "alive": true,
+        "name": "hdc",
+        "parentPid": null,
+        "imageIsSelectedTool": true,
+        "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "startSeconds": 0.0
+      }
+    ]
+  },
+  "connectKeys": {
+    "count": 1,
+    "lengths": [
+      32
+    ],
+    "characterClasses": [
+      "digit",
+      "lower"
+    ]
+  }
+}
