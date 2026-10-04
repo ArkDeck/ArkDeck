@@ -10,6 +10,11 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
   private static let registryVersion = "1.0.0"
   private static let profile = "OPENHARMONY-TOOLS@0.6.0"
   private static let lock = "INTEGRATION-PROFILES-0.7.0"
+  // The profile and lock current today: CHG-2026-078 added the Windows registry in
+  // OPENHARMONY-TOOLS@0.7.0 / INTEGRATION-PROFILES-0.8.0, amended by its r3 to @0.7.1 / -0.8.1;
+  // this registry's own pins stay above.
+  private static let currentProfileVersion = "0.7.1"
+  private static let currentLock = "INTEGRATION-PROFILES-0.8.1"
   private static let toolVersion = "3.2.0f"
   private static let toolSHA256 =
     "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
@@ -558,14 +563,17 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
     let macOS = String(
       decoding: try repositoryData("openspec/platforms/macos/profile.md"), as: UTF8.self)
 
-    XCTAssertEqual(profile.components(separatedBy: "> Version：0.6.0").count - 1, 1)
+    XCTAssertEqual(
+      profile.components(separatedBy: "> Version：\(Self.currentProfileVersion)").count - 1, 1)
+    XCTAssertTrue(profile.contains(Self.profile))
     XCTAssertTrue(profile.contains(Self.registryID))
     XCTAssertTrue(profile.contains(Self.registrySHA256))
     XCTAssertTrue(profile.contains(Self.resourcesSHA256))
     XCTAssertTrue(profile.contains(Self.lock))
 
-    XCTAssertTrue(lock.contains("lock: \(Self.lock)"))
-    XCTAssertTrue(lock.contains("version: 0.6.0"))
+    XCTAssertTrue(lock.contains("lock: \(Self.currentLock)"))
+    XCTAssertTrue(lock.contains("previous_lock: \(Self.lock)"))
+    XCTAssertTrue(lock.contains("version: \(Self.currentProfileVersion)"))
     XCTAssertTrue(lock.contains("profile: \(Self.profile)"))
     XCTAssertTrue(lock.contains(Self.registryID))
     XCTAssertTrue(lock.contains(Self.registrySHA256))

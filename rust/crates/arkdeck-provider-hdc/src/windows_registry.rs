@@ -7,11 +7,14 @@
 //! when `-v` prints the same version text: a macOS hash never matches here,
 //! and a Windows hash never matches the macOS tables.
 //!
-//! [`WINDOWS_HDC_TUPLES`] is empty until the maintainer's Windows samples are
-//! processed and the registry is registered: then each registered candidate
-//! becomes one entry here, copied from `windows-probes.yaml`, and the
-//! Windows daemon composes an HDC for it with no other change. Until then
-//! every Windows HDC is refused before anything is launched or dispatched.
+//! [`WINDOWS_HDC_TUPLES`] is the registered table of
+//! `openspec/integrations/openharmony/windows-probes.yaml` (CHG-2026-078 r2,
+//! maintainer ruling 2026-10-04): DevEco Studio 26.0.0.43's bundled
+//! `hdc.exe` (candidate `c2`, `Ver: 3.2.0g`) only. Candidate `c1` (`3.2.0b`)
+//! was sampled and is not registered, and any other `hdc.exe`, including a
+//! DevEco update with a new hash, is refused before anything is launched or
+//! dispatched. `tests/windows_hdc_registration.rs` holds this table equal to
+//! the registry, entry for entry.
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 /// One registered Windows HDC tuple.
@@ -29,9 +32,15 @@ pub struct WindowsHdcTuple {
     pub endpoint: SocketAddrV4,
 }
 
-/// The registered Windows HDC tuples. None yet: CHG-2026-078 is a draft whose
-/// every sample-derived value is `TBD(sample)`.
-pub const WINDOWS_HDC_TUPLES: &[WindowsHdcTuple] = &[];
+/// The registered Windows HDC tuples, copied from `windows-probes.yaml`
+/// (`toolContext.candidates[registered]` and each entry's endpoint).
+pub const WINDOWS_HDC_TUPLES: &[WindowsHdcTuple] = &[WindowsHdcTuple {
+    candidate: "c2",
+    executable_sha256: "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+    reported_version: "3.2.0g",
+    version_stdout: b"Ver: 3.2.0g\r\n",
+    endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8710),
+}];
 
 /// The registered tuple of `executable_sha256`, if the registry holds one.
 pub fn windows_tuple(executable_sha256: &str) -> Option<&'static WindowsHdcTuple> {

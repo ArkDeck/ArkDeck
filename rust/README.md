@@ -40,12 +40,22 @@ released port or dropped listener stays held. A test whose path starts a child
 belongs in `tests/spawning`, which compiles the daemon's modules from their
 sources and runs one test at a time (`turn()`), as do the integration tests
 that listen or take a lock in their own process while spawning.
-On Windows only `flash_host_facts_control.rs` runs there (TASK-XPA-010): the
-Swift Flash host facts oracle through `Control` and the daemon's own host, over
-the shared fake's answers ported in process
-(`arkdeck-provider-hdc/tests/common/oracle_fake.rs`), which the host probes
-through a seam compiled into test builds only. The Windows daemon itself still
-composes no HDC.
+On Windows two things run there:
+- `flash_host_facts_control.rs` (TASK-XPA-010): the Swift Flash host facts
+  oracle through `Control` and the daemon's own host, over the shared fake's
+  answers ported in process (`arkdeck-provider-hdc/tests/common/oracle_fake.rs`).
+- The signed test daemon, `signed_daemon.rs` (TASK-XPA-009). That binary compiles
+  the Windows lifecycle and composition (`windows_lifecycle`) and is copied and
+  signed with the development signer. It serves a development root on its pipe,
+  and the real `arkdeck.exe` drives it with the production peer check.
+
+Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
+into test builds only. The production Windows daemon composes an HDC only for a
+registered Windows HDC tuple.
+
+A module that binary compiles keeps its unit tests beside it only inside
+`daemon_unit_tests!`. `src/main.rs` expands that block under `cfg(test)`, and
+`tests/spawning` expands it to nothing.
 
 Clippy and the workspace tests are the only checks that compile this checkout.
 `generate-contract.py --check` regenerates the manifest and bindings from the
@@ -1129,7 +1139,7 @@ owner (`session-state`, and `sessions` in a development root or
 section) and `operation.list` (the HDC operations `provider_not_registered`,
 the analyzer operations as the composed analyzers leave them), and recovers the active Jobs at its start
 (`recover_active_jobs`, then the staged Sessions) as the macOS daemon does.
-No HDC provider is composed until the Windows HDC tuple is registered, so a
+No HDC provider is composed without the registered Windows HDC tuple, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
 `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
@@ -2565,7 +2575,8 @@ membership, declared endpoint, listener) where macOS reads argv
 (`verifies_managed_process`). `arkdeck_provider_hdc::ProcessDispatch` and
 `ManagedHdcServer` now build on Windows; `mutation_identity_current()` stays
 `false` there (no Windows launch identity is published), and only a registered
-Windows HDC tuple composes them (below), of which there is none yet.
+Windows HDC tuple composes them (below): DevEco Studio 26.0.0.43's `hdc.exe`
+(CHG-2026-078, `3.2.0g`, `127.0.0.1:8710`) only.
 `tests/windows_tool_dispatch.rs` (platform) and `tests/windows_managed_hdc.rs`
 (provider) are `harness = false` targets whose fake tool and fake `hdc` are the
 test binary itself; no real HDC is launched. The run record is
@@ -2595,10 +2606,36 @@ well.
   answer from it, and the daemon stops it after the drain and before
   releasing the root (exit 70 when the owner must be recomposed). The
   status verifies the process by provenance (`ManagedHdcServer::verifies`).
-  `WINDOWS_HDC_TUPLES` is empty, so today every such input is refused before
+  `WINDOWS_HDC_TUPLES` holds only DevEco's `hdc.exe`, so every other input is refused before
   the root is opened and a root without one answers `runtime.hdc.status` as
   unconfigured (`windows_lifecycle_process.rs`); the composed path is
   exercised with an injected tuple and a stand-in compiled at test time
+  (`windows_lifecycle::tests`). Tool selection's restart and the HDC
+  control-action owner stay macOS-only.
+- The registration itself (CHG-2026-078 TASK-WHR-002): the c2 tuple in
+  `WINDOWS_HDC_TUPLES`, the registered `deviceObservationSnapshot` grammar
+  `parse_registered_windows_presence` (six columns; only `USB` rows are
+  devices; the sampled `COM<n>`/`UART`/`Ready` rows are excluded; `[Empty]`,
+  zero bytes and every other form `unknown`). CHG-2026-078 r3 adds one form:
+  the server-startup listing `[Empty]` CR TAB `hdc` CR LF
+  (`WINDOWS_SERVER_STARTUP_LISTING`, exit 0, empty stderr) is
+  `ObservationFailure::NotYetObservable` (`unknown`, retryable), never no
+  device. On Windows `ManagedHdcServer::start` settles past it
+  (`settle_startup_listing`, at most `WINDOWS_STARTUP_SETTLE` = 3 s) and
+  records `StartupListing::Settled` or `Unsettled`; an unsettled server's
+  observations stay `unknown`. `healthyCheckserver` is no
+  registered Windows probe (`checkserver` starts a server when none runs);
+  Windows server health is the commandless `runtime.hdc.status` observation.
+  Catalog lowering is unchanged here: `observe.device`'s `probeHDCServer`
+  still lowers to `checkserver`, and on Windows it reaches only the managed
+  development HDC, whose dispatch first proves its own launched server is
+  current. Porting that step to the commandless observation is
+  TASK-XPA-005's adoption. `tests/windows_hdc_registration.rs`
+  closes the table and grammar on `openspec/integrations/openharmony/
+  windows-probes.yaml`, `rust/tests/fixtures/hdc-windows/` and the lock. No
+  consumer reads the Windows grammar yet (CHG-2026-074 TASK-XPA-004/005);
+  until then a Windows device listing read by the macOS grammars is
+  `unknown`.
   (`windows_lifecycle::tests`). Swift's union control-action owner is
   composed on every Windows root (`control-action-snapshots`), over the HDC
   control-action owner (`hdc-control-actions`) only beside that managed
@@ -2949,9 +2986,10 @@ directory), created owner-only at the start. The census names `bootstrap` after
   content digest and record (`"platform":"windows"`). Registration admits only an executable a
   registered Windows HDC tuple names: the daemon composes `arkdeck-provider-hdc`'s
   `WINDOWS_HDC_TUPLES` into the store's identities, checked on the source before the store is
-  locked and again on the captured bytes before anything is published. **The table is empty
-  (CHG-2026-078), so every `hdc.exe` is refused** (`admissionDenied`) and nothing is written;
-  with no HDC to select, `runtime.tool.select` answers Swift's no-owner refusal.
+  locked and again on the captured bytes before anything is published. **The table holds
+  DevEco Studio 26.0.0.43's `hdc.exe` only (CHG-2026-078, c2, `3.2.0g`), so every other
+  `hdc.exe` is refused** (`admissionDenied`) and nothing is written; with no HDC to select,
+  `runtime.tool.select` answers Swift's no-owner refusal.
 - **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
   team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
   `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.
@@ -3838,6 +3876,31 @@ profile-served workspace operation is unavailable with
 `workspace.toolchainUnavailable: no code-owned source tool … is trusted on
 Windows`, and a plan of one is refused before admission with zero dispatch.
 `workspace.inspect-source@1` needs no profile, so it runs.
+
+Maintainer ruling 69 decides the rule. `grep`, `sed` and `patch` are
+reimplemented in process. `tar` and `git` are trusted by a registered absolute
+path and an Authenticode publisher, never through PATH.
+`arkdeck_platform::trusted_system_tool` measures each one:
+
+- **`tar`** is `<system directory>\tar.exe`, Microsoft-signed. Either its
+  embedded third-party component signature (root Microsoft Root CA 2011) or
+  the system catalog's Windows production signature (root 2010) is accepted.
+  The catalog is found by the Authenticode hash of the held handle.
+- **`git`** is `<Program Files>\Git\mingw64\bin\git.exe`, signed by Git for
+  Windows' signer (`O=`/`CN=` Johannes Schindelin). It is the real git, not
+  the `cmd\git.exe` launcher.
+
+The root, every directory below it and the file must have the exact spelling
+on disk. No reparse point is allowed, and only `SYSTEM`, `Administrators` or
+`TrustedInstaller` may own or change them. The SHA-256 comes from the same
+held handle that `WinVerifyTrust` verified.
+`WorkspaceCommandPreset::trusted_system` pins a preset by that digest, and its
+dispatch (`VerifiedTool::open`) runs only that image. The workspace profile's
+code-owned tool table does not use them yet, so the refusal above still
+stands. The tests run against the host's real `tar.exe` and Git for Windows.
+They also cover a copy outside the registered path, an altered or unsigned
+image, the other tool's publisher, another spelling, a junctioned root, a
+launch by another digest and a shadowing PATH.
 
 `cargo test -p arkdeck-agentd --test windows_workspace_provider_process`
 (`harness = false`) registers a project and restarts the daemon with this

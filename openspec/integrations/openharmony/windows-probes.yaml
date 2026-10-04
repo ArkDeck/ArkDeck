@@ -1,0 +1,420 @@
+{
+  "schemaVersion": "1.0.0",
+  "serializationFormat": "json-compatible-yaml-1.2",
+  "registryId": "OPENHARMONY-HDC-WINDOWS-PROBES",
+  "registryVersion": "1.1.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.7.1",
+  "registeredBy": "CHG-2026-078-windows-hdc-registration/TASK-WHR-002",
+  "unknownFamilyDisposition": "unknown",
+  "toolContext": {
+    "platform": "windows",
+    "identity": "executable SHA-256 plus the hdc -v stdout bytes observed with it; never path, file version, timestamp or signature (the only version resource is winpthread's, the timestamp is normalised, both candidates are NotSigned)",
+    "selectionRule": "Tool selection must resolve to the registered executable (the DevEco Studio toolchains hdc.exe). Any other hdc.exe, including one found first on PATH, is unsupported. A DevEco update that changes the hash is a new tuple and stays unsupported until a later change registers it (maintainer ruling 2026-10-04, item 1).",
+    "candidates": [
+      {
+        "label": "c1",
+        "source": "hand-placed hdc.exe in a tools directory (origin not recorded on the host)",
+        "executableSHA256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+        "bytes": 5448704,
+        "authenticode": "NotSigned",
+        "markOfTheWeb": false,
+        "reportedVersion": "3.2.0b",
+        "versionBytes": "Ver: 3.2.0b\r\n",
+        "registered": false,
+        "registrationBasis": "maintainer ruling 2026-10-04, item 1: not registered (origin not recorded; older than every macOS-registered version)"
+      },
+      {
+        "label": "c2",
+        "source": "DevEco Studio bundled sdk/default/openharmony/toolchains/hdc.exe, toolchains 26.0.0.43, apiVersion 26, Beta",
+        "executableSHA256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "bytes": 5743104,
+        "authenticode": "NotSigned",
+        "markOfTheWeb": true,
+        "zoneId": "3",
+        "reportedVersion": "3.2.0g",
+        "versionBytes": "Ver: 3.2.0g\r\n",
+        "registered": true,
+        "registrationBasis": "maintainer ruling 2026-10-04, item 1"
+      }
+    ],
+    "divergenceNote": "Windows builds are different executables from the macOS 3.2.0d (48395ba8...d260) and 3.2.0f (05b2bf7a...8f83) tools. No entry, receipt, output family, endpoint or fact crosses this registry and the macOS readonly, trace, device-observation or supervisor-observation registries, even when -v prints the same version text."
+  },
+  "entries": [
+    {
+      "id": "openharmony-hdc-version-3.2.0g-windows-c7951849",
+      "family": "version",
+      "status": "supported",
+      "probeKind": "hdcCommand",
+      "platform": "windows",
+      "toolReportedVersion": "3.2.0g",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [
+        "-v"
+      ],
+      "invocationAllowed": true,
+      "effectClassification": "readOnly",
+      "serverEffectObserved": "none: 0 listeners before and after in the per-command brackets",
+      "inputContract": {
+        "stream": "stdout",
+        "exitCode": 0,
+        "stderrMustBeEmpty": true,
+        "form": "Ver: X",
+        "observedBytes": 13,
+        "observedTerminator": "CRLF",
+        "observedSHA256": "78c4d7b4ffc0bb7bb0bac0512e5fe9da25be07c481ff7a41dfc9732f7da0a424"
+      },
+      "fixture": "rust/tests/fixtures/hdc-windows/c2/no-board/version.stdout.bin"
+    },
+    {
+      "id": "openharmony-hdc-healthy-checkserver-3.2.0g-windows-c7951849",
+      "family": "healthyCheckserver",
+      "status": "unsupported",
+      "statusBasis": "maintainer ruling 2026-10-04, item 3: with no server running, checkserver started one (0 -> 1 listeners, about 1.44 s), so on Windows it is a server-starting command and not a read-only probe. Server health is serverIdentityGeneration.",
+      "probeKind": "hdcCommand",
+      "platform": "windows",
+      "toolReportedVersion": "3.2.0g",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [
+        "checkserver"
+      ],
+      "invocationAllowed": false,
+      "effectClassification": "serverStarting",
+      "inputContract": {
+        "stream": "stdout",
+        "exitCode": 0,
+        "stderrMustBeEmpty": true,
+        "form": "Client version:Ver: X, server version:Ver: X",
+        "observedBytes": 56,
+        "observedTerminator": "CRLF",
+        "observedSHA256": "653e2fe893655835e9c2ed84a2b0b8663cec4af47fa8d50f5304ea912d38c37e",
+        "noServerBehaviour": "starts a server (listener 127.0.0.1:8710 owned by the selected executable appears inside the command bracket) and prints the same healthy form"
+      },
+      "fixture": "rust/tests/fixtures/hdc-windows/c2/no-board/checkserver-server-up.stdout.bin",
+      "fixtureRole": "recorded bytes only; never dispatched"
+    },
+    {
+      "id": "openharmony-hdc-device-observation-snapshot-3.2.0g-windows-c7951849",
+      "family": "deviceObservationSnapshot",
+      "status": "supported",
+      "statusBasis": "maintainer ruling 2026-10-04, item 2",
+      "probeKind": "hdcCommand",
+      "platform": "windows",
+      "toolReportedVersion": "3.2.0g",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "pathSource": "selectedToolchainSnapshot",
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [
+        "list",
+        "targets",
+        "-v"
+      ],
+      "invocationAllowed": true,
+      "preconditions": [
+        "existingServerOnExactEndpointRequired",
+        "stablePreAndPostServerIdentityRequired"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "exactEndpoint": "127.0.0.1:8710",
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable",
+        "note": "Observed: exactly one IPv4 loopback listener; no 0.0.0.0, :: or dual-stack entry."
+      },
+      "effectClassification": "readOnly",
+      "forbiddenEffects": [
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "inputContract": {
+        "rawFamily": "tabDelimitedDeviceAndUartRows",
+        "stream": "stdout",
+        "exitCode": 0,
+        "stderrMustBeEmpty": true,
+        "encoding": "utf-8",
+        "lineTerminators": [
+          "LF",
+          "CRLF"
+        ],
+        "observedTerminator": "CRLF",
+        "residualCarriageReturnForbidden": true,
+        "zeroByteStdoutDisposition": "unknown",
+        "emptyMarker": {
+          "literal": "[Empty]",
+          "observed": true,
+          "disposition": "unknown",
+          "note": "Never emitted by an enumerated server on the sampled host: hdc lists the host's serial ports as UART rows. The only observed [Empty] form is serverStartupListing below; every other [Empty] form ([Empty] CR LF, [Empty] LF, the marker beside rows) stays unknown."
+        },
+        "row": {
+          "delimiter": "TAB",
+          "columnCount": 6,
+          "observedTerminator": "CRLF",
+          "columns": [
+            {
+              "index": 0,
+              "name": "connectKey",
+              "dynamic": true,
+              "identifierBearing": true,
+              "observedLength": 32,
+              "note": "USB rows: the board serial, redacted in every fixture; UART rows: COM<digits>, a host port name"
+            },
+            {
+              "index": 1,
+              "name": "deviceName",
+              "dynamic": true,
+              "mayBeEmpty": true,
+              "observed": "empty on every row"
+            },
+            {
+              "index": 2,
+              "name": "transport",
+              "closedSet": [
+                "USB",
+                "UART"
+              ]
+            },
+            {
+              "index": 3,
+              "name": "state",
+              "closedSetByTransport": {
+                "USB": [
+                  "Connected",
+                  "Offline"
+                ],
+                "UART": [
+                  "Ready"
+                ]
+              }
+            },
+            {
+              "index": 4,
+              "name": "hostTag",
+              "closedSetByTransport": {
+                "USB": [
+                  "localhost"
+                ],
+                "UART": [
+                  "unknown..."
+                ]
+              }
+            },
+            {
+              "index": 5,
+              "name": "sixthColumn",
+              "closedSet": [
+                "hdc"
+              ],
+              "note": "present on every Windows row (3.2.0b and 3.2.0g); meaning not documented; no macOS counterpart"
+            }
+          ],
+          "observedRowBytes": {
+            "USB.Connected": 63,
+            "USB.Offline": 61,
+            "UART.Ready": 33
+          },
+          "removedDeviceRow": "kept, state flipped to Offline, otherwise byte-identical",
+          "duplicateKeyDisposition": "unknown",
+          "orderIsPresentationOnly": true
+        },
+        "knownNonDeviceRow": {
+          "basis": "maintainer ruling 2026-10-04, item 2",
+          "match": "connectKey matches ^COM[0-9]+$, deviceName empty, transport UART, state Ready, hostTag unknown..., sixth column hdc",
+          "disposition": "excluded; never a device observation",
+          "otherUartForms": "unknown"
+        },
+        "serverStartupListing": {
+          "basis": "maintainer ruling 2026-10-04 (register the observed [Empty] form), refined by CHG-2026-078 r3 from the evidence that it is a server-startup race: notYetObservable instead of no device",
+          "exactBytesHex": "5b456d7074795d0d096864630d0a",
+          "exactBytes": "[Empty]\r\thdc\r\n",
+          "bytes": 14,
+          "exitCode": 0,
+          "stderrMustBeEmpty": true,
+          "disposition": "notYetObservable",
+          "classification": "unknown",
+          "retryable": true,
+          "neverObservedEmpty": true,
+          "neverDisappearance": true,
+          "observedWhen": "only while a server the same tool had just started had not enumerated yet: from the moment its listener answered until at most 1.257 s after the server's spawn (at most 0.712 s after the listener answered), in 15 of 15 listener-waited starts; never after the first enumerated listing (the first came 0.967 to 1.495 s after the spawn); independent of the server's and the client's environment",
+          "settleRule": "after a managed start, list again every poll interval for at most 3 s until a registered enumerated form is read; past the bound the server stays up and every observation stays unknown (fail closed); a consumer that reads this listing at any other time treats it as unknown",
+          "evidence": "CHG-2026-074 evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md"
+        }
+      },
+      "semanticMappings": [
+        {
+          "input": "onlyKnownNonDeviceRows",
+          "result": "observedEmpty"
+        },
+        {
+          "input": "usbRowsWithZeroConnected",
+          "result": "observedEmpty"
+        },
+        {
+          "input": "usbRowsWithOneOrMoreConnected",
+          "result": "observed.connectedSet"
+        },
+        {
+          "input": "serverStartupListing",
+          "result": "notYetObservable (unknown, retryable)"
+        },
+        {
+          "input": "emptyMarkerLineInAnyOtherForm",
+          "result": "unknown"
+        },
+        {
+          "input": "zeroByteStdout",
+          "result": "unknown"
+        },
+        {
+          "input": "uartRowOutsideTheKnownForm",
+          "result": "unknown"
+        },
+        {
+          "input": "unknownStateOrTransportOrHostLiteral",
+          "result": "unknown"
+        },
+        {
+          "input": "columnCountMismatchOrSixthColumnOtherThanHdc",
+          "result": "unknown"
+        },
+        {
+          "input": "duplicateConnectKey",
+          "result": "unknown"
+        },
+        {
+          "input": "residualCarriageReturnInAnyField",
+          "result": "unknown"
+        },
+        {
+          "input": "stderrNonEmptyOrNonZeroExitOrTruncated",
+          "result": "unknown"
+        },
+        {
+          "input": "timeoutOrCancellationOrServerAbsentOrEndpointDrift",
+          "result": "unavailable"
+        }
+      ],
+      "presenceRule": "Presence is decided by the state column of USB rows only. A removed device keeps its row with state Offline. Row appearance/disappearance is never a presence signal; UART rows are never devices.",
+      "identityPolicy": {
+        "rawIdentifiersLeaveAdapter": false,
+        "pseudonym": "per-session HMAC-SHA-256 over the connect key",
+        "presentation": "redacted-device-<24 lowercase hex>",
+        "crossSessionCorrelation": "not promised"
+      },
+      "fixtures": {
+        "uartRowsOnly": {
+          "file": "rust/tests/fixtures/hdc-windows/c2/no-board/list-targets-empty.stdout.bin",
+          "bytes": 66,
+          "sha256": "31ab060ed0339793ebabd7b8b5c36866d5f37ee80aa0d43eecad9ffc897db623",
+          "expectedOutcome": "observedEmpty"
+        },
+        "boardConnected": {
+          "file": "rust/tests/fixtures/hdc-windows/c2/board-connected/list-targets-board-connected.stdout.bin",
+          "bytes": 129,
+          "sha256": "55f6ea08dde54a798535c7350526b5a6913c2a80d9ba9a318a5b21a699bde3da",
+          "expectedOutcome": "observed.connectedSet (one)"
+        },
+        "boardRemoved": {
+          "file": "rust/tests/fixtures/hdc-windows/c2/board-removed/list-targets-board-removed.stdout.bin",
+          "bytes": 127,
+          "sha256": "95f2d8900e51ab1e9d51d7c8dc1144c3294a8838af20cf0083b1fbda4ba72a4e",
+          "expectedOutcome": "observedEmpty"
+        },
+        "serverStartup": {
+          "file": "rust/tests/fixtures/hdc-windows/c2/server-startup/list-targets-server-startup.stdout.bin",
+          "bytes": 14,
+          "sha256": "04944aafdaafa5db8d3d38221d275e64e6b2fff949539768db6296201fcdbc70",
+          "expectedOutcome": "notYetObservable"
+        }
+      }
+    },
+    {
+      "id": "openharmony-hdc-supervisor-identity-generation-3.2.0g-windows-c7951849",
+      "family": "serverIdentityGeneration",
+      "status": "supported",
+      "statusBasis": "maintainer ruling 2026-10-04, item 3: this commandless observation is the Windows server-health family",
+      "probeKind": "platformProcessObservation",
+      "platform": "windows",
+      "toolReportedVersion": "3.2.0g",
+      "executableIdentityPolicy": {
+        "required": true,
+        "sha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "pathSource": "selectedToolchainSnapshot",
+        "verifyBytesBeforePreScan": true,
+        "verifyBytesAfterPostScan": true,
+        "replacementInvalidatesReceipt": true
+      },
+      "exactArgv": [],
+      "invocationAllowed": false,
+      "preconditions": [
+        "selectedToolchainSnapshotPinned",
+        "exactObservedEndpoint",
+        "exactlyOneExistingServerProcess",
+        "exactlyOneListener",
+        "listenerOwnedByObservedProcess",
+        "selectedExecutableBytesVerifiedBeforeAndAfter"
+      ],
+      "endpointPolicy": {
+        "requiresExactEndpoint": true,
+        "endpoint": "127.0.0.1:8710",
+        "existingServerRequired": true,
+        "serverAbsentDisposition": "unavailable",
+        "multipleOrAmbiguousDisposition": "unknown",
+        "fallbackAllowed": false
+      },
+      "observationContract": {
+        "listenerSource": "the Windows TCP table (listening entries on the endpoint port) and the owning process",
+        "processIdentity": [
+          "pid",
+          "creationTime",
+          "imagePath",
+          "imageSHA256"
+        ],
+        "requiredListenerCount": 1,
+        "listenerMustBeOwnedByObservedProcess": true,
+        "boundedPrePostScanRequired": true,
+        "prePostEqualityFields": [
+          "pid",
+          "creationTime",
+          "imagePath",
+          "imageSHA256",
+          "endpoint",
+          "listenerOwner"
+        ],
+        "serverStartingCommand": "checkserver with no server running (no-board phase); hdc -v starts none",
+        "identityStableAcrossPhases": "observed: the same PID and creation time in every per-command bracket of the no-board, board-connected and board-removed phases, across unplug and replug; stopped by kill",
+        "perCommandBrackets": "recorded by the Windows sample for every command (closes the macOS DEV-1 gap for this tuple only)"
+      },
+      "forbiddenEffects": [
+        "hdcChild",
+        "serverStart",
+        "serverStop",
+        "serverRestart",
+        "serverAdoption",
+        "subserverLifecycle",
+        "deviceMigration",
+        "deviceMutation",
+        "destructive"
+      ],
+      "fixtures": "rust/tests/fixtures/hdc-windows/c2/{no-board,board-connected,board-removed}/sample.json (listener/owner brackets)"
+    }
+  ],
+  "amendedBy": "CHG-2026-078-windows-hdc-registration r3 (maintainer ruling 2026-10-04, refined by the server-startup evidence)"
+}

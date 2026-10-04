@@ -220,3 +220,31 @@ existing Agent PR workflow still assumes base `main`; its metadata failure on
 this stacked branch does not change the base or count as a passing check.
 Native Windows validation remains in PR CI. No full local unified gate or
 real-device acceptance is claimed.
+
+
+## Archive stack refresh for overview resource additions (2026-10-04)
+
+Merged direct parent `e253848b6`, which includes main `587c938b4`. The only
+conflicts were appended shared strings and the three generated Windows consumers.
+The key-based source merge retains every value from both heads: all 19 archive
+additions coexist with the five new overview device keys. Regenerated consumers
+match 1,299 entries. No archive owner, App ingress, ClientKit facade, App source,
+or contract input was manually changed by this resolution.
+
+### Local targeted checks
+
+All logs below are under `/tmp/arkdeck-macos-conflicts-20261004/`.
+
+- `python3 windows/scripts/generate-ui-strings.py --check`: 1,299 strings pass, exit 0 (`archive-strings.log`). The existing resource-reference checker validates 46 snapshots, 291 references and literal UI-test lookups (`archive-resource-references.log`).
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd --bin arkdeck-agentd app_ingress_tests::`: 41 pass, exit 0 (`archive-ingress.log`).
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-hoststore --lib job_archive::`: 7 pass, exit 0 (`archive-owner-targeted.log`). The initial command omitted `--lib`, built unrelated integration targets and was interrupted; that incomplete run (`archive-owner.log`) is not claimed as a pass.
+- `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter RuntimeJobArchiveApplicationFacadeTests`: 4 pass, exit 0 (`archive-swift.log`).
+- `CARGO_BUILD_JOBS=2 cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-agentd -p arkdeck-hoststore --all-targets -- -D warnings`: exit 0 (`archive-clippy.log`). Rust formatting, SDD and diff checks pass (`archive-fmt.log`, `archive-sdd.log`).
+- App build-for-testing, CLI and unrelated crate suites were not repeated for this resource-only conflict resolution. The full selected validation remains in PR CI; no device execution occurred.
+
+### CI
+
+PR #2468 keeps #2467 as its direct base. This push creates fresh head checks;
+previous-head results are not reused as evidence for the new merge. The existing
+Agent PR workflow's fixed-main metadata assertion remains a separately reported
+compatibility issue; it does not justify retargeting this dependent PR.

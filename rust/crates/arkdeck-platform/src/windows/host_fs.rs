@@ -513,6 +513,15 @@ impl Access {
         self.owner_trusted
             && self.untrusted & WRITE_RIGHTS & !(FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY) == 0
     }
+    /// Unix "owned by root, `mode & 0o022 == 0`" (a system tool's file or
+    /// directory, TASK-XPA-011): owned by one of the [`TRUSTED_PRINCIPALS`],
+    /// not by the token user, and nobody else — the token user included — is
+    /// granted a right to change it.
+    pub(crate) fn system_write_only(&self) -> bool {
+        self.owner_trusted
+            && !self.owner_is_user
+            && (self.user | self.untrusted) & WRITE_RIGHTS == 0
+    }
     /// Unix "owned by this user, `mode & 0o077 == 0`" where root still reads
     /// everything: owned by the token user and nobody but the user and the
     /// trusted principals is granted anything.

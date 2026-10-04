@@ -6,9 +6,10 @@
 //! SHA-256 is a registered entry of `OPENHARMONY-HDC-WINDOWS-PROBES`
 //! ([`arkdeck_provider_hdc::WINDOWS_HDC_TUPLES`]), and only as its managed
 //! server: unlike the macOS owner, it runs no unregistered fixture HDC, and a
-//! macOS tool's hash registers nothing here. While the registry is a draft
-//! the table is empty, and every development HDC is refused here, naming the
-//! digest the registry would have to hold.
+//! macOS tool's hash registers nothing here. The registry holds DevEco
+//! Studio 26.0.0.43's `hdc.exe` only (CHG-2026-078, candidate `c2`); every
+//! other development HDC is refused here, naming the digest the registry
+//! would have to hold.
 //!
 //! What it admits, `windows_lifecycle` starts as the root's managed server
 //! (`managed_hdc::ManagedHdc`) on the endpoint Swift's selector picks, which
@@ -110,7 +111,8 @@ pub(crate) fn admit(
     }))
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
     use arkdeck_provider_hdc::WINDOWS_HDC_TUPLES;
@@ -189,7 +191,8 @@ mod tests {
                 },
             }))
         );
-        // Another entry, a macOS tool's digest, and today's registry: refused.
+        // Another entry, a macOS tool's digest, and the registered table
+        // (which names DevEco's `hdc.exe`, not this stand-in): refused.
         for table in [
             leak(entry(OTHER)),
             leak(entry(
@@ -304,4 +307,5 @@ mod tests {
             }))
         );
     }
+}
 }
