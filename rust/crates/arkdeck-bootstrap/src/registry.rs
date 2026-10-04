@@ -280,6 +280,23 @@ pub(crate) struct ToolRecord {
     pub(crate) generation: i64,
     pub(crate) state: String,
     pub(crate) references: Vec<Owner>,
+    /// A Windows record's host tag, `"windows"`; a macOS record has none, and
+    /// each host reads only its own form.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) platform: Option<String>,
+}
+
+/// The HDC's fixed USB sibling on this host.
+pub(crate) const TOOL_LIBRARY: &str = if cfg!(windows) {
+    "libusb_shared.dll"
+} else {
+    "libusb_shared.dylib"
+};
+
+/// Whether a tool record is this host's form: a macOS record carries no host
+/// tag; a Windows record names `"windows"`.
+fn tool_host_form(record: &ToolRecord) -> bool {
+    record.platform.as_deref() == cfg!(windows).then_some("windows")
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -370,9 +387,10 @@ pub(crate) fn read_tools(bytes: &[u8]) -> Result<(ToolIndex, Vec<u8>), DecodeErr
                 || !(1..=268_435_456).contains(&r.byte_count)
                 || !r.trust.well_formed()
                 || !timestamp(&r.registered_at)
+                || !tool_host_form(r)
                 || r.dependencies.len() > 1
                 || r.dependencies.iter().any(|d| {
-                    d.name != "libusb_shared.dylib"
+                    d.name != TOOL_LIBRARY
                         || !digest(&d.sha256)
                         || !(1..=33_554_432).contains(&d.byte_count)
                         || !d.quarantine_sha256.as_deref().is_none_or(digest)
@@ -409,7 +427,8 @@ pub(crate) fn tool_projection(index: &ToolIndex, r: &ToolRecord, identity: Optio
         .collect();
     json!({
         "schemaVersion": "arkdeck.runtime-tool/1", "toolRef": r.reference,
-        "kind": "hdc", "platform": "macos", "source": "registeredCopy",
+        "kind": "hdc", "platform": r.platform.as_deref().unwrap_or("macos"),
+        "source": "registeredCopy",
         "generation": r.generation.to_string(), "state": r.state,
         "contentDigest": r.content_digest, "digestAlgorithm": "sha256-jcs",
         "contentSchemaVersion": "arkdeck.tool-content/1",
@@ -498,21 +517,40 @@ fn selection_valid(index: &ToolIndex) -> bool {
 mod tests {
     use super::*;
 
-    fn tools(registered_at: &str) -> Vec<u8> {
+    /// A tool index of one selected record in this host's form (a Windows
+    /// record carries its host tag), or in the other host's.
+    fn tool_index(registered_at: &str, windows: bool) -> Vec<u8> {
         let reference = format!("tool:sha256:{}", "a".repeat(64));
+        let mut record = json!({
+            "reference": reference, "contentDigest": "a".repeat(64),
+            "executableSHA256": "b".repeat(64), "byteCount": 1,
+            "registeredAt": registered_at, "trust": {"signature": "unsigned"},
+            "dependencies": [], "relocatable": false, "generation": 1,
+            "state": "available",
+            "references": [{"kind": "activeSelection", "id": "runtime-hdc-selection"}],
+        });
+        if windows {
+            record["platform"] = json!("windows");
+        }
         serde_json::to_vec(&json!({
             "schemaVersion": "arkdeck.bootstrap-tools/2",
-            "records": [{
-                "reference": reference, "contentDigest": "a".repeat(64),
-                "executableSHA256": "b".repeat(64), "byteCount": 1,
-                "registeredAt": registered_at, "trust": {"signature": "unsigned"},
-                "dependencies": [], "relocatable": false, "generation": 1,
-                "state": "available",
-                "references": [{"kind": "activeSelection", "id": "runtime-hdc-selection"}],
-            }],
+            "records": [record],
             "selection": {"activeToolRef": reference, "activeGeneration": 3},
         }))
         .unwrap()
+    }
+
+    fn tools(registered_at: &str) -> Vec<u8> {
+        tool_index(registered_at, cfg!(windows))
+    }
+
+    #[test]
+    fn each_host_reads_only_its_own_tool_record_form() {
+        let other = tool_index("2026-09-30T08:15:00Z", !cfg!(windows));
+        assert!(matches!(decode_tools(&other), Err(DecodeError::Header)));
+        let decoded = decode_tools(&tools("2026-09-30T08:15:00Z")).unwrap();
+        let expected = if cfg!(windows) { "windows" } else { "macos" };
+        assert_eq!(decoded.projection[0]["platform"], expected);
     }
 
     /// A bundle index of one record in this host's form (a Windows record

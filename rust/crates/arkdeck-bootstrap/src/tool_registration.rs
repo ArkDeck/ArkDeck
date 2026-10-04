@@ -1,9 +1,20 @@
 //! HDC registration writes only frozen Bootstrap metadata and immutable content.
 //! Capturing a native executable does not select it or confer execution authority.
+//!
+//! On Windows the same owner captures `hdc.exe` and its imported sibling
+//! `libusb_shared.dll` (PE in place of Mach-O), and admits only an
+//! executable a registered Windows HDC tuple names (CHG-2026-078): the
+//! store's published identities, which the daemon composes from
+//! `arkdeck-provider-hdc`'s `WINDOWS_HDC_TUPLES`. Any other `hdc.exe` is
+//! refused before the store is locked or anything is written, and again,
+//! from the captured bytes, before anything is published.
+#[cfg(target_os = "macos")]
+use crate::tool_macho;
+#[cfg(windows)]
+use crate::tool_pe;
 use crate::{
     ToolRegistryStore, decode_bundles, decode_tools,
     tool_content::{ToolContent, inspect_tool_content},
-    tool_macho,
     tool_registry_owner::matches,
 };
 use arkdeck_contract::WireError;
@@ -50,6 +61,67 @@ fn publication(error: DocumentPublishError) -> WireError {
         DocumentPublishError::OutcomeUnknown(_) => unknown(error),
     }
 }
+/// No registered Windows HDC tuple names this executable (CHG-2026-078).
+#[cfg(windows)]
+fn unregistered() -> WireError {
+    failure(
+        "admissionDenied",
+        "no registered Windows HDC tuple names this hdc.exe (CHG-2026-078); nothing was retained",
+    )
+}
+/// A macOS source is an absolute `/` path with no `.` or `..` component; a
+/// Windows source a standard `X:\…` path, which the capture then opens
+/// without following a link.
+#[cfg(not(windows))]
+fn local_file(text: &str) -> bool {
+    text.starts_with('/')
+        && !text.as_bytes().contains(&0)
+        && !text.split('/').any(|part| matches!(part, "." | ".."))
+}
+#[cfg(windows)]
+fn local_file(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    bytes.len() > 3
+        && bytes.len() <= 16_384
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && bytes[2] == b'\\'
+        && !text.contains('\0')
+        && text[3..]
+            .split('\\')
+            .all(|part| !part.is_empty() && !matches!(part, "." | ".."))
+}
+/// Whether the executable at `source`, read once and bounded, is one a
+/// registered Windows tuple names: an early refusal only, before the store
+/// is locked; admission is decided again from the captured bytes.
+#[cfg(windows)]
+fn source_registered(store: &ToolRegistryStore, source: &Path) -> Result<bool, WireError> {
+    let absent = || {
+        failure(
+            "fileIdentityChanged",
+            "the HDC source is absent or unreadable; nothing was captured",
+        )
+    };
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let file = std::fs::File::open(source).map_err(|_| absent())?;
+    let mut hasher = Sha256::new();
+    let mut bounded = file.take(MAX_TOOL_BYTES + 1);
+    let mut buffer = vec![0u8; 256 * 1024];
+    let mut total = 0u64;
+    loop {
+        match bounded.read(&mut buffer) {
+            Ok(0) => break,
+            Ok(read) => {
+                hasher.update(&buffer[..read]);
+                total += read as u64;
+            }
+            Err(_) => return Err(absent()),
+        }
+    }
+    // An oversized source is the capture's to refuse precisely.
+    Ok(total > MAX_TOOL_BYTES || (store.identities)(&format!("{:x}", hasher.finalize())).is_some())
+}
 fn captured(error: BootstrapToolCaptureError) -> WireError {
     failure(error.code, error.message)
 }
@@ -94,7 +166,8 @@ fn record(content: &ToolContent, now: &str) -> Value {
         "contentDigest":content.digest,"executableSHA256":content.sha256,"registeredAt":now,
         "byteCount":content.byte_count,"quarantineSHA256":content.quarantine_sha256,
         "trust":trust(&content.trust),"dependencies":dependencies,"relocatable":content.relocatable,
-        "generation":1,"state":"available","references":[]});
+        "generation":1,"state":"available","references":[],
+        "platform":cfg!(windows).then_some("windows")});
     value
         .as_object_mut()
         .expect("object")
@@ -198,15 +271,15 @@ impl ToolRegistryStore {
         let text = source
             .to_str()
             .ok_or_else(|| failure("invalidInput", "a local file is required"))?;
-        if !text.starts_with('/')
-            || text.as_bytes().contains(&0)
-            || text.split('/').any(|part| matches!(part, "." | ".."))
-            || arkdeck_platform::host_legacy_iso8601(now) != Some(true)
-        {
+        if !local_file(text) || arkdeck_platform::host_legacy_iso8601(now) != Some(true) {
             return Err(failure(
                 "invalidInput",
                 "the local file or host timestamp is invalid",
             ));
+        }
+        #[cfg(windows)]
+        if !source_registered(self, source)? {
+            return Err(unregistered());
         }
         self.root.validate_path(&self.path).map_err(unreadable)?;
         let lock = self.root.lock_document(".lock").map_err(|error| {
@@ -265,7 +338,8 @@ impl ToolRegistryStore {
         let decoded = decode_tools(&bytes).map_err(unreadable)?;
         let mut index: Value = serde_json::from_slice(&decoded.document).map_err(unreadable)?;
         let retained = self.retained_tool_bytes()?;
-        let mut stage = BootstrapToolCapture::capture(&self.path, source, |file, library| {
+        #[cfg(target_os = "macos")]
+        let inspect_image = |file: &std::fs::File, library: bool| {
             let slices = tool_macho::inspect(file).map_err(|error| BootstrapToolCaptureError {
                 code: error.code,
                 message: error.message,
@@ -280,12 +354,31 @@ impl ToolRegistryStore {
                 });
             }
             Ok(tool_macho::needs_usb(&slices))
-        })
-        .map_err(captured)?;
+        };
+        #[cfg(windows)]
+        let inspect_image = |file: &std::fs::File, library: bool| {
+            let image = tool_pe::inspect(file).map_err(|error| BootstrapToolCaptureError {
+                code: error.code,
+                message: error.message,
+            })?;
+            if image.dll != library {
+                return Err(BootstrapToolCaptureError {
+                    code: "invalidInput",
+                    message: "host tool entry has the wrong native kind",
+                });
+            }
+            Ok(tool_pe::needs_usb(&image))
+        };
+        let mut stage =
+            BootstrapToolCapture::capture(&self.path, source, inspect_image).map_err(captured)?;
         checkpoint("copied").map_err(unreadable)?;
         stage.revalidate_sources().map_err(captured)?;
         let content = inspect_tool_content(stage.path()).map_err(native)?;
         stage.revalidate_sources().map_err(captured)?;
+        #[cfg(windows)]
+        if (self.identities)(&content.sha256).is_none() {
+            return Err(unregistered());
+        }
         let reference = format!("tool:sha256:{}", content.digest);
         if let Some(old) = index["records"]
             .as_array()
@@ -373,7 +466,7 @@ impl ToolRegistryStore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{

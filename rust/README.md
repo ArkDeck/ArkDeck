@@ -2942,16 +2942,26 @@ directory), created owner-only at the start. The census names `bootstrap` after
   `arkdeck.windows-daemon-package/1` with the signer as `teamIdentifier`; the content digest is
   host-tagged. `runtime service update` stays macOS-only (the open question is in
   `evidence/runs/TASK-XPA-012/windows-daemon-bundle-run.md`).
-- **Refused on Windows**, before the store is locked: registering an HDC (no Windows HDC tuple
-  is registered, CHG-2026-078); a retained HDC record is refused as failing its native trust
-  policy. With no HDC to select, `runtime.tool.select` answers Swift's no-owner refusal.
+- **An HDC on Windows** is `hdc.exe` and, exactly when it imports it, the sibling
+  `libusb_shared.dll`: bounded x64 PE images (`arkdeck-bootstrap`'s `tool_pe`, in place of
+  `tool_macho`), captured by `windows::bootstrap_tree`'s `BootstrapToolCapture` as
+  `tool-<digest>.hdc`, with their Authenticode signatures recorded as integrity and a host-tagged
+  content digest and record (`"platform":"windows"`). Registration admits only an executable a
+  registered Windows HDC tuple names: the daemon composes `arkdeck-provider-hdc`'s
+  `WINDOWS_HDC_TUPLES` into the store's identities, checked on the source before the store is
+  locked and again on the captured bytes before anything is published. **The table is empty
+  (CHG-2026-078), so every `hdc.exe` is refused** (`admissionDenied`) and nothing is written;
+  with no HDC to select, `runtime.tool.select` answers Swift's no-owner refusal.
 - **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
   team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
   `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.
 
 Tests on Windows: `arkdeck-hoststore`'s `windows_registration_tests` (a fixture toolchain retires
 once; the installed DevEco Studio's record conforms to the published schemas, ignored unless
-`ARKDECK_LIVE_DEVECO_ROOT` names it), and `arkdeck-agentd/tests/windows_bootstrap_owners_process.rs`
+`ARKDECK_LIVE_DEVECO_ROOT` names it), `arkdeck-bootstrap/tests/windows_tool_registration.rs`
+(an `hdc.exe` refused with no identity, writing nothing; refused again from its captured bytes,
+retaining nothing; admitted only under an injected fixture identity, then registered, inspected,
+listed and retired), and `arkdeck-agentd/tests/windows_bootstrap_owners_process.rs`
 (Swift's recorded empty-registry answers byte for byte and the Windows refusals over the pipe
 across a restart; with `ARKDECK_DEV_SIGNER_THUMBPRINT`, the leaves through the signed CLI, and
 with `ARKDECK_LIVE_DEVECO_ROOT` the DevEco registration, inspection, listing and retirement

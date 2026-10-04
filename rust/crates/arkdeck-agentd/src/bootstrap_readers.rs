@@ -15,8 +15,18 @@ pub struct BootstrapReaders {
 }
 impl BootstrapReaders {
     pub fn open_existing(root: &Path) -> io::Result<Self> {
+        let tools = ToolRegistryStore::open_existing(root)?;
+        // On Windows an HDC is admitted and identified only by a registered
+        // Windows tuple (CHG-2026-078), exactly as the provider's table
+        // holds it; it names no published profile.
+        #[cfg(windows)]
+        let tools = tools.with_published_identities(std::sync::Arc::new(|sha256: &str| {
+            arkdeck_provider_hdc::windows_tuple(sha256).map(|tuple| {
+                serde_json::json!({"version": tuple.reported_version, "profileReferences": []})
+            })
+        }));
         Ok(Self {
-            tools: ToolRegistryStore::open_existing(root)?,
+            tools,
             bundles: BundleRegistryReadStore::open_existing(root)?,
             deveco: DevEcoRegistryStore::open_existing(root)?,
         })
