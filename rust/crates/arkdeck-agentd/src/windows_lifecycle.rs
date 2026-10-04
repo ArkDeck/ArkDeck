@@ -179,9 +179,11 @@ impl Authority {
     ///   root) pins a preset's signing credential in the account's preset
     ///   root `<LocalAppData>\ArkDeck\Signing\OpenHarmony`, the secrets read
     ///   from Credential Manager bound to this daemon's own image
-    ///   (TASK-XPA-011), as the macOS installed daemon does. Neither the
-    ///   DevEco toolchain owner nor the workspace composition is composed, so
-    ///   a project stays `runtimeRestartRequired`; this composition does not
+    ///   (TASK-XPA-011), as the macOS installed daemon does. A build, test
+    ///   or signing preset pins its DevEco toolchain in the daemon's
+    ///   Bootstrap registry ([`Self::bootstrap_root`]), as on macOS. The
+    ///   workspace composition is not composed, so a project stays
+    ///   `runtimeRestartRequired`; this composition does not
     ///   yet ask the Job owner whether a workspace Job names a project or
     ///   preset, so every project or preset mutation is refused
     ///   (`recordUnreadable`, no new dispatch);
@@ -319,10 +321,22 @@ impl Authority {
             .map_err(|error| unusable(&self.root.path().join(name), &error))?;
         let projects = arkdeck_hoststore::WorkspaceProjectStore::open(&path)
             .map_err(|error| unusable(&path, &error))?;
+        // A preset's DevEco toolchain is pinned in this daemon's own
+        // Bootstrap registry, as both macOS compositions pin it in theirs.
+        // A development root composes no signing credential owner, as the
+        // macOS isolated owner composes none: a preset that pins a credential
+        // is refused there.
+        let bootstrap = self.bootstrap_root()?;
+        let toolchains = crate::host::toolchain_pinning(&bootstrap).map_err(|error| {
+            format!(
+                "the Bootstrap registry {} is unusable: {error}; nothing was started",
+                bootstrap.display()
+            )
+        })?;
         let projects = if self.development {
-            projects
+            projects.with_dependency_pinning(Some(toolchains), None)
         } else {
-            projects.with_dependency_pinning(None, Some(credential_pinning()?))
+            projects.with_dependency_pinning(Some(toolchains), Some(credential_pinning()?))
         };
         // Read now, as the macOS start reads it to compose the registered
         // projects: a document it cannot read ends the start.
@@ -333,7 +347,6 @@ impl Authority {
             .with_workspace_projects(projects)
             .with_planning(self.root.path());
         let host = host.with_trace_cache(self.trace_cache()?);
-        let bootstrap = self.bootstrap_root()?;
         let host = host.with_bootstrap(&bootstrap).map_err(|error| {
             format!(
                 "the Bootstrap registry {} is unusable: {error}; nothing was started",

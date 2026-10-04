@@ -39,15 +39,16 @@
 //! owes its debt and parks the Job with its intent outstanding. Every
 //! transport byte comes from the shared fake HDC; none of this is hardware
 //! acceptance. The runs spawn the fake, so this binary is theirs.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
-use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessDispatch, ProcessPlan, Receipt};
+use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt};
 use serde_json::{Map, Value, json};
 use std::fs;
 use std::time::Duration;
 use support::debug_hap;
+use support::hdc_oracle::FakeDispatch;
 use support::hdc_oracle::{self, Owners, exchange};
 
 /// Every call Swift's runs and its continuation made.
@@ -74,7 +75,7 @@ enum Fault {
 
 /// The fake HDC with one command faulted; every other command reaches it.
 struct Faulted<'a> {
-    inner: &'a ProcessDispatch,
+    inner: &'a FakeDispatch,
     fault: Fault,
 }
 

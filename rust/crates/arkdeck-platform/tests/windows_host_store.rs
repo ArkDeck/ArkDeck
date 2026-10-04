@@ -401,6 +401,51 @@ fn links_junctions_and_foreign_rights_are_refused_without_rewriting() {
     HostDirectory::open(&scratch.0).unwrap();
 }
 
+/// A frozen Import checkpoint that replaces its prior waits out a moment's
+/// holder of the prior, as a published document does, and a holder that
+/// stays past the patience refuses it before publication, with the prior
+/// unchanged and no staging left.
+#[test]
+fn an_import_checkpoint_replacement_waits_out_a_brief_holder() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let (scratch, root) = Scratch::new("checkpoint-held");
+    const NAME: &str = "checkpoint.json";
+    root.publish_import_checkpoint(NAME, None, b"first", 64)
+        .unwrap();
+    let hold = || {
+        std::fs::OpenOptions::new()
+            .read(true)
+            // FILE_SHARE_READ | FILE_SHARE_WRITE, no FILE_SHARE_DELETE.
+            .share_mode(0x1 | 0x2)
+            .open(scratch.join(NAME))
+            .unwrap()
+    };
+    let held = hold();
+    let (release, released) = mpsc::channel::<()>();
+    let holder = std::thread::spawn(move || {
+        let _ = released.recv_timeout(std::time::Duration::from_millis(100));
+        drop(held);
+    });
+    root.publish_import_checkpoint(NAME, Some(b"first"), b"second", 64)
+        .unwrap();
+    drop(release);
+    holder.join().unwrap();
+    assert_eq!(root.read(NAME, 64).unwrap(), b"second");
+
+    let held = hold();
+    assert!(matches!(
+        root.publish_import_checkpoint(NAME, Some(b"second"), b"third", 64),
+        Err(DocumentPublishError::BeforePublication(_))
+    ));
+    drop(held);
+    assert_eq!(root.read(NAME, 64).unwrap(), b"second");
+    assert_eq!(
+        root.names(8).unwrap(),
+        vec![NAME.to_owned()],
+        "no staged checkpoint is left"
+    );
+}
+
 /// A replacement waits out a moment's holder of the document it replaces
 /// (an anti-malware or indexing filter holding it without delete sharing,
 /// here a handle of this test released after 100 ms) and then publishes;

@@ -680,7 +680,7 @@ impl HostDirectory {
         checkpoint("beforeRename");
         rename_replacing(&file, &self.0, &target).map_err(|error| {
             // A rename refused because the target is held replaced nothing.
-            if held(&error) {
+            if host_fs::held(&error) {
                 DocumentPublishError::BeforePublication(error)
             } else {
                 DocumentPublishError::OutcomeUnknown(error)
@@ -1325,7 +1325,7 @@ impl HostDirectory {
 
 /// The atomic replacement of a published document. Replacing a name whose
 /// file another handle holds open without delete sharing fails
-/// (`STATUS_ACCESS_DENIED` or `STATUS_SHARING_VIOLATION`, [`held`]). On NTFS
+/// (`STATUS_ACCESS_DENIED` or `STATUS_SHARING_VIOLATION`, [`host_fs::held`]). On NTFS
 /// the holder is the anti-malware scan of the document the previous
 /// publication put there a moment before: the refusals end on their own,
 /// Restart Manager names no process holding the file (a kernel-mode handle,
@@ -1336,36 +1336,11 @@ impl HostDirectory {
 /// (`arkdeck-hoststore/tests/job_store_corpus.rs`, TASK-XPA-005, 25 runs
 /// under an 8.3 `TEMP`): 17 refusals, most over within tens of
 /// milliseconds, three lasting 1.1 to 1.2 s, beyond the second the retry
-/// used to allow. Such a refusal replaced nothing, so the rename is retried
-/// with a doubling pause (1 ms up to 250 ms) until [`REPLACE_PATIENCE`] has
-/// passed, and then answered; any other failure is answered at once.
+/// used to allow. Such a refusal replaced nothing, so the rename waits the
+/// holder out ([`host_fs::waiting_out_holders`]); any other failure is
+/// answered at once.
 fn rename_replacing(file: &File, directory: &File, target: &[u16]) -> io::Result<()> {
-    let deadline = std::time::Instant::now() + REPLACE_PATIENCE;
-    let mut delay = std::time::Duration::from_millis(1);
-    loop {
-        match host_fs::rename(file, directory, target, true) {
-            Err(error) if held(&error) && std::time::Instant::now() < deadline => {
-                std::thread::sleep(delay);
-                delay = (delay * 2).min(std::time::Duration::from_millis(250));
-            }
-            answer => return answer,
-        }
-    }
-}
-
-/// How long a replacement waits out a holder of the target: several times the
-/// longest refusal measured (about 1.2 s).
-const REPLACE_PATIENCE: std::time::Duration = std::time::Duration::from_secs(10);
-
-/// Whether a rename was refused because another handle holds its target
-/// (`ERROR_ACCESS_DENIED`, `ERROR_SHARING_VIOLATION`): nothing was replaced.
-fn held(error: &io::Error) -> bool {
-    const ACCESS_DENIED: i32 = 5;
-    const SHARING_VIOLATION: i32 = 32;
-    matches!(
-        error.raw_os_error(),
-        Some(ACCESS_DENIED | SHARING_VIOLATION)
-    )
+    host_fs::waiting_out_holders(|| host_fs::rename(file, directory, target, true))
 }
 
 /// Hash a file from its first byte to its end through one handle, calling

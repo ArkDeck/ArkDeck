@@ -107,6 +107,8 @@ pub(crate) fn release_in(
 /// script, SDK root and every other pinned child — once the record is
 /// verified. The resolution requires the owner's own pin at the record's
 /// current generation, so a preset can only run the toolchain it pinned.
+/// macOS only: the workspace composition that runs it is macOS-only.
+#[cfg(target_os = "macos")]
 pub(crate) fn resolve_in(
     index: &mut Index,
     reference: &str,
@@ -149,8 +151,14 @@ pub(crate) fn resolve_in(
 /// The encoded index Swift's `saveIndex` publishes, validated as a reader
 /// would read it back.
 pub(crate) fn encode(index: &Index) -> Result<Vec<u8>, WireError> {
+    // As the retirement encodes it: canonical on macOS; on Windows as the
+    // registration encodes it, since an NTFS file id may exceed the exact
+    // integer range canonical JSON admits.
+    #[cfg(target_os = "macos")]
     let encoded =
         canonical_json(&serde_json::to_value(index).map_err(unreadable)?).map_err(unreadable)?;
+    #[cfg(windows)]
+    let encoded = serde_json::to_vec(index).map_err(unreadable)?;
     if encoded.len() > MAX_INDEX {
         return Err(failure(
             "quotaExceeded",
@@ -217,6 +225,7 @@ impl DevEcoRegistryStore {
 
     /// Resolves the toolchain the owner's exact pin names, as Swift's
     /// `resolve`: the record re-measured, nothing written.
+    #[cfg(target_os = "macos")]
     pub fn resolve(
         &self,
         reference: &str,
@@ -304,6 +313,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    #[cfg(target_os = "macos")]
     fn oracle() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/deveco-toolchain-pins")
     }
@@ -312,6 +322,10 @@ mod tests {
     /// index it recorded before the step: the same answer or refusal, and the
     /// index it recorded after, byte for byte. Content verification is Swift's
     /// injected one: it holds until the recorded content change, then refuses.
+    /// The recorded indexes hold macOS records, which a Windows registry
+    /// refuses to read as its own; Windows pins its own records
+    /// (`deveco_registry_owner`'s Windows registration tests).
+    #[cfg(target_os = "macos")]
     #[test]
     fn pins_and_releases_leave_swift_s_index_byte_for_byte() {
         let cases: Value =
@@ -398,22 +412,19 @@ mod tests {
         );
     }
 
+    /// A fresh owner-only registry directory: mode 0700 on macOS, the
+    /// store's owner-only DACL on Windows.
     fn registry() -> (PathBuf, DevEcoRegistryStore) {
-        use std::os::unix::fs::DirBuilderExt;
         let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
-        let path = PathBuf::from(format!("/private/tmp/deveco-pins-{nonce:032x}"));
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&path)
-            .unwrap();
+        let path = crate::test_private::temporary_root().join(format!("deveco-pins-{nonce:032x}"));
+        crate::test_private::create_private_directory(&path);
         let store = DevEcoRegistryStore::open_existing(&path).unwrap();
         (path, store)
     }
 
+    #[cfg(target_os = "macos")]
     fn write(path: &std::path::Path, name: &str, bytes: &[u8]) {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::write(path.join(name), bytes).unwrap();
-        std::fs::set_permissions(path.join(name), std::fs::Permissions::from_mode(0o600)).unwrap();
+        crate::test_private::plant_owner_only(&path.join(name), bytes);
     }
 
     /// An empty registry is created as Swift's shared store creates it, and
@@ -450,6 +461,7 @@ mod tests {
 
     /// A retired toolchain cannot be pinned, and nothing is published for the
     /// refusal. Its retained metadata needs no retained content.
+    #[cfg(target_os = "macos")]
     #[test]
     fn a_retired_toolchain_is_not_pinned() {
         let (path, store) = registry();
@@ -513,6 +525,7 @@ mod tests {
 
     /// A resolution requires the owner's own pin at the current generation
     /// and a verified record, and names the pinned children but Node.
+    #[cfg(target_os = "macos")]
     #[test]
     fn a_resolution_names_the_pinned_toolchain_only_for_its_exact_pin() {
         let cases: Value =

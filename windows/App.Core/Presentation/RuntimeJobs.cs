@@ -76,7 +76,8 @@ public sealed record OperationFacts(
     long TimeoutSeconds,
     long OutputByteBudget,
     OperationReadiness Availability,
-    IReadOnlyList<OperationStep> Steps)
+    IReadOnlyList<OperationStep> Steps,
+    IReadOnlyList<OperationInput>? Inputs = null)
 {
     public bool IsAvailable => Availability.Kind == AvailabilityKind.Available;
 
@@ -100,13 +101,29 @@ public sealed record OperationFacts(
             })
             : [];
         long Number(string key) => o.TryGetValue(key, out var v) && v is JsonNumber n && n.TryGetInt64(out var value) ? value : 0;
+        var inputs = o.TryGetValue("inputs", out var i) && i is JsonArray
+            ? TypedJson.List(i, row =>
+            {
+                var input = Json.Object(row, "an operation input");
+                long? Bound(string key) => input.TryGetValue(key, out var v) && v is JsonNumber n && n.TryGetInt64(out var value) ? value : null;
+                return new OperationInput(TypedJson.Required(input, "name", TypedJson.String), Bound("minimum"), Bound("maximum"));
+            })
+            : [];
         var availability = listed is null
             ? OperationReadiness.From(o, "availability", "availabilityReasons")
             : OperationReadiness.From(listed, "availability", "reasons");
         return new(reference, Json.OptionalString(o, "title") ?? reference, Json.OptionalString(o, "minimumEffect") ?? "",
-            Number("timeoutSeconds"), Number("outputByteBudget"), availability, steps);
+            Number("timeoutSeconds"), Number("outputByteBudget"), availability, steps, inputs);
     }
+
+    /// <summary>The published bounds of one integer input, or null when the Catalog publishes
+    /// none (macOS <c>closedRange(_:)</c> over the descriptor's minimum and maximum).</summary>
+    public (long Minimum, long Maximum)? RangeOf(string input) =>
+        Inputs?.FirstOrDefault(i => i.Name == input) is { Minimum: { } minimum, Maximum: { } maximum } ? (minimum, maximum) : null;
 }
+
+/// <summary>One input of an operation's Catalog description, with its integer bounds.</summary>
+public sealed record OperationInput(string Name, long? Minimum, long? Maximum);
 
 public enum AvailabilityKind
 {
@@ -307,11 +324,18 @@ public sealed partial class SurfaceLoader
     /// answers the status projection, which carries no timeline.</summary>
     public async Task<SessionActionState<JobTerminal>> RunJobAsync(string jobId, string cli)
     {
-        var run = await Action("job.run", Params(("jobId", new JsonString(jobId))), v => Json.Object(v, "a Job status"), cli).ConfigureAwait(false);
-        if (run.Answer.Unavailable is { } refused) return new(Loaded<JobTerminal>.Not(refused), run.DaemonFailure, run.Reached);
-        var shown = await ShowAsync(jobId, cli).ConfigureAwait(false);
+        var shown = await RunAndShowAsync(jobId, cli).ConfigureAwait(false);
         return new(shown.Answer.Value is { } value ? Loaded<JobTerminal>.Of(value.Terminal) : Loaded<JobTerminal>.Not(shown.Answer.Unavailable!),
             shown.DaemonFailure, shown.Reached);
+    }
+
+    /// <summary><see cref="RunJobAsync"/> with the whole status the terminal was read from (the
+    /// Viewer checks that nobody is waited for and no residue is left).</summary>
+    internal async Task<SessionActionState<JobShown>> RunAndShowAsync(string jobId, string cli)
+    {
+        var run = await Action("job.run", Params(("jobId", new JsonString(jobId))), v => Json.Object(v, "a Job status"), cli).ConfigureAwait(false);
+        if (run.Answer.Unavailable is { } refused) return new(Loaded<JobShown>.Not(refused), run.DaemonFailure, run.Reached);
+        return await ShowAsync(jobId, cli).ConfigureAwait(false);
     }
 
     /// <summary>A Job's status presentation (<c>job.show</c>, its timeline inline or paged

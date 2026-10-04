@@ -895,6 +895,279 @@ fn workspace_project_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     ]);
 }
 
+/// A build preset naming `toolchain` at generation 1.
+fn build_preset(request: &str, project: &Value, toolchain: &str) -> Value {
+    json!({"registrationRequestId": request, "projectRef": project, "kind": "build",
+        "templateRef": "openharmony.hvigor-build@1", "timeoutSeconds": "600",
+        "toolchainRef": toolchain, "toolchainGeneration": "1", "module": "entry",
+        "product": "default", "buildMode": "debug"})
+}
+
+/// A build or test preset pins its DevEco toolchain in the daemon's own
+/// Bootstrap registry: without a registered toolchain the registry's refusal
+/// is answered (not the absent owner's), and a signing preset is refused as
+/// the macOS isolated owner refuses it, with no credential owner. Nothing is
+/// written.
+#[test]
+fn a_preset_pins_its_toolchain_in_the_daemon_s_bootstrap_registry() {
+    let _turn = turn();
+    let root = Root::new();
+    let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
+    let mut daemon = Daemon::start(executable, &root.0);
+    let pipe = daemon.serving();
+    let project = answered(
+        &pipe,
+        "workspace.project.register",
+        registration("request-first", &root.project("first")),
+    )["projectRef"]
+        .clone();
+    let written = root.document();
+    let absent = format!("toolchain:sha256:{}", "a".repeat(64));
+    let reply = refused(
+        &pipe,
+        "workspace.preset.register",
+        build_preset("preset-build", &project, &absent),
+        "resourceNotFound",
+    );
+    assert_eq!(
+        reply["error"]["message"], "toolchain reference does not exist",
+        "{reply}"
+    );
+    let signing = json!({"registrationRequestId": "preset-sign", "projectRef": project,
+        "kind": "signing", "templateRef": "openharmony.local-sign@1", "timeoutSeconds": "600",
+        "toolchainRef": absent, "toolchainGeneration": "1",
+        "credentialRef": "credential:signing-one"});
+    let reply = refused(
+        &pipe,
+        "workspace.preset.register",
+        signing,
+        "operationUnavailable",
+    );
+    assert_eq!(
+        reply["error"]["message"], "signing credential reference owner is unavailable",
+        "{reply}"
+    );
+    assert_eq!(
+        answered(
+            &pipe,
+            "workspace.preset.list",
+            json!({"projectRef": project})
+        )["presets"],
+        json!([])
+    );
+    assert_eq!(root.document(), written);
+    daemon.stop(&root.0);
+}
+
+/// With the host's DevEco Studio (`ARKDECK_LIVE_DEVECO_ROOT`, measured and
+/// registered, never run): through the real CLI against a dev-signed daemon,
+/// a build and a test preset register over the toolchain and pin it, the
+/// pinned toolchain is not retired, the presets read back after a restart,
+/// and once both are removed the toolchain retires.
+#[test]
+fn build_and_test_presets_pin_the_host_s_deveco_through_the_cli() {
+    let Some(thumbprint) =
+        std::env::var_os("ARKDECK_DEV_SIGNER_THUMBPRINT").filter(|value| !value.is_empty())
+    else {
+        eprintln!(
+            "SKIPPED: ARKDECK_DEV_SIGNER_THUMBPRINT is not set (or empty), so no host-trusted development \
+             signer can sign the daemon the CLI must verify (rust/scripts/windows-dev-identity.ps1 \
+             create); nothing was checked"
+        );
+        return;
+    };
+    let Some(deveco) = std::env::var("ARKDECK_LIVE_DEVECO_ROOT")
+        .ok()
+        .filter(|value| !value.is_empty())
+    else {
+        eprintln!(
+            "ARKDECK_LIVE_DEVECO_ROOT is not set: the preset registrations over the host's DevEco \
+             Studio were not run"
+        );
+        return;
+    };
+    let _turn = turn();
+    let root = Root::new();
+    let signed = root.0.join("signed-bin");
+    std::fs::create_dir(&signed).unwrap();
+    let daemon = signed.join("arkdeck-agentd.exe");
+    std::fs::copy(env!("CARGO_BIN_EXE_arkdeck-agentd"), &daemon).unwrap();
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/windows-dev-identity.ps1");
+    let signing = Command::new(pwsh())
+        .args(["-NoProfile", "-NonInteractive", "-File"])
+        .arg(&script)
+        .arg("sign")
+        .arg("-Thumbprint")
+        .arg(&thumbprint)
+        .arg("-Path")
+        .arg(&daemon)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(signing.status.success(), "{signing:?}");
+    let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
+    let pin = pin["pin"].as_str().unwrap().to_owned();
+    let first_root = root.project("first");
+
+    let mut first = Daemon::start(&daemon, &root.0);
+    let pipe = first.serving();
+    let run = |pipe: &str, arguments: &[&str]| {
+        let (status, envelope) = cli(&daemon, &pin, pipe, arguments);
+        assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
+        envelope["result"].clone()
+    };
+    let project = run(
+        &pipe,
+        &[
+            "workspace",
+            "project",
+            "register",
+            "--registration-request-id",
+            "request-first",
+            "--kind",
+            "openharmony",
+            "--root",
+            &first_root,
+        ],
+    );
+    let project = project["projectRef"].as_str().unwrap().to_owned();
+    let toolchain = run(
+        &pipe,
+        &[
+            "runtime", "tool", "register", "--kind", "deveco", "--root", &deveco,
+        ],
+    );
+    let toolchain = toolchain["toolRef"].as_str().unwrap().to_owned();
+    let register = |pipe: &str, request: &str, kind: &str, template: &str| {
+        run(
+            pipe,
+            &[
+                "workspace",
+                "preset",
+                "register",
+                "--registration-request-id",
+                request,
+                "--project",
+                &project,
+                "--kind",
+                kind,
+                "--template",
+                template,
+                "--timeout-seconds",
+                "600",
+                "--toolchain",
+                &toolchain,
+                "--toolchain-generation",
+                "1",
+                "--module",
+                "entry",
+                "--product",
+                "default",
+                "--build-mode",
+                "debug",
+            ],
+        )
+    };
+    let build = register(&pipe, "preset-build", "build", "openharmony.hvigor-build@1");
+    assert_eq!(build["kind"], "build", "{build}");
+    assert_eq!(build["toolchainRef"], toolchain.as_str(), "{build}");
+    let test = register(&pipe, "preset-test", "test", "openharmony.hvigor-test@1");
+    // The registry names both presets as the toolchain's holders.
+    let inspected = run(&pipe, &["runtime", "tool", "inspect", "--tool", &toolchain]);
+    let mut holders: Vec<&str> = inspected["references"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|holder| {
+            assert_eq!(holder["kind"], "workspacePreset", "{inspected}");
+            holder["id"].as_str().unwrap()
+        })
+        .collect();
+    holders.sort();
+    let mut expected = vec![
+        build["presetRef"].as_str().unwrap(),
+        test["presetRef"].as_str().unwrap(),
+    ];
+    expected.sort();
+    assert_eq!(holders, expected, "{inspected}");
+    // A pinned toolchain is not retired.
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "runtime",
+            "tool",
+            "remove",
+            "--tool",
+            &toolchain,
+            "--expected-generation",
+            "1",
+        ],
+    );
+    assert_ne!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["error"]["code"], "resourceConflict", "{envelope}");
+    first.stop(&root.0);
+
+    // Restarted: the presets read back; removing both releases the pins,
+    // and the toolchain then retires.
+    let mut second = Daemon::start(&daemon, &root.0);
+    let pipe = second.serving();
+    let listed = run(
+        &pipe,
+        &["workspace", "preset", "list", "--project", &project],
+    );
+    assert_eq!(listed["presets"].as_array().unwrap().len(), 2, "{listed}");
+    for (request, preset) in [("remove-build", &build), ("remove-test", &test)] {
+        let shown = run(
+            &pipe,
+            &[
+                "workspace",
+                "preset",
+                "show",
+                "--project",
+                &project,
+                "--preset",
+                preset["presetRef"].as_str().unwrap(),
+            ],
+        );
+        run(
+            &pipe,
+            &[
+                "workspace",
+                "preset",
+                "remove",
+                "--mutation-request-id",
+                request,
+                "--project",
+                &project,
+                "--preset",
+                preset["presetRef"].as_str().unwrap(),
+                "--expected-generation",
+                shown["generation"].as_str().unwrap(),
+            ],
+        );
+    }
+    let inspected = run(&pipe, &["runtime", "tool", "inspect", "--tool", &toolchain]);
+    assert_eq!(inspected["references"], json!([]), "{inspected}");
+    let retired = run(
+        &pipe,
+        &[
+            "runtime",
+            "tool",
+            "remove",
+            "--tool",
+            &toolchain,
+            "--expected-generation",
+            "1",
+        ],
+    );
+    assert_eq!(retired["state"], "removed", "{retired}");
+    second.stop(&root.0);
+    assert_measured(&["workspace.preset.register"]);
+}
+
 /// What this test measured is what the coverage manifest counts: each
 /// leaf's entries are Windows `implemented` in the manifest the CLI renders
 /// (`maintainer contracts export`'s product, held to the committed
