@@ -192,6 +192,7 @@ impl<H: HostServices> AppIngress<H> {
                     | "job.show"
                     | "job.timeline"
                     | "job.evidence"
+                    | "job.reconcile"
                     | "artifact.list"
                     | "artifact.read"
                     | "artifact.quota"
@@ -235,6 +236,12 @@ impl<H: HostServices> AppIngress<H> {
         let _run = match &job {
             Some(jobs::Action::Run(id)) => match self.jobs.begin(id) {
                 Some(run) => Some(run),
+                None if self.control.app_job_recovery_allowed(id, true) => {
+                    match self.jobs.begin_recovery(id) {
+                        Some(run) => Some(run),
+                        None => return not_allowlisted(&request.id),
+                    }
+                }
                 None => return not_allowlisted(&request.id),
             },
             Some(jobs::Action::Cancel(id)) if !self.jobs.owns(id) => {
@@ -242,6 +249,16 @@ impl<H: HostServices> AppIngress<H> {
             }
             _ => None,
         };
+        if request.method == "job.reconcile" {
+            let id = request
+                .params
+                .as_ref()
+                .and_then(|params| params.get("jobId"))
+                .and_then(Value::as_str);
+            if !id.is_some_and(|id| self.control.app_job_recovery_allowed(id, false)) {
+                return not_allowlisted(&request.id);
+            }
+        }
         #[cfg(test)]
         self.dispatches
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -285,6 +302,13 @@ fn closed_parameters(request: &Request) -> bool {
                     .is_some_and(|reference| {
                         arkdeck_hoststore::parse_reference(reference).is_ok()
                     }));
+    }
+    if request.method == "job.reconcile" {
+        return params.len() == 1
+            && params
+                .get("jobId")
+                .and_then(Value::as_str)
+                .is_some_and(|id| !id.is_empty() && id.len() <= 128);
     }
     // Read schemas close every parameter object, including Artifact owner.
     // Resource owners retain defaults, identity/range/cursor validation and

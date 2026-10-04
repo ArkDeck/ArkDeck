@@ -26,7 +26,7 @@
 | Diagnostics | History 精确来源 → Session reader → index/summary/markers 校验 → timeline/缺口/Artifact；显式读取文本/JSON；已发布 Trace 可转入独立 Viewer | 交互式 arm/append-marker/stop、会话内视频与时钟校准未接通。published bounded ringBuffered 与部分自动 Marker 已存在，不能误报为全缺失；无校准/事件时间时明确无法对齐/未记录时刻 |
 | History | 八类筛选、保存/分页、证据、参数、导出与精确来源上下文；Diagnostics 历史 Session 已加载并保留来源 | 不重放；未知 operation 不猜类型；Flash 来源目标已消失时显示缺失，不静默换设备 |
 | Settings | 独立七标签：General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics；Trace 内 Cache / Licenses | 不再内嵌完整更新设置；当前 App 诊断包不提供 device raw 勾选，敏感 Artifact 从 History 单独导出 |
-| Job Inspector / recovery | job.list/status/evidence/artifact.list 精确详情；标准 published 日志显式读取（最多 2 MiB，末 200 行）；已知活动 Job 取消请求先核对 fresh identity | 取消请求不代表终态；敏感产物走 History。unknown 不取消/重放；恢复 rebind/archive 未有 App RPC 接线，仍保留为缺口，不删 accepted spec |
+| Job Inspector / recovery | job.list/status/evidence/artifact.list 精确详情；标准 published 日志显式读取（最多 2 MiB，末 200 行）；已知活动 Job 取消请求先核对 fresh identity | 取消请求不代表终态；敏感产物走 History。Inspector 可重新核对 waitingForRecovery、继续 confirmed safe boundary，并核验精确 Flash 目标的 Loader 绑定；unknown 不重放。archive 与 TCP/UART 人工 rebind 仍有缺口 |
 
 `prototype.html` 默认展示当前边界。`?page=diagnostics&concept=diagnostics` 仅用于未来会话探索；
 `?page=automation` 解释退役旧链接，不显示任务控制。保存会话状态用 `diagnosticsState=loaded|partial|trace|failed`，
@@ -108,8 +108,17 @@ Artifact metadata；已接通标准日志的显式读取（最多 2 MiB、末 20
 页共享同一 banner family，独立 Settings / Trace Viewer / 帮助不显示。逐项投影尚未解决
 的 unknown、waitingForHuman、waitingForRecovery、awaitingRebindConfirmation、
 resumeAtConfirmedSafeBoundary、userAbandonRequested；已有 Runtime current-epoch
-关系的历史 unknown 仍保留原事实，但不再作为当前提醒。下列 resume/archive/human
-resolution 不是 App 现有动作。Runtime 已发布且准入的恢复能力与 App 缺失入口分开记录。
+关系的历史 unknown 仍保留原事实，但不再作为当前提醒。
+
+Job Inspector 对 `waitingForRecovery` 提供 `job.reconcile`，对 fresh status 确认的
+`resumeAtConfirmedSafeBoundary` 且 outcome known / 无 human wait 提供一次 `job.run`。
+两者均先核对相同 Job、operation、target、Session 和 state；Runtime 仅允许已持久化的
+封闭 App 请求，并重新验证 journal 与执行准入。丢失或漂移的回复只显示未确认并刷新，
+不会自动重试、重新提交或清除 unknown。Flash 恢复记录另可从 fresh adopted targets 中
+精确选取相同 target，调用已有 `flash.bind-current-loader` 核验 Loader；不回退到首台设备，
+不隐式继续刷机，不把身份关联称为效果已确认。UI fixture 与原型不调用真实 Runtime。
+archive、TCP/UART 人工 rebind confirm/abort 与 human resolution 仍未提供 App 动作；
+保留 accepted spec 与剩余实现，不能用 UI 确认代替 Runtime 的完整证明。
 
 主窗口恢复区最多占当前 detail 可用高度的 45%，超出后独立纵向滚动；按内容实测高度
 收缩单条短提示，不为它预留空白。该上限同时为工作区预留 400 pt；空间更小时保留至少
@@ -257,7 +266,7 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 - Runtime 返回 Job ID 后立即显示「取消剩余步骤」；请求通过 `job.cancel` 到达 Runtime。临界写入不会被强杀，取消在下一个安全边界生效，不回放 unknown destructive intent。
 - rebind 按 transport 分流：USB 只有在稳定身份、相邻 binding revision 与 updater/plan 阶段证据完整匹配时可自动 rebind 并继续；TCP / UART 断连必须停在人工确认，任何证据不完整或漂移都 fail closed。不得把 USB 的已证明自动恢复写成“静默续刷”。
 - 固件可改变 DAYU200 的 HDC serial，而已绑定 Loader identity 保持稳定。Runtime 在首笔写入前必须持有 owner-bound 的旧 HDC identity + USB topology；重启后只接受该 topology 上唯一的 HDC personality、唯一匹配的 `Connected` row，并通过新 connect key 精确校验镜像声明的 model/build。完整只读证明落盘后，后续 facts 与 `flash.bootloader-status` 把新 HDC alias 关联回原 target/binding；拓扑歧义、USB identity 自相矛盾或 model/build 不匹配均零落盘、fail closed。App 只显示脱敏后的 target、revision、mode 与结果，不接收 raw serial/topology，也不提供 alias 管理控件。
-- 当前发布的 `flash.dayu200` 只有 USB / RockUSB 路径，因此执行中的 Job 不暴露 rebind confirm / abort 控件；上面的 Loader target 绑定是执行前身份关联，不是断连后续刷确认。未来若发布 TCP / UART Flash operation，必须先补齐对应 domain 状态与 confirm / abort RPC，不能只在 UI 伪造停点。
+- 当前发布的 `flash.dayu200` 只有 USB / RockUSB 路径，因此执行中的 Job 不暴露 rebind confirm / abort 控件；Loader target 绑定是身份关联，可在执行前或 Inspector 的等待恢复记录中显式核验，但不是断连后续刷确认。未来若发布 TCP / UART Flash operation，必须先补齐对应 domain 状态与 confirm / abort RPC，不能只在 UI 伪造停点。
 - 成功结果只展示 Runtime 已投影的事实：明确的「刷机成功」、设备回报 build 与镜像期望一致、总用时；完整 binding revision、plan、artifact 与 timeline 保留在「刷机详情」和 History。执行前 Loader 激活若产生相邻 revision，App 必须先以该新 revision 重新生成精确计划；重启后的 HDC alias 只在 topology、model 与 build 精确证明后关联回这一 target/revision。manifest 全 executed + SHA 在 wire 没有字段前不画占位第三行。failed、cancelled 或 outcomeUnknown 均不得投影为成功，其中 outcomeUnknown 必须显示 needsAttention 与不可通过确认绕过的恢复说明。
 
 ### 5.9 History（REQ-UX-004）

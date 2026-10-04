@@ -1084,6 +1084,18 @@ public static class UiStrings
     public const string WindowsViewerTabAdvancedDump = "windows.viewer.tab.advancedDump";
     public const string WindowsViewerAdvancedDumpLoading = "windows.viewer.advancedDump.loading";
     public const string WindowsViewerAdvancedDumpNoIds = "windows.viewer.advancedDump.noIds";
+    public const string JobRecoveryActionObserved = "jobRecovery.action.observed";
+    public const string JobRecoveryActionReconcile = "jobRecovery.action.reconcile";
+    public const string JobRecoveryActionReconcileDetail = "jobRecovery.action.reconcile.detail";
+    public const string JobRecoveryActionRefused = "jobRecovery.action.refused";
+    public const string JobRecoveryActionResume = "jobRecovery.action.resume";
+    public const string JobRecoveryActionResumeDetail = "jobRecovery.action.resume.detail";
+    public const string JobRecoveryActionStillUnknown = "jobRecovery.action.stillUnknown";
+    public const string JobRecoveryActionUnconfirmed = "jobRecovery.action.unconfirmed";
+    public const string JobRecoveryActionWorking = "jobRecovery.action.working";
+    public const string JobRecoveryActionRebind = "jobRecovery.action.rebind";
+    public const string JobRecoveryActionRebindDetail = "jobRecovery.action.rebind.detail";
+    public const string JobRecoveryActionRebound = "jobRecovery.action.rebound";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2164,5 +2176,17 @@ public static class UiStrings
         WindowsViewerTabAdvancedDump,
         WindowsViewerAdvancedDumpLoading,
         WindowsViewerAdvancedDumpNoIds,
+        JobRecoveryActionObserved,
+        JobRecoveryActionReconcile,
+        JobRecoveryActionReconcileDetail,
+        JobRecoveryActionRefused,
+        JobRecoveryActionResume,
+        JobRecoveryActionResumeDetail,
+        JobRecoveryActionStillUnknown,
+        JobRecoveryActionUnconfirmed,
+        JobRecoveryActionWorking,
+        JobRecoveryActionRebind,
+        JobRecoveryActionRebindDetail,
+        JobRecoveryActionRebound,
     ];
 }

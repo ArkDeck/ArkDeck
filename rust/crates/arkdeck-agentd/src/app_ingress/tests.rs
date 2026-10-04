@@ -125,6 +125,7 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "job.show",
             "job.timeline",
             "job.evidence",
+            "job.reconcile",
             "artifact.list",
             "artifact.read",
             "artifact.quota",
@@ -441,3 +442,6 @@ mod loader_binding_tests;
 
 #[path = "production_tests.rs"]
 mod production_tests;
+
+#[path = "recovery_tests.rs"]
+mod recovery_tests;
