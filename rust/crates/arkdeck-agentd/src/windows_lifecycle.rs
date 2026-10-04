@@ -1218,6 +1218,19 @@ impl Authority {
         Ok(sessions)
     }
 
+    /// The registered tuples this authority admits a selected HDC by,
+    /// replaced: a test build's injected fixture tuple (the signed test
+    /// daemon's), never a production input.
+    #[cfg(all(windows, test))]
+    #[allow(dead_code)]
+    pub(crate) fn with_tuples(
+        mut self,
+        tuples: &'static [arkdeck_provider_hdc::WindowsHdcTuple],
+    ) -> Self {
+        self.tuples = tuples;
+        self
+    }
+
     /// After a complete drain: the owner lock, then the guard, on the thread
     /// that took the guard.
     pub(crate) fn release(self) {
