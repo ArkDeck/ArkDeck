@@ -11,9 +11,10 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
   private static let profile = "OPENHARMONY-TOOLS@0.6.0"
   private static let lock = "INTEGRATION-PROFILES-0.7.0"
   // The profile and lock current today: CHG-2026-078 added the Windows registry in
-  // OPENHARMONY-TOOLS@0.7.0 / INTEGRATION-PROFILES-0.8.0; this registry's own pins stay above.
-  private static let currentProfileVersion = "0.7.0"
-  private static let currentLock = "INTEGRATION-PROFILES-0.8.0"
+  // OPENHARMONY-TOOLS@0.7.0 / INTEGRATION-PROFILES-0.8.0, amended by its r3 to @0.7.1 / -0.8.1;
+  // this registry's own pins stay above.
+  private static let currentProfileVersion = "0.7.1"
+  private static let currentLock = "INTEGRATION-PROFILES-0.8.1"
   private static let toolVersion = "3.2.0f"
   private static let toolSHA256 =
     "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"

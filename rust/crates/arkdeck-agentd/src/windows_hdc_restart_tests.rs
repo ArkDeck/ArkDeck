@@ -117,9 +117,6 @@ fn a_confirmed_restart_of_the_registered_windows_hdc_runs_end_to_end() {
         .unwrap();
     let managed = managed.expect("the registered HDC is composed as the managed server");
     let control = arkdeck_control::Control::new(host).unwrap();
-    // Until CHG-2026-078 r3 settles the composition past it, the first
-    // ~1.3 s of a fresh server list `[Empty]` (not yet observable).
-    std::thread::sleep(Duration::from_secs(3));
 
     let status = frame(&control, "runtime.hdc.status", json!({}), false);
     let before = status["result"].clone();

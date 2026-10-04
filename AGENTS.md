@@ -14,6 +14,12 @@
   重复加载未变内容。历史命令、版本和状态与当前实现核对。
 - 使用用户的语言，简要说明实际修改、验证与阻塞。产品迭代按 `PRODUCT-LOOP.md` §19
   汇报；完成即交付，不主动追加治理、重构、无关功能或为“下一轮建议”制造任务。
+- 同一工作流连续产出的 PR 默认使用 stacked PR：首层以最新 `main` 为 base，后续层从相邻
+  下层分支继续，并以该分支为 base；每层只提交一个可独立审阅的增量。下层更新后由底向上
+  同步整条依赖链，避免多个依赖 PR 各自从旧 `main` 分叉。具体建栈、同步与合入规则见
+  [提交指南](scripts/agent-guides/contributing.md#连续-pr-使用-stacked-pr)。
+- 多个 Agent 需要修改同一份共享字符串、契约、生成器或生成物时，先确定一个集成层及负责的
+  Agent，其余实现依赖该层；共享源与生成物在该层一起更新，不在平行分支重复生成。
 - 当前请求还有未完成的工作时继续推进，不在这些地方停下：总结末尾预告下一步却不执行；询问
   是否继续；列出并不阻塞后续工作的待决事项；因回合已长、完成一个里程碑或 PR 在等
   review/合入而收尾。进度和建议随下一步操作一起给出。只有剩余工作都要等用户输入，或都卡在
@@ -29,7 +35,7 @@
 | 身份、副作用准入、恢复、隐私 | [Constitution](openspec/constitution.md) 对应 Safety invariant / `POL-*`，再读相关 contract |
 | 新 operation 或已发布 operation 的破坏性修改、新 provider、新 integration/device profile、destructive 准入安全策略变化 | 同车 OpenSpec change + 维护者 PR review；读取 [enforcement](openspec/governance/enforcement.md)、[verification policy](openspec/verification/policy.md) 与所属 change |
 | 真机验收已发布 operation，或验收 App 呈现 | [验收指南](scripts/agent-guides/acceptance.md) |
-| 准备 commit、push、创建或更新 PR | [提交指南](scripts/agent-guides/contributing.md)；提交前读取 |
+| 准备 commit、push、创建或更新 PR，包括连续 PR 建栈与冲突同步 | [提交指南](scripts/agent-guides/contributing.md)；提交前读取 |
 | 维护 AGENTS.md、项目 skill 或排查指令冲突 | [指令维护](scripts/agent-guides/instructions.md) |
 
 表中操作指南仅在命中对应任务时读取，是本文件的按需说明；无需预先加载全部链接。

@@ -3,12 +3,12 @@
 Change: CHG-2026-074-shared-rust-runtime-core, over CHG-2026-078 (the registered DevEco Studio
 26.0.0.43 `hdc.exe`, `3.2.0g`, c2). GJ-1's restart hop on Windows.
 
-Branch `agent/xpa-005-windows-hdc-restart-20261004`, one commit, stacked on #2486 (the Windows HDC
+Branch `agent/xpa-005-windows-hdc-restart-20261004`, on `main` after #2486 (the Windows HDC
 adoption: TEMP/TMP for the managed server, the plain image spelling in the commandless observer,
 the registered Windows listing grammar). The confirmed restart end to end also needs two independent
 PRs: #2480 (the Windows foreground-console origin, maintainer ruling 2026-10-04) and #2488
-(`human-action.resume` admits an unsigned preview tool). CHG-2026-078 r3 (#2484) will settle the
-composition past the `[Empty]` listing of a fresh server; until then the live tests wait 3 s.
+(`human-action.resume` admits an unsigned preview tool). CHG-2026-078 r3 (#2484) settles the
+managed start past the `[Empty]` listing of a fresh server, so the live tests need no wait.
 
 Host: the Windows 11 x64 reference host, console session 1, non-elevated. The live runs used only
 the server the daemon itself started on `127.0.0.1:8710` and stopped it; no other server was
@@ -52,8 +52,6 @@ requested.
 
 ## Left out
 
-- The `[Empty]` settle after the managed server starts: CHG-2026-078 r3 and its composition change
-  (#2484 and its follow-up); the live tests wait 3 s until then.
 - Driving the real CLI's console prompt through ConPTY end to end: the in-process test supplies the
   console origin as the macOS tests do; #2480 derives it on the pipe.
 

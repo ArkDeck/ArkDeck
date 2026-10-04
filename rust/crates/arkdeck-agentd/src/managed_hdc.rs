@@ -547,9 +547,7 @@ impl DevelopmentHdc {
         Self { dispatch, managed }
     }
 
-    /// Read by the Job planner's HDC composition, which Windows does not
-    /// compose over this HDC yet.
-    #[cfg_attr(windows, allow(dead_code))]
+    /// Read by the Job planner's HDC composition.
     pub(crate) fn tool_sha256(&self) -> &str {
         self.dispatch.tool_sha256()
     }

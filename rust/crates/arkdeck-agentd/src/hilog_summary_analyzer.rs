@@ -203,7 +203,9 @@ fn file_url_path(value: &str, current: &str, home: Option<&str>) -> String {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
+#[cfg(target_os = "macos")]
 mod tests {
     use super::file_url_path;
 
@@ -246,4 +248,5 @@ mod tests {
             );
         }
     }
+}
 }

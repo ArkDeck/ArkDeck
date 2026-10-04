@@ -5,7 +5,10 @@
 //! through the commandless identity proof — the listener's owner must be the
 //! process this launch recorded, by PID, birth, executable path and digest.
 //! A listener of any other process, however exact, never becomes this server.
-use crate::{ServerCheck, parse_host_server_check};
+//!
+//! On Windows a bound server is then settled past the registered
+//! server-startup listing (CHG-2026-078 r3, [`settle_startup_listing`]).
+use crate::{ObservationFailure, PresenceSnapshot, ServerCheck, parse_host_server_check};
 use arkdeck_platform::{
     LoopbackServerLease, ManagedServer, ServerExit, ServerIdentityReceipt, ServerLaunch,
     ServerStop, ToolLimits, ToolRequest, ToolTermination, VerifiedTool,
@@ -27,6 +30,50 @@ const REACHABILITY_PROBE: Duration = Duration::from_millis(100);
 
 /// Swift `HDCServerEndpointSelection.defaultPort`.
 const DEFAULT_PORT: u16 = 8710;
+
+/// The bound on settling a just-started Windows server past the registered
+/// server-startup listing (CHG-2026-078 r3). Over 15 starts of the
+/// registered `3.2.0g` server the startup listing was last printed 1.26 s
+/// after the spawn (at most 0.71 s after the listener answered), and the
+/// first enumerated listing came at most 1.5 s after the spawn. The settle
+/// begins only after the listener answers and `checkserver` agrees, so 3 s
+/// is more than twice the longest window observed.
+pub const WINDOWS_STARTUP_SETTLE: Duration = Duration::from_secs(3);
+
+/// Whether a just-started server's `list targets -v` settled past the
+/// registered server-startup listing within its bound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartupListing {
+    /// A registered, enumerated listing was read: the server has enumerated.
+    Settled,
+    /// No registered listing was read before the bound. The server stays
+    /// up, but its observations stay what the parser says (the startup
+    /// listing is `unknown`), so nothing is observed from it: fail closed.
+    Unsettled,
+}
+
+/// CHG-2026-078 r3: re-list until a registered listing other than the
+/// server-startup one is read, every `poll`, for at most `bound`. `list`
+/// is one read-only `list targets -v`, judged by the registered Windows
+/// grammar. The startup listing (`NotYetObservable`) is never taken for "no
+/// device": it only means "list again". Any other failure is retried within
+/// the same bound too, and never settles.
+pub fn settle_startup_listing(
+    mut list: impl FnMut() -> Result<PresenceSnapshot, ObservationFailure>,
+    bound: Duration,
+    poll: Duration,
+) -> StartupListing {
+    let deadline = Instant::now() + bound;
+    loop {
+        if list().is_ok() {
+            return StartupListing::Settled;
+        }
+        if Instant::now() + poll > deadline {
+            return StartupListing::Unsettled;
+        }
+        std::thread::sleep(poll);
+    }
+}
 
 /// Swift `HDCServerEndpointSelector.select()` as the daemon's host calls it,
 /// with no explicit endpoint: the inherited `OHOS_HDC_SERVER_PORT` on the
@@ -106,6 +153,8 @@ pub struct ManagedHdcServer {
     lease: LoopbackServerLease,
     check: ServerCheck,
     endpoint: SocketAddrV4,
+    #[cfg(windows)]
+    startup_listing: StartupListing,
 }
 
 impl ManagedHdcServer {
@@ -235,12 +284,29 @@ impl ManagedHdcServer {
         if !launch_matches(server.launch_record(), lease.identity()) || !server.same_birth() {
             return Err(unbound());
         }
+        // The registered Windows server answers `[Empty]` CR TAB `hdc` CR LF
+        // until it has enumerated: settle past it before anything observes.
+        #[cfg(windows)]
+        let startup_listing = settle_startup_listing(
+            || windows_listing(tool, &environment, budget.probe_timeout),
+            WINDOWS_STARTUP_SETTLE,
+            budget.poll,
+        );
         Ok(Self {
             server,
             lease,
             check,
             endpoint,
+            #[cfg(windows)]
+            startup_listing,
         })
+    }
+
+    /// Whether the start settled past the registered server-startup listing
+    /// (CHG-2026-078 r3).
+    #[cfg(windows)]
+    pub fn startup_listing(&self) -> StartupListing {
+        self.startup_listing
     }
 
     pub fn launch(&self) -> &ServerLaunch {
@@ -309,6 +375,46 @@ pub fn generation(identity: &ServerIdentityReceipt) -> Option<u64> {
         .checked_mul(1_000_000)?
         .checked_add(identity.start_microseconds)
         .filter(|generation| *generation > 0)
+}
+
+/// One registered `list targets -v` against the server just started (the
+/// registry's exact argv and the server's port variable), judged by the
+/// Windows grammar. The pseudonyms it may compute are discarded.
+#[cfg(windows)]
+fn windows_listing(
+    tool: &VerifiedTool,
+    environment: &[(OsString, OsString)],
+    timeout: Duration,
+) -> Result<PresenceSnapshot, ObservationFailure> {
+    use crate::{ObservationInput, ObservationTermination, parse_registered_windows_presence};
+    let arguments = ["list", "targets", "-v"].map(OsString::from);
+    let request = ToolRequest {
+        arguments: &arguments,
+        environment,
+        working_directory: None,
+        limits: ToolLimits {
+            timeout,
+            capture_bytes: PROBE_CAPTURE_BYTES,
+        },
+    };
+    let execution = tool
+        .run_tool(&request, &|| false)
+        .map_err(|_| ObservationFailure::Unknown("the listing could not be run"))?;
+    let termination = match execution.termination {
+        ToolTermination::Exited(status) => ObservationTermination::Exited(status),
+        ToolTermination::TimedOut => ObservationTermination::TimedOut,
+        ToolTermination::Cancelled { .. } => ObservationTermination::Cancelled,
+        ToolTermination::Signalled(_) => ObservationTermination::Signalled,
+    };
+    parse_registered_windows_presence(
+        &ObservationInput {
+            stdout: &execution.stdout,
+            stderr: &execution.stderr,
+            termination,
+            stdout_truncated: execution.truncated,
+        },
+        &[0; 32],
+    )
 }
 
 /// Swift `HDCManagedProcessLaunch.matches`.

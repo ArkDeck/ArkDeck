@@ -5,6 +5,16 @@
 // compiles from these sources (`app_ingress`, `bootstrap_readers`, `host`,
 // `managed_hdc`) keep no test module beside them;
 // their unit tests are declared here.
+
+/// The unit tests of a module that `tests/spawning` also compiles on Windows
+/// (the Windows lifecycle and what its composition names) stay beside it,
+/// inside this macro: this binary's test build runs them, and that binary
+/// defines the macro to expand to nothing, so they never run there.
+#[allow(unused_macros)]
+macro_rules! daemon_unit_tests {
+    ($($item:item)*) => { $( #[cfg(test)] $item )* };
+}
+
 #[cfg(target_os = "macos")]
 mod app_ingress;
 #[cfg(all(test, target_os = "macos"))]
@@ -932,6 +942,19 @@ fn main() {
         }
         if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
             std::process::exit(crash_ledger_analyzer::run(&arguments));
+        }
+        // The code-owned grep, sed and patch a Windows workspace profile
+        // pins (TASK-XPA-011): this image is each of them.
+        if first.is_some_and(|argument| argument == arkdeck_hoststore::WORKSPACE_TOOL_FLAG) {
+            let Some(arguments) = arguments[1..]
+                .iter()
+                .map(|argument| argument.to_str().map(str::to_owned))
+                .collect::<Option<Vec<String>>>()
+            else {
+                eprintln!("arkdeck-agentd: a workspace tool argument is not text");
+                std::process::exit(2);
+            };
+            std::process::exit(arkdeck_hoststore::workspace_tool_main(&arguments));
         }
     }
     if let Err(error) = serve() {

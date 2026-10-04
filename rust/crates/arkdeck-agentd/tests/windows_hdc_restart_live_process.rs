@@ -200,9 +200,6 @@ fn a_confirmed_restart_of_the_registered_windows_hdc() {
     let root = Root::new();
     let mut daemon = Daemon::start(&root.0, &hdc);
     let pipe = daemon.serving();
-    // A fresh 3.2.0g server lists `[Empty]` for its first ~1.3 s, which the
-    // registry does not admit yet (CHG-2026-078 r3, #2484, settles past it).
-    std::thread::sleep(Duration::from_secs(3));
 
     let status = call(&pipe, "runtime.hdc.status", json!({}));
     eprintln!("status: {status}");

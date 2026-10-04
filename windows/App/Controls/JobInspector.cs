@@ -70,6 +70,7 @@ public sealed partial class JobInspector : UserControl
         var state = await Task.Run(App.Loader.HistoryAsync);
         RenderList(state);
         MainWindow.Instance.Report(state);
+        MainWindow.Instance.ShowJobRecovery(state.Jobs.Value);
         if (_selectedJob is { } job) await ShowJobAsync(job);
     }
 

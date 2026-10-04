@@ -104,7 +104,8 @@ pub(crate) fn bundled() -> Result<Option<CodeSignHelper>, String> {
     Ok(None)
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
 
@@ -210,4 +211,5 @@ mod tests {
         }
         std::fs::remove_dir_all(&root).unwrap();
     }
+}
 }

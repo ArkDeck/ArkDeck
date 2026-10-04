@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-078-windows-hdc-registration
-change_revision: 2
+change_revision: 3
 platform: windows
 evidence_classes:
 - contract
@@ -48,6 +48,17 @@ cases:
     observedEmpty and the connected fixture is one device. A 5-column row, a sixth column other
     than hdc, any other UART form, an unknown literal, a residual CR, the [Empty] marker or
     zero-byte stdout make the snapshot unknown. checkserver is never dispatched.
+- acceptance_id: WHR-STARTUP-001
+  test_id: TEST-WHR-STARTUP-001
+  method: Classification of the registered c2 server-startup fixture and near-miss vectors, and
+    the managed-start settle over scripted listings (r3).
+  expected_source: openspec/changes/chg-2026-078-windows-hdc-registration/verification.md#WHR-STARTUP-001
+  minimum_evidence: contract
+  expected_result: >-
+    Exactly [Empty] CR TAB hdc CR LF with exit 0 and empty stderr is notYetObservable (unknown,
+    retryable) and never observedEmpty, a device set or a disappearance. Every other [Empty] form
+    is unknown. After a managed start the Runtime lists again for at most 3 s until a registered
+    enumerated listing is read; past the bound every observation stays unknown.
 - acceptance_id: WHR-CENSUS-001
   test_id: TEST-WHR-CENSUS-001
   method: TASK-XPA-004 Windows census tests over synthetic PnP nodes shaped like the sanitized
