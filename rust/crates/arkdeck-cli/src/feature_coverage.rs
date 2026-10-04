@@ -405,9 +405,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.cancel",
     "job.reconcile",
     // The agent execution and human-action owners over Swift's
-    // physical-assistance records (TASK-XPA-005). Not `agent run`, `resume`
-    // or `abandon`, nor `human-action resume`: each reaches a Target, which
-    // needs a registered HDC.
+    // physical-assistance records (TASK-XPA-005). `agent run` and
+    // `agent resume` are measured below, over the signed test daemon's fake
+    // HDC; not `abandon` nor `human-action resume`.
     "agent.list",
     "agent.status",
     "human-action.list",
@@ -474,6 +474,12 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "ui-dump.component-detail",
     "debug.logs",
     "trace.capture",
+    // `agent resume --resume-reference`: an agent execution paused for a
+    // person (the device not observed) resumed by its action's reference
+    // once the device is connected, adopting it and completing its Job, as
+    // the Swift human-action oracle's `connect` scenario records it
+    // (`gj1_device_leaves.rs`); its client-side `--resume-token` path too.
+    "agent.resume",
     // The Debug probe over the Target store and the HDC (TASK-XPA-008;
     // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
     // against the signed test daemon over the Swift oracle's answers). Not

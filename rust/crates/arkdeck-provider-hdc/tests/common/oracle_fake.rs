@@ -35,6 +35,7 @@ pub enum Answers {
     ReadLegs,
     FileLegs,
     TraceLegs,
+    HumanAction,
     DebugProbe,
 }
 
@@ -61,6 +62,7 @@ impl Answers {
             line if line.starts_with("# capture.diagnostics@1 Trace-leg answers") => {
                 Self::TraceLegs
             }
+            line if line.starts_with("# Physical assistance: the device list") => Self::HumanAction,
             line if line.starts_with("# debug.probe and debug.template.run answers") => {
                 Self::DebugProbe
             }
@@ -828,6 +830,34 @@ impl OracleFake {
         Answer::unregistered()
     }
 
+    /// `agent-human-action/hdc-answers.sh`: the physical assistance an agent
+    /// execution waits on (the device list offline, unauthorized or with two
+    /// devices, and a Job held at its server check until `released` exists
+    /// below the root), then `capture.diagnostics@1`'s table.
+    fn human_action(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        if all == "list targets -v" {
+            let row = |key: &str, state: &str| format!("{key}\t\tUSB\t{state}\tlocalhost\n");
+            match mode {
+                "offline" => return Answer::out(row(KEY, "Offline")),
+                "unauthorized" => return Answer::out(row(KEY, "Unauthorized")),
+                "twoDevices" => {
+                    return Answer::out(
+                        row(KEY, "Connected")
+                            + &row("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "Connected"),
+                    );
+                }
+                _ => {}
+            }
+        }
+        if mode == "heldServer" && all == "checkserver" {
+            while !self.root.join("released").exists() {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        Self::capture_diagnostics(argv, mode)
+    }
+
     /// The reads every leg's table shares, on device `key`: its product name,
     /// its full build and the free space under `/data/local/tmp`.
     fn device_basics(all: &str, key: &str) -> Option<Answer> {
@@ -1035,6 +1065,7 @@ impl HdcDispatch for OracleFake {
             Answers::ReadLegs => Self::read_legs(&plan.arguments, &mode),
             Answers::FileLegs => self.file_legs(&plan.arguments, &mode),
             Answers::TraceLegs => self.trace_legs(&plan.arguments, &mode),
+            Answers::HumanAction => self.human_action(&plan.arguments, &mode),
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
