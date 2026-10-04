@@ -73,6 +73,15 @@ pub(crate) fn valid_port(value: &str) -> Option<u16> {
 }
 
 impl HdcDispatch for ProcessDispatch {
+    /// On Windows, the registered tuple of the pinned executable's digest.
+    fn registered_windows_tuple(&self) -> Option<&'static crate::WindowsHdcTuple> {
+        if cfg!(windows) {
+            crate::windows_tuple(self.tool_sha256())
+        } else {
+            None
+        }
+    }
+
     #[cfg(target_os = "macos")]
     fn mutation_identity_current(&self) -> bool {
         self.tool_identity_current()

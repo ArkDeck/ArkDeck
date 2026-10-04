@@ -13,8 +13,8 @@
 //! ArkForge lane serves over `arkforged discoverDevices`.
 use crate::live_mode::{HdcIdentity, LoaderIdentity, UsbProbe, sha256_hex};
 use crate::{
-    DispatchFailure, HdcDispatch, ParseError, ProcessPlan, Property, Receipt, parse_target_list,
-    property_value,
+    DispatchFailure, HdcDispatch, ParseError, ProcessPlan, Property, Receipt,
+    parse_host_target_list, property_value,
 };
 use std::collections::BTreeMap;
 use std::fmt;
@@ -245,7 +245,11 @@ impl<'a> RockchipHdcObserver<'a> {
         while self.clock.now() < deadline {
             let receipt = self.read(target_list_plan(budget.command_timeout))?;
             receipts.push(receipt.clone());
-            match parse_target_list(&receipt.stdout, TARGET_LIST_VERSION, receipt.truncated) {
+            match parse_host_target_list(
+                &receipt.stdout,
+                target_list_version(self.hdc),
+                receipt.truncated,
+            ) {
                 Ok(rows) => {
                     let matches = connected_rows(&rows, connect_key);
                     if if expected_connected {
@@ -294,7 +298,11 @@ impl<'a> RockchipHdcObserver<'a> {
         while self.clock.now() < deadline {
             let receipt = self.read(target_list_plan(budget.command_timeout))?;
             receipts.push(receipt.clone());
-            match parse_target_list(&receipt.stdout, TARGET_LIST_VERSION, receipt.truncated) {
+            match parse_host_target_list(
+                &receipt.stdout,
+                target_list_version(self.hdc),
+                receipt.truncated,
+            ) {
                 Ok(rows) => {
                     let by_topology = self
                         .usb
@@ -600,6 +608,15 @@ fn validate_expectation(
     }
 }
 
+/// The version whose registered grammar reads `hdc`'s target list: the
+/// registered Windows tuple's own (CHG-2026-078: its six-column `USB`
+/// family, UART rows excluded) when the dispatch is pinned to one, Swift's
+/// macOS family otherwise, unchanged.
+fn target_list_version(hdc: &dyn HdcDispatch) -> &'static str {
+    hdc.registered_windows_tuple()
+        .map_or(TARGET_LIST_VERSION, |tuple| tuple.reported_version)
+}
+
 fn connected_rows(rows: &[crate::DeviceCandidate], connect_key: &str) -> usize {
     rows.iter()
         .filter(|row| row.connect_key == connect_key && row.state == "Connected")
@@ -701,6 +718,9 @@ mod tests {
     struct Scripted {
         answers: RefCell<VecDeque<Answer>>,
         plans: RefCell<Vec<ProcessPlan>>,
+        /// Pinned to the registered Windows tuple (CHG-2026-078), as a
+        /// dispatch of the registered `hdc.exe` is.
+        windows: bool,
     }
 
     impl Scripted {
@@ -708,6 +728,15 @@ mod tests {
             Self {
                 answers: RefCell::new(answers.into()),
                 plans: RefCell::new(Vec::new()),
+                windows: false,
+            }
+        }
+
+        #[cfg(windows)]
+        fn pinned_to_the_windows_tuple(answers: Vec<Answer>) -> Self {
+            Self {
+                windows: true,
+                ..Self::new(answers)
             }
         }
 
@@ -721,6 +750,12 @@ mod tests {
     }
 
     impl HdcDispatch for Scripted {
+        fn registered_windows_tuple(&self) -> Option<&'static crate::WindowsHdcTuple> {
+            self.windows
+                .then(|| crate::WINDOWS_HDC_TUPLES.first())
+                .flatten()
+        }
+
         fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
             self.plans.borrow_mut().push(plan.clone());
             let answer = self
@@ -834,6 +869,97 @@ mod tests {
         match result {
             Err(RockchipHdcFailure::Failed(detail)) => detail,
             other => panic!("expected a failed step, got {other:?}"),
+        }
+    }
+
+    /// The registered Windows tuple's own listings (CHG-2026-078, the c2
+    /// captures of 2026-10-04), read by its six-column family.
+    #[cfg(windows)]
+    mod windows_tuple {
+        use super::*;
+
+        /// The redacted connect key of the c2 captures.
+        const C2_KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const CONNECTED: &[u8] = include_bytes!(
+            "../../../tests/fixtures/hdc-windows/c2/board-connected/list-targets-board-connected.stdout.bin"
+        );
+        const REMOVED: &[u8] = include_bytes!(
+            "../../../tests/fixtures/hdc-windows/c2/board-removed/list-targets-board-removed.stdout.bin"
+        );
+        const NO_BOARD: &[u8] = include_bytes!(
+            "../../../tests/fixtures/hdc-windows/c2/no-board/list-targets-empty.stdout.bin"
+        );
+
+        #[test]
+        fn a_reconnect_is_proved_by_the_connected_capture() {
+            let hdc = Scripted::pinned_to_the_windows_tuple(vec![
+                Answer::Bytes(REMOVED.to_vec()),
+                Answer::Bytes(CONNECTED.to_vec()),
+            ]);
+            let usb = UsbScript::default();
+            let clock = FakeClock::new();
+            let receipts = RockchipHdcObserver::new(&hdc, &usb, &clock)
+                .wait_for_hdc(C2_KEY, true, &budget(10))
+                .unwrap();
+            assert_eq!(receipts.len(), 2);
+        }
+
+        #[test]
+        fn a_disconnect_is_proved_by_the_offline_row_or_only_serial_ports() {
+            for list in [REMOVED, NO_BOARD] {
+                let hdc = Scripted::pinned_to_the_windows_tuple(vec![
+                    Answer::Bytes(CONNECTED.to_vec()),
+                    Answer::Bytes(list.to_vec()),
+                ]);
+                let usb = UsbScript::default();
+                let clock = FakeClock::new();
+                let receipts = RockchipHdcObserver::new(&hdc, &usb, &clock)
+                    .wait_for_hdc(C2_KEY, false, &budget(10))
+                    .unwrap();
+                assert_eq!(receipts.len(), 2);
+            }
+        }
+
+        #[test]
+        fn silence_and_the_macos_family_never_prove_a_wait_under_the_windows_tuple() {
+            let usb = UsbScript::default();
+            for (expected_connected, list) in [
+                (false, Vec::new()),
+                (false, b"[Empty]\n".to_vec()),
+                (
+                    true,
+                    b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t\tUSB\tConnected\tlocalhost\n".to_vec(),
+                ),
+            ] {
+                let hdc = Scripted::pinned_to_the_windows_tuple(vec![
+                    Answer::Bytes(list.clone()),
+                    Answer::Bytes(list),
+                ]);
+                let clock = FakeClock::new();
+                let reason = detail(RockchipHdcObserver::new(&hdc, &usb, &clock).wait_for_hdc(
+                    C2_KEY,
+                    expected_connected,
+                    &budget(2),
+                ));
+                assert!(reason.contains("before the deadline"), "{reason}");
+                assert_eq!(hdc.reads(), 2);
+            }
+        }
+
+        #[test]
+        fn an_unpinned_dispatch_keeps_the_macos_family() {
+            let hdc = Scripted::new(vec![Answer::Bytes(CONNECTED.to_vec())]);
+            let usb = UsbScript::default();
+            let clock = FakeClock::new();
+            assert_eq!(
+                detail(RockchipHdcObserver::new(&hdc, &usb, &clock).wait_for_hdc(
+                    C2_KEY,
+                    true,
+                    &budget(1)
+                )),
+                "descriptor-bound HDC target did not reconnect before the deadline; last \
+                 malformed target list read: target line is not the registered 5-column family"
+            );
         }
     }
 

@@ -238,41 +238,57 @@ pub fn parse_registered_windows_presence(
             "stderr was not empty, the exit was nonzero, or stdout truncated",
         ));
     }
-    if execution.stdout.is_empty() {
-        return Err(ObservationFailure::Unknown(
-            "zero-byte stdout is outside the registered Windows raw family",
-        ));
-    }
     if execution.stdout == WINDOWS_SERVER_STARTUP_LISTING {
         return Err(ObservationFailure::NotYetObservable(
             "the HDC server has not enumerated yet (the registered Windows server-startup listing)",
         ));
     }
-    let text = std::str::from_utf8(execution.stdout)
+    let rows = windows_device_rows(execution.stdout).map_err(ObservationFailure::Unknown)?;
+    Ok(snapshot(
+        rows.iter()
+            .filter(|row| row.state == "Connected")
+            .map(|row| pseudonym(session_pseudonym_key, row.connect_key))
+            .collect(),
+    ))
+}
+
+/// One `USB` row of the registered Windows `list targets -v` family: a
+/// device, `Connected` or `Offline`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct WindowsDeviceRow<'a> {
+    pub(crate) connect_key: &'a str,
+    pub(crate) state: &'a str,
+}
+
+/// The device rows of a registered Windows `list targets -v` stdout
+/// (CHG-2026-078, maintainer ruling 2026-10-04, item 2), or why the whole
+/// output is outside the family. The excluded UART rows are not returned.
+/// Shared by the presence feed ([`parse_registered_windows_presence`]) and
+/// the candidate list (`parse_windows_target_list`), so the two can never
+/// read the same bytes differently.
+pub(crate) fn windows_device_rows(
+    stdout: &[u8],
+) -> Result<Vec<WindowsDeviceRow<'_>>, &'static str> {
+    if stdout.is_empty() {
+        return Err("zero-byte stdout is outside the registered Windows raw family");
+    }
+    let text = std::str::from_utf8(stdout)
         .ok()
         .and_then(|text| text.strip_suffix('\n'))
-        .ok_or(ObservationFailure::Unknown(
-            "stdout is not a terminated UTF-8 row family",
-        ))?;
+        .ok_or("stdout is not a terminated UTF-8 row family")?;
     let mut keys = HashSet::new();
-    let mut connected = Vec::new();
+    let mut rows = Vec::new();
     for line in text.split('\n') {
         let line = line.strip_suffix('\r').unwrap_or(line);
         if line.contains('\r') {
-            return Err(ObservationFailure::Unknown(
-                "residual carriage return inside a device row field",
-            ));
+            return Err("residual carriage return inside a device row field");
         }
         let columns: Vec<_> = line.split('\t').collect();
         if columns.len() != 6 || columns[5] != "hdc" {
-            return Err(ObservationFailure::Unknown(
-                "row is not the registered Windows six-column family",
-            ));
+            return Err("row is not the registered Windows six-column family");
         }
         if !keys.insert(columns[0]) {
-            return Err(ObservationFailure::Unknown(
-                "duplicate connect key rows are outside the registered family",
-            ));
+            return Err("duplicate connect key rows are outside the registered family");
         }
         match columns[2] {
             "UART" => {
@@ -284,9 +300,7 @@ pub fn parse_registered_windows_presence(
                     || columns[3] != "Ready"
                     || columns[4] != "unknown..."
                 {
-                    return Err(ObservationFailure::Unknown(
-                        "UART row is outside the registered non-device form",
-                    ));
+                    return Err("UART row is outside the registered non-device form");
                 }
             }
             "USB" => {
@@ -294,20 +308,22 @@ pub fn parse_registered_windows_presence(
                     || !matches!(columns[3], "Connected" | "Offline")
                     || columns[4] != "localhost"
                 {
-                    return Err(ObservationFailure::Unknown(
-                        "device row literal is outside the registered closed sets",
-                    ));
+                    return Err("device row literal is outside the registered closed sets");
                 }
-                if columns[3] == "Connected" {
-                    connected.push(pseudonym(session_pseudonym_key, columns[0]));
+                if columns[0].len() > 128
+                    || !columns[0]
+                        .chars()
+                        .all(|c| c.is_ascii() && !c.is_whitespace())
+                {
+                    return Err("connect key length out of bounds");
                 }
+                rows.push(WindowsDeviceRow {
+                    connect_key: columns[0],
+                    state: columns[3],
+                });
             }
-            _ => {
-                return Err(ObservationFailure::Unknown(
-                    "row transport is outside the registered closed set",
-                ));
-            }
+            _ => return Err("row transport is outside the registered closed set"),
         }
     }
-    Ok(snapshot(connected))
+    Ok(rows)
 }

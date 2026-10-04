@@ -48,6 +48,10 @@ On Windows two things run there:
   the Windows lifecycle and composition (`windows_lifecycle`) and is copied and
   signed with the development signer. It serves a development root on its pipe,
   and the real `arkdeck.exe` drives it with the production peer check.
+  `gj23_replay.rs` drives both GJ-2/3 oracles (63 and 40 exchanges) through it.
+  For that, the test daemon alone takes three inputs: the oracle's clock, the
+  replay root's own Job state as the mutation root, and the recorded code-sign
+  helper's facts.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
@@ -1024,6 +1028,18 @@ checks the daemon over its pipe and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`,
 through `arkdeck job plan|submit` against a dev-signed daemon, before and
 after a restart.
 
+GJ-1's two device operations run on Windows host code too:
+`arkdeck-hoststore/tests/windows_gj1_replays.rs` replays the Swift
+`observe.device@1` and `capture.diagnostics@1` oracles (28 exchanges each)
+through the planner, admitter, runner, result reader and Artifact pager over
+the shared fake's two tables ported in process (`oracle_fake.rs`'s
+`ObserveDevice` and `CaptureDiagnostics` arms). Every answer is Swift's (a
+refusal's wording T2), the fake receives Swift's 11 and 16 calls in order,
+and the Jobs' index, records, Journals, Artifacts and Sessions are Swift's
+byte for byte, read with the host paths in the oracle's spelling, the
+Session platform as the oracle's and a manifest's derived values relabelled
+(`hdc_oracle::assert_read_only_replays`).
+
 ## Windows Session owner, publication and snapshot pages (TASK-XPA-005/014)
 
 `arkdeck-hoststore` builds on Windows the snapshot pager (`snapshot_pager`,
@@ -1545,8 +1561,16 @@ oracle's, and the plan digests and every value derived from them (capability
 IDs and fingerprints, receipts, outcome and record hashes, Journal seals,
 manifest digests) through the same one-to-one relabelling; an entry's mode is
 read from its DACL (`700` for a private directory, `600` for an owner-only
-document). The Windows daemon still composes no HDC and admits none of these
-Jobs: this is host code against a test fake, never the daemon's dispatch.
+document).
+
+The same two oracles also replay end to end through the daemon. In agentd's
+`tests/spawning/gj23_replay.rs`, the real signed `arkdeck.exe` sends every
+recorded exchange to the signed test daemon. That daemon is the production
+Windows development-root composition, with the fake given through a seam that
+exists in test builds only. The test reads the same things with the same
+relabelling, and both replays match. The production Windows daemon composes an
+HDC only for a registered Windows HDC tuple. Until one is registered, it still
+refuses these Jobs before admission.
 
 ## Job run (TASK-XPA-014)
 
@@ -2650,6 +2674,20 @@ well.
   server, so `runtime.hdc.impact-preview` and `runtime.hdc.restart` answer
   `operationUnavailable` without one, as on macOS. Tool selection's restart
   stays macOS-only.
+- Its consumers (TASK-XPA-005): a dispatch names the registered Windows
+  tuple its executable is pinned to (`HdcDispatch::registered_windows_tuple`;
+  `ProcessDispatch` by its digest, on Windows only), and the candidate list,
+  the identity readback and `observe.device`'s confirmation read that tuple's
+  listing with `parse_windows_target_list`, its `-v` with
+  `parse_host_client_version` and the managed start's readiness with
+  `parse_host_server_check` (the CR LF forms the Swift-parity splitter cannot
+  read); every other dispatch keeps the macOS grammars. The managed server is
+  named `TEMP`/`TMP` on Windows (without them `3.2.0g` cannot create its
+  mutex file and exits 0), and a server receipt's `\\?\` image path is
+  compared in the plain spelling. `windows_hdc_live_process.rs` runs the
+  real daemon and CLI over the registered `hdc.exe`
+  (`ARKDECK_LIVE_WINDOWS_HDC`). Jobs still reach no HDC on Windows, so
+  `probeHDCServer`'s commandless lowering waits for Windows Job execution.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
@@ -3632,6 +3670,11 @@ lane's to serve over `arkforged discoverDevices` (ArkDeck no longer owns the
 USB enumeration), as is the facts port that encodes "not observable" as
 `deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
 fake HDC driver as real subprocesses and asserts the argv from the fake's log.
+A dispatch pinned to a registered Windows HDC tuple (CHG-2026-078) reads the
+list by that tuple's own family (`parse_host_target_list` at its version: the
+six-column `USB` rows, UART rows excluded), where a zero-byte list is not
+observable rather than absence; every other dispatch keeps Swift's `3.2.0f`
+family. The module's Windows unit tests replay the c2 captures.
 ## Post-flash HDC alias store (TASK-XPA-016, M4)
 
 Swift's post-flash HDC alias store (`RockchipPostFlashHDCBindingStore`, the
@@ -3702,7 +3745,10 @@ it (`output_excerpt` is its last-output line). The `UsbProbe` port gains
 functions beside the observer. The durable alias store, the Target lineage
 advance and the executor's observation-reuse cache are other owners'.
 `tests/rockchip_hdc.rs` drives the shared fake HDC driver with its own
-answers fragment and asserts the argv from the driver's log.
+answers fragment and asserts the argv from the driver's log. Its waits read a
+registered Windows HDC tuple's list by that tuple's own family, as the live
+probe does; an empty or unregistered read never proves a reconnect or a
+disconnect.
 ## Rockchip Loader transition (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::RockchipLoaderTransition` is the Loader side of
