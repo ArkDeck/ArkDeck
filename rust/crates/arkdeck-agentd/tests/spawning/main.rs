@@ -61,10 +61,10 @@ mod host;
 #[allow(dead_code)]
 #[path = "../../src/managed_hdc.rs"]
 mod managed_hdc;
-/// The shared fake HDC's answers in process (Windows cannot run its driver).
+/// The shared fake HDC's answers in process (Windows cannot run its driver),
+/// as the hoststore replays' support compiles them.
 #[cfg(windows)]
-#[path = "../../../arkdeck-provider-hdc/tests/common/oracle_fake.rs"]
-mod oracle_fake;
+use support::oracle_fake;
 #[cfg(target_os = "macos")]
 #[allow(dead_code)]
 #[path = "../../src/tool_selection_startup.rs"]
@@ -112,10 +112,19 @@ mod flash_execution_control;
 mod flash_host_facts_control;
 #[cfg(target_os = "macos")]
 mod flash_socket_control;
+#[cfg(windows)]
+mod gj23_replay;
 #[cfg(target_os = "macos")]
 mod managed_hdc_server;
 #[cfg(windows)]
 mod signed_daemon;
+/// The hoststore replays' support for the Swift oracles over the shared fake
+/// HDC (rebuilding the oracle's root, its labels and what a replay compares),
+/// which the GJ-2/3 replay through the signed test daemon shares.
+#[cfg(windows)]
+#[allow(unused_imports)]
+#[path = "../../../arkdeck-hoststore/tests/support/mod.rs"]
+mod support;
 #[cfg(target_os = "macos")]
 mod target_observation_control;
 #[cfg(target_os = "macos")]

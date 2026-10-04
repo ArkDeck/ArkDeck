@@ -48,6 +48,10 @@ On Windows two things run there:
   the Windows lifecycle and composition (`windows_lifecycle`) and is copied and
   signed with the development signer. It serves a development root on its pipe,
   and the real `arkdeck.exe` drives it with the production peer check.
+  `gj23_replay.rs` drives both GJ-2/3 oracles (63 and 40 exchanges) through it.
+  For that, the test daemon alone takes three inputs: the oracle's clock, the
+  replay root's own Job state as the mutation root, and the recorded code-sign
+  helper's facts.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
@@ -1545,8 +1549,16 @@ oracle's, and the plan digests and every value derived from them (capability
 IDs and fingerprints, receipts, outcome and record hashes, Journal seals,
 manifest digests) through the same one-to-one relabelling; an entry's mode is
 read from its DACL (`700` for a private directory, `600` for an owner-only
-document). The Windows daemon still composes no HDC and admits none of these
-Jobs: this is host code against a test fake, never the daemon's dispatch.
+document).
+
+The same two oracles also replay end to end through the daemon. In agentd's
+`tests/spawning/gj23_replay.rs`, the real signed `arkdeck.exe` sends every
+recorded exchange to the signed test daemon. That daemon is the production
+Windows development-root composition, with the fake given through a seam that
+exists in test builds only. The test reads the same things with the same
+relabelling, and both replays match. The production Windows daemon composes an
+HDC only for a registered Windows HDC tuple. Until one is registered, it still
+refuses these Jobs before admission.
 
 ## Job run (TASK-XPA-014)
 

@@ -39,6 +39,18 @@ use std::time::{Duration, Instant};
 const FIXTURE: &str = "ARKDECK_TEST_SIGNED_DAEMON_FIXTURE";
 /// The fake HDC's own root (its call log, mode file and device markers).
 const FAKE_ROOT: &str = "ARKDECK_TEST_SIGNED_DAEMON_FAKE_ROOT";
+/// A replay's fixed clock, `<now>|<precise now>`, which the child's Host
+/// reads instead of the system's (`host::TEST_CLOCK`).
+pub(crate) const CLOCK: &str = "ARKDECK_TEST_SIGNED_DAEMON_CLOCK";
+/// The Job state a replay's device mutations prove their continuity against:
+/// the replay root's own, as the oracle's was, where a Windows development
+/// root otherwise names the account's (`windows_lifecycle`).
+pub(crate) const MUTATION_ROOT: &str = "ARKDECK_TEST_SIGNED_DAEMON_MUTATION_ROOT";
+/// A `cases.json` whose recorded `codeSignHelper` facts stand in for the
+/// bundled helper, at `<replay root>\hostrkdeck-code-sign-enable`, the
+/// path its argv names: the oracle recorded the helper's facts, not its
+/// bytes, and the fake never reads them.
+pub(crate) const HELPER: &str = "ARKDECK_TEST_SIGNED_DAEMON_HELPER";
 /// The child's test, by its full name.
 const CHILD: &str = "signed_daemon::the_signed_test_daemon";
 /// As `arkdeck-agentd`'s (`src/main.rs`).
@@ -86,19 +98,39 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
         }
     };
     let authority = authority.ok_or("a development root composes an authority")?;
+    if let Some(clock) = std::env::var_os(CLOCK) {
+        let clock = clock
+            .into_string()
+            .map_err(|_| "the test clock is not text")?;
+        let (now, precise) = clock
+            .split_once('|')
+            .ok_or("the test clock is <now>|<precise now>")?;
+        crate::host::TEST_CLOCK
+            .set((now.to_owned(), precise.to_owned()))
+            .map_err(|_| "the test clock is taken once")?;
+    }
     let host = Host::from_environment();
-    let host = match code_sign_helper::bundled() {
-        Ok(Some(helper)) => host.with_code_sign_helper(helper),
-        Ok(None) => host,
-        Err(reason) => {
-            println!("native deployment stays unavailable: {reason}");
-            host
+    let host = match std::env::var_os(HELPER) {
+        Some(cases) => {
+            host.with_code_sign_helper(recorded_helper(Path::new(&cases), Path::new(&development))?)
         }
+        None => match code_sign_helper::bundled() {
+            Ok(Some(helper)) => host.with_code_sign_helper(helper),
+            Ok(None) => host,
+            Err(reason) => {
+                println!("native deployment stays unavailable: {reason}");
+                host
+            }
+        },
     };
     let (host, arkforge, managed) = authority.compose(host)?;
     if managed.is_some() {
         return Err("the signed test daemon composes no managed HDC server".into());
     }
+    let host = match std::env::var_os(MUTATION_ROOT) {
+        Some(root) => host.with_mutation_root(PathBuf::from(root)),
+        None => host,
+    };
     let answers =
         oracle_fake::Answers::of(&std::fs::read_to_string(fixture.join("hdc-answers.sh"))?);
     let tool_sha256 = arkdeck_contract::sha256_hex(&std::fs::read(fixture.join("hdc"))?);
@@ -140,6 +172,33 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
     println!("arkdeck-agentd stopped");
     let _ = std::io::Write::flush(&mut std::io::stdout());
     Ok(())
+}
+
+/// The helper `cases.json` recorded, at the replay root's
+/// `hostrkdeck-code-sign-enable` (see [`HELPER`]).
+fn recorded_helper(
+    cases: &Path,
+    root: &Path,
+) -> Result<arkdeck_provider_hdc::CodeSignHelper, Box<dyn std::error::Error>> {
+    let cases: Value = serde_json::from_slice(&std::fs::read(cases)?)?;
+    let recorded = &cases["codeSignHelper"];
+    let text = |key: &str| {
+        recorded[key]
+            .as_str()
+            .map(str::to_owned)
+            .ok_or_else(|| format!("the recorded helper has no {key}"))
+    };
+    Ok(arkdeck_provider_hdc::CodeSignHelper {
+        facts: arkdeck_provider_hdc::CodeSignHelperFacts {
+            abi: arkdeck_provider_hdc::NativeAbi::Arm64,
+            build_id: text("buildId")?,
+            sha256: text("sha256")?,
+            byte_count: recorded["byteCount"]
+                .as_i64()
+                .ok_or("the recorded helper has no byteCount")?,
+        },
+        host_path: root.join("host").join("arkdeck-code-sign-enable"),
+    })
 }
 
 /// This binary, copied into `directory` and signed with the development
@@ -219,6 +278,19 @@ impl SignedDaemon {
         fixture: &Path,
         fake_root: &Path,
     ) -> Self {
+        Self::start_with(executable, pin, root, fixture, fake_root, &[])
+    }
+
+    /// [`Self::start`], with the replay's composition inputs (`CLOCK`,
+    /// `MUTATION_ROOT`, `HELPER`) as `variables`.
+    pub(crate) fn start_with(
+        executable: &Path,
+        pin: &str,
+        root: &Path,
+        fixture: &Path,
+        fake_root: &Path,
+        variables: &[(&str, String)],
+    ) -> Self {
         let mut command = Command::new(executable);
         for (key, _) in std::env::vars_os() {
             let upper = key.to_string_lossy().to_ascii_uppercase();
@@ -237,6 +309,7 @@ impl SignedDaemon {
             .env("ARKDECK_DEVELOPMENT_STATE_ROOT", root)
             .env(FIXTURE, fixture)
             .env(FAKE_ROOT, fake_root)
+            .envs(variables.iter().map(|(key, value)| (*key, value)))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::from(stderr))
