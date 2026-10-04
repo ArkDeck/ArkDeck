@@ -41,3 +41,34 @@ Parent Diagnostic Session PR #2465 head `600da7c8` passed Swift CI run
 `37182721655` and SDD Guard `37182721439`. This follow-up is not yet pushed.
 The updated PR-selected CI remains the unified gate; publication requires
 maintainer review and merge into protected main.
+
+
+## Main compatibility follow-up
+
+Merged main `2d85d513d`, retaining its Device preview/deployment state and this
+branch's Diagnostics state in the single conflicting design-table region. Main's
+new Windows Diagnostics reader introduced shared localization entries: its two
+capture-unavailable messages remain unchanged and are now Windows-only, because
+the macOS capture controls replace that surface. Both clients share the updated
+“Start session” label. Windows resources are regenerated from the source registry.
+
+The signed, notarized RC3 was read-only mounted again after checking its original
+DMG SHA-256. A fresh `arkdeck-agentd --cutover-preflight` without the lock option
+returned exit 0 and `clear:false`, `instanceLockHeld:false`
+(`rc3-preflight-latest.json`). The same retained legacy Session lacks its Manifest;
+no failed publication accounts for it. Installation, positive installed SPK-8,
+real SDK/signing and the installed-runtime performance baseline remain held by
+that continuity gate. No state or unresolved outcome was edited or deleted.
+
+
+### Local targeted checks after merging main
+
+- Swift `DiagnosticClockObservationTests|DiagnosticSessionOfflineInspectorContractTests|DiagnosticCaptureSessionContractTests`: 16 passed, exit 0 (`clock-merge-swift.log`).
+- App build-for-testing: exit 0, TEST BUILD SUCCEEDED (`clock-merge-app.log`).
+- Clippy for the same five affected/direct-dependent crates: exit 0 (`clock-merge-clippy.log`). Session owner, CLI diagnostics and the actual daemon App ingress binary module all passed, exit 0 (`clock-merge-rust.log`).
+- Design-system tests: 83 passed; SDD: zero errors/warnings (`clock-merge-ds.log`, `clock-merge-sdd.log`). Rust formatting, diff checks, 108-method contract generation and Windows resource/ClientKit generation checks passed.
+
+The Windows-only unavailable resources use the generator's required `windows.`
+namespace; the Windows page's resource references follow them. Its existing UI
+automation identifiers and unavailable behavior are unchanged. Native Windows
+execution remains a CI check. This follow-up updates the existing PR #2465.

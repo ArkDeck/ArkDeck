@@ -83,7 +83,9 @@ public sealed record JobSummary(
     bool WaitingForHuman,
     string ExecutionMode,
     string CreatedAtUtc,
-    string? FinishedAtUtc)
+    string? FinishedAtUtc,
+    string? SessionId = null,
+    string? WorkspaceKind = null)
 {
     /// <summary>The terminal Job states (spec/recovery/job-state-preflight.json, class
     /// "terminal"); every other state counts as active, as the macOS Job Inspector counts.</summary>
@@ -104,7 +106,9 @@ public sealed record JobSummary(
             TypedJson.Required(o, "waitingForHuman", TypedJson.Bool),
             TypedJson.Required(o, "executionMode", TypedJson.String),
             TypedJson.Required(o, "createdAtUtc", TypedJson.String),
-            o.TryGetValue("finishedAtUtc", out var finished) && finished is JsonString f ? f.Value : null);
+            o.TryGetValue("finishedAtUtc", out var finished) && finished is JsonString f ? f.Value : null,
+            o.TryGetValue("sessionId", out var session) && session is JsonString sid ? sid.Value : null,
+            o.TryGetValue("workspaceKind", out var kind) && kind is JsonString k ? k.Value : null);
     }
 
     public static IReadOnlyList<JobSummary> ParsePage(JsonValue value)

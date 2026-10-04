@@ -20,7 +20,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
-use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
 
 pub(crate) const CHECKPOINT: &str = "workspace.create-checkpoint@1";
 pub(crate) const CHECKPOINT_STEP: &str = "create-checkpoint";
@@ -203,10 +203,7 @@ impl CheckpointAction {
 /// before it is read back: an archive that cannot be opened for writing, or
 /// is a link, is refused here.
 fn synchronize(path: &str) -> Result<(), String> {
-    let file = fs::OpenOptions::new()
-        .write(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)
+    let file = support::open_no_follow(Path::new(path), true)
         .map_err(|error| format!("the archive cannot be opened: {error}"))?;
     file.sync_all()
         .map_err(|error| format!("the archive cannot be synchronized: {error}"))
@@ -227,10 +224,7 @@ pub(crate) fn sealed_archive_evidence(path: &str) -> Result<(u64, String), Strin
         return Err(unsafe_metadata());
     }
     let mut bytes = Vec::new();
-    fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)
+    support::open_no_follow(Path::new(path), false)
         .and_then(|file| file.take(MAXIMUM_ARCHIVE_BYTES + 1).read_to_end(&mut bytes))
         .map_err(|_| "workspace checkpoint archive footer is incomplete".to_owned())?;
     if bytes.len() as u64 != byte_count || bytes[bytes.len() - 1_024..].iter().any(|&b| b != 0) {

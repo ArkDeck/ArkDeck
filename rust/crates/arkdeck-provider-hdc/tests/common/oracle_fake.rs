@@ -1,8 +1,9 @@
 //! `HDCOracleFake` in process, for a Windows host (TASK-XPA-008/009): the
 //! shared fake HDC of the Swift oracles answers from a POSIX shell fragment
 //! (`hdc-answers.sh`) the driver sources, which a Windows host cannot run. The
-//! debug-hap and deploy-native-library fragments are ported here, case for
-//! case and in their order, over the same root: the call log the driver
+//! debug-hap and deploy-native-library fragments, and the Flash host facts
+//! oracle's own (`flash-host-facts/hdc-answers.sh`), are ported here, case
+//! for case and in their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
 //! It reports its tool identity current, as the macOS dispatch over the fake's
@@ -25,6 +26,7 @@ const BUNDLE: &str = "com.example.demo";
 pub enum Answers {
     DebugHap,
     NativeLibrary,
+    FlashHostFacts,
 }
 
 impl Answers {
@@ -35,6 +37,7 @@ impl Answers {
             line if line.starts_with("# deploy.native-library.app-owned@1 answers") => {
                 Self::NativeLibrary
             }
+            line if line.starts_with("# flash.prerequisites answers") => Self::FlashHostFacts,
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -347,6 +350,37 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `flash-host-facts/hdc-answers.sh`: the Rockchip facts probe's list of
+    /// targets, by mode, and the product's full name for either key.
+    fn flash_host_facts(argv: &[String], mode: &str) -> Answer {
+        const HDC_KEY: &str = "1501ffff00000000000000000000cafe";
+        const NEW_KEY: &str = "1501ffff0000000000000000000beef1";
+        let all = argv.join(" ");
+        if all == "list targets -v" {
+            return match mode {
+                "hdcKey" => Answer::out(format!("{HDC_KEY}\t\tUSB\tConnected\tlocalhost\n")),
+                "newKey" => Answer::out(format!("{NEW_KEY}\t\tUSB\tConnected\tlocalhost\n")),
+                "offline" => Answer::out(format!("{HDC_KEY}\t\tUSB\tOffline\tlocalhost\n")),
+                "empty" => Answer::out("[Empty]\r\n"),
+                "malformed" => Answer::out("no device table here\n"),
+                _ => Answer {
+                    status: 1,
+                    stdout: String::new(),
+                    stderr: "list targets failed\n".into(),
+                },
+            };
+        }
+        if [HDC_KEY, NEW_KEY]
+            .iter()
+            .any(|key| all == format!("-t {key} shell param get const.ohos.fullname"))
+        {
+            return Answer::out("OpenHarmony-7.0.0.36\n");
+        }
+        Answer::unregistered()
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -371,6 +405,7 @@ impl HdcDispatch for OracleFake {
         let answer = match self.answers {
             Answers::DebugHap => self.debug_hap(&plan.arguments, &mode),
             Answers::NativeLibrary => self.native_library(&plan.arguments, &mode),
+            Answers::FlashHostFacts => Self::flash_host_facts(&plan.arguments, &mode),
         };
         Ok(Receipt {
             exit_status: answer.status,

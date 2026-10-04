@@ -54,6 +54,9 @@ met 13 refusals in 11 runs, again all `ERROR_ACCESS_DENIED` with no holder named
 exactly as reported, with the retry exhausted after 1108 ms, and the longest refusal that ended
 in time took 903 ms. The short path only made S1's run the one that showed it.
 
+Later measurement under heavier host load found refusals that no handle explains and that outlast
+any patience: see `ntfs-replace-refused-without-holder-run.md`.
+
 ## The fix
 
 - **Longer bounded retry.** `rename_replacing` now waits out a held target until

@@ -178,7 +178,9 @@ where
 impl UsbRegistryRelations<fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable>> {
     /// The host's own census (`arkdeck_platform::usb_host_devices`): the I/O
     /// Registry on macOS, the Plug and Play device tree on Windows, whose
-    /// property choice is provisional until the DAYU200 sample confirms it.
+    /// property choice the 2026-10-04 DAYU200 sample confirmed (CHG-2026-078
+    /// design §4: present nodes, the serial ASCII-lowercase folded, one
+    /// attachment per arrival).
     pub fn system() -> Self {
         Self::new(arkdeck_platform::usb_host_devices)
     }

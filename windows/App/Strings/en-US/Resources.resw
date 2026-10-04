@@ -1040,7 +1040,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.preview (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_productionBoundary" xml:space="preserve">
-    <value>Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.</value>
+    <value>Each Job deploys one signed app-owned .so through the published operation. Queues run these Jobs serially, stopping on failure or uncertainty. ELF, ABI, Build ID, hash, backup and readback checks still apply. .abc replacement and standalone device restart remain unavailable.</value>
     <comment>debug.artifacts.productionBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_remoteBindingFailed" xml:space="preserve">
@@ -1184,7 +1184,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.sheet.warning (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_detail" xml:space="preserve">
-    <value>Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.</value>
+    <value>Choose signed app-owned libraries from local files, folders, mounted SMB shares or a verified SSH build source. Only selected bytes enter Artifact import.</value>
     <comment>debug.artifacts.source.detail (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_kind" xml:space="preserve">
@@ -1204,7 +1204,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.source.title (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_sourceBoundary" xml:space="preserve">
-    <value>SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.</value>
+    <value>Folder access uses the file-picker grant. SMB shares must already be mounted in Finder. SSH, including WSL, stays read-only within the saved root and pins the host key.</value>
     <comment>debug.artifacts.sourceBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_target" xml:space="preserve">
@@ -4317,5 +4317,321 @@ SHA-256: %4$@</value>
   <data name="windows_viewer_advancedDump_noIds" xml:space="preserve">
     <value>This component has no numeric hostWindowId/componentId pair in the current capture</value>
     <comment>windows.viewer.advancedDump.noIds (Windows only)</comment>
+  </data>
+  <data name="app_navigation_diagnostics" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>app.navigation.diagnostics (Localizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_diagnostics" xml:space="preserve">
+    <value>Open Diagnostics</value>
+    <comment>history.activity.open.diagnostics (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_readOnly" xml:space="preserve">
+    <value>This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.</value>
+    <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_diagnostics_capture_unavailable" xml:space="preserve">
+    <value>Session capture is not available</value>
+    <comment>windows.diagnostics.capture.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_diagnostics_capture_unavailable_detail" xml:space="preserve">
+    <value>Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.</value>
+    <comment>windows.diagnostics.capture.unavailable.detail (Windows only)</comment>
+  </data>
+  <data name="diagnostics_alignment_calibrated" xml:space="preserve">
+    <value>Calibrated</value>
+    <comment>diagnostics.alignment.calibrated (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_cannotAlign" xml:space="preserve">
+    <value>Cannot align</value>
+    <comment>diagnostics.alignment.cannotAlign (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_explain" xml:space="preserve">
+    <value>Marks are host time. Without a calibration nothing here can be lined up against what the device recorded.</value>
+    <comment>diagnostics.alignment.explain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_sameClock" xml:space="preserve">
+    <value>One clock</value>
+    <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_arm" xml:space="preserve">
+    <value>Start session</value>
+    <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_mark" xml:space="preserve">
+    <value>Mark (⌘M)</value>
+    <comment>diagnostics.capture.mark (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_auto" xml:space="preserve">
+    <value>Found</value>
+    <comment>diagnostics.mark.auto (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_manual" xml:space="preserve">
+    <value>Marked</value>
+    <comment>diagnostics.mark.manual (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_empty" xml:space="preserve">
+    <value>Nothing was marked in this session.</value>
+    <comment>diagnostics.marks.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_title" xml:space="preserve">
+    <value>Marks</value>
+    <comment>diagnostics.marks.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_missing_title" xml:space="preserve">
+    <value>Missing products</value>
+    <comment>diagnostics.missing.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_detail" xml:space="preserve">
+    <value>These marker kinds were never derived, so their absence says nothing about the run.</value>
+    <comment>diagnostics.notDerived.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_title" xml:space="preserve">
+    <value>Not looked for</value>
+    <comment>diagnostics.notDerived.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial" xml:space="preserve">
+    <value>Partial</value>
+    <comment>diagnostics.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial_detail" xml:space="preserve">
+    <value>This session is missing a product it declared.</value>
+    <comment>diagnostics.partial.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_driftedAway" xml:space="preserve">
+    <value>the cursor has left this event</value>
+    <comment>diagnostics.selection.driftedAway (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_timeOnly" xml:space="preserve">
+    <value>Only a time point is selected</value>
+    <comment>diagnostics.selection.timeOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none" xml:space="preserve">
+    <value>No session open</value>
+    <comment>diagnostics.session.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none_detail" xml:space="preserve">
+    <value>Open a capture.diagnostics Job from History to read its verified artifacts. No connected device is needed to read a saved capture.</value>
+    <comment>diagnostics.session.none.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_failed" xml:space="preserve">
+    <value>The capture failed</value>
+    <comment>diagnostics.shot.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_none" xml:space="preserve">
+    <value>No screenshot was taken here</value>
+    <comment>diagnostics.shot.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_standsFor" xml:space="preserve">
+    <value>A screenshot stands for the moment it was taken, not the moment it was asked for.</value>
+    <comment>diagnostics.shot.standsFor (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_takenAfter" xml:space="preserve">
+    <value>taken after the mark</value>
+    <comment>diagnostics.shot.takenAfter (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar" xml:space="preserve">
+    <value>No picture proves this moment</value>
+    <comment>diagnostics.shot.tooFar (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar_detail" xml:space="preserve">
+    <value>The nearest screenshot is too far from this mark to stand for it.</value>
+    <comment>diagnostics.shot.tooFar.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable" xml:space="preserve">
+    <value>Nothing here can tell</value>
+    <comment>diagnostics.shot.undecidable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable_detail" xml:space="preserve">
+    <value>A screenshot was taken around this mark, but the interval it could have been taken in is wider than the tolerance, so it cannot be said to be this moment.</value>
+    <comment>diagnostics.shot.undecidable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_loading" xml:space="preserve">
+    <value>Reading session artifacts…</value>
+    <comment>diagnostics.session.loading (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_failed" xml:space="preserve">
+    <value>Cannot read this session</value>
+    <comment>diagnostics.session.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_retry" xml:space="preserve">
+    <value>Retry reading</value>
+    <comment>diagnostics.session.retry (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_reload" xml:space="preserve">
+    <value>Reload session</value>
+    <comment>diagnostics.session.reload (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_readOnly" xml:space="preserve">
+    <value>Saved capture · read only. Viewing does not start a new Job.</value>
+    <comment>diagnostics.session.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_timeline" xml:space="preserve">
+    <value>Runtime timeline</value>
+    <comment>diagnostics.session.timeline (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_covered" xml:space="preserve">
+    <value>Runtime found the coverage anchor in the ring snapshot.</value>
+    <comment>diagnostics.ring.covered (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_lost" xml:space="preserve">
+    <value>The ring snapshot lost its coverage anchor. Earlier events may be missing.</value>
+    <comment>diagnostics.ring.lost (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_title" xml:space="preserve">
+    <value>Session artifacts</value>
+    <comment>diagnostics.artifacts.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_privacy" xml:space="preserve">
+    <value>Text previews stay in this App. Sensitive content is read only when you select it; nothing is exported or uploaded.</value>
+    <comment>diagnostics.artifacts.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_read" xml:space="preserve">
+    <value>Read locally</value>
+    <comment>diagnostics.artifacts.read (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_readSensitive" xml:space="preserve">
+    <value>Read sensitive content locally</value>
+    <comment>diagnostics.artifacts.readSensitive (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openElsewhere" xml:space="preserve">
+    <value>A published Trace can open in Trace Viewer. Other files can be exported explicitly from History. Job times are never used as screenshot timestamps.</value>
+    <comment>diagnostics.artifacts.openElsewhere (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_clipped" xml:space="preserve">
+    <value>Preview shows the first 120,000 characters. Export the artifact from History to read the complete file.</value>
+    <comment>diagnostics.preview.clipped (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_timeMissing" xml:space="preserve">
+    <value>Time not reported</value>
+    <comment>diagnostics.mark.timeMissing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace" xml:space="preserve">
+    <value>Open sensitive Trace in Viewer</value>
+    <comment>diagnostics.artifacts.openTrace (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace_privacy" xml:space="preserve">
+    <value>Reads the selected Job’s immutable Trace into the local viewer cache. No upload.</value>
+    <comment>diagnostics.artifacts.openTrace.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_replacedInvalidUTF8" xml:space="preserve">
+    <value>Some bytes are not valid UTF-8 and appear as � in this preview. The original Artifact and its SHA-256 are unchanged.</value>
+    <comment>diagnostics.preview.replacedInvalidUTF8 (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_invalidStructuredText" xml:space="preserve">
+    <value>This structured text is not valid UTF-8. Inspect or export the original Artifact from History.</value>
+    <comment>diagnostics.preview.invalidStructuredText (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_title" xml:space="preserve">
+    <value>HiLog summary</value>
+    <comment>diagnostics.hilog.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed" xml:space="preserve">
+    <value>Unable to verify the HiLog summary</value>
+    <comment>diagnostics.hilog.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed_detail" xml:space="preserve">
+    <value>Return to History to inspect this Job and its Artifacts. Reload to try reading the same record again.</value>
+    <comment>diagnostics.hilog.failed.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_readOnly" xml:space="preserve">
+    <value>Read-only view of the saved summary. Opening or reloading it does not run another analysis.</value>
+    <comment>diagnostics.hilog.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_complete" xml:space="preserve">
+    <value>All nonblank line headers recognized</value>
+    <comment>diagnostics.hilog.coverage.complete (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_partial" xml:space="preserve">
+    <value>Some line headers unrecognized</value>
+    <comment>diagnostics.hilog.coverage.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_unrecognized" xml:space="preserve">
+    <value>No line headers recognized</value>
+    <comment>diagnostics.hilog.coverage.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_empty" xml:space="preserve">
+    <value>No nonblank lines</value>
+    <comment>diagnostics.hilog.coverage.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_detail" xml:space="preserve">
+    <value>These counts describe default HiLog line headers only. They do not prove capture completeness, valid body encoding, absence of faults or device health.</value>
+    <comment>diagnostics.hilog.coverage.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_lines" xml:space="preserve">
+    <value>Physical lines</value>
+    <comment>diagnostics.hilog.lines (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_D" xml:space="preserve">
+    <value>D · Debug</value>
+    <comment>diagnostics.hilog.level.D (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_I" xml:space="preserve">
+    <value>I · Info</value>
+    <comment>diagnostics.hilog.level.I (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_W" xml:space="preserve">
+    <value>W · Warning</value>
+    <comment>diagnostics.hilog.level.W (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_E" xml:space="preserve">
+    <value>E · Error</value>
+    <comment>diagnostics.hilog.level.E (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_F" xml:space="preserve">
+    <value>F · Fatal</value>
+    <comment>diagnostics.hilog.level.F (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_unrecognized" xml:space="preserve">
+    <value>Unrecognized lines</value>
+    <comment>diagnostics.hilog.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_blank" xml:space="preserve">
+    <value>Blank lines</value>
+    <comment>diagnostics.hilog.blank (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source" xml:space="preserve">
+    <value>Recorded source</value>
+    <comment>diagnostics.hilog.source (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source_detail" xml:space="preserve">
+    <value>The source Artifact ID matches the Job input. The source hash and size are recorded by the analyzer; this view does not read the raw log or verify it again. Export the summary from History.</value>
+    <comment>diagnostics.hilog.source.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceJob" xml:space="preserve">
+    <value>Source Job</value>
+    <comment>diagnostics.hilog.sourceJob (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceArtifact" xml:space="preserve">
+    <value>Source Artifact</value>
+    <comment>diagnostics.hilog.sourceArtifact (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceBytes" xml:space="preserve">
+    <value>Recorded source bytes</value>
+    <comment>diagnostics.hilog.sourceBytes (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_digests" xml:space="preserve">
+    <value>Inspect recorded hashes</value>
+    <comment>diagnostics.hilog.digests (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceDigest" xml:space="preserve">
+    <value>Recorded source SHA-256</value>
+    <comment>diagnostics.hilog.sourceDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_toolDigest" xml:space="preserve">
+    <value>Recorded analyzer SHA-256</value>
+    <comment>diagnostics.hilog.toolDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_outputDigest" xml:space="preserve">
+    <value>Analyzer output SHA-256</value>
+    <comment>diagnostics.hilog.outputDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_artifactDigest" xml:space="preserve">
+    <value>Verified summary Artifact SHA-256</value>
+    <comment>diagnostics.hilog.artifactDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_diagnostics_capture_mark" xml:space="preserve">
+    <value>Mark (Ctrl+M)</value>
+    <comment>windows.diagnostics.capture.mark (Windows only)</comment>
   </data>
 </root>

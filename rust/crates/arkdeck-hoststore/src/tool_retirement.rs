@@ -10,8 +10,8 @@ use arkdeck_contract::canonical_json;
 use arkdeck_platform::DocumentPublishError;
 use serde_json::{Value, json};
 use std::io;
-// A workspace preset's pin on a toolchain, on macOS and Windows; the
-// workspace composition that resolves it is macOS-only.
+// A workspace preset's pin on a toolchain, which the workspace composition
+// takes and resolves on macOS and Windows (TASK-XPA-011).
 #[cfg(any(target_os = "macos", windows))]
 #[path = "deveco_pins.rs"]
 pub(crate) mod pins;

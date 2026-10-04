@@ -122,7 +122,7 @@ private final class ArkDeckAppModelStore {
       diagnosticBundles: RuntimeSupportBundleSettingsExporter(),
       storageFixture: SettingsStoragePresentationFixture.make()))
   @ObservationIgnored lazy var deviceWorkspace = DeviceWorkspaceViewModel(
-    provider: DeviceControlFacade.make())
+    provider: DeviceInteractionFixture.provider() ?? DeviceControlFacade.make())
   // A launch without `--ui-test-device-recording=` never reaches the fixture.
   @ObservationIgnored lazy var deviceRecording = DeviceRecordingViewModel(
     provider: DeviceRecordingFixture.provider() ?? DeviceControlFacade.make())

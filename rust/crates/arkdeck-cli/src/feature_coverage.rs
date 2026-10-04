@@ -490,11 +490,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "recovery.cleanup.list",
     "cleanup-debt.list",
     // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
-    // the bundle inventory, and a DevEco toolchain's inspection, listing and
-    // retirement. Not the registrations, nor `runtime tool select`: a daemon
-    // Bundle and an HDC are not registered on Windows yet, so nothing is
-    // selected.
+    // a release-candidate package tree registered, inspected, listed and
+    // retired as a daemon Bundle, and a DevEco toolchain's inspection,
+    // listing and retirement. Not `runtime tool register` (an HDC is not
+    // registered until a Windows HDC tuple is, CHG-2026-078) nor `runtime
+    // tool select`, which has nothing to select.
+    "runtime.bundle.register",
+    "runtime.bundle.inspect",
     "runtime.bundle.list",
+    "runtime.bundle.remove",
     "runtime.tool.list",
     "runtime.tool.inspect",
     "runtime.tool.remove",
@@ -506,6 +510,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "history.filter.list",
     "history.filter.save",
     "history.filter.delete",
+    // The analyzer provider's host-only analyses (TASK-XPA-011). Not the
+    // ArkTrace analyses, which no ArkTrace distribution serves on Windows
+    // (TASK-XPA-021).
+    "analyze.crash-signature",
+    "analyze.hilog-summary",
+    // The workspace provider's source inspection (TASK-XPA-011). Not the
+    // profile-served workspace leaves: no code-owned source tool is trusted
+    // on Windows yet, so no registered project resolves to a profile.
+    "workspace.inspect",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the

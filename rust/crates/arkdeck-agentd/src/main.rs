@@ -24,7 +24,7 @@ mod code_sign_helper;
 mod control_action_control;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_host_control;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod crash_ledger_analyzer;
 #[cfg(target_os = "macos")]
 mod crash_symbolizer_mode;
@@ -41,12 +41,12 @@ mod development_mutation;
 mod development_usb;
 #[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod hilog_summary_analyzer;
 mod host;
 #[cfg(test)]
 mod host_tests;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod managed_hdc;
 #[cfg(all(test, target_os = "macos"))]
 mod operation_availability_control;
@@ -310,10 +310,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(any(target_os = "macos", windows))]
     #[cfg_attr(windows, allow(unused_mut))]
     let mut arkforge: Option<arkforge_lane::Composed> = None;
-    // The managed server the isolated or the production owner starts, which
-    // it stops last after its drain; any failure once it is started stops it
-    // on the way out, first (`managed_hdc::Launched`).
-    #[cfg(target_os = "macos")]
+    // The managed server the isolated or the production owner starts (on
+    // Windows, a development root's registered HDC: `windows_lifecycle`),
+    // which it stops last after its drain; any failure once it is started
+    // stops it on the way out, first (`managed_hdc::Launched`).
+    #[cfg(any(target_os = "macos", windows))]
     let mut managed_hdc: Option<managed_hdc::Launched> = None;
     #[cfg(unix)]
     let endpoint = match std::env::var_os("ARKDECK_ENDPOINT") {
@@ -346,8 +347,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
     let host = match &authority {
         Some(authority) => {
-            let (host, composed) = authority.compose(host)?;
+            let (host, composed, managed) = authority.compose(host)?;
             arkforge = Some(composed);
+            managed_hdc = managed;
             host
         }
         None => host,
@@ -870,6 +872,19 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(arkforge) = &arkforge {
             arkforge.stop();
         }
+        // Then the managed server, as on macOS, while the root is still
+        // owned, so a successor never meets it on the endpoint; a server the
+        // owner must be recomposed after exits 70, as there.
+        let recompose = managed_hdc
+            .as_ref()
+            .is_some_and(|h| h.server().requires_recomposition());
+        if let Some(managed) = managed_hdc
+            && let Some(stopped) = managed.stop()
+        {
+            for line in stopped.report(true) {
+                eprintln!("arkdeck-agentd: {line}");
+            }
+        }
         if socket_drain.complete
             && let Some(authority) = authority
         {
@@ -877,7 +892,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         }
         println!("arkdeck-agentd stopped");
         let _ = std::io::Write::flush(&mut std::io::stdout());
-        std::process::exit(0);
+        std::process::exit(if recompose { 70 } else { 0 });
     }
 }
 
@@ -903,6 +918,18 @@ fn main() {
         }
         if first.is_some_and(|argument| argument == cutover_preflight::FLAG) {
             std::process::exit(cutover_preflight::run(&arguments));
+        }
+    }
+    // The two analyzer modes on Windows too (TASK-XPA-011).
+    #[cfg(windows)]
+    {
+        let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        let first = arguments.first();
+        if first.is_some_and(|argument| argument == hilog_summary_analyzer::FLAG) {
+            std::process::exit(hilog_summary_analyzer::run(&arguments));
+        }
+        if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
+            std::process::exit(crash_ledger_analyzer::run(&arguments));
         }
     }
     if let Err(error) = serve() {

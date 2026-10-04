@@ -50,6 +50,9 @@ public sealed class AccessibilityTests
         ["trace", "viewer", Array.Empty<string>()],
         ["traceViewer", "viewer", Array.Empty<string>()],
         ["viewer", "viewer", new[] { "viewer.recapture" }],
+        ["diagnostics", "jobs", Array.Empty<string>()],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics" }],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openDiagnostics" }],
         ["overview", "jobs", new[] { "jobInspector.row.job-0000000000000000000000000000a004" }],
     ];
 
@@ -62,9 +65,10 @@ public sealed class AccessibilityTests
         var file = Path.Combine(Path.GetTempPath(), $"arkdeck-focus-{Guid.NewGuid():N}.json");
         try
         {
-            using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", page, "--focus-walk", file]);
-            app.Find(Refresh(page));
-            foreach (var id in selections)
+            var start = StartPage(page, selections);
+            using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", start, "--focus-walk", file]);
+            app.Find(Refresh(start));
+            foreach (var id in selections.Where(s => !s.StartsWith('@')))
             {
                 var element = app.Find(id);
                 if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
@@ -126,6 +130,7 @@ public sealed class AccessibilityTests
             ["trace"] = ("T", 0),
             ["traceViewer"] = ("R", 0),
             ["viewer"] = ("V", 0),
+            ["diagnostics"] = ("G", 0),
             ["history"] = ("H", 0),
             ["device"] = ("D", 0),
             ["settings"] = ("S", 0),
@@ -279,6 +284,9 @@ public sealed class AccessibilityTests
         ["traceViewer", "viewer", Array.Empty<string>()],
         ["viewer", "viewer", new[] { "viewer.recapture" }],
         ["viewer", "targets", Array.Empty<string>()],
+        ["diagnostics", "jobs", Array.Empty<string>()],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics", "diagnostics.artifact.read.hilog.txt" }],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openDiagnostics" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a002" }],
     ];
 
@@ -288,9 +296,10 @@ public sealed class AccessibilityTests
     public void NothingIsClippedAtTheLargestTextSize(string page, string scenario, string[] steps)
     {
         var exe = AppSession.RequireApp();
-        using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", page, "--text-scale", "2.25"]);
-        app.Find(Refresh(page));
-        foreach (var id in steps)
+        var start = StartPage(page, steps);
+        using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", start, "--text-scale", "2.25"]);
+        app.Find(Refresh(start));
+        foreach (var id in steps.Where(s => !s.StartsWith('@')))
         {
             var element = app.Find(id);
             if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
@@ -362,7 +371,16 @@ public sealed class AccessibilityTests
         SemanticSnapshotTests.WaitUntil(() => app.TryFind(dialog, TimeSpan.FromMilliseconds(200)) is null, what);
     }
 
-    private static string Refresh(string page) => page == "device" ? "hdc.devices.refresh" : page + ".refresh";
+    private static string Refresh(string page) => page switch
+    {
+        "device" => "hdc.devices.refresh",
+        "diagnostics" => "diagnostics.session.reload",
+        _ => page + ".refresh",
+    };
+
+    /// <summary>The page the App starts on: the page itself, or the one an <c>@page</c> step names
+    /// (Diagnostics opens a record from History).</summary>
+    private static string StartPage(string page, string[] steps) => steps.FirstOrDefault(s => s.StartsWith('@'))?[1..] ?? page;
 
     private static HashSet<string> Buttons(AutomationElement pageRoot) =>
         pageRoot.FindAllDescendants(cf => cf.ByControlType(ControlType.Button))
