@@ -3535,7 +3535,11 @@ impl HostServices for Host {
         })?;
         store.handle(method, params, &utc_now())
     }
-    #[cfg(target_os = "macos")]
+    /// `debug.probe` and `debug.template.run` over this host's HDC
+    /// composition (on Windows, the registered tuple's managed server, or a
+    /// test build's fake), as Swift's daemon composes its Debug probe
+    /// (TASK-XPA-008).
+    #[cfg(any(target_os = "macos", windows))]
     fn debug_read(
         &self,
         target_id: &str,

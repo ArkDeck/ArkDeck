@@ -461,6 +461,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // are the Swift oracle's. A pause is kept and resumed there too.
     "target.observe",
     "diagnostics.capture",
+    // The Debug probe over the Target store and the HDC (TASK-XPA-008;
+    // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
+    // against the signed test daemon over the Swift oracle's answers). Not
+    // `debug template run`: it runs the `debug.template@1` Job, whose
+    // admission observes the Target, and no Swift oracle records that Job's
+    // HDC answers.
+    "debug.probe",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset

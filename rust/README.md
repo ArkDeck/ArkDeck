@@ -2859,6 +2859,31 @@ bundle is refused with nothing published, and, with
 releases. Run record:
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
 
+## Windows Debug reads (TASK-XPA-008)
+
+The Windows daemon answers `debug.probe` and `debug.template.run` as Swift's
+daemon composes its Debug probe. Each reads through the Host's HDC composition
+(`HdcComposition::debug_read`, now built on Windows). That composition is the
+registered tuple's managed server, or a Windows test build's fake.
+
+The tests replay the Swift oracles on Windows:
+
+- `arkdeck-agentd --test spawning debug_probe_replay` replays every exchange
+  of the Debug probe oracle (23, every mode) through the production Host and
+  Control. It checks the fake's calls too.
+- `debug_leaves_cli` runs `debug probe` through the real CLI against the signed
+  test daemon, for the 7 probes the leaf can send.
+- `arkdeck-hoststore`'s `tests/debug_invocation.rs` replays the 68 exchanges of
+  the Flash recovery broker oracle. It now runs on Windows too.
+
+The shared fake's Debug probe answers are ported in process (`oracle_fake.rs`,
+`Answers::DebugProbe`). `debug.probe` is in `WINDOWS_MEASURED_LEAVES`.
+
+`debug template run` stays `partial`. It runs the `debug.template@1` Job, whose
+admission observes the Target, and no Swift oracle records that Job's HDC
+answers. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-debug-reads-run.md`.
+
 ## Windows History filter owner (TASK-XPA-012)
 
 `arkdeck-hoststore` builds the History filter owner (`HistoryStore`) on
