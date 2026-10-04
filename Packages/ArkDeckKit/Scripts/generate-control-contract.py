@@ -185,7 +185,17 @@ ARTIFACT_EXPORT_OWNER_ERROR_CODES = [
 #   action. An unsigned tool's null identifier (DevEco's Windows `hdc.exe`,
 #   Authenticode NotSigned; no Swift oracle records one) is admitted there
 #   exactly as its siblings admit it (TASK-XPA-005; delegated 2026-10-04).
+# - an agent execution's `nextAction`: `agent.resume` and `human-action.resume`
+#   answer the same agent-execution projection, whose `nextAction` names a
+#   `retryAfter` while the execution's Job still runs. Swift's oracle recorded
+#   that only through `agent.resume` (`human-action.resume` only after the Job
+#   completed), so `human-action.resume` answered a still-running resume with
+#   `internalError`. Its `nextAction` admits exactly `agent.resume`'s
+#   (TASK-XPA-005; delegated 2026-10-05).
 SHARED_MEMBERS = {
+    ("agent.resume", "result.nextAction"): [
+        ("human-action.resume", "result.nextAction"),
+    ],
     ("runtime.hdc.impact-preview", "result.preview.tool.signature.identifier"): [
         ("human-action.resume", "result.controlAction.preview.tool.signature.identifier"),
         ("human-action.resume", "result.preview.tool.signature.identifier"),
