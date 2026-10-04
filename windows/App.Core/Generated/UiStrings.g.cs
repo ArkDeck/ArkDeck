@@ -1316,6 +1316,16 @@ public static class UiStrings
     public const string DebugArtifactsDirectoryTitle = "debug.artifacts.directory.title";
     public const string DebugArtifactsWslSource = "debug.artifacts.wslSource";
     public const string DebugArtifactsChooseDirectory = "debug.artifacts.chooseDirectory";
+    public const string JobInspectorFactRecoveryRelation = "jobInspector.fact.recoveryRelation";
+    public const string JobInspectorProgress = "jobInspector.progress";
+    public const string JobInspectorResidue = "jobInspector.residue";
+    public const string JobInspectorResultSupersededByRecovery = "jobInspector.result.supersededByRecovery";
+    public const string JobInspectorResultTargetAliasResolved = "jobInspector.result.targetAliasResolved";
+    public const string JobInspectorStateCurrentEpochEstablished = "jobInspector.state.currentEpochEstablished";
+    public const string JobInspectorActionReadLog = "jobInspector.action.readLog";
+    public const string JobInspectorLogTail = "jobInspector.log.tail";
+    public const string JobInspectorLogPrivacy = "jobInspector.log.privacy";
+    public const string JobInspectorLogNotText = "jobInspector.log.notText";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2628,5 +2638,15 @@ public static class UiStrings
         DebugArtifactsDirectoryTitle,
         DebugArtifactsWslSource,
         DebugArtifactsChooseDirectory,
+        JobInspectorFactRecoveryRelation,
+        JobInspectorProgress,
+        JobInspectorResidue,
+        JobInspectorResultSupersededByRecovery,
+        JobInspectorResultTargetAliasResolved,
+        JobInspectorStateCurrentEpochEstablished,
+        JobInspectorActionReadLog,
+        JobInspectorLogTail,
+        JobInspectorLogPrivacy,
+        JobInspectorLogNotText,
     ];
 }
