@@ -699,7 +699,7 @@ public sealed class RealDaemonTests
             Assert.AreEqual(strings["diagnostics.session.none"], app.WaitForName("diagnostics.session.empty", n => n.Length > 0));
             Assert.AreEqual("diagnostic_session_capture_not_connected", AppSession.Name(app.Find("diagnostics.capture.reasonCode")));
             app.Invoke("diagnostics.capture.arm");
-            StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["diagnostics.capture.unavailable"]);
+            StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["windows.diagnostics.capture.unavailable"]);
             app.Navigate("history");
             Assert.AreEqual(strings["history.empty.title"], app.WaitForName("history.empty.title", n => n.Length > 0));
             Assert.IsNull(app.TryFind("history.openDiagnostics", TimeSpan.FromMilliseconds(300)));

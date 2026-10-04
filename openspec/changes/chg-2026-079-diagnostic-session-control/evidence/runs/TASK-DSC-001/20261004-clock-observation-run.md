@@ -72,3 +72,26 @@ The Windows-only unavailable resources use the generator's required `windows.`
 namespace; the Windows page's resource references follow them. Its existing UI
 automation identifiers and unavailable behavior are unchanged. Native Windows
 execution remains a CI check. This follow-up updates the existing PR #2465.
+
+
+### Windows resource consumer correction
+
+CI run `37189081537`, job `111397335393`, failed
+`ShellContractTests.EverySnapshotNamesKnownKeysAndRoles`: the Windows semantic
+snapshot still referenced the two former shared unavailable-message keys. The
+snapshot now names the Windows-only keys, and both Windows UI test consumers use
+the same resource lookup. Automation IDs, unavailable behavior and every assertion
+remain intact. The snapshot identifies these two resources as Windows-origin.
+
+Local targeted checks: `python3 /tmp/arkdeck-macos-closeout-20261004/check-windows-resource-references.py`
+verified all 45 snapshots, 275 references and every literal UI-test resource
+lookup; `python3 windows/scripts/generate-ui-strings.py --check` verified all
+1,155 resources. Both exited 0; log: `clock-windows-key-references.log` under the
+run log directory. `git diff --check` passed. Native .NET/Windows execution is
+unavailable on this host and remains delegated to fresh CI. The initial unprivileged
+edit was denied by the workspace sandbox and made no changes; the subsequent
+scoped edit succeeded.
+
+CI: the old Windows job had 119 passing App contract tests and this single failing
+snapshot test, plus 41 passing ClientKit tests (two existing skips). Its UI suite
+was skipped and is not claimed as validation. Updated head requires fresh checks.
