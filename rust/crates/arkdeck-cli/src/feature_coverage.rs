@@ -519,18 +519,17 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // profile-served workspace leaves: no code-owned source tool is trusted
     // on Windows yet, so no registered project resolves to a profile.
     "workspace.inspect",
-    // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` (and its alias
-    // `flash.dayu200`) planned, admitted and run to a terminal state through
-    // `flash run`, `agent run` and `job plan|submit|run`, and the Flash host
-    // reads over the same composition, by the real CLI against a signed copy
-    // of the daemon's test build over its control pipe, with the Swift Flash
-    // run oracle's fake lane and Rockchip host and an in-process fake HDC
-    // (`tests/spawning/flash_socket_control.rs`). No board is flashed.
+    // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
+    // state through `flash run`, and the Flash host reads over the same
+    // composition, by the real CLI against a signed copy of the daemon's test
+    // build over its control pipe, with the Swift Flash run oracle's fake lane
+    // and Rockchip host and an in-process fake HDC
+    // (`tests/spawning/flash_socket_control.rs`). No board is flashed. The
+    // shared generic leaves the same test drives (`agent run`, `job plan|
+    // submit|run`) are not counted until every operation they reach on
+    // Windows answers as Swift does (the lead's ruling of 2026-10-04 for
+    // GJ-2/3).
     "flash.run",
-    "agent.run",
-    "job.plan",
-    "job.submit",
-    "job.run",
     "flash.bootloader-status",
     "flash.prerequisites",
 ];
@@ -1233,9 +1232,8 @@ mod tests {
             ("diagnostics.export", "implemented"),
             ("trace.inspect", "partial"),
             ("device.observations", "partial"),
-            // Measured with GJ-4's Flash (TASK-XPA-010).
-            ("job.submit", "implemented"),
-            ("agent.run", "implemented"),
+            ("job.submit", "partial"),
+            ("agent.run", "partial"),
             ("runtime.storage.root", "implemented"),
             ("help", "implemented"),
             ("completion", "implemented"),

@@ -93,7 +93,7 @@
       "feature": "agent.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "implemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2983,7 +2983,7 @@
       "feature": "job.plan",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "implemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3037,7 +3037,7 @@
       "feature": "job.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "implemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3091,7 +3091,7 @@
       "feature": "job.submit",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "implemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

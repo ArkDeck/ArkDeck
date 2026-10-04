@@ -19,10 +19,15 @@ nothing was flashed. Host tests are not Windows acceptance.
 
 ## Coverage
 
-`flash.run`, `agent.run`, `job.plan`, `job.submit`, `job.run`, `flash.bootloader-status` and
-`flash.prerequisites` join `WINDOWS_MEASURED_LEAVES`. `cli-feature-coverage.json` regenerated with
-`arkdeck maintainer contracts export` (Windows implemented 89 -> 96, partial 68 -> 61, among them
-`flash.full-restore@1`; `flash.dayu200`, a generic Catalog operation, stays partial); its six oracle pins substituted. The pins on main
+`flash.run`, `flash.bootloader-status` and `flash.prerequisites` join
+`WINDOWS_MEASURED_LEAVES`. The shared generic leaves the same test drives (`agent run`, `job plan`,
+`job submit`, `job run`) are not counted: by the lead's ruling of 2026-10-04 (with CI2, for
+GJ-2/3), a shared generic leaf counts on Windows only once every operation it reaches there
+answers as Swift does, and counting them on the Flash evidence would overstate the debug, native,
+observe and workspace operations they also reach. The tests that drive them stay. `cli-feature-coverage.json` regenerated with
+`arkdeck maintainer contracts export` (Windows implemented 89 -> 92, partial 68 -> 65: `flash.full-restore@1`,
+whose target is `flash run`, and the two host reads; `flash.dayu200`, a generic Catalog operation
+reached through `job submit`, stays partial); its six oracle pins substituted. The pins on main
 still named the coverage before #2465 (50ef81c4…); they are replaced by this coverage's digest.
 
 ## Left out
@@ -37,9 +42,10 @@ still named the coverage before #2465 (50ef81c4…); they are replaced by this c
   invocation owner (`with_flash_invocations`) is macOS-only.
 - The production Windows daemon still installs no executable lane: its lane authority binds the
   managed-control HDC's digest, which only a registered Windows HDC tuple's managed server gives.
-- Delegated minor decision, pending the next rulings batch: Flash leaves measured end to end
-  against the oracle's fake lane and an in-process fake HDC through the signed test daemon count
-  as measured on Windows, as CI2's harness (#2479) measures GJ-2/3.
+- Delegated minor decision, pending the next rulings batch: Flash-specific leaves measured end to
+  end against the oracle's fake lane and an in-process fake HDC through the signed test daemon
+  count as measured on Windows, as CI2's harness (#2479) measures GJ-2/3; the shared generic
+  leaves do not (the lead's ruling of 2026-10-04, above).
 
 ## Local checks
 
