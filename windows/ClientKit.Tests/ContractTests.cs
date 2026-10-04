@@ -267,3 +267,36 @@ public sealed class WireCorpusTests
         Assert.IsNull(DeviceObservationsResultObservationsItem.Parse(explicitNull).DisplayName);
     }
 }
+
+/// <summary>
+/// A control action's preview tool signature in <c>human-action.resume</c> (the console
+/// challenge's <c>controlAction</c> and the consumed action) admits an unsigned tool, as
+/// <c>runtime.hdc.impact-preview</c> does: DevEco's Windows <c>hdc.exe</c> is Authenticode
+/// NotSigned, so its signature reads <c>identifier: null</c> (TASK-XPA-005).
+/// </summary>
+[TestClass]
+public sealed class ControlActionSignatureTests
+{
+    private const string Recorded = "\"signature\":{\"executionAssessment\":\"notPerformed\",\"identifier\":\"ArkDeckFakeHDCFixture-555549446a3f4aeca2ae318089702237d2660296\",\"platformTrust\":\"unverified\",\"state\":\"adHoc\",\"teamIdentifier\":null}";
+    private const string Unsigned = "\"signature\":{\"executionAssessment\":\"notPerformed\",\"identifier\":null,\"platformTrust\":\"unverified\",\"state\":\"unsigned\",\"teamIdentifier\":null}";
+
+    [TestMethod]
+    public void AnUnsignedToolsChallengeAndConsumedActionDecode()
+    {
+        var decoded = 0;
+        foreach (var (method, index, line) in Corpus.Rows())
+        {
+            if (method != "human-action.resume") continue;
+            var text = Encoding.UTF8.GetString(line);
+            if (!text.Contains(Recorded, StringComparison.Ordinal)) continue;
+            var row = (JsonObject)StrictJson.Parse(Encoding.UTF8.GetBytes(text.Replace(Recorded, Unsigned, StringComparison.Ordinal)));
+            var id = $"corpus-{index}";
+            var wire = new JsonObject([new("id", new JsonString(id)), new("ok", JsonBool.True), new("result", row["result"])]);
+            var response = Wire.DecodeResponse(Wire.EncodeFrame(wire, ControlContract.MaxResponseBytes).AsSpan()[..^1], id, method);
+            Assert.IsTrue(response.Ok, $"row {index}");
+            Assert.AreEqual(row["result"], response.Result);
+            decoded++;
+        }
+        Assert.IsTrue(decoded >= 2, "the recorded challenge and consumed action");
+    }
+}
