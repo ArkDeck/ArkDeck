@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using ArkDeck.ClientKit.Contract;
 using ArkDeck.ClientKit.Json;
@@ -141,8 +142,16 @@ public sealed class ClientTests
     [TestMethod]
     public async Task ABusinessRequestPastTheBudgetIsOutcomeUnknown()
     {
-        var peer = HealthyPeer((_, _) => ScriptedReply.Hang);
-        using var client = new ControlClient(peer, TimeSpan.FromMilliseconds(300));
+        // The budget runs out on the client's own clock only once the peer has read the business
+        // frame, so the health exchange can never be the step that times out on a loaded runner.
+        var now = Stopwatch.GetTimestamp();
+        var budget = TimeSpan.FromMilliseconds(300);
+        var peer = HealthyPeer((_, _) =>
+        {
+            now += (long)(budget.TotalSeconds * Stopwatch.Frequency) + 1;
+            return ScriptedReply.Hang;
+        });
+        using var client = new ControlClient(peer, budget, () => now);
         var error = await Assert.ThrowsExactlyAsync<ControlClientException>(() => client.RequestAsync("r", "doctor"));
         Assert.AreEqual(ControlFailureKind.OutcomeUnknown, error.Failure.Kind);
         Assert.AreEqual(2, peer.Frames.Count);
