@@ -67,3 +67,16 @@ membership 与顺序。已有不同子层、多个栈交叠或 API 不可用时�
 创建、更新和删除临时队列分支；只给该内置 bot 添加 bypass，不开放其他 actor 的分支写入。
 应用后读回 queue 配置和必需检查；由维护者 review 后入队的首个真实 PR 验证 `merge_group`
 上的 `guard`、`swift`。不得用手工上传 status 或旧 PR 的绿色检查替代组合验证。
+
+## 共享文件与重复构建
+
+同时推进的平台或功能若触及同一份 `spec/ui-semantics/strings.json`、Catalog、control contract
+或对应生成物，先在已有 PR 链中选一个共享集成层并注明负责 Agent。该层合并双方需要的源输入，
+运行生成器并提交配套产物；其他层基于它消费结果。确实需要新增共享字段时先更新该层再向上
+restack，不让多个顶层各自重复生成。独立文件仍可并行开发。
+
+SwiftPM 与 Xcode 的成功 agent push 可复用本分支构建缓存；候选缓存按分支隔离，只在相同
+runner、toolchain 和输入键上复用。main 与 merge group 只读取可信 main 缓存，每个候选仍运行
+已选择的构建和测试。受保护 main 上的维护 workflow 按最新成功构建清理候选缓存，保留总预算
+2 GB、每分支/格式最新一份，避免大量层级缓存长期挤占 main 缓存；写入到清理之间可能暂时超出
+保留预算。缓存命中和耗时以实际 CI 为准，不把本地 fixture 结果当作性能改善证据。
