@@ -71,6 +71,7 @@ public static class CliCommands
     public const string DebugPortForward = "arkdeck port-forward create --inputs-file <path>"; // port-forward.create|remove@1
     public const string DebugPortForwardRemove = "arkdeck port-forward remove --inputs-file <path>";
     public const string JobRun = "arkdeck job run --job <job-id>";                // job.run
+    public const string OperationList = "arkdeck operation list";                 // operation.list (Overview's capability matrix)
     public const string JobPlan = "arkdeck job plan";                             // job.plan (Overview's prepared continuation)
     public const string JobSubmit = "arkdeck job submit";                         // job.submit (Overview's prepared continuation)
     public const string TraceProbe = "arkdeck trace probe --target <id>";                // trace.probe, app.trace.runtime
@@ -134,7 +135,9 @@ public sealed record OverviewState(
     ControlFailure? DaemonFailure,
     bool Reached,
     Loaded<IReadOnlyList<DeviceCandidate>>? Devices = null,
-    IReadOnlyDictionary<string, Loaded<JobEvidenceFacts>>? Evidence = null) : SurfaceState(DaemonFailure, Reached)
+    IReadOnlyDictionary<string, Loaded<JobEvidenceFacts>>? Evidence = null,
+    HdcEnvironment? Hdc = null,
+    CapabilityMatrix? Capabilities = null) : SurfaceState(DaemonFailure, Reached)
 {
     /// <summary>The record's lines of work (at most four).</summary>
     public IReadOnlyList<OverviewRunThread> Threads => Recent.Value is { } jobs ? OverviewRuns.Threads(jobs) : [];
@@ -222,7 +225,9 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
     /// <summary>The channel the loaders read through (the Artifact export reads through it too).</summary>
     public IControlChannel Channel => channel;
 
-    public async Task<OverviewState> OverviewAsync()
+    /// <summary>Overview: <paramref name="preferredTarget"/> is the person's choice of device in
+    /// scope, whose capabilities are probed.</summary>
+    public async Task<OverviewState> OverviewAsync(string? preferredTarget = null)
     {
         var run = new Run(channel);
         var health = await run.Load(c => c.HealthAsync(), HealthFacts.Parse, CliCommands.RuntimeHealth);
@@ -246,7 +251,17 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
                 }
             }
         }
-        return new(health, doctor, recent, run.DaemonFailure, run.Reached, devices, evidence);
+        // The HDC environment (macOS HDCStatusView): the Runtime's HDC status with the device
+        // authorization, and the capability matrix of the device in scope.
+        var hdc = await run.Load(c => c.RequestAsync("runtime.hdc.status"), v => Json.Object(v, "an HDC status"), CliCommands.RuntimeHdcStatus);
+        var operations = await run.Load(c => c.RequestAsync("operation.list", Params()), v => v as JsonArray ?? throw new ContractException(ContractErrorKind.SchemaMismatch, "operation.list is not a list"),
+            CliCommands.OperationList);
+        var online = OverviewScope.Online(devices.Value);
+        var scoped = OverviewScope.Selected(online, preferredTarget);
+        var probe = scoped is null ? null : await run.Load(c => c.RequestAsync("trace.probe", Params(("targetId", new JsonString(scoped.TargetId)))),
+            v => Json.Object(v, "a Trace probe"), CliCommands.TraceProbe.Replace("<id>", scoped.TargetId, StringComparison.Ordinal));
+        return new(health, doctor, recent, run.DaemonFailure, run.Reached, devices, evidence,
+            HdcEnvironment.From(hdc, devices), CapabilityMatrix.For(online, scoped, operations, probe));
     }
 
     /// <summary>The Device page: the candidates HDC observes and the Targets adopted before

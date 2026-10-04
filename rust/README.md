@@ -66,6 +66,9 @@ On Windows two things run there:
   `ui-dump component-detail`, `debug logs`, `trace capture`) complete there
   too, over the Trace legs' fake, their device mutations proved against the
   test daemon's own Job state (`MUTATION_ROOT`).
+  `agent resume --resume-reference` completes an agent execution paused for a
+  person to connect the device, as the Swift human-action oracle's `connect`
+  scenario records it: the oracle's own Job and Artifacts.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a

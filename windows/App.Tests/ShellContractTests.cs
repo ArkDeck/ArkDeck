@@ -191,7 +191,7 @@ public sealed class ShellContractTests
                      CliCommands.ImportFlashBundle, CliCommands.ImportWorkspacePatch, CliCommands.ImportNativeLibrary,
                      CliCommands.TraceProbe, CliCommands.TraceCapture,
                      CliCommands.UiDumpCapture, CliCommands.UiDumpComponentDetail,
-                     CliCommands.JobPlan, CliCommands.JobSubmit,
+                     CliCommands.JobPlan, CliCommands.JobSubmit, CliCommands.OperationList,
                  })
         {
             Assert.IsTrue(commands.Contains(command), command);

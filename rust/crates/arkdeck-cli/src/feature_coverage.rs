@@ -405,9 +405,8 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.cancel",
     "job.reconcile",
     // The agent execution and human-action owners over Swift's
-    // physical-assistance records (TASK-XPA-005). Not `agent run`, `resume`
-    // or `abandon`, nor `human-action resume`: each reaches a Target, which
-    // needs a registered HDC.
+    // physical-assistance records (TASK-XPA-005). Not `agent run`, `agent
+    // resume` or `human-action resume`; see the GJ-1 leaves below.
     "agent.list",
     "agent.status",
     "human-action.list",
@@ -474,6 +473,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "ui-dump.component-detail",
     "debug.logs",
     "trace.capture",
+    // Not `agent resume` (nor `human-action resume`), although
+    // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
+    // oracle's `connect` scenario: once its action resolves, a resume
+    // submits the execution's operation through the same admission as
+    // `agent run` and `job submit`, so its answer depends on that
+    // operation, and these shared generic leaves are not counted until
+    // every operation they reach on Windows answers as Swift does (the
+    // lead's ruling of 2026-10-04, as for `flash run` below).
     // The Debug probe over the Target store and the HDC (TASK-XPA-008;
     // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
     // against the signed test daemon over the Swift oracle's answers). Not
@@ -1315,6 +1322,7 @@ mod tests {
             ("device.observations", "partial"),
             ("job.submit", "partial"),
             ("agent.run", "partial"),
+            ("agent.resume", "partial"),
             ("runtime.storage.root", "implemented"),
             ("help", "implemented"),
             ("completion", "implemented"),

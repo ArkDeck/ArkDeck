@@ -6022,4 +6022,220 @@ SHA-256：%4$@</value>
     <value>此草稿已启动过一次，不会再次启动。</value>
     <comment>windows.overview.continuation.attempted (Windows only)</comment>
   </data>
+  <data name="overview_attention_trust" xml:space="preserve">
+    <value>设备信任未就绪</value>
+    <comment>overview.attention.trust (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_attention_nextStep_refresh" xml:space="preserve">
+    <value>请解锁并在设备上确认信任，然后刷新概览以重新读取当前状态。</value>
+    <comment>overview.attention.nextStep.refresh (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_capability" xml:space="preserve">
+    <value>能力</value>
+    <comment>overview.capabilities.column.capability (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_evidence" xml:space="preserve">
+    <value>探测证据</value>
+    <comment>overview.capabilities.column.evidence (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_state" xml:space="preserve">
+    <value>状态</value>
+    <comment>overview.capabilities.column.state (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_loading" xml:space="preserve">
+    <value>正在探测设备能力…</value>
+    <comment>overview.capabilities.loading (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_available" xml:space="preserve">
+    <value>可用</value>
+    <comment>overview.capabilities.state.available (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_limited" xml:space="preserve">
+    <value>受限</value>
+    <comment>overview.capabilities.state.limited (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_unavailable" xml:space="preserve">
+    <value>不可用</value>
+    <comment>overview.capabilities.state.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_unknown" xml:space="preserve">
+    <value>无法确认</value>
+    <comment>overview.capabilities.state.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_title_noTarget" xml:space="preserve">
+    <value>设备能力矩阵</value>
+    <comment>overview.capabilities.title.noTarget (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_title_target" xml:space="preserve">
+    <value>设备能力矩阵（%1$@ · binding %2$lld）</value>
+    <comment>overview.capabilities.title.target (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_channel_encryptedVerified" xml:space="preserve">
+    <value>已加密并验证</value>
+    <comment>overview.channel.encryptedVerified (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_channel_unverified" xml:space="preserve">
+    <value>未验证</value>
+    <comment>overview.channel.unverified (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_environment_collapsed" xml:space="preserve">
+    <value>已收起</value>
+    <comment>overview.environment.collapsed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_environment_expanded" xml:space="preserve">
+    <value>已展开</value>
+    <comment>overview.environment.expanded (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_authorization" xml:space="preserve">
+    <value>授权</value>
+    <comment>overview.field.authorization (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_autoLifecycleDispatches" xml:space="preserve">
+    <value>自动生命周期调度次数</value>
+    <comment>overview.field.autoLifecycleDispatches (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_autoSubserverDispatches" xml:space="preserve">
+    <value>自动子服务器调度次数</value>
+    <comment>overview.field.autoSubserverDispatches (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_channelProtection" xml:space="preserve">
+    <value>通道保护</value>
+    <comment>overview.field.channelProtection (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_clientVersion" xml:space="preserve">
+    <value>客户端版本</value>
+    <comment>overview.field.clientVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_daemonVersion" xml:space="preserve">
+    <value>守护进程版本</value>
+    <comment>overview.field.daemonVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_deviceEvents" xml:space="preserve">
+    <value>近期设备事件</value>
+    <comment>overview.field.deviceEvents (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_endpoint" xml:space="preserve">
+    <value>端点</value>
+    <comment>overview.field.endpoint (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_endpointSource" xml:space="preserve">
+    <value>端点来源</value>
+    <comment>overview.field.endpointSource (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_generation" xml:space="preserve">
+    <value>服务器代次</value>
+    <comment>overview.field.generation (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_hash" xml:space="preserve">
+    <value>哈希</value>
+    <comment>overview.field.hash (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_lifecycleAvailability" xml:space="preserve">
+    <value>服务器恢复</value>
+    <comment>overview.field.lifecycleAvailability (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_ownership" xml:space="preserve">
+    <value>归属</value>
+    <comment>overview.field.ownership (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_ownershipBasis" xml:space="preserve">
+    <value>归属判定依据</value>
+    <comment>overview.field.ownershipBasis (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_path" xml:space="preserve">
+    <value>绝对路径</value>
+    <comment>overview.field.path (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_platformTrust" xml:space="preserve">
+    <value>平台信任</value>
+    <comment>overview.field.platformTrust (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_serverHealth" xml:space="preserve">
+    <value>服务器健康状态</value>
+    <comment>overview.field.serverHealth (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_serverVersion" xml:space="preserve">
+    <value>服务器版本</value>
+    <comment>overview.field.serverVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_source" xml:space="preserve">
+    <value>HDC 来源</value>
+    <comment>overview.field.source (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_subserver" xml:space="preserve">
+    <value>子服务器能力</value>
+    <comment>overview.field.subserver (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_advanced" xml:space="preserve">
+    <value>高级诊断</value>
+    <comment>overview.section.advanced (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_capabilities" xml:space="preserve">
+    <value>能力</value>
+    <comment>overview.section.capabilities (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_deviceChannel" xml:space="preserve">
+    <value>所选设备与通道</value>
+    <comment>overview.section.deviceChannel (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_serverToolchain" xml:space="preserve">
+    <value>服务器与工具链</value>
+    <comment>overview.section.serverToolchain (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_healthy" xml:space="preserve">
+    <value>正常</value>
+    <comment>overview.serverHealth.healthy (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_unavailable" xml:space="preserve">
+    <value>不可用</value>
+    <comment>overview.serverHealth.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_unknown" xml:space="preserve">
+    <value>未知</value>
+    <comment>overview.serverHealth.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_none" xml:space="preserve">
+    <value>无</value>
+    <comment>overview.status.needsAttention.none (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_one" xml:space="preserve">
+    <value>1 项</value>
+    <comment>overview.status.needsAttention.one (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_other" xml:space="preserve">
+    <value>%lld 项</value>
+    <comment>overview.status.needsAttention.other (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_cancelled" xml:space="preserve">
+    <value>已取消</value>
+    <comment>overview.trust.cancelled (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_denied" xml:space="preserve">
+    <value>已拒绝</value>
+    <comment>overview.trust.denied (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_keyAccessDenied" xml:space="preserve">
+    <value>密钥访问被拒绝</value>
+    <comment>overview.trust.keyAccessDenied (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_ready" xml:space="preserve">
+    <value>已就绪</value>
+    <comment>overview.trust.ready (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_timedOut" xml:space="preserve">
+    <value>已超时</value>
+    <comment>overview.trust.timedOut (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_unavailable" xml:space="preserve">
+    <value>不可用</value>
+    <comment>overview.trust.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_waiting" xml:space="preserve">
+    <value>等待信任</value>
+    <comment>overview.trust.waiting (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_overview_hdc_checkHidumper" xml:space="preserve">
+    <value>用只读窗口清单检查 hidumper</value>
+    <comment>windows.overview.hdc.checkHidumper (Windows only)</comment>
+  </data>
 </root>
