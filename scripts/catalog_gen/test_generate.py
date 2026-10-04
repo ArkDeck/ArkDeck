@@ -745,14 +745,14 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
             ),
-            10,
+            11,
         )
         self.assertEqual(
             swift.count(
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
             ),
-            10,
+            11,
         )
         self.assertEqual(
             swift.count(
