@@ -256,6 +256,10 @@ pub use windows::{application_support_directory, arkdeck_application_support_roo
 // (TASK-XPA-015).
 #[cfg(windows)]
 pub use windows::InspectedDirectory;
+// The directory junctions a Runtime-owned workspace copy recreates inside
+// itself (TASK-XPA-011).
+#[cfg(windows)]
+pub use windows::{create_junction, junction_target};
 
 #[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;

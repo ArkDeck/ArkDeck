@@ -781,6 +781,7 @@ fn registered_signing_preset(signing_last: bool) {
             hvigor_script_path: "/usr/bin/true".into(),
             sdk_root_path: "/usr".into(),
             verified_resources: Vec::new(),
+            search_directory: None,
         })
     };
     let request = |label: &str| {

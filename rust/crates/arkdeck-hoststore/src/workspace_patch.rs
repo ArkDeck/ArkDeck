@@ -869,6 +869,11 @@ pub struct ToolInvocation<'a> {
     /// Swift's inspection, whose plan names none — where the Runtime runs.
     pub working_directory: Option<&'a str>,
     pub timeout_seconds: i64,
+    /// The one directory the child finds first on its search path: only a
+    /// registered toolchain's Hvigor build or test child names one (Windows:
+    /// the pinned JDK's `jbr\bin`). Every other child keeps the clean
+    /// search path; macOS names none and refuses one.
+    pub search_directory: Option<&'a str>,
 }
 
 /// What a tool child left: its status and both streams, as captured.
@@ -944,7 +949,6 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
             })
             .collect::<Option<Vec<VerifiedSource>>>()
             .ok_or_else(|| ToolFailure::Failed("dispatch resource identity refused".into()))?;
-        #[cfg_attr(windows, allow(unused_mut))]
         let mut tool = VerifiedTool::open(invocation.executable_path, invocation.executable_sha256)
             .map_err(|error| refused(&error))?;
         #[cfg(not(windows))]
@@ -955,6 +959,18 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
         if invocation.argument_zero.is_some() {
             return Err(refused(
                 &"a tool role named by argument zero is not run on Windows",
+            ));
+        }
+        #[cfg(windows)]
+        if let Some(directory) = invocation.search_directory {
+            tool = tool
+                .with_search_directory(Path::new(directory))
+                .map_err(|error| refused(&error))?;
+        }
+        #[cfg(not(windows))]
+        if invocation.search_directory.is_some() {
+            return Err(refused(
+                &"a leading search directory is not given on this host",
             ));
         }
         let environment: Vec<(std::ffi::OsString, std::ffi::OsString)> = invocation

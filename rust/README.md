@@ -4217,6 +4217,66 @@ a restart. `workspace.inspect` is in `WINDOWS_MEASURED_LEAVES`, so
 `cli-feature-coverage.json`
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-provider-run.md)).
 
+### Hvigor build, tests and crash symbolization on Windows
+
+A Hvigor build or test preset runs on a Runtime-owned copy on Windows. The build product lands
+below the copy's `X:\` root. Node and Hvigor inherit the account's profile and temporary
+directories (`USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `TEMP`, `TMP`) where macOS gives `HOME`
+and `TMPDIR`, plus the composition's `DEVECO_SDK_HOME`.
+
+`arkdeck-hoststore/tests/windows_workspace_hvigor.rs` builds and tests a copy through a
+stand-in Node and a pinned `hvigorw.js`. It also checks that the person's own tree is never
+built, and that a changed script never runs.
+
+A registered DevEco toolchain resolves to the installation's own `tools\node\node.exe`,
+`tools\hvigor\bin\hvigorw.js` and `sdk`, spelled `X:\…`. A tool child's working directory is
+handed to it in its standard `X:\…` spelling whenever that names exactly the canonical
+`\\?\` one; Hvigor cannot resolve module paths below a `\\?\` directory.
+
+`arkdeck-agentd/tests/windows_workspace_hvigor_live_process.rs` runs only when
+`ARKDECK_LIVE_DEVECO_ROOT` and `ARKDECK_DEV_SIGNER_THUMBPRINT` are set. It registers the host's
+DevEco, the repository's WaterFlow demo and a build preset through the real CLI, then runs
+`workspace isolate` and `workspace build` on an installed-mode daemon over a fake account. On
+the reference host the build lands `entry-default-unsigned.hap` as the Job's verified Artifact,
+so `workspace build` is Windows `implemented`.
+
+Hvigor's packaging runs `java` by name, and Windows has no system `java`. A Windows DevEco
+record therefore pins a fifth child, `jbr\bin\java.exe`. It is Authenticode-verified and
+SHA-256-pinned like `node.exe`, under the same ownership rules, and registration refuses an
+unsigned one. Only the Hvigor build or test child of a registered preset gets that one
+directory ahead of the system directory on its search path
+(`VerifiedTool::with_search_directory`). The dispatch holds `java.exe` open by its pinned
+identity while the child runs. Every other child keeps the system directory alone, and a caller
+still cannot overlay `PATH`. A record registered before this pin stays readable but resolves no
+preset; register the toolchain again. The tool runner also names its child by the standard
+`X:\…` spelling of the verified image when that names the same file. Hvigor's first-run
+wrapper bootstrap hands Node's image path to `cmd.exe`, which cannot run a `\\?\` one. Managed
+servers and consoles keep `\\?\`.
+
+Node and `cmd.exe` look up a bare command name (`java`, `cmd.exe`, `wmic`) in the working
+directory before `PATH`, and a Hvigor child's working directory is the copy of the person's
+project. So a registered toolchain's Node children also get
+`NoDefaultCurrentDirectoryInExePath=1`, and a command planted in the project never runs ahead of
+the pinned JDK or the system's tools. The live test plants images and scripts under those names
+and builds anyway. Hvigor still runs the project's own `hvigorfile.ts` and declared plugins, by
+design, as on macOS
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-cwd-run.md)).
+
+The daemon's `--symbolize-crash` mode answers the Swift symbolizer oracle on Windows
+(`crash_symbolizer_mode`). The symbolize leaf stays `partial`, since a symbolization needs a
+device-captured crash.
+
+`ohpm` links a project's packages as directory junctions inside the project. A Windows copy
+recreates such a junction, as macOS keeps an in-tree link, when its fully resolved target is a
+directory inside the source root. The new junction names the copy's corresponding directory at
+the copy's published path. Symbolic links, junctions that leave the tree, and dangling ones are
+still refused. The copy also writes paths past `MAX_PATH` (`\\?\` for long drive-letter paths).
+The live test installs the demo's `ohpm` dependencies and runs `workspace test` on the copy
+after the build, so `workspace test` is Windows `implemented`
+([junction layer](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-copy-junctions-run.md);
+earlier [run records](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md),
+[JDK layer](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-jdk-run.md)).
+
 ## Windows analyzer provider (TASK-XPA-011)
 
 The Windows daemon composes the analyzers `ARKDECK_ANALYZER_PATH` names, as
