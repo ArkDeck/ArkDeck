@@ -106,6 +106,8 @@ mod windows_hdc_gate;
 #[path = "../../src/windows_lifecycle.rs"]
 mod windows_lifecycle;
 
+#[cfg(windows)]
+mod account_tool_selection;
 #[cfg(target_os = "macos")]
 mod app_ingress_fake_hdc;
 #[cfg(target_os = "macos")]
