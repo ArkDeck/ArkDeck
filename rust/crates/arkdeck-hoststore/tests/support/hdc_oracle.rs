@@ -509,6 +509,7 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         &default_root,
         &answers,
         &mut labels,
+        owned,
         spelled,
     );
 }
@@ -519,13 +520,16 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
 /// the plan digests and what they derive are learned; then every answer,
 /// read through those labels, must be the recorded one (`answers` holds each
 /// exchange's name, the answer as `spelled` reads it, and the recorded
-/// answer), and everything left below the root must be Swift's.
+/// answer), and everything left below the root must be Swift's. A replay
+/// without mutation owners (`owned` false: a read-only oracle) compares a
+/// refusal without its words, which are Swift's (T2) and reported.
 pub fn assert_relabelled(
     fixture: &Path,
     replayed_root: &Path,
     default_root: &Path,
     answers: &[(Value, Value, Value)],
     labels: &mut debug_hap::HostLabels,
+    owned: bool,
     spelled: impl Fn(&[u8]) -> Vec<u8>,
 ) {
     let spelled_json = |value: &Value| -> Value {

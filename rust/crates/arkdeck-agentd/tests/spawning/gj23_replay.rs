@@ -331,6 +331,7 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
         &default_root,
         &answers,
         &mut labels,
+        true,
         spelled,
     );
     let _ = fs::remove_dir_all(&scratch);
