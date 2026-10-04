@@ -252,6 +252,33 @@ const PRESET_INPUTS: [&str; 4] = [
     "symbolPresetRef",
 ];
 
+/// The children's environment by executable, and on Windows Git for
+/// Windows' own: it runs with no system configuration
+/// (`GIT_CONFIG_NOSYSTEM=1`). Git finds that file relative to the image it
+/// was launched as, which a verified launch does not name, and the Runtime's
+/// git reads no host-wide configuration, as the macOS oracles run git in a
+/// closed environment.
+fn system_tool_environment(
+    environment: BTreeMap<String, Vec<(String, String)>>,
+    _profiles: &[WorkspaceProfile],
+) -> BTreeMap<String, Vec<(String, String)>> {
+    #[cfg(windows)]
+    {
+        let mut environment = environment;
+        for profile in _profiles {
+            if let Some(git) = profile.source_control_invocation("", &[]) {
+                environment
+                    .entry(git.executable_path)
+                    .or_default()
+                    .push(("GIT_CONFIG_NOSYSTEM".into(), "1".into()));
+            }
+        }
+        environment
+    }
+    #[cfg(not(windows))]
+    environment
+}
+
 fn isolation_at(root: &Path) -> io::Result<Isolation> {
     support::create_private_directories(root)?;
     let root = root.to_str().ok_or_else(|| {
@@ -662,7 +689,7 @@ impl WorkspaceComposition {
                 tool: Box::new(VerifiedToolDispatch),
                 lane: Mutex::new(()),
                 resources: WorkspaceProfile::resources_by_executable(&resolved),
-                environment: presets.environment.clone(),
+                environment: system_tool_environment(presets.environment.clone(), &resolved),
                 signing,
                 inspector: None,
                 inspection_roots,
@@ -830,6 +857,16 @@ impl WorkspaceComposition {
     pub fn with_tool_dispatch(mut self, tool: Box<dyn WorkspaceToolDispatch>) -> Self {
         self.tool = tool;
         self
+    }
+
+    /// What the child of the code-owned tool at `executable_path` finds in
+    /// its environment beyond the clean base (a read, a patch, a checkpoint):
+    /// the overlay the composition names for that executable, if any.
+    pub(crate) fn tool_environment(&self, executable_path: &str) -> Vec<(String, String)> {
+        self.environment
+            .get(executable_path)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// The same composition, the children of the executable at `path` given

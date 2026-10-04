@@ -38,6 +38,12 @@
 //!   answers as `grep -r -n --include <glob> -- <symbol> <root>` does):
 //!   `workspace inspect` runs to a verified `source-inspection.txt`, and
 //!   again after a restart to the same bytes.
+//! - The same provider over a registered OpenHarmony project inside a git
+//!   working copy, resolved to its profile through the code-owned tools
+//!   (the daemon's own grep/sed/patch, the trusted `tar` and `git`):
+//!   `workspace read`, `workspace status`, `workspace diff`, `workspace
+//!   isolate` and `workspace sweep` run to a verified derived Artifact each,
+//!   and the reads again after a restart to the same bytes.
 //! - A fake Runtime, which is this binary itself run as
 //!   `<exe> --fake-runtime <pipe>` (a `harness = false` target, so nothing but
 //!   its own lines reach its streams), serving `job watch` the same recorded
@@ -186,6 +192,10 @@ mod windows {
             (
                 "workspace_inspect_leaf_runs_end_to_end_through_the_pipe",
                 workspace_inspect_leaf_runs_end_to_end_through_the_pipe,
+            ),
+            (
+                "workspace_profile_leaves_run_end_to_end_through_the_pipe",
+                workspace_profile_leaves_run_end_to_end_through_the_pipe,
             ),
             (
                 "ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope",
@@ -1020,6 +1030,233 @@ mod windows {
             windows_statuses("workspace.inspect-source@1"),
             ["implemented"]
         );
+    }
+
+    /// The trusted git, as the workspace dispatch runs it.
+    fn git(project: &Path, arguments: &[&str]) {
+        let tool =
+            arkdeck_platform::trusted_system_tool(arkdeck_platform::SystemTool::Git).unwrap();
+        let status = Command::new(&tool.path)
+            .arg("-C")
+            .arg(project)
+            .args(arguments)
+            .env_clear()
+            .envs([
+                ("GIT_CONFIG_NOSYSTEM", "1"),
+                ("GIT_AUTHOR_NAME", "Process"),
+                ("GIT_AUTHOR_EMAIL", "process@invalid.example"),
+                ("GIT_COMMITTER_NAME", "Process"),
+                ("GIT_COMMITTER_EMAIL", "process@invalid.example"),
+            ])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "git {arguments:?}");
+    }
+
+    /// Swift `workspaceRevision` of a git working copy over `files`.
+    fn workspace_revision(project: &Path, files: &[&str]) -> String {
+        let git = project.join(".git");
+        let head = std::fs::read_to_string(git.join("HEAD")).unwrap();
+        let oid = match head.trim().strip_prefix("ref: ") {
+            Some(reference) => std::fs::read_to_string(git.join(reference))
+                .unwrap()
+                .trim()
+                .to_owned(),
+            None => head.trim().to_owned(),
+        };
+        let index = arkdeck_contract::sha256_hex(&std::fs::read(git.join("index")).unwrap());
+        let mut material =
+            format!("profileVersion\twaterflow-openharmony@1\nhead\t{oid}\nindex\t{index}\n");
+        for file in files {
+            let bytes = std::fs::read(project.join(file)).unwrap();
+            material.push_str(&format!(
+                "file\t{file}\t{}\n",
+                arkdeck_contract::sha256_hex(&bytes)
+            ));
+        }
+        arkdeck_contract::sha256_hex(material.as_bytes())
+    }
+
+    /// `workspace read|status|diff|isolate|sweep` (TASK-XPA-011) through the
+    /// CLI against the signed daemon, over an OpenHarmony project inside a
+    /// git working copy, registered through the CLI and composed by the next
+    /// start: each runs to its one verified derived Artifact, and the reads
+    /// again after a restart to the same bytes.
+    fn workspace_profile_leaves_run_end_to_end_through_the_pipe(thumbprint: &str) {
+        const INDEX: &str = "entry/src/main/ets/pages/Index.ets";
+        let directory = Directory::new();
+        let (daemon, pin) = signed_copy(
+            &Path::new(CLI).with_file_name("arkdeck-agentd.exe"),
+            &directory,
+            thumbprint,
+        );
+        let canonical = std::fs::canonicalize(&directory.0).unwrap();
+        let canonical = canonical.to_str().unwrap();
+        let base = PathBuf::from(canonical.strip_prefix(r"\\?\").unwrap_or(canonical));
+        let root = base.join("root");
+        std::fs::create_dir(&root).unwrap();
+        let project = base.join("project");
+        for (relative, text) in [
+            ("build-profile.json5", "{}\n"),
+            ("entry/src/main/module.json5", "{}\n"),
+            (
+                INDEX,
+                "@Entry\n@Component\nstruct Index {\n  build() {}\n}\n",
+            ),
+        ] {
+            let file = project.join(relative);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, text).unwrap();
+        }
+        git(&project, &["init", "--quiet"]);
+        git(&project, &["add", "-A"]);
+        git(&project, &["commit", "--quiet", "-m", "base"]);
+        // An uncommitted edit, which `status` and `diff` report.
+        std::fs::write(
+            project.join(INDEX),
+            "@Entry\n@Component\nstruct Index {\n  build() {}\n}\n// edited\n",
+        )
+        .unwrap();
+        let project_text = project.to_str().unwrap().to_owned();
+
+        let (server, pipe) = serve(&daemon, &root);
+        let registered = answered(
+            &pipe,
+            &daemon,
+            &pin,
+            &[
+                "workspace",
+                "project",
+                "register",
+                "--registration-request-id",
+                "request-profile-leaves",
+                "--kind",
+                "openharmony",
+                "--root",
+                &project_text,
+            ],
+        );
+        let reference = registered["projectRef"].as_str().unwrap().to_owned();
+        stop(server, &root);
+
+        let inputs = |name: &str, value: Value| {
+            let path = directory.0.join(format!("{name}.json"));
+            std::fs::write(&path, value.to_string()).unwrap();
+            path.to_str().unwrap().to_owned()
+        };
+        let leaves = [
+            (
+                "read",
+                inputs(
+                    "read",
+                    json!({"projectRef": reference, "filePath": INDEX, "lineStart": 2,
+                        "lineEnd": 4}),
+                ),
+                "readWorkspaceSourceRange",
+            ),
+            (
+                "status",
+                inputs("status", json!({"projectRef": reference})),
+                "inspectWorkspaceGitStatus",
+            ),
+            (
+                "diff",
+                inputs(
+                    "diff",
+                    json!({"projectRef": reference, "baseRevision": "HEAD",
+                        "pathScope": "entry"}),
+                ),
+                "inspectWorkspaceDiff",
+            ),
+        ];
+        let serve_profile = || {
+            let mut command = Command::new(&daemon);
+            command.env("ARKDECK_DEVELOPMENT_STATE_ROOT", &root);
+            let server = Server::start(command);
+            let pipe = server
+                .line_starting("arkdeck-agentd listening on ")
+                .pop()
+                .unwrap()
+                .trim_start_matches("arkdeck-agentd listening on ")
+                .to_owned();
+            (server, pipe)
+        };
+        let run = |pipe: &str, leaf: &str, inputs: &str, execution: &str| {
+            answered(
+                pipe,
+                &daemon,
+                &pin,
+                &[
+                    "workspace",
+                    leaf,
+                    "--inputs-file",
+                    inputs,
+                    "--execution-id",
+                    execution,
+                ],
+            )
+        };
+        let verified = |answer: &Value, kind: &str| {
+            assert_eq!(answer["terminalState"], "succeeded", "{answer}");
+            assert_eq!(answer["providerID"], "workspace", "{answer}");
+            assert_eq!(answer["actualEffect"], "hostOnly", "{answer}");
+            assert_eq!(answer["stepKinds"], json!([kind]), "{answer}");
+            assert_eq!(answer["evidenceBlockers"], json!([]), "{answer}");
+            let produced = answer["artifacts"].as_array().unwrap();
+            assert_eq!(produced.len(), 1, "{answer}");
+            assert_eq!(produced[0]["bytesVerified"], true, "{answer}");
+            produced[0].clone()
+        };
+        let (server, pipe) = serve_profile();
+        let mut first = Vec::new();
+        for (leaf, inputs, kind) in &leaves {
+            let answer = run(&pipe, leaf, inputs, &format!("exec-windows-{leaf}-1"));
+            first.push(verified(&answer, kind));
+        }
+        let copy = run(
+            &pipe,
+            "isolate",
+            &inputs(
+                "isolate",
+                json!({"projectRef": reference, "allowedFileGlobs": ["entry/src/main/ets/**"],
+                    "expectedWorkspaceRevision": workspace_revision(&project, &[INDEX])}),
+            ),
+            "exec-windows-isolate-1",
+        );
+        verified(&copy, "prepareWorkspaceIsolation");
+        let sweep = run(
+            &pipe,
+            "sweep",
+            &inputs(
+                "sweep",
+                json!({"dryRun": true, "minimumQuiescentSeconds": 0, "retainLatestCount": 0}),
+            ),
+            "exec-windows-sweep-1",
+        );
+        verified(&sweep, "sweepWorkspaceIsolation");
+        stop(server, &root);
+
+        // After a restart the profile is composed again: each read is a new
+        // Job whose Artifact has the same bytes.
+        let (server, pipe) = serve_profile();
+        for ((leaf, inputs, kind), earlier) in leaves.iter().zip(&first) {
+            let answer = run(&pipe, leaf, inputs, &format!("exec-windows-{leaf}-2"));
+            let again = verified(&answer, kind);
+            assert_eq!(again["sha256"], earlier["sha256"], "{leaf}: {answer}");
+        }
+        stop(server, &root);
+        // What this measured is what the coverage manifest counts.
+        for feature in [
+            "workspace.read-source-range@1",
+            "workspace.inspect-git-status@1",
+            "workspace.inspect-diff@1",
+            "workspace.prepare-isolated-copy@1",
+            "workspace.sweep-isolated-copies@1",
+        ] {
+            assert_eq!(windows_statuses(feature), ["implemented"], "{feature}");
+        }
     }
 
     fn ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope(thumbprint: &str) {
