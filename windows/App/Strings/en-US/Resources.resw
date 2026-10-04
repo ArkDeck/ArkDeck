@@ -5782,4 +5782,460 @@ SHA-256: %4$@</value>
     <value>The interruption is recorded; Session publication is pending. Review archive again to finish publishing.</value>
     <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="overview_continuation_close" xml:space="preserve">
+    <value>Discard draft</value>
+    <comment>overview.continuation.close (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_explanation" xml:space="preserve">
+    <value>Inputs are copied exactly from the source record. Starting creates a new Job after fresh identity checks and keeps its recorded thread as provenance only. Nothing has been submitted yet.</value>
+    <comment>overview.continuation.explanation (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_openJob" xml:space="preserve">
+    <value>Open new Job</value>
+    <comment>overview.continuation.openJob (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_statusNote" xml:space="preserve">
+    <value>This draft has been attempted once. Check its Job record for the outcome; this view does not retry or replay.</value>
+    <comment>overview.continuation.statusNote (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_submit" xml:space="preserve">
+    <value>Start new read-only Job</value>
+    <comment>overview.continuation.submit (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_submitted" xml:space="preserve">
+    <value>Submitted · awaiting Runtime outcome</value>
+    <comment>overview.continuation.submitted (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_title" xml:space="preserve">
+    <value>Prepared read-only request</value>
+    <comment>overview.continuation.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_attention" xml:space="preserve">
+    <value>Needs attention</value>
+    <comment>overview.record.next.attention (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_empty_detail" xml:space="preserve">
+    <value>Viewer, Trace, Debug, Flash and Device already provide the shortest route. New runs and artifacts will appear here automatically.</value>
+    <comment>overview.record.next.empty.detail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_empty_title" xml:space="preserve">
+    <value>Start from a workflow in the sidebar</value>
+    <comment>overview.record.next.empty.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_recentDetail" xml:space="preserve">
+    <value>Latest result in a line of %1$lld runs: %2$@</value>
+    <comment>overview.record.next.recentDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_residueDetail" xml:space="preserve">
+    <value>This run has %lld outstanding device effects. Review the Job before changing the target.</value>
+    <comment>overview.record.next.residueDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_title" xml:space="preserve">
+    <value>Next step</value>
+    <comment>overview.record.next.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_unknownDetail" xml:space="preserve">
+    <value>The external effect is unknown. The original request will not be replayed; inspect durable recovery evidence in History.</value>
+    <comment>overview.record.next.unknownDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_waitingDetail" xml:space="preserve">
+    <value>Runtime is waiting for a required human action. Open the Job to continue from the recorded boundary.</value>
+    <comment>overview.record.next.waitingDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_recent_all" xml:space="preserve">
+    <value>All records ›</value>
+    <comment>overview.record.recent.all (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_effectUnknown" xml:space="preserve">
+    <value>effect grade unrecorded</value>
+    <comment>overview.record.refusal.effectUnknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_neverReplayed" xml:space="preserve">
+    <value>never replayed</value>
+    <comment>overview.record.refusal.neverReplayed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_notTerminal" xml:space="preserve">
+    <value>still running</value>
+    <comment>overview.record.refusal.notTerminal (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_parametersNotReported" xml:space="preserve">
+    <value>typed inputs unreported</value>
+    <comment>overview.record.refusal.parametersNotReported (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_residue" xml:space="preserve">
+    <value>residue × %lld</value>
+    <comment>overview.record.residue (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_again" xml:space="preserve">
+    <value>Run it again</value>
+    <comment>overview.record.run.again (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_againGated" xml:space="preserve">
+    <value>Run it again…</value>
+    <comment>overview.record.run.againGated (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_open" xml:space="preserve">
+    <value>View in History</value>
+    <comment>overview.record.run.open (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_outcomeUnknown" xml:space="preserve">
+    <value>external effect unknown</value>
+    <comment>overview.record.run.outcomeUnknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_runCount" xml:space="preserve">
+    <value>runs × %lld</value>
+    <comment>overview.record.runCount (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_thread_more" xml:space="preserve">
+    <value>Show %lld more runs</value>
+    <comment>overview.record.thread.more (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_thread_needsAttention" xml:space="preserve">
+    <value>Needs you</value>
+    <comment>overview.record.thread.needsAttention (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_thread_ungrouped" xml:space="preserve">
+    <value>ungrouped run</value>
+    <comment>overview.record.thread.ungrouped (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_debug" xml:space="preserve">
+    <value>HAP debugging</value>
+    <comment>overview.record.workspace.debug (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_device" xml:space="preserve">
+    <value>Device control</value>
+    <comment>overview.record.workspace.device (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_flash" xml:space="preserve">
+    <value>Device flash</value>
+    <comment>overview.record.workspace.flash (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_trace" xml:space="preserve">
+    <value>Trace capture</value>
+    <comment>overview.record.workspace.trace (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_viewer" xml:space="preserve">
+    <value>Viewer inspection</value>
+    <comment>overview.record.workspace.viewer (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>overview.resume.cancel (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_catalogDigest" xml:space="preserve">
+    <value>Source Catalog digest</value>
+    <comment>overview.resume.catalogDigest (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_drift_binding" xml:space="preserve">
+    <value>The binding revision has changed since the source run. The recorded parameters describe the old target epoch and are not applied automatically.</value>
+    <comment>overview.resume.drift.binding (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_drift_target" xml:space="preserve">
+    <value>The source run used a different target. Check the target and inputs in the workspace before starting a new run.</value>
+    <comment>overview.resume.drift.target (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_drift_unknown" xml:space="preserve">
+    <value>The source run's binding revision was not reported, so this cannot state whether the target epoch still matches.</value>
+    <comment>overview.resume.drift.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_effect" xml:space="preserve">
+    <value>Effect</value>
+    <comment>overview.resume.effect (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_effect_unrecorded" xml:space="preserve">
+    <value>unrecorded</value>
+    <comment>overview.resume.effect.unrecorded (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_explanation" xml:space="preserve">
+    <value>Open the source workspace, or prepare the recorded typed inputs for a supported read-only operation. Preparing never submits a Job. Target and binding must still match; Runtime checks them again on submission.</value>
+    <comment>overview.resume.explanation (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_gated" xml:space="preserve">
+    <value>This run's effect grade is %@, so continuing re-enters that workspace's authorization gate rather than repeating a prefilled request.</value>
+    <comment>overview.resume.gated (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_loading" xml:space="preserve">
+    <value>Reading the source run's evidence…</value>
+    <comment>overview.resume.loading (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_neverReplayed" xml:space="preserve">
+    <value>This run's external effect is unknown. ArkDeck never replays an unknown intent; review its recovery evidence in History instead.</value>
+    <comment>overview.resume.neverReplayed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_noParameters" xml:space="preserve">
+    <value>This run did not report its typed inputs. ArkDeck will not fill them from defaults and call the result the same parameters.</value>
+    <comment>overview.resume.noParameters (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_notRepeatable" xml:space="preserve">
+    <value>There is nothing finished to repeat yet, or Runtime recorded no effect grade for this run.</value>
+    <comment>overview.resume.notRepeatable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_open" xml:space="preserve">
+    <value>Open Workspace</value>
+    <comment>overview.resume.open (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_parameters" xml:space="preserve">
+    <value>Parameters · the typed inputs the source run reported</value>
+    <comment>overview.resume.parameters (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_parameters_note" xml:space="preserve">
+    <value>These are recorded values. Only the prepared draft carries them forward. Historical authority, artifact leases, marker times and Runtime session IDs are never reused.</value>
+    <comment>overview.resume.parameters.note (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_prepare" xml:space="preserve">
+    <value>Prepare inputs</value>
+    <comment>overview.resume.prepare (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_prepare_unavailable" xml:space="preserve">
+    <value>A safe typed draft cannot be prepared from this record</value>
+    <comment>overview.resume.prepare.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_source" xml:space="preserve">
+    <value>Source run</value>
+    <comment>overview.resume.source (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>overview.resume.target (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_thread" xml:space="preserve">
+    <value>Thread</value>
+    <comment>overview.resume.thread (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_title" xml:space="preserve">
+    <value>Run It Again</value>
+    <comment>overview.resume.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_overview_thread_less" xml:space="preserve">
+    <value>Show fewer runs</value>
+    <comment>windows.overview.thread.less (Windows only)</comment>
+  </data>
+  <data name="windows_overview_resume_openRefused" xml:space="preserve">
+    <value>Open Workspace is offered only for a run that can be repeated as it was recorded.</value>
+    <comment>windows.overview.resume.openRefused (Windows only)</comment>
+  </data>
+  <data name="windows_overview_resume_openUnknown" xml:space="preserve">
+    <value>This record does not state which workspace ran it, so no workspace is opened.</value>
+    <comment>windows.overview.resume.openUnknown (Windows only)</comment>
+  </data>
+  <data name="windows_overview_continuation_attempted" xml:space="preserve">
+    <value>This draft was already started once and is not started again.</value>
+    <comment>windows.overview.continuation.attempted (Windows only)</comment>
+  </data>
+  <data name="overview_attention_trust" xml:space="preserve">
+    <value>Device trust is not ready</value>
+    <comment>overview.attention.trust (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_attention_nextStep_refresh" xml:space="preserve">
+    <value>Unlock and trust the device, then refresh the overview to re-read the current state.</value>
+    <comment>overview.attention.nextStep.refresh (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_capability" xml:space="preserve">
+    <value>Capability</value>
+    <comment>overview.capabilities.column.capability (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_evidence" xml:space="preserve">
+    <value>Probe evidence</value>
+    <comment>overview.capabilities.column.evidence (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_column_state" xml:space="preserve">
+    <value>State</value>
+    <comment>overview.capabilities.column.state (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_loading" xml:space="preserve">
+    <value>Probing device capabilities…</value>
+    <comment>overview.capabilities.loading (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_available" xml:space="preserve">
+    <value>Available</value>
+    <comment>overview.capabilities.state.available (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_limited" xml:space="preserve">
+    <value>Limited</value>
+    <comment>overview.capabilities.state.limited (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>overview.capabilities.state.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_state_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>overview.capabilities.state.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_title_noTarget" xml:space="preserve">
+    <value>Device capability matrix</value>
+    <comment>overview.capabilities.title.noTarget (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_capabilities_title_target" xml:space="preserve">
+    <value>Device capability matrix (%1$@ · binding %2$lld)</value>
+    <comment>overview.capabilities.title.target (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_channel_encryptedVerified" xml:space="preserve">
+    <value>Encrypted, verified</value>
+    <comment>overview.channel.encryptedVerified (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_channel_unverified" xml:space="preserve">
+    <value>Unverified</value>
+    <comment>overview.channel.unverified (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_environment_collapsed" xml:space="preserve">
+    <value>Collapsed</value>
+    <comment>overview.environment.collapsed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_environment_expanded" xml:space="preserve">
+    <value>Expanded</value>
+    <comment>overview.environment.expanded (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_authorization" xml:space="preserve">
+    <value>Authorization</value>
+    <comment>overview.field.authorization (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_autoLifecycleDispatches" xml:space="preserve">
+    <value>Automatic lifecycle dispatches</value>
+    <comment>overview.field.autoLifecycleDispatches (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_autoSubserverDispatches" xml:space="preserve">
+    <value>Automatic subserver dispatches</value>
+    <comment>overview.field.autoSubserverDispatches (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_channelProtection" xml:space="preserve">
+    <value>Channel protection</value>
+    <comment>overview.field.channelProtection (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_clientVersion" xml:space="preserve">
+    <value>Client version</value>
+    <comment>overview.field.clientVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_daemonVersion" xml:space="preserve">
+    <value>Daemon version</value>
+    <comment>overview.field.daemonVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_deviceEvents" xml:space="preserve">
+    <value>Recent device events</value>
+    <comment>overview.field.deviceEvents (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_endpoint" xml:space="preserve">
+    <value>Endpoint</value>
+    <comment>overview.field.endpoint (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_endpointSource" xml:space="preserve">
+    <value>Endpoint source</value>
+    <comment>overview.field.endpointSource (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_generation" xml:space="preserve">
+    <value>Server generation</value>
+    <comment>overview.field.generation (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_hash" xml:space="preserve">
+    <value>Hash</value>
+    <comment>overview.field.hash (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_lifecycleAvailability" xml:space="preserve">
+    <value>Server recovery</value>
+    <comment>overview.field.lifecycleAvailability (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_ownership" xml:space="preserve">
+    <value>Ownership</value>
+    <comment>overview.field.ownership (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_ownershipBasis" xml:space="preserve">
+    <value>Ownership basis</value>
+    <comment>overview.field.ownershipBasis (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_path" xml:space="preserve">
+    <value>Absolute path</value>
+    <comment>overview.field.path (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_platformTrust" xml:space="preserve">
+    <value>Platform trust</value>
+    <comment>overview.field.platformTrust (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_serverHealth" xml:space="preserve">
+    <value>Server health</value>
+    <comment>overview.field.serverHealth (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_serverVersion" xml:space="preserve">
+    <value>Server version</value>
+    <comment>overview.field.serverVersion (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_source" xml:space="preserve">
+    <value>HDC source</value>
+    <comment>overview.field.source (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_field_subserver" xml:space="preserve">
+    <value>Subserver capability</value>
+    <comment>overview.field.subserver (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_advanced" xml:space="preserve">
+    <value>Advanced Diagnostics</value>
+    <comment>overview.section.advanced (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_capabilities" xml:space="preserve">
+    <value>Capabilities</value>
+    <comment>overview.section.capabilities (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_deviceChannel" xml:space="preserve">
+    <value>Selected Device &amp; Channel</value>
+    <comment>overview.section.deviceChannel (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_section_serverToolchain" xml:space="preserve">
+    <value>Server &amp; Toolchain</value>
+    <comment>overview.section.serverToolchain (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_healthy" xml:space="preserve">
+    <value>Healthy</value>
+    <comment>overview.serverHealth.healthy (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>overview.serverHealth.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_serverHealth_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>overview.serverHealth.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_none" xml:space="preserve">
+    <value>None</value>
+    <comment>overview.status.needsAttention.none (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_one" xml:space="preserve">
+    <value>1 item</value>
+    <comment>overview.status.needsAttention.one (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_status_needsAttention_other" xml:space="preserve">
+    <value>%lld items</value>
+    <comment>overview.status.needsAttention.other (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+    <comment>overview.trust.cancelled (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_denied" xml:space="preserve">
+    <value>Denied</value>
+    <comment>overview.trust.denied (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_keyAccessDenied" xml:space="preserve">
+    <value>Key access denied</value>
+    <comment>overview.trust.keyAccessDenied (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_ready" xml:space="preserve">
+    <value>Ready</value>
+    <comment>overview.trust.ready (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_timedOut" xml:space="preserve">
+    <value>Timed out</value>
+    <comment>overview.trust.timedOut (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>overview.trust.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_trust_waiting" xml:space="preserve">
+    <value>Waiting for trust</value>
+    <comment>overview.trust.waiting (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_overview_hdc_checkHidumper" xml:space="preserve">
+    <value>Check hidumper with a read-only window inventory</value>
+    <comment>windows.overview.hdc.checkHidumper (Windows only)</comment>
+  </data>
 </root>

@@ -13,7 +13,7 @@
 //! and its code are the same (`TimedOut`, `Cancelled { drained }`); only the
 //! grace a child could have used to exit on its own is absent (T1, recorded
 //! as a proposal in the run record).
-use super::process::{BASE_ENVIRONMENT, PipeReader, RunningChild, spawn_in, uppercase};
+use super::process::{BASE_ENVIRONMENT, PipeReader, RunningChild, uppercase};
 use super::{bool_result, wide};
 use crate::process::tool_request::check_limits;
 use crate::process::{
@@ -67,7 +67,7 @@ impl VerifiedTool {
     /// `run_tool` for the HDC lifecycle client alone: the child is ended as
     /// every child is, but a process it creates breaks away from its Job, as
     /// the server `hdc kill -r` starts outlives the client in its own
-    /// session on macOS (`process::spawn_detaching`).
+    /// session on macOS (`process::spawn_tool` detaching).
     pub fn run_lifecycle_tool(
         &self,
         request: &ToolRequest<'_>,
@@ -87,7 +87,7 @@ impl VerifiedTool {
         validate_environment(request.environment).map_err(ToolRunError::Refused)?;
         let directory = request
             .working_directory
-            .map(validate_working_directory)
+            .map(child_working_directory)
             .transpose()
             .map_err(ToolRunError::Refused)?;
         self.revalidate().map_err(ToolRunError::Refused)?;
@@ -105,16 +105,12 @@ impl VerifiedTool {
         let started = Instant::now();
         // The child starts suspended and is killed unless the retained
         // executable still verifies, so any failure here ran no tool code.
-        let spawn = if detaching {
-            super::process::spawn_detaching
-        } else {
-            spawn_in
-        };
-        let mut child = spawn(
+        let mut child = super::process::spawn_tool(
             self,
             request.arguments,
             request.environment,
             directory.as_deref(),
+            detaching,
         )
         .map_err(ToolRunError::Refused)?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -255,6 +251,23 @@ pub(crate) fn validate_environment(environment: &[(OsString, OsString)]) -> io::
 /// its own canonical form (`\\?\` spelled, as `VerifiedTool` paths are) and
 /// an existing directory; the daemon's own directory never changes.
 pub(crate) fn validate_working_directory(directory: &Path) -> io::Result<Vec<u16>> {
+    wide(canonical_directory(directory)?.as_os_str())
+}
+
+/// `validate_working_directory` for a tool child: the same rule, and the
+/// child is given the directory in its standard spelling (`X:\…`) when that
+/// names exactly the canonical one. A tool resolving paths against its
+/// directory (Hvigor joins a project's module paths to it) reads `\\?\` as
+/// no directory of its own. Otherwise it keeps the `\\?\` form.
+pub(crate) fn child_working_directory(directory: &Path) -> io::Result<Vec<u16>> {
+    let canonical = canonical_directory(directory)?;
+    match standard_spelling(&canonical) {
+        Some(standard) => wide(std::ffi::OsStr::new(&standard)),
+        None => wide(canonical.as_os_str()),
+    }
+}
+
+fn canonical_directory(directory: &Path) -> io::Result<std::path::PathBuf> {
     if !directory.is_absolute() || directory.as_os_str().encode_wide().any(|unit| unit == 0) {
         return Err(invalid(
             "working directory must be an absolute NUL-free path",
@@ -265,7 +278,62 @@ pub(crate) fn validate_working_directory(directory: &Path) -> io::Result<Vec<u16
     if canonical != directory || !canonical.is_dir() {
         return Err(invalid("working directory unavailable"));
     }
-    wide(canonical.as_os_str())
+    Ok(canonical)
+}
+
+/// `VerifiedTool::with_search_directory`'s rule: `directory` names an
+/// existing directory in its standard spelling (`X:\…`), exactly the
+/// standard spelling of its canonical path, and holds no `;` or `"`, so it
+/// is one search path entry. Answers that spelling.
+pub(crate) fn search_directory(directory: &Path) -> io::Result<String> {
+    let text = directory
+        .to_str()
+        .filter(|text| !text.contains(';') && !text.contains('"'))
+        .ok_or_else(|| invalid("a search directory must be one plain path"))?;
+    let canonical =
+        std::fs::canonicalize(directory).map_err(|_| invalid("search directory unavailable"))?;
+    if !canonical.is_dir() || standard_spelling(&canonical).as_deref() != Some(text) {
+        return Err(invalid(
+            "a search directory must be an existing directory named as its canonical path",
+        ));
+    }
+    Ok(text.to_owned())
+}
+
+/// `\\?\X:\…` as `X:\…` when Win32 path normalisation leaves that spelling
+/// exactly as written, so both name one directory: a drive-letter path
+/// shorter than a directory's `MAX_PATH` bound, none of whose components
+/// ends in a dot or a space or is a DOS device name. `None` otherwise.
+pub(crate) fn standard_spelling(canonical: &Path) -> Option<String> {
+    let text = canonical.to_str()?.strip_prefix(r"\\?\")?;
+    let bytes = text.as_bytes();
+    if bytes.len() < 3
+        || bytes.len() >= 248
+        || !bytes[0].is_ascii_alphabetic()
+        || &bytes[1..3] != b":\\"
+        || text.contains('/')
+    {
+        return None;
+    }
+    const DEVICES: [&str; 4] = ["CON", "PRN", "AUX", "NUL"];
+    for component in text[3..].split('\\').filter(|part| !part.is_empty()) {
+        if component.ends_with('.') || component.ends_with(' ') {
+            return None;
+        }
+        let stem = component
+            .split('.')
+            .next()
+            .unwrap_or_default()
+            .trim_end()
+            .to_ascii_uppercase();
+        let numbered = stem.len() == 4
+            && (stem.starts_with("COM") || stem.starts_with("LPT"))
+            && stem.as_bytes()[3].is_ascii_digit();
+        if DEVICES.contains(&stem.as_str()) || numbered {
+            return None;
+        }
+    }
+    Some(text.to_owned())
 }
 
 /// Swift `terminateProcessGroup` on Windows: the Job is terminated at once,
@@ -382,5 +450,52 @@ impl Capture {
             // pending this cancels nothing and fails harmlessly.
             let _ = bool_result(unsafe { CancelSynchronousIo(self.thread.as_raw_handle()) });
         }
+    }
+}
+
+#[cfg(test)]
+mod working_directory_tests {
+    use super::{child_working_directory, standard_spelling, validate_working_directory};
+    use std::path::Path;
+
+    #[test]
+    fn a_child_s_directory_is_spelled_as_win32_spells_it_when_that_names_the_same() {
+        let standard = |text: &str| standard_spelling(Path::new(text));
+        assert_eq!(
+            standard(r"\\?\C:\Users\me\AppData\Local\Temp\copy").as_deref(),
+            Some(r"C:\Users\me\AppData\Local\Temp\copy")
+        );
+        assert_eq!(standard(r"\\?\D:\").as_deref(), Some(r"D:\"));
+        for kept in [
+            r"\\?\UNC\server\share\copy",
+            r"\\?\Volume{0b1c}\copy",
+            r"\\?\C:\copy\trailing.",
+            r"\\?\C:\copy\trailing ",
+            r"\\?\C:\copy\nul",
+            r"\\?\C:\copy\Com1.txt",
+            r"\\?\C:\copy\lpt9",
+            r"C:\not-verbatim",
+        ] {
+            assert_eq!(standard(kept), None, "{kept}");
+        }
+        let long = format!(r"\\?\C:\{}", "a".repeat(250));
+        assert_eq!(standard(&long), None);
+        // A component that only begins like a device stays standard.
+        assert!(standard(r"\\?\C:\console\community").is_some());
+
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        let given = child_working_directory(&temporary).unwrap();
+        let given = String::from_utf16(&given[..given.len() - 1]).unwrap();
+        assert_eq!(
+            Some(given.as_str()),
+            standard_spelling(&temporary).as_deref()
+        );
+        assert!(!given.starts_with(r"\\?\"), "{given}");
+        // A managed server or a console keeps the canonical spelling.
+        let kept = validate_working_directory(&temporary).unwrap();
+        assert_eq!(
+            String::from_utf16(&kept[..kept.len() - 1]).unwrap(),
+            temporary.to_str().unwrap()
+        );
     }
 }

@@ -405,9 +405,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.cancel",
     "job.reconcile",
     // The agent execution and human-action owners over Swift's
-    // physical-assistance records (TASK-XPA-005). Not `agent run`, `resume`
-    // or `abandon`, nor `human-action resume`: each reaches a Target, which
-    // needs a registered HDC.
+    // physical-assistance records (TASK-XPA-005). Not `agent run`, `agent
+    // resume` or `human-action resume`; `agent abandon` is counted. See the
+    // GJ-1 leaves below.
     "agent.list",
     "agent.status",
     "human-action.list",
@@ -474,6 +474,23 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "ui-dump.component-detail",
     "debug.logs",
     "trace.capture",
+    // Not `agent resume` (nor `human-action resume`), although
+    // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
+    // oracle's `connect` scenario: once its action resolves, a resume
+    // submits the execution's operation through the same admission as
+    // `agent run` and `job submit`, so its answer depends on that
+    // operation, and these shared generic leaves are not counted until
+    // every operation they reach on Windows answers as Swift does (the
+    // lead's ruling of 2026-10-04, as for `flash run` below).
+    // `agent abandon`, over the Swift human-action oracle's `trust` scenario
+    // (`gj1_device_leaves.rs`): an execution paused on the device's trust
+    // prompt, abandoned under its current generation (a stale one refused),
+    // its expired action then refusing either resume. It is counted because
+    // it acts on the existing execution alone: it moves the record to
+    // `abandoned` and expires its waiting action, and refuses once the
+    // execution owns a Job. It never submits or plans, so its answer does
+    // not depend on which operation the execution runs.
+    "agent.abandon",
     // The Debug probe over the Target store and the HDC (TASK-XPA-008;
     // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
     // against the signed test daemon over the Swift oracle's answers). Not
@@ -569,6 +586,17 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.patch",
     "workspace.revert",
     "workspace.checkpoint",
+    // The Hvigor build of a Runtime-owned copy (TASK-XPA-011), with the
+    // host's registered DevEco Studio, its search path led by the
+    // toolchain's pinned JDK, through the real CLI against a dev-signed
+    // installed-mode daemon
+    // (`arkdeck-agentd/tests/windows_workspace_hvigor_live_process.rs`, run
+    // with `ARKDECK_LIVE_DEVECO_ROOT`).
+    "workspace.build",
+    // The module's local unit tests in the same copy, through its test
+    // preset, reaching the project's `ohpm` dependencies through the in-tree
+    // junctions the copy recreates (the same live test).
+    "workspace.test",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test
@@ -1304,6 +1332,7 @@ mod tests {
             ("device.observations", "partial"),
             ("job.submit", "partial"),
             ("agent.run", "partial"),
+            ("agent.resume", "partial"),
             ("runtime.storage.root", "implemented"),
             ("help", "implemented"),
             ("completion", "implemented"),
@@ -1311,6 +1340,7 @@ mod tests {
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
+            ("agent.abandon", "implemented"),
             // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),

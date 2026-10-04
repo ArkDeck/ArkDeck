@@ -87,6 +87,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -112,11 +113,14 @@
                 <!-- The macOS global Job recovery banner: every record that needs a person now. -->
                 <ScrollViewer x:Name="JobRecoveryHost" Grid.Row="2" MaxHeight="280" VerticalScrollBarVisibility="Auto" Visibility="Collapsed"
                     AutomationProperties.AutomationId="jobRecovery.list" />
-                <ContentControl x:Name="PageHost" Grid.Row="3" IsTabStop="False" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+                <!-- The macOS WorkspaceContinuationCard: Overview's prepared read-only request, shown
+                     above the workspace it belongs to until it is discarded. -->
+                <ContentControl x:Name="ContinuationHost" Grid.Row="3" IsTabStop="False" HorizontalContentAlignment="Stretch" Visibility="Collapsed" />
+                <ContentControl x:Name="PageHost" Grid.Row="4" IsTabStop="False" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
                 <!-- The global Job Inspector, below every page as on macOS (VSplitView). -->
                 <Border
                     x:Name="InspectorHost"
-                    Grid.Row="4"
+                    Grid.Row="5"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="0,1,0,0" />
             </Grid>

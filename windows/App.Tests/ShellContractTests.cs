@@ -100,7 +100,7 @@ public sealed class ShellContractTests
             var text = File.ReadAllText(file);
             foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs" or "Flash.cs"
-                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs"))
+                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs" or "ScriptedDaemon.Continue.cs"))
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }
@@ -126,6 +126,9 @@ public sealed class ShellContractTests
         {
             "capture.diagnostics", "debug.hap", "debug.template", "deploy.native-library.app-owned", "port-forward.create", "port-forward.remove",
             "flash.full-restore",
+            // Overview's prepared continuation (macOS RuntimeWorkspaceContinuation): a new
+            // read-only Job of one of the two published observation operations.
+            "observe.device",
         };
         var built = new List<string>();
         foreach (var file in RepoPaths.AppSources("*.cs").Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
@@ -188,6 +191,7 @@ public sealed class ShellContractTests
                      CliCommands.ImportFlashBundle, CliCommands.ImportWorkspacePatch, CliCommands.ImportNativeLibrary,
                      CliCommands.TraceProbe, CliCommands.TraceCapture,
                      CliCommands.UiDumpCapture, CliCommands.UiDumpComponentDetail,
+                     CliCommands.JobPlan, CliCommands.JobSubmit, CliCommands.OperationList,
                  })
         {
             Assert.IsTrue(commands.Contains(command), command);

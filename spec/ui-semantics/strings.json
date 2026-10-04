@@ -8657,6 +8657,690 @@
       "table": "JobsLocalizable",
       "en": "The interruption is recorded; Session publication is pending. Review archive again to finish publishing.",
       "zh-Hans": "中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。"
+    },
+    {
+      "key": "overview.continuation.close",
+      "table": "Localizable",
+      "en": "Discard draft",
+      "zh-Hans": "丢弃草稿"
+    },
+    {
+      "key": "overview.continuation.explanation",
+      "table": "Localizable",
+      "en": "Inputs are copied exactly from the source record. Starting creates a new Job after fresh identity checks and keeps its recorded thread as provenance only. Nothing has been submitted yet.",
+      "zh-Hans": "参数完整复制自来源记录。开始后经最新身份检查创建新 Job，原 thread 仅作为来源记录保留。当前尚未提交。"
+    },
+    {
+      "key": "overview.continuation.openJob",
+      "table": "Localizable",
+      "en": "Open new Job",
+      "zh-Hans": "打开新 Job"
+    },
+    {
+      "key": "overview.continuation.statusNote",
+      "table": "Localizable",
+      "en": "This draft has been attempted once. Check its Job record for the outcome; this view does not retry or replay.",
+      "zh-Hans": "此草稿已尝试提交一次。请以 Job 记录中的结果为准；此界面不会重试或重放。"
+    },
+    {
+      "key": "overview.continuation.submit",
+      "table": "Localizable",
+      "en": "Start new read-only Job",
+      "zh-Hans": "开始新的只读 Job"
+    },
+    {
+      "key": "overview.continuation.submitted",
+      "table": "Localizable",
+      "en": "Submitted · awaiting Runtime outcome",
+      "zh-Hans": "已提交 · 等待 Runtime 结果"
+    },
+    {
+      "key": "overview.continuation.title",
+      "table": "Localizable",
+      "en": "Prepared read-only request",
+      "zh-Hans": "已准备的只读请求"
+    },
+    {
+      "key": "overview.record.next.attention",
+      "table": "Localizable",
+      "en": "Needs attention",
+      "zh-Hans": "需要处理"
+    },
+    {
+      "key": "overview.record.next.empty.detail",
+      "table": "Localizable",
+      "en": "Viewer, Trace, Debug, Flash and Device already provide the shortest route. New runs and artifacts will appear here automatically.",
+      "zh-Hans": "Viewer、Trace、Debug、Flash 和 Device 已经是最短入口；新的运行与产物会自动出现在这里。"
+    },
+    {
+      "key": "overview.record.next.empty.title",
+      "table": "Localizable",
+      "en": "Start from a workflow in the sidebar",
+      "zh-Hans": "从左侧工作流开始"
+    },
+    {
+      "key": "overview.record.next.recentDetail",
+      "table": "Localizable",
+      "en": "Latest result in a line of %1$lld runs: %2$@",
+      "zh-Hans": "这条调试线共 %1$lld 次运行，最近结果：%2$@"
+    },
+    {
+      "key": "overview.record.next.residueDetail",
+      "table": "Localizable",
+      "en": "This run has %lld outstanding device effects. Review the Job before changing the target.",
+      "zh-Hans": "这次运行还有 %lld 项设备残留，修改目标前请先查看 Job。"
+    },
+    {
+      "key": "overview.record.next.title",
+      "table": "Localizable",
+      "en": "Next step",
+      "zh-Hans": "下一步"
+    },
+    {
+      "key": "overview.record.next.unknownDetail",
+      "table": "Localizable",
+      "en": "The external effect is unknown. The original request will not be replayed; inspect durable recovery evidence in History.",
+      "zh-Hans": "外部效果未知，原请求不会重放；请到 History 查看持久化恢复证据。"
+    },
+    {
+      "key": "overview.record.next.waitingDetail",
+      "table": "Localizable",
+      "en": "Runtime is waiting for a required human action. Open the Job to continue from the recorded boundary.",
+      "zh-Hans": "Runtime 正在等待必要的人工动作，请打开 Job 从已记录边界继续。"
+    },
+    {
+      "key": "overview.record.recent.all",
+      "table": "Localizable",
+      "en": "All records ›",
+      "zh-Hans": "全部记录 ›"
+    },
+    {
+      "key": "overview.record.refusal.effectUnknown",
+      "table": "Localizable",
+      "en": "effect grade unrecorded",
+      "zh-Hans": "未记录效果分级"
+    },
+    {
+      "key": "overview.record.refusal.neverReplayed",
+      "table": "Localizable",
+      "en": "never replayed",
+      "zh-Hans": "不可重放"
+    },
+    {
+      "key": "overview.record.refusal.notTerminal",
+      "table": "Localizable",
+      "en": "still running",
+      "zh-Hans": "仍在运行"
+    },
+    {
+      "key": "overview.record.refusal.parametersNotReported",
+      "table": "Localizable",
+      "en": "typed inputs unreported",
+      "zh-Hans": "未上报 typed inputs"
+    },
+    {
+      "key": "overview.record.residue",
+      "table": "Localizable",
+      "en": "residue × %lld",
+      "zh-Hans": "残留 × %lld"
+    },
+    {
+      "key": "overview.record.run.again",
+      "table": "Localizable",
+      "en": "Run it again",
+      "zh-Hans": "再来一次"
+    },
+    {
+      "key": "overview.record.run.againGated",
+      "table": "Localizable",
+      "en": "Run it again…",
+      "zh-Hans": "再来一次…"
+    },
+    {
+      "key": "overview.record.run.open",
+      "table": "Localizable",
+      "en": "View in History",
+      "zh-Hans": "在 History 中查看"
+    },
+    {
+      "key": "overview.record.run.outcomeUnknown",
+      "table": "Localizable",
+      "en": "external effect unknown",
+      "zh-Hans": "外部效果未知"
+    },
+    {
+      "key": "overview.record.runCount",
+      "table": "Localizable",
+      "en": "runs × %lld",
+      "zh-Hans": "%lld 次运行"
+    },
+    {
+      "key": "overview.record.thread.more",
+      "table": "Localizable",
+      "en": "Show %lld more runs",
+      "zh-Hans": "显示另外 %lld 次"
+    },
+    {
+      "key": "overview.record.thread.needsAttention",
+      "table": "Localizable",
+      "en": "Needs you",
+      "zh-Hans": "需要你处理"
+    },
+    {
+      "key": "overview.record.thread.ungrouped",
+      "table": "Localizable",
+      "en": "ungrouped run",
+      "zh-Hans": "未分组的运行"
+    },
+    {
+      "key": "overview.record.workspace.debug",
+      "table": "Localizable",
+      "en": "HAP debugging",
+      "zh-Hans": "HAP 调试"
+    },
+    {
+      "key": "overview.record.workspace.device",
+      "table": "Localizable",
+      "en": "Device control",
+      "zh-Hans": "真机操作"
+    },
+    {
+      "key": "overview.record.workspace.flash",
+      "table": "Localizable",
+      "en": "Device flash",
+      "zh-Hans": "设备刷机"
+    },
+    {
+      "key": "overview.record.workspace.trace",
+      "table": "Localizable",
+      "en": "Trace capture",
+      "zh-Hans": "Trace 抓取"
+    },
+    {
+      "key": "overview.record.workspace.viewer",
+      "table": "Localizable",
+      "en": "Viewer inspection",
+      "zh-Hans": "Viewer 界面检查"
+    },
+    {
+      "key": "overview.resume.cancel",
+      "table": "Localizable",
+      "en": "Cancel",
+      "zh-Hans": "取消"
+    },
+    {
+      "key": "overview.resume.catalogDigest",
+      "table": "Localizable",
+      "en": "Source Catalog digest",
+      "zh-Hans": "来源 Catalog digest"
+    },
+    {
+      "key": "overview.resume.drift.binding",
+      "table": "Localizable",
+      "en": "The binding revision has changed since the source run. The recorded parameters describe the old target epoch and are not applied automatically.",
+      "zh-Hans": "自来源运行以来 binding revision 已变化。所列参数属于旧目标代次，不会自动应用。"
+    },
+    {
+      "key": "overview.resume.drift.target",
+      "table": "Localizable",
+      "en": "The source run used a different target. Check the target and inputs in the workspace before starting a new run.",
+      "zh-Hans": "来源运行的目标与本页当前绑定的目标不同。开始新运行前，请在工作区重新检查目标和输入。"
+    },
+    {
+      "key": "overview.resume.drift.unknown",
+      "table": "Localizable",
+      "en": "The source run's binding revision was not reported, so this cannot state whether the target epoch still matches.",
+      "zh-Hans": "来源运行未上报 binding revision，因此无法断言目标代次是否仍然一致。"
+    },
+    {
+      "key": "overview.resume.effect",
+      "table": "Localizable",
+      "en": "Effect",
+      "zh-Hans": "效果"
+    },
+    {
+      "key": "overview.resume.effect.unrecorded",
+      "table": "Localizable",
+      "en": "unrecorded",
+      "zh-Hans": "未记录"
+    },
+    {
+      "key": "overview.resume.explanation",
+      "table": "Localizable",
+      "en": "Open the source workspace, or prepare the recorded typed inputs for a supported read-only operation. Preparing never submits a Job. Target and binding must still match; Runtime checks them again on submission.",
+      "zh-Hans": "可打开来源工作区，或为受支持的只读操作准备已记录的类型化参数。准备草稿不会提交 Job。目标与绑定必须一致，提交时 Runtime 会再次检查。"
+    },
+    {
+      "key": "overview.resume.gated",
+      "table": "Localizable",
+      "en": "This run's effect grade is %@, so continuing re-enters that workspace's authorization gate rather than repeating a prefilled request.",
+      "zh-Hans": "该次运行的效果分级是 %@，因此继续会重新走该工作区的授权闸，而不是重复一个预填的请求。"
+    },
+    {
+      "key": "overview.resume.loading",
+      "table": "Localizable",
+      "en": "Reading the source run's evidence…",
+      "zh-Hans": "正在读取来源运行的证据……"
+    },
+    {
+      "key": "overview.resume.neverReplayed",
+      "table": "Localizable",
+      "en": "This run's external effect is unknown. ArkDeck never replays an unknown intent; review its recovery evidence in History instead.",
+      "zh-Hans": "该次运行的外部效果未知。ArkDeck 永不重放未知的意图；请到 History 查看恢复证据。"
+    },
+    {
+      "key": "overview.resume.noParameters",
+      "table": "Localizable",
+      "en": "This run did not report its typed inputs. ArkDeck will not fill them from defaults and call the result the same parameters.",
+      "zh-Hans": "该次运行未上报 typed inputs。ArkDeck 不会用默认值补齐后声称这是同一组参数。"
+    },
+    {
+      "key": "overview.resume.notRepeatable",
+      "table": "Localizable",
+      "en": "There is nothing finished to repeat yet, or Runtime recorded no effect grade for this run.",
+      "zh-Hans": "这次运行还没有结束，或者 Runtime 未记录它的效果分级。"
+    },
+    {
+      "key": "overview.resume.open",
+      "table": "Localizable",
+      "en": "Open Workspace",
+      "zh-Hans": "打开工作区"
+    },
+    {
+      "key": "overview.resume.parameters",
+      "table": "Localizable",
+      "en": "Parameters · the typed inputs the source run reported",
+      "zh-Hans": "参数 · 来自来源运行上报的 typed inputs"
+    },
+    {
+      "key": "overview.resume.parameters.note",
+      "table": "Localizable",
+      "en": "These are recorded values. Only the prepared draft carries them forward. Historical authority, artifact leases, marker times and Runtime session IDs are never reused.",
+      "zh-Hans": "这些是历史记录值，仅“准备参数草稿”会带入。不会沿用历史授权、产物租约、标记时刻或 Runtime Session ID。"
+    },
+    {
+      "key": "overview.resume.prepare",
+      "table": "Localizable",
+      "en": "Prepare inputs",
+      "zh-Hans": "准备参数草稿"
+    },
+    {
+      "key": "overview.resume.prepare.unavailable",
+      "table": "Localizable",
+      "en": "A safe typed draft cannot be prepared from this record",
+      "zh-Hans": "此记录无法生成安全的类型化参数草稿"
+    },
+    {
+      "key": "overview.resume.source",
+      "table": "Localizable",
+      "en": "Source run",
+      "zh-Hans": "来源运行"
+    },
+    {
+      "key": "overview.resume.target",
+      "table": "Localizable",
+      "en": "Target",
+      "zh-Hans": "目标"
+    },
+    {
+      "key": "overview.resume.thread",
+      "table": "Localizable",
+      "en": "Thread",
+      "zh-Hans": "调试线"
+    },
+    {
+      "key": "overview.resume.title",
+      "table": "Localizable",
+      "en": "Run It Again",
+      "zh-Hans": "再来一次"
+    },
+    {
+      "key": "windows.overview.thread.less",
+      "table": null,
+      "en": "Show fewer runs",
+      "zh-Hans": "收起其他运行"
+    },
+    {
+      "key": "windows.overview.resume.openRefused",
+      "table": null,
+      "en": "Open Workspace is offered only for a run that can be repeated as it was recorded.",
+      "zh-Hans": "仅当运行可按记录重复时才提供“打开工作区”。"
+    },
+    {
+      "key": "windows.overview.resume.openUnknown",
+      "table": null,
+      "en": "This record does not state which workspace ran it, so no workspace is opened.",
+      "zh-Hans": "此记录未说明由哪个工作区运行，因此不会打开工作区。"
+    },
+    {
+      "key": "windows.overview.continuation.attempted",
+      "table": null,
+      "en": "This draft was already started once and is not started again.",
+      "zh-Hans": "此草稿已启动过一次，不会再次启动。"
+    },
+    {
+      "key": "overview.attention.trust",
+      "table": "Localizable",
+      "en": "Device trust is not ready",
+      "zh-Hans": "设备信任未就绪"
+    },
+    {
+      "key": "overview.attention.nextStep.refresh",
+      "table": "Localizable",
+      "en": "Unlock and trust the device, then refresh the overview to re-read the current state.",
+      "zh-Hans": "请解锁并在设备上确认信任，然后刷新概览以重新读取当前状态。"
+    },
+    {
+      "key": "overview.capabilities.column.capability",
+      "table": "Localizable",
+      "en": "Capability",
+      "zh-Hans": "能力"
+    },
+    {
+      "key": "overview.capabilities.column.evidence",
+      "table": "Localizable",
+      "en": "Probe evidence",
+      "zh-Hans": "探测证据"
+    },
+    {
+      "key": "overview.capabilities.column.state",
+      "table": "Localizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "overview.capabilities.loading",
+      "table": "Localizable",
+      "en": "Probing device capabilities…",
+      "zh-Hans": "正在探测设备能力…"
+    },
+    {
+      "key": "overview.capabilities.state.available",
+      "table": "Localizable",
+      "en": "Available",
+      "zh-Hans": "可用"
+    },
+    {
+      "key": "overview.capabilities.state.limited",
+      "table": "Localizable",
+      "en": "Limited",
+      "zh-Hans": "受限"
+    },
+    {
+      "key": "overview.capabilities.state.unavailable",
+      "table": "Localizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "overview.capabilities.state.unknown",
+      "table": "Localizable",
+      "en": "Unknown",
+      "zh-Hans": "无法确认"
+    },
+    {
+      "key": "overview.capabilities.title.noTarget",
+      "table": "Localizable",
+      "en": "Device capability matrix",
+      "zh-Hans": "设备能力矩阵"
+    },
+    {
+      "key": "overview.capabilities.title.target",
+      "table": "Localizable",
+      "en": "Device capability matrix (%1$@ · binding %2$lld)",
+      "zh-Hans": "设备能力矩阵（%1$@ · binding %2$lld）"
+    },
+    {
+      "key": "overview.channel.encryptedVerified",
+      "table": "Localizable",
+      "en": "Encrypted, verified",
+      "zh-Hans": "已加密并验证"
+    },
+    {
+      "key": "overview.channel.unverified",
+      "table": "Localizable",
+      "en": "Unverified",
+      "zh-Hans": "未验证"
+    },
+    {
+      "key": "overview.environment.collapsed",
+      "table": "Localizable",
+      "en": "Collapsed",
+      "zh-Hans": "已收起"
+    },
+    {
+      "key": "overview.environment.expanded",
+      "table": "Localizable",
+      "en": "Expanded",
+      "zh-Hans": "已展开"
+    },
+    {
+      "key": "overview.field.authorization",
+      "table": "Localizable",
+      "en": "Authorization",
+      "zh-Hans": "授权"
+    },
+    {
+      "key": "overview.field.autoLifecycleDispatches",
+      "table": "Localizable",
+      "en": "Automatic lifecycle dispatches",
+      "zh-Hans": "自动生命周期调度次数"
+    },
+    {
+      "key": "overview.field.autoSubserverDispatches",
+      "table": "Localizable",
+      "en": "Automatic subserver dispatches",
+      "zh-Hans": "自动子服务器调度次数"
+    },
+    {
+      "key": "overview.field.channelProtection",
+      "table": "Localizable",
+      "en": "Channel protection",
+      "zh-Hans": "通道保护"
+    },
+    {
+      "key": "overview.field.clientVersion",
+      "table": "Localizable",
+      "en": "Client version",
+      "zh-Hans": "客户端版本"
+    },
+    {
+      "key": "overview.field.daemonVersion",
+      "table": "Localizable",
+      "en": "Daemon version",
+      "zh-Hans": "守护进程版本"
+    },
+    {
+      "key": "overview.field.deviceEvents",
+      "table": "Localizable",
+      "en": "Recent device events",
+      "zh-Hans": "近期设备事件"
+    },
+    {
+      "key": "overview.field.endpoint",
+      "table": "Localizable",
+      "en": "Endpoint",
+      "zh-Hans": "端点"
+    },
+    {
+      "key": "overview.field.endpointSource",
+      "table": "Localizable",
+      "en": "Endpoint source",
+      "zh-Hans": "端点来源"
+    },
+    {
+      "key": "overview.field.generation",
+      "table": "Localizable",
+      "en": "Server generation",
+      "zh-Hans": "服务器代次"
+    },
+    {
+      "key": "overview.field.hash",
+      "table": "Localizable",
+      "en": "Hash",
+      "zh-Hans": "哈希"
+    },
+    {
+      "key": "overview.field.lifecycleAvailability",
+      "table": "Localizable",
+      "en": "Server recovery",
+      "zh-Hans": "服务器恢复"
+    },
+    {
+      "key": "overview.field.ownership",
+      "table": "Localizable",
+      "en": "Ownership",
+      "zh-Hans": "归属"
+    },
+    {
+      "key": "overview.field.ownershipBasis",
+      "table": "Localizable",
+      "en": "Ownership basis",
+      "zh-Hans": "归属判定依据"
+    },
+    {
+      "key": "overview.field.path",
+      "table": "Localizable",
+      "en": "Absolute path",
+      "zh-Hans": "绝对路径"
+    },
+    {
+      "key": "overview.field.platformTrust",
+      "table": "Localizable",
+      "en": "Platform trust",
+      "zh-Hans": "平台信任"
+    },
+    {
+      "key": "overview.field.serverHealth",
+      "table": "Localizable",
+      "en": "Server health",
+      "zh-Hans": "服务器健康状态"
+    },
+    {
+      "key": "overview.field.serverVersion",
+      "table": "Localizable",
+      "en": "Server version",
+      "zh-Hans": "服务器版本"
+    },
+    {
+      "key": "overview.field.source",
+      "table": "Localizable",
+      "en": "HDC source",
+      "zh-Hans": "HDC 来源"
+    },
+    {
+      "key": "overview.field.subserver",
+      "table": "Localizable",
+      "en": "Subserver capability",
+      "zh-Hans": "子服务器能力"
+    },
+    {
+      "key": "overview.section.advanced",
+      "table": "Localizable",
+      "en": "Advanced Diagnostics",
+      "zh-Hans": "高级诊断"
+    },
+    {
+      "key": "overview.section.capabilities",
+      "table": "Localizable",
+      "en": "Capabilities",
+      "zh-Hans": "能力"
+    },
+    {
+      "key": "overview.section.deviceChannel",
+      "table": "Localizable",
+      "en": "Selected Device & Channel",
+      "zh-Hans": "所选设备与通道"
+    },
+    {
+      "key": "overview.section.serverToolchain",
+      "table": "Localizable",
+      "en": "Server & Toolchain",
+      "zh-Hans": "服务器与工具链"
+    },
+    {
+      "key": "overview.serverHealth.healthy",
+      "table": "Localizable",
+      "en": "Healthy",
+      "zh-Hans": "正常"
+    },
+    {
+      "key": "overview.serverHealth.unavailable",
+      "table": "Localizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "overview.serverHealth.unknown",
+      "table": "Localizable",
+      "en": "Unknown",
+      "zh-Hans": "未知"
+    },
+    {
+      "key": "overview.status.needsAttention.none",
+      "table": "Localizable",
+      "en": "None",
+      "zh-Hans": "无"
+    },
+    {
+      "key": "overview.status.needsAttention.one",
+      "table": "Localizable",
+      "en": "1 item",
+      "zh-Hans": "1 项"
+    },
+    {
+      "key": "overview.status.needsAttention.other",
+      "table": "Localizable",
+      "en": "%lld items",
+      "zh-Hans": "%lld 项"
+    },
+    {
+      "key": "overview.trust.cancelled",
+      "table": "Localizable",
+      "en": "Cancelled",
+      "zh-Hans": "已取消"
+    },
+    {
+      "key": "overview.trust.denied",
+      "table": "Localizable",
+      "en": "Denied",
+      "zh-Hans": "已拒绝"
+    },
+    {
+      "key": "overview.trust.keyAccessDenied",
+      "table": "Localizable",
+      "en": "Key access denied",
+      "zh-Hans": "密钥访问被拒绝"
+    },
+    {
+      "key": "overview.trust.ready",
+      "table": "Localizable",
+      "en": "Ready",
+      "zh-Hans": "已就绪"
+    },
+    {
+      "key": "overview.trust.timedOut",
+      "table": "Localizable",
+      "en": "Timed out",
+      "zh-Hans": "已超时"
+    },
+    {
+      "key": "overview.trust.unavailable",
+      "table": "Localizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "overview.trust.waiting",
+      "table": "Localizable",
+      "en": "Waiting for trust",
+      "zh-Hans": "等待信任"
+    },
+    {
+      "key": "windows.overview.hdc.checkHidumper",
+      "table": null,
+      "en": "Check hidumper with a read-only window inventory",
+      "zh-Hans": "用只读窗口清单检查 hidumper"
     }
   ]
 }

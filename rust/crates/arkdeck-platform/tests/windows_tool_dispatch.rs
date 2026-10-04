@@ -89,6 +89,11 @@ mod windows {
             "cwd" => {
                 write!(stdout, "{}", std::env::current_dir().unwrap().display()).unwrap();
             }
+            // The path the child's own image was started by, as the loader
+            // reports it (what Node calls `process.execPath`).
+            "image" => {
+                write!(stdout, "{}", std::env::current_exe().unwrap().display()).unwrap();
+            }
             // How many bytes stdin had to give.
             "stdin" => {
                 let mut bytes = Vec::new();
@@ -222,6 +227,10 @@ mod windows {
     type Test = (&'static str, fn());
 
     const TESTS: &[Test] = &[
+        (
+            "a_tool_child_is_named_by_its_standard_image_path_and_may_lead_its_search_path",
+            a_tool_child_is_named_by_its_standard_image_path_and_may_lead_its_search_path,
+        ),
         (
             "argv_reaches_the_child_verbatim_without_a_shell_and_stdin_is_nul",
             argv_reaches_the_child_verbatim_without_a_shell_and_stdin_is_nul,
@@ -668,6 +677,67 @@ mod windows {
         assert!(!marker.exists(), "a refused request ran the tool");
     }
 
+    /// TASK-XPA-011: the tool runner names its child by the standard
+    /// spelling of the verified image's canonical path (Node hands its image
+    /// path to `cmd.exe`), and a tool given one leading search directory —
+    /// an existing directory named as its canonical path — hands its child
+    /// exactly that directory before the system directory; nothing else of
+    /// `PATH` changes, and other spellings are refused.
+    fn a_tool_child_is_named_by_its_standard_image_path_and_may_lead_its_search_path() {
+        let tool = this_tool();
+        let canonical = tool.path().to_str().unwrap().to_owned();
+        assert!(canonical.starts_with(r"\\?\"), "{canonical}");
+        let image = run(&tool, &args(&["image"]));
+        assert_eq!(
+            String::from_utf8(image.stdout).unwrap(),
+            canonical.trim_start_matches(r"\\?\")
+        );
+        let clean = String::from_utf8(run(&tool, &args(&["environment"])).stdout).unwrap();
+        let system_path = clean
+            .lines()
+            .find_map(|row| row.strip_prefix("PATH="))
+            .unwrap()
+            .to_owned();
+
+        let scratch = Scratch::new("search");
+        let directory = scratch.directory("jbr bin");
+        let standard = PathBuf::from(directory.to_str().unwrap().trim_start_matches(r"\\?\"));
+        let led = this_tool().with_search_directory(&standard).unwrap();
+        let environment = String::from_utf8(run(&led, &args(&["environment"])).stdout).unwrap();
+        let path = environment
+            .lines()
+            .find_map(|row| row.strip_prefix("PATH="))
+            .unwrap();
+        assert_eq!(
+            path,
+            format!("{};{system_path}", standard.to_str().unwrap())
+        );
+        // Every other row is the clean base's.
+        let others = |text: &str| -> Vec<String> {
+            text.lines()
+                .filter(|row| !row.starts_with("PATH="))
+                .map(str::to_owned)
+                .collect()
+        };
+        assert_eq!(others(&environment), others(&clean));
+
+        fs::write(scratch.0.join("file"), b"").unwrap();
+        for refused in [
+            directory.clone(),
+            PathBuf::from("jbr bin"),
+            scratch.0.join("missing"),
+            scratch.0.join("file"),
+            PathBuf::from(format!("{};C:\\Windows", standard.to_str().unwrap())),
+            PathBuf::from(standard.to_str().unwrap().to_uppercase()),
+        ] {
+            assert!(
+                this_tool().with_search_directory(&refused).is_err(),
+                "{}",
+                refused.display()
+            );
+        }
+    }
+
     fn the_working_directory_binds_the_child_only_and_must_exist_canonically() {
         let tool = this_tool();
         let scratch = Scratch::new("cwd");
@@ -686,14 +756,17 @@ mod windows {
         };
         let execution = request(&directory).unwrap();
         assert_eq!(execution.termination, ToolTermination::Exited(0));
+        // The child is handed the directory in its standard spelling, which
+        // names exactly the canonical one (TASK-XPA-011: Hvigor resolves its
+        // modules against it).
+        let plain = PathBuf::from(directory.to_str().unwrap().trim_start_matches(r"\\?\"));
         assert_eq!(
             String::from_utf8(execution.stdout).unwrap(),
-            directory.to_str().unwrap()
+            plain.to_str().unwrap()
         );
         assert_eq!(std::env::current_dir().unwrap(), before);
         // The same directory spelled without the canonical `\\?\` prefix, a
         // relative path, a missing directory and a file are all refused.
-        let plain = PathBuf::from(directory.to_str().unwrap().trim_start_matches(r"\\?\"));
         assert_ne!(plain, directory);
         fs::write(scratch.0.join("file"), b"").unwrap();
         for unavailable in [

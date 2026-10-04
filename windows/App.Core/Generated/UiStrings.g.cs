@@ -1450,6 +1450,120 @@ public static class UiStrings
     public const string JobRecoveryArchiveBlockerRefresh = "jobRecovery.archive.blocker.refresh";
     public const string JobRecoveryArchiveReview = "jobRecovery.archive.review";
     public const string JobRecoveryArchivePublicationPending = "jobRecovery.archive.publicationPending";
+    public const string OverviewContinuationClose = "overview.continuation.close";
+    public const string OverviewContinuationExplanation = "overview.continuation.explanation";
+    public const string OverviewContinuationOpenJob = "overview.continuation.openJob";
+    public const string OverviewContinuationStatusNote = "overview.continuation.statusNote";
+    public const string OverviewContinuationSubmit = "overview.continuation.submit";
+    public const string OverviewContinuationSubmitted = "overview.continuation.submitted";
+    public const string OverviewContinuationTitle = "overview.continuation.title";
+    public const string OverviewRecordNextAttention = "overview.record.next.attention";
+    public const string OverviewRecordNextEmptyDetail = "overview.record.next.empty.detail";
+    public const string OverviewRecordNextEmptyTitle = "overview.record.next.empty.title";
+    public const string OverviewRecordNextRecentDetail = "overview.record.next.recentDetail";
+    public const string OverviewRecordNextResidueDetail = "overview.record.next.residueDetail";
+    public const string OverviewRecordNextTitle = "overview.record.next.title";
+    public const string OverviewRecordNextUnknownDetail = "overview.record.next.unknownDetail";
+    public const string OverviewRecordNextWaitingDetail = "overview.record.next.waitingDetail";
+    public const string OverviewRecordRecentAll = "overview.record.recent.all";
+    public const string OverviewRecordRefusalEffectUnknown = "overview.record.refusal.effectUnknown";
+    public const string OverviewRecordRefusalNeverReplayed = "overview.record.refusal.neverReplayed";
+    public const string OverviewRecordRefusalNotTerminal = "overview.record.refusal.notTerminal";
+    public const string OverviewRecordRefusalParametersNotReported = "overview.record.refusal.parametersNotReported";
+    public const string OverviewRecordResidue = "overview.record.residue";
+    public const string OverviewRecordRunAgain = "overview.record.run.again";
+    public const string OverviewRecordRunAgainGated = "overview.record.run.againGated";
+    public const string OverviewRecordRunOpen = "overview.record.run.open";
+    public const string OverviewRecordRunOutcomeUnknown = "overview.record.run.outcomeUnknown";
+    public const string OverviewRecordRunCount = "overview.record.runCount";
+    public const string OverviewRecordThreadMore = "overview.record.thread.more";
+    public const string OverviewRecordThreadNeedsAttention = "overview.record.thread.needsAttention";
+    public const string OverviewRecordThreadUngrouped = "overview.record.thread.ungrouped";
+    public const string OverviewRecordWorkspaceDebug = "overview.record.workspace.debug";
+    public const string OverviewRecordWorkspaceDevice = "overview.record.workspace.device";
+    public const string OverviewRecordWorkspaceFlash = "overview.record.workspace.flash";
+    public const string OverviewRecordWorkspaceTrace = "overview.record.workspace.trace";
+    public const string OverviewRecordWorkspaceViewer = "overview.record.workspace.viewer";
+    public const string OverviewResumeCancel = "overview.resume.cancel";
+    public const string OverviewResumeCatalogDigest = "overview.resume.catalogDigest";
+    public const string OverviewResumeDriftBinding = "overview.resume.drift.binding";
+    public const string OverviewResumeDriftTarget = "overview.resume.drift.target";
+    public const string OverviewResumeDriftUnknown = "overview.resume.drift.unknown";
+    public const string OverviewResumeEffect = "overview.resume.effect";
+    public const string OverviewResumeEffectUnrecorded = "overview.resume.effect.unrecorded";
+    public const string OverviewResumeExplanation = "overview.resume.explanation";
+    public const string OverviewResumeGated = "overview.resume.gated";
+    public const string OverviewResumeLoading = "overview.resume.loading";
+    public const string OverviewResumeNeverReplayed = "overview.resume.neverReplayed";
+    public const string OverviewResumeNoParameters = "overview.resume.noParameters";
+    public const string OverviewResumeNotRepeatable = "overview.resume.notRepeatable";
+    public const string OverviewResumeOpen = "overview.resume.open";
+    public const string OverviewResumeParameters = "overview.resume.parameters";
+    public const string OverviewResumeParametersNote = "overview.resume.parameters.note";
+    public const string OverviewResumePrepare = "overview.resume.prepare";
+    public const string OverviewResumePrepareUnavailable = "overview.resume.prepare.unavailable";
+    public const string OverviewResumeSource = "overview.resume.source";
+    public const string OverviewResumeTarget = "overview.resume.target";
+    public const string OverviewResumeThread = "overview.resume.thread";
+    public const string OverviewResumeTitle = "overview.resume.title";
+    public const string WindowsOverviewThreadLess = "windows.overview.thread.less";
+    public const string WindowsOverviewResumeOpenRefused = "windows.overview.resume.openRefused";
+    public const string WindowsOverviewResumeOpenUnknown = "windows.overview.resume.openUnknown";
+    public const string WindowsOverviewContinuationAttempted = "windows.overview.continuation.attempted";
+    public const string OverviewAttentionTrust = "overview.attention.trust";
+    public const string OverviewAttentionNextStepRefresh = "overview.attention.nextStep.refresh";
+    public const string OverviewCapabilitiesColumnCapability = "overview.capabilities.column.capability";
+    public const string OverviewCapabilitiesColumnEvidence = "overview.capabilities.column.evidence";
+    public const string OverviewCapabilitiesColumnState = "overview.capabilities.column.state";
+    public const string OverviewCapabilitiesLoading = "overview.capabilities.loading";
+    public const string OverviewCapabilitiesStateAvailable = "overview.capabilities.state.available";
+    public const string OverviewCapabilitiesStateLimited = "overview.capabilities.state.limited";
+    public const string OverviewCapabilitiesStateUnavailable = "overview.capabilities.state.unavailable";
+    public const string OverviewCapabilitiesStateUnknown = "overview.capabilities.state.unknown";
+    public const string OverviewCapabilitiesTitleNoTarget = "overview.capabilities.title.noTarget";
+    public const string OverviewCapabilitiesTitleTarget = "overview.capabilities.title.target";
+    public const string OverviewChannelEncryptedVerified = "overview.channel.encryptedVerified";
+    public const string OverviewChannelUnverified = "overview.channel.unverified";
+    public const string OverviewEnvironmentCollapsed = "overview.environment.collapsed";
+    public const string OverviewEnvironmentExpanded = "overview.environment.expanded";
+    public const string OverviewFieldAuthorization = "overview.field.authorization";
+    public const string OverviewFieldAutoLifecycleDispatches = "overview.field.autoLifecycleDispatches";
+    public const string OverviewFieldAutoSubserverDispatches = "overview.field.autoSubserverDispatches";
+    public const string OverviewFieldChannelProtection = "overview.field.channelProtection";
+    public const string OverviewFieldClientVersion = "overview.field.clientVersion";
+    public const string OverviewFieldDaemonVersion = "overview.field.daemonVersion";
+    public const string OverviewFieldDeviceEvents = "overview.field.deviceEvents";
+    public const string OverviewFieldEndpoint = "overview.field.endpoint";
+    public const string OverviewFieldEndpointSource = "overview.field.endpointSource";
+    public const string OverviewFieldGeneration = "overview.field.generation";
+    public const string OverviewFieldHash = "overview.field.hash";
+    public const string OverviewFieldLifecycleAvailability = "overview.field.lifecycleAvailability";
+    public const string OverviewFieldOwnership = "overview.field.ownership";
+    public const string OverviewFieldOwnershipBasis = "overview.field.ownershipBasis";
+    public const string OverviewFieldPath = "overview.field.path";
+    public const string OverviewFieldPlatformTrust = "overview.field.platformTrust";
+    public const string OverviewFieldServerHealth = "overview.field.serverHealth";
+    public const string OverviewFieldServerVersion = "overview.field.serverVersion";
+    public const string OverviewFieldSource = "overview.field.source";
+    public const string OverviewFieldSubserver = "overview.field.subserver";
+    public const string OverviewSectionAdvanced = "overview.section.advanced";
+    public const string OverviewSectionCapabilities = "overview.section.capabilities";
+    public const string OverviewSectionDeviceChannel = "overview.section.deviceChannel";
+    public const string OverviewSectionServerToolchain = "overview.section.serverToolchain";
+    public const string OverviewServerHealthHealthy = "overview.serverHealth.healthy";
+    public const string OverviewServerHealthUnavailable = "overview.serverHealth.unavailable";
+    public const string OverviewServerHealthUnknown = "overview.serverHealth.unknown";
+    public const string OverviewStatusNeedsAttentionNone = "overview.status.needsAttention.none";
+    public const string OverviewStatusNeedsAttentionOne = "overview.status.needsAttention.one";
+    public const string OverviewStatusNeedsAttentionOther = "overview.status.needsAttention.other";
+    public const string OverviewTrustCancelled = "overview.trust.cancelled";
+    public const string OverviewTrustDenied = "overview.trust.denied";
+    public const string OverviewTrustKeyAccessDenied = "overview.trust.keyAccessDenied";
+    public const string OverviewTrustReady = "overview.trust.ready";
+    public const string OverviewTrustTimedOut = "overview.trust.timedOut";
+    public const string OverviewTrustUnavailable = "overview.trust.unavailable";
+    public const string OverviewTrustWaiting = "overview.trust.waiting";
+    public const string WindowsOverviewHdcCheckHidumper = "windows.overview.hdc.checkHidumper";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2896,5 +3010,119 @@ public static class UiStrings
         JobRecoveryArchiveBlockerRefresh,
         JobRecoveryArchiveReview,
         JobRecoveryArchivePublicationPending,
+        OverviewContinuationClose,
+        OverviewContinuationExplanation,
+        OverviewContinuationOpenJob,
+        OverviewContinuationStatusNote,
+        OverviewContinuationSubmit,
+        OverviewContinuationSubmitted,
+        OverviewContinuationTitle,
+        OverviewRecordNextAttention,
+        OverviewRecordNextEmptyDetail,
+        OverviewRecordNextEmptyTitle,
+        OverviewRecordNextRecentDetail,
+        OverviewRecordNextResidueDetail,
+        OverviewRecordNextTitle,
+        OverviewRecordNextUnknownDetail,
+        OverviewRecordNextWaitingDetail,
+        OverviewRecordRecentAll,
+        OverviewRecordRefusalEffectUnknown,
+        OverviewRecordRefusalNeverReplayed,
+        OverviewRecordRefusalNotTerminal,
+        OverviewRecordRefusalParametersNotReported,
+        OverviewRecordResidue,
+        OverviewRecordRunAgain,
+        OverviewRecordRunAgainGated,
+        OverviewRecordRunOpen,
+        OverviewRecordRunOutcomeUnknown,
+        OverviewRecordRunCount,
+        OverviewRecordThreadMore,
+        OverviewRecordThreadNeedsAttention,
+        OverviewRecordThreadUngrouped,
+        OverviewRecordWorkspaceDebug,
+        OverviewRecordWorkspaceDevice,
+        OverviewRecordWorkspaceFlash,
+        OverviewRecordWorkspaceTrace,
+        OverviewRecordWorkspaceViewer,
+        OverviewResumeCancel,
+        OverviewResumeCatalogDigest,
+        OverviewResumeDriftBinding,
+        OverviewResumeDriftTarget,
+        OverviewResumeDriftUnknown,
+        OverviewResumeEffect,
+        OverviewResumeEffectUnrecorded,
+        OverviewResumeExplanation,
+        OverviewResumeGated,
+        OverviewResumeLoading,
+        OverviewResumeNeverReplayed,
+        OverviewResumeNoParameters,
+        OverviewResumeNotRepeatable,
+        OverviewResumeOpen,
+        OverviewResumeParameters,
+        OverviewResumeParametersNote,
+        OverviewResumePrepare,
+        OverviewResumePrepareUnavailable,
+        OverviewResumeSource,
+        OverviewResumeTarget,
+        OverviewResumeThread,
+        OverviewResumeTitle,
+        WindowsOverviewThreadLess,
+        WindowsOverviewResumeOpenRefused,
+        WindowsOverviewResumeOpenUnknown,
+        WindowsOverviewContinuationAttempted,
+        OverviewAttentionTrust,
+        OverviewAttentionNextStepRefresh,
+        OverviewCapabilitiesColumnCapability,
+        OverviewCapabilitiesColumnEvidence,
+        OverviewCapabilitiesColumnState,
+        OverviewCapabilitiesLoading,
+        OverviewCapabilitiesStateAvailable,
+        OverviewCapabilitiesStateLimited,
+        OverviewCapabilitiesStateUnavailable,
+        OverviewCapabilitiesStateUnknown,
+        OverviewCapabilitiesTitleNoTarget,
+        OverviewCapabilitiesTitleTarget,
+        OverviewChannelEncryptedVerified,
+        OverviewChannelUnverified,
+        OverviewEnvironmentCollapsed,
+        OverviewEnvironmentExpanded,
+        OverviewFieldAuthorization,
+        OverviewFieldAutoLifecycleDispatches,
+        OverviewFieldAutoSubserverDispatches,
+        OverviewFieldChannelProtection,
+        OverviewFieldClientVersion,
+        OverviewFieldDaemonVersion,
+        OverviewFieldDeviceEvents,
+        OverviewFieldEndpoint,
+        OverviewFieldEndpointSource,
+        OverviewFieldGeneration,
+        OverviewFieldHash,
+        OverviewFieldLifecycleAvailability,
+        OverviewFieldOwnership,
+        OverviewFieldOwnershipBasis,
+        OverviewFieldPath,
+        OverviewFieldPlatformTrust,
+        OverviewFieldServerHealth,
+        OverviewFieldServerVersion,
+        OverviewFieldSource,
+        OverviewFieldSubserver,
+        OverviewSectionAdvanced,
+        OverviewSectionCapabilities,
+        OverviewSectionDeviceChannel,
+        OverviewSectionServerToolchain,
+        OverviewServerHealthHealthy,
+        OverviewServerHealthUnavailable,
+        OverviewServerHealthUnknown,
+        OverviewStatusNeedsAttentionNone,
+        OverviewStatusNeedsAttentionOne,
+        OverviewStatusNeedsAttentionOther,
+        OverviewTrustCancelled,
+        OverviewTrustDenied,
+        OverviewTrustKeyAccessDenied,
+        OverviewTrustReady,
+        OverviewTrustTimedOut,
+        OverviewTrustUnavailable,
+        OverviewTrustWaiting,
+        WindowsOverviewHdcCheckHidumper,
     ];
 }

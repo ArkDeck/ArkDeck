@@ -1798,6 +1798,7 @@ mod windows_tests {
             resources: &[],
             working_directory: None,
             timeout_seconds: 30,
+            search_directory: None,
         })
     }
 

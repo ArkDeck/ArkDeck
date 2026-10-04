@@ -71,6 +71,9 @@ public static class CliCommands
     public const string DebugPortForward = "arkdeck port-forward create --inputs-file <path>"; // port-forward.create|remove@1
     public const string DebugPortForwardRemove = "arkdeck port-forward remove --inputs-file <path>";
     public const string JobRun = "arkdeck job run --job <job-id>";                // job.run
+    public const string OperationList = "arkdeck operation list";                 // operation.list (Overview's capability matrix)
+    public const string JobPlan = "arkdeck job plan";                             // job.plan (Overview's prepared continuation)
+    public const string JobSubmit = "arkdeck job submit";                         // job.submit (Overview's prepared continuation)
     public const string TraceProbe = "arkdeck trace probe --target <id>";                // trace.probe, app.trace.runtime
     public const string TraceCapture = "arkdeck trace capture --inputs-file <path>";     // capture.diagnostics@1 (the Trace preset), app.trace.capture
     public const string UiDumpCapture = "arkdeck ui-dump capture";                        // capture.diagnostics@1 (the UI dump preset), app.viewer.main
@@ -131,7 +134,21 @@ public sealed record OverviewState(
     Loaded<IReadOnlyList<JobSummary>> Recent,
     ControlFailure? DaemonFailure,
     bool Reached,
-    Loaded<IReadOnlyList<DeviceCandidate>>? Devices = null) : SurfaceState(DaemonFailure, Reached);
+    Loaded<IReadOnlyList<DeviceCandidate>>? Devices = null,
+    IReadOnlyDictionary<string, Loaded<JobEvidenceFacts>>? Evidence = null,
+    HdcEnvironment? Hdc = null,
+    CapabilityMatrix? Capabilities = null) : SurfaceState(DaemonFailure, Reached)
+{
+    /// <summary>The record's lines of work (at most four).</summary>
+    public IReadOnlyList<OverviewRunThread> Threads => Recent.Value is { } jobs ? OverviewRuns.Threads(jobs) : [];
+
+    /// <summary>A shown run's evidence when it was read.</summary>
+    public JobEvidenceFacts? EvidenceOf(string jobId) => Evidence is not null && Evidence.TryGetValue(jobId, out var e) ? e.Value : null;
+
+    /// <summary>macOS <c>resumeDisposition</c> with the evidence the page read.</summary>
+    public ResumeDisposition DispositionOf(JobSummary job) =>
+        OverviewRuns.Disposition(job, Evidence is not null && Evidence.TryGetValue(job.JobId, out var e) && e.Value is { } facts ? facts.Parameters is not null : null);
+}
 
 public sealed record DeviceState(
     Loaded<IReadOnlyList<DeviceCandidate>> Candidates,
@@ -201,7 +218,6 @@ public sealed record TraceInspectionState(string JobId, string ArtifactId, Loade
 /// </summary>
 public sealed partial class SurfaceLoader(IControlChannel channel)
 {
-    public const int OverviewRecentCount = 5;
     public const int HistoryPageSize = 100;
     public const int ArtifactPageSize = 1000;
     public const int ArtifactPageLimit = 16;
@@ -209,15 +225,43 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
     /// <summary>The channel the loaders read through (the Artifact export reads through it too).</summary>
     public IControlChannel Channel => channel;
 
-    public async Task<OverviewState> OverviewAsync()
+    /// <summary>Overview: <paramref name="preferredTarget"/> is the person's choice of device in
+    /// scope, whose capabilities are probed.</summary>
+    public async Task<OverviewState> OverviewAsync(string? preferredTarget = null)
     {
         var run = new Run(channel);
         var health = await run.Load(c => c.HealthAsync(), HealthFacts.Parse, CliCommands.RuntimeHealth);
         var doctor = await run.Load(c => c.RequestAsync("doctor", Params(("deep", JsonBool.False))), DoctorFacts.Parse, CliCommands.Doctor);
-        var recent = await run.Load(c => c.RequestAsync("job.list", Params(("pageSize", JsonNumber.FromInt64(OverviewRecentCount)))),
-            JobSummary.ParsePage, CliCommands.JobList);
+        // The record reads what every macOS workspace reads (RuntimeAppReadResources.recentSummaryParams).
+        var recent = await run.Load(c => c.RequestAsync("job.list", RecentJobParams()), JobSummary.ParsePage, CliCommands.JobList);
         var devices = await run.Load(c => c.RequestAsync("device.observations"), DeviceCandidate.ParseAll, CliCommands.DeviceCandidates);
-        return new(health, doctor, recent, run.DaemonFailure, run.Reached, devices);
+        // Whether a run may be offered again lives in its evidence: read it for the runs the
+        // record shows (each line's featured run and its disclosed others), once each.
+        var evidence = new Dictionary<string, Loaded<JobEvidenceFacts>>(StringComparer.Ordinal);
+        if (recent.Value is { } jobs)
+        {
+            foreach (var thread in OverviewRuns.Threads(jobs))
+            {
+                if (OverviewRuns.Featured(thread) is not { } featured) continue;
+                foreach (var job in OverviewRuns.Additional(thread, featured).Prepend(featured))
+                {
+                    if (evidence.ContainsKey(job.JobId)) continue;
+                    evidence[job.JobId] = await run.Load(c => c.RequestAsync("job.evidence", Params(("jobId", new JsonString(job.JobId)))), JobEvidenceFacts.Parse,
+                        CliCommands.ForJob(CliCommands.JobEvidence, job.JobId));
+                }
+            }
+        }
+        // The HDC environment (macOS HDCStatusView): the Runtime's HDC status with the device
+        // authorization, and the capability matrix of the device in scope.
+        var hdc = await run.Load(c => c.RequestAsync("runtime.hdc.status"), v => Json.Object(v, "an HDC status"), CliCommands.RuntimeHdcStatus);
+        var operations = await run.Load(c => c.RequestAsync("operation.list", Params()), v => v as JsonArray ?? throw new ContractException(ContractErrorKind.SchemaMismatch, "operation.list is not a list"),
+            CliCommands.OperationList);
+        var online = OverviewScope.Online(devices.Value);
+        var scoped = OverviewScope.Selected(online, preferredTarget);
+        var probe = scoped is null ? null : await run.Load(c => c.RequestAsync("trace.probe", Params(("targetId", new JsonString(scoped.TargetId)))),
+            v => Json.Object(v, "a Trace probe"), CliCommands.TraceProbe.Replace("<id>", scoped.TargetId, StringComparison.Ordinal));
+        return new(health, doctor, recent, run.DaemonFailure, run.Reached, devices, evidence,
+            HdcEnvironment.From(hdc, devices), CapabilityMatrix.For(online, scoped, operations, probe));
     }
 
     /// <summary>The Device page: the candidates HDC observes and the Targets adopted before

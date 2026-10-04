@@ -2,9 +2,10 @@
 //! SDK enumeration, registration, selection, process execution or activation.
 //!
 //! On Windows (TASK-XPA-011) the root is the DevEco Studio directory and the
-//! roles are four: the two manifests, `tools\node\node.exe` and
-//! `tools\hvigor\bin\hvigorw.js`. There is no signed resource envelope;
-//! node's own Authenticode signature must verify, and the DevEco launcher
+//! roles are five: the two manifests, `tools\node\node.exe`,
+//! `tools\hvigor\bin\hvigorw.js` and the bundled JDK's `jbr\bin\java.exe`.
+//! There is no signed resource envelope; node's and java's own Authenticode
+//! signatures must verify, and the DevEco launcher
 //! must be signed by the DevEco publisher, in place of the macOS bundle
 //! signature. The content digest names the host (`"platform":"windows"`), so
 //! no Windows registration can share a reference with a macOS one.
@@ -139,7 +140,7 @@ pub(crate) fn inspect_root(path: &Path) -> io::Result<Record> {
 fn read_child(root: &DevEcoRoot, role: DevEcoRole) -> io::Result<Child> {
     let read = root.read_role(role)?;
     let identity = &read.facts.identity;
-    let trust = if matches!(role, DevEcoRole::Node) {
+    let trust = if matches!(role, DevEcoRole::Node | DevEcoRole::Java) {
         Some(Trust::native(inspect_native_code_signature(
             &root.path().join(role.path().replace('/', "\\")),
         )?))
@@ -211,11 +212,13 @@ pub(crate) fn inspect_root(path: &Path) -> io::Result<Record> {
         DevEcoManifestError::Unreadable => unreadable(),
         DevEcoManifestError::Unsupported => denied(),
     })?;
-    if children[2]
-        .trust
-        .as_ref()
-        .is_none_or(|t| t.signature != "verified")
-    {
+    // Node and the bundled JDK's launcher: each signature verifies.
+    if [&children[2], &children[4]].iter().any(|child| {
+        child
+            .trust
+            .as_ref()
+            .is_none_or(|t| t.signature != "verified")
+    }) {
         return Err(denied());
     }
     let bundle_trust = Trust::native(publisher_trust(root.path())?);

@@ -344,3 +344,316 @@ fn every_capture_preset_completes_over_the_signed_test_daemon() {
     // Every leaf of the operation is measured now.
     assert_windows_status(&["capture.diagnostics@1"], "implemented");
 }
+
+/// `agent resume --resume-reference` end to end, as the Swift human-action
+/// oracle's `connect` scenario (`agent-human-action`) records it: an agent
+/// execution of `observe.device@1` with no adopted Target and the device
+/// offline pauses for a person to connect it (`physicalConnection`,
+/// `device.notObserved`), its action listed by `human-action list`, with
+/// only device-list reads sent; with the device connected and the board
+/// present (the daemon restarted over the same root), the resume by the
+/// action's reference adopts the device, runs the Job and completes it. The
+/// Job and its three Artifacts are the oracle's own (their references,
+/// digests and sizes), and a second resume answers the same Job.
+#[test]
+fn agent_resume_completes_a_paused_execution_over_the_signed_test_daemon() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-agent-resume");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let fixture = fixtures("agent-human-action");
+    let cases: Value =
+        serde_json::from_slice(&std::fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+    let completed = cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exchange| exchange["name"] == "connect.completed")
+        .unwrap()["answer"]["result"]
+        .clone();
+    // No Target is adopted yet; the device is offline.
+    let (root, fake_root) = (scratch.join("state"), scratch.join("fake"));
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::create_dir_all(&fake_root).unwrap();
+    std::fs::write(
+        fake_root.join("hdc-mode"),
+        "offline
+",
+    )
+    .unwrap();
+    let daemon = SignedDaemon::start(&executable, &pin, &root, &fixture, &fake_root);
+    let (status, paused) = daemon.cli(&[
+        "agent",
+        "run",
+        "--operation",
+        "observe.device@1",
+        "--execution-id",
+        "har-connect",
+    ]);
+    assert_eq!(status, Some(75), "{paused}");
+    let execution = &paused["error"]["details"]["execution"];
+    assert_eq!(execution["state"], "waitingForHuman", "{paused}");
+    let action = &execution["humanAction"];
+    assert_eq!(action["category"], "physicalConnection", "{paused}");
+    assert_eq!(action["reasonCode"], "device.notObserved", "{paused}");
+    assert_eq!(action["minimumAction"], "human.connectOrPowerDevice");
+    let reference = action["resumeReference"].as_str().unwrap().to_owned();
+    let (status, listed) = daemon.cli(&["human-action", "list"]);
+    assert_eq!(status, Some(0), "{listed}");
+    assert_eq!(
+        listed["result"]["items"][0]["resumeReference"],
+        reference.as_str()
+    );
+    assert!(
+        calls(&fake_root)
+            .iter()
+            .all(|call| call == "list targets -v"),
+        "only the device list was read while it waited"
+    );
+    daemon.stop();
+
+    // The device connected and the board present.
+    std::fs::write(
+        fake_root.join("hdc-mode"),
+        "normal
+",
+    )
+    .unwrap();
+    let daemon =
+        SignedDaemon::start_with_board(&executable, &pin, &root, &fixture, &fake_root, KEY);
+    let (status, resumed) = daemon.cli(&["agent", "resume", "--resume-reference", &reference]);
+    assert_eq!(status, Some(0), "{resumed}");
+    assert_eq!(resumed["command"], "agent.resume", "{resumed}");
+    let result = &resumed["result"];
+    assert_eq!(result["executionId"], "har-connect", "{resumed}");
+    assert_eq!(result["targetId"], TARGET, "{resumed}");
+    assert_eq!(result["bindingRevision"], 1, "{resumed}");
+    assert_eq!(
+        result["jobId"], cases["jobs"]["connect"],
+        "the oracle's Job"
+    );
+    let artifacts = |value: &Value| -> Vec<(Value, Value, Value)> {
+        value["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|artifact| {
+                (
+                    artifact["reference"].clone(),
+                    artifact["sha256"].clone(),
+                    artifact["byteCount"].clone(),
+                )
+            })
+            .collect()
+    };
+    assert_eq!(
+        artifacts(result),
+        artifacts(&completed),
+        "the oracle's Artifacts"
+    );
+    let (status, state) = daemon.cli(&["agent", "status", "--execution-id", "har-connect"]);
+    assert_eq!(status, Some(0), "{state}");
+    assert_eq!(state["result"]["state"], "completed", "{state}");
+    assert_eq!(state["result"]["jobState"], "succeeded", "{state}");
+    // Resumed again: the same completed execution, nothing run again.
+    let before = calls(&fake_root).len();
+    let (status, again) = daemon.cli(&["agent", "resume", "--resume-reference", &reference]);
+    assert_eq!(status, Some(0), "{again}");
+    assert_eq!(again["result"]["jobId"], result["jobId"], "{again}");
+    assert_eq!(calls(&fake_root).len(), before, "nothing is sent again");
+    daemon.stop();
+    let _ = std::fs::remove_dir_all(&scratch);
+    // Measured, but not counted: a resume submits the execution's operation
+    // (the shared generic leaves' ruling of 2026-10-04).
+    assert_windows_status(&["agent.resume"], "partial");
+}
+
+/// GJ-1's human-action loop through the real CLI, as the Swift human-action
+/// oracle's `trust` and `connect` scenarios record it
+/// (`agent-human-action`). An execution paused on the device's trust prompt
+/// (`deviceTrustPrompt`) is abandoned: `agent abandon` under a stale
+/// generation is refused (`resourceConflict`) and under the current one
+/// accepted, after which its action reads expired and both `agent resume`
+/// and `human-action resume` of it are refused (`humanActionExpired`) with
+/// nothing dispatched. An execution paused for the device to be connected
+/// (`physicalConnection`) is resumed and completed once the device is
+/// connected and the board present; `human-action resume` of its action and
+/// reference then answers that completed execution, the oracle's own Job, as
+/// Swift's did, and a selection is refused there.
+#[test]
+fn the_human_action_loop_runs_over_the_signed_test_daemon() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-human-action-loop");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let fixture = fixtures("agent-human-action");
+    let cases: Value =
+        serde_json::from_slice(&std::fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+    let (root, fake_root) = (scratch.join("state"), scratch.join("fake"));
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::create_dir_all(&fake_root).unwrap();
+    let mode =
+        |mode: &str| std::fs::write(fake_root.join("hdc-mode"), format!("{mode}\n")).unwrap();
+    let paused_action = |envelope: &Value| -> (String, String, String) {
+        let execution = &envelope["error"]["details"]["execution"];
+        assert_eq!(execution["state"], "waitingForHuman", "{envelope}");
+        let action = &execution["humanAction"];
+        (
+            action["actionId"].as_str().unwrap().to_owned(),
+            action["resumeReference"].as_str().unwrap().to_owned(),
+            execution["generation"].as_str().unwrap().to_owned(),
+        )
+    };
+    let refusal = |envelope: &Value, code: &str| {
+        assert_eq!(envelope["ok"], false, "{envelope}");
+        assert_eq!(envelope["error"]["code"], code, "{envelope}");
+        assert_eq!(
+            envelope["error"]["details"]["newDispatchCount"], 0,
+            "{envelope}"
+        );
+    };
+
+    // Paused for the device to be connected: no board, the device offline.
+    mode("offline");
+    let daemon = SignedDaemon::start(&executable, &pin, &root, &fixture, &fake_root);
+    let (status, paused) = daemon.cli(&[
+        "agent",
+        "run",
+        "--operation",
+        "observe.device@1",
+        "--execution-id",
+        "har-connect",
+    ]);
+    assert_eq!(status, Some(75), "{paused}");
+    let (connect_action, connect_reference, _) = paused_action(&paused);
+    daemon.stop();
+
+    // The board present, the device asking for trust.
+    mode("unauthorized");
+    let daemon =
+        SignedDaemon::start_with_board(&executable, &pin, &root, &fixture, &fake_root, KEY);
+    let (status, paused) = daemon.cli(&[
+        "agent",
+        "run",
+        "--operation",
+        "observe.device@1",
+        "--execution-id",
+        "har-trust",
+    ]);
+    assert_eq!(status, Some(75), "{paused}");
+    assert_eq!(
+        paused["error"]["details"]["execution"]["humanAction"]["category"], "deviceTrustPrompt",
+        "{paused}"
+    );
+    let (trust_action, trust_reference, generation) = paused_action(&paused);
+    let stale = (generation.parse::<u64>().unwrap() - 2).to_string();
+    let (status, conflict) = daemon.cli(&[
+        "agent",
+        "abandon",
+        "--execution-id",
+        "har-trust",
+        "--expected-generation",
+        &stale,
+    ]);
+    assert_ne!(status, Some(0), "{conflict}");
+    refusal(&conflict, "resourceConflict");
+    let before = calls(&fake_root).len();
+    let (status, abandoned) = daemon.cli(&[
+        "agent",
+        "abandon",
+        "--execution-id",
+        "har-trust",
+        "--expected-generation",
+        &generation,
+    ]);
+    assert_eq!(status, Some(0), "{abandoned}");
+    assert_eq!(abandoned["command"], "agent.abandon", "{abandoned}");
+    assert_eq!(
+        abandoned["result"]["executionId"], "har-trust",
+        "{abandoned}"
+    );
+    let (status, shown) = daemon.cli(&["human-action", "show", "--human-action", &trust_action]);
+    assert_eq!(status, Some(0), "{shown}");
+    let expired = cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exchange| exchange["name"] == "trust.expired")
+        .unwrap()["answer"]["result"]["status"]
+        .clone();
+    assert_eq!(shown["result"]["status"], expired, "{shown}");
+    let (_, resumed) = daemon.cli(&["agent", "resume", "--resume-reference", &trust_reference]);
+    refusal(&resumed, "humanActionExpired");
+    let (_, resumed) = daemon.cli(&[
+        "human-action",
+        "resume",
+        "--human-action",
+        &trust_action,
+        "--resume-reference",
+        &trust_reference,
+    ]);
+    refusal(&resumed, "humanActionExpired");
+    assert_eq!(calls(&fake_root).len(), before, "nothing was dispatched");
+
+    // The device connected: the connect execution resumed and completed
+    // (`connect.resume`), then its action resumed again by `human-action
+    // resume`, which answers the same completed execution
+    // (`connect.againByAction`) and sends nothing.
+    mode("normal");
+    let (status, resumed) =
+        daemon.cli(&["agent", "resume", "--resume-reference", &connect_reference]);
+    assert_eq!(status, Some(0), "{resumed}");
+    let (status, state) = daemon.cli(&["agent", "status", "--execution-id", "har-connect"]);
+    assert_eq!(status, Some(0), "{state}");
+    assert_eq!(state["result"]["state"], "completed", "{state}");
+    let before = calls(&fake_root).len();
+    let (status, by_action) = daemon.cli(&[
+        "human-action",
+        "resume",
+        "--human-action",
+        &connect_action,
+        "--resume-reference",
+        &connect_reference,
+    ]);
+    assert_eq!(status, Some(0), "{by_action}");
+    assert_eq!(by_action["command"], "human-action.resume", "{by_action}");
+    let recorded = &cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exchange| exchange["name"] == "connect.againByAction")
+        .unwrap()["answer"]["result"];
+    for key in [
+        "executionId",
+        "state",
+        "jobId",
+        "jobState",
+        "targetId",
+        "bindingRevision",
+    ] {
+        assert_eq!(
+            by_action["result"][key], recorded[key],
+            "{key}: {by_action}"
+        );
+    }
+    assert_eq!(calls(&fake_root).len(), before, "nothing was sent again");
+    let (_, selected) = daemon.cli(&[
+        "human-action",
+        "resume",
+        "--human-action",
+        &connect_action,
+        "--resume-reference",
+        &connect_reference,
+        "--selection",
+        "any",
+    ]);
+    refusal(&selected, "invalidInput");
+    daemon.stop();
+    let _ = std::fs::remove_dir_all(&scratch);
+    assert_windows_status(&["agent.abandon"], "implemented");
+    // Measured, but not counted: like `agent resume`, a resolved action's
+    // resume submits the execution's operation (the ruling of 2026-10-04).
+    assert_windows_status(&["human-action.resume"], "partial");
+}
