@@ -39,6 +39,14 @@ public static partial class ScriptedDaemon
     /// the daemon goes away while the App shows its data.</summary>
     public const string Outage = "outage";
 
+    /// <summary><see cref="Jobs"/> with two records that need a person now (a Flash waiting for
+    /// recovery, a HAP debug run to resume at a confirmed safe boundary): the global Job
+    /// recovery banner shows them.</summary>
+    public const string Recovery = "recovery";
+
+    public const string WaitingForRecoveryJobId = "job-0000000000000000000000000000a0f1";
+    public const string ResumeSafeJobId = "job-0000000000000000000000000000a0f2";
+
     /// <summary>A daemon with a Job store, an Artifact owner and devices: three candidates, one
     /// adopted Target, three Jobs (a running one whose state advances on each
     /// <c>job.status</c> read) with their Artifacts; no Trace inspector, so
@@ -57,7 +65,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -154,6 +162,7 @@ public static partial class ScriptedDaemon
             {
                 Recovers => connection <= 2 ? Unavailable : Foundation,
                 Outage => connection <= 5 ? Foundation : Unavailable,
+                Recovery => Jobs,
                 _ => scenario,
             };
             return new Peer(request =>
@@ -243,6 +252,10 @@ public static partial class ScriptedDaemon
             (FailedJobId, "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
             (TraceJobId, "trace.capture@1", "succeeded", "2026-09-30T08:00:00Z"),
             (QueuedJobId, "observe.device@1", _queuedCancelled ? "cancelled" : "queued", "2026-09-30T08:04:00Z"),
+            .. scenario == Recovery
+                ? new[] { (ResumeSafeJobId, "debug.hap@1", "resumeAtConfirmedSafeBoundary", "2026-09-30T07:58:00Z"),
+                          (WaitingForRecoveryJobId, "flash.full-restore@1", "waitingForRecovery", "2026-09-30T07:59:00Z") }
+                : [],
         ];
 
         private byte[] JobStatus(JsonObject request)
