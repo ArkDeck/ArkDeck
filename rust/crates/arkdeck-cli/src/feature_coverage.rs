@@ -536,9 +536,8 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // (TASK-XPA-021).
     "analyze.crash-signature",
     "analyze.hilog-summary",
-    // The workspace provider's source inspection (TASK-XPA-011). Not the
-    // profile-served workspace leaves: no code-owned source tool is trusted
-    // on Windows yet, so no registered project resolves to a profile.
+    // The workspace provider's source inspection (TASK-XPA-011), which needs
+    // no profile.
     "workspace.inspect",
     // The profile-served reads, the isolated copy and the sweep (TASK-XPA-011):
     // the code-owned tools of the ruling of 2026-10-04 resolve the profile.
