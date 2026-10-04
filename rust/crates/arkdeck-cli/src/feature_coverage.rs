@@ -474,6 +474,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "ui-dump.component-detail",
     "debug.logs",
     "trace.capture",
+    // GJ-1's pointer inputs (TASK-XPA-005): `input tap`, `input long-press`
+    // and `input swipe` over the same daemon with the Swift pointer-input
+    // oracle's fake, every case the oracle recorded sent in its order: each
+    // Job ends in the oracle's state after exactly the oracle's calls, each
+    // refusal is the oracle's, and the standing capabilities left are the
+    // oracle's (`arkdeck-agentd/tests/spawning/gj1_inputs.rs`).
+    "input.tap",
+    "input.long-press",
+    "input.swipe",
     // Not `agent resume` (nor `human-action resume`), although
     // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
     // oracle's `connect` scenario: once its action resolves, a resume

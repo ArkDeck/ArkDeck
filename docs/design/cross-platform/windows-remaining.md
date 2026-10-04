@@ -31,7 +31,7 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 | `device.observations` (`device wait`, `device list`) | 1 | now | Composed; `observe-device` oracle via the shared fake, as `gj1_device_leaves.rs` |
 | `device.display-name.set`, `.clear` | 1 | now | Local leaves over a device observation; same fake |
 | `trace.probe` | 1 | now | `trace-probe` oracle, already replayed at Control level (`trace_probe_control.rs`); no signed-CLI test |
-| `input.tap@1`, `input.swipe@1`, `input.long-press@1` | 1 | now | `pointer-input` oracle; needs fake answers for it |
+| `input.tap@1`, `input.swipe@1`, `input.long-press@1` | 1 | done | Measured: every `pointer-input` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`); Windows `implemented` |
 | `input.keyboard@1` | 1 | now | No Swift oracle (keyboard input lands with #2473 on macOS); measure against the macOS Rust answers once it merges |
 | `capture.screen-sequence@1` (`screen record`) | 1 | now | `screen-sequence` oracle; needs fake answers |
 | `port-forward.create@1`, `.remove@1` | 1 | now | `port-forward` oracle; needs fake answers |

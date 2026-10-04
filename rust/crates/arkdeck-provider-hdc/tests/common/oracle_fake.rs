@@ -5,7 +5,8 @@
 //! oracle's own (`flash-host-facts/hdc-answers.sh`), and `observe.device@1`'s
 //! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables, and the
 //! read, file and Trace legs' fragments) and the Debug probe oracle's
-//! (`debug-probe/hdc-answers.sh`) are ported here, case for case and in
+//! (`debug-probe/hdc-answers.sh`), and the GJ-1 pointer inputs'
+//! (`pointer-input/hdc-answers.sh`) are ported here, case for case and in
 //! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
@@ -37,6 +38,7 @@ pub enum Answers {
     TraceLegs,
     HumanAction,
     DebugProbe,
+    PointerInput,
 }
 
 impl Answers {
@@ -65,6 +67,9 @@ impl Answers {
             line if line.starts_with("# Physical assistance: the device list") => Self::HumanAction,
             line if line.starts_with("# debug.probe and debug.template.run answers") => {
                 Self::DebugProbe
+            }
+            line if line.starts_with("# input.tap@1, input.long-press@1 and input.swipe@1") => {
+                Self::PointerInput
             }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
@@ -1035,6 +1040,65 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `pointer-input/hdc-answers.sh`: the fixture's device and the pointer
+    /// gestures `uinput` injects, by mode: a tap's click, a long press's touch
+    /// down and up, a swipe's move, each followed by `uinput`'s boundary
+    /// hint; a refusal (`rejected`), nothing (`silent`) or another gesture's
+    /// echo (`otherGesture`) in place of any of them.
+    fn pointer_input(argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        if !all.starts_with(&format!("-t {KEY} shell uinput ")) {
+            return Answer::unregistered();
+        }
+        match mode {
+            "rejected" => return Answer::out("parameter error, unable to run\n"),
+            "silent" => return Answer::exit(0),
+            "otherGesture" => {
+                return Answer::out("startX:100, startY:2200, endX:100, endY:1200\n");
+            }
+            _ => {}
+        }
+        // `shift 4`, and `shift 2` past a display (`-D <id>`): `$1` is then
+        // `-T`, `$2` the gesture.
+        let mut rest = &argv[4..];
+        if rest.first().map(String::as_str) == Some("-D") {
+            rest = rest.get(2..).unwrap_or_default();
+        }
+        let arg = |n: usize| rest.get(n - 1).map(String::as_str).unwrap_or_default();
+        let gesture = match arg(2) {
+            "-c" => format!(
+                "   click coordinate: ({}, {})\nclick interval time: 100ms\n",
+                arg(3),
+                arg(4)
+            ),
+            "-d" => format!(
+                "touch down {} {}\ntouch up {} {}\n",
+                arg(3),
+                arg(4),
+                arg(8),
+                arg(9)
+            ),
+            "-m" => format!(
+                "startX:{}, startY:{}, endX:{}, endY:{}\n",
+                arg(3),
+                arg(4),
+                arg(5),
+                arg(6)
+            ),
+            _ => String::new(),
+        };
+        Answer::out(
+            gesture
+                + "If the command does not work as expected, check whether the specified \
+                   coordinates exceed the screen boundary\n",
+        )
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -1067,6 +1131,7 @@ impl HdcDispatch for OracleFake {
             Answers::TraceLegs => self.trace_legs(&plan.arguments, &mode),
             Answers::HumanAction => self.human_action(&plan.arguments, &mode),
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
+            Answers::PointerInput => Self::pointer_input(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));
