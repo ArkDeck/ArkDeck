@@ -612,6 +612,7 @@ impl JobRunner<'_> {
                 resources: &[],
                 working_directory: Some(&invocation.project_root),
                 timeout_seconds: invocation.timeout_seconds,
+                search_directory: None,
             }),
             None => Err(ToolFailure::Failed(
                 "dispatch refused: the Runtime clock is unavailable".into(),
@@ -828,6 +829,7 @@ impl JobRunner<'_> {
                 resources: &lowering.resources,
                 working_directory: Some(&invocation.project_root),
                 timeout_seconds: invocation.timeout_seconds,
+                search_directory: lowering.search_directory.as_deref(),
             }),
             None => Err(ToolFailure::Failed(
                 "dispatch refused: the Runtime clock is unavailable".into(),
@@ -1388,6 +1390,7 @@ impl JobRunner<'_> {
                 resources: &resources,
                 working_directory: lowering.working_directory.as_deref(),
                 timeout_seconds: lowering.timeout_seconds,
+                search_directory: None,
             }),
             None => Err(ToolFailure::Failed(
                 "dispatch refused: the Runtime clock is unavailable".into(),
@@ -1625,6 +1628,7 @@ impl JobRunner<'_> {
                 resources: &resources,
                 working_directory: Some(&invocation.project_root),
                 timeout_seconds: invocation.timeout_seconds,
+                search_directory: None,
             }),
             None => Err(ToolFailure::Failed(
                 "dispatch refused: the Runtime clock is unavailable".into(),
@@ -2083,6 +2087,7 @@ impl JobRunner<'_> {
                 resources: &lowering.resources,
                 working_directory: Some(&invocation.project_root),
                 timeout_seconds: invocation.timeout_seconds,
+                search_directory: lowering.search_directory.as_deref(),
             }),
             None => Err(ToolFailure::Failed(
                 "dispatch refused: the Runtime clock is unavailable".into(),

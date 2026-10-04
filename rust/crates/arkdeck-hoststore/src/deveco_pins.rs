@@ -102,6 +102,28 @@ pub(crate) fn release_in(
     Ok(record.references.len() != before)
 }
 
+/// The Node launcher a registered DevEco root holds: macOS's bundle layout,
+/// and on Windows the installation's `tools\node\node.exe` (the registry's
+/// `node` child there).
+#[cfg(not(windows))]
+const NODE: &str = "tools/node/bin/node";
+#[cfg(windows)]
+const NODE: &str = "tools/node/node.exe";
+
+/// `relative` (`/`-separated, as a record names its children) below a
+/// registered root, spelled as the host spells a path: `root/relative` on
+/// macOS, `X:\root\relative` on Windows.
+fn below(root: &str, relative: &str) -> String {
+    #[cfg(not(windows))]
+    return format!("{root}/{relative}");
+    #[cfg(windows)]
+    return format!(
+        "{}\\{}",
+        root.trim_end_matches('\\'),
+        relative.replace('/', "\\")
+    );
+}
+
 /// Swift `resolve(_:expectedGeneration:owner:)` on a loaded index: the
 /// files an available record's exact pin names — its Node launcher, Hvigor
 /// script, SDK root and every other pinned child — once the record is
@@ -126,25 +148,56 @@ pub(crate) fn resolve_in(
     }
     verify(record)?;
     let root = record.root.path.trim_end_matches('/');
+    let search_directory = search_directory(record, root);
+    // A Windows record registered before its JDK was pinned resolves no
+    // preset: it is registered again.
+    #[cfg(windows)]
+    if search_directory.is_none() {
+        return Err(failure(
+            "resourceConflict",
+            "DevEco toolchain record does not pin its JDK; register it again",
+        ));
+    }
     Ok(crate::workspace_composition::ResolvedToolchain {
-        node_path: format!("{root}/tools/node/bin/node"),
-        hvigor_script_path: format!("{root}/tools/hvigor/bin/hvigorw.js"),
-        sdk_root_path: format!("{root}/sdk"),
+        node_path: below(root, NODE),
+        hvigor_script_path: below(root, "tools/hvigor/bin/hvigorw.js"),
+        sdk_root_path: below(root, "sdk"),
         verified_resources: record
             .children
             .iter()
             .filter(|child| child.role != "node")
             .filter_map(|child| {
                 Some(crate::workspace_profile::VerifiedResource {
-                    path: format!("{root}/{}", child.relative_path),
+                    path: below(root, &child.relative_path),
                     sha256: child.sha256.clone(),
                     byte_count: u64::try_from(child.byte_count).ok()?,
                     require_executable: child.executable,
                 })
             })
             .collect(),
+        search_directory,
     })
 }
+
+/// The one directory a registered toolchain's Hvigor children find first on
+/// their search path: on Windows, the bundled JDK's `jbr\bin`, whose
+/// `java.exe` the record pins (and the dispatch holds open) as a verified
+/// child. Hvigor's packaging runs `java` by name. macOS names none.
+#[cfg(windows)]
+fn search_directory(record: &Record, root: &str) -> Option<String> {
+    record
+        .children
+        .iter()
+        .any(|child| child.role == "java" && child.relative_path == JAVA)
+        .then(|| below(root, "jbr/bin"))
+}
+#[cfg(not(windows))]
+fn search_directory(_record: &Record, _root: &str) -> Option<String> {
+    None
+}
+
+#[cfg(windows)]
+const JAVA: &str = "jbr/bin/java.exe";
 
 /// The encoded index Swift's `saveIndex` publishes, validated as a reader
 /// would read it back.
@@ -591,5 +644,24 @@ mod tests {
                 .code,
             "recordUnreadable"
         );
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::{NODE, below};
+
+    #[test]
+    fn a_windows_pin_names_the_installation_s_own_files() {
+        let root = r"C:\Program Files\Huawei\DevEco Studio";
+        assert_eq!(
+            below(root, NODE),
+            r"C:\Program Files\Huawei\DevEco Studio\tools\node\node.exe"
+        );
+        assert_eq!(
+            below(&format!("{root}\\"), "tools/hvigor/bin/hvigorw.js"),
+            r"C:\Program Files\Huawei\DevEco Studio\tools\hvigor\bin\hvigorw.js"
+        );
+        assert_eq!(below(root, "sdk"), format!(r"{root}\sdk"));
     }
 }

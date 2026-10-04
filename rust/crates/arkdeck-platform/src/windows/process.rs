@@ -397,11 +397,17 @@ pub(crate) fn spawn_in(
         working_directory,
         None,
         None,
-        false,
+        Launch {
+            breakaway: false,
+            standard_image: false,
+        },
     )
 }
 
-/// `spawn_in` for the one command whose own children must outlive it: the
+/// `spawn_in` for the tool runner's child, named by the standard spelling of
+/// its image path where that names the same file.
+///
+/// `detaching` is for the one command whose own children must outlive it: the
 /// HDC lifecycle client (`hdc kill -r`), whose replacement server macOS
 /// leaves running in a session of its own. The child itself is in its
 /// kill-on-close Job, ended as every child is; the Job lets the processes
@@ -409,13 +415,25 @@ pub(crate) fn spawn_in(
 /// a server is adopted only by a fresh commandless proof, and ended only
 /// while one still names it (`end_proved_process`). Every other tool keeps
 /// the Job its descendants cannot leave.
-pub(crate) fn spawn_detaching(
+pub(crate) fn spawn_tool(
     tool: &VerifiedTool,
     args: &[OsString],
     environment: &[(OsString, OsString)],
     working_directory: Option<&[u16]>,
+    detaching: bool,
 ) -> io::Result<RunningChild> {
-    spawn_with(tool, args, environment, working_directory, None, None, true)
+    spawn_with(
+        tool,
+        args,
+        environment,
+        working_directory,
+        None,
+        None,
+        Launch {
+            breakaway: detaching,
+            standard_image: true,
+        },
+    )
 }
 
 /// `spawn_in` with `input` — the inheritable read end of an [`input_pipe`] —
@@ -436,7 +454,10 @@ pub(crate) fn spawn_paired(
         Some(working_directory),
         None,
         Some(input),
-        false,
+        Launch {
+            breakaway: false,
+            standard_image: false,
+        },
     )
 }
 
@@ -478,8 +499,20 @@ pub(crate) fn spawn_attached(
         working_directory,
         Some(console),
         None,
-        false,
+        Launch {
+            breakaway: false,
+            standard_image: false,
+        },
     )
+}
+
+/// How `spawn_with` starts a child beyond its streams: whether its Job lets
+/// the child's own children break away, and whether it is named by the
+/// standard spelling of its image path (tool runner children only).
+#[derive(Clone, Copy)]
+struct Launch {
+    breakaway: bool,
+    standard_image: bool,
 }
 
 fn spawn_with(
@@ -489,7 +522,7 @@ fn spawn_with(
     working_directory: Option<&[u16]>,
     console: Option<HPCON>,
     input: Option<&Handle>,
-    breakaway: bool,
+    launch: Launch,
 ) -> io::Result<RunningChild> {
     if !tool
         .path
@@ -500,8 +533,22 @@ fn spawn_with(
             "verified Windows tools must be executable images, not shell scripts",
         ));
     }
-    let application = wide(tool.path.as_os_str())?;
-    let mut command_line = command_line(tool.path.as_os_str(), args)?;
+    // A tool child is named by the standard spelling of its canonical image
+    // path when that names exactly the same file (TASK-XPA-011: Node hands
+    // its image path to `cmd.exe`, which cannot run a `\\?\` one); every
+    // other child, and a path with no such spelling, keeps the canonical
+    // one. The suspended child's image is proved against the retained file
+    // either way.
+    let image: OsString = match launch
+        .standard_image
+        .then(|| super::tool::standard_spelling(&tool.path))
+        .flatten()
+    {
+        Some(standard) => standard.into(),
+        None => tool.path.clone().into_os_string(),
+    };
+    let application = wide(&image)?;
+    let mut command_line = command_line(&image, args)?;
     // Pipes: NUL stdin (or the paired input) and two output pipes, the only
     // handles inherited. The list stays live through CreateProcessW.
     let mut pipes = None;
@@ -570,7 +617,7 @@ fn spawn_with(
     let job = Handle::new(unsafe { CreateJobObjectW(null(), null()) })?;
     let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-        | if breakaway {
+        | if launch.breakaway {
             JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK
         } else {
             0
@@ -599,9 +646,15 @@ fn spawn_with(
     let root = String::from_utf16(&windows_directory[..length])
         .map_err(|_| invalid("invalid Windows system directory"))?;
     let system = format!("{root}\\System32");
+    // The tool's one leading search directory, if it was given one; the
+    // system directory otherwise, as for every child.
+    let search = match &tool.search_directory {
+        Some(directory) => format!("{directory};{system}"),
+        None => system.clone(),
+    };
     let mut environment_rows: Vec<(Vec<u16>, Vec<u16>)> = BASE_ENVIRONMENT
         .iter()
-        .zip([system.as_str(), root.as_str(), root.as_str()])
+        .zip([search.as_str(), root.as_str(), root.as_str()])
         .map(|(key, value)| (key.encode_utf16().collect(), value.encode_utf16().collect()))
         .collect();
     for (key, value) in environment {

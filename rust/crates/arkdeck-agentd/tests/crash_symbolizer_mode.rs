@@ -6,11 +6,11 @@
 //! stdout with exit 0 — or, for a map that is not a JSON object, exit 1 and a
 //! line naming the error — and the usage refusals are Swift's line and exit
 //! 64, with nothing read. Host only: no store, socket, HDC or device.
-#![cfg(target_os = "macos")]
+//! On Windows (TASK-XPA-011) too, over `X:\` paths.
+#![cfg(any(target_os = "macos", windows))]
 
 use serde_json::Value;
 use std::fs;
-use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -45,8 +45,25 @@ struct Scratch(PathBuf);
 impl Scratch {
     fn new() -> Self {
         let nonce = u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap());
-        let path = PathBuf::from(format!("/private/tmp/arkdeck-symbolize-mode-{nonce:016x}"));
-        fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+        #[cfg(not(windows))]
+        let path = {
+            use std::os::unix::fs::DirBuilderExt;
+            let path = PathBuf::from(format!("/private/tmp/arkdeck-symbolize-mode-{nonce:016x}"));
+            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            path
+        };
+        #[cfg(windows)]
+        let path = {
+            let temporary = std::env::temp_dir().canonicalize().unwrap();
+            let temporary = temporary.to_str().unwrap().to_owned();
+            let temporary = temporary
+                .strip_prefix(r"\\?\")
+                .unwrap_or(&temporary)
+                .to_owned();
+            let path = Path::new(&temporary).join(format!("ad-symbolize-mode-{nonce:016x}"));
+            fs::create_dir(&path).unwrap();
+            path
+        };
         Self(path)
     }
 }

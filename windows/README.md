@@ -208,6 +208,13 @@ first, `ControlResult` back.
   Target, binding, system and transport, a picker when several are online, "No online device"
   otherwise — and the remote build server bound to that Target from the App's own bindings
   (unbound, bound with its endpoint, or stale when the server was removed).
+- **Overview record (TASK-XPA-020).** The macOS next step and Recent Work: runs grouped into lines
+  by thread (those needing a person first, four lines), each with its featured run and Show more,
+  and whether it may run again with every refusal named (an unknown outcome is never replayed;
+  only read-only and host-only effects repeat without the workspace's gate). Run It Again shows
+  what the source recorded and prepares a read-only draft (`observe.device@1` or
+  `capture.diagnostics@1`, same Target and binding, inputs as reported), shown above its
+  workspace and started once as a new Job after fresh checks and the Runtime's read-only plan.
 - **Debug deployment queue (TASK-XPA-020).** macOS #2466 in Debug › Artifacts: choose up to four
   folders (a mapped or UNC share works as any folder) and tick lib*.so files found in them
   (subfolders searched, hidden entries and reparse points skipped, at most 500 entries and 100

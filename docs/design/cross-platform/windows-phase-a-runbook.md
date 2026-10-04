@@ -1,7 +1,7 @@
 # Windows phase A runbook (maintainer)
 
-- **Version:** 2026-10-05. §4 brought up to date with protected `main` `162c94f3` (#2536): G1, G3,
-  G4, G6, G8 and G9 are closed. The 2026-10-04 version (`982d4e6d`, #2518) and the first version
+- **Version:** 2026-10-05. §4 brought up to date with protected `main` `a72df529` (#2549): G1, G3,
+  G4, G6, G7, G8 and G9 are closed. The 2026-10-04 version (`982d4e6d`, #2518) and the first version
   (2026-09-30, `565f8b1d`) are superseded. §2 is done.
 - **Scope:** CHG-2026-074 r12/r13, Windows phase A. This runbook is the maintainer's ordered
   checklist. Phase S (software) is the agents'.
@@ -315,7 +315,7 @@ preconditions). That is the account daemon of an installed RC, started by the CL
 `%LOCALAPPDATA%\ArkDeck\Agentd`, not a development root. A development root's evidence is never
 `REAL_DEVICE_PASS` (`rust/crates/arkdeck-agentd/src/main.rs`, `development_usb.rs`).
 
-On protected `main` `162c94f3` the two compose different things:
+On protected `main` `a72df529` the two compose different things:
 
 | | Account daemon (installed RC) | Development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`) |
 | --- | --- | --- |
@@ -690,10 +690,28 @@ Never:
   arkdeck runtime tool list --output json
   arkdeck workspace project register --registration-request-id gj5-<date>-project --kind openharmony --root '<project X:\…>' --output json
   arkdeck workspace preset register --registration-request-id gj5-<date>-build --project <ref> --kind build --template <template> --toolchain <toolchain ref> --toolchain-generation <n> --module <module> --product <product> --build-mode <mode> --timeout-seconds 900 --output json
+  arkdeck workspace preset register --registration-request-id gj5-<date>-test --project <ref> --kind test --template openharmony.hvigor-test@1 --toolchain <toolchain ref> --toolchain-generation <n> --module <module> --product <product> --build-mode <mode> --timeout-seconds 900 --output json
   ```
 
-  - The DevEco launcher must be Huawei-signed, and `node.exe` OpenJS-signed. Node and hvigor
-    are never taken from `PATH`.
+  - **Pinned children.** The DevEco launcher must be Huawei-signed and `node.exe` OpenJS-signed.
+    Node and Hvigor are never taken from `PATH`.
+  - **JDK.** The Windows DevEco record also pins `jbr\bin\java.exe`, Authenticode-verified and
+    SHA-256-pinned (#2549), so registration refuses an unsigned one.
+    - Only a build or test preset's Hvigor child gets that directory ahead of the system
+      directory on its search path.
+    - A DevEco record registered before #2549 has four roles. It stays readable but resolves no
+      preset, so register the DevEco again.
+  - **Working-directory lookups.** Hvigor's Node children run with
+    `NoDefaultCurrentDirectoryInExePath=1`, so a `java`, `cmd` or `wmic` planted in the project
+    never runs ahead of the pinned JDK or the system's tools.
+  - **What a build runs.** Building a project runs that project's own `hvigorfile.ts`, in the
+    root and in each module, and the Hvigor plugins its `hvigor/hvigor-config.json5` declares.
+    The plugins are installed from the registry its `.npmrc` names. That code runs with the
+    build child's rights, on macOS as on Windows.
+    - The working-directory hardening stops a planted file from replacing a toolchain command.
+      It does not make building an untrusted project safe.
+    - Only build projects the maintainer trusts. Whether such builds need a further boundary is
+      an open design question (`runs/TASK-XPA-011/windows-workspace-hvigor-cwd-run.md`).
 - **Signing credential: maintainer gate.**
   - The passwords never go in argv or the environment, and the agent never sees them.
   - `--build-profile` reads DevEco's encrypted passwords from the project's `build-profile.json5`
@@ -726,13 +744,28 @@ Never:
 - **Inputs (maintainer supplies):**
   - the crash-probe fixture project and its signed HAP;
   - the fixed patch `gj5-fix.patch` (headless runbook §1).
+- **Project preparation (maintainer, before the window, not a Journey step).**
+  - Run `ohpm install --all` once in the registered project, with DevEco's `ohpm`.
+  - `ohpm` links the packages as directory junctions inside the project. The Runtime-owned copy
+    recreates each in-tree junction to name the copy's own directory. Out-of-tree, dangling and
+    symbolic links are refused.
+  - The copy writes paths past `MAX_PATH` (#2549).
+  - This is input preparation, like the signed HAP. During the Journey itself nothing but the
+    published CLI touches the project (headless runbook §6 discipline).
 - **Agent:** headless runbook §6 in full:
   1. repro;
   2. `analyzer.extract-crash-signature@1`;
-  3. isolate, then `artifact import workspace-patch` and `workspace.apply-patch@1`;
-  4. build, sign, `artifact export`, re-import;
+  3. `workspace isolate` (`workspace.prepare-isolated-copy@1`), then `artifact import
+     workspace-patch` and `workspace.apply-patch@1` on the copy;
+  4. `workspace build` (`workspace.build-openharmony@1`) and `workspace test` (the test preset)
+     on the same copy, then sign, `artifact export` and re-import;
   5. verify;
   6. the zero-dispatch negative case, with the full Job-set comparison.
+
+  `workspace symbolize` is the one workspace leaf still `partial` on Windows: a symbolization
+  needs a device-captured crash. GJ-5's own repro provides one (the crash-index entry and its
+  fault log), so a symbolize run against it may be recorded as an extra step. It is not one of
+  §6's criteria.
 - **Authority:** the repro and verify `debug.hap@1` steps are `deviceMutation`. The workspace
   mutations need the account daemon's authority.
 - **Destructive:** none.
@@ -741,10 +774,13 @@ Never:
     measured (#2506).
   - The sign Job replays the Swift oracle (#2495), and signing through a registered preset is
     measured (#2508).
-  - The hvigor build has not run on Windows.
+  - `workspace build` and `workspace test` run end to end on Windows with the real DevEco (#2549):
+    `ohpm install`, `workspace isolate`, `workspace build` and `workspace test` were run on the
+    repository's WaterFlow demo through the CLI. Both are measured `implemented`.
+  - The daemon's `--symbolize-crash` mode replays the Swift oracle on Windows.
 - **Blocking gaps:**
   - G1 is closed.
-  - G7: the hvigor build and test Jobs have not been measured on Windows.
+  - G7 is closed (#2549).
   - G8 is closed (#2532): `--build-profile` decodes DevEco's stored passwords on Windows.
   - `hap-sign-tool.jar` carries Mark-of-the-Web (ZoneId=3) in the sampled install. Whether it
     affects the signer has not been observed; record it.
@@ -759,11 +795,11 @@ Never:
 | G4 | **Closed** (#2535): `flash install-binding` is served on Windows | none | done |
 | G5 | AF-W1 (ArkForge Windows acceptance) | WIN-GJ4 | external, maintainer |
 | G6 | **Closed** (#2531, #2535): `flash device-access`, `lane-preview`, `bind-loader` measured through the CLI on Windows over stand-ins | none | done |
-| G7 | hvigor build and test Jobs not measured on Windows (workspace mutations are measured, #2506) | WIN-GJ5 | TASK-XPA-011 |
+| G7 | **Closed** (#2549): `workspace build` and `workspace test` run end to end on Windows with the real DevEco (pinned JDK, working-directory hardening, in-tree junctions, long paths). Platform-wide note: a build runs the project's own `hvigorfile.ts` and declared plugins, on macOS too (§4.5) | none | done |
 | G8 | **Closed** (#2532): `runtime signing install --build-profile` and `migrate-deveco` decode DevEco's stored passwords on Windows | none | done |
 | G9 | **Closed** by `scripts/gj_record`: it assembles the redacted `gj-headless-rerun` record from the captured CLI JSON and applies each row's criteria (§4.0.6) | none | done |
 
-### 4.7 Readiness per row (main `162c94f3`)
+### 4.7 Readiness per row (main `a72df529`)
 
 | Row | Software path on Windows | Real-device blockers | Maintainer gate | Destructive |
 | --- | --- | --- | --- | --- |
@@ -771,7 +807,7 @@ Never:
 | WIN-GJ2-001 | full oracle replay end to end (#2505) | none | device window; HAP input | no (device mutation) |
 | WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged; fixture check (G3) | none | device window; `.so` and rollback fixture | no (device mutation) |
 | WIN-GJ4-001 | lane, plan, run, reconcile on fakes (#2504); broker (#2519); install-binding, device-access, lane-preview, bind-loader (#2531, #2535) | G5 | HardwareCampaign go; ArkForge bundle; image archive | **yes** (`flash.full-restore@1`) |
-| WIN-GJ5-001 | reads, isolate, sweep, patch, checkpoint and revert measured (#2500, #2506); sign replayed and registered signing measured (#2495, #2508) | G7 | DevEco install; signing install from the build profile; inputs | no (device mutation) |
+| WIN-GJ5-001 | reads, isolate, sweep, patch, checkpoint and revert measured (#2500, #2506); sign replayed and registered signing measured (#2495, #2508); build and test end to end with the real DevEco (#2549) | none | DevEco install; `ohpm install` in the project; signing install from the build profile; inputs | no (device mutation) |
 
 With G1 closed, WIN-GJ1..3 can be run in the next device window. Nothing has run on the board
 yet, so no row is `REAL_DEVICE_PASS`.
@@ -842,7 +878,7 @@ Nothing flips on hosted CI, fixtures or plan-only runs (AGENTS.md "什么不算�
 
 ## 7. Order at a glance
 
-| # | Step | State on `main` `162c94f3` | Blocked on |
+| # | Step | State on `main` `a72df529` | Blocked on |
 | --- | --- | --- | --- |
 | 1 | §1.1 dev signer check | open (maintainer) | — |
 | 2 | §2 HDC and USB samples, WHR-001..003 | **done** | — |
@@ -850,7 +886,7 @@ Nothing flips on hosted CI, fixtures or plan-only runs (AGENTS.md "什么不算�
 | 4 | G1: the account daemon selects and starts the registered HDC | **done** (#2524, #2526, #2536; live #2530) | — (awaiting-approval paths: #2501) |
 | 5 | §4.1 GJ-1, §3 row 6 | open (agent + maintainer) | the maintainer's board window |
 | 6 | §4.2 GJ-2, §4.3 GJ-3 | open after step 5 | WIN-GJ1-001 on the same digest |
-| 7 | §4.5 GJ-5 | blocked | G7 (agents) |
+| 7 | §4.5 GJ-5 | open after step 6 | WIN-GJ2-001 on the same digest; the maintainer's DevEco, project and signing preparation |
 | 8 | §1.3 production signing | open (maintainer) | Artifact Signing account |
 | 9 | §4.4 GJ-4 | blocked | G5 AF-W1, the maintainer's HardwareCampaign go |
 | 10 | §5 clean-host smoke | open | step 8 |

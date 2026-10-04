@@ -929,6 +929,7 @@ fn a_registered_hvigor_preset_composes_through_its_resolved_toolchain() {
                 hvigor_script_path: text(&tools.hvigor),
                 sdk_root_path: text(&tools.sdk),
                 verified_resources: vec![script_resource(&tools)],
+                search_directory: None,
             })
         } else {
             Err("resourceConflict: DevEco resolution requires an exact workspace-preset pin".into())

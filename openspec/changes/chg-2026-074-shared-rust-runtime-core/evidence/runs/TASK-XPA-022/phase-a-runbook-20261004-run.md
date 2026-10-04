@@ -124,3 +124,25 @@ Brought up to date with protected `main` `162c94f3`:
   install-binding` on Windows, and #2531/#2535 measure device-access, lane-preview and bind-loader
   through the CLI over stand-ins.
 - **Still open:** G2 (risk), G5 and G7. No row has run on the board.
+
+## Follow-up 2026-10-05: G7 closed
+
+Brought up to date with protected `main` `a72df529` (#2549):
+
+- **G7 closed.** `workspace build` and `workspace test` run end to end on Windows with the real
+  DevEco, through the pinned DevEco JDK, `NoDefaultCurrentDirectoryInExePath`, in-tree junction
+  recreation and long paths. Both are measured `implemented`.
+- **§4.5.** The DevEco record now pins `jbr\bin\java.exe`, so a pre-#2549 record must be registered
+  again. A test preset is registered beside the build preset.
+  - `ohpm install --all` runs in the project as maintainer preparation before the window.
+  - The agent steps are now isolate, patch, build and test on the same copy.
+  - `workspace symbolize` stays `partial`, since it needs a device-captured crash. GJ-5's own
+    repro provides one, as an optional extra step.
+- **§4.6, §4.7 and §7.** G7 is closed, WIN-GJ5-001 has no software blocker left, and GJ-5 opens
+  after GJ-2 on the same digest.
+- **Platform-wide note, H3's.** Building a project runs its own `hvigorfile.ts` and the Hvigor
+  plugins it declares, with the build child's rights, on macOS as on Windows. The
+  working-directory hardening does not make building an untrusted project safe. It is recorded
+  in §4.5 and in the G7 row; the further boundary is an open design question
+  (`runs/TASK-XPA-011/windows-workspace-hvigor-cwd-run.md`).
+- **Remaining.** G2 (risk) and G5. No row has run on the board.

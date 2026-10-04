@@ -57,3 +57,8 @@ workspace = true
 [[test]]
 name = "windows_workspace_sign_oracle"
 harness = false
+
+# The Hvigor presets' Node launcher is this test binary itself.
+[[test]]
+name = "windows_workspace_hvigor"
+harness = false

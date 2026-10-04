@@ -36,7 +36,7 @@ mod control_action_control;
 mod control_action_host_control;
 #[cfg(any(target_os = "macos", windows))]
 mod crash_ledger_analyzer;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod crash_symbolizer_mode;
 #[cfg(target_os = "macos")]
 mod cutover_preflight;
@@ -939,6 +939,10 @@ fn main() {
         }
         if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
             std::process::exit(crash_ledger_analyzer::run(&arguments));
+        }
+        // The ArkTS crash symbolizer a symbol preset runs (TASK-XPA-011).
+        if first.is_some_and(|argument| argument == crash_symbolizer_mode::FLAG) {
+            std::process::exit(crash_symbolizer_mode::run(&arguments));
         }
         // The code-owned grep, sed and patch a Windows workspace profile
         // pins (TASK-XPA-011): this image is each of them.

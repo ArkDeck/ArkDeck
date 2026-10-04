@@ -58,6 +58,7 @@ public abstract partial class SurfacePage<TState> : UserControl, IRefreshable wh
             // ClientKit connects and authenticates synchronously; keep that off the UI thread.
             var state = await Task.Run(LoadAsync);
             _progress.Content = null;
+            _last = state;
             _body.Children.Clear();
             Render(state, _body);
             MainWindow.Instance.Report(state);
@@ -66,6 +67,16 @@ public abstract partial class SurfacePage<TState> : UserControl, IRefreshable wh
         {
             _refreshing = false;
         }
+    }
+
+    private TState? _last;
+
+    /// <summary>Renders the last state again (a page-local choice changed; nothing is re-read).</summary>
+    protected void Rerender()
+    {
+        if (_last is not { } state) return;
+        _body.Children.Clear();
+        Render(state, _body);
     }
 
     protected abstract Task<TState> LoadAsync();
