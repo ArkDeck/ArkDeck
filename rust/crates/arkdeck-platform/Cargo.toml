@@ -22,6 +22,12 @@ sha2 = { workspace = true, features = ["asm"] }
 [dev-dependencies]
 serde_json.workspace = true
 
+# The real CLI answers an HDC restart's impact approval in a pseudo console
+# this binary hosts; no test framework may own that console.
+[[test]]
+name = "windows_console_restart"
+harness = false
+
 # The fake tool of the Windows tool-dispatch tests is the test binary itself,
 # so it runs without libtest, whose output would reach the child's streams.
 [[test]]
