@@ -209,3 +209,49 @@ fn a_dispatch_pinned_to_no_windows_tuple_is_read_by_the_macos_grammar() {
         Outcome::Verified(_)
     ));
 }
+
+/// `probeHDCServer` on a registered Windows tuple is the commandless server
+/// observation (CHG-2026-078 `serverIdentityGeneration`), never
+/// `checkserver`: the step verifies the tuple's version as the client's and
+/// the server's once the registered executable's own server is observed,
+/// and is unknown otherwise. An unpinned dispatch keeps Swift's
+/// `checkserver`, and a dispatch with no observation of its own refuses it.
+#[cfg(windows)]
+#[test]
+fn the_server_probe_of_a_registered_tuple_is_the_commandless_observation() {
+    use arkdeck_provider_hdc::ServerObservation;
+    let tuple = windows_tuple(C2_SHA256).unwrap();
+    assert!(Action::ObserveServer.observes_server_commandlessly(&c2(CONNECTED)));
+    let unpinned = Replay {
+        tuple: None,
+        list: CONNECTED,
+    };
+    assert!(!Action::ObserveServer.observes_server_commandlessly(&unpinned));
+    assert!(!Action::ObserveDevice.observes_server_commandlessly(&c2(CONNECTED)));
+    assert_eq!(
+        Action::ObserveServer
+            .lower("probe", None)
+            .unwrap()
+            .arguments,
+        ["checkserver"],
+        "the process lowering itself is Swift's"
+    );
+    assert_eq!(
+        Action::verify_server_observation(tuple, &ServerObservation::Observed),
+        Outcome::Verified(
+            [
+                ("clientVersion".to_owned(), "3.2.0g".to_owned()),
+                ("serverVersion".to_owned(), "3.2.0g".to_owned()),
+            ]
+            .into()
+        )
+    );
+    assert_eq!(
+        Action::verify_server_observation(tuple, &ServerObservation::Unknown("absent".into())),
+        Outcome::Unknown("absent".into())
+    );
+    assert!(matches!(
+        c2(CONNECTED).observe_server(),
+        Err(DispatchFailure::Refused(_))
+    ));
+}
