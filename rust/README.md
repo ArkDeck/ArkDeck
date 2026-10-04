@@ -2981,6 +2981,13 @@ pinned full restore through it, and `flash_socket_control.rs` drives
 `recovery flash-invocation start|evaluate|status|list` (and the `debug`
 spellings) and `flash reconcile-alias` through the real CLI against the
 signed test daemon.
+`device_access_control.rs` replays Swift's `flash.device-access` control
+frames on Windows against a stand-in serving ArkForge's public named pipe for
+the lane directory (`arkforge_platform`'s transport), and
+`flash_socket_control.rs` drives `flash device-access` and `flash
+lane-preview` through the CLI against the signed test daemon, over that
+stand-in and a stand-in plan previewer in the test binary; the daemon binary
+has no seam for either.
 
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
