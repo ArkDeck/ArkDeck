@@ -18,10 +18,10 @@ mod windows;
 #[cfg(any(target_os = "macos", windows))]
 pub use process::ToolLaunchIdentity;
 #[cfg(target_os = "macos")]
-pub use process::{
-    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ManagedServer,
-    VerifiedNamespace, VerifiedResource, VerifiedSource,
-};
+pub use process::{ManagedServer, VerifiedNamespace, VerifiedResource, VerifiedSource};
+// The analyzer runner on macOS and Windows (TASK-XPA-011).
+#[cfg(any(target_os = "macos", windows))]
+pub use process::{AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination};
 #[cfg(any(target_os = "macos", windows))]
 pub use process::{
     DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError, PtyError, PtyExecution,
@@ -404,7 +404,9 @@ pub use windows::{
 // A pinned file measured through one no-follow handle (`FileIdInfo`, owner
 // and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
 #[cfg(windows)]
-pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
+pub use windows::{
+    HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
+};
 // The Authenticode signature of a registered DevEco tool and the DevEco
 // launcher's publisher, with the macOS answer type (TASK-XPA-011, G12).
 #[cfg(windows)]

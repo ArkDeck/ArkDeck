@@ -189,3 +189,33 @@ pub fn measure_host_file(
         executable,
     })
 }
+
+/// Read the regular file at the local absolute `path` whole, as Swift's
+/// bounded physical reader reads an analyzer's input (`read_profile_file`):
+/// the path canonical (no link or junction in any component, the spelling
+/// on disk), the last component opened without following a reparse point,
+/// at most `maximum` bytes, and the file unchanged while it is read.
+pub fn read_host_file(path: &Path, maximum: u64) -> Result<Vec<u8>, HostFileMeasureError> {
+    use HostFileMeasureError::{Changed, Unreadable};
+    if !standard_local_path(path) {
+        return Err(Unreadable);
+    }
+    let file = open_no_follow(path, READ).map_err(|_| Unreadable)?;
+    let before = Stat::of(&file).map_err(|_| Unreadable)?;
+    if !before.regular() || before.size > maximum {
+        return Err(Unreadable);
+    }
+    host_fs::canonical(path, &file).map_err(|_| Unreadable)?;
+    let mut bytes = Vec::with_capacity(before.size as usize);
+    (&file)
+        .take(maximum + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| Changed)?;
+    let after = Stat::of(&file).map_err(|_| Changed)?;
+    if bytes.len() as u64 != before.size
+        || !(before.same_file(&after) && before.same_content(&after))
+    {
+        return Err(Changed);
+    }
+    Ok(bytes)
+}

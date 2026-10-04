@@ -8,8 +8,8 @@
 //! 0.25 s), and a cancellation probe asked before the spawn and while the
 //! child runs. The analyzer runner is this runner with its source retained.
 use super::macos_process::RunningChild;
+pub(super) use super::tool_request::MAX_CAPTURE_BYTES;
 use super::tool_request::check_limits;
-pub(super) use super::tool_request::{MAX_CAPTURE_BYTES, MAX_TIMEOUT};
 use super::{
     READER_CLEANUP_TIMEOUT, ToolExecution, ToolRequest, ToolRunError, ToolTermination,
     VerifiedTool, invalid,

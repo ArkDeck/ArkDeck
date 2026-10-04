@@ -78,13 +78,12 @@ const DOCUMENT_LIMIT: u64 = 64 * 1024;
 /// Inputs from which the isolated macOS owner composes an owner that this
 /// composition does not compose yet: each one set refuses the start. The
 /// development HDC is decided by the tuple gate instead (`windows_hdc_gate`).
-const NOT_COMPOSED: [&str; 8] = [
+const NOT_COMPOSED: [&str; 7] = [
     "ARKDECK_DEVELOPMENT_USB_RELATIONS",
     "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC",
     "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER",
     "ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY",
     "ARKDECK_APP_INGRESS",
-    "ARKDECK_ANALYZER_PATH",
     "ARKDECK_ARKTRACE_DESCRIPTOR",
     "ARKDECK_WORKSPACE_INSPECTOR",
 ];
@@ -329,9 +328,21 @@ impl Authority {
         projects
             .startup_records()
             .map_err(|error| unusable(&path, &error.message))?;
+        // The analyzers `ARKDECK_ANALYZER_PATH` names (TASK-XPA-011): the
+        // crash-ledger analyzer, and the HiLog summary when it is this
+        // daemon's own executable; a named path that is no executable ends
+        // the start, as on macOS.
+        let analyzers = crate::hilog_summary_analyzer::composed(
+            std::env::var_os("ARKDECK_ANALYZER_PATH")
+                .as_deref()
+                .map(Path::new),
+        )
+        .map_err(|error| {
+            format!("ARKDECK_ANALYZER_PATH is unusable: {error}; nothing was started")
+        })?;
         let host = host
             .with_workspace_projects(projects)
-            .with_planning(self.root.path());
+            .with_planning(self.root.path(), Some(analyzers));
         let host = host.with_trace_cache(self.trace_cache()?);
         let bootstrap = self.bootstrap_root()?;
         let host = host.with_bootstrap(&bootstrap).map_err(|error| {
