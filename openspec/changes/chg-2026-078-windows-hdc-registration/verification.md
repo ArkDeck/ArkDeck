@@ -1,6 +1,6 @@
 # Verification Plan
 
-> Change:CHG-2026-078-windows-hdc-registration@r2
+> Change:CHG-2026-078-windows-hdc-registration@r3
 > Status:planned # planned | passed | failed;结论经维护者在 PR 中确认
 
 ## Environment
@@ -21,6 +21,7 @@
 | WHR-IDENTITY-001 | registry and fixture contract tests (TASK-WHR-002) | every registered fixture classifies as its family; the hash closure holds | TASK-WHR-002 run record |
 | WHR-SEPARATION-001 | macOS registry byte identity and a cross-platform substitution matrix | byte-identical macOS registries; no crossing, no fallback | `git diff --stat` and the TASK-WHR-002 tests |
 | WHR-OBSERVATION-001 | c2 fixture classification and negative row vectors (TASK-WHR-002) | USB rows only; sampled UART rows excluded; everything else `unknown`; `checkserver` never dispatched | TASK-WHR-002 run record |
+| WHR-STARTUP-001 | classification of the c2 server-startup fixture, its near-miss vectors and the managed-start settle (r3) | the exact 14-byte form is `notYetObservable`, never `observedEmpty`; every other `[Empty]` form `unknown`; the settle stops at the first enumerated listing and gives up after its bound | the r3 run record (CHG-2026-074 `TASK-XPA-002/hdc-windows-empty-form-20261004-run.md`) |
 | WHR-CENSUS-001 | TASK-XPA-004 Windows census tests (CHG-2026-074) | ASCII-lowercase serial fold, present-only, attachment = (instance ID, arrival), topology per attachment only | TASK-XPA-004 run record |
 | WHR-PRIVACY-001 | leak scan of every sanitized output (`windows_sample_process.py`) and a reviewer's own search for the board serial | no identifier, path, name or hash of key-bearing bytes | TASK-WHR-001 run record |
 
@@ -38,6 +39,13 @@ fallback.
 
 The registered `deviceObservationSnapshot` reads only `USB` rows as devices and excludes the
 sampled UART row form (maintainer ruling 2026-10-04, item 2). Every other form is `unknown`.
+
+### WHR-STARTUP-001
+
+The registered server-startup listing `[Empty]` CR TAB `hdc` CR LF (exit 0, empty stderr) is
+`notYetObservable`: `unknown` and retryable, never no device and never a disappearance. A
+managed start settles past it for at most 3 s; past the bound observations stay `unknown`
+(r3: maintainer ruling 2026-10-04, refined by the server-startup evidence).
 
 ### WHR-CENSUS-001
 
@@ -66,7 +74,10 @@ These are synthetic vectors. They prove fail-closed behaviour only and are never
   registry, give `unsupported`;
 - a port-derived USB instance suffix gives no identity;
 - candidate 1's hash gives `unsupported`;
-- the `[Empty]` marker, a 5-column row, a sixth column other than `hdc` and a UART row outside the
+- every `[Empty]` form other than the 14-byte server-startup listing (`[Empty]` CR LF, LF,
+  without the TAB or `hdc`, beside rows, with stderr or a non-zero exit) gives `unknown`, and the
+  startup listing itself is never `observedEmpty`;
+- a 5-column row, a sixth column other than `hdc` and a UART row outside the
   sampled form give `unknown`;
 - a phantom (non-present) USB node gives no entry, and a serial differing from the connect key
   after the fold gives no relation.
