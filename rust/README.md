@@ -52,6 +52,16 @@ On Windows two things run there:
   For that, the test daemon alone takes three inputs: the oracle's clock, the
   replay root's own Job state as the mutation root, and the recorded code-sign
   helper's facts.
+  and the real `arkdeck.exe` drives it with the production peer check. Started
+  with a board (`SignedDaemon::start_with_board`), it also reads a synthetic
+  USB census naming one HDC-normal DAYU200 by the fixture's serial, through the
+  production census relations (`Host::with_usb_registry_relations`), so the
+  fake's device is proved the adopted Target's.
+- `gj1_device_leaves.rs` (TASK-XPA-005): GJ-1's device leaves through that
+  daemon, end to end. `target observe` pauses without the board, keeps its run
+  owner-only below the account's local application data, and resumes after a
+  restart with the board (`agent resume --resume-token`). `target observe` and
+  `diagnostics capture` complete, and each Job's calls are the Swift oracle's.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
