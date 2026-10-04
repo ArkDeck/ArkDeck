@@ -42,3 +42,18 @@ macOS behaviour is unchanged: this layer adds tests, coverage and documentation 
 - **The hvigor build, tests and symbolization** are the next layer of this slice. They also need
   the build landing path join on Windows.
 - **Signing and the HAR console challenge** are another agent's layer, stacked on this slice.
+
+## Correction: no daemon outlives the test on the account's pipe (2026-10-04)
+
+A daemon started from this test's signed copy (`ad-signed-workspace-…`) was found serving the
+account's real pipe after a run. The most likely cause is that the CLI's own client start
+launched the daemon it had been pointed at while that daemon's pipe was briefly absent.
+Neither test can do that any more:
+
+- Each test now holds the account's daemon starters' turn (`StarterLock`, as
+  `windows_account_locations_process.rs` does) for as long as it runs. A CLI that finds the
+  pipe absent waits for the turn instead of starting the daemon, and no other process starts
+  one over its own fake account meanwhile.
+- Each test ends by asserting that no daemon serves the account's pipe.
+- The test's own daemons are stopped by their stop request, or killed and waited for by their
+  drop on any failure.
