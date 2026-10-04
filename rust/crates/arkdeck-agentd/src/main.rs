@@ -58,6 +58,8 @@ mod tool_selection_startup;
 mod tool_selection_startup_tests;
 #[cfg(windows)]
 mod windows_hdc_gate;
+#[cfg(all(test, windows))]
+mod windows_hdc_restart_tests;
 #[cfg(windows)]
 mod windows_lifecycle;
 #[cfg(all(test, target_os = "macos"))]

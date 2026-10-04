@@ -75,7 +75,7 @@ pub use pinned_file::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
 };
 pub(crate) use process::spawn;
-pub use server::{LoopbackServerLease, end_proved_process};
+pub use server::{LoopbackServerLease, PortHolder, end_proved_process, port_holders};
 pub use state::{
     GuardAcquisition, GuardObject, InstanceScope, OWNER_ONLY_REMEDY, OwnerLock,
     SingleInstanceGuard, StateRoot,

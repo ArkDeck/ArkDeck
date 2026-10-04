@@ -84,6 +84,12 @@ pub enum StartFailure {
     /// what listens there is named, never adopted or stopped (Swift's
     /// "managed HDC endpoint was not absent before the foreground launch").
     Occupied(String),
+    /// Nothing listens on the endpoint, but another process holds its port
+    /// (on Windows a connection's local port, or a listener on another
+    /// address, keeps the server from binding it): nothing was launched,
+    /// and each holder is named from the kernel's connection table, never
+    /// adopted or stopped.
+    PortInUse(String),
     /// The launch itself was refused: nothing ran.
     Refused(io::Error),
     /// The server ended before it was ready (Swift `foregroundExitReason`).
@@ -130,6 +136,14 @@ impl ManagedHdcServer {
     ) -> Result<Self, StartFailure> {
         if reachable(endpoint) {
             return Err(StartFailure::Occupied(occupant(tool, endpoint)));
+        }
+        // Windows refuses the server's bind (`uv_tcp_bind` EACCES, and the
+        // server exits 0 at once) while any other process holds the port,
+        // even as an outbound connection's local port: say so, and by whom,
+        // before launching anything.
+        #[cfg(windows)]
+        if let Some(reason) = port_in_use(endpoint)? {
+            return Err(StartFailure::PortInUse(reason));
         }
         let spelled = endpoint.to_string();
         let mut environment = vec![(
@@ -332,6 +346,27 @@ fn occupant(tool: &VerifiedTool, endpoint: SocketAddrV4) -> String {
         Err(error) => format!("the owner of its listener cannot be proved ({error})"),
     };
     format!("managed HDC endpoint was not absent before the foreground launch: {holder}")
+}
+
+/// Who else holds the endpoint's port, if anyone; a table that cannot be
+/// read refuses the start (nothing launched), as an unknown holder would.
+#[cfg(windows)]
+fn port_in_use(endpoint: SocketAddrV4) -> Result<Option<String>, StartFailure> {
+    let holders = arkdeck_platform::port_holders(endpoint.port()).map_err(|error| {
+        StartFailure::PortInUse(format!(
+            "managed HDC endpoint {endpoint}: the holders of its port cannot be read ({error})"
+        ))
+    })?;
+    Ok((!holders.is_empty()).then(|| {
+        format!(
+            "managed HDC endpoint {endpoint} is in use by another process: {}",
+            holders
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("; ")
+        )
+    }))
 }
 
 /// Swift `foregroundExitReason`.

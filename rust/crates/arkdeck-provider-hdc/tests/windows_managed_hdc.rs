@@ -154,6 +154,10 @@ mod windows {
             an_occupied_endpoint_launches_nothing,
         ),
         (
+            "a_held_port_launches_nothing_and_names_its_holder",
+            a_held_port_launches_nothing_and_names_its_holder,
+        ),
+        (
             "a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start",
             a_proved_replacement_is_ended_and_the_endpoint_serves_the_next_start,
         ),
@@ -376,6 +380,45 @@ mod windows {
              that is not the configured HDC executable holds it"
         );
         assert!(fake.calls().is_empty(), "{:?}", fake.calls());
+    }
+
+    /// Nothing listens on the endpoint, but its port is held: here by a
+    /// listener on another loopback address, as an outbound connection's
+    /// local port held it on the reference host (`uv_tcp_bind` EACCES, the
+    /// server exiting 0 at once). The start launches nothing and names the
+    /// holder from the kernel's connection table, never stopping it.
+    fn a_held_port_launches_nothing_and_names_its_holder() {
+        let fake = FakeHdc::new("hdc");
+        let endpoint = free_endpoint();
+        let holder = TcpListener::bind(SocketAddrV4::new(
+            std::net::Ipv4Addr::new(127, 0, 0, 2),
+            endpoint.port(),
+        ))
+        .unwrap();
+        let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(5)))
+            .err()
+            .expect("a held port is refused");
+        let StartFailure::PortInUse(reason) = error else {
+            panic!("expected the port's holder, got {error:?}");
+        };
+        let image = std::env::current_exe().unwrap();
+        let image = image.file_name().unwrap().to_string_lossy().into_owned();
+        assert_eq!(
+            reason,
+            format!(
+                "managed HDC endpoint {endpoint} is in use by another process: pid {} ({image}), \
+                 listen 127.0.0.2:{} -> 0.0.0.0:0",
+                std::process::id(),
+                endpoint.port()
+            )
+        );
+        assert!(fake.calls().is_empty(), "{:?}", fake.calls());
+        // The holder was never touched; once it lets go, the start owns the port.
+        assert!(holder.local_addr().is_ok());
+        drop(holder);
+        let server = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(15)))
+            .expect("once the port is free the start owns it");
+        server.stop().unwrap();
     }
 
     /// TASK-XPA-014's replacement lifetime (#2131) on Windows: a confirmed
