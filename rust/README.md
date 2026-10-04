@@ -2864,6 +2864,31 @@ bundle is refused with nothing published, and, with
 releases. Run record:
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
 
+## Windows Debug reads (TASK-XPA-008)
+
+The Windows daemon answers `debug.probe` and `debug.template.run` as Swift's
+daemon composes its Debug probe. Each reads through the Host's HDC composition
+(`HdcComposition::debug_read`, now built on Windows). That composition is the
+registered tuple's managed server, or a Windows test build's fake.
+
+The tests replay the Swift oracles on Windows:
+
+- `arkdeck-agentd --test spawning debug_probe_replay` replays every exchange
+  of the Debug probe oracle (23, every mode) through the production Host and
+  Control. It checks the fake's calls too.
+- `debug_leaves_cli` runs `debug probe` through the real CLI against the signed
+  test daemon, for the 7 probes the leaf can send.
+- `arkdeck-hoststore`'s `tests/debug_invocation.rs` replays the 68 exchanges of
+  the Flash recovery broker oracle. It now runs on Windows too.
+
+The shared fake's Debug probe answers are ported in process (`oracle_fake.rs`,
+`Answers::DebugProbe`). `debug.probe` is in `WINDOWS_MEASURED_LEAVES`.
+
+`debug template run` stays `partial`. It runs the `debug.template@1` Job, whose
+admission observes the Target, and no Swift oracle records that Job's HDC
+answers. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-debug-reads-run.md`.
+
 ## Windows History filter owner (TASK-XPA-012)
 
 `arkdeck-hoststore` builds the History filter owner (`HistoryStore`) on
@@ -3020,9 +3045,30 @@ remove` (and the `signing …` spellings) on Windows; the daemon it binds is the
 one it would start (`ARKDECK_DAEMON_PATH` or `arkdeck-agentd.exe` beside it),
 and the maintenance leaves first require that image to satisfy a configured
 signing pin (`ARKDECK_DAEMON_SIGNER_SHA256` or the publisher identity) before
-Credential Manager is opened. `migrate-deveco` and `install --build-profile`,
-which read DevEco's encrypted password material, are `unsupportedOnPlatform`
-on Windows. The installed Windows daemon composes the workspace presets'
+Credential Manager is opened.
+
+`install --build-profile` and `migrate-deveco` read DevEco's encrypted
+passwords on Windows too, at macOS parity, so the maintainer never handles a
+plaintext password:
+
+- **Build profile.** It is read through one handle that follows no reparse
+  point, in its spelling on disk, and must be trusted-write-only. Its single
+  `storeFile` is the JSON string DevEco writes (a `\\`-escaped drive path).
+- **Password material.** It sits beside the keystore
+  (`material\fd\<slot>\<file>` ×3, `material\ac`, `material\ce`), the
+  layout DevEco writes on macOS too. Each directory must be trusted-write-only
+  and in its spelling on disk. Each file is read as the file it measured, and
+  must have a single link.
+- **`migrate-deveco --daemon`.** It must name the installed, pinned daemon.
+
+`arkdeck-provider-workspace`'s `deveco_password` test replays the Swift vectors
+on Windows. The CLI's `windows_signing_leaves` test installs and migrates from
+a Windows-spelled build profile and decodes it with the Swift vectors. With
+`ARKDECK_LIVE_DEVECO_BUILD_PROFILE`, it decodes one of the host's DevEco build
+profiles through the host's own material, checking only the shape and printing
+nothing.
+
+The installed Windows daemon composes the workspace presets'
 credential pinning over the account's preset root, bound to its own image, and
 Windows attempts go under `SigningPresetStore::attempts_root`
 (`<preset root>\Attempts`).

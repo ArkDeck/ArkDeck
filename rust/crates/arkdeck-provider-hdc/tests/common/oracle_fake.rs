@@ -3,8 +3,8 @@
 //! (`hdc-answers.sh`) the driver sources, which a Windows host cannot run. The
 //! debug-hap and deploy-native-library fragments, the Flash host facts
 //! oracle's own (`flash-host-facts/hdc-answers.sh`), and `observe.device@1`'s
-//! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables) are
-//! ported here, case for case and in their order, over the same root: the call log the driver
+//! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables) and the
+//! Debug probe oracle's (`debug-probe/hdc-answers.sh`) are ported here, case for case and in their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
 //! It reports its tool identity current, as the macOS dispatch over the fake's
@@ -30,6 +30,7 @@ pub enum Answers {
     FlashHostFacts,
     ObserveDevice,
     CaptureDiagnostics,
+    DebugProbe,
 }
 
 impl Answers {
@@ -50,6 +51,9 @@ impl Answers {
             {
                 Self::CaptureDiagnostics
             }
+            line if line.starts_with("# debug.probe and debug.template.run answers") => {
+                Self::DebugProbe
+            }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -63,7 +67,7 @@ pub struct OracleFake {
 /// What one call answered: its exit status and both streams.
 struct Answer {
     status: i32,
-    stdout: String,
+    stdout: Vec<u8>,
     stderr: String,
 }
 
@@ -71,21 +75,21 @@ impl Answer {
     fn out(stdout: impl Into<String>) -> Self {
         Self {
             status: 0,
-            stdout: stdout.into(),
+            stdout: stdout.into().into_bytes(),
             stderr: String::new(),
         }
     }
     fn exit(status: i32) -> Self {
         Self {
             status,
-            stdout: String::new(),
+            stdout: Vec::new(),
             stderr: String::new(),
         }
     }
     fn unregistered() -> Self {
         Self {
             status: 23,
-            stdout: String::new(),
+            stdout: Vec::new(),
             stderr: "unregistered fixture output\n".into(),
         }
     }
@@ -189,7 +193,7 @@ impl OracleFake {
             if mode == "cleanupDebt" {
                 return Answer {
                     status: 1,
-                    stdout: String::new(),
+                    stdout: Vec::new(),
                     stderr: format!("rm: {}: Permission denied\n", arg(6)),
                 };
             }
@@ -378,7 +382,7 @@ impl OracleFake {
                 "malformed" => Answer::out("no device table here\n"),
                 _ => Answer {
                     status: 1,
-                    stdout: String::new(),
+                    stdout: Vec::new(),
                     stderr: "list targets failed\n".into(),
                 },
             };
@@ -478,6 +482,72 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `debug-probe/hdc-answers.sh`: the Debug probe's three reads and the
+    /// four read-only templates, by mode. Each call is also recorded as one
+    /// line of its arguments in `hdc-calls.log`, as the fragment records it.
+    /// `None` is the fragment's `kill -9 $$`.
+    fn debug_probe(&self, argv: &[String], mode: &str) -> Option<Answer> {
+        let all = argv.join(" ");
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(self.root.join("hdc-calls.log"))
+            .unwrap()
+            .write_all(format!("{all}\n").as_bytes())
+            .unwrap();
+        let key = KEY;
+        Some(match all.as_str() {
+            command if command == format!("-t {key} shell bm dump -a") => match mode {
+                "packagesUnavailable" | "allUnavailable" => Answer::exit(1),
+                "packagesUnparseable" => Answer::out("no bundle is installed\n"),
+                _ => Answer::out("Bundle names:\n\tcom.example.alpha\n\tcom.example.zeta\n"),
+            },
+            command if command == format!("-t {key} fport ls") => match mode {
+                "forwardUnavailable" | "allUnavailable" => Answer::exit(1),
+                _ => Answer::out("tcp:9000 tcp:9001    [Forward]\n"),
+            },
+            command if command == format!("-t {key} rport ls") => match mode {
+                "reverseUnavailable" | "allUnavailable" => Answer {
+                    status: 0,
+                    stdout: Vec::new(),
+                    stderr: "[Fail]Device not founded or connected\n".into(),
+                },
+                _ => Answer::out("tcp:9100 tcp:9101    [Reverse]\n"),
+            },
+            command if command == format!("-t {key} shell param get persist.ace.debug.enabled") => {
+                match mode {
+                    "templateTruncated" => {
+                        Answer::out("persist.ace.debug.enabled=true\n".repeat(600))
+                    }
+                    // `printf '...\377\n'`: one byte that is not UTF-8.
+                    "templateBinary" => Answer {
+                        status: 0,
+                        stdout: b"persist.ace.debug.enabled=\xff\n".to_vec(),
+                        stderr: String::new(),
+                    },
+                    _ => Answer::out("true\n"),
+                }
+            }
+            command
+                if command == format!("-t {key} shell hidumper -s WindowManagerService -a -a") =>
+            {
+                Answer::out("WindowManagerService\n----------\nfocus window: com.example.alpha\n")
+            }
+            command if command == format!("-t {key} shell uptime") => match mode {
+                "templateFailure" => Answer {
+                    status: 7,
+                    stdout: Vec::new(),
+                    stderr: "uptime: cannot read /proc/uptime\n".into(),
+                },
+                "templateKilled" => return None,
+                _ => Answer::out(" 10:00:00 up 1 day,  2:03,  0 users\n"),
+            },
+            _ => Answer::unregistered(),
+        })
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -505,12 +575,32 @@ impl HdcDispatch for OracleFake {
             Answers::FlashHostFacts => Self::flash_host_facts(&plan.arguments, &mode),
             Answers::ObserveDevice => Self::observe_device(&plan.arguments, &mode),
             Answers::CaptureDiagnostics => Self::capture_diagnostics(&plan.arguments, &mode),
+            Answers::DebugProbe => match self.debug_probe(&plan.arguments, &mode) {
+                Some(answer) => answer,
+                // `kill -9 $$`: the child dies on its signal, which the
+                // process runner reports as an unobservable outcome.
+                None => {
+                    return Err(DispatchFailure::Unobservable(
+                        arkdeck_provider_hdc::signal_death(9),
+                    ));
+                }
+            },
         };
+        let mut stdout = answer.stdout;
+        let mut stderr = answer.stderr.into_bytes();
+        // The Debug probe's truncated template: the runner keeps each stream
+        // to the plan's capture and says when either went past it.
+        let truncated = self.answers == Answers::DebugProbe
+            && (stdout.len() > plan.capture_bytes || stderr.len() > plan.capture_bytes);
+        if truncated {
+            stdout.truncate(plan.capture_bytes);
+            stderr.truncate(plan.capture_bytes);
+        }
         Ok(Receipt {
             exit_status: answer.status,
-            stdout: answer.stdout.into_bytes(),
-            stderr: answer.stderr.into_bytes(),
-            truncated: false,
+            stdout,
+            stderr,
+            truncated,
             duration: Duration::from_millis(1),
         })
     }
