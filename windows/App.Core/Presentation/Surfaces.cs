@@ -130,7 +130,8 @@ public sealed record OverviewState(
     Loaded<DoctorFacts> Doctor,
     Loaded<IReadOnlyList<JobSummary>> Recent,
     ControlFailure? DaemonFailure,
-    bool Reached) : SurfaceState(DaemonFailure, Reached);
+    bool Reached,
+    Loaded<IReadOnlyList<DeviceCandidate>>? Devices = null) : SurfaceState(DaemonFailure, Reached);
 
 public sealed record DeviceState(
     Loaded<IReadOnlyList<DeviceCandidate>> Candidates,
@@ -182,7 +183,8 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
         var doctor = await run.Load(c => c.RequestAsync("doctor", Params(("deep", JsonBool.False))), DoctorFacts.Parse, CliCommands.Doctor);
         var recent = await run.Load(c => c.RequestAsync("job.list", Params(("pageSize", JsonNumber.FromInt64(OverviewRecentCount)))),
             JobSummary.ParsePage, CliCommands.JobList);
-        return new(health, doctor, recent, run.DaemonFailure, run.Reached);
+        var devices = await run.Load(c => c.RequestAsync("device.observations"), DeviceCandidate.ParseAll, CliCommands.DeviceCandidates);
+        return new(health, doctor, recent, run.DaemonFailure, run.Reached, devices);
     }
 
     /// <summary>The Device page: the candidates HDC observes and the Targets adopted before

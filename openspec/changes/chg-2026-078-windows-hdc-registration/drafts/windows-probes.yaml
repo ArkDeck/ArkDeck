@@ -149,9 +149,19 @@
         "zeroByteStdoutDisposition": "unknown",
         "emptyMarker": {
           "literal": "[Empty]",
-          "observed": false,
+          "observed": true,
           "disposition": "unknown",
-          "note": "Never emitted on the sampled host: hdc lists the host's serial ports as UART rows in every phase. Not registered as empty (maintainer ruling 2026-10-04, item 2)."
+          "note": "r3: the only observed [Empty] form is serverStartupListing; every other [Empty] form stays unknown."
+        },
+        "serverStartupListing": {
+          "exactBytesHex": "5b456d7074795d0d096864630d0a",
+          "bytes": 14,
+          "exitCode": 0,
+          "stderrMustBeEmpty": true,
+          "disposition": "notYetObservable",
+          "classification": "unknown",
+          "retryable": true,
+          "settleRule": "after a managed start, list again for at most 3 s until a registered enumerated form is read; past the bound every observation stays unknown"
         },
         "row": {
           "delimiter": "TAB",
@@ -181,7 +191,8 @@
         {"input": "onlyKnownNonDeviceRows", "result": "observedEmpty"},
         {"input": "usbRowsWithZeroConnected", "result": "observedEmpty"},
         {"input": "usbRowsWithOneOrMoreConnected", "result": "observed.connectedSet"},
-        {"input": "emptyMarkerLine", "result": "unknown"},
+        {"input": "serverStartupListing", "result": "notYetObservable (unknown, retryable)"},
+        {"input": "emptyMarkerLineInAnyOtherForm", "result": "unknown"},
         {"input": "zeroByteStdout", "result": "unknown"},
         {"input": "uartRowOutsideTheKnownForm", "result": "unknown"},
         {"input": "unknownStateOrTransportOrHostLiteral", "result": "unknown"},
@@ -201,7 +212,8 @@
       "fixtures": {
         "uartRowsOnly": {"file": "rust/tests/fixtures/hdc-windows/c2/no-board/list-targets-empty.stdout.bin", "bytes": 66, "sha256": "31ab060ed0339793ebabd7b8b5c36866d5f37ee80aa0d43eecad9ffc897db623", "expectedOutcome": "observedEmpty"},
         "boardConnected": {"file": "rust/tests/fixtures/hdc-windows/c2/board-connected/list-targets-board-connected.stdout.bin", "bytes": 129, "sha256": "55f6ea08dde54a798535c7350526b5a6913c2a80d9ba9a318a5b21a699bde3da", "expectedOutcome": "observed.connectedSet (one)"},
-        "boardRemoved": {"file": "rust/tests/fixtures/hdc-windows/c2/board-removed/list-targets-board-removed.stdout.bin", "bytes": 127, "sha256": "95f2d8900e51ab1e9d51d7c8dc1144c3294a8838af20cf0083b1fbda4ba72a4e", "expectedOutcome": "observedEmpty"}
+        "boardRemoved": {"file": "rust/tests/fixtures/hdc-windows/c2/board-removed/list-targets-board-removed.stdout.bin", "bytes": 127, "sha256": "95f2d8900e51ab1e9d51d7c8dc1144c3294a8838af20cf0083b1fbda4ba72a4e", "expectedOutcome": "observedEmpty"},
+        "serverStartup": {"file": "rust/tests/fixtures/hdc-windows/c2/server-startup/list-targets-server-startup.stdout.bin", "bytes": 14, "sha256": "04944aafdaafa5db8d3d38221d275e64e6b2fff949539768db6296201fcdbc70", "expectedOutcome": "notYetObservable"}
       }
     },
     {

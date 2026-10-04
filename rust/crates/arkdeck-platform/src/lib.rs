@@ -418,6 +418,11 @@ pub use windows::{
 pub use windows::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
 };
+// The system tools a Windows Runtime trusts for workspace operations
+// (TASK-XPA-011, maintainer ruling 69): `tar` and `git` by their registered
+// absolute path and Authenticode publisher, measured through one handle.
+#[cfg(windows)]
+pub use windows::{SystemTool, TrustedSystemTool, trusted_system_tool};
 // The Authenticode signature of a registered DevEco tool and the DevEco
 // launcher's publisher, with the macOS answer type (TASK-XPA-011, G12).
 #[cfg(windows)]

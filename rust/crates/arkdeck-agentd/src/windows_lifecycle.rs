@@ -1134,7 +1134,8 @@ fn signing_store() -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     Ok((root, image))
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
 
@@ -1163,10 +1164,17 @@ mod tests {
     /// A stand-in HDC compiled from Rust at test time (the macOS tests
     /// compile theirs from C): `-s <endpoint> -m` listens on the endpoint and
     /// accepts until it is ended; `-s <endpoint> checkserver` answers agreeing
-    /// versions; anything else is unregistered (status 64). No real HDC runs.
+    /// versions; `list targets -v` answers the registered UART-only listing,
+    /// so the managed start settles past the server-startup listing at once
+    /// (CHG-2026-078 r3); anything else is unregistered (status 64). No real
+    /// HDC runs.
     const STAND_IN: &str = r#"
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();
+    if arguments[1..] == ["list", "targets", "-v"] {
+        print!("COM1\t\tUART\tReady\tunknown...\thdc\r\n");
+        return;
+    }
     match arguments.get(3).map(String::as_str) {
         Some("-m") => {
             let listener = std::net::TcpListener::bind(&arguments[2]).unwrap();
@@ -1333,4 +1341,5 @@ fn main() {
             );
         }
     }
+}
 }

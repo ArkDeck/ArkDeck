@@ -62,7 +62,10 @@ pub use live_mode::{
     LoaderObserver, UsbProbe,
 };
 #[cfg(any(target_os = "macos", windows))]
-pub use managed_server::{EndpointSelection, ManagedHdcServer, StartBudget, StartFailure};
+pub use managed_server::{
+    EndpointSelection, ManagedHdcServer, StartBudget, StartFailure, StartupListing,
+    WINDOWS_STARTUP_SETTLE, settle_startup_listing,
+};
 pub use native_elf::{
     CodeSignFacts, MAXIMUM_LIBRARY_BYTES, NativeAbi, NativeLibraryFacts, ValidationError,
     is_static_executable, static_executable, validate_elf,
@@ -93,7 +96,7 @@ pub use pointer_input::{
 pub use port_forward::{Direction, PORT_MAXIMUM, PORT_MINIMUM, PortAction, PortRule};
 pub use presence::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,
-    parse_registered_presence, parse_registered_windows_presence,
+    WINDOWS_SERVER_STARTUP_LISTING, parse_registered_presence, parse_registered_windows_presence,
 };
 pub use provider::HdcReadOnlyProvider;
 pub use rockchip_hdc::{

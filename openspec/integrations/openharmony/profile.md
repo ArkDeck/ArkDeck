@@ -1,7 +1,7 @@
 # OpenHarmony Tool Integration Profile
 
 > ID：OPENHARMONY-TOOLS  
-> Version：0.7.0
+> Version：0.7.1
 > Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`） / version-probed at runtime  
 > Core baseline：CORE-2.0.0
 
@@ -199,12 +199,13 @@ health 或 client/server/daemon version；external ownership 仍必须由 consum
 
 ## Windows HDC registry（CHG-2026-078 / TASK-WHR-002，2026-10-04）
 
-`OPENHARMONY-HDC-WINDOWS-PROBES@1.0.0` is registered in
+`OPENHARMONY-HDC-WINDOWS-PROBES@1.1.0` is registered in
 `openspec/integrations/openharmony/windows-probes.yaml` (SHA-256
-`205c4977cd07ce7e4ad1d3ad84d5cbdee3130b4cd77fb6ac53144d79a6d059cb`). Its resource manifest is
+`cad5444a7c78b39d3c466929fb30407cad0f51ffa14e1721e6f13906f18089c1`). Its resource manifest is
 `rust/tests/fixtures/hdc-windows/resources.json` (SHA-256
-`c4b9f81e924f34e374f4a38acc27ba4c4ffc5254cd3ec32c054a5b6660ad8f77`). Profile `OPENHARMONY-TOOLS@0.7.0`, lock
-`INTEGRATION-PROFILES-0.8.0`.
+`400345520e299d18478ff32d1763d2fd521737b4c321ff99f90d5ed24ec48ed2`). Profile `OPENHARMONY-TOOLS@0.7.1`, lock
+`INTEGRATION-PROFILES-0.8.1` (r3 amendment; registered first as `@1.0.0` in
+`OPENHARMONY-TOOLS@0.7.0`, lock `INTEGRATION-PROFILES-0.8.0`).
 
 **Tool identity (read first).** A Windows tuple is the `hdc.exe` executable SHA-256 plus the
 `hdc -v` stdout bytes observed with it.
@@ -231,7 +232,7 @@ applies to Windows, or the other way round, even when the version text matches.
 | --- | --- | --- |
 | `version` | `supported`: `Ver: 3.2.0g` CR LF (13 B), stderr empty, exit 0, starts no server | the terminator is CR LF (macOS golden: LF) |
 | `healthyCheckserver` | `unsupported`; never dispatched as a probe. Server health is `serverIdentityGeneration` | with no server, `checkserver` **starts one**, then prints the healthy form (CR LF, 56 B) |
-| `deviceObservationSnapshot` | `supported`, existing server on `127.0.0.1:8710` only. 6 TAB columns, CR LF rows. Only `USB` rows are devices (`Connected`/`Offline`, hostTag `localhost`, sixth column `hdc`). The sampled `COM<n>`/`UART`/`Ready`/`unknown...`/`hdc` rows are excluded non-device rows, so UART rows alone mean no device. Any other form is `unknown` | 6 columns, not 5; CR LF rows, not LF; UART rows in every phase; `[Empty]` never emitted, so it is `unknown` on Windows, as is zero-byte stdout. Unchanged: the removed row is kept and flipped to `Offline` |
+| `deviceObservationSnapshot` | `supported`, existing server on `127.0.0.1:8710` only. 6 TAB columns, CR LF rows. Only `USB` rows are devices (`Connected`/`Offline`, hostTag `localhost`, sixth column `hdc`). The sampled `COM<n>`/`UART`/`Ready`/`unknown...`/`hdc` rows are excluded non-device rows, so UART rows alone mean no device. Any other form is `unknown` | 6 columns, not 5; CR LF rows, not LF; UART rows in every phase once the server has enumerated. A server that has just started answers `[Empty]` CR TAB `hdc` CR LF (14 B, exit 0) until it has enumerated (at most 1.26 s after its start): that exact form is `notYetObservable` (unknown, retryable; r3), never no device; a managed start settles past it for at most 3 s. Every other `[Empty]` form and zero-byte stdout are `unknown`. Unchanged: the removed row is kept and flipped to `Offline` |
 | `serverIdentityGeneration` | `supported`: exactly one listener on `127.0.0.1:8710`, owned by the registered hash, with a stable PID and creation time | per-command brackets exist (closing `DEV-1` for this tuple); the server is started by `checkserver`, never by `-v` |
 
 The registered Windows fixtures under `rust/tests/fixtures/hdc-windows/c2/` are the capture of
@@ -242,7 +243,9 @@ The registered Windows fixtures under `rust/tests/fixtures/hdc-windows/c2/` are 
 - user paths are relative, and account and machine names are removed.
 
 The run records are CHG-2026-074 `evidence/runs/TASK-XPA-002/hdc-windows-sample-20261004-run.md`
-and `evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`.
+and `evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`. The server-startup
+listing (`c2/server-startup/`, r3) is from
+`evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md`.
 
 The Rust table `arkdeck_provider_hdc::WINDOWS_HDC_TUPLES` holds exactly the registered tuple, and
 `parse_registered_windows_presence` is the registered `deviceObservationSnapshot` grammar;

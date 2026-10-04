@@ -333,7 +333,10 @@ impl Scene {
         };
         #[cfg(windows)]
         let host = if self.probe {
-            host.with_flash_test_hdc(hdc.dispatch())
+            host.with_test_hdc(
+                hdc.dispatch(),
+                &arkdeck_contract::sha256_hex(&fs::read(fixtures().join("hdc")).unwrap()),
+            )
         } else {
             host
         };

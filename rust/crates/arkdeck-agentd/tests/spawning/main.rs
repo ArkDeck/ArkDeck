@@ -22,10 +22,14 @@
 //! `src/main.rs` alone. Host tests only: every HDC here is a fake, and
 //! nothing installed is read or written.
 //!
-//! On Windows only the Flash host facts replay runs here, over the shared
-//! fake's answers ported in process (`oracle_fake.rs`), which the Host's
-//! test-only seam probes: no Windows daemon composes an HDC until its tuple
-//! is registered (TASK-XPA-010).
+//! On Windows two things run here:
+//! - the Flash host facts replay (TASK-XPA-010);
+//! - the signed test daemon (`signed_daemon.rs`, TASK-XPA-009), which this
+//!   binary serves on a development root's pipe for the real CLI.
+//!
+//! Both use the shared fake's answers ported in process (`oracle_fake.rs`),
+//! given to the Host through its test-only seam (`Host::with_test_hdc`). No
+//! production Windows daemon composes an HDC until its tuple is registered.
 #![cfg(any(target_os = "macos", windows))]
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -34,6 +38,13 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 static TURN: Mutex<()> = Mutex::new(());
 fn turn() -> MutexGuard<'static, ()> {
     TURN.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The daemon's unit tests beside a module compiled here run in its own test
+/// build only (`src/main.rs`): here the block is nothing.
+#[allow(unused_macros)]
+macro_rules! daemon_unit_tests {
+    ($($item:item)*) => {};
 }
 
 // The daemon's modules, from its sources. The tests drive part of each.
@@ -58,6 +69,37 @@ mod oracle_fake;
 #[allow(dead_code)]
 #[path = "../../src/tool_selection_startup.rs"]
 mod tool_selection_startup;
+// The Windows development root's lifecycle and composition, which the
+// signed test daemon serves through (`signed_daemon.rs`), with every module
+// it names.
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../../src/arkforge_execution.rs"]
+mod arkforge_execution;
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../../src/arkforge_lane.rs"]
+mod arkforge_lane;
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../../src/code_sign_helper.rs"]
+mod code_sign_helper;
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../../src/development_usb.rs"]
+mod development_usb;
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../../src/hilog_summary_analyzer.rs"]
+mod hilog_summary_analyzer;
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../../src/windows_hdc_gate.rs"]
+mod windows_hdc_gate;
+#[cfg(windows)]
+#[allow(dead_code)]
+#[path = "../../src/windows_lifecycle.rs"]
+mod windows_lifecycle;
 
 #[cfg(target_os = "macos")]
 mod app_ingress_fake_hdc;
@@ -72,6 +114,8 @@ mod flash_host_facts_control;
 mod flash_socket_control;
 #[cfg(target_os = "macos")]
 mod managed_hdc_server;
+#[cfg(windows)]
+mod signed_daemon;
 #[cfg(target_os = "macos")]
 mod target_observation_control;
 #[cfg(target_os = "macos")]
@@ -79,7 +123,9 @@ mod trace_probe_control;
 
 /// A module compiled here from the daemon's sources keeps no test beside it:
 /// one would run in this binary as well, outside [`turn`], besides the
-/// daemon's own unit tests.
+/// daemon's own unit tests. A module keeps its unit tests beside it only
+/// inside `daemon_unit_tests!`, which this binary expands to nothing; that
+/// block is its last item.
 #[test]
 fn the_daemon_modules_compiled_here_keep_no_tests_beside_them() {
     let _turn = turn();
@@ -103,7 +149,56 @@ fn the_daemon_modules_compiled_here_keep_no_tests_beside_them() {
             "managed_hdc_lifecycle",
             include_str!("../../src/managed_hdc_lifecycle.rs"),
         ),
+        (
+            "arkforge_execution",
+            include_str!("../../src/arkforge_execution.rs"),
+        ),
+        ("arkforge_lane", include_str!("../../src/arkforge_lane.rs")),
+        (
+            "code_sign_helper",
+            include_str!("../../src/code_sign_helper.rs"),
+        ),
+        (
+            "development_usb",
+            include_str!("../../src/development_usb.rs"),
+        ),
+        (
+            "hilog_summary_analyzer",
+            include_str!("../../src/hilog_summary_analyzer.rs"),
+        ),
+        (
+            "windows_hdc_gate",
+            include_str!("../../src/windows_hdc_gate.rs"),
+        ),
+        (
+            "windows_lifecycle",
+            include_str!("../../src/windows_lifecycle.rs"),
+        ),
     ] {
+        let source = match source.find("\ndaemon_unit_tests! {\n") {
+            Some(start) => {
+                let block = &source[start..];
+                let mut depth = 0_i32;
+                let end = block
+                    .char_indices()
+                    .find(|&(_, c)| {
+                        depth += match c {
+                            '{' => 1,
+                            '}' => -1,
+                            _ => 0,
+                        };
+                        c == '}' && depth == 0
+                    })
+                    .map(|(end, _)| end)
+                    .unwrap_or_else(|| panic!("{module}'s daemon_unit_tests! block is unclosed"));
+                assert!(
+                    block[end + 1..].trim().is_empty(),
+                    "{module}'s daemon_unit_tests! block is its last item"
+                );
+                &source[..start]
+            }
+            None => source,
+        };
         let lines: Vec<&str> = source.lines().map(str::trim).collect();
         for (index, line) in lines.iter().enumerate() {
             assert!(!line.starts_with("#[test]"), "{module} declares a test");

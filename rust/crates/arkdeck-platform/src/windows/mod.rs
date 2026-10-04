@@ -20,6 +20,7 @@ use windows_sys::Win32::System::Threading::*;
 mod account;
 mod bootstrap_tree;
 mod code_signature;
+mod console_origin;
 mod console_secret;
 mod credential;
 mod daemon_fingerprint;
@@ -39,6 +40,7 @@ mod server;
 pub(crate) mod shell;
 mod state;
 mod stop;
+mod system_tool;
 mod tool;
 mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
@@ -83,6 +85,7 @@ pub use state::{
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 pub use stop::{Latch, StopSignal, send_console_break};
+pub use system_tool::{SystemTool, TrustedSystemTool, trusted_system_tool};
 pub use verified_source::{VerifiedSource, create_private_directory, create_private_file};
 
 pub(crate) struct Handle(OwnedHandle);
@@ -565,6 +568,13 @@ impl LocalConnection {
     /// The process ID returned for this exact pipe instance, retained for SPK-3.
     pub fn authenticated_peer_pid(&self) -> u32 {
         self.peer.pid
+    }
+    /// Whether this connection's client is the foreground console
+    /// (maintainer ruling 2026-10-04, `console_origin.rs`): the daemon's own
+    /// user in the active console session, read of the very process this
+    /// pipe instance authenticated. Anything unread is no console.
+    pub fn foreground_console(&self) -> bool {
+        console_origin::foreground_console(&self.peer)
     }
     /// Expiry requests cancellation; returning the borrowed buffer still waits
     /// for safe kernel completion. Native cancellation latency is a SPK-3 check.
