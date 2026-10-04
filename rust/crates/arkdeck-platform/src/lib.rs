@@ -64,7 +64,9 @@ pub use windows::{
 // The Windows counterpart of the `/.vol`-bound source (a held file and
 // namespace) and the signing layer's private entries (TASK-XPA-011).
 #[cfg(windows)]
-pub use windows::{VerifiedSource, create_private_directory, create_private_file};
+pub use windows::{
+    VerifiedSource, create_private_directories, create_private_directory, create_private_file,
+};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;

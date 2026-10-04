@@ -973,13 +973,14 @@ capture), the capability store and policy (`capability_store`,
 `capability_policy`; the store directory is the host store's owner-only
 directory on Windows) and `catalog_review`; the Artifact read owner comes
 from #2356. Members whose owner is not built on Windows yet are types with
-no value there, so they are always `None`: `WorkspaceComposition` (the workspace provider crate and the DevEco owners)
-and `MutationAuthority` (the Session root owner and the Job owner's
-continuity census). The analyzer profile and the planner's analyzer paths
-(`AnalyzerProfile`, `materialize`, `unmaterialized_analyzer`) build on
-Windows too (see "Windows analyzer provider"). Still `cfg(target_os =
-"macos")`: the Flash planner and admitter (the ArkForge lane, AF-W1), the
-ArkTrace cross-field check, `workspace_plan`, and the authority's uses (`preauthorize*`, the
+no value there, so they are always `None`: `MutationAuthority` (the Session
+root owner and the Job owner's continuity census). The analyzer profile and
+the planner's analyzer paths (`AnalyzerProfile`, `materialize`,
+`unmaterialized_analyzer`) and the workspace provider (`WorkspaceComposition`,
+`workspace_plan`, `preauthorize_workspace`) build on Windows too (see
+"Windows analyzer provider" and "Windows workspace provider"). Still
+`cfg(target_os = "macos")`: the Flash planner and admitter (the ArkForge
+lane, AF-W1), the ArkTrace cross-field check, and the authority's uses (the
 capability-gap repair, `submit_for_agent`); on Windows their stand-ins
 answer what macOS answers without the owner. On macOS only attributes were
 added.
@@ -1115,10 +1116,10 @@ followed); the analyzer operations' fixed facts moved to
 `analyzer_operations.rs`, which `analyzer_composition` re-exports;
 `MutationAuthority` is the same type on Windows (its proof, the continuity
 census, is built there too: see below). The analyzer lane runs on Windows
-(see "Windows analyzer provider"). Still macOS-only, each refused on Windows
-as a Job this Runtime does not execute: the ArkTrace analyses (their
-trace_streamer), the workspace lane (`workspace_run.rs`) and the Flash lane (`flash_run.rs`,
-AF-W1); a Flash Job's recovery epoch is not read on Windows, and such a Job
+(see "Windows analyzer provider"), and so does the workspace lane
+(`workspace_run.rs`, see "Windows workspace provider"). Still macOS-only,
+each refused on Windows as a Job this Runtime does not execute: the ArkTrace
+analyses (their trace_streamer) and the Flash lane (`flash_run.rs`, AF-W1); a Flash Job's recovery epoch is not read on Windows, and such a Job
 is left as it is.
 
 The Windows daemon composes the runner, `job.cancel`, `job.result` and
@@ -3760,6 +3761,63 @@ an isolated Runtime, by `job.run` and by `agent.run`;
 `cargo test -p arkdeck-hoststore --test job_run_hilog` replays the Jobs byte
 for byte
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
+
+## Windows workspace provider (TASK-XPA-011)
+
+The Windows daemon composes the workspace provider over the registered
+projects at its start, as the macOS compositions do
+(`Host::with_workspace_operations`). It uses the root's `evolution-workspaces`
+for the Runtime-owned copies. The source inspection uses the inspector named
+by `ARKDECK_WORKSPACE_INSPECTOR`, pinned at the start; an inspector that is not
+an executable ends the start. The symbolizer is the one `ARKDECK_ANALYZER_PATH`
+names. Signing is composed for the installed daemon only: it uses the
+account's preset store, Credential Manager bound to the daemon's own image,
+and the root's `workspace-signing-attempts`. A development root composes no
+signing, as the macOS isolated owner composes none. A preset's DevEco
+toolchain is pinned in the Bootstrap registry, as both macOS compositions pin
+it.
+
+The hoststore workspace modules (composition, profile, reads, patch attempts,
+isolation, build, checkpoint, sweep, tests and symbolization), the planner's
+`workspace_plan`, the runner's `workspace_run`, the admitter's
+`preauthorize_workspace` and the reconciler's workspace arms all build on
+Windows. Two things change there:
+
+- **Paths.** An absolute path is spelled as the host spells a standard local
+  one (`X:\a\b`), which is what the project registration pins and what the
+  platform's verified handles require. A path relative to a project root keeps
+  Swift's `/` (`workspace_support::{join, relative_to, is_within}`). A colon
+  is never part of a relative path.
+- **Files.** Files are opened without following a reparse point and created
+  with the private descriptor. An executable is a PE image the caller may
+  execute, measured through `measure_host_file`. A copy refuses a link or
+  junction inside the tree instead of recreating it.
+
+A registered project resolves to no profile on Windows. Swift's profiles pin
+code-owned system tools (`/usr/bin/grep`, `sed`, `patch`, `bsdtar`, `git`, and
+SwiftPM), Windows ships none of them, and no rule yet decides which ones a
+Windows Runtime may trust. No PATH lookup stands in for that decision. So every
+profile-served workspace operation is unavailable with
+`workspace.toolchainUnavailable: no code-owned source tool … is trusted on
+Windows`, and a plan of one is refused before admission with zero dispatch.
+`workspace.inspect-source@1` needs no profile, so it runs.
+
+`cargo test -p arkdeck-agentd --test windows_workspace_provider_process`
+(`harness = false`) registers a project and restarts the daemon with this
+test binary as the inspector; the binary answers as `grep -r -n` does. The
+inspection is planned under the default read-only policy and runs. It
+publishes exactly what the inspector prints when run directly, and it reads
+back and deduplicates after a restart. The test also checks that the
+profile-served operations carry the code-owned tools reason, that a plan of
+one is refused with zero dispatch, and that an inspector that is not an
+executable refuses the start.
+
+With `ARKDECK_DEV_SIGNER_THUMBPRINT`, `arkdeck-cli/tests/windows_signed_runtime.rs`
+runs `arkdeck workspace inspect` against a dev-signed daemon, before and after
+a restart. `workspace.inspect` is in `WINDOWS_MEASURED_LEAVES`, so
+`workspace.inspect-source@1` is Windows `implemented` in
+`cli-feature-coverage.json`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-provider-run.md)).
 
 ## Windows analyzer provider (TASK-XPA-011)
 
