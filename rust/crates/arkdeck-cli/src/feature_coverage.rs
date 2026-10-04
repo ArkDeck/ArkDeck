@@ -200,6 +200,8 @@ const RULINGS: &[(&str, Ruling)] = &[
     ("human-action.list", leaf("human-action.list")),
     ("human-action.resume", leaf("human-action.resume")),
     ("human-action.show", leaf("human-action.show")),
+    ("job.archive", leaf("job.archive.apply")),
+    ("job.archive.preview", leaf("job.archive.preview")),
     ("job.cancel", leaf("job.cancel")),
     ("job.events", leaf("job.events")),
     ("job.evidence", leaf("job.evidence")),
@@ -1337,16 +1339,16 @@ mod tests {
             document["summary"]["bySource"]["daemon"],
             serde_json::json!(METHODS.len() - 1)
         );
-        let mut expected = vec![
-            "daemon method job.unruled has no coverage ruling".to_owned(),
-            "coverage names a daemon method the registry does not classify: job.status".to_owned(),
-        ];
+        let mut expected = vec!["daemon method job.unruled has no coverage ruling".to_owned()];
         for method in [
+            "job.archive",
+            "job.archive.preview",
+            "job.status",
             "diagnostic.session.status",
             "diagnostic.session.mark",
             "diagnostic.session.stop",
         ] {
-            if !METHODS.contains(&method) {
+            if !methods.contains(&method) {
                 expected.push(format!(
                     "coverage names a daemon method the registry does not classify: {method}"
                 ));
