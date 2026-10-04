@@ -121,3 +121,37 @@ fn socket_read_is_bounded_by_the_client_deadline() {
     ));
     task.join().unwrap();
 }
+
+#[test]
+fn peer_close_preserves_buffered_frames_and_incomplete_eof() {
+    for bytes in [b"reply\n".as_slice(), b"reply".as_slice(), b"".as_slice()] {
+        let directory = Directory::new();
+        let endpoint = directory.endpoint();
+        let mut listener = LocalListener::bind(&endpoint).unwrap();
+        let task = std::thread::spawn(move || {
+            let mut connection = listener.accept().unwrap();
+            connection.write_all(bytes).unwrap();
+        });
+        let mut client =
+            LocalConnection::connect(&endpoint, &ServerIdentity::new("/unused")).unwrap();
+        // Join proves the peer closed before the timeout refresh. No scheduler
+        // timing or delay is needed to reproduce Darwin's setsockopt EINVAL.
+        task.join().unwrap();
+        assert!(client.set_read_timeout(Some(Duration::ZERO)).is_err());
+        client
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut reader = std::io::BufReader::with_capacity(2, client);
+        let frame = arkdeck_platform::read_frame(&mut reader, 64);
+        if bytes.ends_with(b"\n") {
+            assert_eq!(frame.unwrap(), b"reply");
+        } else {
+            assert_eq!(frame.unwrap_err().kind(), std::io::ErrorKind::UnexpectedEof);
+        }
+        client = reader.into_inner();
+        client
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        assert_eq!(client.read(&mut [0; 1]).unwrap(), 0);
+    }
+}
