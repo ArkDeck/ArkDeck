@@ -66,9 +66,11 @@ in time took 903 ms. The short path only made S1's run the one that showed it.
   refusal (`JobWriteError::Refused` for `persist`), no longer `OutcomeUnknown`. Every other
   rename or directory-flush failure stays `OutcomeUnknown`.
 
-Other replacing renames with the same exposure that were not changed here, to keep this small:
+Other replacing renames with the same exposure were not changed here, to keep this small:
 - the import upload's checkpoint replace (`host_import_upload.rs`);
 - the instance document (`state.rs`), whose target the next start alone reads.
+
+The follow-up below covers both.
 
 H2's test of a holder that stays (`a_replacement_waits_out_a_brief_holder_of_the_replaced_document`
 in `arkdeck-platform/tests/windows_host_store.rs`) now expects `BeforePublication`. It waits the
@@ -101,3 +103,72 @@ the Windows-only `windows/host_store.rs`, so macOS and Linux build the same code
 ## CI
 
 To be recorded by the follow-up.
+
+## Follow-up: the other two replacing renames
+
+On base `3efba88c` (#2444), two other replacing renames get the same treatment.
+
+**The shared piece.** The patience now lives in `host_fs`: `held`, `REPLACE_PATIENCE` (10 s) and
+`waiting_out_holders`, which retries with a pause doubling from 1 ms to 250 ms.
+`host_store.rs`'s `rename_replacing` calls it, with unchanged behaviour.
+
+**The two sites:**
+- **Import checkpoint (`host_import_upload.rs`, `publish_import_checkpoint`).**
+  - A frozen successor replacing its prior now goes through `rename_replacing`, so it waits out
+    a holder.
+  - A refusal because the target is held is answered `BeforePublication`, as an existing name
+    already was, rather than `OutcomeUnknown`.
+  - A new, exclusive checkpoint is renamed without replace, as before, and does not wait: its
+    name does not exist, so nothing can hold it.
+- **Instance document (`state.rs`, `StateRoot::publish_document`).**
+  - It waits out a holder the same way.
+  - It answers a plain `io::Result`, so there is no classification to change. A held refusal
+    after the patience is returned as the OS error, with the staged file removed, as before.
+
+Reading an exhausted hold of the checkpoint as `BeforePublication` is a delegated minor
+decision, pending the next rulings batch. It is the same reading as the document replace's.
+
+**Tests.** There is one per site, each with a handle that shares read and write but not delete:
+- a holder released after 100 ms: the replacement publishes;
+- a holder that stays: the checkpoint is refused `BeforePublication`, and the instance document
+  answers the held error. The document is unchanged and no staging is left.
+
+Tests added:
+- `an_import_checkpoint_replacement_waits_out_a_brief_holder` in
+  `tests/windows_host_store.rs`;
+- `a_document_replacement_waits_out_a_brief_holder` in `state.rs`'s unit tests.
+
+**Negative control.** With both sites routed back to the bare rename, both tests failed at once,
+on the brief holder. I then restored the fix.
+
+**Checks** (Rust 1.99.0, `CARGO_BUILD_JOBS=2`, on a host shared with other worktrees' builds):
+
+| command | result |
+| --- | --- |
+| `cargo fmt --all --check` | exit 0 |
+| `cargo clippy --workspace --all-targets -- -D warnings` | exit 0 |
+| `cargo test -p arkdeck-platform -p arkdeck-hoststore --no-fail-fast` | exit 101: 655 passed, 1 failed (below), 10 ignored, 2 SKIPPED |
+| the same with `TEMP`/`TMP` on an 8.3 short path on C: (`AD-SHO~4`) | exit 101: the same counts and the same failure |
+| both new tests and H2's, 10 rounds each with four CPU-spinning processes | 10/10 and 10/10 passed |
+| macOS and Linux clippy `-D warnings` cross-check (stub toolchain) | exit 0 (check and clippy, both targets) |
+| `PYTHONUTF8=1 sh scripts/check-sdd.sh` | exit 0 |
+| `git diff --check` | exit 0 |
+
+The two SKIPPED lines are the known wildcard-listener skips.
+
+**The one failure was already on `main`.** It is
+`recorded_job_indexes_are_rebuilt_by_the_owner_and_read_back_after_a_restart`
+(`arkdeck-hoststore/tests/job_store_corpus.rs:191`). There a `persist` answers
+`Refused(Os { code: 5 })`: the host store's own replace exhausted the 10 s patience.
+This change does not touch that path; it only moves the patience into `host_fs`. To check, the test
+ran alone, alternating between bare `origin/main` (`3efba88c`) and this change:
+
+| | passed | failed |
+| --- | ---: | ---: |
+| `origin/main` | 2 | 2 |
+| this change | 3 | 1 |
+
+It failed on both sides, so a hold, or some other access denial, can outlast 10 s on this host
+while other worktrees build. Before the host shutdown it passed on `6b7ce952`. Whether to lengthen
+the patience, or to find what holds the target, is left to a separate change. It is outside this
+change's scope and does not decide it.

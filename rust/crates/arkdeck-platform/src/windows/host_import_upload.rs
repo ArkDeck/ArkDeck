@@ -527,13 +527,22 @@ impl HostDirectory {
             return Err(fail().into());
         }
         // Both names are relative to the held directory; new records are
-        // exclusive (no replace), a frozen successor replaces its prior.
-        if let Err(error) = host_fs::rename(&stage.file, &self.0, &target, original.is_some()) {
-            return Err(if error.kind() == io::ErrorKind::AlreadyExists {
-                BeforePublication(error)
-            } else {
-                OutcomeUnknown(error)
-            });
+        // exclusive (no replace), a frozen successor replaces its prior and
+        // waits out a holder of it as every published document does.
+        let renamed = if original.is_some() {
+            super::rename_replacing(&stage.file, &self.0, &target)
+        } else {
+            host_fs::rename(&stage.file, &self.0, &target, false)
+        };
+        if let Err(error) = renamed {
+            // An existing name, or a held one, was not replaced.
+            return Err(
+                if error.kind() == io::ErrorKind::AlreadyExists || host_fs::held(&error) {
+                    BeforePublication(error)
+                } else {
+                    OutcomeUnknown(error)
+                },
+            );
         }
         stage.published = true;
         host_fs::flush_directory(&self.0).map_err(OutcomeUnknown)?;

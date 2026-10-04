@@ -935,3 +935,36 @@ pub(crate) fn create_private_directories(path: &Path) -> io::Result<()> {
     }
     Ok(())
 }
+
+/// Whether a rename was refused because another handle holds its target
+/// (`ERROR_ACCESS_DENIED`, `ERROR_SHARING_VIOLATION`): nothing was replaced.
+pub(crate) fn held(error: &io::Error) -> bool {
+    const ACCESS_DENIED: i32 = 5;
+    const SHARING_VIOLATION: i32 = 32;
+    matches!(
+        error.raw_os_error(),
+        Some(ACCESS_DENIED | SHARING_VIOLATION)
+    )
+}
+
+/// How long a replacement waits out a holder of the target: several times the
+/// longest refusal measured on NTFS (about 1.2 s, the anti-malware scan of a
+/// document published a moment before; TASK-XPA-005).
+pub(crate) const REPLACE_PATIENCE: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Runs `replace` again, with a doubling pause (1 ms up to 250 ms), while
+/// its target is [`held`] and [`REPLACE_PATIENCE`] has not passed; then
+/// answers what it last answered. Any other failure is answered at once.
+pub(crate) fn waiting_out_holders(mut replace: impl FnMut() -> io::Result<()>) -> io::Result<()> {
+    let deadline = std::time::Instant::now() + REPLACE_PATIENCE;
+    let mut delay = std::time::Duration::from_millis(1);
+    loop {
+        match replace() {
+            Err(error) if held(&error) && std::time::Instant::now() < deadline => {
+                std::thread::sleep(delay);
+                delay = (delay * 2).min(std::time::Duration::from_millis(250));
+            }
+            answer => return answer,
+        }
+    }
+}
