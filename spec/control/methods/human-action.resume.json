@@ -551,7 +551,10 @@
                               "type": "string"
                             },
                             "identifier": {
-                              "type": "string"
+                              "type": [
+                                "null",
+                                "string"
+                              ]
                             },
                             "platformTrust": {
                               "type": "string"
@@ -560,7 +563,10 @@
                               "type": "string"
                             },
                             "teamIdentifier": {
-                              "type": "null"
+                              "type": [
+                                "null",
+                                "string"
+                              ]
                             }
                           },
                           "required": [
@@ -1449,7 +1455,10 @@
                           "type": "string"
                         },
                         "identifier": {
-                          "type": "string"
+                          "type": [
+                            "null",
+                            "string"
+                          ]
                         },
                         "platformTrust": {
                           "type": "string"
@@ -1458,7 +1467,10 @@
                           "type": "string"
                         },
                         "teamIdentifier": {
-                          "type": "null"
+                          "type": [
+                            "null",
+                            "string"
+                          ]
                         }
                       },
                       "required": [

@@ -183,7 +183,7 @@ public static class ControlContract
         ["history.filter.list"] = "23f39be8ceeee9ea4b7a79f26c9510b2382f9c9887a7b5eeb2b894ab50ae8583",
         ["history.filter.save"] = "3ccdd711bb6fe62c5915a8731b7d219693f81de0de3bcbb1261c18f62e2df26e",
         ["human-action.list"] = "4af330e38c9b086f612ac02dcf971acf2f0bb3074cff9800d1523dafd9145b1a",
-        ["human-action.resume"] = "65298b8d05cdd20d5534a5c8be8163e3965ca30f4fe4dc50aeeccbb4ede3076e",
+        ["human-action.resume"] = "4248e9c3316696952721543fca3d5257ad0208ecb45bc9c11419fb956e7c91d4",
         ["human-action.show"] = "1fa279bdab0e3d1d4aacf7668dc0994a02e2b554c2de40246e7882858f50470e",
         ["job.cancel"] = "8256f2f922fad631aa15c9861eb9678a16a0e20783d185170dbbba8b6b74132b",
         ["job.events"] = "5c9c9963d6fe6e79307246c7d3a09607f4c1c53e487b4b0dad742d6748b7433e",
