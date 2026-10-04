@@ -5782,4 +5782,244 @@ SHA-256：%4$@</value>
     <value>中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。</value>
     <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="overview_continuation_close" xml:space="preserve">
+    <value>丢弃草稿</value>
+    <comment>overview.continuation.close (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_explanation" xml:space="preserve">
+    <value>参数完整复制自来源记录。开始后经最新身份检查创建新 Job，原 thread 仅作为来源记录保留。当前尚未提交。</value>
+    <comment>overview.continuation.explanation (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_openJob" xml:space="preserve">
+    <value>打开新 Job</value>
+    <comment>overview.continuation.openJob (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_statusNote" xml:space="preserve">
+    <value>此草稿已尝试提交一次。请以 Job 记录中的结果为准；此界面不会重试或重放。</value>
+    <comment>overview.continuation.statusNote (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_submit" xml:space="preserve">
+    <value>开始新的只读 Job</value>
+    <comment>overview.continuation.submit (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_submitted" xml:space="preserve">
+    <value>已提交 · 等待 Runtime 结果</value>
+    <comment>overview.continuation.submitted (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_continuation_title" xml:space="preserve">
+    <value>已准备的只读请求</value>
+    <comment>overview.continuation.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_attention" xml:space="preserve">
+    <value>需要处理</value>
+    <comment>overview.record.next.attention (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_empty_detail" xml:space="preserve">
+    <value>Viewer、Trace、Debug、Flash 和 Device 已经是最短入口；新的运行与产物会自动出现在这里。</value>
+    <comment>overview.record.next.empty.detail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_empty_title" xml:space="preserve">
+    <value>从左侧工作流开始</value>
+    <comment>overview.record.next.empty.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_recentDetail" xml:space="preserve">
+    <value>这条调试线共 %1$lld 次运行，最近结果：%2$@</value>
+    <comment>overview.record.next.recentDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_residueDetail" xml:space="preserve">
+    <value>这次运行还有 %lld 项设备残留，修改目标前请先查看 Job。</value>
+    <comment>overview.record.next.residueDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_title" xml:space="preserve">
+    <value>下一步</value>
+    <comment>overview.record.next.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_unknownDetail" xml:space="preserve">
+    <value>外部效果未知，原请求不会重放；请到 History 查看持久化恢复证据。</value>
+    <comment>overview.record.next.unknownDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_next_waitingDetail" xml:space="preserve">
+    <value>Runtime 正在等待必要的人工动作，请打开 Job 从已记录边界继续。</value>
+    <comment>overview.record.next.waitingDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_recent_all" xml:space="preserve">
+    <value>全部记录 ›</value>
+    <comment>overview.record.recent.all (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_effectUnknown" xml:space="preserve">
+    <value>未记录效果分级</value>
+    <comment>overview.record.refusal.effectUnknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_neverReplayed" xml:space="preserve">
+    <value>不可重放</value>
+    <comment>overview.record.refusal.neverReplayed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_notTerminal" xml:space="preserve">
+    <value>仍在运行</value>
+    <comment>overview.record.refusal.notTerminal (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_refusal_parametersNotReported" xml:space="preserve">
+    <value>未上报 typed inputs</value>
+    <comment>overview.record.refusal.parametersNotReported (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_residue" xml:space="preserve">
+    <value>残留 × %lld</value>
+    <comment>overview.record.residue (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_again" xml:space="preserve">
+    <value>再来一次</value>
+    <comment>overview.record.run.again (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_againGated" xml:space="preserve">
+    <value>再来一次…</value>
+    <comment>overview.record.run.againGated (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_open" xml:space="preserve">
+    <value>在 History 中查看</value>
+    <comment>overview.record.run.open (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_run_outcomeUnknown" xml:space="preserve">
+    <value>外部效果未知</value>
+    <comment>overview.record.run.outcomeUnknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_runCount" xml:space="preserve">
+    <value>%lld 次运行</value>
+    <comment>overview.record.runCount (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_thread_more" xml:space="preserve">
+    <value>显示另外 %lld 次</value>
+    <comment>overview.record.thread.more (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_thread_needsAttention" xml:space="preserve">
+    <value>需要你处理</value>
+    <comment>overview.record.thread.needsAttention (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_thread_ungrouped" xml:space="preserve">
+    <value>未分组的运行</value>
+    <comment>overview.record.thread.ungrouped (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_debug" xml:space="preserve">
+    <value>HAP 调试</value>
+    <comment>overview.record.workspace.debug (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_device" xml:space="preserve">
+    <value>真机操作</value>
+    <comment>overview.record.workspace.device (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_flash" xml:space="preserve">
+    <value>设备刷机</value>
+    <comment>overview.record.workspace.flash (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_trace" xml:space="preserve">
+    <value>Trace 抓取</value>
+    <comment>overview.record.workspace.trace (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_workspace_viewer" xml:space="preserve">
+    <value>Viewer 界面检查</value>
+    <comment>overview.record.workspace.viewer (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_cancel" xml:space="preserve">
+    <value>取消</value>
+    <comment>overview.resume.cancel (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_catalogDigest" xml:space="preserve">
+    <value>来源 Catalog digest</value>
+    <comment>overview.resume.catalogDigest (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_drift_binding" xml:space="preserve">
+    <value>自来源运行以来 binding revision 已变化。所列参数属于旧目标代次，不会自动应用。</value>
+    <comment>overview.resume.drift.binding (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_drift_target" xml:space="preserve">
+    <value>来源运行的目标与本页当前绑定的目标不同。开始新运行前，请在工作区重新检查目标和输入。</value>
+    <comment>overview.resume.drift.target (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_drift_unknown" xml:space="preserve">
+    <value>来源运行未上报 binding revision，因此无法断言目标代次是否仍然一致。</value>
+    <comment>overview.resume.drift.unknown (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_effect" xml:space="preserve">
+    <value>效果</value>
+    <comment>overview.resume.effect (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_effect_unrecorded" xml:space="preserve">
+    <value>未记录</value>
+    <comment>overview.resume.effect.unrecorded (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_explanation" xml:space="preserve">
+    <value>可打开来源工作区，或为受支持的只读操作准备已记录的类型化参数。准备草稿不会提交 Job。目标与绑定必须一致，提交时 Runtime 会再次检查。</value>
+    <comment>overview.resume.explanation (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_gated" xml:space="preserve">
+    <value>该次运行的效果分级是 %@，因此继续会重新走该工作区的授权闸，而不是重复一个预填的请求。</value>
+    <comment>overview.resume.gated (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_loading" xml:space="preserve">
+    <value>正在读取来源运行的证据……</value>
+    <comment>overview.resume.loading (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_neverReplayed" xml:space="preserve">
+    <value>该次运行的外部效果未知。ArkDeck 永不重放未知的意图；请到 History 查看恢复证据。</value>
+    <comment>overview.resume.neverReplayed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_noParameters" xml:space="preserve">
+    <value>该次运行未上报 typed inputs。ArkDeck 不会用默认值补齐后声称这是同一组参数。</value>
+    <comment>overview.resume.noParameters (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_notRepeatable" xml:space="preserve">
+    <value>这次运行还没有结束，或者 Runtime 未记录它的效果分级。</value>
+    <comment>overview.resume.notRepeatable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_open" xml:space="preserve">
+    <value>打开工作区</value>
+    <comment>overview.resume.open (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_parameters" xml:space="preserve">
+    <value>参数 · 来自来源运行上报的 typed inputs</value>
+    <comment>overview.resume.parameters (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_parameters_note" xml:space="preserve">
+    <value>这些是历史记录值，仅“准备参数草稿”会带入。不会沿用历史授权、产物租约、标记时刻或 Runtime Session ID。</value>
+    <comment>overview.resume.parameters.note (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_prepare" xml:space="preserve">
+    <value>准备参数草稿</value>
+    <comment>overview.resume.prepare (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_prepare_unavailable" xml:space="preserve">
+    <value>此记录无法生成安全的类型化参数草稿</value>
+    <comment>overview.resume.prepare.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_source" xml:space="preserve">
+    <value>来源运行</value>
+    <comment>overview.resume.source (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_target" xml:space="preserve">
+    <value>目标</value>
+    <comment>overview.resume.target (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_thread" xml:space="preserve">
+    <value>调试线</value>
+    <comment>overview.resume.thread (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_resume_title" xml:space="preserve">
+    <value>再来一次</value>
+    <comment>overview.resume.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_overview_thread_less" xml:space="preserve">
+    <value>收起其他运行</value>
+    <comment>windows.overview.thread.less (Windows only)</comment>
+  </data>
+  <data name="windows_overview_resume_openRefused" xml:space="preserve">
+    <value>仅当运行可按记录重复时才提供“打开工作区”。</value>
+    <comment>windows.overview.resume.openRefused (Windows only)</comment>
+  </data>
+  <data name="windows_overview_resume_openUnknown" xml:space="preserve">
+    <value>此记录未说明由哪个工作区运行，因此不会打开工作区。</value>
+    <comment>windows.overview.resume.openUnknown (Windows only)</comment>
+  </data>
+  <data name="windows_overview_continuation_attempted" xml:space="preserve">
+    <value>此草稿已启动过一次，不会再次启动。</value>
+    <comment>windows.overview.continuation.attempted (Windows only)</comment>
+  </data>
 </root>
