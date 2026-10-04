@@ -3336,7 +3336,7 @@
       "feature": "runtime.bundle.remove",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

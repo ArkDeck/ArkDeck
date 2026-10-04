@@ -63,10 +63,10 @@ pub use registry::{decode_bundles, decode_tool_identity, decode_tools};
 // protocol, the frozen indexes' read, list, inspect and retirement, the
 // bundle references and the HDC selection ledger. What reads native content
 // is per platform: on macOS the Mach-O and Security checks of a retained HDC
-// or daemon Bundle; on Windows neither kind has a content policy, so a
-// retained record never verifies and registration refuses
-// (`windows_registration`: no Windows daemon-bundle form, and no Windows HDC
-// tuple is registered, CHG-2026-078).
+// or daemon Bundle; on Windows the release-candidate package tree of a daemon
+// Bundle, and no HDC content policy, so a retained HDC record never verifies
+// and HDC registration refuses (`windows_registration`: no Windows HDC tuple
+// is registered, CHG-2026-078).
 #[cfg(any(target_os = "macos", windows))]
 mod tool_content;
 #[cfg(target_os = "macos")]
@@ -102,7 +102,7 @@ pub use store::create_store;
 pub mod bundle_content;
 #[cfg(any(target_os = "macos", windows))]
 mod bundle_references;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod bundle_registration;
 #[cfg(any(target_os = "macos", windows))]
 mod bundle_registry_owner;

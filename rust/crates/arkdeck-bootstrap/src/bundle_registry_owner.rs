@@ -3,9 +3,9 @@
 //! owner's lock through its frozen snapshot pager and may initialize a
 //! genuinely empty registry. No content is selected or run.
 #[cfg(windows)]
-use crate::bundle_content::no_windows_bundle_policy as validate_production_daemon_bundle;
+use crate::bundle_content::validate_windows_daemon_package as validate_production_daemon_bundle;
 use crate::{
-    bundle_content::{BundleContent, verify_bundle_content},
+    bundle_content::{BundleContent, retained_name, verify_bundle_content},
     decode_bundles,
 };
 #[cfg(target_os = "macos")]
@@ -194,11 +194,15 @@ impl BundleRegistryReadStore {
                 .get("version")
                 .and_then(Value::as_str)
                 .map(str::to_owned),
+            signer: record
+                .get("signer")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         };
         // The strict decoder already proved the digest is exactly 64 hex
         // bytes. The content reader binds this root and every child inode.
         verify_bundle_content(
-            &self.path.join(format!("bundle-{}.app", measured.digest)),
+            &self.path.join(retained_name(&measured.digest)),
             &measured,
             &*self.validate,
         )
