@@ -2309,15 +2309,10 @@ impl HostServices for Host {
                                 "interactive HDC lifecycle execution is unavailable",
                             )
                         })?;
-                        // No tool-selection owner on Windows (its Bootstrap
-                        // selection is macOS-only).
-                        #[cfg(target_os = "macos")]
                         let drivers = (
                             driver as &dyn arkdeck_hoststore::HdcLifecycleDriver,
                             Some(driver as &dyn arkdeck_hoststore::ToolSelectionDriver),
                         );
-                        #[cfg(windows)]
-                        let drivers = (driver as &dyn arkdeck_hoststore::HdcLifecycleDriver, None);
                         controls
                             .consume_with_drivers(id, reference, response, jobs, source, drivers)
                     })
@@ -2386,10 +2381,11 @@ impl HostServices for Host {
     /// isolated composition makes — over the HDC control-action owner and the
     /// impact source of its managed HDC server, when it started one — or,
     /// without it, as Swift's handler answers with no control-action owner.
-    /// Production also composes the registered tool-selection owner. On
-    /// Windows no tool-selection owner is composed (no Windows HDC can be
-    /// registered while no Windows HDC tuple is, CHG-2026-078), and the HDC
-    /// control-action owner only beside a registered tuple's managed server.
+    /// Production also composes the registered tool-selection owner, and so
+    /// does the Windows account daemon beside the managed server it starts
+    /// from its Bootstrap selection (`windows_lifecycle`); on Windows the HDC
+    /// control-action owner is composed only beside a registered tuple's
+    /// managed server.
     #[cfg(any(target_os = "macos", windows))]
     fn control_action(
         &self,

@@ -7,6 +7,11 @@ use arkdeck_bootstrap::{
 };
 use arkdeck_platform::HostDirectory;
 
+/// The platform a registered tool's row names on this host: a selection
+/// reads only this host's registrations (the Windows store records
+/// `windows`, the macOS one `macos`).
+pub(crate) const HOST_TOOL_PLATFORM: &str = if cfg!(windows) { "windows" } else { "macos" };
+
 /// The existing bootstrap ledger, separated for deterministic failure fixtures.
 pub trait ToolSelectionRegistry: Send + Sync {
     fn candidate(
@@ -84,7 +89,7 @@ impl ToolFacts {
         };
         if source["schemaVersion"] != "arkdeck.runtime-tool/1"
             || source["kind"] != "hdc"
-            || source["platform"] != "macos"
+            || source["platform"] != HOST_TOOL_PLATFORM
             || trust["registeredIdentity"] != true
             || trust["policy"] != "arkdeck.host-tool-inspection/1"
             || !trust["toolVersion"].is_string()
