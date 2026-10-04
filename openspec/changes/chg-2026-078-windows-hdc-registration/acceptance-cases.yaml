@@ -1,7 +1,7 @@
 ---
 schema_version: 1.0.0
 change_id: CHG-2026-078-windows-hdc-registration
-change_revision: 1
+change_revision: 2
 platform: windows
 evidence_classes:
 - contract
@@ -37,3 +37,26 @@ cases:
     No connect key, USB serial, user path, account or machine name, other USB device identity,
     or hash of key-bearing raw bytes appears in any committed file; keys and serials are
     same-length placeholders and every other output byte is unchanged.
+- acceptance_id: WHR-OBSERVATION-001
+  test_id: TEST-WHR-OBSERVATION-001
+  method: Classification of the registered c2 list targets -v fixtures plus negative row vectors.
+  expected_source: openspec/changes/chg-2026-078-windows-hdc-registration/verification.md#WHR-OBSERVATION-001
+  minimum_evidence: contract
+  expected_result: >-
+    Only USB rows are device observations. The sampled UART rows (COM<n>, empty name, UART, Ready,
+    unknown..., hdc) are excluded, so the UART-only fixture and the removed-board fixture are
+    observedEmpty and the connected fixture is one device. A 5-column row, a sixth column other
+    than hdc, any other UART form, an unknown literal, a residual CR, the [Empty] marker or
+    zero-byte stdout make the snapshot unknown. checkserver is never dispatched.
+- acceptance_id: WHR-CENSUS-001
+  test_id: TEST-WHR-CENSUS-001
+  method: TASK-XPA-004 Windows census tests over synthetic PnP nodes shaped like the sanitized
+    2026-10-04 USB sample.
+  expected_source: openspec/changes/chg-2026-078-windows-hdc-registration/verification.md#WHR-CENSUS-001
+  minimum_evidence: contract
+  expected_result: >-
+    A present device-level node with an upper-case serial suffix relates to the lower-case HDC
+    connect key after the registered ASCII-lowercase fold. A port-derived suffix and a phantom
+    node yield no identity. An attachment is the pair (instance ID, LastArrivalDate), and a new
+    arrival is a new attachment. Topology is compared only within one attachment and never
+    enters the long-term identity.
