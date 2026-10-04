@@ -941,6 +941,19 @@ fn main() {
         if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
             std::process::exit(crash_ledger_analyzer::run(&arguments));
         }
+        // The code-owned grep, sed and patch a Windows workspace profile
+        // pins (TASK-XPA-011): this image is each of them.
+        if first.is_some_and(|argument| argument == arkdeck_hoststore::WORKSPACE_TOOL_FLAG) {
+            let Some(arguments) = arguments[1..]
+                .iter()
+                .map(|argument| argument.to_str().map(str::to_owned))
+                .collect::<Option<Vec<String>>>()
+            else {
+                eprintln!("arkdeck-agentd: a workspace tool argument is not text");
+                std::process::exit(2);
+            };
+            std::process::exit(arkdeck_hoststore::workspace_tool_main(&arguments));
+        }
     }
     if let Err(error) = serve() {
         eprintln!("arkdeck-agentd: {error}");
