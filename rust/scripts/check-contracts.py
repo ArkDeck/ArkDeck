@@ -197,7 +197,15 @@ def commands(view: Path, output: Path, *, owners: bool = False,
             # can check. Repeating the lane's lint and workspace tests here
             # cost about 15 minutes on Windows (#2545, run 37224202133: the
             # candidate's workspace tests ran out the job's 40 minutes).
-            native = [(["cargo", "test", "--package", "arkdeck-contract",
+            #
+            # arkdeck-cli's process tests launch the workspace's binaries
+            # beside the CLI (`arkdeck-agentd`, the code-sign helper, ...),
+            # which `cargo test -p arkdeck-cli` does not build: they are built
+            # first, in this view's own target, so no binary of a cached or
+            # other build answers with another contract's digest (#2548's
+            # regression: windows_signed_runtime read a stale daemon).
+            native = [(["cargo", "build", "--workspace", "--bins", "--locked"], rust),
+                      (["cargo", "test", "--package", "arkdeck-contract",
                         "--package", "arkdeck-cli", "--locked"], rust)]
     else:
         native = [
