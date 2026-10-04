@@ -1040,7 +1040,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.preview (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_productionBoundary" xml:space="preserve">
-    <value>Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.</value>
+    <value>Each Job deploys one signed app-owned .so through the published operation. Queues run these Jobs serially, stopping on failure or uncertainty. ELF, ABI, Build ID, hash, backup and readback checks still apply. .abc replacement and standalone device restart remain unavailable.</value>
     <comment>debug.artifacts.productionBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_remoteBindingFailed" xml:space="preserve">
@@ -1184,7 +1184,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.sheet.warning (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_detail" xml:space="preserve">
-    <value>Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.</value>
+    <value>Choose signed app-owned libraries from local files, folders, mounted SMB shares or a verified SSH build source. Only selected bytes enter Artifact import.</value>
     <comment>debug.artifacts.source.detail (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_kind" xml:space="preserve">
@@ -1204,7 +1204,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.source.title (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_sourceBoundary" xml:space="preserve">
-    <value>SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.</value>
+    <value>Folder access uses the file-picker grant. SMB shares must already be mounted in Finder. SSH, including WSL, stays read-only within the saved root and pins the host key.</value>
     <comment>debug.artifacts.sourceBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_target" xml:space="preserve">

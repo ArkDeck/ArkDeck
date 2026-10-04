@@ -1040,7 +1040,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.preview (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_productionBoundary" xml:space="preserve">
-    <value>当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。</value>
+    <value>每个 Job 通过已发布 operation 部署一个已签名 app-owned .so；队列串行运行，失败或结果不确定时停止。仍执行 ELF、ABI、Build ID、hash、备份与读取验证。.abc 替换和独立设备重启仍不可用。</value>
     <comment>debug.artifacts.productionBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_remoteBindingFailed" xml:space="preserve">
@@ -1184,7 +1184,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.sheet.warning (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_detail" xml:space="preserve">
-    <value>从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。</value>
+    <value>从本地文件、文件夹、已挂载 SMB 共享或已验证 SSH 构建源选择已签名的 app-owned 动态库；只有所选字节进入 Artifact 导入。</value>
     <comment>debug.artifacts.source.detail (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_kind" xml:space="preserve">
@@ -1204,7 +1204,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.source.title (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_sourceBoundary" xml:space="preserve">
-    <value>SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。</value>
+    <value>文件夹访问使用文件选择器授权；SMB 共享需先在 Finder 挂载。SSH（包括 WSL）在已保存根目录内只读访问，并固定主机密钥。</value>
     <comment>debug.artifacts.sourceBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_target" xml:space="preserve">

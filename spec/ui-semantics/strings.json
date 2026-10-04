@@ -1551,8 +1551,8 @@
     {
       "key": "debug.artifacts.productionBoundary",
       "table": "DebugLocalizable",
-      "en": "Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.",
-      "zh-Hans": "当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。"
+      "en": "Each Job deploys one signed app-owned .so through the published operation. Queues run these Jobs serially, stopping on failure or uncertainty. ELF, ABI, Build ID, hash, backup and readback checks still apply. .abc replacement and standalone device restart remain unavailable.",
+      "zh-Hans": "每个 Job 通过已发布 operation 部署一个已签名 app-owned .so；队列串行运行，失败或结果不确定时停止。仍执行 ELF、ABI、Build ID、hash、备份与读取验证。.abc 替换和独立设备重启仍不可用。"
     },
     {
       "key": "debug.artifacts.remoteBindingFailed",
@@ -1767,8 +1767,8 @@
     {
       "key": "debug.artifacts.source.detail",
       "table": "DebugLocalizable",
-      "en": "Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.",
-      "zh-Hans": "从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。"
+      "en": "Choose signed app-owned libraries from local files, folders, mounted SMB shares or a verified SSH build source. Only selected bytes enter Artifact import.",
+      "zh-Hans": "从本地文件、文件夹、已挂载 SMB 共享或已验证 SSH 构建源选择已签名的 app-owned 动态库；只有所选字节进入 Artifact 导入。"
     },
     {
       "key": "debug.artifacts.source.kind",
@@ -1797,8 +1797,8 @@
     {
       "key": "debug.artifacts.sourceBoundary",
       "table": "DebugLocalizable",
-      "en": "SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.",
-      "zh-Hans": "SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。"
+      "en": "Folder access uses the file-picker grant. SMB shares must already be mounted in Finder. SSH, including WSL, stays read-only within the saved root and pins the host key.",
+      "zh-Hans": "文件夹访问使用文件选择器授权；SMB 共享需先在 Finder 挂载。SSH（包括 WSL）在已保存根目录内只读访问，并固定主机密钥。"
     },
     {
       "key": "debug.artifacts.target",
