@@ -22,6 +22,11 @@ GENERATOR = "scripts/gj_record"
 JOURNEYS = ("GJ-1", "GJ-2", "GJ-3", "GJ-4", "GJ-5")
 # The runbook's pinned GJ-4 input, OpenHarmony-7.0.0.37 (SHA-256 4fd35765…c674).
 GJ4_FIRMWARE = "OpenHarmony-7.0.0.37"
+# The GJ-3 rollback fixture the macOS rounds published and pinned
+# (`libarkdeck_gj-rollback-ghost.signed.so`, an armeabi-v7a library whose
+# DT_NEEDED cannot resolve; TASK-XPA-003 run.md). Another fixture is a reviewed
+# change here, never a value typed at assembly.
+ROLLBACK_FIXTURE_SHA256 = "260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a"
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SAFE_RAW = re.compile(r"^[A-Za-z0-9._:@+\- ]{0,120}$")
 
@@ -145,7 +150,7 @@ def _journey(name: str, run: Run, date: str, facts: dict, revision: str, digest:
     elif name == "GJ-2":
         journeys.gj2(context)
     elif name == "GJ-3":
-        journeys.gj3(context)
+        journeys.gj3(context, ROLLBACK_FIXTURE_SHA256)
     elif name == "GJ-4":
         journeys.gj4(context, GJ4_FIRMWARE)
     else:

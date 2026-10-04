@@ -550,22 +550,38 @@ Never:
   for it; `ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER` is refused.
 - **Inputs (maintainer supplies):**
   - the signed `armeabi-v7a` `.so`, `targetBundle` and `libraryLogicalName`;
-  - **the rollback fixture**: the signed fixture checked for the current target. The macOS round
-    pinned SHA-256 `260a533a…6d3a` (`runs/TASK-XPA-003/run.md`); the agent records its digest and
-    checks the ABI before use.
+  - **the rollback fixture**: the signed fixture the macOS rounds pinned, SHA-256 `260a533a…6d3a`
+    (`runs/TASK-XPA-003/run.md`; `ROLLBACK_FIXTURE_SHA256` in `scripts/gj_record/record.py`).
 - **Agent:**
   1. Headless runbook §4: `artifact import native-library`, `gj3.json`,
      `agent run --operation deploy.native-library.app-owned@1`, `job wait`, `job evidence`.
-  2. The rollback leg, as a separate execution with the rollback fixture.
+  2. The rollback leg, as a separate execution with the rollback fixture:
+     1. `artifact import native-library --import-request-id gj3-<d>-fixture --target <TGT>
+        --file $out\inputs\<fixture>.so`.
+     2. `artifact import inspect --import-request-id gj3-<d>-fixture`.
+     3. `agent run --operation deploy.native-library.app-owned@1 --inputs-file
+        gj3-rollback.json --execution-id gj3-<d>-rollback` with that import's lease.
+     4. `job show` and `job result`.
+  3. **The fixture check (G3).** `gj_record assemble` applies it to the outputs of steps 1–2. The
+     fixture applies to the current Target only when all of these hold:
+     - the import is the pinned digest;
+     - it was imported for this Target at the forward leg's binding revision;
+     - the Runtime's ELF validation of it names a build ID;
+     - its ABI is the ABI the forward leg's library was verified loaded under
+       (`verification-report.json`'s `abi`);
+     - the rollback Job consumed exactly that import's lease;
+     - the rollback Job got past `atomic-publish` before it rolled back.
+
+     A fixture refused at admission, for example on ABI, proves only that refusal. Without an
+     applicable fixture the rollback leg stays unverified and the row is not
+     `REAL_DEVICE_PASS`.
 - **Authority:** `deviceMutation`, a Runtime-issued capability as in GJ-2.
 - **Destructive:** no (app-owned library). The rollback leg is a device mutation that the
   Runtime itself reverts.
 - **Software readiness:** 40/40 exchanges and 225 HDC calls replayed end to end (#2505).
 - **Blocking gaps:**
   - G1.
-  - G3: no Windows tooling checks the rollback fixture's applicability to the current target. The
-    agent does it by hand from `artifact import inspect` and the target's ABI. Without an
-    applicable fixture the rollback leg stays unverified, as the headless runbook says.
+  - G3 is closed: `gj_record` checks the fixture's applicability (step 3 above).
 
 ### 4.4 GJ-4 Flash Recovery (WIN-GJ4-001) — **destructive**
 
@@ -712,7 +728,7 @@ Never:
 | --- | --- | --- | --- |
 | G1 | The account daemon does not select and start the registered `c2` HDC (the Windows tool-selection owner); only a development root composes the managed HDC, and it holds no mutation authority | WIN-GJ1..5 | tool-selection port, in flight |
 | G2 | `observe.device@1` and `capture.diagnostics@1` not yet run once against the real `hdc.exe` (fake only; `probeHDCServer` lowered to the commandless observation, #2509) | WIN-GJ1 (risk, not a stop) | first rehearsal after G1 |
-| G3 | No tooling checks the native rollback fixture's applicability to the current target | WIN-GJ3 rollback leg | agent at run time; tooling optional |
+| G3 | **Closed** by `scripts/gj_record`: the rollback fixture's pinned digest, Target, binding revision, ABI and lease are checked against the current Target (§4.3 step 3) | none | done |
 | G4 | `flash install-binding` is macOS-only | WIN-GJ4 first takeover | TASK-XPA-010 |
 | G5 | AF-W1 (ArkForge Windows acceptance) | WIN-GJ4 | external, maintainer |
 | G6 | `flash device-access`, `lane-preview`, `bind-loader` not measured through the CLI on Windows | WIN-GJ4 (risk) | TASK-XPA-010 |
@@ -726,7 +742,7 @@ Never:
 | --- | --- | --- | --- | --- |
 | WIN-GJ1-001 | candidates and adopt live on a development root; observe and capture on the fake (#2518) | G1 (G2 risk) | board window; unplug and replug | no |
 | WIN-GJ2-001 | full oracle replay end to end (#2505) | G1 | device window; HAP input | no (device mutation) |
-| WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged | G1, G3 | device window; `.so` and rollback fixture | no (device mutation) |
+| WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged | G1 | device window; `.so` and rollback fixture | no (device mutation) |
 | WIN-GJ4-001 | lane, plan, run, reconcile on fakes (#2504); broker (#2519) | G1, G4, G5, G6 | HardwareCampaign go; ArkForge bundle; image archive | **yes** (`flash.full-restore@1`) |
 | WIN-GJ5-001 | reads, isolate, sweep measured; sign replayed; patch (#2506) and registered signing (#2508) in flight | G1, G7 | DevEco install; signing install from the build profile; inputs | no (device mutation) |
 
@@ -805,7 +821,7 @@ Nothing flips on hosted CI, fixtures or plan-only runs (AGENTS.md "什么不算�
 | 3 | §1.2 dev MSIX publisher, §3 SPK-3 rows 1–5 | open (maintainer) | certificate creation, second account, elevated terminal, second host |
 | 4 | G1: the account daemon selects and starts the registered HDC | in flight (agents) | the Windows tool-selection port |
 | 5 | §4.1 GJ-1, §3 row 6 | blocked | step 4 |
-| 6 | §4.2 GJ-2, §4.3 GJ-3 | blocked | step 4 (GJ-3 also G3) |
+| 6 | §4.2 GJ-2, §4.3 GJ-3 | blocked | step 4 |
 | 7 | §4.5 GJ-5 | blocked | step 4, G7 (agents) |
 | 8 | §1.3 production signing | open (maintainer) | Artifact Signing account |
 | 9 | §4.4 GJ-4 | blocked | step 4, G4 (agents), G5 AF-W1, the maintainer's HardwareCampaign go |

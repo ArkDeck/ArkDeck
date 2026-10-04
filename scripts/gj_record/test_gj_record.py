@@ -178,7 +178,7 @@ class Journal:
         }
 
     def job(self, execution, operation, artifacts, *, terminal="succeeded", timeline=None, kinds=None,
-            observation=None, read=True, corrupt=None, settle=True, target=True):
+            observation=None, read=True, corrupt=None, settle=True, target=True, inputs=None):
         job = f"job-{sha(execution.encode())[:32]}"
         evidence = self.evidence(job, operation, terminal, kinds, **(observation or {}))
         state = "completed" if terminal == "succeeded" else "failed"
@@ -203,6 +203,7 @@ class Journal:
         if timeline is not None:
             self.ok("job.show", ["job", "show", "--job", job], {
                 "job": {"jobId": job}, "catalogDigest": self.digest, "actualStepKinds": kinds,
+                "request": {"inputs": inputs or {}},
                 "timeline": {"kind": "inline", "entries": timeline}})
         if read:
             for row, (name, data) in zip(rows, artifacts.items()):
@@ -447,7 +448,8 @@ class LaterJourneyTests(Case):
         self.assertEqual(journey["state"], DEFECT)
         self.assertEqual(journey["firstFailingCriterion"]["criterion"], f"gj2-{D}: send-hap verified")
 
-    def test_gj3_needs_the_loader_verification_and_a_real_rollback(self):
+    def gj3(self, *, fixture_abi="armeabi-v7a", fixture_sha256=record.ROLLBACK_FIXTURE_SHA256,
+            fixture=True, published=True, lease="lease-fixture"):
         self.journal.facts()
         forward = [
             "verify-elf-locally abi=armeabi-v7a buildId=ab sha256=" + "1" * 64,
@@ -461,14 +463,56 @@ class LaterJourneyTests(Case):
             'verified verify-loaded-library ["abi", "loaderVerified", "publishedSha256"]',
         ]
         self.journal.job(f"gj3-{D}", "deploy.native-library.app-owned@1", {
-            "publish-report.json": b"{}", "verification-report.json": b'{"loaderVerified": "true"}'},
+            "publish-report.json": b"{}",
+            "verification-report.json": b'{"loaderVerified": "true", "abi": "armeabi-v7a"}'},
             timeline=forward)
-        self.journal.job(f"gj3-{D}-rollback", "deploy.native-library.app-owned@1", {}, terminal="failed", timeline=[
+        if fixture:
+            self.journal.ok("artifact.import.inspect", ["artifact", "import", "inspect", "--import-request-id",
+                                                        f"gj3-{D}-fixture"], {
+                "importRequestId": f"gj3-{D}-fixture", "state": "committed",
+                "metadata": {"sha256": fixture_sha256, "targetId": TARGET, "bindingRevision": "1",
+                             "kind": "native-library", "name": "libarkdeck_gj-rollback-ghost.signed.so"},
+                "receipt": {"lease": "lease-fixture", "validation": {
+                    "kind": "nativeLibrary", "abi": fixture_abi, "buildId": "ba7d", "elfClassBits": 32}}})
+        rollback = [
+            'verified atomic-publish ["buildId", "publishedSha256"]',
+            "failed start-target: nativeTargetNotRunning: did not start",
             'verified rollback-native-library ["processIds", "restored", "restoredSha256"]',
             "native deployment failure restored previous library",
-        ])
-        journey = self.journey(self.assemble(names=("GJ-3",)), "GJ-3")
+        ]
+        if not published:
+            rollback = rollback[1:]
+        self.journal.job(f"gj3-{D}-rollback", "deploy.native-library.app-owned@1", {}, terminal="failed",
+                         timeline=rollback, inputs={"libraryArtifactLease": lease})
+        return self.journey(self.assemble(names=("GJ-3",)), "GJ-3")
+
+    def test_gj3_needs_the_loader_verification_and_a_real_rollback(self):
+        journey = self.gj3()
         self.assertEqual(journey["state"], PASS, journey.get("firstFailingCriterion"))
+        held = {c["criterion"] for c in journey["criteria"]}
+        self.assertIn(f"gj3-{D}-rollback: fixture ABI is the Target's loaded ABI", held)
+
+    def test_g3_a_fixture_for_another_abi_does_not_apply(self):
+        failing = self.gj3(fixture_abi="arm64-v8a")["firstFailingCriterion"]
+        self.assertEqual(failing["criterion"], f"gj3-{D}-rollback: fixture ABI is the Target's loaded ABI")
+        self.assertEqual(failing["raw"], "arm64-v8a")
+
+    def test_g3_a_fixture_other_than_the_pinned_one_does_not_apply(self):
+        failing = self.gj3(fixture_sha256="0" * 64)["firstFailingCriterion"]
+        self.assertEqual(failing["criterion"], f"gj3-{D}-rollback: fixture is the pinned rollback fixture")
+
+    def test_g3_a_rollback_that_did_not_consume_the_fixture_does_not_count(self):
+        failing = self.gj3(lease="lease-other")["firstFailingCriterion"]
+        self.assertEqual(failing["criterion"], f"gj3-{D}-rollback: the rollback Job consumed the fixture's lease")
+
+    def test_g3_without_the_fixture_import_the_rollback_leg_is_unverified(self):
+        journey = self.gj3(fixture=False)
+        self.assertEqual(journey["state"], INCOMPLETE)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"], f"gj3-{D}-rollback: fixture import")
+
+    def test_g3_a_failure_before_publication_is_not_a_rollback(self):
+        failing = self.gj3(published=False)["firstFailingCriterion"]
+        self.assertEqual(failing["criterion"], f"gj3-{D}-rollback: atomic-publish verified")
 
     def test_gj4_reads_the_step_kinds_and_the_machine_readback(self):
         self.journal.facts()

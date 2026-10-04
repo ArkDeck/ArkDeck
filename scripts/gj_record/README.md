@@ -47,7 +47,7 @@ Executions are found by the IDs the runbook gives them. `<d>` is the record date
 | --- | --- |
 | GJ-1 | `gj1-<d>` observe; `gj1-<d>-capture`; `gj1-<d>-har` (no `--target`) |
 | GJ-2 | `gj2-<d>` `debug.hap@1`; `gj2-<d>-capture` app-scoped `capture.diagnostics@1` with HiLog, UI Dump and Trace |
-| GJ-3 | `gj3-<d>` deploy; `gj3-<d>-rollback` with the rollback fixture |
+| GJ-3 | `gj3-<d>` deploy; the fixture import `gj3-<d>-fixture` (`artifact import inspect`); `gj3-<d>-rollback` with that import's lease |
 | GJ-4 | `gj4-<d>` `flash.full-restore@1`; `gj4-<d>-postflight` observe |
 | GJ-5 | `gj5-<d>-baseline`, `-repro`, `-repro-capture`, `-analyze`, `-isolate`, `-patch`, `-build`, `-sign`, `-verify`, `-verify-capture` and `-negative` |
 
@@ -128,6 +128,16 @@ publish, the criterion reads the execution that does. The criterion itself is ne
   composed them.
 - **GJ-5.** Liveness and the crash index come from `-repro-capture` and `-verify-capture`.
   "Exactly one new crash-index entry" is counted against `-baseline`.
+- **GJ-3 rollback fixture (G3).** The fixture applies to the current Target only when all of
+  these hold:
+  - its import is the pinned digest (`ROLLBACK_FIXTURE_SHA256`);
+  - it was imported for this Target at the forward leg's binding revision;
+  - the Runtime's ELF validation names a build ID;
+  - its ABI is the forward leg's verified loaded ABI;
+  - the rollback Job consumed that import's lease;
+  - the rollback Job reached `atomic-publish`.
+
+  A different fixture is a reviewed change to the pin, not an assembly option.
 - **Per-step verification.** It is read from the `job show` timeline (`verified <step> [keys]`,
   `dispatched <step>; awaiting readback`), the only place the Runtime publishes it.
 
