@@ -1271,6 +1271,17 @@ public static class UiStrings
     public const string HistoryContextOperation = "history.context.operation";
     public const string HistoryContextState = "history.context.state";
     public const string HistoryContextArtifacts = "history.context.artifacts";
+    public const string JobRecoveryActionOpenHistory = "jobRecovery.action.openHistory";
+    public const string JobRecoveryCount = "jobRecovery.count";
+    public const string JobRecoveryList = "jobRecovery.list";
+    public const string JobRecoveryArchivePendingGuidance = "jobRecovery.archivePending.guidance";
+    public const string JobRecoveryArchivePendingTitle = "jobRecovery.archivePending.title";
+    public const string JobRecoveryOutcomeUnknownGuidance = "jobRecovery.outcomeUnknown.guidance";
+    public const string JobRecoveryOutcomeUnknownTitle = "jobRecovery.outcomeUnknown.title";
+    public const string JobRecoveryResumeSafeGuidance = "jobRecovery.resumeSafe.guidance";
+    public const string JobRecoveryResumeSafeTitle = "jobRecovery.resumeSafe.title";
+    public const string JobRecoveryWaitingGuidance = "jobRecovery.waiting.guidance";
+    public const string JobRecoveryWaitingTitle = "jobRecovery.waiting.title";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2538,5 +2549,16 @@ public static class UiStrings
         HistoryContextOperation,
         HistoryContextState,
         HistoryContextArtifacts,
+        JobRecoveryActionOpenHistory,
+        JobRecoveryCount,
+        JobRecoveryList,
+        JobRecoveryArchivePendingGuidance,
+        JobRecoveryArchivePendingTitle,
+        JobRecoveryOutcomeUnknownGuidance,
+        JobRecoveryOutcomeUnknownTitle,
+        JobRecoveryResumeSafeGuidance,
+        JobRecoveryResumeSafeTitle,
+        JobRecoveryWaitingGuidance,
+        JobRecoveryWaitingTitle,
     ];
 }

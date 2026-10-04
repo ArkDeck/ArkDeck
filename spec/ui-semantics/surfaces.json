@@ -770,6 +770,18 @@
         {"automationId": "settings.remoteSources.security.readOnly", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.security.readOnly"]},
         {"automationId": "settings.remoteSources.client", "origin": "windows", "role": "text", "name": ["@windows.remoteSources.client"]}
       ]
+    },
+    {
+      "id": "jobRecovery.recovery",
+      "scenario": "recovery",
+      "page": "overview",
+      "elements": [
+        {"automationId": "jobRecovery.count", "origin": "macos", "role": "text", "name": [{"format": "jobRecovery.count", "args": ["2"]}]},
+        {"automationId": "jobRecovery.title.job-0000000000000000000000000000a0f1", "origin": "macos", "role": "text", "name": ["@jobRecovery.waiting.title"]},
+        {"automationId": "jobRecovery.guidance.job-0000000000000000000000000000a0f1", "origin": "macos", "role": "text", "name": ["@jobRecovery.waiting.guidance"]},
+        {"automationId": "jobRecovery.title.job-0000000000000000000000000000a0f2", "origin": "macos", "role": "text", "name": ["@jobRecovery.resumeSafe.title"]},
+        {"automationId": "jobRecovery.openHistory.job-0000000000000000000000000000a0f1", "origin": "macos", "role": "button", "name": ["@jobRecovery.action.openHistory"], "match": "prefix"}
+      ]
     }
   ]
 }

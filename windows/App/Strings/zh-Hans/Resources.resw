@@ -5066,4 +5066,48 @@ SHA-256：%4$@</value>
     <value>Artifacts</value>
     <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_action_openHistory" xml:space="preserve">
+    <value>在历史记录中检查</value>
+    <comment>jobRecovery.action.openHistory (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_count" xml:space="preserve">
+    <value>%d 条记录待检查</value>
+    <comment>jobRecovery.count (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_list" xml:space="preserve">
+    <value>恢复记录</value>
+    <comment>jobRecovery.list (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_guidance" xml:space="preserve">
+    <value>Runtime 正在等待安全边界，之后才能完成恢复记录；此 App 不能强制停止当前步骤。</value>
+    <comment>jobRecovery.archivePending.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_title" xml:space="preserve">
+    <value>恢复归档正在等待</value>
+    <comment>jobRecovery.archivePending.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_guidance" xml:space="preserve">
+    <value>条件允许时请保持设备状态不变。在通过已批准的 Runtime 路径核对未决影响前，不要开始其他设备操作。</value>
+    <comment>jobRecovery.outcomeUnknown.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_title" xml:space="preserve">
+    <value>设备影响未知</value>
+    <comment>jobRecovery.outcomeUnknown.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_guidance" xml:space="preserve">
+    <value>Runtime 已记录确认过的安全边界。请先检查记录，再通过已批准的 Runtime 路径恢复。</value>
+    <comment>jobRecovery.resumeSafe.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_title" xml:space="preserve">
+    <value>已有安全恢复边界</value>
+    <comment>jobRecovery.resumeSafe.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_guidance" xml:space="preserve">
+    <value>请保持设备当前状态不变，并在 Runtime 记录中检查所需的恢复步骤。</value>
+    <comment>jobRecovery.waiting.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_title" xml:space="preserve">
+    <value>恢复正在等待</value>
+    <comment>jobRecovery.waiting.title (JobsLocalizable.xcstrings)</comment>
+  </data>
 </root>

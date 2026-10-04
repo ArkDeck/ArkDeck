@@ -163,6 +163,47 @@ public sealed partial class MainWindow : Window
         NavView.SelectedItem = NavOverview;
     }
 
+    private string _recoveryShown = "";
+
+    /// <summary>The macOS global Job recovery banner (<c>GlobalRecoveryBannerView</c>), from the
+    /// Jobs the Job Inspector read: one card per record that needs a person now (its kind in words,
+    /// its guidance, Job and Target, and Open in History), the count when there are several; gone
+    /// when none does. A change is announced.</summary>
+    public void ShowJobRecovery(IReadOnlyList<JobSummary>? jobs)
+    {
+        var recovery = JobRecovery.Ordered(jobs ?? []);
+        var key = string.Join(",", recovery.Select(j => j.JobId + ":" + JobRecovery.TitleKey(j)));
+        if (key == _recoveryShown) return;
+        _recoveryShown = key;
+        if (recovery.Count == 0)
+        {
+            JobRecoveryHost.Content = null;
+            JobRecoveryHost.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var list = Ui.Stack(6);
+        list.Padding = new Thickness(16, 8, 16, 8);
+        AutomationProperties.SetName(JobRecoveryHost, S.Text(UiStrings.JobRecoveryList));
+        if (recovery.Count > 1) list.Children.Add(Ui.Text("jobRecovery.count", S.Format(UiStrings.JobRecoveryCount, recovery.Count), "ArkDeckCaptionStyle"));
+        TextBlock? first = null;
+        foreach (var job in recovery)
+        {
+            var title = Ui.Text("jobRecovery.title." + job.JobId, S.Text(JobRecovery.TitleKey(job)), "ArkDeckSectionTitleStyle");
+            first ??= title;
+            var id = Ui.Text("jobRecovery.job." + job.JobId, $"{job.JobId} · {job.TargetId}", "ArkDeckMonoStyle");
+            id.IsTextSelectionEnabled = true;
+            var open = Ui.Button("jobRecovery.openHistory." + job.JobId, S.Text(UiStrings.JobRecoveryActionOpenHistory), async (_, _) => await OpenJobAsync(job.JobId));
+            AutomationProperties.SetName(open, $"{S.Text(UiStrings.JobRecoveryActionOpenHistory)}: {job.JobId}");
+            list.Children.Add(Ui.Card(Ui.Stack(4, title,
+                Ui.Text("jobRecovery.guidance." + job.JobId, S.Text(JobRecovery.GuidanceKey(job))),
+                id, Ui.Row(open)), "jobRecovery.banner"));
+        }
+        JobRecoveryHost.Content = list;
+        JobRecoveryHost.Visibility = Visibility.Visible;
+        AutomationProperties.SetLiveSetting(first!, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
+        first!.DispatcherQueue.TryEnqueue(() => Ui.Announce(first));
+    }
+
     private void ShowBanner(ControlFailure failure)
     {
         var banner = RecoveryBannerState.For(failure, S);

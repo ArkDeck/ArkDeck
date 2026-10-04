@@ -198,6 +198,11 @@ first, `ControlResult` back.
   adopted is said to be missing), Device (its Target selected) and Diagnostics. The workspace shows
   the record's read-only context (Job, Target, operation, state, Artifacts) until dismissed;
   nothing is submitted or replayed.
+- **Job recovery banner (TASK-XPA-020).** The macOS global banner above every page: each record
+  the Job Inspector's `job.list` shows needing a person now (an unknown outcome, a person's action,
+  waiting for recovery or a rebind confirmation, a resume at a confirmed safe boundary, an archive)
+  unless the Runtime established a later epoch for it — most urgent first, its kind and guidance,
+  Job and Target, and Open in History; the count when there are several. A change is announced.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for
