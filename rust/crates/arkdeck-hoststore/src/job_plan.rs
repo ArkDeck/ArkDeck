@@ -38,6 +38,8 @@ mod debug_hap_plan;
 #[cfg(any(target_os = "macos", windows))]
 #[path = "flash_plan.rs"]
 mod flash_plan;
+#[path = "keyboard_plan.rs"]
+mod keyboard_plan;
 #[path = "native_library_plan.rs"]
 mod native_library_plan;
 #[path = "screen_sequence_plan.rs"]
@@ -66,7 +68,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 29] = [
+const MATERIALIZED: [&str; 30] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -74,6 +76,7 @@ const MATERIALIZED: [&str; 29] = [
     "observe.device@1",
     "debug.template@1",
     "capture.diagnostics@1",
+    "input.keyboard@1",
     device_steps::DIAGNOSTIC_SESSION,
     "input.tap@1",
     "input.long-press@1",
@@ -685,6 +688,9 @@ impl<'a> JobPlanner<'a> {
         }
         // A native deployment binds its leased library, verified as the
         // expected ABI's code-signed ELF, whose facts name its capability.
+        if reference == "input.keyboard@1" {
+            return self.materialize_keyboard(request, descriptor, &facts);
+        }
         if reference == device_steps::NATIVE {
             return self.materialize_native(request, descriptor, &facts);
         }

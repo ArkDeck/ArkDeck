@@ -87,9 +87,10 @@ pub(crate) fn kind(text: &str) -> Option<Kind> {
         ("ArkDeckApp.DebugWorkspace.Commands", "debug.template") => Kind::Template,
         ("ArkDeckApp.Toolkit.DeviceControl", "capture.diagnostics") => Kind::Screenshot,
         ("ArkDeckApp.Toolkit.DeviceControl", "capture.screen-sequence") => Kind::Recording,
-        ("ArkDeckApp.Toolkit.DeviceControl", "input.tap" | "input.long-press" | "input.swipe") => {
-            Kind::Input
-        }
+        (
+            "ArkDeckApp.Toolkit.DeviceControl",
+            "input.keyboard" | "input.tap" | "input.long-press" | "input.swipe",
+        ) => Kind::Input,
         _ => return None,
     })
 }

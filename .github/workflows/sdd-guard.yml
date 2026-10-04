@@ -74,6 +74,13 @@ jobs:
         working-directory: scripts
         run: python3 -m unittest discover -s host_loop -t .
 
+      # The Golden Journey record generator judges REAL_DEVICE_PASS; its
+      # refusals (fake, plan-only, development root, stale Catalog, unredacted
+      # literals) are what keep a record honest, so they run on every PR.
+      - name: Golden Journey record generator tests
+        working-directory: scripts
+        run: python3 -m unittest discover -s gj_record -t .
+
   # @arkdeck/ds encodes the design language defined by docs/design/*. Nothing
   # generates it, so the two drift by hand — and once already did, silently: the
   # library shipped v0.2's palette while main had moved to v0.3, and it surfaced

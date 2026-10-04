@@ -183,6 +183,7 @@ fn typed_app_pairs_are_closed_and_bad_authority_never_reaches_control() {
                 "input.tap",
                 "input.long-press",
                 "input.swipe",
+                "input.keyboard",
             ],
         ),
         ("ArkDeckApp.FlashWorkspace", vec!["flash.full-restore"]),

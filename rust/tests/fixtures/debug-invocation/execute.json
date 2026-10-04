@@ -2,7 +2,7 @@
   "answer" : {
     "ok" : true,
     "result" : {
-      "baselineMaterializedPlanDigest" : "4d69cf96eccc1f6cb0136d95893d9831ebb5479b3f4ad578a1ededcc1c2bc04d",
+      "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
       "bindingRevision" : 1,
       "createdAtUTC" : "2026-09-25T00:00:15Z",
       "destructiveEpochsUsed" : 1,
@@ -27,7 +27,7 @@
       "invocationID" : "<invocation-4>",
       "maximumDestructiveEpochs" : 16,
       "operationReference" : "flash.full-restore@1",
-      "seedRequestFingerprintSHA256" : "691a745efbe09ff6defd70a10e4c9378eb74829132d24121d3b931a00c52f504",
+      "seedRequestFingerprintSHA256" : "123d22bed2065a3f5a12b445249c9ce15128639cd9b4f2dde993104afae6ae41",
       "state" : "active",
       "targetID" : "TGT-83405c84ff74"
     }

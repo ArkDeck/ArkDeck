@@ -110,6 +110,10 @@ mod windows_lifecycle;
 
 #[cfg(target_os = "macos")]
 mod app_ingress_fake_hdc;
+#[cfg(windows)]
+mod debug_leaves_cli;
+#[cfg(windows)]
+mod debug_probe_replay;
 #[cfg(target_os = "macos")]
 mod debug_read_control;
 mod flash_broker_control;

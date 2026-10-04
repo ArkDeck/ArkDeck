@@ -161,7 +161,7 @@ const PROCESS_STATES: [&str; 5] = [
 
 /// Swift `WorkflowStepKind`: a raw kind outside it is refused by
 /// `WorkflowStepValidator.resolveKind` before any other member is read.
-const STEP_KINDS: [&str; 43] = [
+const STEP_KINDS: [&str; 44] = [
     "probeHostTool",
     "probeHDCServer",
     "mutateHDCServerLifecycle",
@@ -191,6 +191,7 @@ const STEP_KINDS: [&str; 43] = [
     "createPortForward",
     "removePortForward",
     "injectPointerInput",
+    "injectKeyboardInput",
     "clearLogBuffer",
     "resizeLogBuffer",
     "startDeviceLogPersist",

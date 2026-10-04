@@ -82,7 +82,7 @@
         "sessionId" : "session-job-7e6c03dd2126fed73de39f82c2485c8e",
         "sessionPublication" : {
           "catalogGeneration" : "2",
-          "manifestSha256" : "31eed4b21318dc7b8ba29d669a4c0aecb14d29b38e23c6e942bab4b8a4b31dd8",
+          "manifestSha256" : "7bdaa6bca735944cb8c0c74c83140b1c0f085724aaec57966d4c18713dbd26b1",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -153,7 +153,7 @@
         "sessionId" : "session-job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
         "sessionPublication" : {
           "catalogGeneration" : "3",
-          "manifestSha256" : "8a4a34253660e72f0abf7bfd0297094dd9776920c40a960085fd632fc7b70d11",
+          "manifestSha256" : "afe6fe95dd1adca2ff8d1a6dcc85e74e7bb5fa7695b81cdde8a955a1e22cc93b",
           "reasonCode" : null,
           "state" : "published"
         },

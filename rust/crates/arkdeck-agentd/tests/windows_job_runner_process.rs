@@ -3,7 +3,8 @@
 //! `operation.list`, as the real daemon composes them over an isolated
 //! development root.
 //!
-//! No Windows HDC tuple is registered, so the daemon composes no HDC
+//! The test's development root names no registered Windows HDC, so the
+//! daemon composes no HDC
 //! provider and no device Job runs: the queued `observe.device@1` Job the
 //! test records is admitted in process before the daemon starts — over an
 //! HDC composition naming the recorded Target, whose dispatcher fails the

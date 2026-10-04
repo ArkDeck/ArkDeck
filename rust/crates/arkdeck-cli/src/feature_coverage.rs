@@ -463,6 +463,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // are the Swift oracle's. A pause is kept and resumed there too.
     "target.observe",
     "diagnostics.capture",
+    // The Debug probe over the Target store and the HDC (TASK-XPA-008;
+    // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
+    // against the signed test daemon over the Swift oracle's answers). Not
+    // `debug template run`: it runs the `debug.template@1` Job, whose
+    // admission observes the Target, and no Swift oracle records that Job's
+    // HDC answers.
+    "debug.probe",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset
@@ -536,19 +543,21 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // (TASK-XPA-021).
     "analyze.crash-signature",
     "analyze.hilog-summary",
-    // The workspace provider's source inspection (TASK-XPA-011). Not the
-    // profile-served workspace leaves: no code-owned source tool is trusted
-    // on Windows yet, so no registered project resolves to a profile.
+    // The workspace provider's source inspection (TASK-XPA-011), which needs
+    // no profile.
     "workspace.inspect",
     // The profile-served reads, the isolated copy and the sweep (TASK-XPA-011):
     // the code-owned tools of the ruling of 2026-10-04 resolve the profile.
-    // Not the workspace mutations, which a development root's mutation
-    // authority does not hold.
     "workspace.read",
     "workspace.status",
     "workspace.diff",
     "workspace.isolate",
     "workspace.sweep",
+    // The workspace mutations on a Runtime-owned copy (TASK-XPA-011), under
+    // the Runtime's own capability, through the installed composition.
+    "workspace.patch",
+    "workspace.revert",
+    "workspace.checkpoint",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test
@@ -562,6 +571,10 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "flash.run",
     "flash.bootloader-status",
     "flash.prerequisites",
+    // The Loader binding coordinator: `flash bind-loader` over the Swift Loader
+    // binding oracle's state, by the same CLI against the same signed test
+    // daemon (TASK-XPA-010).
+    "flash.bind-loader",
     // The protected Flash recovery broker over the Flash invocation owner
     // (TASK-XPA-010): an invocation started, its pinned full restore executed
     // to a terminal state, shown and listed (`recovery flash-invocation …`
@@ -576,6 +589,12 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "debug.start",
     "debug.evaluate",
     "debug.status",
+    // ArkForge's device access and the lane's plan preview (TASK-XPA-010):
+    // through the same CLI against the same signed test daemon, over a
+    // stand-in for `arkforged`'s public pipe (ArkForge's own codec and
+    // transport) and a stand-in plan previewer, both in the test binary.
+    "flash.device-access",
+    "flash.lane-preview",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -595,10 +614,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "agentd.status",
     "agentd.verify",
     "agentd.uninstall",
-    // DevEco's password material is not read on Windows (TASK-XPA-011); the
-    // other signing leaves are served there over Credential Manager.
-    "runtime.signing.migrate-deveco",
-    "signing.migrate-deveco",
     "runtime.update.check",
     "runtime.update.download",
     "runtime.update.handoff",
@@ -611,7 +626,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "maintainer.update-feed.assemble",
     "update-feed.prepare",
     "update-feed.assemble",
-    "flash.install-binding",
 ];
 
 /// The App's capability table as published, read once.
