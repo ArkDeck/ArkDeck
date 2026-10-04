@@ -457,7 +457,7 @@ fn earlier_layout_moves_once_and_reads_back(short_name: bool) {
         .clone();
     assert!(
         owners.contains("storage")
-            && owners.ends_with("traceCache, flashHostFacts, deviceAccess, loaderBinding"),
+            && owners.ends_with("traceCache, flashAliasReconciler, flashInvocations, flashHostFacts, deviceAccess, loaderBinding"),
         "{owners}"
     );
     // Moved, not copied: the same tree, byte for byte, and nothing left.

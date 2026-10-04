@@ -7,6 +7,14 @@
 //! controller wrote. Every answer must be Swift's, byte for byte once the
 //! pager's random revision and cursors are named, and every file the
 //! reconciler leaves in the Application Support root must be Swift's.
+//!
+//! On Windows (TASK-XPA-010) the same oracle replays over a root below the
+//! temporary directory: an owner-only (0600/0700) file or directory is the
+//! store's private one, and a shared mode (0644, 0755) is a read entry for
+//! the local Users group, removed again when the oracle restores 0700, as a
+//! mode would open and close it on macOS. Every answer and every byte must
+//! still be Swift's; each entry's kind and size too, but not its mode, which
+//! Windows does not have.
 use arkdeck_contract::{
     CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION, strict_json, validate_method_value,
 };
@@ -16,6 +24,7 @@ use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -27,6 +36,7 @@ type Census = Arc<Mutex<Option<Vec<UsbHostDevice>>>>;
 struct Root(PathBuf);
 
 impl Root {
+    #[cfg(unix)]
     fn new() -> Self {
         let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
             "flash-host-reads-{:x}",
@@ -37,6 +47,25 @@ impl Root {
             .mode(0o700)
             .create(root.join("state/targets"))
             .unwrap();
+        Self(root)
+    }
+}
+
+#[cfg(windows)]
+impl Root {
+    fn new() -> Self {
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        let temporary = temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .map_or(temporary.clone(), PathBuf::from);
+        let root = temporary.join(format!(
+            "flash-host-reads-{:x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        for path in [root.clone(), root.join("state"), root.join("state/targets")] {
+            arkdeck_platform::HostDirectory::open_or_create_private(&path).unwrap();
+        }
         Self(root)
     }
 }
@@ -90,8 +119,48 @@ fn call(control: &Control<crate::host::Host>, id: usize, method: &str, params: V
     }
 }
 
+#[cfg(unix)]
 fn mode(text: &str) -> u32 {
     u32::from_str_radix(text, 8).unwrap()
+}
+
+#[cfg(unix)]
+fn set_mode(path: &Path, text: &str) {
+    fs::set_permissions(path, fs::Permissions::from_mode(mode(text))).unwrap();
+}
+
+/// A recorded mode, the Windows way: owner-only is the private DACL an entry
+/// inherits from its private directory; anything wider gives the local Users
+/// group read access, which owner-only takes away again.
+#[cfg(windows)]
+fn set_mode(path: &Path, text: &str) {
+    let arguments: &[&str] = if text == "600" || text == "700" {
+        &["/remove:g", "*S-1-5-32-545"]
+    } else {
+        &["/grant", "*S-1-5-32-545:(R)"]
+    };
+    let status = std::process::Command::new("icacls")
+        .arg(path)
+        .args(arguments)
+        .stdout(std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert!(status.success(), "icacls {}", path.display());
+}
+
+/// A symbolic link to a file outside the root, the Windows hosts file
+/// standing in for `/etc/hosts`.
+#[cfg(unix)]
+fn symlink(to: &str, path: &Path) {
+    std::os::unix::fs::symlink(to, path).unwrap();
+}
+
+#[cfg(windows)]
+fn symlink(to: &str, path: &Path) {
+    assert_eq!(to, "/etc/hosts");
+    let hosts =
+        PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join(r"System32\drivers\etc\hosts");
+    std::os::windows::fs::symlink_file(hosts, path).unwrap();
 }
 
 fn device(value: &Value) -> UsbHostDevice {
@@ -117,21 +186,11 @@ fn perform(root: &Path, fixtures: &Path, census: &Census, action: &Value) {
                 fs::read(fixtures.join(action["input"].as_str().unwrap())).unwrap(),
             )
             .unwrap();
-            fs::set_permissions(
-                &target,
-                fs::Permissions::from_mode(mode(action["mode"].as_str().unwrap())),
-            )
-            .unwrap();
+            set_mode(&target, action["mode"].as_str().unwrap());
         }
         "remove" => fs::remove_file(path("path")).unwrap(),
-        "chmod" => fs::set_permissions(
-            path("path"),
-            fs::Permissions::from_mode(mode(action["mode"].as_str().unwrap())),
-        )
-        .unwrap(),
-        "symlink" => {
-            std::os::unix::fs::symlink(action["to"].as_str().unwrap(), path("path")).unwrap()
-        }
+        "chmod" => set_mode(&path("path"), action["mode"].as_str().unwrap()),
+        "symlink" => symlink(action["to"].as_str().unwrap(), &path("path")),
         "usb" => {
             *census.lock().unwrap() = action["devices"]
                 .as_array()
@@ -172,9 +231,14 @@ fn application_support_files(root: &Path) -> (Vec<Value>, BTreeMap<String, Vec<u
         } else {
             "file"
         };
+        #[cfg(unix)]
+        let mode = format!("{:o}", metadata.mode() & 0o777);
+        // Windows has no mode (see the module).
+        #[cfg(windows)]
+        let mode = "-".to_owned();
         listing.push(json!({
-            "path": name, "kind": kind,
-            "mode": format!("{:o}", metadata.mode() & 0o777), "bytes": metadata.len(),
+            "path": name.replace('\\', "/"), "kind": kind,
+            "mode": mode, "bytes": metadata.len(),
         }));
         if kind == "file" {
             bytes.insert(name, fs::read(root.join(&path)).unwrap());
@@ -271,6 +335,14 @@ fn the_rust_daemon_replays_the_swift_flash_host_reads_oracle() {
         );
         if let Some(recorded) = exchange.get("files") {
             let (listing, bytes) = application_support_files(&root.0);
+            #[cfg(windows)]
+            let recorded = &{
+                let mut recorded = recorded.clone();
+                for entry in recorded.as_array_mut().unwrap() {
+                    entry["mode"] = json!("-");
+                }
+                recorded
+            };
             assert_eq!(&json!(listing), recorded, "{index} {name}: files");
             for (path, content) in bytes {
                 let expected = fs::read(fixtures.join(format!("steps/{index:02}-{name}/{path}")))
