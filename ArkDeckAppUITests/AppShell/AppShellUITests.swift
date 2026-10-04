@@ -860,6 +860,7 @@ final class AppShellUITests: XCTestCase {
     select("app.navigation.device", in: app)
     let start = app.buttons["device.record.start"]
     XCTAssertTrue(start.waitForExistenceFast(timeout: 10))
+    scrollIntoView(start, in: app)
     start.click()
 
     XCTAssertFalse(start.isEnabled, "the quota await must reject another recording")
@@ -885,6 +886,44 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["22 frames"].exists)
     XCTAssertFalse(element("device.record.stage", in: app).exists)
     assertDisplayed(start, equals: "Record")
+    app.terminate()
+  }
+
+  func testDevicePreviewStopsBeforeKeyboardInputAndUnknownStaysStale() {
+    let app = launch(arguments: [
+      "--ui-test-runtime-history", "--ui-test-devices", "--ui-test-device-interaction",
+      "--ui-test-device-input-unknown", "-AppleLanguages", "(en)",
+    ], resetDeviceNames: false)
+    select("app.navigation.device", in: app)
+    let preview = app.buttons["device.preview.toggle"]
+    XCTAssertTrue(preview.waitForExistenceFast(timeout: 10))
+    preview.click()
+    XCTAssertTrue(element("device.screen.image", in: app).waitForExistenceFast(timeout: 10))
+    XCTAssertFalse(app.buttons["device.capture"].isEnabled)
+    XCTAssertFalse(app.buttons["device.record.start"].isEnabled)
+    XCTAssertFalse(app.buttons["device.keyboard.tap"].isEnabled)
+    preview.click()
+    let focus = app.buttons["device.keyboard.focus"]
+    let ready = NSPredicate(format: "enabled == true")
+    expectation(for: ready, evaluatedWith: focus)
+    waitForExpectations(timeout: 10)
+    scrollIntoView(focus, in: app)
+    focus.click()
+    XCTAssertTrue(element("device.screen.surface", in: app).isHittable)
+    XCTAssertLessThanOrEqual(
+      element("device.screen.surface", in: app).frame.maxY,
+      element("device.frame.age", in: app).frame.minY,
+      "The whole picture must fit above the footer when keyboard focus returns to it")
+    app.typeKey(XCUIKeyboardKey.rightArrow.rawValue, modifierFlags: [])
+    assertDisplayed(element("device.keyboard.position", in: app), equals: "X 561 · Y 960")
+    app.typeKey(XCUIKeyboardKey.return.rawValue, modifierFlags: [])
+    XCTAssertTrue(element("device.stale.badge", in: app).waitForExistenceFast(timeout: 5))
+    XCTAssertFalse(app.buttons["device.keyboard.tap"].isEnabled)
+    XCTAssertTrue(element("device.log.entry", in: app).exists)
+    let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+    attachment.name = "Device keyboard input unknown after stopped preview"
+    attachment.lifetime = .keepAlways
+    add(attachment)
     app.terminate()
   }
 

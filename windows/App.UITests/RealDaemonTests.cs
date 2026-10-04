@@ -246,7 +246,9 @@ public sealed class RealDaemonTests
             app.Select("settings.tab.trace");
             TestContext.WriteLine("trace cache: " + app.WaitForName("settings.trace.entries", n => n.Length > 0) + " · " + AppSession.Name(app.Find("settings.trace.scope")));
             app.Select("settings.tab.toolchains");
-            TestContext.WriteLine("hdc: " + app.WaitForName("settings.toolchains.hdc.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
+            // Since #2453 the Windows daemon answers runtime.hdc.status as macOS does without an
+            // HDC host: the unconfigured status, not a refusal.
+            StringAssert.StartsWith(app.WaitForName("settings.toolchains.health", n => n.Length > 0), "unavailable (hdc.notConfigured)");
             app.Select("settings.tab.workspace");
             app.Select("settings.workspace.project." + reference);
             Assert.AreEqual("runtimeRestartRequired", app.WaitForName("settings.workspace.detail.configuration", n => n.Length > 0));
@@ -654,6 +656,53 @@ public sealed class RealDaemonTests
             Assert.AreEqual(blocked, app.WaitForName("viewer.empty.message", n => n == blocked));
             app.Invoke("viewer.recapture");
             Assert.AreEqual(blocked, app.WaitForName("viewer.captureFailure", n => n.Length > 0), "nothing is sent");
+
+            Assert.AreEqual(0, Frame(endpoint, "job.list", """{"pageSize":200,"order":"createdAtDescJobIdAsc","includeTimeline":false,"includeCurrent":true}""")
+                .GetProperty("result").GetProperty("items").GetArrayLength(), "nothing was admitted");
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            Stop(process, directory);
+        }
+    }
+
+    /// <summary>
+    /// Diagnostics against the Windows daemon over a development root (TASK-XPA-020): no
+    /// Diagnostic Session capture is connected, so Arm and Mark say so with the macOS reason code;
+    /// with no saved record the page says how to open one, and History has none to open (the
+    /// daemon admits no capture without an HDC). Nothing is admitted.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void TheDiagnosticsPageShowsThatSessionCaptureIsNotConnected()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-diagnostics-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            (process, var endpoint) = StartRootDaemon(signed, root);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "diagnostics"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            Assert.AreEqual(strings["diagnostics.session.none"], app.WaitForName("diagnostics.session.empty", n => n.Length > 0));
+            Assert.AreEqual("diagnostic_session_capture_not_connected", AppSession.Name(app.Find("diagnostics.capture.reasonCode")));
+            app.Invoke("diagnostics.capture.arm");
+            StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["diagnostics.capture.unavailable"]);
+            app.Navigate("history");
+            Assert.AreEqual(strings["history.empty.title"], app.WaitForName("history.empty.title", n => n.Length > 0));
+            Assert.IsNull(app.TryFind("history.openDiagnostics", TimeSpan.FromMilliseconds(300)));
 
             Assert.AreEqual(0, Frame(endpoint, "job.list", """{"pageSize":200,"order":"createdAtDescJobIdAsc","includeTimeline":false,"includeCurrent":true}""")
                 .GetProperty("result").GetProperty("items").GetArrayLength(), "nothing was admitted");

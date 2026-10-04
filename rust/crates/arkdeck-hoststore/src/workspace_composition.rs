@@ -43,9 +43,7 @@ use arkdeck_provider_workspace::signing_preset::{
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
-use std::fs::DirBuilder;
 use std::io;
-use std::os::unix::fs::DirBuilderExt;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -120,12 +118,12 @@ impl Signing {
         secrets: Box<dyn SigningSecrets + Send + Sync>,
         attempts_root: &Path,
     ) -> io::Result<Self> {
-        use std::os::unix::fs::PermissionsExt;
-        DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(attempts_root)?;
-        std::fs::set_permissions(attempts_root, std::fs::Permissions::from_mode(0o700))?;
+        support::create_private_directories(attempts_root)?;
+        #[cfg(not(windows))]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(attempts_root, std::fs::Permissions::from_mode(0o700))?;
+        }
         let spelled = |path: &Path| foundation_standardized(&path.to_string_lossy());
         Ok(Self {
             owner: CredentialOwner::new(SigningPresetStore::new(spelled(store_root))),
@@ -255,7 +253,7 @@ const PRESET_INPUTS: [&str; 4] = [
 ];
 
 fn isolation_at(root: &Path) -> io::Result<Isolation> {
-    DirBuilder::new().recursive(true).mode(0o700).create(root)?;
+    support::create_private_directories(root)?;
     let root = root.to_str().ok_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidInput, "isolation root is not UTF-8")
     })?;

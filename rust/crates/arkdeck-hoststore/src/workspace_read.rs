@@ -24,8 +24,8 @@ use crate::workspace_patch::{Invocation, ToolReceipt, failed_detail, output_summ
 use crate::workspace_support::{self as support, foundation_resolved, matches};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
+#[cfg(not(windows))]
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub(crate) const INSPECT: &str = "workspace.inspect-source@1";
@@ -96,7 +96,9 @@ impl Inspector {
     /// Swift `FixedExecutableResolver.hashing(path:providerID:)`: an
     /// explicit absolute path, resolved as Foundation resolves it, naming a
     /// regular executable file, pinned by the digest of its bytes.
+    #[cfg(not(windows))]
     pub fn hashing(path: &str) -> Result<Self, String> {
+        use std::os::unix::fs::PermissionsExt;
         if !path.starts_with('/') {
             return Err("provider executable path must be explicit and absolute".into());
         }
@@ -112,6 +114,35 @@ impl Inspector {
         Ok(Self {
             path: executable,
             sha256: support::sha256(&bytes),
+        })
+    }
+
+    /// On Windows: an explicit local absolute path, resolved to its spelling
+    /// on disk, naming a PE image this caller may execute, pinned by the
+    /// digest of its bytes measured through one handle that follows no
+    /// reparse point (the analyzer profile's rule, TASK-XPA-011).
+    #[cfg(windows)]
+    pub fn hashing(path: &str) -> Result<Self, String> {
+        if !support::is_absolute(path) {
+            return Err("provider executable path must be explicit and absolute".into());
+        }
+        let executable = foundation_resolved(path);
+        let measure = arkdeck_platform::measure_host_file(
+            std::path::Path::new(&executable),
+            support::MAXIMUM_EXECUTABLE_BYTES,
+        )
+        .ok()
+        .filter(|measure| measure.executable)
+        .ok_or_else(|| {
+            format!("provider executable must be a regular executable file: {executable}")
+        })?;
+        Ok(Self {
+            path: executable,
+            sha256: measure
+                .sha256
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect(),
         })
     }
 }
@@ -211,19 +242,25 @@ pub(crate) fn resolved_readable_path(
         || has_prefix_character(relative, "/")
         || contains_characters(relative, "..")
         || contains_character(relative, "\0")
+        || (cfg!(windows) && (relative.contains('\\') || relative.contains(':')))
     {
         return Err("workspace.malformedFilePath".into());
     }
     if !profile_globs.iter().any(|glob| matches(relative, glob)) {
         return Err("workspace.pathOutsideProfileScope".into());
     }
-    let joined = format!("{}/{relative}", root.trim_end_matches('/'));
-    let trimmed = joined.trim_end_matches('/');
-    Ok(if trimmed.is_empty() {
-        "/".into()
-    } else {
-        trimmed.into()
-    })
+    #[cfg(not(windows))]
+    {
+        let joined = format!("{}/{relative}", root.trim_end_matches('/'));
+        let trimmed = joined.trim_end_matches('/');
+        Ok(if trimmed.is_empty() {
+            "/".into()
+        } else {
+            trimmed.into()
+        })
+    }
+    #[cfg(windows)]
+    Ok(support::join(root, relative.trim_end_matches('/')))
 }
 
 /// Swift `WorkspaceProviderSupport.validateRevisionExpression`: a revision,
@@ -580,6 +617,23 @@ mod tests {
         }
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn a_readable_path_is_joined_below_a_windows_root() {
+        let globs = vec!["entry/src/main/ets/**".to_owned()];
+        assert_eq!(
+            resolved_readable_path("entry/src/main/ets/a.ets", r"D:\r", &globs).unwrap(),
+            r"D:\r\entry\src\main\ets\a.ets"
+        );
+        for relative in [r"entry/src/main/ets\a.ets", "entry/src/main/ets/a:b"] {
+            assert_eq!(
+                resolved_readable_path(relative, r"D:\r", &globs).unwrap_err(),
+                "workspace.malformedFilePath"
+            );
+        }
+    }
+
+    #[cfg(not(windows))]
     #[test]
     fn a_readable_path_is_joined_as_foundation_joins_it() {
         let globs = vec!["entry/src/main/ets/**".to_owned()];

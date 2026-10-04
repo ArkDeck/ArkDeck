@@ -95,7 +95,7 @@ first, `ControlResult` back.
   Job Inspector status, the selected Job's state and the recovery banner.
 - **Test transport.** `--test-transport <scenario>` replaces the pipe with an in-process
   scripted daemon (`App.Core/Testing/ScriptedDaemon.cs`: `unavailable`, `contract-mismatch`,
-  `foundation`, `recovers`, `outage`, `jobs`, `targets`, `inspector`) so the UIA tests can show states the real daemon
+  `foundation`, `recovers`, `outage`, `jobs`, `targets`, `inspector`, `flash`, `viewer`, `diagnostics`) so the UIA tests can show states the real daemon
   cannot be made to show on demand. ClientKit still decodes and schema-checks every reply; the
   window shows a "Test transport" banner. Only beside it, three accessibility test hooks:
   `--text-scale <1..2.25>` (the App's own text at up to 225 %), `--high-contrast-tokens` (the
@@ -170,9 +170,18 @@ first, `ControlResult` back.
   hit-testing, the complete tree (a list: arrows move, Left and Right collapse and expand), the
   search, the selected component's properties, layout, accessibility, raw fields and Advanced
   Dump (`componentDetail`), and the capture's timings.
+- **Diagnostics (TASK-XPA-020).** The macOS Diagnostics session reader, opened on a History
+  record (Open Diagnostics, for `capture.diagnostics@1` Jobs and the Jobs whose workspace is
+  Diagnostics): a saved session read from its verified Artifacts and inspected on the host
+  (`DiagnosticSession`, checked against the Swift CLI's 15 diagnostics-inspect oracle cases) —
+  the alignment state, the marks and why a mark has no picture, what was never looked for, the
+  missing products, the Artifacts with a bounded local text preview and the sensitive Trace
+  opened in the Trace viewer — or a HiLog summary verified as macOS verifies it. No Diagnostic
+  Session capture provider is composed, so Arm and Mark (Ctrl+M) say so with the macOS reason
+  code `diagnostic_session_capture_not_connected`.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
-  have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
   empty Tab stop.
 
