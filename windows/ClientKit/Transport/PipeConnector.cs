@@ -73,7 +73,14 @@ public static class PipeConnector
     internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner) =>
         Connect(endpoint, expected, expectedOwner, TimeSpan.Zero);
 
-    internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner, TimeSpan wait)
+    internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner, TimeSpan wait) =>
+        Connect(endpoint, expected, expectedOwner, wait, null);
+
+    /// <summary>As above; <paramref name="waiting"/> is told, with the milliseconds left of the
+    /// budget, each time a busy pipe is about to be waited for, so a test offers the next
+    /// instance on that signal rather than on a guess at wall-clock timing.</summary>
+    internal static AuthenticatedPipe Connect(PipeEndpoint endpoint, DaemonIdentity expected, SecurityIdentifier expectedOwner, TimeSpan wait,
+        Action<long>? waiting)
     {
         // Read before anything is opened: a partial or malformed publisher identity refuses
         // whatever else is configured (maintainer ruling 17; the Rust verify_installed_image).
@@ -96,9 +103,10 @@ public static class PipeConnector
             var code = Marshal.GetLastPInvokeError();
             file.Dispose();
             var left = deadline - Environment.TickCount64;
-            if (code == Native.ERROR_PIPE_BUSY && left > 0 && Native.WaitNamedPipe(endpoint.Name, (uint)Math.Min(left, uint.MaxValue - 1)))
+            if (code == Native.ERROR_PIPE_BUSY && left > 0)
             {
-                continue;
+                waiting?.Invoke(left);
+                if (Native.WaitNamedPipe(endpoint.Name, (uint)Math.Min(left, uint.MaxValue - 1))) continue;
             }
             var error = new Win32Exception(code);
             throw new ServerAuthenticationException(DaemonUnavailableReason.EndpointUnavailable,
