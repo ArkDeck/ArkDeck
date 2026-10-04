@@ -6,25 +6,26 @@ import UniformTypeIdentifiers
 
 /// Device · device control.
 ///
-/// The picture is a still, not a live view. Everything here is arranged so a
-/// person can tell the difference: the frame's age is always on screen, a
+/// Explicit preview refreshes bounded stills. The frame's age is always on screen, a
 /// gesture is shown pending until the runtime answers, and an outcome the
 /// runtime could not establish is shown as unknown rather than resolved one
 /// way for the sake of a tidier list.
 struct DeviceWorkspaceView: View {
   var model: DeviceWorkspaceViewModel
   @Bindable var recording: DeviceRecordingViewModel
+  @FocusState private var screenFocused: Bool
+  @State private var pointerFocusRequest = 0
   @State private var isSaveErrorPresented = false
   @State private var saveErrorMessage = ""
   @State private var isSavingRecording = false
-  @State private var workspaceWidth: CGFloat = 0
+  @State private var workspaceSize = CGSize.zero
   @State private var screenAvailableSize = CGSize.zero
 
   var body: some View {
     VStack(spacing: 0) {
       toolbar
       Divider()
-      if workspaceWidth >= 880 {
+      if workspaceSize.width >= 880 {
         HStack(spacing: 0) {
           screenPane
           Divider()
@@ -33,13 +34,29 @@ struct DeviceWorkspaceView: View {
             .accessibilityIdentifier("device.inspector.scroll")
         }
       } else {
-        ScrollView { VStack(spacing: 0) { screenPane.frame(height: 420); inspector } }
+        ScrollViewReader { scroll in
+          ScrollView {
+            VStack(spacing: 0) {
+              screenPane
+                .frame(height: min(420, max(160, workspaceSize.height - 140)))
+                .id("device.screen")
+              inspector
+            }
+          }
+          .onChange(of: screenFocused) { _, focused in
+            if focused { scroll.scrollTo("device.screen", anchor: .top) }
+          }
+          .onChange(of: pointerFocusRequest) { _, _ in
+            scroll.scrollTo("device.screen", anchor: .top)
+          }
+        }
       }
       Divider()
       footer
     }
-    .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { workspaceWidth = $0 }
+    .onGeometryChange(for: CGSize.self, of: { $0.size }) { workspaceSize = $0 }
     .task { await model.refresh() }
+    .onDisappear { model.deactivate() }
     .alert(
       deviceText("device.record.saveFailed"),
       isPresented: $isSaveErrorPresented
@@ -76,7 +93,7 @@ struct DeviceWorkspaceView: View {
           systemImage: "camera")
       }
       .fixedSize()
-      .disabled(!model.canCapture || model.isCapturing)
+      .disabled(!model.canCapture || recording.isBusy)
       .accessibilityIdentifier("device.capture")
     }
     .padding(.horizontal, 20)
@@ -106,6 +123,18 @@ struct DeviceWorkspaceView: View {
             .accessibilityIdentifier("device.screen.image")
           gestureSurface(frame: frame, rendered: rendered)
           if model.frameIsStale { staleOverlay }
+          if screenFocused, model.canSendInput {
+            Image(systemName: "plus.circle")
+              .font(WorkspaceFont.sectionTitle)
+              .imageScale(.large)
+              .foregroundStyle(.white)
+              .background(Circle().fill(.black.opacity(0.8)))
+              .position(
+                x: rendered.width * model.keyboardPointer.x,
+                y: rendered.height * model.keyboardPointer.y)
+              .allowsHitTesting(false)
+              .accessibilityHidden(true)
+          }
           if let marker = model.pendingMarker {
             touchMarker(marker, rendered: rendered, pending: true)
           } else if let marker = model.lastMarker {
@@ -133,6 +162,35 @@ struct DeviceWorkspaceView: View {
     Color.clear
       .contentShape(.rect)
       .accessibilityIdentifier("device.screen.surface")
+      .accessibilityLabel(deviceText("device.keyboard.title"))
+      .accessibilityValue(keyboardPosition)
+      .accessibilityHint(deviceText("device.keyboard.help"))
+      .focusable()
+      .focused($screenFocused)
+      .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: [.down, .repeat]) { press in
+        guard model.canSendInput, !recording.isBusy else { return .ignored }
+        let step = press.modifiers.contains(.shift) ? 0.1 : 0.02
+        switch press.key {
+        case .upArrow: model.moveKeyboardPointer(dx: 0, dy: -step)
+        case .downArrow: model.moveKeyboardPointer(dx: 0, dy: step)
+        case .leftArrow: model.moveKeyboardPointer(dx: -step, dy: 0)
+        case .rightArrow: model.moveKeyboardPointer(dx: step, dy: 0)
+        default: return .ignored
+        }
+        return .handled
+      }
+      .onKeyPress(keys: [.return, .space, .escape], phases: .down) { press in
+        guard model.canSendInput, !recording.isBusy else { return .ignored }
+        if press.key == .escape { model.cancelKeyboardSwipe(); return .handled }
+        if press.modifiers.contains(.shift) {
+          if model.keyboardPointer.anchor == nil { model.beginKeyboardSwipe() }
+          else { Task { await model.sendKeyboardGesture(.swipe) } }
+        } else {
+          let gesture: DeviceGesture = press.modifiers.contains(.option) ? .longPress : .tap
+          Task { await model.sendKeyboardGesture(gesture) }
+        }
+        return .handled
+      }
       .gesture(
         DragGesture(minimumDistance: 0)
           .onChanged { value in model.pointerMoved(to: value.location, rendered: rendered) }
@@ -144,7 +202,9 @@ struct DeviceWorkspaceView: View {
             }
           }
       )
-      .disabled(model.isSendingGesture)
+      // Keep keyboard focus on the picture while a request settles. The model
+      // refuses busy/stale input; disabling the focusable surface would scroll
+      // a compact workspace back to the inspector when its focus disappears.
   }
 
   /// The picture stays on screen - it is still the last thing the device is
@@ -191,12 +251,35 @@ struct DeviceWorkspaceView: View {
 
   private var inspector: some View {
     VStack(alignment: .leading, spacing: 0) {
+      previewPane
+      Divider()
       VStack(alignment: .leading, spacing: 8) {
         Text(deviceText("device.gestures.title"))
           .font(WorkspaceFont.sectionTitle)
         gestureRow("device.gestures.tap")
         gestureRow("device.gestures.longPress")
         gestureRow("device.gestures.swipe")
+        Text(deviceText("device.keyboard.help"))
+          .font(WorkspaceFont.caption)
+          .foregroundStyle(.secondary)
+        Text(keyboardPosition).font(WorkspaceFont.caption).monospacedDigit()
+          .accessibilityIdentifier("device.keyboard.position")
+        Button(deviceText("device.keyboard.focus")) { focusPointer() }
+          .disabled(!model.canSendInput || recording.isBusy)
+          .accessibilityIdentifier("device.keyboard.focus")
+        HStack {
+          Button(deviceText("device.gesture.tap")) { Task { await model.sendKeyboardGesture(.tap) } }
+            .accessibilityIdentifier("device.keyboard.tap")
+          Button(deviceText("device.gesture.longPress")) { Task { await model.sendKeyboardGesture(.longPress) } }
+            .accessibilityIdentifier("device.keyboard.longPress")
+        }
+        .disabled(!model.canSendInput || recording.isBusy)
+        Button(deviceText(model.keyboardPointer.anchor == nil ? "device.keyboard.swipeStart" : "device.keyboard.swipeEnd")) {
+          if model.keyboardPointer.anchor == nil { model.beginKeyboardSwipe(); focusPointer() }
+          else { Task { await model.sendKeyboardGesture(.swipe) } }
+        }
+        .disabled(!model.canSendInput || recording.isBusy)
+        .accessibilityIdentifier("device.keyboard.swipe")
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(16)
@@ -222,6 +305,42 @@ struct DeviceWorkspaceView: View {
       Divider()
       performanceNotice
     }
+  }
+
+  private var keyboardPosition: String {
+    guard let frame = model.frame,
+      let request = model.keyboardPointer.request(.tap, frame: frame)
+    else { return deviceText("device.frame.none") }
+    return "X \(request.x) · Y \(request.y)"
+  }
+
+  private func focusPointer() {
+    screenFocused = true
+    // A mouse scroll need not resign keyboard focus. Repeating the command
+    // must reveal the picture even when it was already the keyboard target.
+    pointerFocusRequest &+= 1
+  }
+
+  private var previewPane: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Button {
+        if model.preview.isRunning { model.preview.stop() }
+        else { Task { await model.startPreview() } }
+      } label: {
+        Label(
+          deviceText(model.preview.isRunning ? "device.preview.stop" : "device.preview.start"),
+          systemImage: model.preview.isRunning ? "pause.circle" : "play.circle")
+      }
+      .disabled(!model.preview.isRunning && (!model.canCapture || recording.isBusy))
+      .accessibilityIdentifier("device.preview.toggle")
+      Text(model.previewStatus)
+        .font(WorkspaceFont.caption)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("device.preview.status")
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(16)
   }
 
   /// What watching costs.
@@ -330,12 +449,12 @@ struct DeviceWorkspaceView: View {
       }
 
       Button {
-        Task { await recording.record(target: model.target) }
+        Task { await model.recordScreen(using: recording) }
       } label: {
         Label(recording.stageTitle, systemImage: "record.circle")
           .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .disabled(recording.isBusy)
+      .disabled(recording.isBusy || model.isCapturing || model.isSendingGesture || model.preview.isBusy)
       .accessibilityIdentifier("device.record.start")
 
       // Said, not swallowed, and said alongside whatever the run is doing:

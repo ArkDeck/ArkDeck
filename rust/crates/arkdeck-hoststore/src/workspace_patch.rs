@@ -18,9 +18,8 @@
 //! named by its reference, never by a Foundation error carrying a host path.
 use crate::workspace_support::{self as support, foundation_standardized, matches, swift_sort};
 use serde_json::{Map, Value, json};
-use std::fs::{self, DirBuilder, OpenOptions};
+use std::fs;
 use std::io::{self, Read, Write};
-use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -661,10 +660,7 @@ pub(crate) fn valid_reference(reference: &str) -> bool {
 }
 
 fn read_bounded(path: &str, bound: u64) -> io::Result<Vec<u8>> {
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)?;
+    let file = support::open_no_follow(Path::new(path), false)?;
     let mut bytes = Vec::new();
     file.take(bound + 1).read_to_end(&mut bytes)?;
     if bytes.len() as u64 > bound {
@@ -676,13 +672,7 @@ fn read_bounded(path: &str, bound: u64) -> io::Result<Vec<u8>> {
 /// Written beside `destination`, synchronized, then renamed over it.
 fn replace(destination: &str, bytes: &[u8], staged: &str) -> io::Result<()> {
     let written = (|| {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(staged)?;
+        let mut file = support::create_private_staged(Path::new(staged))?;
         file.write_all(bytes)?;
         file.sync_all()?;
         fs::rename(staged, destination)
@@ -695,7 +685,7 @@ fn replace(destination: &str, bytes: &[u8], staged: &str) -> io::Result<()> {
 
 impl AttemptStore {
     pub(crate) fn open(root: &Path) -> io::Result<Self> {
-        DirBuilder::new().recursive(true).mode(0o700).create(root)?;
+        support::create_private_directories(root)?;
         let root = root.to_str().ok_or_else(|| {
             io::Error::new(io::ErrorKind::InvalidInput, "attempt root is not UTF-8")
         })?;
@@ -804,13 +794,7 @@ impl AttemptStore {
             std::process::id()
         );
         let written = (|| {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .custom_flags(libc::O_NOFOLLOW)
-                .open(&staged)?;
+            let mut file = support::create_private_staged(Path::new(&staged))?;
             file.write_all(&bytes)?;
             file.sync_all()?;
             // Swift moves without replacing: bytes that appeared meanwhile
@@ -925,6 +909,12 @@ pub trait WorkspaceToolDispatch: Send + Sync {
 /// clean base environment plus the invocation's overlay, `/dev/null` as stdin
 /// and each stream bounded; every verified resource opened by its pinned
 /// identity first and held until the child is gone.
+///
+/// On Windows (TASK-XPA-011) the executable is the pinned image `VerifiedTool`
+/// starts suspended and verifies before it resumes, a resource required to
+/// be executable is a PE image the caller may execute, a role named by
+/// `argument_zero` (SwiftPM's multi-call binary, macOS only) is refused
+/// before anything runs, and a child that dies is reported by its exit code.
 pub struct VerifiedToolDispatch;
 
 impl WorkspaceToolDispatch for VerifiedToolDispatch {
@@ -932,7 +922,6 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
         use arkdeck_platform::{
             ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedSource, VerifiedTool,
         };
-        use std::os::unix::fs::PermissionsExt;
         let refused = |error: &dyn std::fmt::Display| {
             ToolFailure::Failed(format!("dispatch refused: {error}"))
         };
@@ -948,16 +937,22 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
                     resource.byte_count,
                 )
                 .ok()?;
-                let executable = fs::metadata(&resource.path)
-                    .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0);
-                (!resource.require_executable || executable).then_some(source)
+                (!resource.require_executable || executable_file(&resource.path)).then_some(source)
             })
             .collect::<Option<Vec<VerifiedSource>>>()
             .ok_or_else(|| ToolFailure::Failed("dispatch resource identity refused".into()))?;
+        #[cfg_attr(windows, allow(unused_mut))]
         let mut tool = VerifiedTool::open(invocation.executable_path, invocation.executable_sha256)
             .map_err(|error| refused(&error))?;
+        #[cfg(not(windows))]
         if let Some(zero) = invocation.argument_zero {
             tool = tool.with_argument_zero(zero);
+        }
+        #[cfg(windows)]
+        if invocation.argument_zero.is_some() {
+            return Err(refused(
+                &"a tool role named by argument zero is not run on Windows",
+            ));
         }
         let environment: Vec<(std::ffi::OsString, std::ffi::OsString)> = invocation
             .environment
@@ -968,7 +963,7 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
         // physical spelling.
         let directory = invocation
             .working_directory
-            .map(fs::canonicalize)
+            .map(physical_directory)
             .transpose()
             .map_err(|error| refused(&error))?;
         let arguments: Vec<std::ffi::OsString> = invocation
@@ -993,11 +988,15 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
         // Its profile-owned test role needs the same suspended, mapping-proved
         // canonical launch already used for bundle analyzers. Ordinary tools
         // keep the inode path; no caller selects a launch mode.
+        #[cfg(not(windows))]
         let swiftpm_tests = Path::new(invocation.executable_path).file_name()
             == Some(std::ffi::OsStr::new("swift-package"))
             && invocation.argument_zero.is_some_and(|zero| {
                 Path::new(zero).file_name() == Some(std::ffi::OsStr::new("swift-test"))
             });
+        #[cfg(windows)]
+        let ran = tool.run_tool(&request, &|| false);
+        #[cfg(not(windows))]
         let ran = if swiftpm_tests {
             let bound = || {
                 for resource in invocation.resources {
@@ -1031,17 +1030,54 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
                 ToolTermination::TimedOut => Err(ToolFailure::OutcomeUnknown(
                     "process timed out before completion".into(),
                 )),
-                ToolTermination::Signalled(signal) => Err(ToolFailure::OutcomeUnknown(format!(
-                    "process died on signal {signal}; the child never reached its own semantic \
-                     boundary. Its crash report is in ~/Library/Logs/DiagnosticReports/ (look for \
-                     a same-second entry named after the executable)."
-                ))),
+                ToolTermination::Signalled(signal) => {
+                    Err(ToolFailure::OutcomeUnknown(signal_death(signal)))
+                }
                 ToolTermination::Cancelled { .. } => Err(ToolFailure::OutcomeUnknown(
                     "dispatch task cancellation carried no process-group drain proof".into(),
                 )),
             },
         }
     }
+}
+
+/// Why a child that died is not judged by its own answer.
+#[cfg(not(windows))]
+fn signal_death(signal: i32) -> String {
+    format!(
+        "process died on signal {signal}; the child never reached its own semantic \
+         boundary. Its crash report is in ~/Library/Logs/DiagnosticReports/ (look for \
+         a same-second entry named after the executable)."
+    )
+}
+
+/// On Windows a child always ends with an exit code; no crash report is
+/// named.
+#[cfg(windows)]
+fn signal_death(signal: i32) -> String {
+    format!("process died on signal {signal}; the child never reached its own semantic boundary")
+}
+
+/// Whether the file at `path` may be run: an execute bit, or on Windows a PE
+/// image the caller may execute, measured through no reparse point.
+fn executable_file(path: &str) -> bool {
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::metadata(path).is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0)
+    }
+    #[cfg(windows)]
+    arkdeck_platform::measure_host_file(Path::new(path), support::MAXIMUM_EXECUTABLE_BYTES)
+        .is_ok_and(|measure| measure.executable)
+}
+
+/// The physical spelling of a working directory the spawn needs.
+fn physical_directory(path: &str) -> io::Result<std::path::PathBuf> {
+    #[cfg(not(windows))]
+    return fs::canonicalize(path);
+    #[cfg(windows)]
+    arkdeck_platform::host_resolved_path(Path::new(path))
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "working directory unresolved"))
 }
 
 /// Swift `outputSummary(_:)`.

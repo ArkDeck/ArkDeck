@@ -389,7 +389,6 @@ impl JobAdmitter<'_> {
                 ),
             )
         };
-        #[cfg(target_os = "macos")]
         if descriptor.provider == "workspace" {
             return self.preauthorize_workspace(request, descriptor, effect, materialized);
         }
@@ -499,7 +498,6 @@ impl JobAdmitter<'_> {
     ///
     /// Either capability is then checked against its envelope and lineage;
     /// nothing is reserved or consumed, and every refusal dispatches nothing.
-    #[cfg(target_os = "macos")]
     fn preauthorize_workspace(
         &self,
         request: &OperationRequest,

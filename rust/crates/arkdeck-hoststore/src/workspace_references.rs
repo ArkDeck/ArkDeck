@@ -192,8 +192,7 @@ impl JobStore {
     /// whether all of them are terminal (the repository's own active-set
     /// filter, not a reading of state words), and the newest transition among
     /// the terminal ones. The sweep's testimony comes only from here; no
-    /// caller supplies or biases it. The sweep is macOS-only.
-    #[cfg(target_os = "macos")]
+    /// caller supplies or biases it.
     pub(crate) fn workspace_reference_facts(
         &self,
         prepare_runtime_owner_id: &str,

@@ -1551,8 +1551,8 @@
     {
       "key": "debug.artifacts.productionBoundary",
       "table": "DebugLocalizable",
-      "en": "Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.",
-      "zh-Hans": "当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。"
+      "en": "Each Job deploys one signed app-owned .so through the published operation. Queues run these Jobs serially, stopping on failure or uncertainty. ELF, ABI, Build ID, hash, backup and readback checks still apply. .abc replacement and standalone device restart remain unavailable.",
+      "zh-Hans": "每个 Job 通过已发布 operation 部署一个已签名 app-owned .so；队列串行运行，失败或结果不确定时停止。仍执行 ELF、ABI、Build ID、hash、备份与读取验证。.abc 替换和独立设备重启仍不可用。"
     },
     {
       "key": "debug.artifacts.remoteBindingFailed",
@@ -1767,8 +1767,8 @@
     {
       "key": "debug.artifacts.source.detail",
       "table": "DebugLocalizable",
-      "en": "Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.",
-      "zh-Hans": "从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。"
+      "en": "Choose signed app-owned libraries from local files, folders, mounted SMB shares or a verified SSH build source. Only selected bytes enter Artifact import.",
+      "zh-Hans": "从本地文件、文件夹、已挂载 SMB 共享或已验证 SSH 构建源选择已签名的 app-owned 动态库；只有所选字节进入 Artifact 导入。"
     },
     {
       "key": "debug.artifacts.source.kind",
@@ -1797,8 +1797,8 @@
     {
       "key": "debug.artifacts.sourceBoundary",
       "table": "DebugLocalizable",
-      "en": "SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.",
-      "zh-Hans": "SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。"
+      "en": "Folder access uses the file-picker grant. SMB shares must already be mounted in Finder. SSH, including WSL, stays read-only within the saved root and pins the host key.",
+      "zh-Hans": "文件夹访问使用文件选择器授权；SMB 共享需先在 Finder 挂载。SSH（包括 WSL）在已保存根目录内只读访问，并固定主机密钥。"
     },
     {
       "key": "debug.artifacts.target",
@@ -6463,10 +6463,478 @@
       "zh-Hans": "当前采集中，此组件没有数字形式的 hostWindowId/componentId 组合"
     },
     {
-      "key": "jobRecovery.action.observed",
-      "table": "JobsLocalizable",
-      "en": "Runtime reported the updated state",
-      "zh-Hans": "Runtime 已返回更新后的状态"
+      "key": "app.navigation.diagnostics",
+      "table": "Localizable",
+      "en": "Diagnostics",
+      "zh-Hans": "Diagnostics"
+    },
+    {
+      "key": "history.activity.open.diagnostics",
+      "table": "HistoryLocalizable",
+      "en": "Open Diagnostics",
+      "zh-Hans": "打开诊断工具"
+    },
+    {
+      "key": "history.context.readOnly",
+      "table": "HistoryLocalizable",
+      "en": "This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.",
+      "zh-Hans": "这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。"
+    },
+    {
+      "key": "diagnostics.capture.unavailable",
+      "table": "DiagnosticsLocalizable",
+      "en": "Session capture is not available",
+      "zh-Hans": "诊断会话采集尚不可用"
+    },
+    {
+      "key": "diagnostics.capture.unavailable.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.",
+      "zh-Hans": "交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。"
+    },
+    {
+      "key": "diagnostics.alignment.calibrated",
+      "table": "DiagnosticsLocalizable",
+      "en": "Calibrated",
+      "zh-Hans": "已校准"
+    },
+    {
+      "key": "diagnostics.alignment.cannotAlign",
+      "table": "DiagnosticsLocalizable",
+      "en": "Cannot align",
+      "zh-Hans": "无法对齐"
+    },
+    {
+      "key": "diagnostics.alignment.explain",
+      "table": "DiagnosticsLocalizable",
+      "en": "Marks are host time. Without a calibration nothing here can be lined up against what the device recorded.",
+      "zh-Hans": "标记走的是主机时间。没有校准，这里的任何东西都无法与设备记录的内容对齐。"
+    },
+    {
+      "key": "diagnostics.alignment.sameClock",
+      "table": "DiagnosticsLocalizable",
+      "en": "One clock",
+      "zh-Hans": "同一时钟"
+    },
+    {
+      "key": "diagnostics.capture.arm",
+      "table": "DiagnosticsLocalizable",
+      "en": "Arm a session",
+      "zh-Hans": "布防会话"
+    },
+    {
+      "key": "diagnostics.capture.mark",
+      "table": "DiagnosticsLocalizable",
+      "en": "Mark (⌘M)",
+      "zh-Hans": "打标记（⌘M）"
+    },
+    {
+      "key": "diagnostics.mark.auto",
+      "table": "DiagnosticsLocalizable",
+      "en": "Found",
+      "zh-Hans": "自动标记"
+    },
+    {
+      "key": "diagnostics.mark.manual",
+      "table": "DiagnosticsLocalizable",
+      "en": "Marked",
+      "zh-Hans": "手动标记"
+    },
+    {
+      "key": "diagnostics.marks.empty",
+      "table": "DiagnosticsLocalizable",
+      "en": "Nothing was marked in this session.",
+      "zh-Hans": "这次会话没有任何标记。"
+    },
+    {
+      "key": "diagnostics.marks.title",
+      "table": "DiagnosticsLocalizable",
+      "en": "Marks",
+      "zh-Hans": "标记"
+    },
+    {
+      "key": "diagnostics.missing.title",
+      "table": "DiagnosticsLocalizable",
+      "en": "Missing products",
+      "zh-Hans": "缺失的产物"
+    },
+    {
+      "key": "diagnostics.notDerived.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "These marker kinds were never derived, so their absence says nothing about the run.",
+      "zh-Hans": "这些标记种类从未被反推，所以它们的缺席不说明这次运行发生了什么。"
+    },
+    {
+      "key": "diagnostics.notDerived.title",
+      "table": "DiagnosticsLocalizable",
+      "en": "Not looked for",
+      "zh-Hans": "未检查的种类"
+    },
+    {
+      "key": "diagnostics.partial",
+      "table": "DiagnosticsLocalizable",
+      "en": "Partial",
+      "zh-Hans": "不完整"
+    },
+    {
+      "key": "diagnostics.partial.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "This session is missing a product it declared.",
+      "zh-Hans": "这次会话缺少它自己声明过的产物。"
+    },
+    {
+      "key": "diagnostics.selection.driftedAway",
+      "table": "DiagnosticsLocalizable",
+      "en": "the cursor has left this event",
+      "zh-Hans": "光标已离开该事件"
+    },
+    {
+      "key": "diagnostics.selection.timeOnly",
+      "table": "DiagnosticsLocalizable",
+      "en": "Only a time point is selected",
+      "zh-Hans": "当前仅选择了时间点"
+    },
+    {
+      "key": "diagnostics.session.none",
+      "table": "DiagnosticsLocalizable",
+      "en": "No session open",
+      "zh-Hans": "尚无诊断会话"
+    },
+    {
+      "key": "diagnostics.session.none.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "Open a capture.diagnostics Job from History to read its verified artifacts. No connected device is needed to read a saved capture.",
+      "zh-Hans": "从 History 打开 capture.diagnostics 记录，读取校验后的产物。读取已保存的采集无需连接设备。"
+    },
+    {
+      "key": "diagnostics.shot.failed",
+      "table": "DiagnosticsLocalizable",
+      "en": "The capture failed",
+      "zh-Hans": "截图失败"
+    },
+    {
+      "key": "diagnostics.shot.none",
+      "table": "DiagnosticsLocalizable",
+      "en": "No screenshot was taken here",
+      "zh-Hans": "此处未拍摄截图"
+    },
+    {
+      "key": "diagnostics.shot.standsFor",
+      "table": "DiagnosticsLocalizable",
+      "en": "A screenshot stands for the moment it was taken, not the moment it was asked for.",
+      "zh-Hans": "截图只代表拍摄时刻，不代表标记时刻的画面。"
+    },
+    {
+      "key": "diagnostics.shot.takenAfter",
+      "table": "DiagnosticsLocalizable",
+      "en": "taken after the mark",
+      "zh-Hans": "拍摄于标记之后"
+    },
+    {
+      "key": "diagnostics.shot.tooFar",
+      "table": "DiagnosticsLocalizable",
+      "en": "No picture proves this moment",
+      "zh-Hans": "这一时刻没有可证明对应的画面"
+    },
+    {
+      "key": "diagnostics.shot.tooFar.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "The nearest screenshot is too far from this mark to stand for it.",
+      "zh-Hans": "最近的一张截图距这个标记太远，不能代表它。"
+    },
+    {
+      "key": "diagnostics.shot.undecidable",
+      "table": "DiagnosticsLocalizable",
+      "en": "Nothing here can tell",
+      "zh-Hans": "此处无法判定"
+    },
+    {
+      "key": "diagnostics.shot.undecidable.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "A screenshot was taken around this mark, but the interval it could have been taken in is wider than the tolerance, so it cannot be said to be this moment.",
+      "zh-Hans": "这个标记附近确有一张截图，但它可能被拍摄的时间区间宽于容差，因此无法断定它就是这一时刻。"
+    },
+    {
+      "key": "diagnostics.session.loading",
+      "table": "DiagnosticsLocalizable",
+      "en": "Reading session artifacts…",
+      "zh-Hans": "正在读取会话产物…"
+    },
+    {
+      "key": "diagnostics.session.failed",
+      "table": "DiagnosticsLocalizable",
+      "en": "Cannot read this session",
+      "zh-Hans": "无法读取此会话"
+    },
+    {
+      "key": "diagnostics.session.retry",
+      "table": "DiagnosticsLocalizable",
+      "en": "Retry reading",
+      "zh-Hans": "重新读取"
+    },
+    {
+      "key": "diagnostics.session.reload",
+      "table": "DiagnosticsLocalizable",
+      "en": "Reload session",
+      "zh-Hans": "重新加载会话"
+    },
+    {
+      "key": "diagnostics.session.readOnly",
+      "table": "DiagnosticsLocalizable",
+      "en": "Saved capture · read only. Viewing does not start a new Job.",
+      "zh-Hans": "已保存的采集 · 只读。查看不会启动新 Job。"
+    },
+    {
+      "key": "diagnostics.session.timeline",
+      "table": "DiagnosticsLocalizable",
+      "en": "Runtime timeline",
+      "zh-Hans": "Runtime 时间线"
+    },
+    {
+      "key": "diagnostics.ring.covered",
+      "table": "DiagnosticsLocalizable",
+      "en": "Runtime found the coverage anchor in the ring snapshot.",
+      "zh-Hans": "Runtime 已在环形快照中找到覆盖锚点。"
+    },
+    {
+      "key": "diagnostics.ring.lost",
+      "table": "DiagnosticsLocalizable",
+      "en": "The ring snapshot lost its coverage anchor. Earlier events may be missing.",
+      "zh-Hans": "环形快照未保留覆盖锚点，较早事件可能缺失。"
+    },
+    {
+      "key": "diagnostics.artifacts.title",
+      "table": "DiagnosticsLocalizable",
+      "en": "Session artifacts",
+      "zh-Hans": "会话产物"
+    },
+    {
+      "key": "diagnostics.artifacts.privacy",
+      "table": "DiagnosticsLocalizable",
+      "en": "Text previews stay in this App. Sensitive content is read only when you select it; nothing is exported or uploaded.",
+      "zh-Hans": "文本预览仅留在此 App。敏感内容仅在选择后读取，不会导出或上传。"
+    },
+    {
+      "key": "diagnostics.artifacts.read",
+      "table": "DiagnosticsLocalizable",
+      "en": "Read locally",
+      "zh-Hans": "在本机读取"
+    },
+    {
+      "key": "diagnostics.artifacts.readSensitive",
+      "table": "DiagnosticsLocalizable",
+      "en": "Read sensitive content locally",
+      "zh-Hans": "在本机读取敏感内容"
+    },
+    {
+      "key": "diagnostics.artifacts.openElsewhere",
+      "table": "DiagnosticsLocalizable",
+      "en": "A published Trace can open in Trace Viewer. Other files can be exported explicitly from History. Job times are never used as screenshot timestamps.",
+      "zh-Hans": "已发布的 Trace 可在 Trace Viewer 打开；其他文件可从 History 显式导出。不会使用 Job 时间推算截图时刻。"
+    },
+    {
+      "key": "diagnostics.preview.clipped",
+      "table": "DiagnosticsLocalizable",
+      "en": "Preview shows the first 120,000 characters. Export the artifact from History to read the complete file.",
+      "zh-Hans": "预览显示前 120,000 个字符。可从 History 导出产物以读取完整文件。"
+    },
+    {
+      "key": "diagnostics.mark.timeMissing",
+      "table": "DiagnosticsLocalizable",
+      "en": "Time not reported",
+      "zh-Hans": "未记录时刻"
+    },
+    {
+      "key": "diagnostics.artifacts.openTrace",
+      "table": "DiagnosticsLocalizable",
+      "en": "Open sensitive Trace in Viewer",
+      "zh-Hans": "在 Viewer 中打开敏感 Trace"
+    },
+    {
+      "key": "diagnostics.artifacts.openTrace.privacy",
+      "table": "DiagnosticsLocalizable",
+      "en": "Reads the selected Job’s immutable Trace into the local viewer cache. No upload.",
+      "zh-Hans": "将所选 Job 的不可变 Trace 读取到本机查看器缓存，不上传。"
+    },
+    {
+      "key": "diagnostics.preview.replacedInvalidUTF8",
+      "table": "DiagnosticsLocalizable",
+      "en": "Some bytes are not valid UTF-8 and appear as � in this preview. The original Artifact and its SHA-256 are unchanged.",
+      "zh-Hans": "部分字节不是有效 UTF-8，在此预览中显示为 �。原始 Artifact 及其 SHA-256 未改变。"
+    },
+    {
+      "key": "diagnostics.preview.invalidStructuredText",
+      "table": "DiagnosticsLocalizable",
+      "en": "This structured text is not valid UTF-8. Inspect or export the original Artifact from History.",
+      "zh-Hans": "这份结构化文本不是有效 UTF-8。请在 History 中检查或导出原始 Artifact。"
+    },
+    {
+      "key": "diagnostics.hilog.title",
+      "table": "DiagnosticsLocalizable",
+      "en": "HiLog summary",
+      "zh-Hans": "HiLog 摘要"
+    },
+    {
+      "key": "diagnostics.hilog.failed",
+      "table": "DiagnosticsLocalizable",
+      "en": "Unable to verify the HiLog summary",
+      "zh-Hans": "无法核验 HiLog 摘要"
+    },
+    {
+      "key": "diagnostics.hilog.failed.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "Return to History to inspect this Job and its Artifacts. Reload to try reading the same record again.",
+      "zh-Hans": "请返回 History 检查此 Job 与 Artifact；重新加载只会重读同一记录。"
+    },
+    {
+      "key": "diagnostics.hilog.readOnly",
+      "table": "DiagnosticsLocalizable",
+      "en": "Read-only view of the saved summary. Opening or reloading it does not run another analysis.",
+      "zh-Hans": "只读查看已保存的摘要。打开或重新加载不会再次执行分析。"
+    },
+    {
+      "key": "diagnostics.hilog.coverage.complete",
+      "table": "DiagnosticsLocalizable",
+      "en": "All nonblank line headers recognized",
+      "zh-Hans": "全部非空行的行首已识别"
+    },
+    {
+      "key": "diagnostics.hilog.coverage.partial",
+      "table": "DiagnosticsLocalizable",
+      "en": "Some line headers unrecognized",
+      "zh-Hans": "部分行首未识别"
+    },
+    {
+      "key": "diagnostics.hilog.coverage.unrecognized",
+      "table": "DiagnosticsLocalizable",
+      "en": "No line headers recognized",
+      "zh-Hans": "没有识别到行首"
+    },
+    {
+      "key": "diagnostics.hilog.coverage.empty",
+      "table": "DiagnosticsLocalizable",
+      "en": "No nonblank lines",
+      "zh-Hans": "没有非空行"
+    },
+    {
+      "key": "diagnostics.hilog.coverage.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "These counts describe default HiLog line headers only. They do not prove capture completeness, valid body encoding, absence of faults or device health.",
+      "zh-Hans": "这些统计仅描述默认 HiLog 行首；不证明采集完整、正文编码有效、没有故障或设备健康。"
+    },
+    {
+      "key": "diagnostics.hilog.lines",
+      "table": "DiagnosticsLocalizable",
+      "en": "Physical lines",
+      "zh-Hans": "物理行数"
+    },
+    {
+      "key": "diagnostics.hilog.level.D",
+      "table": "DiagnosticsLocalizable",
+      "en": "D · Debug",
+      "zh-Hans": "D · 调试"
+    },
+    {
+      "key": "diagnostics.hilog.level.I",
+      "table": "DiagnosticsLocalizable",
+      "en": "I · Info",
+      "zh-Hans": "I · 信息"
+    },
+    {
+      "key": "diagnostics.hilog.level.W",
+      "table": "DiagnosticsLocalizable",
+      "en": "W · Warning",
+      "zh-Hans": "W · 警告"
+    },
+    {
+      "key": "diagnostics.hilog.level.E",
+      "table": "DiagnosticsLocalizable",
+      "en": "E · Error",
+      "zh-Hans": "E · 错误"
+    },
+    {
+      "key": "diagnostics.hilog.level.F",
+      "table": "DiagnosticsLocalizable",
+      "en": "F · Fatal",
+      "zh-Hans": "F · 致命"
+    },
+    {
+      "key": "diagnostics.hilog.unrecognized",
+      "table": "DiagnosticsLocalizable",
+      "en": "Unrecognized lines",
+      "zh-Hans": "未识别行数"
+    },
+    {
+      "key": "diagnostics.hilog.blank",
+      "table": "DiagnosticsLocalizable",
+      "en": "Blank lines",
+      "zh-Hans": "空行数"
+    },
+    {
+      "key": "diagnostics.hilog.source",
+      "table": "DiagnosticsLocalizable",
+      "en": "Recorded source",
+      "zh-Hans": "已记录来源"
+    },
+    {
+      "key": "diagnostics.hilog.source.detail",
+      "table": "DiagnosticsLocalizable",
+      "en": "The source Artifact ID matches the Job input. The source hash and size are recorded by the analyzer; this view does not read the raw log or verify it again. Export the summary from History.",
+      "zh-Hans": "来源 Artifact 标识与 Job 输入一致。来源哈希与大小来自分析器记录；此页面不会读取或重新核验原始日志。可从 History 导出摘要。"
+    },
+    {
+      "key": "diagnostics.hilog.sourceJob",
+      "table": "DiagnosticsLocalizable",
+      "en": "Source Job",
+      "zh-Hans": "来源 Job"
+    },
+    {
+      "key": "diagnostics.hilog.sourceArtifact",
+      "table": "DiagnosticsLocalizable",
+      "en": "Source Artifact",
+      "zh-Hans": "来源 Artifact"
+    },
+    {
+      "key": "diagnostics.hilog.sourceBytes",
+      "table": "DiagnosticsLocalizable",
+      "en": "Recorded source bytes",
+      "zh-Hans": "已记录来源字节数"
+    },
+    {
+      "key": "diagnostics.hilog.digests",
+      "table": "DiagnosticsLocalizable",
+      "en": "Inspect recorded hashes",
+      "zh-Hans": "查看已记录哈希"
+    },
+    {
+      "key": "diagnostics.hilog.sourceDigest",
+      "table": "DiagnosticsLocalizable",
+      "en": "Recorded source SHA-256",
+      "zh-Hans": "已记录来源 SHA-256"
+    },
+    {
+      "key": "diagnostics.hilog.toolDigest",
+      "table": "DiagnosticsLocalizable",
+      "en": "Recorded analyzer SHA-256",
+      "zh-Hans": "已记录分析器 SHA-256"
+    },
+    {
+      "key": "diagnostics.hilog.outputDigest",
+      "table": "DiagnosticsLocalizable",
+      "en": "Analyzer output SHA-256",
+      "zh-Hans": "分析器输出 SHA-256"
+    },
+    {
+      "key": "diagnostics.hilog.artifactDigest",
+      "table": "DiagnosticsLocalizable",
+      "en": "Verified summary Artifact SHA-256",
+      "zh-Hans": "已核验摘要 Artifact SHA-256"
+    },
+    {
+      "key": "windows.diagnostics.capture.mark",
+      "table": null,
+      "en": "Mark (Ctrl+M)",
+      "zh-Hans": "打标记（Ctrl+M）"
     },
     {
       "key": "jobRecovery.action.reconcile",
@@ -6475,10 +6943,10 @@
       "zh-Hans": "重新核对恢复状态"
     },
     {
-      "key": "jobRecovery.action.reconcile.detail",
+      "key": "jobRecovery.action.observed",
       "table": "JobsLocalizable",
-      "en": "Runtime checks durable evidence and current identity. An unknown original action is never replayed.",
-      "zh-Hans": "Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。"
+      "en": "Runtime reported the updated state",
+      "zh-Hans": "Runtime 已返回更新后的状态"
     },
     {
       "key": "jobRecovery.action.refused",
@@ -6487,16 +6955,34 @@
       "zh-Hans": "恢复操作不可用"
     },
     {
+      "key": "jobRecovery.action.rebind.detail",
+      "table": "JobsLocalizable",
+      "en": "Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.",
+      "zh-Hans": "核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。"
+    },
+    {
+      "key": "jobRecovery.action.reconcile.detail",
+      "table": "JobsLocalizable",
+      "en": "Runtime checks durable evidence and current identity. An unknown original action is never replayed.",
+      "zh-Hans": "Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。"
+    },
+    {
       "key": "jobRecovery.action.resume",
       "table": "JobsLocalizable",
       "en": "Continue from confirmed safe boundary",
       "zh-Hans": "从已确认的安全边界继续"
     },
     {
-      "key": "jobRecovery.action.resume.detail",
+      "key": "jobRecovery.action.rebound",
       "table": "JobsLocalizable",
-      "en": "Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.",
-      "zh-Hans": "仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。"
+      "en": "Loader binding verified; review the Job’s current recovery state",
+      "zh-Hans": "Loader 绑定已核验；请查看此 Job 的当前恢复状态"
+    },
+    {
+      "key": "jobRecovery.action.working",
+      "table": "JobsLocalizable",
+      "en": "Checking this Job…",
+      "zh-Hans": "正在核对这个 Job…"
     },
     {
       "key": "jobRecovery.action.stillUnknown",
@@ -6511,10 +6997,10 @@
       "zh-Hans": "未能确认请求结果。请先刷新此 Job，再决定后续操作。"
     },
     {
-      "key": "jobRecovery.action.working",
+      "key": "jobRecovery.action.resume.detail",
       "table": "JobsLocalizable",
-      "en": "Checking this Job…",
-      "zh-Hans": "正在核对这个 Job…"
+      "en": "Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.",
+      "zh-Hans": "仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。"
     },
     {
       "key": "jobRecovery.action.rebind",
@@ -6523,100 +7009,10 @@
       "zh-Hans": "核验并重新绑定 Loader"
     },
     {
-      "key": "jobRecovery.action.rebind.detail",
+      "key": "jobRecovery.archive.blocker.active",
       "table": "JobsLocalizable",
-      "en": "Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.",
-      "zh-Hans": "核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。"
-    },
-    {
-      "key": "jobRecovery.action.rebound",
-      "table": "JobsLocalizable",
-      "en": "Loader binding verified; review the Job’s current recovery state",
-      "zh-Hans": "Loader 绑定已核验；请查看此 Job 的当前恢复状态"
-    },
-    {
-      "key": "jobRecovery.archive.review",
-      "table": "JobsLocalizable",
-      "en": "Review archive…",
-      "zh-Hans": "检查归档条件…"
-    },
-    {
-      "key": "jobRecovery.archive.working",
-      "table": "JobsLocalizable",
-      "en": "Checking archive state…",
-      "zh-Hans": "正在核对归档状态…"
-    },
-    {
-      "key": "jobRecovery.archive.unavailable",
-      "table": "JobsLocalizable",
-      "en": "Archive is unavailable. Refresh this Job and inspect its recovery state.",
-      "zh-Hans": "暂时无法归档。请刷新此 Job 并检查恢复状态。"
-    },
-    {
-      "key": "jobRecovery.archive.complete",
-      "table": "JobsLocalizable",
-      "en": "Archived as interrupted. The Session retains the original evidence.",
-      "zh-Hans": "已按中断状态归档，Session 保留原始证据。"
-    },
-    {
-      "key": "jobRecovery.archive.publicationPending",
-      "table": "JobsLocalizable",
-      "en": "The interruption is recorded; Session publication is pending. Review archive again to finish publishing.",
-      "zh-Hans": "中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。"
-    },
-    {
-      "key": "jobRecovery.archive.title",
-      "table": "JobsLocalizable",
-      "en": "Archive interrupted Job",
-      "zh-Hans": "归档中断的 Job"
-    },
-    {
-      "key": "jobRecovery.archive.detail",
-      "table": "JobsLocalizable",
-      "en": "Archive ends this Job and keeps its evidence. It does not recover the device or clean up device state. Runtime must prove that no managed process, unknown outcome, or unresolved hazard remains.",
-      "zh-Hans": "归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。"
-    },
-    {
-      "key": "jobRecovery.archive.lastStep",
-      "table": "JobsLocalizable",
-      "en": "Last confirmed step",
-      "zh-Hans": "最后确认的步骤"
-    },
-    {
-      "key": "jobRecovery.archive.existingDecision",
-      "table": "JobsLocalizable",
-      "en": "A previous archive decision is already recorded. This action only finishes its audit or Session publication.",
-      "zh-Hans": "已有归档决策记录。此操作仅补齐原决策的审计或 Session 发布。"
-    },
-    {
-      "key": "jobRecovery.archive.dismiss",
-      "table": "JobsLocalizable",
-      "en": "Back",
-      "zh-Hans": "返回"
-    },
-    {
-      "key": "jobRecovery.archive.confirm",
-      "table": "JobsLocalizable",
-      "en": "Archive as interrupted",
-      "zh-Hans": "按中断状态归档"
-    },
-    {
-      "key": "jobRecovery.archive.finish",
-      "table": "JobsLocalizable",
-      "en": "Finish recorded archive",
-      "zh-Hans": "完成已记录的归档"
-    },
-    {
-      "key": "jobRecovery.archive.blocker.unknown",
-      "table": "JobsLocalizable",
-      "en": "An action still has an unknown outcome. Keep this Job available for recovery.",
-      "zh-Hans": "仍有操作结果未知，需保留此 Job 进行恢复。"
-    },
-    {
-      "key": "jobRecovery.archive.blocker.mutation",
-      "table": "JobsLocalizable",
-      "en": "This Runtime cannot yet prove that a device-changing Job can release all its holds.",
-      "zh-Hans": "当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。"
+      "en": "Runtime is still handling this Job. Wait for it to reach a safe boundary.",
+      "zh-Hans": "Runtime 仍在处理此 Job，请等待其到达安全边界。"
     },
     {
       "key": "jobRecovery.archive.blocker.hazards",
@@ -6625,16 +7021,22 @@
       "zh-Hans": "未解决的风险或设备残留仍需与此 Job 关联。"
     },
     {
+      "key": "jobRecovery.archive.blocker.mutation",
+      "table": "JobsLocalizable",
+      "en": "This Runtime cannot yet prove that a device-changing Job can release all its holds.",
+      "zh-Hans": "当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。"
+    },
+    {
       "key": "jobRecovery.archive.blocker.process",
       "table": "JobsLocalizable",
       "en": "The managed process or compensation state is not proven safe to close.",
       "zh-Hans": "尚不能证明托管进程或补偿状态可安全结束。"
     },
     {
-      "key": "jobRecovery.archive.blocker.active",
+      "key": "jobRecovery.archive.blocker.refresh",
       "table": "JobsLocalizable",
-      "en": "Runtime is still handling this Job. Wait for it to reach a safe boundary.",
-      "zh-Hans": "Runtime 仍在处理此 Job，请等待其到达安全边界。"
+      "en": "The Job record or journal needs a fresh recovery check before archive.",
+      "zh-Hans": "归档前需要重新核对 Job 记录与日志的恢复状态。"
     },
     {
       "key": "jobRecovery.archive.blocker.storage",
@@ -6643,10 +7045,82 @@
       "zh-Hans": "Session 存储不可用，请恢复存储后再归档。"
     },
     {
-      "key": "jobRecovery.archive.blocker.refresh",
+      "key": "jobRecovery.archive.blocker.unknown",
       "table": "JobsLocalizable",
-      "en": "The Job record or journal needs a fresh recovery check before archive.",
-      "zh-Hans": "归档前需要重新核对 Job 记录与日志的恢复状态。"
+      "en": "An action still has an unknown outcome. Keep this Job available for recovery.",
+      "zh-Hans": "仍有操作结果未知，需保留此 Job 进行恢复。"
+    },
+    {
+      "key": "jobRecovery.archive.complete",
+      "table": "JobsLocalizable",
+      "en": "Archived as interrupted. The Session retains the original evidence.",
+      "zh-Hans": "已按中断状态归档，Session 保留原始证据。"
+    },
+    {
+      "key": "jobRecovery.archive.confirm",
+      "table": "JobsLocalizable",
+      "en": "Archive as interrupted",
+      "zh-Hans": "按中断状态归档"
+    },
+    {
+      "key": "jobRecovery.archive.detail",
+      "table": "JobsLocalizable",
+      "en": "Archive ends this Job and keeps its evidence. It does not recover the device or clean up device state. Runtime must prove that no managed process, unknown outcome, or unresolved hazard remains.",
+      "zh-Hans": "归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。"
+    },
+    {
+      "key": "jobRecovery.archive.dismiss",
+      "table": "JobsLocalizable",
+      "en": "Back",
+      "zh-Hans": "返回"
+    },
+    {
+      "key": "jobRecovery.archive.existingDecision",
+      "table": "JobsLocalizable",
+      "en": "A previous archive decision is already recorded. This action only finishes its audit or Session publication.",
+      "zh-Hans": "已有归档决策记录。此操作仅补齐原决策的审计或 Session 发布。"
+    },
+    {
+      "key": "jobRecovery.archive.finish",
+      "table": "JobsLocalizable",
+      "en": "Finish recorded archive",
+      "zh-Hans": "完成已记录的归档"
+    },
+    {
+      "key": "jobRecovery.archive.lastStep",
+      "table": "JobsLocalizable",
+      "en": "Last confirmed step",
+      "zh-Hans": "最后确认的步骤"
+    },
+    {
+      "key": "jobRecovery.archive.publicationPending",
+      "table": "JobsLocalizable",
+      "en": "The interruption is recorded; Session publication is pending. Review archive again to finish publishing.",
+      "zh-Hans": "中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。"
+    },
+    {
+      "key": "jobRecovery.archive.review",
+      "table": "JobsLocalizable",
+      "en": "Review archive…",
+      "zh-Hans": "检查归档条件…"
+    },
+    {
+      "key": "jobRecovery.archive.title",
+      "table": "JobsLocalizable",
+      "en": "Archive interrupted Job",
+      "zh-Hans": "归档中断的 Job"
+    },
+    {
+      "key": "jobRecovery.archive.unavailable",
+      "table": "JobsLocalizable",
+      "en": "Archive is unavailable. Refresh this Job and inspect its recovery state.",
+      "zh-Hans": "暂时无法归档。请刷新此 Job 并检查恢复状态。"
+    },
+    {
+      "key": "jobRecovery.archive.working",
+      "table": "JobsLocalizable",
+      "en": "Checking archive state…",
+      "zh-Hans": "正在核对归档状态…"
     }
   ]
 }

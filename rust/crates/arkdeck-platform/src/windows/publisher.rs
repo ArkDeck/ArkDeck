@@ -118,6 +118,35 @@ pub(crate) fn chain_matches(
         && usages.contains(&publisher.eku)
 }
 
+/// The publisher identity (maintainer ruling 17) a chain `WinVerifyTrust`
+/// verified carries, if it is an Artifact Signing chain: its root is the
+/// pinned Microsoft root, and its leaf has one subject `O=`, the code-signing
+/// EKU and exactly one certificate-profile identity EKU. None otherwise, as
+/// for the development signer's chain.
+pub(crate) fn chain_publisher(chain: &[Vec<u8>]) -> Option<(String, String)> {
+    let [leaf, .., root] = chain else {
+        return None;
+    };
+    if format!("{:x}", Sha256::digest(root)) != ARTIFACT_SIGNING_ROOT_SHA256 {
+        return None;
+    }
+    let certificate = Certificate::decode(leaf).ok()?;
+    let organizations = certificate.subject_organizations().ok()?;
+    let usages = certificate.enhanced_key_usages().ok()?;
+    let profiles: Vec<&String> = usages
+        .iter()
+        .filter(|usage| {
+            usage.starts_with(IDENTITY_EKU_PREFIX) && usage.as_str() != PUBLIC_TRUST_MARKER_EKU
+        })
+        .collect();
+    match (organizations.as_slice(), profiles.as_slice()) {
+        ([organization], [eku]) if usages.iter().any(|usage| usage == CODE_SIGNING_EKU) => {
+            Some((organization.clone(), (*eku).clone()))
+        }
+        _ => None,
+    }
+}
+
 /// The name a signer is known by in a tool registration (TASK-XPA-011): the
 /// leaf's single subject `O=`, or, with no `O=`, its single `CN=`. Anything
 /// else is not one name and is an error.

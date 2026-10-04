@@ -697,7 +697,7 @@ body.device-native .nav button.on .ic{color:var(--accent-ink)}body.device-native
 body.device-native .dev{margin-top:4px}body.device-native #devlist>.nav{margin-bottom:4px}
 body.device-native .dev .dn span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @container (max-width:879px){
-  .device-control-grid{display:flex;flex-direction:column;overflow-y:auto}.device-stage{height:420px;min-height:420px;flex:none}
+  .device-control-grid{display:flex;flex-direction:column;overflow-y:auto}.device-stage{height:clamp(160px,calc(100dvh - 260px),420px);min-height:160px;flex:none}
   .device-inspector{overflow:visible;min-height:auto;border-inline-start:0;border-top:1px solid var(--line);flex:none}
   .device-footer{align-items:flex-start;flex-wrap:wrap}.device-footer>p:last-child{text-align:start}
 }
@@ -1284,7 +1284,7 @@ function toggleTheme(){
   $("themeToggle").textContent=themeLabel();
 }
 function openDrawer(){if(!S.drawerOpen)toggleDrawer();}
-function go(nav){S.nav=nav;render();}
+function go(nav){if(S.nav==="device-control"&&nav!==S.nav&&S.deviceControl)S.deviceControl.previewActive=false;S.nav=nav;render();}
 function pickDevice(id){S.device=id;S.nav=DEVICES.find(d=>d.id===id).state==="unauthorized"?"auth":"device";render();}
 function closeDeviceMenu(){$("deviceMenu").hidden=true;$("deviceMenu").innerHTML="";}
 function openDeviceMenu(event,id){
@@ -3297,7 +3297,19 @@ document.addEventListener("keydown",e=>{
 // not hardware latency, recording duration or a promised capture rate.
 const DEVICE_COPY = {
   "zh-Hans": {
-    "device.boundary": "这是静止画面，不是实时预览。每个手势都是一次 typed operation；结果未知时绝不重发。",
+    "device.boundary": "预览按次刷新静止画面。每个手势都是一次 typed operation；结果未知时绝不重发。",
+    "device.keyboard.focus": "移动指针",
+    "device.keyboard.swipeEnd": "滑动到指针",
+    "device.keyboard.swipeStart": "设置滑动起点",
+    "device.keyboard.help": "按 Tab 聚焦画面。方向键移动指针，Shift 加速；回车或空格点击，Option-回车长按；Shift-回车设置滑动起点，移动后再按一次发送；Esc 清除起点。",
+    "device.keyboard.title": "设备键盘指针",
+    "device.preview.detail": "最多 60 秒／30 帧，每次截图间隔 2 秒。操作设备或录屏前请停止预览。",
+    "device.preview.contextChanged": "预览已停止 · 设备或绑定发生变化",
+    "device.preview.limit": "预览结束 · 已达 60 秒或 30 帧上限",
+    "device.preview.stopping": "正在停止 · 等待本次截图结束",
+    "device.preview.running": "正在刷新截图",
+    "device.preview.stop": "停止预览",
+    "device.preview.start": "开始预览",
     "device.frame.age": "画面拍摄于",
     "device.frame.none": "尚无画面",
     "device.frame.unknownAge": "画面年龄未知",
@@ -3350,11 +3362,23 @@ const DEVICE_COPY = {
     "device.record.needs": "需要",
     "device.record.free": "剩余",
     "device.record.headroomUnknown": "读不到制品库剩余空间，这次运行没有对它做检查。运行时仍会拒绝一段它存不下的录屏。",
-    "device.performance.title": "不会自行取帧。",
-    "device.performance.detail": "每张画面都是你要来的，录屏是一段有限的连拍。采集期间会抬高设备负载，你正在观察的东西可能随之变化。显示的帧率是实测值，不是承诺值。"
+    "device.performance.title": "截图会影响设备负载",
+    "device.performance.detail": "预览和录屏都会增加设备负载。测量基线性能前请停止采集。"
   },
   "en": {
-    "device.boundary": "A still, not a live view. Each gesture is one typed operation; an unknown outcome is never resent.",
+    "device.boundary": "Preview refreshes still images. Each gesture is one typed operation; an unknown outcome is never resent.",
+    "device.keyboard.focus": "Move pointer",
+    "device.keyboard.swipeEnd": "Swipe to pointer",
+    "device.keyboard.swipeStart": "Set swipe start",
+    "device.keyboard.help": "Focus the picture with Tab. Arrows move the pointer; Shift moves faster. Return or Space taps; Option-Return holds. Shift-Return sets a swipe start, then sends at the new position. Escape clears the start.",
+    "device.keyboard.title": "Device keyboard pointer",
+    "device.preview.detail": "Up to 60 seconds / 30 frames, with 2 seconds between captures. Stop preview before sending input or recording.",
+    "device.preview.contextChanged": "Preview stopped · device or binding changed",
+    "device.preview.limit": "Preview finished · 60 seconds or 30 frames reached",
+    "device.preview.stopping": "Stopping · waiting for the current capture",
+    "device.preview.running": "Refreshing screenshots",
+    "device.preview.stop": "Stop preview",
+    "device.preview.start": "Start preview",
     "device.frame.age": "Picture taken",
     "device.frame.none": "No picture yet",
     "device.frame.unknownAge": "Picture age unknown",
@@ -3407,8 +3431,8 @@ const DEVICE_COPY = {
     "device.record.needs": "needs",
     "device.record.free": "free",
     "device.record.headroomUnknown": "Could not read the artifact store's remaining room, so this run was not checked against it. The runtime still refuses a recording it cannot keep.",
-    "device.performance.title": "Nothing captures on its own.",
-    "device.performance.detail": "Every picture is one you asked for, and a recording is a bounded run of stills. Capturing raises the device's load while it runs, so what you are watching can move with it. The rate shown is the one that was measured, never a promised one."
+    "device.performance.title": "Capture affects device load",
+    "device.performance.detail": "Preview and recording add device load. Stop capture before measuring baseline performance."
   }
 };
 function deviceText(key){return DEVICE_COPY[S.language][key]||key;}
@@ -3433,7 +3457,7 @@ const DEVICE_SCENARIOS=[
 function deviceDraftState(scenario="empty"){
   const t={scenario,hasTarget:scenario!=="noTarget",frame:null,isCapturing:false,captureFailure:null,
     frameCount:40,recordStage:"idle",headroomUnchecked:false,remainingBytes:64*1024*1024,
-    refusal:null,lastRecording:null,recordFailure:null,events:[],gesturePending:false,pointer:null,marker:null};
+    refusal:null,lastRecording:null,recordFailure:null,events:[],gesturePending:false,pointer:null,marker:null,previewActive:false,previewCount:0,keyboard:{x:360,y:640,anchor:null}};
   if(["captured","stale","history","unknown","inputFailed","captureFailed"].includes(scenario)){
     t.frame={width:720,height:1280,capturedAt:Date.now(),stale:["stale","history"].includes(scenario)};
   }
@@ -3457,17 +3481,24 @@ function devicePushEvent(t,key,detail,outcome="neutral",refused=false){
   t.events.unshift({key,detail,outcome,refused});t.events=t.events.slice(0,40);
   deviceAnnounce(deviceText(key)+" · "+detail);
 }
-function captureDeviceScreenshot(){
-  const t=S.deviceControl;if(!t.hasTarget||t.isCapturing)return;
+function captureDeviceScreenshot(preview=false){
+  const t=S.deviceControl;if(!t.hasTarget||t.isCapturing||t.gesturePending||deviceRecordingBusy(t)||(!preview&&t.previewActive))return;
+  if(preview&&performance.now()-t.previewStarted>=60000){t.previewActive=false;deviceRender();return;}
   t.isCapturing=true;deviceAnnounce(deviceText("device.screen.capturing"));deviceRender();
   setTimeout(()=>{
     if(S.deviceControl!==t)return;t.isCapturing=false;
+    if(preview&&!t.previewActive){deviceRender();return;}
     if(t.scenario==="captureFailed"){
       t.captureFailure=deviceLocale("演示：截图任务失败，保留上一张画面。","Demo: capture failed; the previous frame is retained.");
-      devicePushEvent(t,"device.log.captureFailed",t.captureFailure,"failed");
+      t.previewActive=false;devicePushEvent(t,"device.log.captureFailed",t.captureFailure,"failed");
     }else{
       t.frame={width:720,height:1280,capturedAt:Date.now(),stale:false};t.captureFailure=null;t.marker=null;
-      devicePushEvent(t,"device.log.captured","720×1280");
+      if(preview)t.previewCount++;else devicePushEvent(t,"device.log.captured","720×1280");
+      t.keyboard.anchor=null;
+    }
+    if(t.previewActive){
+      if(t.previewCount>=30||performance.now()-t.previewStarted>=60000)t.previewActive=false;
+      else setTimeout(()=>{if(S.deviceControl===t&&t.previewActive)captureDeviceScreenshot(true);},2000);
     }
     deviceRender();
   },700);
@@ -3478,7 +3509,7 @@ function devicePoint(event){
     y:Math.min(f.height-1,Math.max(0,Math.trunc((event.clientY-r.top)/r.height*f.height)))};
 }
 function devicePointerDown(event){
-  const t=S.deviceControl;if(event.button!==0||!t.frame||t.gesturePending||t.pointer)return;
+  const t=S.deviceControl;if(event.button!==0||!t.frame||t.gesturePending||t.pointer||t.previewActive||t.isCapturing||deviceRecordingBusy(t))return;
   t.pointer={...devicePoint(event),clientX:event.clientX,clientY:event.clientY,startedAt:performance.now(),id:event.pointerId};
   event.currentTarget.setPointerCapture(event.pointerId);event.preventDefault();
   deviceMoveMarker(t.pointer,true);
@@ -3504,6 +3535,11 @@ function devicePointerUp(event){
   const kind=distance>=6?"swipe":held>=500?"longPress":"tap";
   const duration=Math.min(2000,Math.max(kind==="longPress"?500:80,Math.trunc(held)));
   const detail=`(${a.x}, ${a.y})`+(kind==="swipe"?` → (${b.x}, ${b.y})`:"")+(kind!=="tap"?` · ${duration}ms`:"");
+  submitDeviceGesture(t,kind,a,detail);
+}
+function submitDeviceGesture(t,kind,a,detail){
+  if(!t.frame||t.frame.stale||t.previewActive||t.isCapturing||t.gesturePending||deviceRecordingBusy(t))return;
+  t.keyboard.anchor=null;
   t.gesturePending=true;t.marker={x:a.x,y:a.y,pending:true};
   deviceAnnounce(deviceLocale("输入已提交，等待结果。","Input submitted; awaiting a result."));deviceRender();
   setTimeout(()=>{
@@ -3516,6 +3552,41 @@ function devicePointerUp(event){
     deviceAnnounce(deviceText("device.gesture."+kind)+" · "+deviceText("device.log."+outcome));deviceRender();
   },650);
 }
+function toggleDevicePreview(){
+  const t=S.deviceControl;
+  if(t.previewActive){t.previewActive=false;deviceRender();return;}
+  if(!t.hasTarget||t.isCapturing||t.gesturePending||deviceRecordingBusy(t))return;
+  t.previewActive=true;t.previewCount=0;t.previewStarted=performance.now();captureDeviceScreenshot(true);
+}
+function deviceKeyboardReady(t=S.deviceControl){return t.hasTarget&&t.frame&&!t.frame.stale&&!t.previewActive&&!t.isCapturing&&!t.gesturePending&&!deviceRecordingBusy(t);}
+function focusDevicePointer(){document.querySelector('[data-sync-id="device.screen.surface"]')?.focus();}
+function deviceKeyboardActivate(kind){
+  const t=S.deviceControl;if(!deviceKeyboardReady(t))return;const k=t.keyboard;
+  if(kind==="swipe"&&!k.anchor){k.anchor={x:k.x,y:k.y};deviceRender();focusDevicePointer();return;}
+  const start=kind==="swipe"?k.anchor:k;
+  const detail=`(${start.x}, ${start.y})`+(kind==="swipe"?` → (${k.x}, ${k.y}) · 300ms`:kind==="longPress"?" · 800ms":"");
+  submitDeviceGesture(t,kind,start,detail);
+}
+function deviceKeyboardEvent(event){
+  const t=S.deviceControl;if(!deviceKeyboardReady(t))return;
+  const k=t.keyboard,step=event.shiftKey?0.1:0.02;
+  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key)){
+    event.preventDefault();
+    if(event.key==="ArrowLeft")k.x=Math.max(0,k.x-Math.round(719*step));
+    if(event.key==="ArrowRight")k.x=Math.min(719,k.x+Math.round(719*step));
+    if(event.key==="ArrowUp")k.y=Math.max(0,k.y-Math.round(1279*step));
+    if(event.key==="ArrowDown")k.y=Math.min(1279,k.y+Math.round(1279*step));
+    t.marker={x:k.x,y:k.y,pending:true};deviceRender();focusDevicePointer();
+  }else if(event.key==="Escape"){event.preventDefault();k.anchor=null;deviceRender();focusDevicePointer();}
+  else if(["Enter"," "].includes(event.key)&&!event.repeat){event.preventDefault();deviceKeyboardActivate(event.shiftKey?"swipe":event.altKey?"longPress":"tap");}
+}
+function devicePreviewHTML(t){
+  return `<section class="device-control-section"><button class="btn" data-sync-id="device.preview.toggle" onclick="toggleDevicePreview()" ${!t.previewActive&&(!t.hasTarget||t.isCapturing||t.gesturePending||deviceRecordingBusy(t))?"disabled":""}>${deviceText(t.previewActive?"device.preview.stop":"device.preview.start")}</button><p data-sync-id="device.preview.status">${t.previewActive?deviceText("device.preview.running")+` · ${t.previewCount}/30`:deviceText("device.preview.detail")}</p></section>`;
+}
+function deviceKeyboardHTML(t){
+  const disabled=deviceKeyboardReady(t)?"":"disabled";
+  return `<p>${deviceText("device.keyboard.help")}</p><p data-sync-id="device.keyboard.position">X ${t.keyboard.x} · Y ${t.keyboard.y}</p><button class="btn" data-sync-id="device.keyboard.focus" onclick="focusDevicePointer()" ${disabled}>${deviceText("device.keyboard.focus")}</button><button class="btn" data-sync-id="device.keyboard.tap" onclick="deviceKeyboardActivate('tap')" ${disabled}>${deviceText("device.gesture.tap")}</button><button class="btn" data-sync-id="device.keyboard.longPress" onclick="deviceKeyboardActivate('longPress')" ${disabled}>${deviceText("device.gesture.longPress")}</button><button class="btn" data-sync-id="device.keyboard.swipe" onclick="deviceKeyboardActivate('swipe')" ${disabled}>${deviceText(t.keyboard.anchor?"device.keyboard.swipeEnd":"device.keyboard.swipeStart")}</button>`;
+}
 function deviceRecordingBusy(t=S.deviceControl){return ["preflighting","capturing","assembling","validating"].includes(t.recordStage);}
 function deviceRecordingBytes(frames){return Math.max(1<<20,Math.trunc(frames*42573*3/2)+(64<<10));}
 function deviceChangeFrames(delta){const t=S.deviceControl;if(deviceRecordingBusy(t))return;t.frameCount=Math.min(300,Math.max(2,t.frameCount+delta));deviceRender();}
@@ -3524,7 +3595,7 @@ function deviceRecordingTitle(t){
   return deviceText("device.record."+t.recordStage)+(t.recordStage==="capturing"?" · "+t.frameCount:"");
 }
 function startDeviceRecording(){
-  const t=S.deviceControl;if(deviceRecordingBusy(t))return;
+  const t=S.deviceControl;if(deviceRecordingBusy(t)||t.previewActive||t.isCapturing||t.gesturePending)return;
   if(!t.hasTarget){t.recordStage="failed";t.recordFailure=deviceText("device.record.noTarget");deviceRender();return;}
   const requestedFrames=t.frameCount;
   t.lastRecording=null;t.refusal=null;t.headroomUnchecked=false;t.recordStage="preflighting";
@@ -3560,7 +3631,7 @@ function deviceSaveRecording(){
 function deviceFrameHTML(t){
   if(!t.frame)return `<div class="device-empty" data-sync-id="device.screen.empty">${icon("device")}<h2>${deviceText("device.screen.empty.title")}</h2><p>${esc(t.captureFailure||deviceText(t.hasTarget?"device.screen.empty.ready":"device.screen.empty.noTarget"))}</p></div>`;
   const m=t.marker;
-  return `<div class="device-screen" data-sync-id="device.screen.surface" role="group" aria-label="${deviceLocale("演示截图操作面：单击、长按或拖动；没有键盘输入映射","Demo screenshot: click, hold or drag; keyboard input is not mapped")}" tabindex="0" aria-busy="${t.gesturePending}" onpointerdown="devicePointerDown(event)" onpointermove="devicePointerMove(event)" onpointerup="devicePointerUp(event)" onpointercancel="devicePointerCancel(event)">
+  return `<div class="device-screen" data-sync-id="device.screen.surface" role="group" aria-label="${deviceText("device.keyboard.title")}" onkeydown="deviceKeyboardEvent(event)" tabindex="0" aria-busy="${t.gesturePending}" onpointerdown="devicePointerDown(event)" onpointermove="devicePointerMove(event)" onpointerup="devicePointerUp(event)" onpointercancel="devicePointerCancel(event)">
     <div class="device-screen-content" aria-hidden="true"><b>${deviceLocale("演示截图","Demo screenshot")}</b><span>720 × 1280</span><span>${deviceLocale("不包含真实设备内容","No real device content")}</span></div>
     ${t.frame.stale?`<span class="device-stale-overlay" data-sync-id="device.stale.badge">${icon("history",true)}${deviceText("device.stale.badge")}</span>`:""}
     <span id="deviceTouch" class="device-touch-feedback${m?.pending?" pending":""}" ${m?"":"hidden"} style="left:${m?100*m.x/t.frame.width:0}%;top:${m?100*m.y/t.frame.height:0}%" aria-hidden="true"></span>
@@ -3582,15 +3653,16 @@ function deviceRecordingHTML(t){
   if(t.recordStage==="ready"&&t.lastRecording){const r=t.lastRecording;
     state=`<div class="device-recording-result"><strong data-sync-id="device.record.ready" role="status">${icon("check",true)}${r.frameCount} ${deviceText("device.record.frames")} · ${r.fps.toFixed(2)} fps ${deviceText("device.record.rate")}</strong>${r.missing?`<p class="device-warning device-small" data-sync-id="device.record.gap">${r.missing} ${deviceText("device.record.gap")}</p>`:""}<span class="device-recording-path" title="${r.path}" data-sync-id="device.record.location">${r.path}</span><p class="device-small">${deviceText("device.record.timeline")}</p><div class="device-record-actions"><button data-sync-id="device.record.reveal" onclick="deviceAnnounce(deviceLocale('演示稿不会打开访达，也没有生成文件。','This draft does not open Finder or generate a file.'))">${deviceText("device.record.reveal")}</button><button data-sync-id="device.record.saveAs" onclick="deviceSaveRecording()">${deviceText("device.record.saveAs")}</button><button data-sync-id="device.record.again" onclick="resetDeviceRecording()">${deviceText("device.record.again")}</button></div></div>`;
   }
-  return `<section class="device-control-section"><h2>${deviceText("device.record.title")}${deviceRecordingBusy(t)?'<span class="device-record-progress" aria-hidden="true"></span>':""}</h2><div class="device-record-stepper" data-sync-id="device.record.frames"><output aria-label="${deviceLocale("录制帧数","Frame count")}">${t.frameCount} ${deviceText("device.record.frames")}</output><span><button data-focus-key="device-frames-increase" aria-label="${deviceLocale("增加帧数","Increase frame count")}" onclick="deviceChangeFrames(10)" ${deviceRecordingBusy(t)||t.frameCount>=300?"disabled":""}>${icon("chevron",true)}</button><button data-focus-key="device-frames-decrease" aria-label="${deviceLocale("减少帧数","Decrease frame count")}" onclick="deviceChangeFrames(-10)" ${deviceRecordingBusy(t)||t.frameCount<=2?"disabled":""}>${icon("chevron",true)}</button></span></div><button class="btn device-record-start" data-sync-id="device.record.start" onclick="startDeviceRecording()" ${deviceRecordingBusy(t)?"disabled":""}>${icon("record",true)}${deviceRecordingTitle(t)}</button>${t.headroomUnchecked?`<p class="device-warning device-small" data-sync-id="device.record.headroomUnknown">${deviceText("device.record.headroomUnknown")}</p>`:""}${state}</section>`;
+  return `<section class="device-control-section"><h2>${deviceText("device.record.title")}${deviceRecordingBusy(t)?'<span class="device-record-progress" aria-hidden="true"></span>':""}</h2><div class="device-record-stepper" data-sync-id="device.record.frames"><output aria-label="${deviceLocale("录制帧数","Frame count")}">${t.frameCount} ${deviceText("device.record.frames")}</output><span><button data-focus-key="device-frames-increase" aria-label="${deviceLocale("增加帧数","Increase frame count")}" onclick="deviceChangeFrames(10)" ${deviceRecordingBusy(t)||t.frameCount>=300?"disabled":""}>${icon("chevron",true)}</button><button data-focus-key="device-frames-decrease" aria-label="${deviceLocale("减少帧数","Decrease frame count")}" onclick="deviceChangeFrames(-10)" ${deviceRecordingBusy(t)||t.frameCount<=2?"disabled":""}>${icon("chevron",true)}</button></span></div><button class="btn device-record-start" data-sync-id="device.record.start" onclick="startDeviceRecording()" ${deviceRecordingBusy(t)||t.previewActive||t.isCapturing||t.gesturePending?"disabled":""}>${icon("record",true)}${deviceRecordingTitle(t)}</button>${t.headroomUnchecked?`<p class="device-warning device-small" data-sync-id="device.record.headroomUnknown">${deviceText("device.record.headroomUnknown")}</p>`:""}${state}</section>`;
 }
 function pDeviceControl(){
   const t=S.deviceControl;
   const age=t.frame?`${deviceText("device.frame.age")} ${Math.max(0,Math.floor((Date.now()-t.frame.capturedAt)/1000))}s · ${t.frame.width}×${t.frame.height}`:deviceText("device.frame.none");
   return `<div class="device-workspace-shell" data-page-title="Device">
-    <header class="device-toolbar"><div class="device-target"><b>${t.hasTarget?"OpenHarmony 3.2":deviceText("device.target.none")}</b><span>${t.hasTarget?"TGT-DEMO-001 · binding r4":deviceText("device.target.none.detail")}</span></div><button class="btn" data-sync-id="device.capture" onclick="captureDeviceScreenshot()" ${!t.hasTarget||t.isCapturing?"disabled":""}>${icon("camera",true)} ${deviceText(t.isCapturing?"device.screen.capturing":"device.screen.capture")}</button></header>
+    <header class="device-toolbar"><div class="device-target"><b>${t.hasTarget?"OpenHarmony 3.2":deviceText("device.target.none")}</b><span>${t.hasTarget?"TGT-DEMO-001 · binding r4":deviceText("device.target.none.detail")}</span></div><button class="btn" data-sync-id="device.capture" onclick="captureDeviceScreenshot()" ${!t.hasTarget||t.isCapturing||t.previewActive||t.gesturePending||deviceRecordingBusy(t)?"disabled":""}>${icon("camera",true)} ${deviceText(t.isCapturing?"device.screen.capturing":"device.screen.capture")}</button></header>
     <div class="device-control-grid"><section class="device-stage" aria-label="${deviceLocale("设备画面","Device screen")}">${deviceFrameHTML(t)}</section><aside class="device-inspector" aria-label="${deviceLocale("设备操作","Device controls")}">
-      <section class="device-control-section"><h2>${deviceText("device.gestures.title")}</h2><p>${deviceText("device.gestures.tap")}</p><p>${deviceText("device.gestures.longPress")}</p><p>${deviceText("device.gestures.swipe")}</p></section>
+      ${devicePreviewHTML(t)}
+      <section class="device-control-section"><h2>${deviceText("device.gestures.title")}</h2><p>${deviceText("device.gestures.tap")}</p><p>${deviceText("device.gestures.longPress")}</p><p>${deviceText("device.gestures.swipe")}</p>${deviceKeyboardHTML(t)}</section>
       ${deviceRecordingHTML(t)}
       <section class="device-control-section device-log"><h2>${deviceText("device.log.title")}</h2>${t.events.length?`<div class="device-log-list">${t.events.map(e=>`<div class="device-log-row" data-outcome="${e.outcome}" data-sync-id="${e.refused?"device.log.refused":"device.log.entry"}">${icon(e.refused||e.outcome==="failed"||e.outcome==="unknown"?"warning":e.outcome==="confirmed"?"check":"camera",true)}<div><b>${deviceText(e.key)}${e.isInput?" · "+deviceText("device.log."+e.outcome):""}</b><p>${esc(e.detail)}</p></div></div>`).join("")}</div>`:`<p>${deviceText("device.log.empty")}</p>`}</section>
       <section class="performance-note" data-sync-id="device.performance">${icon("trace",true)}<div><b>${deviceText("device.performance.title")}</b><p>${deviceText("device.performance.detail")}</p></div></section>
@@ -3613,9 +3685,9 @@ function toggleDeviceWidth(){
 /* Mirrors the shipped Debug workbench: five tabs with Artifacts first, one
    signed app-owned .so per request from a local file or a verified read-only
    SSH build source, and every group drawn as a section title over a hairline
-   rather than a bordered card. Unshipped design directions (SMB, WSL, batch
-   selection, .abc replacement, standalone device restart, per-package
-   lifecycle) stay visible as unavailable instead of being faked. */
+   rather than a bordered card. Folder and mounted-SMB sources feed the same
+   per-library operation; WSL uses verified SSH. Reviewed queues run serially
+   and stop on uncertainty. .abc and standalone restart remain unavailable. */
 let DEBUG_SERVERS=[
   {id:"build-nightly",name:"build · nightly",host:"build.example.internal",port:"22",
    username:"builder",auth:"key",keyName:"id_ed25519",credentialStored:true,
@@ -3786,7 +3858,7 @@ function debugServerManager(){
         <button class="btn" onclick="deleteDebugServerModal('${s.id}')">${lc("移除服务器","Remove server")}</button></div></div>`).join("")
       ||lc("<p class=\"empty\">尚未配置服务器。先添加 SSH 服务器，随后即可在 Debug 中浏览远端编译产物。</p>","<p class=\"empty\">No server configured. Add an SSH server to browse remote build artifacts in Debug.</p>")}</div>
     <div class="okbox">${icon("warning",true)} ${lc("安全边界：只读 SFTP;首次验证的指纹需显式保存，后续连接若主机密钥变化将直接拒绝；导入的凭据只存入 Keychain，秘密不会进入配置、日志、命令行或 Runtime XPC。","Read-only SFTP. Save the verified fingerprint explicitly; later host-key changes are refused. Credentials stay in Keychain, outside configuration, logs, command lines and Runtime XPC.")}</div>
-    <p class="hint">${lc("本机目录、SMB 共享与 WSL 发行版是 v0.9 设计输入,对应 typed behavior 发布前保持不可用。","Local directories, SMB shares and WSL distributions remain unavailable until their typed behavior is published.")}</p>
+    <p class="hint">${lc("本机目录与已挂载 SMB 在产物页选择；WSL 使用已验证的 SSH 服务器。此编辑器仅保存 SSH 来源。","Select directories and mounted SMB shares in Artifacts; use verified SSH for WSL. This editor saves SSH sources only.")}</p>
     <div class="modal-actions"><button class="btn" onclick="closeModal()">${lc("完成","Done")}</button>
       <button class="btn pri" onclick="openDebugServerEditor('')">${lc("添加服务器","Add server")}</button></div></div>`);
 }
@@ -3797,9 +3869,9 @@ function openDebugServerEditor(id){
     <label class="debug-field"><span>${lc("显示名称","Display name")}</span><input class="inp" id="dbgName" value="${esc(s?.name||"")}" placeholder="build · nightly"></label>
     <label class="debug-field"><span>${lc("来源类型","Source type")}</span><select class="inp" id="dbgKind">
       <option value="ssh" selected>${lc("SSH 服务器","SSH server")}</option>
-      <option value="dir" disabled>${lc("本机目录 — 暂不可用","Local directory — unavailable")}</option>
-      <option value="smb" disabled>${lc("SMB 共享 — 暂不可用","SMB share — unavailable")}</option>
-      <option value="wsl" disabled>${lc("WSL 发行版 — 暂不可用","WSL distribution — unavailable")}</option></select></label>
+      <option value="dir" disabled>${lc("本机目录 — 在产物页选择","Local directory — choose in Artifacts")}</option>
+      <option value="smb" disabled>${lc("SMB 共享 — 先在 Finder 挂载","SMB share — mount in Finder first")}</option>
+      <option value="wsl" disabled>${lc("WSL — 使用 SSH 服务器","WSL — use an SSH server")}</option></select></label>
     <div class="debug-source">
       <label class="debug-field"><span>${lc("主机名或 IP","Host or IP")}</span><input class="inp mono" id="dbgHost" value="${esc(s?.host||"")}" placeholder="build.example.internal"></label>
       <label class="debug-field"><span>${lc("端口","Port")}</span><input class="inp mono" id="dbgPort" type="number" min="1" max="65535" value="${esc(s?.port||"22")}" inputmode="numeric"></label>
@@ -4151,6 +4223,34 @@ function debugHAPPreview(){
   const h=S.hap,inputs={bundleName:h.bundle,abilityName:h.ability,installPolicy:h.install,cleanupPolicy:h.cleanup,postRunAbilityState:h.postRun,captureDiagnostics:h.diagnostics,diagnosticsDurationSeconds:Number(h.seconds)};
   modal(`<div class="modal" role="dialog" aria-modal="true"><h3>debug.hap@1 · ${lc('演示提交边界','Demo submission boundary')}</h3><p>${lc('生产 App 将逐个导入并校验入口 HAP 和附加 HAP/HSP，获取绑定的 Artifact lease，再提交一个 typed 生命周期 Job。Runtime 决定准入与实际结果。当前原型不会导入文件、创建 Job 或执行设备操作。','The App imports and validates the entry HAP and additional HAP/HSP packages, obtains bound Artifact leases, then submits one typed lifecycle Job. Runtime determines admission and outcome. This prototype imports no file, creates no Job and performs no device operation.')}</p><pre class="viewer-raw">${esc(JSON.stringify({inputs,localSelection:{entry:h.file,additional:h.additional}},null,2))}</pre><div class="mfoot"><button class="btn" onclick="closeModal()">${lc('关闭','Close')}</button></div></div>`);
 }
+const DEBUG_LIBRARY_QUEUE=[];
+function debugQueueLibrary(name,source){
+  if(!debugLibValid(name)||DEBUG_LIBRARY_QUEUE.length>=16||DEBUG_LIBRARY_QUEUE.some(row=>row.name===name))return;
+  DEBUG_LIBRARY_QUEUE.push({name,source});renderPage();
+}
+function debugRemoveQueuedLibrary(index){if(Number.isInteger(index))DEBUG_LIBRARY_QUEUE.splice(index,1);renderPage();}
+function debugBrowseDirectory(){
+  modal(`<div class="modal" role="dialog" aria-modal="true"><h3>${lc('所选文件夹中的动态库','Libraries in selected folders')}</h3>
+    <p>${lc('原型展示示例文件；生产 App 使用系统文件夹选择器，也可选择 Finder 已挂载的 SMB 共享。最多读取 500 个条目、展示 100 个动态库，跳过符号链接。','The prototype shows sample files. The App uses the system folder picker, including Finder-mounted SMB shares, with at most 500 entries and 100 libraries and no symbolic-link traversal.')}</p>
+    ${['libfeature_debug.so','libperf_probe.so'].map(name=>`<p><label><input type="checkbox" ${DEBUG_LIBRARY_QUEUE.some(row=>row.name===name)?'checked disabled':''} onchange="debugQueueLibrary('${name}','folder sample');this.disabled=true"> ${name}</label></p>`).join('')}
+    <div class="mfoot"><button class="btn" onclick="closeModal()">${lc('完成','Done')}</button></div></div>`);
+}
+function debugReviewBatch(){
+  if(!DEBUG_LIBRARY_QUEUE.length||!debugBundleValid(S.debug.bundle))return;
+  modal(`<div class="modal" role="dialog" aria-modal="true"><h3>${lc('检查动态库部署队列','Review library deployment queue')}</h3>
+    <p>${lc('每个动态库单独部署，分别执行备份、应用重启、读取验证和失败回滚。整批不具备原子性：后续文件失败时，先前成功的部署会保留。','Each library is a separate deployment with its own backup, app restart, readback and rollback. This is not an atomic batch: earlier successful deployments are kept if a later item fails.')}</p>
+    <p class="mono">DAYU200 · binding r12 · ${esc(S.debug.bundle)}</p>
+    ${DEBUG_LIBRARY_QUEUE.map(row=>`<details><summary>${esc(row.name)}</summary><p>${esc(row.source)}</p><pre>${esc(DEBUG_PLAN_STEPS.map(step=>step.join(' · ')).join('\n'))}</pre></details>`).join('')}
+    <p class="hint">${lc('原型不读取文件、不生成计划或提交 Job；生产 App 展示每个真实计划的 SHA-256 与 plan digest。','The prototype reads no files and creates no plan or Job. The App shows the actual SHA-256 and plan digest for every library.')}</p>
+    <div class="mfoot"><button class="btn" onclick="closeModal()">${lc('返回修改','Back')}</button><button class="btn pri" data-sync-id="debug.artifacts.batch.submit" onclick="closeModal()">${lc('部署已检查的队列','Deploy reviewed queue')}</button></div></div>`);
+}
+function debugQueueSection(){
+  if(!DEBUG_LIBRARY_QUEUE.length)return '';
+  return `<section class="gsec"><h2 class="sechead">${lc('部署队列','Deployment queue')}</h2>
+    <p class="hint">${lc('所有动态库使用上方 Bundle，保留原文件名。开始前逐项检查计划；失败或结果未知时停止队列，已完成的动态库保留部署结果。','All libraries use the bundle above and keep their filenames. Review every plan before starting. A failed or unknown result stops the queue; completed libraries remain deployed.')}</p>
+    ${DEBUG_LIBRARY_QUEUE.map((row,index)=>`<div class="debug-selection"><span class="mono">${esc(row.name)}</span><span class="hint">${esc(row.source)}</span><button class="btn" onclick="debugRemoveQueuedLibrary(${index})">${lc('从队列移除','Remove from queue')}</button></div>`).join('')}
+    <button class="btn" data-sync-id="debug.artifacts.batch.prepare" onclick="debugReviewBatch()" ${debugBundleValid(S.debug.bundle)?'':'disabled'}>${lc('校验并检查队列','Validate and review queue')}</button></section>`;
+}
 function pDebug(){
   const tb=S.debugTab,d=S.debug;
   const tabs=S.language==="en"?[["artifacts","Artifacts"],["logs","Logs"],["apps","Apps"],["net","Network"],["cmd","Commands"]]
@@ -4187,19 +4287,20 @@ function pDebug(){
       <div class="debug-cols">
         <section class="gsec">
           <h2 class="sechead">${lc("编译产物","Build Artifact")}${availability(true)}</h2>
-          <p class="hint">${lc("从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。","Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.")}</p>
+          <p class="hint">${lc("从本地文件、文件夹、已挂载 SMB 共享或已验证 SSH 构建源选择已签名的 app-owned 动态库；只有所选字节进入 Artifact 导入。","Choose signed app-owned libraries from local files, folders, mounted SMB shares or a verified SSH build source. Only selected bytes enter Artifact import.")}</p>
           <span class="seg mini" aria-label="${lc("构建来源","Build source")}">
             <button class="${d.sourceKind==="local"?"on":""}" onclick="debugSetSourceKind('local')">${lc("本地文件","Local file")}</button>
             <button class="${d.sourceKind==="remote"?"on":""}" onclick="debugSetSourceKind('remote')">${lc("远端服务器","Remote server")}</button>
           </span>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             ${d.sourceKind==="local"
-              ?`<button class="btn" onclick="debugPickLocal()">${lc("选择本地 .so…","Choose local .so…")}</button>`
+              ?`<button class="btn" onclick="debugPickLocal()">${lc("选择本地 .so…","Choose local .so…")}</button><button class="btn" data-sync-id="debug.artifacts.chooseDirectory" onclick="debugBrowseDirectory()">${lc("选择文件夹 / 已挂载 SMB…","Choose folder / mounted SMB…")}</button>`
               :`<button class="btn" onclick="debugBrowseRemote()">${lc("浏览远端 .so…","Browse remote .so…")}</button>
                  <button class="btn" onclick="debugServerManager()">${lc("管理服务器…","Manage servers…")}</button>`}
           </div>
           <div><div class="hint">${lc("已选动态库","Selected library")}</div>${picked}</div>
-          <p class="hint">${lc("SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。","SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.")}</p>
+          ${d.picked?`<button class="btn" data-sync-id="debug.artifacts.batch.add" onclick="debugQueueLibrary(S.debug.picked,S.debug.pickedFrom||'local')">${lc('加入部署队列','Add to deployment queue')}</button>`:''}
+          <p class="hint">${lc("文件夹访问使用文件选择器授权；SMB 共享需先在 Finder 挂载。SSH（包括 WSL）在已保存根目录内只读访问，并固定主机密钥。","Folder access uses the file-picker grant. SMB shares must already be mounted in Finder. SSH, including WSL, stays read-only within the saved root and pins the host key.")}</p>
         </section>
 
         <section class="gsec">
@@ -4234,7 +4335,8 @@ function pDebug(){
         </div>
       </section>
 
-      <div class="warnbox" data-sync-id="debug.artifacts.productionBoundary">${icon("warning",true)} ${lc("当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。","Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.")}</div>
+      ${debugQueueSection()}
+      <div class="warnbox" data-sync-id="debug.artifacts.productionBoundary">${icon("warning",true)} ${lc("每个 Job 通过已发布 operation 部署一个已签名 app-owned .so；队列串行运行，失败或结果不确定时停止。仍执行 ELF、ABI、Build ID、hash、备份与读取验证。.abc 替换和独立设备重启仍不可用。","Each Job deploys one signed app-owned .so through the published operation. Queues run these Jobs serially, stopping on failure or uncertainty. ELF, ABI, Build ID, hash, backup and readback checks still apply. .abc replacement and standalone device restart remain unavailable.")}</div>
 
       ${stage==="verified"?`<section class="gsec"><h2 class="sechead">${lc("发布与验证 Artifact","Publish and verification Artifacts")}</h2>
         <div class="tablewrap"><table><tr><th>Artifact</th><th>SHA-256</th><th>${lc("大小","Size")}</th></tr>
@@ -4976,7 +5078,7 @@ function settingsPaneBody(tab){
   case 'toolchains':return `<section class="card"><h2>HDC</h2><dl class="kv"><dt>${lc('来源','Source')}</dt><dd>security-scoped executable</dd><dt>${lc('路径 / 版本 / SHA-256','Path / version / SHA-256')}</dt><dd>${lc('由 Runtime 探测提供','Provided by Runtime probes')}</dd><dt>server / endpoint</dt><dd>${lc('身份与归属分别展示','Identity and ownership shown separately')}</dd></dl><div class="device-actions"><button class="btn" onclick="doneBtn(this,lc('演示：打开文件选择器','Demo: open file picker'))">${lc('选择 HDC…','Choose HDC…')}</button><button class="btn" onclick="doneBtn(this,lc('演示：重新探测','Demo: re-probe'))">${lc('重新探测','Re-probe')}</button></div>${S.settings.activeJobs
       ?`<div class="warnbox" data-sync-id="settings.toolchains.futureJobsActive"><div>${lc('有任务正在运行：切换不影响运行中的 Job——工具在 Job 创建时固化，仅新任务使用新选择。','Jobs are running now: switching does not affect them — the toolchain is pinned when a Job is created, and only new Jobs use the new selection.')}</div></div>`
       :`<p class="hint" data-sync-id="settings.toolchains.futureJobs">${lc('更换 HDC 只影响新任务；运行中和已完成的任务继续保留其固定工具链快照。','Changing HDC affects only new Jobs. Running and completed Jobs keep their pinned toolchain snapshot.')}</p>`}</section>`;
-  case 'servers':return `<section class="card"><h2>${lc('远端编译来源','Remote build sources')}</h2><p class="hint">${lc('只读 SSH / SFTP，固定主机密钥和已验证根目录；凭据存入 Keychain。','Read-only SSH / SFTP with pinned host keys and verified roots. Credentials stay in Keychain.')}</p>${DEBUG_SERVERS.map(server=>`<div class="overview-run"><div><b>${esc(server.name)}</b><p class="mono hint">${esc(server.username)}@${esc(server.host)}:${esc(server.port)}<br>${esc(server.root)}</p></div><button class="btn" onclick="openDebugServerEditor('${server.id}')">${lc('编辑…','Edit…')}</button><button class="btn" onclick="deleteDebugServerModal('${server.id}')">${lc('移除…','Remove…')}</button></div>`).join('')}<div><button class="btn pri" onclick="openDebugServerEditor('')">${lc('添加 SSH 服务器…','Add SSH server…')}</button></div><p class="hint">${lc('SMB / WSL / 本机目录来源管理尚未实现；本地单文件导入已实现。','SMB / WSL / local-directory source management is not implemented. Local single-file import is implemented.')}</p></section>`;
+  case 'servers':return `<section class="card"><h2>${lc('远端编译来源','Remote build sources')}</h2><p class="hint">${lc('只读 SSH / SFTP，固定主机密钥和已验证根目录；凭据存入 Keychain。','Read-only SSH / SFTP with pinned host keys and verified roots. Credentials stay in Keychain.')}</p>${DEBUG_SERVERS.map(server=>`<div class="overview-run"><div><b>${esc(server.name)}</b><p class="mono hint">${esc(server.username)}@${esc(server.host)}:${esc(server.port)}<br>${esc(server.root)}</p></div><button class="btn" onclick="openDebugServerEditor('${server.id}')">${lc('编辑…','Edit…')}</button><button class="btn" onclick="deleteDebugServerModal('${server.id}')">${lc('移除…','Remove…')}</button></div>`).join('')}<div><button class="btn pri" onclick="openDebugServerEditor('')">${lc('添加 SSH 服务器…','Add SSH server…')}</button></div><p class="hint">${lc('文件夹和已挂载 SMB 可在产物页面选择；WSL 可通过已验证 SSH 服务器访问。','Choose folders and mounted SMB shares in Artifacts. Access WSL through a verified SSH server.')}</p></section>`;
   case 'storage':return `<section class="card"><h2>${lc('产物与历史保留','Artifacts and retention')}</h2><p class="mono">~/Library/Application Support/ArkDeck</p><button class="btn" onclick="doneBtn(this,lc('演示：选择输出目录','Demo: choose output directory'))">${lc('选择输出目录…','Choose output root…')}</button><p class="hint">${lc('目录变更仅影响新 Job；历史记录与已有产物保留原位置。','Root changes affect new Jobs only; existing records and artifacts keep their original locations.')}</p><label class="debug-field">${lc('配额（GiB）','Quota (GiB)')}<input class="inp" type="number" min="1" value="20"></label><label class="debug-field">${lc('安全余量（GiB）','Safety margin (GiB)')}<input class="inp" type="number" min="1" value="2"></label><label class="debug-field">${lc('保留天数','Retention days')}<input class="inp" type="number" min="1" value="90"></label>${S.settings.storage==="invalid"
       ?`<p class="hint" style="color:var(--danger)" role="alert" data-sync-id="settings.storage.validationError">${lc('请输入大于零的整数，并确保总配额大于安全余量。','Enter whole numbers greater than zero, with a total quota larger than the safety margin.')}</p>`:""}
     <h3>${lc('ArkDeck Runtime Artifact','ArkDeck Runtime artifacts')}</h3>

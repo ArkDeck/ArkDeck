@@ -1084,37 +1084,116 @@ public static class UiStrings
     public const string WindowsViewerTabAdvancedDump = "windows.viewer.tab.advancedDump";
     public const string WindowsViewerAdvancedDumpLoading = "windows.viewer.advancedDump.loading";
     public const string WindowsViewerAdvancedDumpNoIds = "windows.viewer.advancedDump.noIds";
-    public const string JobRecoveryActionObserved = "jobRecovery.action.observed";
+    public const string AppNavigationDiagnostics = "app.navigation.diagnostics";
+    public const string HistoryActivityOpenDiagnostics = "history.activity.open.diagnostics";
+    public const string HistoryContextReadOnly = "history.context.readOnly";
+    public const string DiagnosticsCaptureUnavailable = "diagnostics.capture.unavailable";
+    public const string DiagnosticsCaptureUnavailableDetail = "diagnostics.capture.unavailable.detail";
+    public const string DiagnosticsAlignmentCalibrated = "diagnostics.alignment.calibrated";
+    public const string DiagnosticsAlignmentCannotAlign = "diagnostics.alignment.cannotAlign";
+    public const string DiagnosticsAlignmentExplain = "diagnostics.alignment.explain";
+    public const string DiagnosticsAlignmentSameClock = "diagnostics.alignment.sameClock";
+    public const string DiagnosticsCaptureArm = "diagnostics.capture.arm";
+    public const string DiagnosticsCaptureMark = "diagnostics.capture.mark";
+    public const string DiagnosticsMarkAuto = "diagnostics.mark.auto";
+    public const string DiagnosticsMarkManual = "diagnostics.mark.manual";
+    public const string DiagnosticsMarksEmpty = "diagnostics.marks.empty";
+    public const string DiagnosticsMarksTitle = "diagnostics.marks.title";
+    public const string DiagnosticsMissingTitle = "diagnostics.missing.title";
+    public const string DiagnosticsNotDerivedDetail = "diagnostics.notDerived.detail";
+    public const string DiagnosticsNotDerivedTitle = "diagnostics.notDerived.title";
+    public const string DiagnosticsPartial = "diagnostics.partial";
+    public const string DiagnosticsPartialDetail = "diagnostics.partial.detail";
+    public const string DiagnosticsSelectionDriftedAway = "diagnostics.selection.driftedAway";
+    public const string DiagnosticsSelectionTimeOnly = "diagnostics.selection.timeOnly";
+    public const string DiagnosticsSessionNone = "diagnostics.session.none";
+    public const string DiagnosticsSessionNoneDetail = "diagnostics.session.none.detail";
+    public const string DiagnosticsShotFailed = "diagnostics.shot.failed";
+    public const string DiagnosticsShotNone = "diagnostics.shot.none";
+    public const string DiagnosticsShotStandsFor = "diagnostics.shot.standsFor";
+    public const string DiagnosticsShotTakenAfter = "diagnostics.shot.takenAfter";
+    public const string DiagnosticsShotTooFar = "diagnostics.shot.tooFar";
+    public const string DiagnosticsShotTooFarDetail = "diagnostics.shot.tooFar.detail";
+    public const string DiagnosticsShotUndecidable = "diagnostics.shot.undecidable";
+    public const string DiagnosticsShotUndecidableDetail = "diagnostics.shot.undecidable.detail";
+    public const string DiagnosticsSessionLoading = "diagnostics.session.loading";
+    public const string DiagnosticsSessionFailed = "diagnostics.session.failed";
+    public const string DiagnosticsSessionRetry = "diagnostics.session.retry";
+    public const string DiagnosticsSessionReload = "diagnostics.session.reload";
+    public const string DiagnosticsSessionReadOnly = "diagnostics.session.readOnly";
+    public const string DiagnosticsSessionTimeline = "diagnostics.session.timeline";
+    public const string DiagnosticsRingCovered = "diagnostics.ring.covered";
+    public const string DiagnosticsRingLost = "diagnostics.ring.lost";
+    public const string DiagnosticsArtifactsTitle = "diagnostics.artifacts.title";
+    public const string DiagnosticsArtifactsPrivacy = "diagnostics.artifacts.privacy";
+    public const string DiagnosticsArtifactsRead = "diagnostics.artifacts.read";
+    public const string DiagnosticsArtifactsReadSensitive = "diagnostics.artifacts.readSensitive";
+    public const string DiagnosticsArtifactsOpenElsewhere = "diagnostics.artifacts.openElsewhere";
+    public const string DiagnosticsPreviewClipped = "diagnostics.preview.clipped";
+    public const string DiagnosticsMarkTimeMissing = "diagnostics.mark.timeMissing";
+    public const string DiagnosticsArtifactsOpenTrace = "diagnostics.artifacts.openTrace";
+    public const string DiagnosticsArtifactsOpenTracePrivacy = "diagnostics.artifacts.openTrace.privacy";
+    public const string DiagnosticsPreviewReplacedInvalidUTF8 = "diagnostics.preview.replacedInvalidUTF8";
+    public const string DiagnosticsPreviewInvalidStructuredText = "diagnostics.preview.invalidStructuredText";
+    public const string DiagnosticsHilogTitle = "diagnostics.hilog.title";
+    public const string DiagnosticsHilogFailed = "diagnostics.hilog.failed";
+    public const string DiagnosticsHilogFailedDetail = "diagnostics.hilog.failed.detail";
+    public const string DiagnosticsHilogReadOnly = "diagnostics.hilog.readOnly";
+    public const string DiagnosticsHilogCoverageComplete = "diagnostics.hilog.coverage.complete";
+    public const string DiagnosticsHilogCoveragePartial = "diagnostics.hilog.coverage.partial";
+    public const string DiagnosticsHilogCoverageUnrecognized = "diagnostics.hilog.coverage.unrecognized";
+    public const string DiagnosticsHilogCoverageEmpty = "diagnostics.hilog.coverage.empty";
+    public const string DiagnosticsHilogCoverageDetail = "diagnostics.hilog.coverage.detail";
+    public const string DiagnosticsHilogLines = "diagnostics.hilog.lines";
+    public const string DiagnosticsHilogLevelD = "diagnostics.hilog.level.D";
+    public const string DiagnosticsHilogLevelI = "diagnostics.hilog.level.I";
+    public const string DiagnosticsHilogLevelW = "diagnostics.hilog.level.W";
+    public const string DiagnosticsHilogLevelE = "diagnostics.hilog.level.E";
+    public const string DiagnosticsHilogLevelF = "diagnostics.hilog.level.F";
+    public const string DiagnosticsHilogUnrecognized = "diagnostics.hilog.unrecognized";
+    public const string DiagnosticsHilogBlank = "diagnostics.hilog.blank";
+    public const string DiagnosticsHilogSource = "diagnostics.hilog.source";
+    public const string DiagnosticsHilogSourceDetail = "diagnostics.hilog.source.detail";
+    public const string DiagnosticsHilogSourceJob = "diagnostics.hilog.sourceJob";
+    public const string DiagnosticsHilogSourceArtifact = "diagnostics.hilog.sourceArtifact";
+    public const string DiagnosticsHilogSourceBytes = "diagnostics.hilog.sourceBytes";
+    public const string DiagnosticsHilogDigests = "diagnostics.hilog.digests";
+    public const string DiagnosticsHilogSourceDigest = "diagnostics.hilog.sourceDigest";
+    public const string DiagnosticsHilogToolDigest = "diagnostics.hilog.toolDigest";
+    public const string DiagnosticsHilogOutputDigest = "diagnostics.hilog.outputDigest";
+    public const string DiagnosticsHilogArtifactDigest = "diagnostics.hilog.artifactDigest";
+    public const string WindowsDiagnosticsCaptureMark = "windows.diagnostics.capture.mark";
     public const string JobRecoveryActionReconcile = "jobRecovery.action.reconcile";
-    public const string JobRecoveryActionReconcileDetail = "jobRecovery.action.reconcile.detail";
+    public const string JobRecoveryActionObserved = "jobRecovery.action.observed";
     public const string JobRecoveryActionRefused = "jobRecovery.action.refused";
+    public const string JobRecoveryActionRebindDetail = "jobRecovery.action.rebind.detail";
+    public const string JobRecoveryActionReconcileDetail = "jobRecovery.action.reconcile.detail";
     public const string JobRecoveryActionResume = "jobRecovery.action.resume";
-    public const string JobRecoveryActionResumeDetail = "jobRecovery.action.resume.detail";
+    public const string JobRecoveryActionRebound = "jobRecovery.action.rebound";
+    public const string JobRecoveryActionWorking = "jobRecovery.action.working";
     public const string JobRecoveryActionStillUnknown = "jobRecovery.action.stillUnknown";
     public const string JobRecoveryActionUnconfirmed = "jobRecovery.action.unconfirmed";
-    public const string JobRecoveryActionWorking = "jobRecovery.action.working";
+    public const string JobRecoveryActionResumeDetail = "jobRecovery.action.resume.detail";
     public const string JobRecoveryActionRebind = "jobRecovery.action.rebind";
-    public const string JobRecoveryActionRebindDetail = "jobRecovery.action.rebind.detail";
-    public const string JobRecoveryActionRebound = "jobRecovery.action.rebound";
-    public const string JobRecoveryArchiveReview = "jobRecovery.archive.review";
-    public const string JobRecoveryArchiveWorking = "jobRecovery.archive.working";
-    public const string JobRecoveryArchiveUnavailable = "jobRecovery.archive.unavailable";
-    public const string JobRecoveryArchiveComplete = "jobRecovery.archive.complete";
-    public const string JobRecoveryArchivePublicationPending = "jobRecovery.archive.publicationPending";
-    public const string JobRecoveryArchiveTitle = "jobRecovery.archive.title";
-    public const string JobRecoveryArchiveDetail = "jobRecovery.archive.detail";
-    public const string JobRecoveryArchiveLastStep = "jobRecovery.archive.lastStep";
-    public const string JobRecoveryArchiveExistingDecision = "jobRecovery.archive.existingDecision";
-    public const string JobRecoveryArchiveDismiss = "jobRecovery.archive.dismiss";
-    public const string JobRecoveryArchiveConfirm = "jobRecovery.archive.confirm";
-    public const string JobRecoveryArchiveFinish = "jobRecovery.archive.finish";
-    public const string JobRecoveryArchiveBlockerUnknown = "jobRecovery.archive.blocker.unknown";
-    public const string JobRecoveryArchiveBlockerMutation = "jobRecovery.archive.blocker.mutation";
-    public const string JobRecoveryArchiveBlockerHazards = "jobRecovery.archive.blocker.hazards";
-    public const string JobRecoveryArchiveBlockerProcess = "jobRecovery.archive.blocker.process";
     public const string JobRecoveryArchiveBlockerActive = "jobRecovery.archive.blocker.active";
-    public const string JobRecoveryArchiveBlockerStorage = "jobRecovery.archive.blocker.storage";
+    public const string JobRecoveryArchiveBlockerHazards = "jobRecovery.archive.blocker.hazards";
+    public const string JobRecoveryArchiveBlockerMutation = "jobRecovery.archive.blocker.mutation";
+    public const string JobRecoveryArchiveBlockerProcess = "jobRecovery.archive.blocker.process";
     public const string JobRecoveryArchiveBlockerRefresh = "jobRecovery.archive.blocker.refresh";
+    public const string JobRecoveryArchiveBlockerStorage = "jobRecovery.archive.blocker.storage";
+    public const string JobRecoveryArchiveBlockerUnknown = "jobRecovery.archive.blocker.unknown";
+    public const string JobRecoveryArchiveComplete = "jobRecovery.archive.complete";
+    public const string JobRecoveryArchiveConfirm = "jobRecovery.archive.confirm";
+    public const string JobRecoveryArchiveDetail = "jobRecovery.archive.detail";
+    public const string JobRecoveryArchiveDismiss = "jobRecovery.archive.dismiss";
+    public const string JobRecoveryArchiveExistingDecision = "jobRecovery.archive.existingDecision";
+    public const string JobRecoveryArchiveFinish = "jobRecovery.archive.finish";
+    public const string JobRecoveryArchiveLastStep = "jobRecovery.archive.lastStep";
+    public const string JobRecoveryArchivePublicationPending = "jobRecovery.archive.publicationPending";
+    public const string JobRecoveryArchiveReview = "jobRecovery.archive.review";
+    public const string JobRecoveryArchiveTitle = "jobRecovery.archive.title";
+    public const string JobRecoveryArchiveUnavailable = "jobRecovery.archive.unavailable";
+    public const string JobRecoveryArchiveWorking = "jobRecovery.archive.working";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2195,36 +2274,115 @@ public static class UiStrings
         WindowsViewerTabAdvancedDump,
         WindowsViewerAdvancedDumpLoading,
         WindowsViewerAdvancedDumpNoIds,
-        JobRecoveryActionObserved,
+        AppNavigationDiagnostics,
+        HistoryActivityOpenDiagnostics,
+        HistoryContextReadOnly,
+        DiagnosticsCaptureUnavailable,
+        DiagnosticsCaptureUnavailableDetail,
+        DiagnosticsAlignmentCalibrated,
+        DiagnosticsAlignmentCannotAlign,
+        DiagnosticsAlignmentExplain,
+        DiagnosticsAlignmentSameClock,
+        DiagnosticsCaptureArm,
+        DiagnosticsCaptureMark,
+        DiagnosticsMarkAuto,
+        DiagnosticsMarkManual,
+        DiagnosticsMarksEmpty,
+        DiagnosticsMarksTitle,
+        DiagnosticsMissingTitle,
+        DiagnosticsNotDerivedDetail,
+        DiagnosticsNotDerivedTitle,
+        DiagnosticsPartial,
+        DiagnosticsPartialDetail,
+        DiagnosticsSelectionDriftedAway,
+        DiagnosticsSelectionTimeOnly,
+        DiagnosticsSessionNone,
+        DiagnosticsSessionNoneDetail,
+        DiagnosticsShotFailed,
+        DiagnosticsShotNone,
+        DiagnosticsShotStandsFor,
+        DiagnosticsShotTakenAfter,
+        DiagnosticsShotTooFar,
+        DiagnosticsShotTooFarDetail,
+        DiagnosticsShotUndecidable,
+        DiagnosticsShotUndecidableDetail,
+        DiagnosticsSessionLoading,
+        DiagnosticsSessionFailed,
+        DiagnosticsSessionRetry,
+        DiagnosticsSessionReload,
+        DiagnosticsSessionReadOnly,
+        DiagnosticsSessionTimeline,
+        DiagnosticsRingCovered,
+        DiagnosticsRingLost,
+        DiagnosticsArtifactsTitle,
+        DiagnosticsArtifactsPrivacy,
+        DiagnosticsArtifactsRead,
+        DiagnosticsArtifactsReadSensitive,
+        DiagnosticsArtifactsOpenElsewhere,
+        DiagnosticsPreviewClipped,
+        DiagnosticsMarkTimeMissing,
+        DiagnosticsArtifactsOpenTrace,
+        DiagnosticsArtifactsOpenTracePrivacy,
+        DiagnosticsPreviewReplacedInvalidUTF8,
+        DiagnosticsPreviewInvalidStructuredText,
+        DiagnosticsHilogTitle,
+        DiagnosticsHilogFailed,
+        DiagnosticsHilogFailedDetail,
+        DiagnosticsHilogReadOnly,
+        DiagnosticsHilogCoverageComplete,
+        DiagnosticsHilogCoveragePartial,
+        DiagnosticsHilogCoverageUnrecognized,
+        DiagnosticsHilogCoverageEmpty,
+        DiagnosticsHilogCoverageDetail,
+        DiagnosticsHilogLines,
+        DiagnosticsHilogLevelD,
+        DiagnosticsHilogLevelI,
+        DiagnosticsHilogLevelW,
+        DiagnosticsHilogLevelE,
+        DiagnosticsHilogLevelF,
+        DiagnosticsHilogUnrecognized,
+        DiagnosticsHilogBlank,
+        DiagnosticsHilogSource,
+        DiagnosticsHilogSourceDetail,
+        DiagnosticsHilogSourceJob,
+        DiagnosticsHilogSourceArtifact,
+        DiagnosticsHilogSourceBytes,
+        DiagnosticsHilogDigests,
+        DiagnosticsHilogSourceDigest,
+        DiagnosticsHilogToolDigest,
+        DiagnosticsHilogOutputDigest,
+        DiagnosticsHilogArtifactDigest,
+        WindowsDiagnosticsCaptureMark,
         JobRecoveryActionReconcile,
-        JobRecoveryActionReconcileDetail,
+        JobRecoveryActionObserved,
         JobRecoveryActionRefused,
+        JobRecoveryActionRebindDetail,
+        JobRecoveryActionReconcileDetail,
         JobRecoveryActionResume,
-        JobRecoveryActionResumeDetail,
+        JobRecoveryActionRebound,
+        JobRecoveryActionWorking,
         JobRecoveryActionStillUnknown,
         JobRecoveryActionUnconfirmed,
-        JobRecoveryActionWorking,
+        JobRecoveryActionResumeDetail,
         JobRecoveryActionRebind,
-        JobRecoveryActionRebindDetail,
-        JobRecoveryActionRebound,
-        JobRecoveryArchiveReview,
-        JobRecoveryArchiveWorking,
-        JobRecoveryArchiveUnavailable,
-        JobRecoveryArchiveComplete,
-        JobRecoveryArchivePublicationPending,
-        JobRecoveryArchiveTitle,
-        JobRecoveryArchiveDetail,
-        JobRecoveryArchiveLastStep,
-        JobRecoveryArchiveExistingDecision,
-        JobRecoveryArchiveDismiss,
-        JobRecoveryArchiveConfirm,
-        JobRecoveryArchiveFinish,
-        JobRecoveryArchiveBlockerUnknown,
-        JobRecoveryArchiveBlockerMutation,
-        JobRecoveryArchiveBlockerHazards,
-        JobRecoveryArchiveBlockerProcess,
         JobRecoveryArchiveBlockerActive,
-        JobRecoveryArchiveBlockerStorage,
+        JobRecoveryArchiveBlockerHazards,
+        JobRecoveryArchiveBlockerMutation,
+        JobRecoveryArchiveBlockerProcess,
         JobRecoveryArchiveBlockerRefresh,
+        JobRecoveryArchiveBlockerStorage,
+        JobRecoveryArchiveBlockerUnknown,
+        JobRecoveryArchiveComplete,
+        JobRecoveryArchiveConfirm,
+        JobRecoveryArchiveDetail,
+        JobRecoveryArchiveDismiss,
+        JobRecoveryArchiveExistingDecision,
+        JobRecoveryArchiveFinish,
+        JobRecoveryArchiveLastStep,
+        JobRecoveryArchivePublicationPending,
+        JobRecoveryArchiveReview,
+        JobRecoveryArchiveTitle,
+        JobRecoveryArchiveUnavailable,
+        JobRecoveryArchiveWorking,
     ];
 }

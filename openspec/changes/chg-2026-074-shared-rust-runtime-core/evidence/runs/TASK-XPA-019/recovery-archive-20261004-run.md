@@ -136,3 +136,28 @@ unsafe` before capacity admission, with an empty selected root. This matches the
 fixture's noncanonical stored path and the existing `locked_storage` comparison.
 The corrected Windows execution is pending in the next PR run; macOS success
 alone is not reported as Windows verification.
+
+
+## Main compatibility follow-up
+
+PR #2468 head `024511e9` passed all selected lanes in Swift CI run `37186647925`
+and SDD Guard run `37186647718`, including Windows/macOS workspace and contract
+parity. This confirms the canonical local-drive fixture path correction on Windows.
+
+The branch now inherits recovery-controls compatibility head `545d4fdee` and main
+`2d85d513d`. Conflicts were limited to the shared string registry and its three
+Windows outputs. All 19 archive-only keys were applied against the common
+baseline and outputs regenerated; the archive proof/dispatch behavior is unchanged.
+
+### Local targeted checks
+
+- Swift archive/recovery facades and Jobs localization: 17 tests passed, exit 0 (`archive-merge-swift.log`).
+- App build-for-testing: exit 0, TEST BUILD SUCCEEDED (`archive-merge-app.log`).
+- Design-system tests: 85 passed, exit 0 (`archive-merge-ds.log`).
+- Windows strings and ClientKit, 107-method contract generation, Rust formatting, diff checks and SDD: exit 0 (`archive-merge-sdd.log`, zero errors/warnings). The generator verifies 1,186 strings, including 898 unchanged shared macOS values.
+
+### CI
+
+Fresh CI on the compatibility head is pending. The prior all-green result is not
+represented as validation of a different head, and no maintainer or hardware
+approval is inferred. No full local unified gate or device operation was run.

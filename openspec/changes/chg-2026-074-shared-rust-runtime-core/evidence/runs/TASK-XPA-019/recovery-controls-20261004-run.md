@@ -68,3 +68,30 @@ Audited archive requires its durable Runtime path and is a separate implementati
 TCP/UART recovery confirm/abort requires a published operation/profile; no identity proof
 is inferred from a user click. The five real-device Golden Journeys remain excluded. The
 retained legacy Session continuity blocker to the signed RC3 cutover remains unchanged.
+
+
+## Main compatibility follow-up
+
+Main `2d85d513d` merged the independent preview, deployment and Windows work.
+The recovery branch preserves those changes. Its only textual conflicts were
+`spec/ui-semantics/strings.json` and the three derived Windows resources: all
+12 recovery-only keys were merged by key against the common baseline, and the
+resources were regenerated. No recovery behavior or permission was changed.
+
+### Local targeted checks
+
+`python3 windows/scripts/generate-ui-strings.py --write` and `--check`: exit 0,
+1,167 strings (879 shared with macOS) match. `npm test --prefix
+docs/design/arkdeck-ds`: 84 passed, exit 0 (`recovery-merge-ds-final.log`). The
+first attempt found the new isolated checkout lacked JS dependencies; an offline,
+lockfile-based `npm ci --ignore-scripts` installed them before the passing run.
+`cargo fmt --all --check --manifest-path rust/Cargo.toml`, `git diff --check` and
+`sh scripts/check-sdd.sh`: exit 0 (`recovery-merge-sdd.log`, zero errors/warnings).
+`run-swiftpm.sh test --filter 'RuntimeJobRecoveryApplicationFacadeTests|JobsLocalizationContractTests'`: 13 passed, exit 0 (`recovery-merge-swift.log`).
+`ARKDECK_XCODE_JOBS=2 sh scripts/ci/run-xcodebuild.sh`: exit 0, TEST BUILD SUCCEEDED (`recovery-merge-app.log`). The recovery Rust guard is byte-equivalent to the previously tested implementation; main only adds its independently reviewed Windows composition around it. Native Windows validation remains in CI.
+
+### CI
+
+PR #2467's previous head was green; compatibility-head CI is pending. The
+previous archive PR #2468 head `024511e9` passed Windows and macOS workspace,
+Swift and App checks in run `37186647925`; both contract-parity lanes subsequently passed and run `37186647925` concluded success.

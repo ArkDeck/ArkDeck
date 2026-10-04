@@ -515,7 +515,7 @@ public enum DebugPortRuleValidator {
   }
 }
 
-public protocol DebugApplicationProviding: Sendable {
+public protocol DebugApplicationProviding: NativeLibraryDeploymentProviding {
   func refreshWorkspace(targetID: String?) async -> DebugWorkspacePresentation
   func submitLogs(
     target: DebugTargetPresentation,

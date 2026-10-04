@@ -20,7 +20,7 @@
 //! The file is opened without following a reparse point and held while it
 //! is checked.
 use super::identity::authenticode_chain;
-use super::publisher::signer_name;
+use super::publisher::{chain_publisher, signer_name};
 use super::reject_reparse_file;
 use sha2::{Digest, Sha256};
 use std::io;
@@ -70,6 +70,41 @@ pub fn inspect_native_code_signature(path: &Path) -> io::Result<NativeCodeSignat
             "the image's Authenticode signature does not verify under the trust policy",
         )),
     }
+}
+
+/// The verified chain of the image at `path`, held while it is checked.
+fn verified_chain(path: &Path) -> io::Result<Vec<Vec<u8>>> {
+    let file = crate::process::open_locked_file(path)?;
+    reject_reparse_file(&file)?;
+    match authenticode_chain(&file, path)? {
+        Ok(chain) if !chain.is_empty() => Ok(chain),
+        _ => Err(refused(
+            "the image carries no Authenticode signature that verifies under the trust policy",
+        )),
+    }
+}
+
+/// Whether the image at `path` is signed as `reference` is (maintainer
+/// ruling 17's two pins): both verify under the trust policy, and either
+/// their leaf certificates are the same (the development signer) or both are
+/// Artifact Signing chains of one publisher (the same subject `O=` and
+/// certificate-profile EKU; the leaf itself renews daily). The answer is the
+/// signer's name. Anything else is refused (`PermissionDenied`), including an
+/// unsigned `reference`: nothing can be pinned to it.
+pub fn same_signer(path: &Path, reference: &Path) -> io::Result<String> {
+    let expected = verified_chain(reference)?;
+    let chain = verified_chain(path)?;
+    let same_leaf = chain.first() == expected.first();
+    let same_publisher = matches!(
+        (chain_publisher(&chain), chain_publisher(&expected)),
+        (Some(a), Some(b)) if a == b
+    );
+    if !same_leaf && !same_publisher {
+        return Err(refused(
+            "the image is not signed by this Runtime's signer or publisher",
+        ));
+    }
+    signer_name(&chain[0])
 }
 
 /// The DevEco Studio installation at `root`: its Windows launcher
