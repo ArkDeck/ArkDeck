@@ -404,6 +404,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.wait",
     "job.cancel",
     "job.reconcile",
+    // The Job archive (#2468): a quiescent Job previewed, a stale review
+    // refused, archived with its Session published and the publication
+    // finished again, against the macOS Rust Runtime's recorded answers (no
+    // Swift oracle records it), through the real CLI and the signed test
+    // daemon (`arkdeck-agentd/tests/spawning/job_archive_cli.rs`).
+    "job.archive.preview",
+    "job.archive.apply",
     // The agent execution and human-action owners over Swift's
     // physical-assistance records (TASK-XPA-005). Not `agent run`, `agent
     // resume` or `human-action resume`; `agent abandon` is counted. See the

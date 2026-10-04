@@ -2500,7 +2500,7 @@ impl HostServices for Host {
                 });
         let archiver = arkdeck_hoststore::JobArchiver {
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             sessions: publisher.as_ref(),
         };
         if method == "job.archive.preview" {

@@ -36,9 +36,8 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 | `capture.screen-sequence@1` (`screen record`) | 1 | now | `screen-sequence` oracle; needs fake answers |
 | `port-forward.create@1`, `.remove@1` | 1 | now | `port-forward` oracle; needs fake answers |
 | `capture.diagnostic-session@1` | 1 | ruling | Reached through `job submit` alone (a generic leaf). Its live control `diagnostic.session.mark|status|stop` is measured over the `diagnostic-session` oracle through the real CLI (`tests/spawning/diagnostic_session_cli.rs`, TASK-XPA-005) |
-| `job.archive`, `job.archive.preview` | — | now | Composed on Windows (#2468); no Swift oracle (Swift retired), measure against the macOS Rust answers |
 | `runtime.tool.select` | 1 | now | `runtime.tool.register` is measured (`--kind hdc` over the account composition, `tests/spawning/account_tool_selection.rs`, TASK-XPA-012). Selecting a registered candidate still answers only a drifted action: its impact needs the HDC lifecycle owner's healthy server proof (#2501) |
-| `workspace.continuation.run`, `.submit` | 5 | now | `workspace-continuation` oracle |
+| `workspace.continuation.run`, `.submit` | 5 | ruling | Run through the real CLI against the signed test daemon, every source Job is refused before anything is submitted (`operationUnavailable`, "the source Job provider is not published by the current Runtime"): the Rust control layer answers `health` with `providers: []` on every host (`arkdeck-control` `handle`), where Swift's daemon listed its providers and the `workspace-continuation` oracle's health names `hdc` and `workspace`. Publishing the providers changes the macOS daemon's `health` answer too, so it needs a ruling |
 | `workspace.sign-openharmony-hap@1` (`workspace sign`) | 5 | now | `workspace-sign-oracle`; in flight (#2508) |
 | `workspace.symbolize-crash@1` (`workspace symbolize`) | 5 | now | `workspace-test-symbolize-oracle`; in flight (#2512) |
 | `flash.reconcile-alias` | 4 | now | Reconciler reached by the CLI; `post-flash-alias` / `flash-host-reads` oracles, needs a fake lineage |
