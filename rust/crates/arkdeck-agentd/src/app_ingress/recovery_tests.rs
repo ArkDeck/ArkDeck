@@ -194,3 +194,68 @@ fn recovery_continuation_is_exclusive_and_does_not_create_a_new_runnable_claim()
     }
     assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 1);
 }
+
+#[test]
+fn archive_gate_names_only_durable_app_jobs_and_never_accepts_caller_proofs() {
+    let published = arkdeck_contract::METHODS.contains(&"job.archive.preview");
+    for (state, client, allowed) in [
+        ("waitingForRecovery", "ArkDeckApp.TraceWorkspace", true),
+        ("userAbandonRequested", "ArkDeckApp.TraceWorkspace", true),
+        ("interrupted", "ArkDeckApp.TraceWorkspace", true),
+        ("running", "ArkDeckApp.TraceWorkspace", false),
+        ("succeeded", "ArkDeckApp.TraceWorkspace", false),
+        ("waitingForRecovery", "untrusted-caller", false),
+    ] {
+        let root = Root::new();
+        let host = parked(&root, state, false, client);
+        assert_eq!(host.app_job_archive_allowed("job-recover"), allowed);
+        assert!(!host.app_job_archive_allowed("another-job"));
+        let ingress = AppIngress::new(Arc::new(Control::new(host).unwrap()), root.peer().euid);
+        let reply = ingress.handle(
+            &frame("job.archive.preview", json!({"jobId":"job-recover"})),
+            root.peer(),
+        );
+        if !published {
+            assert_eq!(code(&reply), "unknownMethod");
+        } else {
+            assert_eq!(code(&reply) == "methodNotAllowlisted", !allowed);
+        }
+        assert_eq!(
+            ingress.dispatches.load(Ordering::Relaxed),
+            usize::from(published && allowed)
+        );
+    }
+    let root = Root::new();
+    let ingress = AppIngress::new(
+        Arc::new(
+            Control::new(parked(
+                &root,
+                "waitingForRecovery",
+                false,
+                "ArkDeckApp.TraceWorkspace",
+            ))
+            .unwrap(),
+        ),
+        root.peer().euid,
+    );
+    for extra in [
+        "targetId",
+        "authorization",
+        "outcomeCertainty",
+        "managedProcessState",
+        "deviceHazards",
+    ] {
+        let mut params = json!({"jobId":"job-recover","expectedReviewSha256":"a".repeat(64),"userConfirmationId":"user-archive-fixture"});
+        params[extra] = json!("caller supplied");
+        let reply = ingress.handle(&frame("job.archive", params), root.peer());
+        assert_eq!(
+            code(&reply),
+            if published {
+                "invalidParams"
+            } else {
+                "unknownMethod"
+            }
+        );
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+}

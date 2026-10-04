@@ -29,6 +29,8 @@
 //!   given through the test seam (`flash_execution_control.rs`, TASK-XPA-010),
 //!   and the same Flash driven by the real CLI over the control pipe of a
 //!   signed copy of this binary (`flash_socket_control.rs`);
+//! - the protected Flash recovery broker's pinned request executed through the
+//!   same Host (`flash_broker_control.rs`);
 //! - the signed test daemon (`signed_daemon.rs`, TASK-XPA-009), which this
 //!   binary serves on a development root's pipe for the real CLI.
 //!
@@ -110,7 +112,6 @@ mod windows_lifecycle;
 mod app_ingress_fake_hdc;
 #[cfg(target_os = "macos")]
 mod debug_read_control;
-#[cfg(target_os = "macos")]
 mod flash_broker_control;
 mod flash_execution_control;
 mod flash_host_facts_control;
