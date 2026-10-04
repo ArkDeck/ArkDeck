@@ -436,6 +436,15 @@ mod tests {
         jobs: JobStore,
         sessions: SessionStore,
         claims: StorageClaims,
+        /// Dropped last, once the stores above have closed their files: on
+        /// Windows nothing open can be removed.
+        _removed: Removed,
+    }
+    struct Removed(PathBuf);
+    impl Drop for Removed {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
     }
     impl Fixture {
         fn new() -> Self {
@@ -535,6 +544,7 @@ mod tests {
             record.state = "waitingForRecovery".into();
             jobs.persist(&record, AT).unwrap();
             Self {
+                _removed: Removed(base.clone()),
                 path: base,
                 jobs,
                 sessions,
@@ -571,11 +581,6 @@ mod tests {
             change(&mut value);
             let record = JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
             self.jobs.persist(&record, AT).unwrap();
-        }
-    }
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
         }
     }
     fn params() -> Map<String, Value> {

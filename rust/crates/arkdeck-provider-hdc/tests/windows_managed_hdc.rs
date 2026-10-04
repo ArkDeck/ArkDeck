@@ -264,8 +264,13 @@ mod windows {
     }
 
     impl Drop for Removed {
+        /// Retried while a server the test ended is still letting go of
+        /// its image (NTFS removes no directory holding an open file).
         fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while fs::remove_dir_all(&self.0).is_err() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(50));
+            }
         }
     }
 
