@@ -1054,12 +1054,29 @@ impl<R: Runtime, C: FnMut() -> String> Executor<R, C> {
         let bytes = arkdeck_contract::foundation_json::pretty(value, false).map_err(|_| {
             ExecutorFailure::Persistence("the pending record could not be encoded".into())
         })?;
-        let mut directory = std::fs::DirBuilder::new();
-        directory.recursive(true);
-        // Owner-only where the host has POSIX modes.
-        #[cfg(unix)]
-        std::os::unix::fs::DirBuilderExt::mode(&mut directory, 0o700);
-        directory.create(&self.state_directory).map_err(failure)?;
+        #[cfg(not(windows))]
+        {
+            let mut directory = std::fs::DirBuilder::new();
+            directory.recursive(true);
+            // Owner-only where the host has POSIX modes.
+            #[cfg(unix)]
+            std::os::unix::fs::DirBuilderExt::mode(&mut directory, 0o700);
+            directory.create(&self.state_directory).map_err(failure)?;
+        }
+        // On Windows every missing level is created with the private
+        // directory descriptor, and the directory must then open as an
+        // owner-only one, as the Runtime's private roots do; a directory
+        // another account can reach is refused, never written.
+        #[cfg(windows)]
+        {
+            if !self.state_directory.is_absolute() {
+                return Err(ExecutorFailure::Persistence(
+                    "the paused run's state directory is unavailable".into(),
+                ));
+            }
+            arkdeck_platform::create_private_directories(&self.state_directory).map_err(failure)?;
+            arkdeck_platform::HostDirectory::open(&self.state_directory).map_err(failure)?;
+        }
         let temporary = self.state_directory.join(format!(
             ".pending-{}",
             crate::job_plan::uuid().map_err(|error| ExecutorFailure::Persistence(error.message))?
