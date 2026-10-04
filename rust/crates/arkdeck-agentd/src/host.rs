@@ -2189,15 +2189,20 @@ impl HostServices for Host {
             now: arkdeck_hoststore::runtime_now,
             authority: self.authority(),
         };
-        let engine = arkdeck_hoststore::AgentEngine {
-            targets,
-            jobs,
-            admitter: &admitter,
-            now: arkdeck_hoststore::runtime_precise_now,
-            observations: self.observing(),
-        };
-        let answer = agents
-            .advance(method, params, &engine)
+        // An execution's request is admitted as `job.submit` admits it: a
+        // Flash operation over the Flash composition (Swift `submitOwned`),
+        // as on macOS (TASK-XPA-010).
+        let answer = self
+            .with_flash_admitter(admitter, |admitter| {
+                let engine = arkdeck_hoststore::AgentEngine {
+                    targets,
+                    jobs,
+                    admitter,
+                    now: arkdeck_hoststore::runtime_precise_now,
+                    observations: self.observing(),
+                };
+                agents.advance(method, params, &engine)
+            })
             .map_err(|mut error| {
                 if method == "human-action.resume" && error.code != "internalError" {
                     let details = error.details.get_or_insert_with(Default::default);
