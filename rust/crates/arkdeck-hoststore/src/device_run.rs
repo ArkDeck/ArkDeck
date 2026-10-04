@@ -1187,7 +1187,25 @@ impl JobRunner<'_> {
             return Err(Stop::Failed(reason.into()));
         };
         // A sequence runs its processes in order, as Swift's dispatcher does.
-        let dispatched = if matches!(plan, FilePlan::DiagnosticTrace { .. }) {
+        // On a registered Windows tuple the server probe launches nothing: it
+        // is the commandless observation, whose verdict is read here.
+        let mut observed = None;
+        let commandless = hdc
+            .dispatch
+            .registered_windows_tuple()
+            .filter(|_| action.observes_server_commandlessly(hdc.dispatch));
+        let dispatched = if let Some(tuple) = commandless {
+            hdc.dispatch.observe_server().map(|observation| {
+                observed = Some(arkdeck_provider_hdc::Action::verify_server_observation(
+                    tuple,
+                    &observation,
+                ));
+                FileReceipt {
+                    subprocesses: Vec::new(),
+                    landed: None,
+                }
+            })
+        } else if matches!(plan, FilePlan::DiagnosticTrace { .. }) {
             self.run_diagnostic_trace(run, hdc, plan, target_id, revision)
         } else {
             arkdeck_provider_hdc::run(plan, hdc.dispatch)
@@ -1220,7 +1238,8 @@ impl JobRunner<'_> {
         // A package readback binds its verdict to the entry package resolved
         // for it.
         let entry = resolved.first().map(|artifact| artifact.sha256.as_str());
-        match port_readback(descriptor, step, action.verify(&receipt, expected, entry)) {
+        let verdict = observed.unwrap_or_else(|| action.verify(&receipt, expected, entry));
+        match port_readback(descriptor, step, verdict) {
             Outcome::Verified(summary) => {
                 let outcome_at = run.clock()?;
                 outcome(run, "succeeded", &outcome_at, None)?;

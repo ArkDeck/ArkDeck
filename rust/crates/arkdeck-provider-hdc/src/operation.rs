@@ -175,6 +175,30 @@ pub trait HdcDispatch {
     fn registered_windows_tuple(&self) -> Option<&'static crate::WindowsHdcTuple> {
         None
     }
+
+    /// The commandless server observation a `probeHDCServer` step lowers to
+    /// on a dispatch pinned to a registered Windows tuple (CHG-2026-078's
+    /// `serverIdentityGeneration`; `checkserver` is never a Windows probe,
+    /// since it starts a server when none runs). Nothing is launched. A
+    /// refusal means nothing was observed; unknown implementations have no
+    /// such observation.
+    fn observe_server(&self) -> Result<ServerObservation, DispatchFailure> {
+        Err(DispatchFailure::Refused(
+            "dispatch refused: this HDC has no commandless server observation".into(),
+        ))
+    }
+}
+
+/// What the commandless server observation read at the registered tuple's
+/// endpoint (Windows): exactly one server of the registered executable, or
+/// why that was not established.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ServerObservation {
+    /// The registered executable's own server listens at its endpoint.
+    Observed,
+    /// No server, another executable's, another owner's, or no answer
+    /// within the deadline.
+    Unknown(String),
 }
 
 /// Swift `ProviderSemanticOutcome`.
@@ -375,6 +399,32 @@ impl Action {
             timeout,
             capture_bytes,
         })
+    }
+
+    /// Whether this step lowers to the commandless server observation rather
+    /// than a process: `probeHDCServer` over a dispatch pinned to a
+    /// registered Windows tuple (CHG-2026-078). Elsewhere it is
+    /// `checkserver`, as Swift lowers it.
+    pub fn observes_server_commandlessly(&self, dispatch: &dyn HdcDispatch) -> bool {
+        matches!(self, Self::ObserveServer) && dispatch.registered_windows_tuple().is_some()
+    }
+
+    /// The verdict of the commandless server observation: the registered
+    /// tuple's version as both the client's and the server's, which its
+    /// executable's hash proves, once that executable's own server is
+    /// observed at its endpoint; otherwise unknown, as an unreadable
+    /// `checkserver` answer is.
+    pub fn verify_server_observation(
+        tuple: &crate::WindowsHdcTuple,
+        observation: &ServerObservation,
+    ) -> Outcome {
+        match observation {
+            ServerObservation::Observed => verified([
+                ("clientVersion", tuple.reported_version.to_owned()),
+                ("serverVersion", tuple.reported_version.to_owned()),
+            ]),
+            ServerObservation::Unknown(reason) => Outcome::Unknown(reason.clone()),
+        }
     }
 
     /// Swift `verify` for these actions, which never read the exit status.
