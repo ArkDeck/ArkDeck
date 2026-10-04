@@ -361,12 +361,15 @@ class ContractChecksTests(unittest.TestCase):
     def test_catalog_change_replays_original_fixtures_with_current_implementation(self):
         self.write("rust/tests/fixtures/example/cases.json", b"old plan digest\n")
         self.write("rust/tests/fixtures/example/old-artifact", b"old artifact\n")
+        self.write("rust/tests/fixtures/contracts-bundle/owned.json", b"old CLI products\n")
         self.git("add", ".")
         self.git("-c", "user.name=Contract test", "-c", "user.email=contract@example.invalid",
                  "commit", "-qm", "Record old Catalog fixtures")
         commit = self.git("rev-parse", "HEAD").decode().strip()
         old_info = {**self.published_info, "commit": commit}
         companions = runner.published_catalog_companions(commit)
+        self.assertNotIn("rust/tests/fixtures/contracts-bundle/owned.json", companions)
+        self.write("rust/tests/fixtures/contracts-bundle/owned.json", b"current CLI products\n")
         self.write("rust/tests/fixtures/example/cases.json", b"new plan digest\n")
         self.write("rust/tests/fixtures/example/new-artifact", b"new artifact\n")
         self.write("rust/tests/fixtures/new-operation/cases.json", b"new implementation fixture\n")
@@ -377,6 +380,7 @@ class ContractChecksTests(unittest.TestCase):
                            catalog_companions=companions)
         self.assertEqual((published / "rust/current-implementation.rs").read_bytes(), b"current source\n")
         fixtures = published / "rust/tests/fixtures"
+        self.assertEqual((fixtures / "contracts-bundle/owned.json").read_bytes(), b"current CLI products\n")
         self.assertEqual((fixtures / "example/cases.json").read_bytes(), b"old plan digest\n")
         self.assertEqual((fixtures / "example/old-artifact").read_bytes(), b"old artifact\n")
         self.assertFalse((fixtures / "example/new-artifact").exists())

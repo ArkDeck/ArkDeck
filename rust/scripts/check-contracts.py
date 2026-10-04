@@ -55,6 +55,11 @@ def published_catalog_companions(commit: str) -> dict[str, tuple[bytes, int]]:
                     or not (member.name.startswith("rust/tests/fixtures/")
                             or member.name == REVIEW_PROJECTION)):
                 raise ValueError(f"unsafe published Catalog companion: {member.name}")
+            # This table pins products emitted by the current CLI implementation,
+            # not Catalog-bound device/plan recordings. Its bytes are separately
+            # checked against the checkout by verify_contract_bundle_digests().
+            if member.name.startswith("rust/tests/fixtures/contracts-bundle/"):
+                continue
             result[member.name] = (members.extractfile(member).read(), member.mode & 0o777)
     if REVIEW_PROJECTION not in result:
         raise ValueError("published Catalog has no matching App review projection")
