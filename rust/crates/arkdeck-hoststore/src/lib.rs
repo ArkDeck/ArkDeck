@@ -192,7 +192,7 @@ mod debug_read;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod device_facts;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod trace_probe;
 #[cfg(any(target_os = "macos", windows))]
 pub use device_facts::HdcComposition;

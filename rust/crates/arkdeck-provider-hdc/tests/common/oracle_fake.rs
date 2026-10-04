@@ -4,8 +4,9 @@
 //! debug-hap and deploy-native-library fragments, the Flash host facts
 //! oracle's own (`flash-host-facts/hdc-answers.sh`), and `observe.device@1`'s
 //! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables, and the
-//! read, file and Trace legs' fragments) and the Debug probe oracle's
-//! (`debug-probe/hdc-answers.sh`) are ported here, case for case and in
+//! read, file and Trace legs' fragments), the Debug probe oracle's
+//! (`debug-probe/hdc-answers.sh`), the Target adoption oracle's and the Trace
+//! probe oracle's are ported here, case for case and in
 //! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
@@ -38,6 +39,7 @@ pub enum Answers {
     HumanAction,
     DebugProbe,
     TargetAdoption,
+    TraceProbe,
 }
 
 impl Answers {
@@ -69,6 +71,9 @@ impl Answers {
             }
             line if line.starts_with("# Target adoption: the device list in the state") => {
                 Self::TargetAdoption
+            }
+            line if line.starts_with("# trace.probe answers of the shared fake HDC") => {
+                Self::TraceProbe
             }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
@@ -989,6 +994,194 @@ fn first_word(text: &str) -> &str {
     text.split(' ').next().unwrap_or_default()
 }
 
+/// `"$1"` and the resource after its first 20 bytes: a registered family
+/// captured at another time (`stamped`), whose leading `YYYY/MM/DD HH:MM:SS `
+/// the registry ignores.
+fn stamped(stamp: &str, resource: &[u8]) -> Answer {
+    let mut stdout = stamp.as_bytes().to_vec();
+    stdout.extend_from_slice(&resource[20.min(resource.len())..]);
+    Answer::bytes(stdout)
+}
+
+/// `sed "s/<from>/<to>/"`: the first `from` of each line replaced.
+fn first_per_line(resource: &[u8], from: &str, to: &str) -> Answer {
+    let text = String::from_utf8(resource.to_vec()).unwrap();
+    let mut out = String::with_capacity(text.len());
+    for line in text.split_inclusive('\n') {
+        out.push_str(&line.replacen(from, to, 1));
+    }
+    Answer::out(out)
+}
+
+/// `lines "$1" n`: `n` lines of `text`.
+fn lines(text: &str, count: usize) -> String {
+    format!("{text}\n").repeat(count)
+}
+
+/// `flood "$1"`: seven hundred lines of about a hundred bytes, past the
+/// 64 KiB a help or tag read keeps.
+fn flood(text: &str) -> Answer {
+    Answer::out(lines(
+        &format!(
+            "{text} ................................................................................"
+        ),
+        700,
+    ))
+}
+
+/// `trace-probe/hdc-answers.sh`'s `parameter "$6"`, by mode.
+fn probe_parameter(name: &str, mode: &str) -> Answer {
+    let missing = |name: &str| format!("Get parameter \"{name}\" fail! errNum is:106!\n");
+    match (mode, name) {
+        ("parametersUnreadable", "persist.ace.trace.syntax.enabled") => {
+            Answer::out("Get parameter \"another.parameter\" fail! errNum is:106!\n")
+        }
+        ("parametersUnreadable", "persist.ace.trace.layout.enabled") => {
+            Answer::out(format!("Get parameter \"{name}\" fail! errNum is:105!\n"))
+        }
+        ("parametersUnreadable", "persist.ace.trace.build.enabled") => Answer {
+            stderr: b"unexpected stderr\n".to_vec(),
+            ..Answer::out(missing(name))
+        },
+        ("parametersUnreadable", "persist.ace.trace.measure.debug.enabled") => {
+            Answer::out(missing(name) + "extra output\n")
+        }
+        ("parametersUnreadable", "persist.ace.trace.sync.debug.enabled") => {
+            Answer::bytes(b"true\xff\n".to_vec())
+        }
+        ("parametersUnreadable", "persist.ace.debug.enabled") => {
+            Answer::out("x".repeat(401) + "\n")
+        }
+        ("parametersUnreadable", "persist.ace.performance.monitor.enabled") => {
+            Answer::out(lines(&format!("{name}=true"), 600))
+        }
+        ("parametersUnreadable", "persist.sys.graphic.openDebugTrace") => Answer::exit(1),
+        ("parametersUnreadable", "persist.rosen.animationtrace.enabled") => {
+            Answer::out("device offline\n")
+        }
+        ("parametersEdge", "persist.ace.trace.syntax.enabled") => {
+            Answer::out("device unauthorized\n")
+        }
+        ("parametersEdge", "persist.ace.trace.layout.enabled") => Answer::killed(),
+        ("parametersEdge", "persist.ace.trace.build.enabled") => Answer::out(format!(
+            "\n  Get parameter \"{name}\" fail! errNum is:106!  \n\n"
+        )),
+        ("parametersEdge", "persist.ace.trace.measure.debug.enabled") => {
+            Answer::out("other.key = 1\n")
+        }
+        ("parametersEdge", "persist.ace.trace.sync.debug.enabled") => {
+            Answer::out(format!("{name}.extra = 1\n"))
+        }
+        ("parametersEdge", "persist.ace.debug.enabled") => Answer::out("y".repeat(400) + "\n"),
+        ("parametersEdge", "persist.ace.performance.monitor.enabled") => Answer {
+            stderr: lines("noise noise", 600).into_bytes(),
+            ..Answer::out("true\n")
+        },
+        ("parametersEdge", "persist.sys.graphic.openDebugTrace") => {
+            let mut stdout = b"\xef\xbb\xbf".to_vec();
+            stdout.extend_from_slice(missing(name).as_bytes());
+            Answer::bytes(stdout)
+        }
+        ("parametersEdge", "persist.rosen.animationtrace.enabled") => {
+            Answer::out(format!("{name} =\n"))
+        }
+        (_, "persist.ace.trace.syntax.enabled") => Answer::out("false\n"),
+        (_, "persist.ace.trace.layout.enabled") => Answer::out(format!("{name} = true\n")),
+        (_, "persist.ace.trace.build.enabled") => Answer::out(missing(name)),
+        (_, "persist.ace.trace.measure.debug.enabled") => Answer::out(format!("{name}=1\n")),
+        (_, "persist.ace.trace.sync.debug.enabled") => Answer::out(""),
+        (_, "persist.ace.debug.enabled") => Answer::out("0\n"),
+        (_, "persist.ace.performance.monitor.enabled") => Answer::out("\n  true  \n\n"),
+        (_, "persist.sys.graphic.openDebugTrace") => Answer::out("1\n"),
+        (_, "persist.rosen.animationtrace.enabled") => Answer::out("false\n"),
+        _ => Answer::refusing(24, "unregistered fixture parameter\n"),
+    }
+}
+
+impl OracleFake {
+    /// `trace-probe/hdc-answers.sh`: the probe's help, tag-list and parameter
+    /// reads on the adopted device, by mode, from the registered resources
+    /// below the root (`resources/`). Each call is also appended to
+    /// `hdc-calls.log`, its arguments joined by spaces, as the fragment
+    /// appends it. A `/bin/sleep` before an answer is not kept: nothing
+    /// observes the order of the probe's concurrent reads but their log,
+    /// which is read sorted. A read that sleeps past its budget hangs.
+    fn trace_probe(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(self.root.join("hdc-calls.log"))
+            .unwrap()
+            .write_all(format!("{all}\n").as_bytes())
+            .unwrap();
+        let resource = |name: &str| fs::read(self.root.join("resources").join(name)).unwrap();
+        let shell = format!("-t {KEY} shell ");
+        let stamp = "2026/09/14 08:30:00 ";
+        if all == format!("{shell}hitrace --help") {
+            let help = resource("hitrace-help.stdout.bin");
+            return match mode {
+                "restamped" => stamped(stamp, &help),
+                "helpExitNonZero" => Answer {
+                    status: 1,
+                    ..Answer::bytes(help)
+                },
+                "helpUnregistered" => first_per_line(&help, "buffer", "BUFFER"),
+                "helpBadTimestamp" => stamped("2026/13/14 08:30:00 ", &help),
+                "helpStderr" => Answer {
+                    stderr: b"hitrace: running as shell\n".to_vec(),
+                    ..Answer::bytes(help)
+                },
+                "helpSwapped" => Answer::bytes(resource("bytrace-help.stdout.bin")),
+                "helpUnobservable" => Answer::killed(),
+                "helpNotUTF8" => Answer::bytes(b"\xff\xfe hitrace\n".to_vec()),
+                _ => Answer::bytes(help),
+            };
+        }
+        if all == format!("{shell}bytrace --help") {
+            let help = resource("bytrace-help.stdout.bin");
+            return match mode {
+                "restamped" => stamped(stamp, &help),
+                "helpExitNonZero" => Answer {
+                    status: 3,
+                    ..Answer::bytes(help)
+                },
+                "helpUnregistered" => {
+                    Answer::failing(127, "/bin/sh: bytrace: inaccessible or not found\n")
+                }
+                "helpSwapped" => Answer::bytes(resource("hitrace-help.stdout.bin")),
+                "helpUnobservable" => flood("bytrace usage"),
+                _ => Answer::bytes(help),
+            };
+        }
+        if all == format!("{shell}hitrace -l") {
+            let tags = resource("hitrace-tags.stdout.bin");
+            return match mode {
+                "restamped" => stamped(stamp, &tags),
+                "tagsUnregistered" => first_per_line(&tags, "Ability", "ABILITY"),
+                "tagsStderr" => Answer {
+                    stderr: b"hitrace: running as shell\n".to_vec(),
+                    ..Answer::bytes(tags)
+                },
+                "tagsSwapped" => Answer::bytes(resource("bytrace-tags.stdout.bin")),
+                "tagsExitNonZero" => Answer {
+                    status: 1,
+                    ..Answer::bytes(tags)
+                },
+                "tagsFailMarker" => Answer::out("[Fail]ExecuteCommand need connect-key?\n"),
+                "tagsUnobservable" => Answer::killed(),
+                "tagsTruncated" => flood("category - description"),
+                "tagsTimeout" => Answer::hangs(),
+                _ => Answer::bytes(tags),
+            };
+        }
+        if let Some(name) = all.strip_prefix(&format!("{shell}param get ")) {
+            return probe_parameter(name, mode);
+        }
+        Answer::unregistered()
+    }
+}
+
 /// The Trace legs' `parameter "$6"`: each probed parameter's answer, the
 /// animation trace's unreadable while the ring is not held.
 fn trace_parameter(name: &str, mode: &str) -> Answer {
@@ -1100,6 +1293,7 @@ impl HdcDispatch for OracleFake {
             Answers::HumanAction => self.human_action(&plan.arguments, &mode),
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
             Answers::TargetAdoption => Self::target_adoption(&plan.arguments, &mode),
+            Answers::TraceProbe => self.trace_probe(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));
