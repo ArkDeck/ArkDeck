@@ -4,7 +4,8 @@
 //! debug-hap and deploy-native-library fragments, the Flash host facts
 //! oracle's own (`flash-host-facts/hdc-answers.sh`), and `observe.device@1`'s
 //! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables, and the
-//! read, file and Trace legs' fragments) are ported here, case for case and in
+//! read, file and Trace legs' fragments) and the Debug probe oracle's
+//! (`debug-probe/hdc-answers.sh`) are ported here, case for case and in
 //! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
@@ -34,6 +35,7 @@ pub enum Answers {
     ReadLegs,
     FileLegs,
     TraceLegs,
+    DebugProbe,
 }
 
 impl Answers {
@@ -58,6 +60,9 @@ impl Answers {
             line if line.starts_with("# capture.diagnostics@1 file-leg answers") => Self::FileLegs,
             line if line.starts_with("# capture.diagnostics@1 Trace-leg answers") => {
                 Self::TraceLegs
+            }
+            line if line.starts_with("# debug.probe and debug.template.run answers") => {
+                Self::DebugProbe
             }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
@@ -944,6 +949,62 @@ fn trace_parameter(name: &str, mode: &str) -> Answer {
     }
 }
 
+impl OracleFake {
+    /// `debug-probe/hdc-answers.sh`: the Debug probe's three reads and the
+    /// four read-only templates, by mode. Each call is also recorded as one
+    /// line of its arguments in `hdc-calls.log`, as the fragment records it.
+    fn debug_probe(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(self.root.join("hdc-calls.log"))
+            .unwrap()
+            .write_all(format!("{all}\n").as_bytes())
+            .unwrap();
+        let key = KEY;
+        match all.as_str() {
+            command if command == format!("-t {key} shell bm dump -a") => match mode {
+                "packagesUnavailable" | "allUnavailable" => Answer::exit(1),
+                "packagesUnparseable" => Answer::out("no bundle is installed\n"),
+                _ => Answer::out("Bundle names:\n\tcom.example.alpha\n\tcom.example.zeta\n"),
+            },
+            command if command == format!("-t {key} fport ls") => match mode {
+                "forwardUnavailable" | "allUnavailable" => Answer::exit(1),
+                _ => Answer::out("tcp:9000 tcp:9001    [Forward]\n"),
+            },
+            command if command == format!("-t {key} rport ls") => match mode {
+                "reverseUnavailable" | "allUnavailable" => {
+                    Answer::refusing(0, "[Fail]Device not founded or connected\n")
+                }
+                _ => Answer::out("tcp:9100 tcp:9101    [Reverse]\n"),
+            },
+            command if command == format!("-t {key} shell param get persist.ace.debug.enabled") => {
+                match mode {
+                    "templateTruncated" => {
+                        Answer::out("persist.ace.debug.enabled=true\n".repeat(600))
+                    }
+                    // `printf '...\377\n'`: one byte that is not UTF-8.
+                    "templateBinary" => Answer::bytes(b"persist.ace.debug.enabled=\xff\n".to_vec()),
+                    _ => Answer::out("true\n"),
+                }
+            }
+            command
+                if command == format!("-t {key} shell hidumper -s WindowManagerService -a -a") =>
+            {
+                Answer::out("WindowManagerService\n----------\nfocus window: com.example.alpha\n")
+            }
+            command if command == format!("-t {key} shell uptime") => match mode {
+                "templateFailure" => Answer::refusing(7, "uptime: cannot read /proc/uptime\n"),
+                // `kill -9 $$`.
+                "templateKilled" => Answer::killed(),
+                _ => Answer::out(" 10:00:00 up 1 day,  2:03,  0 users\n"),
+            },
+            _ => Answer::unregistered(),
+        }
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -974,6 +1035,7 @@ impl HdcDispatch for OracleFake {
             Answers::ReadLegs => Self::read_legs(&plan.arguments, &mode),
             Answers::FileLegs => self.file_legs(&plan.arguments, &mode),
             Answers::TraceLegs => self.trace_legs(&plan.arguments, &mode),
+            Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));
