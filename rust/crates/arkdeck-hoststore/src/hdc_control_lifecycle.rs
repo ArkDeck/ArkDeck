@@ -46,15 +46,6 @@ pub(crate) fn launch_path(payload: &Value) -> Value {
     return payload["authorizedExecutable"].clone();
 }
 /// The launch path's form, before the record is bound to its command.
-/// The executable a lifecycle command names is an absolute path: on macOS
-/// a `/` path, on Windows a drive or UNC path (`C:\…`), as the registered
-/// Windows HDC's own path is spelled (CHG-2026-078).
-fn absolute_executable(path: &str) -> bool {
-    #[cfg(target_os = "macos")]
-    return path.starts_with('/');
-    #[cfg(windows)]
-    return std::path::Path::new(path).is_absolute();
-}
 fn launch_path_form(payload: &Value) -> bool {
     #[cfg(target_os = "macos")]
     return text(payload, "inodeLaunchPath").is_some_and(|s| s.starts_with("/.vol/"));
