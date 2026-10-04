@@ -20,7 +20,9 @@
 //!
 //! The fake is the shared oracle fake's answers in process
 //! (`oracle_fake.rs`), over a root of its own, answering as the recorded
-//! driver whose digest is the fixture's `hdc`. Host tests only: nothing here
+//! driver whose digest is the fixture's `hdc`. Started with a board
+//! ([`SignedDaemon::start_with_board`]), the Host also reads a synthetic USB
+//! census naming the fixture's DAYU200 by its serial. Host tests only: nothing here
 //! reaches a device or an installed Runtime.
 use crate::host::Host;
 use crate::{code_sign_helper, oracle_fake, windows_lifecycle};
@@ -51,6 +53,12 @@ pub(crate) const MUTATION_ROOT: &str = "ARKDECK_TEST_SIGNED_DAEMON_MUTATION_ROOT
 /// path its argv names: the oracle recorded the helper's facts, not its
 /// bytes, and the fake never reads them.
 pub(crate) const HELPER: &str = "ARKDECK_TEST_SIGNED_DAEMON_HELPER";
+/// The serial of the one DAYU200 a synthetic USB census names
+/// ([`SignedDaemon::start_with_board`]): the Host reads it through the
+/// production census relations (`Host::with_usb_registry_relations`), so an
+/// observation of the fake's device is proved the adopted Target's, as a
+/// registered HDC's composition proves it over the Runtime's own census.
+pub(crate) const BOARD: &str = "ARKDECK_TEST_SIGNED_DAEMON_BOARD";
 /// The child's test, by its full name.
 const CHILD: &str = "signed_daemon::the_signed_test_daemon";
 /// As `arkdeck-agentd`'s (`src/main.rs`).
@@ -138,6 +146,23 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
         Arc::new(oracle_fake::OracleFake::new(fake_root, answers)),
         &tool_sha256,
     );
+    // The board the fake's device is, in its HDC-normal personality on one
+    // port with one attachment, as the census reads a present DAYU200.
+    let host = match std::env::var(BOARD) {
+        Ok(serial) => host.with_usb_registry_relations(
+            arkdeck_provider_hdc::UsbRegistryRelations::new(move || {
+                Ok(vec![arkdeck_platform::UsbHostDevice {
+                    serial: serial.clone(),
+                    vendor_id: arkdeck_provider_hdc::ROCKUSB_VENDOR_ID,
+                    product_id: arkdeck_provider_hdc::DAYU200_NORMAL_PRODUCT_ID,
+                    topology: "1".into(),
+                    product_name: Some("HDC Device".into()),
+                    registry_entry_id: Some(1),
+                }])
+            }),
+        ),
+        Err(_) => host,
+    };
     if let Some(recovered) = host.recover_active_jobs()? {
         for (job, reason) in recovered.quarantined.iter().chain(&recovered.refused) {
             eprintln!("arkdeck-agentd: job {job} was not recovered: {reason}");
@@ -281,8 +306,28 @@ impl SignedDaemon {
         Self::start_with(executable, pin, root, fixture, fake_root, &[])
     }
 
+    /// [`Self::start`], with the synthetic USB census naming one DAYU200 whose
+    /// serial is `serial` (the fixture's connect key; [`BOARD`]).
+    pub(crate) fn start_with_board(
+        executable: &Path,
+        pin: &str,
+        root: &Path,
+        fixture: &Path,
+        fake_root: &Path,
+        serial: &str,
+    ) -> Self {
+        Self::start_with(
+            executable,
+            pin,
+            root,
+            fixture,
+            fake_root,
+            &[(BOARD, serial.to_owned())],
+        )
+    }
+
     /// [`Self::start`], with the replay's composition inputs (`CLOCK`,
-    /// `MUTATION_ROOT`, `HELPER`) as `variables`.
+    /// `MUTATION_ROOT`, `HELPER`, `BOARD`) as `variables`.
     pub(crate) fn start_with(
         executable: &Path,
         pin: &str,
@@ -392,6 +437,11 @@ impl SignedDaemon {
         (output.status.code(), envelope)
     }
 
+    /// The pipe it serves, as it printed it.
+    pub(crate) fn pipe(&self) -> &str {
+        &self.pipe
+    }
+
     /// [`Self::cli_pinned`] with the signed copy's own pin.
     pub(crate) fn cli(&self, arguments: &[&str]) -> (Option<i32>, Value) {
         self.cli_pinned(&self.pin.clone(), arguments)
@@ -431,7 +481,7 @@ impl Drop for SignedDaemon {
 }
 
 /// A fresh directory below `TEMP`, in its plain canonical spelling.
-fn temporary(prefix: &str) -> PathBuf {
+pub(crate) fn temporary(prefix: &str) -> PathBuf {
     let base = std::env::temp_dir().canonicalize().unwrap();
     let base = match base.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
         Some(plain) => PathBuf::from(plain),
@@ -443,7 +493,7 @@ fn temporary(prefix: &str) -> PathBuf {
     ))
 }
 
-fn fixtures(name: &str) -> PathBuf {
+pub(crate) fn fixtures(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures")
         .join(name)

@@ -113,6 +113,8 @@ mod flash_host_facts_control;
 #[cfg(target_os = "macos")]
 mod flash_socket_control;
 #[cfg(windows)]
+mod gj1_device_leaves;
+#[cfg(windows)]
 mod gj23_replay;
 #[cfg(target_os = "macos")]
 mod managed_hdc_server;
