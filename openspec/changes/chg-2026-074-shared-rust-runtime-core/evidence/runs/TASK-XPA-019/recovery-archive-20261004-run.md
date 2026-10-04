@@ -295,3 +295,60 @@ PR #2468 now targets main after #2467's publication. Run `37198785153` and
 Agent PR run `37198784985` remain historical failures; the new merge must pass
 fresh required checks. Its run IDs and current results are recorded in the PR
 description after push. Maintainer review remains required.
+
+## macOS final-reply timeout race, 2026-10-04
+
+Fresh head `a40c784b82aa38c9907a7c0a57271660420ebeca` fails Swift CI run
+`37209275788`, macOS contract job `111457146829`, at
+`real_cli_daemon_three_kinds_restart_and_lost_commit_reply` in the candidate
+view. Its final `artifact.import.inspect` reports `EINVAL`. A deterministic
+local socket reproduction proves Darwin rejects a read-timeout refresh after
+peer close even while the complete final reply remains buffered. The isolated
+published and candidate tests passed standalone before the correction, but
+that alone does not meet the four invalid-run criteria: this is a code failure,
+not a load-related retry.
+
+The shared transport tolerates the failed timeout update only on macOS, only
+for `EINVAL`, and only after zero-wait kernel `poll` proves `POLLHUP`. Such a
+receive stream can only drain existing bytes and reach EOF; it cannot wait for
+new bytes. Zero budgets and other errors still fail. Bounded client deadline
+checks, framing, health validation and no-replay semantics remain in force.
+The new regression joins the peer before reading and verifies complete,
+truncated and empty frames without a timing delay or weakened assertion. The
+same fix is included in #2473, whose consumers share this transport.
+
+### Local targeted checks
+
+Logs are under `/tmp/arkdeck-macos-ci-20261004/`. The deterministic regression
+fails before the correction with the exact `EINVAL`
+(`socket-regression-before.log`, exit 101). After the fix these commands exit 0
+(`CARGO_BUILD_JOBS=2`):
+
+- `cargo test --manifest-path rust/Cargo.toml -p arkdeck-platform --test unix_transport`:
+  7 pass, including complete-frame drain, incomplete EOF, zero-budget refusal
+  and a live peer's read timeout (`archive-socket-regression.log`).
+- `cargo test --manifest-path rust/Cargo.toml -p arkdeck-client --test bounded`:
+  4 pass, retaining one total budget and refusal to replay
+  (`archive-socket-regression.log`).
+- `cargo build --manifest-path rust/Cargo.toml -p arkdeck-cli --bin arkdeck`, then
+  `cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd --test import_publication_process`:
+  the real CLI/daemon restart and lost-commit-reply journey passes
+  (`archive-import-regression.log`).
+- All-target Clippy with `-D warnings` passes for platform and its direct
+  dependents: agentd, bootstrap, CLI, client, hoststore, provider-arkforge,
+  provider-hdc, provider-workspace and rockchip-binding (`archive-socket-clippy.log`).
+  The target-specific direct dependent soak also passes all-target Clippy
+  (`archive-socket-soak-clippy.log`).
+- `cargo fmt --all --check --manifest-path rust/Cargo.toml`, `sh scripts/check-sdd.sh`
+  and `git diff --check` pass (`archive-socket-fmt.log`, `archive-socket-sdd.log`).
+
+The full local unified gate and unrelated App/Swift tests are not repeated for
+this Rust-only correction; PR CI checks the complete diff. No device execution
+or native UI acceptance is claimed.
+
+### CI
+
+PR #2468 run `37209275788` remains a failure on the preceding head. This
+correction requires fresh `guard` and `swift` results on its pushed head; the
+run IDs and conclusion are recorded in the PR description after push. No test
+assertion is relaxed, no sleep is added, and no failed run is counted as passed.
