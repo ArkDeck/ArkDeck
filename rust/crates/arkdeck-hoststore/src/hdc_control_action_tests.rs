@@ -20,7 +20,12 @@ const CATALOG: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 #[cfg(target_os = "macos")]
 const LAUNCH_PATH: &str = "/.vol/1/2";
 #[cfg(windows)]
-const LAUNCH_PATH: &str = "/fixture/hdc";
+const LAUNCH_PATH: &str = FIXTURE_HDC;
+/// The lifecycle command's executable, an absolute path of the platform.
+#[cfg(target_os = "macos")]
+const FIXTURE_HDC: &str = "/fixture/hdc";
+#[cfg(windows)]
+const FIXTURE_HDC: &str = r"C:\fixture\hdc.exe";
 
 fn reference(endpoint: &str) -> String {
     format!("hdc-endpoint:{}", sha256_hex(endpoint.as_bytes()))
@@ -1559,11 +1564,11 @@ impl HdcLifecycleDriver for LifecycleBoundaries<'_> {
             ),
             (
                 "actualCommand",
-                json!({"stepId":step,"executable":"/fixture/hdc","argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"]}),
+                json!({"stepId":step,"executable":FIXTURE_HDC,"argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"]}),
             ),
             (
                 "launchWindowEntered",
-                json!({"stepId":step,"executable":"/fixture/hdc","argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"],"authorizedExecutable":"/fixture/hdc","inodeLaunchPath":LAUNCH_PATH,"executableDevice":"1","executableInode":"2","executableFileSize":1,"executableMode":"448","executableSha256":"b".repeat(64)}),
+                json!({"stepId":step,"executable":FIXTURE_HDC,"argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"],"authorizedExecutable":FIXTURE_HDC,"inodeLaunchPath":LAUNCH_PATH,"executableDevice":"1","executableInode":"2","executableFileSize":1,"executableMode":"448","executableSha256":"b".repeat(64)}),
             ),
             ("outcome", json!({"stepId":step,"outcome":outcome})),
             (
@@ -1900,7 +1905,7 @@ fn fresh_impact_is_required_again_before_the_actual_command_is_durable() {
                 "actualCommand",
                 intent["auditId"].as_str().unwrap(),
                 json!({"stepId":intent["payload"]["stepId"],"endpoint":"127.0.0.1:8710",
-                    "executable":"/fixture/hdc","argv":["-s","127.0.0.1:8710","kill","-r"]}),
+                    "executable":FIXTURE_HDC,"argv":["-s","127.0.0.1:8710","kill","-r"]}),
             )?;
             panic!("a changed impact cannot enter the executor");
         }
@@ -1935,4 +1940,31 @@ fn fresh_impact_is_required_again_before_the_actual_command_is_durable() {
     assert_eq!(record.projection()["dispatchCount"], 0);
     assert!(!record.audit().iter().any(|e| e["kind"] == "actualCommand"));
     assert!(jobs.acquire_hdc_lifecycle_interlock().is_ok());
+}
+
+/// A lifecycle command names its executable by an absolute path of the
+/// platform: the registered Windows HDC's own `C:\…` path on Windows, where
+/// a `/`-rooted or relative spelling is not one (CHG-2026-078; the restart
+/// of DevEco's `hdc.exe` recorded its command this way).
+#[test]
+fn a_lifecycle_command_names_an_absolute_executable_of_its_platform() {
+    let command = |executable: &str| {
+        json!({"stepId": "5f0c1a52-0b4e-4c8a-9d2e-2b7f3c6a9e10", "executable": executable,
+            "argv": ["-s", "127.0.0.1:8710", "kill", "-r"], "endpoint": "127.0.0.1:8710"})
+    };
+    assert!(lifecycle::valid_payload(
+        "actualCommand",
+        &command(FIXTURE_HDC)
+    ));
+    assert!(!lifecycle::valid_payload("actualCommand", &command("hdc")));
+    #[cfg(windows)]
+    {
+        let devec =
+            r"C:\Program Files\Huawei\DevEco Studio\sdk\default\openharmony\toolchains\hdc.exe";
+        assert!(lifecycle::valid_payload("actualCommand", &command(devec)));
+        assert!(!lifecycle::valid_payload(
+            "actualCommand",
+            &command(r"toolchains\hdc.exe")
+        ));
+    }
 }

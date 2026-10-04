@@ -168,6 +168,8 @@ fn a_confirmed_restart_of_the_registered_windows_hdc_runs_end_to_end() {
     let restarted = frame(&control, "human-action.resume", answer, true);
     eprintln!("restarted: {restarted}");
     assert_eq!(restarted["ok"], true, "{restarted}");
+    assert_eq!(restarted["result"]["state"], "succeeded", "{restarted}");
+    assert_eq!(restarted["result"]["dispatchCount"], 1, "{restarted}");
 
     let after = frame(&control, "runtime.hdc.status", json!({}), false);
     eprintln!("status after: {after}");
@@ -185,9 +187,10 @@ fn a_confirmed_restart_of_the_registered_windows_hdc_runs_end_to_end() {
     eprintln!("control action: {shown}");
     assert!(!endpoint_free(), "the replacement serves the endpoint");
     assert!(
-        generation(&after["result"]).is_none_or(|g| Some(g) > generation(&before)),
-        "{after}"
+        generation(&after["result"]) > generation(&before),
+        "a strictly newer server: {after}"
     );
+    assert_eq!(after["result"]["ownership"], "arkDeckManaged", "{after}");
 
     // The daemon's stop ends the original child and the proved replacement.
     let stopped = managed.stop().expect("stopped once");

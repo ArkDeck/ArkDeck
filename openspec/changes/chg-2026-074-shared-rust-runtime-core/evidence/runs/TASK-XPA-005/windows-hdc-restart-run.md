@@ -32,6 +32,8 @@ requested.
 | --- | --- |
 | `arkdeck-hoststore` `hdc_impact_source.rs` | On Windows, for a registered Windows tuple's executable on the tuple's endpoint, health is two equal commandless identity observations with a representable generation (nothing is run); the version is the tuple's. A server receipt's image is compared with the configured path in the plain spelling (`\\?\` removed), as #2486 does in the status observer. macOS is unchanged. |
 | `arkdeck-platform` `windows/server.rs`; `arkdeck-provider-hdc` `managed_server.rs`; `arkdeck-agentd` `managed_hdc.rs` | A held port is its own typed refusal. On the reference host an unrelated process (a proxy) held local port 8710 for an outbound connection; nothing listened, so the start launched the server, which could not bind (`uv_tcp_bind -4092`, EACCES) and exited 0, read as a generic "exited with status 0". Now, before launching, `port_holders` reads the kernel's connection table (`GetExtendedTcpTable`, `TCP_TABLE_OWNER_PID_ALL`, IPv4 and IPv6) for any socket holding the port (a listener on any address or a connection's local port; TIME_WAIT and other ownerless rows excluded), and the start is refused as `StartFailure::PortInUse`, naming each holder (PID, image when readable, state, local and remote address). Nothing is launched, and no holder is adopted or stopped; a table that cannot be read refuses the start too. |
+| `arkdeck-hoststore` `hdc_control_lifecycle.rs` | The durable lifecycle record's command executable must be an absolute path of the platform: `/…` on macOS (unchanged), a drive or UNC path on Windows. It only admitted `/…`, so the approval of the registered Windows `hdc.exe` (`C:\Program Files\…`) was refused as `recordUnreadable` before dispatch. The Windows test fixture's executable is now `C:\fixture\hdc.exe`. |
+| `arkdeck-provider-hdc` `lifecycle.rs` | The Windows lifecycle client (`kill -r`) is named this daemon's TEMP/TMP, as the managed server is: 3.2.0g's client finds the server it ends through the server's files in the temporary directory, and the replacement it starts inherits the client's environment. Without them `kill -r` ended nothing, its replacement could not bind, and the restart was `outcomeUnknown` (dispatch 1, generation unchanged). |
 | `arkdeck-agentd` `windows_hdc_restart_tests.rs` | The confirmed restart end to end through Control over the real Windows composition (`windows_lifecycle::start`, `Authority::compose`) with the real registered `hdc.exe` (`ARKDECK_LIVE_WINDOWS_HDC`; skipped without it). |
 | `arkdeck-agentd/tests/windows_hdc_restart_live_process.rs` | The real daemon over its pipe: preview healthy and `arkDeckManaged`, version 3.2.0g, no blocker; the restart requests the impact approval and restarts nothing (generation and PID unchanged). Live-gated likewise. |
 
@@ -44,11 +46,23 @@ requested.
 - `windows_managed_hdc.rs` `a_held_port_launches_nothing_and_names_its_holder`: a listener on
   127.0.0.2 holding the endpoint's port refuses the start as `PortInUse` naming that process, with
   nothing launched; once the holder lets go, the start owns the port.
-- Live (2026-10-04, real c2 `hdc.exe`, no board): preview `serverHealth: healthy`,
+- `hdc_control_action_tests::a_lifecycle_command_names_an_absolute_executable_of_its_platform`:
+  the DevEco `C:\Program Files\…\hdc.exe` path is admitted on Windows; relative spellings are not.
+- **The confirmed restart, live, end to end** (2026-10-04 12:58Z, real c2 `hdc.exe`, on this layer
+  plus #2488, in process through Control over the Windows composition, the console origin supplied
+  as on macOS): preview healthy and `arkDeckManaged` at generation 1791118709224786; the restart
+  requested the impact approval; without the console it came back unchanged; with it the challenge
+  was issued; its answer ran `-s 127.0.0.1:8710 kill -r` once (`dispatchCount` 1) and the control
+  action ended `succeeded`; the replacement (PID 25016, generation 1791118714229049, strictly newer)
+  was proved and reported `arkDeckManaged`; the daemon's stop ended it ("ended the replacement HDC
+  server a confirmed restart proved") and nothing listened on 8710 afterwards. The DAYU200 happened
+  to be attached (one affected device observation in the preview); the restart only addresses the
+  server, and no device was changed. Before the two fixes above the same run failed at the approval
+  (`recordUnreadable`) and then at the outcome (`outcomeUnknown`, nothing ended).
+- Live, earlier (2026-10-04, real c2 `hdc.exe`, no board): preview `serverHealth: healthy`,
   `serverOwnership: arkDeckManaged`, `serverVersion: 3.2.0g`, `blockerReasonCode: null`; the restart
-  answered the waiting `impactApproval`. In process, with the console origin supplied, the Runtime
-  issued the console challenge, and without #2488 the control layer replaced it as nonconforming
-  (an unsigned tool's `identifier: null`), the gap #2488 closes.
+  answered the waiting `impactApproval`. Without #2488 the console challenge was replaced as
+  nonconforming (an unsigned tool's `identifier: null`), the gap #2488 closes.
 
 ## Left out
 
