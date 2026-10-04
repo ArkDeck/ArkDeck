@@ -1338,6 +1338,99 @@ public static class UiStrings
     public const string JobInspectorLogTail = "jobInspector.log.tail";
     public const string JobInspectorLogPrivacy = "jobInspector.log.privacy";
     public const string JobInspectorLogNotText = "jobInspector.log.notText";
+    public const string HistoryActionLoadOlder = "history.action.loadOlder";
+    public const string HistoryActivityAll = "history.activity.all";
+    public const string HistoryActivityDebug = "history.activity.debug";
+    public const string HistoryActivityDiagnostics = "history.activity.diagnostics";
+    public const string HistoryActivityFlash = "history.activity.flash";
+    public const string HistoryActivityOther = "history.activity.other";
+    public const string HistoryActivityQuickFilters = "history.activity.quickFilters";
+    public const string HistoryActivityRecent = "history.activity.recent";
+    public const string HistoryActivityRecentDescription = "history.activity.recentDescription";
+    public const string HistoryActivityTitle = "history.activity.title";
+    public const string HistoryActivityTrace = "history.activity.trace";
+    public const string HistoryActivityDevice = "history.activity.device";
+    public const string HistoryActivityViewer = "history.activity.viewer";
+    public const string HistoryFilterApplySaved = "history.filter.applySaved";
+    public const string HistoryFilterDeleteSaved = "history.filter.deleteSaved";
+    public const string HistoryFilterReloadSaved = "history.filter.reloadSaved";
+    public const string HistoryFilterDevice = "history.filter.device";
+    public const string HistoryFilterDeviceAll = "history.filter.device.all";
+    public const string HistoryFilterEmptyDescription = "history.filter.empty.description";
+    public const string HistoryFilterEmptyTitle = "history.filter.empty.title";
+    public const string HistoryFilterMode = "history.filter.mode";
+    public const string HistoryFilterModeAll = "history.filter.mode.all";
+    public const string HistoryFilterModeExecute = "history.filter.mode.execute";
+    public const string HistoryFilterModePlanned = "history.filter.mode.planned";
+    public const string HistoryFilterModeSimulated = "history.filter.mode.simulated";
+    public const string HistoryFilterModeUnknown = "history.filter.mode.unknown";
+    public const string HistoryFilterPresetNeedsAttention = "history.filter.preset.needsAttention";
+    public const string HistoryFilterPresetRecentFailures = "history.filter.preset.recentFailures";
+    public const string HistoryFilterReset = "history.filter.reset";
+    public const string HistoryFilterResultCount = "history.filter.resultCount";
+    public const string HistoryFilterSave = "history.filter.save";
+    public const string HistoryFilterSaved = "history.filter.saved";
+    public const string HistoryFilterSearch = "history.filter.search";
+    public const string HistoryFilterSession = "history.filter.session";
+    public const string HistoryFilterSessionAll = "history.filter.session.all";
+    public const string HistoryFilterStatus = "history.filter.status";
+    public const string HistoryFilterStatusActive = "history.filter.status.active";
+    public const string HistoryFilterStatusAll = "history.filter.status.all";
+    public const string HistoryFilterStatusCancelled = "history.filter.status.cancelled";
+    public const string HistoryFilterStatusFailed = "history.filter.status.failed";
+    public const string HistoryFilterStatusInterrupted = "history.filter.status.interrupted";
+    public const string HistoryFilterStatusNeedsAttention = "history.filter.status.needsAttention";
+    public const string HistoryFilterStatusSucceeded = "history.filter.status.succeeded";
+    public const string HistoryFilterTime = "history.filter.time";
+    public const string HistoryFilterTimeAnyTime = "history.filter.time.anyTime";
+    public const string HistoryFilterTimeLastDay = "history.filter.time.lastDay";
+    public const string HistoryFilterTimeLastHour = "history.filter.time.lastHour";
+    public const string HistoryFilterTimeLastWeek = "history.filter.time.lastWeek";
+    public const string HistoryFilterTitle = "history.filter.title";
+    public const string WindowsHistoryFilterSavedNone = "windows.history.filter.savedNone";
+    public const string WindowsHistoryFilterSavedSummary = "windows.history.filter.savedSummary";
+    public const string WindowsHistoryFilterSavedDone = "windows.history.filter.savedDone";
+    public const string WindowsHistoryFilterDeletedDone = "windows.history.filter.deletedDone";
+    public const string WindowsHistoryFilterSavedUnavailable = "windows.history.filter.savedUnavailable";
+    public const string HistoryDetailCorrelation = "history.detail.correlation";
+    public const string HistoryCorrelationShowSession = "history.correlation.showSession";
+    public const string HistoryCorrelationNoArtifacts = "history.correlation.noArtifacts";
+    public const string HistoryCorrelationArtifactCount = "history.correlation.artifactCount";
+    public const string HistoryCorrelationReadOnly = "history.correlation.readOnly";
+    public const string HistoryDetailEffect = "history.detail.effect";
+    public const string HistoryDetailNotLoaded = "history.detail.notLoaded";
+    public const string HistoryDetailOutcomeCertainty = "history.detail.outcomeCertainty";
+    public const string HistoryDetailParameters = "history.detail.parameters";
+    public const string HistoryDetailProjectionNote = "history.detail.projectionNote";
+    public const string HistoryDetailRecovery = "history.detail.recovery";
+    public const string HistoryDetailResidue = "history.detail.residue";
+    public const string HistoryDetailSession = "history.detail.session";
+    public const string HistoryDetailStarted = "history.detail.started";
+    public const string HistoryDetailSummary = "history.detail.summary";
+    public const string HistoryDetailTimeline = "history.detail.timeline";
+    public const string HistoryEvidenceFirmware = "history.evidence.firmware";
+    public const string HistoryEvidenceModel = "history.evidence.model";
+    public const string HistoryEvidenceTransport = "history.evidence.transport";
+    public const string HistoryOutcomeConfirmed = "history.outcome.confirmed";
+    public const string HistoryOutcomeUnknown = "history.outcome.unknown";
+    public const string HistoryParametersColumnAfter = "history.parameters.column.after";
+    public const string HistoryParametersColumnBefore = "history.parameters.column.before";
+    public const string HistoryParametersColumnName = "history.parameters.column.name";
+    public const string HistoryParametersColumnStatus = "history.parameters.column.status";
+    public const string HistoryParametersComparisonChanged = "history.parameters.comparison.changed";
+    public const string HistoryParametersComparisonUnchanged = "history.parameters.comparison.unchanged";
+    public const string HistoryParametersComparisonUnverified = "history.parameters.comparison.unverified";
+    public const string HistoryParametersEmpty = "history.parameters.empty";
+    public const string HistoryParametersStateMissing = "history.parameters.state.missing";
+    public const string HistoryParametersStateUnknown = "history.parameters.state.unknown";
+    public const string HistoryParametersStateUnreadable = "history.parameters.state.unreadable";
+    public const string HistoryParametersTypedInputs = "history.parameters.typedInputs";
+    public const string HistoryParametersUnavailable = "history.parameters.unavailable";
+    public const string HistoryRecoveryNone = "history.recovery.none";
+    public const string HistoryRecoveryOutcomeUnknown = "history.recovery.outcomeUnknown";
+    public const string HistoryRecoveryReadOnly = "history.recovery.readOnly";
+    public const string HistoryRecoveryResidue = "history.recovery.residue";
+    public const string HistoryRecoveryWaitingForHuman = "history.recovery.waitingForHuman";
     public const string JobRecoveryArchiveBlockerMutation = "jobRecovery.archive.blocker.mutation";
     public const string JobRecoveryArchiveUnavailable = "jobRecovery.archive.unavailable";
     public const string JobRecoveryArchiveTitle = "jobRecovery.archive.title";
@@ -2691,6 +2784,99 @@ public static class UiStrings
         JobInspectorLogTail,
         JobInspectorLogPrivacy,
         JobInspectorLogNotText,
+        HistoryActionLoadOlder,
+        HistoryActivityAll,
+        HistoryActivityDebug,
+        HistoryActivityDiagnostics,
+        HistoryActivityFlash,
+        HistoryActivityOther,
+        HistoryActivityQuickFilters,
+        HistoryActivityRecent,
+        HistoryActivityRecentDescription,
+        HistoryActivityTitle,
+        HistoryActivityTrace,
+        HistoryActivityDevice,
+        HistoryActivityViewer,
+        HistoryFilterApplySaved,
+        HistoryFilterDeleteSaved,
+        HistoryFilterReloadSaved,
+        HistoryFilterDevice,
+        HistoryFilterDeviceAll,
+        HistoryFilterEmptyDescription,
+        HistoryFilterEmptyTitle,
+        HistoryFilterMode,
+        HistoryFilterModeAll,
+        HistoryFilterModeExecute,
+        HistoryFilterModePlanned,
+        HistoryFilterModeSimulated,
+        HistoryFilterModeUnknown,
+        HistoryFilterPresetNeedsAttention,
+        HistoryFilterPresetRecentFailures,
+        HistoryFilterReset,
+        HistoryFilterResultCount,
+        HistoryFilterSave,
+        HistoryFilterSaved,
+        HistoryFilterSearch,
+        HistoryFilterSession,
+        HistoryFilterSessionAll,
+        HistoryFilterStatus,
+        HistoryFilterStatusActive,
+        HistoryFilterStatusAll,
+        HistoryFilterStatusCancelled,
+        HistoryFilterStatusFailed,
+        HistoryFilterStatusInterrupted,
+        HistoryFilterStatusNeedsAttention,
+        HistoryFilterStatusSucceeded,
+        HistoryFilterTime,
+        HistoryFilterTimeAnyTime,
+        HistoryFilterTimeLastDay,
+        HistoryFilterTimeLastHour,
+        HistoryFilterTimeLastWeek,
+        HistoryFilterTitle,
+        WindowsHistoryFilterSavedNone,
+        WindowsHistoryFilterSavedSummary,
+        WindowsHistoryFilterSavedDone,
+        WindowsHistoryFilterDeletedDone,
+        WindowsHistoryFilterSavedUnavailable,
+        HistoryDetailCorrelation,
+        HistoryCorrelationShowSession,
+        HistoryCorrelationNoArtifacts,
+        HistoryCorrelationArtifactCount,
+        HistoryCorrelationReadOnly,
+        HistoryDetailEffect,
+        HistoryDetailNotLoaded,
+        HistoryDetailOutcomeCertainty,
+        HistoryDetailParameters,
+        HistoryDetailProjectionNote,
+        HistoryDetailRecovery,
+        HistoryDetailResidue,
+        HistoryDetailSession,
+        HistoryDetailStarted,
+        HistoryDetailSummary,
+        HistoryDetailTimeline,
+        HistoryEvidenceFirmware,
+        HistoryEvidenceModel,
+        HistoryEvidenceTransport,
+        HistoryOutcomeConfirmed,
+        HistoryOutcomeUnknown,
+        HistoryParametersColumnAfter,
+        HistoryParametersColumnBefore,
+        HistoryParametersColumnName,
+        HistoryParametersColumnStatus,
+        HistoryParametersComparisonChanged,
+        HistoryParametersComparisonUnchanged,
+        HistoryParametersComparisonUnverified,
+        HistoryParametersEmpty,
+        HistoryParametersStateMissing,
+        HistoryParametersStateUnknown,
+        HistoryParametersStateUnreadable,
+        HistoryParametersTypedInputs,
+        HistoryParametersUnavailable,
+        HistoryRecoveryNone,
+        HistoryRecoveryOutcomeUnknown,
+        HistoryRecoveryReadOnly,
+        HistoryRecoveryResidue,
+        HistoryRecoveryWaitingForHuman,
         JobRecoveryArchiveBlockerMutation,
         JobRecoveryArchiveUnavailable,
         JobRecoveryArchiveTitle,
