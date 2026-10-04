@@ -429,12 +429,59 @@ impl Runtime for LocalRuntime<'_> {
 
 /// Swift `AgentRuntimeExecutor`'s default state directory: `agent-runtime`
 /// beside the Runtime's socket, where a paused run's pending record is kept.
+///
+/// A Windows endpoint is a named pipe, which has no directory beside it
+/// (`\\.\pipe\agent-runtime` is the pipe namespace, where nothing can be
+/// created): there it is `%LOCALAPPDATA%\ArkDeck\agent-runtime\<pipe name>`,
+/// below the account's local application data as the Known Folder API
+/// resolves it, one per Runtime pipe as one per socket on macOS. A pipe name
+/// is kept to ASCII letters, digits, `-`, `_` and `.`, any other character
+/// read as `_`; a name of dots only, or no Known Folder, leaves no directory,
+/// which the executor's persistence refuses and its resume reads as an
+/// unknown token.
 pub fn state_directory(endpoint: &LocalEndpoint) -> PathBuf {
-    endpoint
-        .as_path()
-        .parent()
-        .unwrap_or_else(|| Path::new(""))
-        .join("agent-runtime")
+    #[cfg(windows)]
+    {
+        windows_state_directory(
+            endpoint.as_path(),
+            arkdeck_platform::arkdeck_application_support_root(),
+        )
+    }
+    #[cfg(not(windows))]
+    {
+        endpoint
+            .as_path()
+            .parent()
+            .unwrap_or_else(|| Path::new(""))
+            .join("agent-runtime")
+    }
+}
+
+/// [`state_directory`] on Windows for the pipe `pipe`, below the account's
+/// ArkDeck directory `product` (`%LOCALAPPDATA%\ArkDeck`).
+#[cfg(windows)]
+pub fn windows_state_directory(pipe: &Path, product: Option<PathBuf>) -> PathBuf {
+    let name: String = pipe
+        .file_name()
+        .map(|name| {
+            name.to_string_lossy()
+                .chars()
+                .map(|character| {
+                    if character.is_ascii_alphanumeric() || "-_.".contains(character) {
+                        character
+                    } else {
+                        '_'
+                    }
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    match product {
+        Some(product) if !name.chars().all(|character| character == '.') => {
+            product.join("agent-runtime").join(name)
+        }
+        _ => PathBuf::new(),
+    }
 }
 
 /// `runDomainOperation` after the request is built: the executor's run and
