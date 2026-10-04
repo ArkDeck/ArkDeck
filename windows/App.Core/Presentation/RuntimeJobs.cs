@@ -27,13 +27,17 @@ public sealed record RuntimeRequest(string Json)
     private static readonly string ProcessSalt = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
 
     public static RuntimeRequest Build(string requestPrefix, string operationId, int version, string targetId, long? bindingRevision,
-        IEnumerable<(string Key, JsonValue Value)> inputs, IEnumerable<string> requestedOutputs, string clientName, bool threaded = true)
+        IEnumerable<(string Key, JsonValue Value)> inputs, IEnumerable<string> requestedOutputs, string clientName, bool threaded = true,
+        IReadOnlyList<(string Key, JsonValue Value)>? provenance = null)
     {
         var nonce = Guid.NewGuid().ToString("D");
         var target = bindingRevision is { } revision
             ? SurfaceLoader.Params(("expectedBindingRevision", JsonNumber.FromInt64(revision)), ("targetId", new JsonString(targetId)))
             : SurfaceLoader.Params(("targetId", new JsonString(targetId)));
-        var client = threaded
+        // A continuation states its own provenance (the source Job and its recorded thread).
+        var client = provenance is not null
+            ? SurfaceLoader.Params(("clientName", new JsonString(clientName)), ("provenance", SurfaceLoader.Params([.. provenance])))
+            : threaded
             ? SurfaceLoader.Params(("clientName", new JsonString(clientName)),
                 ("provenance", SurfaceLoader.Params(("arkdeck.threadId", new JsonString(ThreadId(clientName, targetId))))))
             : SurfaceLoader.Params(("clientName", new JsonString(clientName)));
@@ -390,4 +394,79 @@ public sealed partial class SurfaceLoader
         }
         throw new ContractException(ContractErrorKind.SchemaMismatch, "job.timeline returned more than 64 pages");
     }
+}
+
+public sealed partial class SurfaceLoader
+{
+    /// <summary>
+    /// Submits a prepared continuation after fresh identity checks (macOS
+    /// <c>RuntimeContinuationXPCProvider.submit</c>): exactly one Target with that ID at the
+    /// recorded binding, the source Job's status unchanged and terminal with a known outcome, the
+    /// draft prepared again from fresh evidence identical, and the Runtime's own plan of the new
+    /// request read-only for the same operation and binding. Only then <c>job.submit</c>; the
+    /// accepted Job must be new.
+    /// </summary>
+    public async Task<SessionActionState<JobAcceptance>> SubmitContinuationAsync(WorkspaceContinuation draft)
+    {
+        var run = new Run(channel);
+        var source = draft.SourceJob;
+        var targets = await run.Load(c => c.RequestAsync("target.list"), TargetSummary.ParseAll, CliCommands.TargetList);
+        var status = await run.Load(c => c.RequestAsync("job.status", Params(("jobId", new JsonString(source.JobId)))), JobSummary.Parse,
+            CliCommands.ForJob(CliCommands.JobStatus, source.JobId));
+        var evidence = await run.Load(c => c.RequestAsync("job.evidence", Params(("jobId", new JsonString(source.JobId)))), JobEvidenceFacts.Parse,
+            CliCommands.ForJob(CliCommands.JobEvidence, source.JobId));
+        if ((targets.Unavailable ?? status.Unavailable ?? evidence.Unavailable) is { } unread) return new(Loaded<JobAcceptance>.Not(unread), run.DaemonFailure, run.Reached);
+        var matching = targets.Value!.Where(t => t.TargetId == source.TargetId).ToArray();
+        var now = status.Value!;
+        var drifted = matching.Length != 1 || now.Operation != source.Operation || now.TargetId != source.TargetId || now.SessionId != source.SessionId
+                      || now.OutcomeUnknown || !JobSummary.TerminalStates.Contains(now.State)
+                      || WorkspaceContinuation.Prepare(source, evidence.Value, source.TargetId, matching[0].BindingRevision).Draft is not { } again
+                      || again.Kind != draft.Kind || again.BindingRevision != draft.BindingRevision || again.Inputs.ToString() != draft.Inputs.ToString();
+        if (drifted) return new(Loaded<JobAcceptance>.Not(Refusal("continuation_source_or_target_drifted")), run.DaemonFailure, run.Reached);
+
+        var request = draft.Request();
+        var plan = await run.Load(c => c.RequestAsync("job.plan", Params(("requestJson", new JsonString(request.Json)))), JobPlan.Parse, CliCommands.JobPlan);
+        if (plan.Unavailable is { } refused) return new(Loaded<JobAcceptance>.Not(refused), run.DaemonFailure, run.Reached);
+        if (plan.Value!.Operation != source.Operation || plan.Value.BindingRevision != draft.BindingRevision
+            || !OverviewRuns.RepeatableEffects.Contains(plan.Value.EffectiveEffect) || plan.Value.AdmissionBlocker is not null)
+        {
+            return new(Loaded<JobAcceptance>.Not(Refusal("continuation_inputs_not_read_only_or_invalid")), run.DaemonFailure, run.Reached);
+        }
+        var accepted = await run.Load(c => c.RequestAsync("job.submit", Params(("requestJson", new JsonString(request.Json)))), v => Json.Object(v, "a Job acceptance"), CliCommands.JobSubmit);
+        if (accepted.Unavailable is { } notAccepted) return new(Loaded<JobAcceptance>.Not(notAccepted), run.DaemonFailure, run.Reached);
+        // A deduplicated answer is an earlier Job, not the new one this draft asked for.
+        JobAcceptance job;
+        try
+        {
+            job = JobAcceptance.Parse(accepted.Value!);
+        }
+        catch (ArkDeck.ClientKit.Contract.ContractException)
+        {
+            return new(Loaded<JobAcceptance>.Not(Refusal("continuation_submit_not_confirmed")), run.DaemonFailure, run.Reached);
+        }
+        if (job.JobId == source.JobId || !accepted.Value!.TryGetValue("deduplicated", out var deduplicated) || deduplicated is not JsonBool { Value: false })
+        {
+            return new(Loaded<JobAcceptance>.Not(Refusal("continuation_submit_not_confirmed")), run.DaemonFailure, run.Reached);
+        }
+        return new(Loaded<JobAcceptance>.Of(job), run.DaemonFailure, run.Reached);
+    }
+
+    /// <summary>Runs the newly accepted continuation Job and reads its state back (macOS
+    /// <c>run(jobID:)</c>): the same Target and operation, and a known outcome.</summary>
+    public async Task<SessionActionState<JobShown>> RunContinuationAsync(WorkspaceContinuation draft, string jobId)
+    {
+        var shown = await RunAndShowAsync(jobId, CliCommands.ForJob(CliCommands.JobRun, jobId)).ConfigureAwait(false);
+        if (shown.Answer.Value is { } value)
+        {
+            string? Text(string key) => value.Status.TryGetValue(key, out var v) && v is JsonString s ? s.Value : null;
+            if (Text("jobId") != jobId || Text("targetId") != draft.SourceJob.TargetId || Text("operation") != draft.SourceJob.Operation
+                || !value.Status.TryGetValue("outcomeUnknown", out var unknown) || unknown is not JsonBool { Value: false })
+            {
+                return new(Loaded<JobShown>.Not(Refusal("continuation_run_result_unconfirmed_check_history")), shown.DaemonFailure, shown.Reached);
+            }
+        }
+        return shown;
+    }
+
+    private static Unavailable Refusal(string code) => new(code, code, CliCommands.JobList, null);
 }
