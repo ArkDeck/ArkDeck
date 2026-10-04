@@ -1,0 +1,112 @@
+{
+  "label": "c2",
+  "path": "<candidate-2-dir>\\sdk\\default\\openharmony\\toolchains\\hdc.exe",
+  "sha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+  "bytes": 5743104,
+  "versionResource": {
+    "fileVersion": "1, 0, 0, 0",
+    "productVersion": "1, 0, 0, 0",
+    "originalFilename": "WinPthreadGC",
+    "productName": "",
+    "companyName": "MingW-W64 Project. All rights reserved."
+  },
+  "authenticodeStatus": "NotSigned",
+  "signerSubject": null,
+  "markOfTheWeb": true,
+  "zoneIdentifier": {
+    "zoneId": "3",
+    "hostUrlHost": null
+  },
+  "siblingFiles": [
+    {
+      "name": "ark_disasm_static.exe",
+      "bytes": 2301952,
+      "sha256": "1dc35fed32b6a19f0c8c46979b4f765cce697561768713deaf2292b2898c7403",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "ark_disasm.exe",
+      "bytes": 2329600,
+      "sha256": "8323d039350ff8e41a7520b03123a23ec60b00f5570e5e92e4d26f5853d7c33e",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "diff.exe",
+      "bytes": 4609536,
+      "sha256": "6538ad5554f458153cdb63a8bcbf0b216cab840b9863a268c072357fff8ff145",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "glslang_validator.exe",
+      "bytes": 3127808,
+      "sha256": "79137298ec8ac26fedc4ce4e1d737a03445ff2d939734aaf5291eacdbf3befcc",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "hdc.exe",
+      "bytes": 5743104,
+      "sha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "hnpcli.exe",
+      "bytes": 180224,
+      "sha256": "d7344b9f05c7ee0240feea5fdfb6adac8f669035118deaaad79f4454f2549170",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "idl.exe",
+      "bytes": 2595328,
+      "sha256": "817a253779cafea3d8e0673a19ee356976c42a4af9c195feed1ef94b4c5479b0",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "js_rawheap_translator.exe",
+      "bytes": 29090816,
+      "sha256": "baeffa09fd84a487c3891a06d074c96b3abca337fce108c4c2b3589b984ceada",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "libusb_shared.dll",
+      "bytes": 202240,
+      "sha256": "4652cf440870e8d72db17a60dbb6f8a62bb89db30aa6af8b10c35347e5942c29",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "rawheap_translator.exe",
+      "bytes": 956416,
+      "sha256": "ea1067697ddc6842d3eddc19faf4665e01bbaf1190c1bd8cc5aeeeef1626cfc9",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "restool.exe",
+      "bytes": 2390528,
+      "sha256": "3da6329b74ff6b5bdee3599978a5fef97374e2b2c60d436ed49af3d413938433",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "spirv-remap.exe",
+      "bytes": 3061760,
+      "sha256": "439fb83024dd99a1fa9952a770b5a1f7559e860e3846e9c384073446171096cd",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "syscap_tool.exe",
+      "bytes": 388608,
+      "sha256": "6efac64f5af08f8cdee1b85f1cab2f17ef8d5af39214a9fbfa191e13ffd3d97a",
+      "authenticodeStatus": "NotSigned"
+    }
+  ],
+  "os": {
+    "Caption": "Microsoft Windows 11 \u4e13\u4e1a\u7248",
+    "Version": "10.0.26200",
+    "BuildNumber": "26200",
+    "OSArchitecture": "64 \u4f4d"
+  },
+  "environment": {
+    "ohosHdc": [],
+    "hdcOnPath": [
+      "<candidate-1-dir>\\hdc.exe"
+    ]
+  }
+}

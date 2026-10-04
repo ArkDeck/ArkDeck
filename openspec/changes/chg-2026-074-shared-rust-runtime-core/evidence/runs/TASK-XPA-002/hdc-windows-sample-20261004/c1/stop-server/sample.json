@@ -1,0 +1,96 @@
+{
+  "schema": "arkdeck-windows-hdc-sample-sanitized/v1",
+  "phase": "stop-server",
+  "refused": null,
+  "serverBefore": {
+    "listeners8710": [
+      {
+        "localAddress": "127.0.0.1",
+        "localPort": 8710,
+        "pid": "pid-1"
+      }
+    ],
+    "listenerOwners": [
+      {
+        "pid": "pid-1",
+        "alive": true,
+        "name": "hdc",
+        "parentPid": null,
+        "imageIsSelectedTool": true,
+        "imageSha256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+        "startSeconds": 0.0
+      }
+    ],
+    "hdcProcesses": [
+      {
+        "pid": "pid-1",
+        "alive": true,
+        "name": "hdc",
+        "parentPid": null,
+        "imageIsSelectedTool": true,
+        "imageSha256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+        "startSeconds": 0.0
+      }
+    ]
+  },
+  "serverAfter": {
+    "listeners8710": [],
+    "listenerOwners": [],
+    "hdcProcesses": []
+  },
+  "commands": [
+    {
+      "name": "kill-server",
+      "argv": [
+        "kill"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 203.2671,
+      "streamsClosedWithin5s": true,
+      "stdoutBytes": 20,
+      "stderrBytes": 0,
+      "stdoutRedactedSha256": "36525257f23ac0a14f586bd2a3196567f359f046672b9d3a1b60e1e2dd2f7377",
+      "stderrRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "keyRedacted": false,
+      "stdoutTerminator": "CRLF",
+      "stdoutHasCR": true,
+      "serverBefore": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "serverAfter": {
+        "listeners8710": [],
+        "listenerOwners": [],
+        "hdcProcesses": []
+      }
+    }
+  ]
+}

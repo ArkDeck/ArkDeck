@@ -1,0 +1,43 @@
+{
+  "label": "c1",
+  "path": "<candidate-1-dir>\\hdc.exe",
+  "sha256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+  "bytes": 5448704,
+  "versionResource": {
+    "fileVersion": "1, 0, 0, 0",
+    "productVersion": "1, 0, 0, 0",
+    "originalFilename": "WinPthreadGC",
+    "productName": "",
+    "companyName": "MingW-W64 Project. All rights reserved."
+  },
+  "authenticodeStatus": "NotSigned",
+  "signerSubject": null,
+  "markOfTheWeb": false,
+  "zoneIdentifier": null,
+  "siblingFiles": [
+    {
+      "name": "hdc.exe",
+      "bytes": 5448704,
+      "sha256": "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+      "authenticodeStatus": "NotSigned"
+    },
+    {
+      "name": "libusb_shared.dll",
+      "bytes": 202240,
+      "sha256": "77d35ec3e2b3be8201aaab90ea2f8470c6d960be38bd941fc8c26bfcacace73b",
+      "authenticodeStatus": "NotSigned"
+    }
+  ],
+  "os": {
+    "Caption": "Microsoft Windows 11 \u4e13\u4e1a\u7248",
+    "Version": "10.0.26200",
+    "BuildNumber": "26200",
+    "OSArchitecture": "64 \u4f4d"
+  },
+  "environment": {
+    "ohosHdc": [],
+    "hdcOnPath": [
+      "<candidate-1-dir>\\hdc.exe"
+    ]
+  }
+}

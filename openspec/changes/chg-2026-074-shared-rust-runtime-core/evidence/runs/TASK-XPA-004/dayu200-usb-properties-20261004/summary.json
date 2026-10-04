@@ -1,0 +1,130 @@
+{
+  "schema": "arkdeck-windows-usb-sample-summary/v1",
+  "deviceInstanceCount": 2,
+  "suffixKinds": [
+    "serial",
+    "serial"
+  ],
+  "serials": [
+    {
+      "length": 32,
+      "characterClasses": [
+        "digit",
+        "upper"
+      ],
+      "equalsConnectKey": false,
+      "equalsConnectKeyIgnoringCase": true
+    },
+    {
+      "length": 16,
+      "characterClasses": [
+        "digit"
+      ],
+      "equalsConnectKey": false,
+      "equalsConnectKeyIgnoringCase": false
+    }
+  ],
+  "phases": {
+    "before": {
+      "boardNodes": 2,
+      "boardPresent": [
+        false,
+        false
+      ],
+      "interfaceNodes": 0,
+      "hardwareIds": [
+        "USB\\VID_2207&PID_5000&REV_0223",
+        "USB\\VID_2207&PID_5000"
+      ],
+      "locationPaths": [
+        "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(26)",
+        "ACPI(_SB_)#ACPI(PCI0)#ACPI(XHC_)#ACPI(RHUB)#ACPI(SS10)"
+      ],
+      "locationInfo": "Port_#0026.Hub_#0001",
+      "busReportedDeviceDesc": "\"HDC Device\"",
+      "arrivalOrder": {
+        "order": 7
+      },
+      "services": [
+        "Rockusb",
+        "WINUSB"
+      ]
+    },
+    "after": {
+      "boardNodes": 2,
+      "boardPresent": [
+        true,
+        false
+      ],
+      "interfaceNodes": 0,
+      "hardwareIds": [
+        "USB\\VID_2207&PID_5000&REV_0223",
+        "USB\\VID_2207&PID_5000"
+      ],
+      "locationPaths": [
+        "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(10)",
+        "ACPI(_SB_)#ACPI(PCI0)#ACPI(XHC_)#ACPI(RHUB)#ACPI(HS10)"
+      ],
+      "locationInfo": "Port_#0010.Hub_#0001",
+      "busReportedDeviceDesc": "\"HDC Device\"",
+      "arrivalOrder": {
+        "order": 9
+      },
+      "services": [
+        "Rockusb",
+        "WINUSB"
+      ]
+    },
+    "removed": {
+      "boardNodes": 2,
+      "boardPresent": [
+        false,
+        false
+      ],
+      "interfaceNodes": 0,
+      "hardwareIds": [
+        "USB\\VID_2207&PID_5000&REV_0223",
+        "USB\\VID_2207&PID_5000"
+      ],
+      "locationPaths": [
+        "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(10)",
+        "ACPI(_SB_)#ACPI(PCI0)#ACPI(XHC_)#ACPI(RHUB)#ACPI(HS10)"
+      ],
+      "locationInfo": "Port_#0010.Hub_#0001",
+      "busReportedDeviceDesc": "\"HDC Device\"",
+      "arrivalOrder": {
+        "order": 9
+      },
+      "services": [
+        "Rockusb",
+        "WINUSB"
+      ]
+    },
+    "replugged": {
+      "boardNodes": 2,
+      "boardPresent": [
+        true,
+        false
+      ],
+      "interfaceNodes": 0,
+      "hardwareIds": [
+        "USB\\VID_2207&PID_5000&REV_0223",
+        "USB\\VID_2207&PID_5000"
+      ],
+      "locationPaths": [
+        "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(26)",
+        "ACPI(_SB_)#ACPI(PCI0)#ACPI(XHC_)#ACPI(RHUB)#ACPI(SS10)"
+      ],
+      "locationInfo": "Port_#0026.Hub_#0001",
+      "busReportedDeviceDesc": "\"HDC Device\"",
+      "arrivalOrder": {
+        "order": 11
+      },
+      "services": [
+        "Rockusb",
+        "WINUSB"
+      ]
+    }
+  },
+  "locationSurvivesReplugSamePort": false
+}
