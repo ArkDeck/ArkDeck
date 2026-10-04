@@ -49,3 +49,17 @@ attempted. No real SMB/WSL connection, device deployment or Golden Journey was e
 
 Pending initial push. Required `guard` and `swift` are recorded on the PR. No CI result is a
 maintainer approval or physical-device acceptance.
+
+## CI follow-up: shared localization companions
+
+Local targeted checks: `python3 windows/scripts/generate-ui-strings.py --check`
+exited 0 after copying the three changed existing deployment labels into
+`spec/ui-semantics/strings.json` and regenerating both Windows `.resw` files.
+The source and generated values now agree; no App behavior changed in this
+follow-up. `git diff --check` exited 0. The already-passing App build and Swift
+behavior tests were not repeated for this generated-resource correction.
+
+CI: PR #2466, Swift CI run `37179304977` passed Swift tests, App build and design
+interactions; the Windows lane failed its generated UI-string drift check for
+these three labels before compiling. SDD Guard run `37179376168` passed. The
+follow-up commit corrects that drift; its new CI result remains pending.
