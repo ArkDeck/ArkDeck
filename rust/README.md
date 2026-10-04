@@ -272,10 +272,13 @@ the check.
 
 These are local host configuration, never control request fields or capability
 authority. An arbitrary configured hash cannot register a Windows HDC tool.
-The current published HDC tuples are macOS-only. The macOS commandless server
-lease is also unavailable in this phase, so both paths refuse HDC dispatch.
-Registering Windows requires actual Windows tool/output provenance and a
-separately scoped integration change; see the
+On Windows, the one registered tuple is DevEco Studio 26.0.0.43's `hdc.exe`
+(CHG-2026-078, `c2`, `3.2.0g`; `WINDOWS_HDC_TUPLES`). A development root starts
+it as its managed server (`ARKDECK_DEVELOPMENT_HDC_PATH` with
+`ARKDECK_DEVELOPMENT_HDC_SERVER=managed`). The account daemon does not select
+it yet: the Windows tool-selection owner is not composed. Registering another
+Windows tool needs its own Windows tool and output provenance and a separately
+scoped integration change; see the
 [delivery record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/xpa-002-readonly-foundation.md).
 On macOS, `ARKDECK_RUNTIME_COMPOSITION=production` selects the
 [production composition](#macos-production-composition-task-xpa-017-not-activated)
@@ -380,7 +383,10 @@ deadline cut short leaves the guard abandoned: `restart.drain` says
 `deadlineElapsed`, the guard stays abandoned, and the successor starts as after
 a crash.
 
-`install`, `update`, `uninstall` and the `agentd` spellings stay macOS-only.
+`install`, `update` and the `agentd` spellings stay macOS-only. `uninstall`
+stops the client-started daemon through its stop event and answers
+`arkdeck-windows-daemon-uninstall/v1`; the installed files are the
+package's to remove (#2411).
 `tests/windows_client_start_process.rs` (in `arkdeck-agentd`) and the CLI's
 `tests/windows_runtime_service.rs` drive these. The signed paths use a copy of
 the daemon signed with the host-trusted development signer
@@ -1014,7 +1020,7 @@ owner and, where one is composed, its HDC: the HDC composition the planner,
 the admitter (with the capability authority), the runner, the reconciler,
 the cleanup-debt continuation and an agent execution's owned Job all read
 (`Host::hdc`, as on macOS), with the receive root below the account's
-temporary directory (`%TEMP%rkdeck-receive`). That HDC exists only as a
+temporary directory (`%TEMP%\arkdeck-receive`). That HDC exists only as a
 registered Windows HDC tuple's managed server (`windows_hdc_gate`,
 CHG-2026-078), and `operation.list` then asks after its tool identity as
 macOS does. Without one, `job.plan` and `job.submit` of `observe.device@1`
@@ -2835,11 +2841,10 @@ development-signed copy. The run record is
 append, abort, commit, inspect, list, release, an Import's Artifacts, and a
 Job's Import inputs) on Windows, over the host store's NTFS import upload
 (#2357) and the Artifact publication and read owners. The code is the macOS
-code, and `TargetStore::resolve_import_binding` with it. One kind waits: a
-`flash-bundle` Import is refused at publication as a kind whose validator is
-not configured ("This Import kind's publication validator is not
-configured"), before anything is published, until the Flash archive reader
-is on Windows (AF-W1); its begin and upload are the macOS ones. The Windows
+code, and `TargetStore::resolve_import_binding` with it. A `flash-bundle`
+Import is judged at publication by the Flash archive reader, which reads the
+archive on Windows with the platform's own raw DEFLATE decoder (#2410). Its
+upload is measured end to end through the CLI (#2435). The Windows
 daemon composes the owner over its Artifact root's private `.imports-v1`,
 right after the Artifact owner (census `…, artifacts, imports, storage, …`),
 and hands it to the Job planner and runner. The CLI's `artifact import
@@ -3533,7 +3538,8 @@ with `RegistryUnavailable::MappingUnconfirmed`):
 daemon composes the Target observation owner it feeds (see
 [Windows Target owners](#windows-target-owners-task-xpa-004)) and reads it by the
 macOS rule: only beside a registered HDC the composition started as its managed
-server. No Windows HDC tuple is registered yet, so it reads no relation.
+server. That is the registered `c2` `hdc.exe` on a development root
+(CHG-2026-078). The account daemon composes no HDC yet, so it reads no relation.
 
 Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
 sets: the upper-case suffix folded, a phantom passed over, a new arrival a new
@@ -3569,8 +3575,11 @@ owner-only refuses the start (exit 69, `the Target store … is unusable`).
 - The Target observation owner (`TargetObservations`) with the USB relations
   the macOS rule names (`development_usb::relation_source`): the Windows census
   only beside a registered HDC the composition started as its managed server.
-  No Windows HDC tuple is registered yet (its integration change waits for the
-  maintainer's samples), so nothing is observed or dispatched:
+  On a development root with the registered `c2` `hdc.exe`, `device
+  candidates` and `target adopt` run against the board (measured live on
+  2026-10-04, `windows_hdc_live_process.rs`). Without an HDC (the account
+  daemon, until the Windows tool-selection owner is composed), nothing is
+  observed or dispatched:
   `device.observations` answers `rejected` (`hdc.notConfigured`),
   `device.display-name.*` finds no snapshot (`resourceConflict`, phase
   `candidateDisplayNameOwner`, `newDispatchCount: 0`), and `target.adopt`
@@ -4085,12 +4094,13 @@ need the device-mutation authority, which a development root does not hold.
 measure the rest, and `workspace read|status|diff|isolate|sweep` are in
 `WINDOWS_MEASURED_LEAVES`
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-lanes-run.md)).
-Until the trusted system tools are composed, a registered project resolves to
-no profile. Every profile-served workspace operation is unavailable with
-`workspace.toolchainUnavailable: no trusted system archive (tar) or
-source-control (git) tool is composed on Windows yet`, and a plan of one is
-refused before admission with zero dispatch. `workspace.inspect-source@1`
-needs no profile, so it runs.
+A registered project resolves to its profile through the code-owned tools:
+the daemon's own `grep`, `sed` and `patch`, and the trusted `tar` and `git`
+below. A tool that does not verify on the host leaves the project with no
+profile. Every profile-served operation is then unavailable with
+`workspace.toolchainUnavailable` and its reason, and a plan of one is refused
+before admission with zero dispatch. `workspace.inspect-source@1` needs no
+profile, so it runs either way.
 
 `cargo test -p arkdeck-hoststore --test workspace_text_tools_oracle` checks the
 reimplementation against the macOS tools in two ways:
@@ -4126,8 +4136,8 @@ on disk. No reparse point is allowed, and only `SYSTEM`, `Administrators` or
 held handle that `WinVerifyTrust` verified.
 `WorkspaceCommandPreset::trusted_system` pins a preset by that digest, and its
 dispatch (`VerifiedTool::open`) runs only that image. The workspace profile's
-code-owned tool table does not use them yet, so the refusal above still
-stands. The tests run against the host's real `tar.exe` and Git for Windows.
+code-owned tool table uses them for the archive and source-control slots
+(#2500). The tests run against the host's real `tar.exe` and Git for Windows.
 They also cover a copy outside the registered path, an altered or unsigned
 image, the other tool's publisher, another spelling, a junctioned root, a
 launch by another digest and a shadowing PATH.

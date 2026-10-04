@@ -14,6 +14,11 @@ pub mod foundation_json;
 pub mod foundation_path;
 mod framing;
 mod imports;
+mod keyboard_input;
+pub use keyboard_input::{
+    KEYBOARD_MEDIA_TYPE, KEYBOARD_PAYLOAD_MAX_BYTES, KEYBOARD_TEXT_MAX_BYTES, KeyboardKey,
+    KeyboardPayload,
+};
 mod job_state_preflight;
 pub mod operation_catalog;
 pub use imports::{

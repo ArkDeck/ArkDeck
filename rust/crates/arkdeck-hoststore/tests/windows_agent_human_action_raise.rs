@@ -20,8 +20,8 @@
 //! two reads of the USB relations each exchange plugged. The devices come from
 //! a scripted HDC (`HdcDispatch`) answering `list targets -v` in the state the
 //! oracle's fake HDC answered it for each exchange's mode: no `hdc` runs, and
-//! no Windows HDC tuple is registered or needed, since the owners are fed a
-//! dispatch directly. Every answer is Swift's once the identities the owners
+//! no registered Windows HDC is needed, since the owners are fed a dispatch
+//! directly. Every answer is Swift's once the identities the owners
 //! mint read as the oracle's labels; the dispatch is asked for the four device
 //! lists the oracle's fake recorded; the execution records are Swift's up to
 //! the observation identities and generations Swift's skipped resume advanced;

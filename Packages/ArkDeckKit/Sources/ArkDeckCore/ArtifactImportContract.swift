@@ -19,7 +19,7 @@ package struct ArtifactImportIntent: Codable, Equatable, Sendable {
     guard Set(fields.keys) == ["schemaVersion", "importRequestId", "kind", "targetId", "bindingRevision", "deviceProfile", "name", "byteCount", "sha256"],
       fields["schemaVersion"] == .string(Self.schemaVersion),
       case .string(let request)? = fields["importRequestId"], AgentExecutionIntent.validIdentifier(request),
-      case .string(let kind)? = fields["kind"], ["hap", "workspace-patch", "flash-bundle", "native-library"].contains(kind),
+      case .string(let kind)? = fields["kind"], ["hap", "workspace-patch", "flash-bundle", "native-library", "keyboard-input"].contains(kind),
       case .string(let target)? = fields["targetId"], AgentExecutionIntent.validIdentifier(target),
       let revision = Self.decimal(fields["bindingRevision"]), revision > 0,
       case .string(let name)? = fields["name"], name.utf8.count <= 128,
@@ -40,6 +40,8 @@ package struct ArtifactImportIntent: Codable, Equatable, Sendable {
     case "native-library":
       guard name.range(of: #"^lib[A-Za-z0-9_.-]+\.so$"#, options: .regularExpression) != nil,
         (64...64 * 1024 * 1024).contains(count), profile == nil else { throw invalid() }
+    case "keyboard-input":
+      guard name == "keyboard-input.json", count <= 4096, profile == nil else { throw invalid() }
     case "flash-bundle":
       guard name == "images.tar.gz", count <= 8 * 1024 * 1024 * 1024, profile == "dayu200" else { throw invalid() }
     default: throw invalid()

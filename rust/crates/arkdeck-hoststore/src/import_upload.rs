@@ -696,7 +696,7 @@ impl ImportUploadStore {
         let mut record = loaded.record;
         if app_owned
             && (record.app_owned != Some(true)
-                || !["hap", "native-library", "flash-bundle"]
+                || !["hap", "native-library", "flash-bundle", "keyboard-input"]
                     .contains(&record.intent.kind.as_str()))
         {
             return Err(failure(
@@ -786,7 +786,7 @@ impl ImportUploadStore {
         let mut record = loaded.record;
         if app_owned
             && (record.app_owned != Some(true)
-                || !["hap", "native-library", "flash-bundle"]
+                || !["hap", "native-library", "flash-bundle", "keyboard-input"]
                     .contains(&record.intent.kind.as_str()))
         {
             return Err(failure(
@@ -874,7 +874,7 @@ impl ImportUploadStore {
                 || (method == "artifact.import.begin"
                     && !matches!(
                         fields["kind"].as_str(),
-                        Some("hap" | "native-library" | "flash-bundle")
+                        Some("hap" | "native-library" | "flash-bundle" | "keyboard-input")
                     )))
         {
             return Err(failure(
