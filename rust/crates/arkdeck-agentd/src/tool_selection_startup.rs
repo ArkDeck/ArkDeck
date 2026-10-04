@@ -145,3 +145,33 @@ pub(crate) fn recover_prelaunch(
         .filter(|s| s.pending_action_id.is_none())
         .ok_or("pre-launch selection lost its prior active HDC".into())
 }
+
+/// Swift's production HDC (`main.swift` 462-584): only `ARKDECK_HDC_PATH`
+/// configures one. While the account's bootstrap registry holds no
+/// selection, that file is adopted as its first, as Swift's
+/// `adoptInstalledHDC` adopts it; the registry's startup selection — never
+/// the configured path once a selection exists — is the executable the
+/// managed server runs. A pending selection is returned to the startup
+/// transaction, which verifies its server before publishing or restoring it.
+pub(crate) fn registered_hdc(
+    registry: &ToolRegistryStore,
+    configured: &std::path::Path,
+    now: &str,
+) -> Result<arkdeck_hoststore::StartupSelection, String> {
+    let refused = |error: arkdeck_contract::WireError| {
+        format!(
+            "the registered HDC is unavailable: {}: {}",
+            error.code, error.message
+        )
+    };
+    if registry.startup_selection().map_err(refused)?.is_none() {
+        registry
+            .adopt_installed_hdc(configured, now)
+            .map_err(refused)?;
+    }
+    let selection = registry
+        .startup_selection()
+        .map_err(refused)?
+        .ok_or("the registered HDC selection is absent after its adoption")?;
+    Ok(selection)
+}

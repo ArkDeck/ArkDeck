@@ -1,7 +1,6 @@
 //! Coordinator behavior using retained Swift facts and private fixture stores.
 use super::*;
 use std::fs;
-use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
 use std::sync::{
     Arc, Mutex,
@@ -9,6 +8,24 @@ use std::sync::{
 };
 
 const NOW: u64 = 1_788_220_800_000;
+
+/// A fresh owner-only directory below this host's temporary directory, in
+/// its plain spelling.
+#[cfg(unix)]
+fn private_scratch(name: &str) -> PathBuf {
+    use std::os::unix::fs::DirBuilderExt;
+    let root = std::env::temp_dir().canonicalize().unwrap().join(name);
+    fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    root
+}
+#[cfg(windows)]
+fn private_scratch(name: &str) -> PathBuf {
+    let base = std::env::temp_dir().canonicalize().unwrap();
+    let base = base.to_str().unwrap();
+    let root = PathBuf::from(base.strip_prefix(r"\\?\").unwrap_or(base)).join(name);
+    arkdeck_platform::create_private_directory(&root).unwrap();
+    root
+}
 fn fields(v: Value) -> Map<String, Value> {
     v.as_object().unwrap().clone()
 }
@@ -23,7 +40,7 @@ fn fixture_preview() -> Map<String, Value> {
     record["preview"].as_object().unwrap().clone()
 }
 fn projection(f: &Value) -> Value {
-    json!({"schemaVersion":"arkdeck.runtime-tool/1","kind":"hdc","platform":"macos","toolRef":f["toolRef"],"generation":f["recordGeneration"],
+    json!({"schemaVersion":"arkdeck.runtime-tool/1","kind":"hdc","platform":HOST_TOOL_PLATFORM,"toolRef":f["toolRef"],"generation":f["recordGeneration"],
         "contentDigest":f["contentSHA256"],"executableSHA256":f["executableSHA256"],"trust":{
             "policy":f["trust"]["policy"],"registeredIdentity":true,"signature":f["signature"]["state"],"toolVersion":f["version"],
             "signingIdentifier":f["signature"]["identifier"],"teamIdentifier":f["signature"]["teamIdentifier"],
@@ -124,11 +141,10 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = private_scratch(&format!(
             "selection-owner-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
         let dir = HostDirectory::open(&root).unwrap();
         dir.private_child("actions").unwrap();
         dir.private_child("jobs").unwrap();
@@ -373,7 +389,14 @@ impl ToolSelectionDriver for Entered {
         let actual = json!({"stepId":id,"executable":selected.executable,"argv":["-s",h["endpoint"],"kill","-r"],"endpoint":h["endpoint"]});
         audit.append("actualCommand", id, actual.clone())?;
         let mut launch = fields(actual);
-        launch.extend(fields(json!({"authorizedExecutable":selected.executable,"inodeLaunchPath":"/.vol/1/2","executableDevice":"1","executableInode":"2",
+        // macOS launches by `/.vol/<device>/<inode>`; Windows by the
+        // authorized path itself (`hdc_control_lifecycle::launch_path`).
+        let launch_path = if cfg!(windows) {
+            json!(selected.executable)
+        } else {
+            json!("/.vol/1/2")
+        };
+        launch.extend(fields(json!({"authorizedExecutable":selected.executable,"inodeLaunchPath":launch_path,"executableDevice":"1","executableInode":"2",
             "executableFileSize":1,"executableMode":"448","executableSha256":if self.wrong_hash {"c".repeat(64)} else {selected.executable_sha256.clone()}})));
         audit.append("launchWindowEntered", id, Value::Object(launch))?;
         Err(WireError {
@@ -647,4 +670,52 @@ fn audit_read_failure_after_launch_keeps_admission_frozen_without_zero_dispatch_
     assert!(f.jobs.admission_interlock().is_err());
     assert!(f.jobs.acquire_hdc_lifecycle_interlock().is_err());
     assert_eq!(f.registry.prepares.load(Ordering::SeqCst), 1);
+}
+
+/// A row the Windows Bootstrap store registered (`platform` `windows`, its
+/// Authenticode facts) projects to the same path-free facts a selection's
+/// preview carries; a row of the other platform, or without a registered
+/// identity, is no candidate.
+#[cfg(windows)]
+#[test]
+fn a_windows_registry_row_projects_to_selection_facts() {
+    use std::io::Write;
+    let root = private_scratch(&format!(
+        "selection-projection-{:032x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    ));
+    let source = root.join("sdk");
+    arkdeck_platform::create_private_directory(&source).unwrap();
+    let bytes = fs::read(
+        PathBuf::from(std::env::var_os("SystemRoot").unwrap())
+            .join("System32")
+            .join("whoami.exe"),
+    )
+    .unwrap();
+    let hdc = source.join("hdc.exe");
+    arkdeck_platform::create_private_file(&hdc)
+        .unwrap()
+        .write_all(&bytes)
+        .unwrap();
+    let store_path = root.join("bootstrap");
+    arkdeck_platform::create_private_directory(&store_path).unwrap();
+    let expected = arkdeck_contract::sha256_hex(&bytes);
+    let store = ToolRegistryStore::open_existing(&store_path)
+        .unwrap()
+        .with_published_identities(std::sync::Arc::new(move |sha256: &str| {
+            (sha256 == expected).then(|| json!({"version": "3.2.0g", "profileReferences": []}))
+        }));
+    let row = store.register(&hdc, "2026-10-04T00:00:00Z").unwrap();
+    let facts = ToolFacts::registry_projection(&row).unwrap();
+    assert_eq!(facts.tool(), row["toolRef"].as_str().unwrap());
+    assert_eq!(facts.value()["version"], "3.2.0g");
+    assert_eq!(facts.value()["executableSHA256"], row["executableSHA256"]);
+    assert_eq!(facts.value()["trust"]["profileReferences"], json!([]));
+    let mut other = row.clone();
+    other["platform"] = json!("macos");
+    assert!(ToolFacts::registry_projection(&other).is_err());
+    let mut unregistered = row.clone();
+    unregistered["trust"]["registeredIdentity"] = json!(false);
+    assert!(ToolFacts::registry_projection(&unregistered).is_err());
+    let _ = fs::remove_dir_all(&root);
 }

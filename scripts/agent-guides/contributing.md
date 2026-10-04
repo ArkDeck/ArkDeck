@@ -45,6 +45,7 @@ sandbox 内 `gh auth status` 报未登录或 token 无效时，用受控权限�
 自动开 PR 会保留已有 PR 的实际 base；新 PR 从未合入的同仓 PR 中选择唯一最近的祖先。
 首次 push 需要明确父层（例如父层已前进，或有多个可能父层）时，在末尾提交添加
 `Stack-Base: agent/<直接父分支>` trailer；显式新建独立栈可写 `Stack-Base: main`。
+该行从提交说明正文的任一行读取（提交时工具在其后追加的署名段落不影响读取），只能出现一次；
 该 trailer 只参与新 PR 的创建，不重设已有 PR，也不代替 restack。
 
 机器人通过 GitHub Stacks REST API 登记依赖链；只创建新栈或在既有栈顶追加新层，并读回

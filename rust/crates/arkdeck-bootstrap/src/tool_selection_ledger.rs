@@ -99,6 +99,10 @@ pub struct SelectionCandidate {
     pub new_tool: Value,
 }
 
+/// The retained executable's name in its content directory, as the
+/// registration captured it.
+const RETAINED_EXECUTABLE: &str = if cfg!(windows) { "hdc.exe" } else { "hdc" };
+
 /// The tool a starting daemon composes its HDC server from: the pending
 /// selection's new tool while one is in flight, else the active tool.
 #[derive(Clone, Debug, PartialEq)]
@@ -106,7 +110,8 @@ pub struct StartupSelection {
     pub tool_ref: String,
     pub active_generation: u64,
     pub pending_action_id: Option<String>,
-    /// `<store>/tool-<contentDigest>.hdc/hdc`, as retained.
+    /// `<store>/tool-<contentDigest>.hdc/hdc` (`hdc.exe` on Windows), as
+    /// retained.
     pub executable: PathBuf,
     pub executable_sha256: String,
     /// The retained dependencies, as the tool's row lists them.
@@ -673,7 +678,7 @@ impl Ledger<'_> {
                 .store
                 .path
                 .join(format!("tool-{}.hdc", record.content_digest))
-                .join("hdc"),
+                .join(RETAINED_EXECUTABLE),
             executable_sha256: record.executable_sha256.clone(),
             dependencies: row["dependencies"].as_array().cloned().unwrap_or_default(),
         }

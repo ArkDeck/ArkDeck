@@ -31,7 +31,27 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
     private readonly Dictionary<string, ContentControl> _resultHosts = new(StringComparer.Ordinal);
     private string? _selected;
 
-    protected override Task<HistoryState> LoadAsync() => App.Loader.HistoryAsync();
+    // The Jobs read so far (the first page and every older page) and the next page's cursor.
+    private List<JobSummary> _jobs = [];
+    private string? _cursor;
+    private string? _olderFailure;
+    private bool _loadingOlder;
+    private HistoryFilterQuery _filter = HistoryFilterQuery.None;
+    private SessionActionState<SavedHistoryFilter>? _saved;
+    private bool _savedBusy;
+    private StackPanel _tableHost = new() { Spacing = 8 };
+    private ContentControl _filtersHost = new() { IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+    private TextBlock _filterStatus = Ui.Status("history.filter.status.line");
+
+    protected override async Task<HistoryState> LoadAsync()
+    {
+        var state = await App.Loader.HistoryAsync();
+        _jobs = state.Jobs.Value?.ToList() ?? [];
+        _cursor = state.NextCursor;
+        _olderFailure = null;
+        if (_saved is null && state.Reached) _saved = await App.Loader.SavedHistoryFilterAsync();
+        return state;
+    }
 
     protected override void Render(HistoryState state, StackPanel body)
     {
@@ -40,7 +60,7 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             body.Children.Add(Ui.Card(Ui.UnavailableNotice("history.unavailable", UiStrings.HistoryUnavailableTitle, why,
                 UiStrings.HistoryUnavailableGuidance, titleId: "history.unavailable.title")));
         }
-        else if (state.Jobs.Value!.Count == 0)
+        else if (_jobs.Count == 0)
         {
             body.Children.Add(Ui.Card(Ui.Stack(4,
                 Ui.Text("history.empty.title", S.Text(UiStrings.HistoryEmptyTitle), "ArkDeckSectionTitleStyle"),
@@ -48,8 +68,209 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
         }
         else
         {
+            // New hosts each render: an element is never moved between renders.
+            _filtersHost = new ContentControl { IsTabStop = false, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            _tableHost = new StackPanel { Spacing = 8 };
+            _filtersHost.Content = Filters();
+            body.Children.Add(Ui.Card(_filtersHost, "history.filters"));
+            body.Children.Add(Ui.Card(_tableHost, "history.list"));
+            RenderTable();
+            _detail = new StackPanel { Spacing = 8 };
+            body.Children.Add(Ui.Card(_detail, "history.detail"));
+            if (_selected is { } selected && _jobs.Any(j => j.JobId == selected))
+            {
+                DispatcherQueue.TryEnqueue(async () => await ShowDetailAsync(selected));
+            }
+            else
+            {
+                _selected = null;
+                _detail.Children.Add(Ui.Heading("history.detail.title", S.Text(UiStrings.HistoryDetailTitle)));
+                _detail.Children.Add(Ui.Text("history.detail.select", S.Text(UiStrings.HistoryDetailSelect), "ArkDeckCaptionStyle"));
+            }
+        }
+        body.Children.Add(Ui.Text("history.readOnlyNote", S.Text(UiStrings.HistoryReadOnlyNote), "ArkDeckCaptionStyle"));
+    }
+
+    // ---- filters (macOS filterSidebar, filterPickers, savedFilterMenu) ----
+
+    private static ComboBox Picker<T>(string id, string headerKey, T current, IEnumerable<(T Value, string Label, string Tag)> options, Action<T> chosen)
+    {
+        var combo = new ComboBox { Header = S.Text(headerKey), MinWidth = 200 };
+        AutomationProperties.SetAutomationId(combo, id);
+        AutomationProperties.SetName(combo, S.Text(headerKey));
+        foreach (var (value, label, tag) in options)
+        {
+            var item = new ComboBoxItem { Content = label, Tag = value };
+            AutomationProperties.SetAutomationId(item, $"{id}.{tag}");
+            combo.Items.Add(item);
+            if (EqualityComparer<T>.Default.Equals(value, current)) combo.SelectedItem = item;
+        }
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (combo.SelectedItem is ComboBoxItem { Tag: T value }) chosen(value);
+        };
+        return combo;
+    }
+
+    private static IEnumerable<(T, string, string)> Enum<T>(string prefix) where T : struct, System.Enum =>
+        System.Enum.GetValues<T>().Select(v => (v, S.Text(prefix + HistoryFilterQuery.Name(v)), HistoryFilterQuery.Name(v)));
+
+    private StackPanel Filters()
+    {
+        _filterStatus = Ui.Status("history.filter.status.line");
+        var activity = Picker("history.filter.activity", UiStrings.HistoryActivityTitle, _filter.Activity,
+            System.Enum.GetValues<HistoryActivity>().Select(a => (a,
+                $"{S.Text("history.activity." + HistoryFilterQuery.Name(a))} ({_jobs.Count(j => a == HistoryActivity.All || HistoryFilterQuery.ActivityOf(j) == a)})",
+                HistoryFilterQuery.Name(a))),
+            a => SetFilter(_filter with { Activity = a }));
+        var search = new TextBox { Header = S.Text(UiStrings.HistoryFilterSearch), PlaceholderText = S.Text(UiStrings.HistoryFilterSearch), Text = _filter.Search, MinWidth = 260 };
+        AutomationProperties.SetAutomationId(search, "history.filter.search");
+        AutomationProperties.SetName(search, S.Text(UiStrings.HistoryFilterSearch));
+        search.TextChanging += (_, _) => { if (search.Text != _filter.Search) SetFilter(_filter with { Search = search.Text }, rebuildFilters: false); };
+        var sessions = _jobs.Select(j => j.SessionId).OfType<string>().Distinct().Order(StringComparer.Ordinal);
+        var targets = _jobs.Select(j => j.TargetId).Distinct().Order(StringComparer.Ordinal);
+        var row = Ui.Row(activity, search,
+            Picker("history.filter.status", UiStrings.HistoryFilterStatus, _filter.Status, Enum<HistoryStatus>("history.filter.status."), v => SetFilter(_filter with { Status = v })),
+            Picker("history.filter.mode", UiStrings.HistoryFilterMode, _filter.Mode, Enum<HistoryMode>("history.filter.mode."), v => SetFilter(_filter with { Mode = v })),
+            Picker("history.filter.session", UiStrings.HistoryFilterSession, _filter.SessionId ?? "",
+                new[] { ("", S.Text(UiStrings.HistoryFilterSessionAll), "all") }.Concat(sessions.Select(x => (x, x, x))),
+                v => SetFilter(_filter with { SessionId = v.Length == 0 ? null : v })),
+            Picker("history.filter.device", UiStrings.HistoryFilterDevice, _filter.TargetId ?? "",
+                new[] { ("", S.Text(UiStrings.HistoryFilterDeviceAll), "all") }.Concat(targets.Select(x => (x, x, x))),
+                v => SetFilter(_filter with { TargetId = v.Length == 0 ? null : v })),
+            Picker("history.filter.time", UiStrings.HistoryFilterTime, _filter.Time, Enum<HistoryTime>("history.filter.time."), v => SetFilter(_filter with { Time = v })));
+        var quick = Ui.Row(
+            Ui.Button("history.filter.reset", S.Text(UiStrings.HistoryFilterReset), (_, _) => SetFilter(HistoryFilterQuery.None)),
+            Ui.Button("history.activity.needsAttention", S.Text(UiStrings.HistoryFilterPresetNeedsAttention), (_, _) => SetFilter(HistoryFilterQuery.None with { Status = HistoryStatus.NeedsAttention })),
+            Ui.Button("history.filter.preset.recentFailures", S.Text(UiStrings.HistoryFilterPresetRecentFailures),
+                (_, _) => SetFilter(HistoryFilterQuery.None with { Status = HistoryStatus.Failed, Time = HistoryTime.LastWeek })));
+        if (_selected is { } selected && _jobs.FirstOrDefault(j => j.JobId == selected) is { } job)
+        {
+            quick.Children.Add(Ui.Button("history.activity.selectedDevice", job.TargetId, (_, _) => SetFilter(HistoryFilterQuery.None with { TargetId = job.TargetId })));
+        }
+        return Ui.Stack(8, Ui.Heading("history.filter.title", S.Text(UiStrings.HistoryFilterTitle), AutomationHeadingLevel.Level2),
+            row, Ui.Text("history.activity.quickFilters", S.Text(UiStrings.HistoryActivityQuickFilters), "ArkDeckCaptionStyle"), quick, Saved(), _filterStatus);
+    }
+
+    /// <summary>The Runtime's one saved filter (<c>history.filter.*</c>, generation-guarded).</summary>
+    private StackPanel Saved()
+    {
+        var panel = Ui.Stack(4, Ui.Text("history.filter.saved", S.Text(UiStrings.HistoryFilterSaved), "ArkDeckSectionTitleStyle"));
+        var actions = Ui.Row();
+        if (_saved?.Answer.Value is { } saved)
+        {
+            panel.Children.Add(Ui.Text("history.filter.saved.summary",
+                saved.Query is { } q ? S.Format(UiStrings.WindowsHistoryFilterSavedSummary, Describe(q)) : S.Text(UiStrings.WindowsHistoryFilterSavedNone), "ArkDeckCaptionStyle"));
+            actions.Children.Add(Ui.Button("history.filter.save", S.Text(UiStrings.HistoryFilterSave), async (_, _) => await MutateSavedAsync(save: true)));
+            if (saved.Query is not null)
+            {
+                actions.Children.Add(Ui.Button("history.filter.applySaved", S.Text(UiStrings.HistoryFilterApplySaved), (_, _) => ApplySaved(saved.Query)));
+                actions.Children.Add(Ui.Button("history.filter.deleteSaved", S.Text(UiStrings.HistoryFilterDeleteSaved), async (_, _) => await MutateSavedAsync(save: false)));
+            }
+        }
+        else if (_saved?.Answer.Unavailable is { } why)
+        {
+            panel.Children.Add(Ui.Text("history.filter.saved.failure", S.Format(UiStrings.WindowsHistoryFilterSavedUnavailable, why.ReasonText(S)), "ArkDeckCaptionStyle"));
+            actions.Children.Add(Ui.Button("history.filter.reloadSaved", S.Text(UiStrings.HistoryFilterReloadSaved), async (_, _) => await ReloadSavedAsync()));
+        }
+        panel.Children.Add(actions);
+        return panel;
+    }
+
+    private string Describe(HistoryFilterQuery q)
+    {
+        var parts = new List<string>();
+        if (q.Activity != HistoryActivity.All) parts.Add(S.Text("history.activity." + HistoryFilterQuery.Name(q.Activity)));
+        if (q.Search.Length > 0) parts.Add($"\u201c{q.Search}\u201d");
+        if (q.Status != HistoryStatus.All) parts.Add(S.Text("history.filter.status." + HistoryFilterQuery.Name(q.Status)));
+        if (q.Mode != HistoryMode.All) parts.Add(S.Text("history.filter.mode." + HistoryFilterQuery.Name(q.Mode)));
+        if (q.SessionId is { } session) parts.Add(session);
+        if (q.TargetId is { } target) parts.Add(target);
+        if (q.Time != HistoryTime.AnyTime) parts.Add(S.Text("history.filter.time." + HistoryFilterQuery.Name(q.Time)));
+        return parts.Count == 0 ? S.Text(UiStrings.HistoryActivityAll) : string.Join(" · ", parts);
+    }
+
+    /// <summary>macOS <c>applySavedFilter</c>: a Session or Target not among the Jobs read is dropped.</summary>
+    private void ApplySaved(HistoryFilterQuery query) => SetFilter(query with
+    {
+        SessionId = query.SessionId is { } s && _jobs.Any(j => j.SessionId == s) ? s : null,
+        TargetId = query.TargetId is { } t && _jobs.Any(j => j.TargetId == t) ? t : null,
+    });
+
+    private async Task ReloadSavedAsync()
+    {
+        if (_savedBusy) return;
+        _savedBusy = true;
+        try
+        {
+            _saved = await Task.Run(() => App.Loader.SavedHistoryFilterAsync());
+            MainWindow.Instance.Report(_saved);
+        }
+        finally
+        {
+            _savedBusy = false;
+            _filtersHost.Content = Filters();
+        }
+    }
+
+    private async Task MutateSavedAsync(bool save)
+    {
+        if (_savedBusy || _saved?.Answer.Value is not { } current) return;
+        _savedBusy = true;
+        var query = _filter;
+        try
+        {
+            var result = await Task.Run(() => save ? App.Loader.SaveHistoryFilterAsync(query, current.Generation) : App.Loader.DeleteHistoryFilterAsync(current.Generation));
+            MainWindow.Instance.Report(result);
+            if (result.Answer.Value is not null)
+            {
+                _saved = result;
+                Ui.Say(_filterStatus, S.Text(save ? UiStrings.WindowsHistoryFilterSavedDone : UiStrings.WindowsHistoryFilterDeletedDone));
+            }
+            else
+            {
+                // A changed generation (or anything else) re-reads the Runtime's filter, as macOS does.
+                var reason = result.Answer.Unavailable!.ReasonText(S);
+                _saved = await Task.Run(() => App.Loader.SavedHistoryFilterAsync());
+                Ui.Say(_filterStatus, reason);
+            }
+        }
+        finally
+        {
+            _savedBusy = false;
+        }
+        var said = _filterStatus.Text;
+        _filtersHost.Content = Filters();
+        Ui.Say(_filterStatus, said);
+    }
+
+    private void SetFilter(HistoryFilterQuery filter, bool rebuildFilters = true)
+    {
+        _filter = filter;
+        // Only the filters and the list are rebuilt, from the Jobs already read (no new read).
+        if (rebuildFilters) DispatcherQueue.TryEnqueue(() => _filtersHost.Content = Filters());
+        RenderTable();
+    }
+
+    /// <summary>The filtered list (macOS jobTable): the count, the rows, the empty match, Load Older.</summary>
+    private void RenderTable()
+    {
+        _tableHost.Children.Clear();
+        var shown = _filter.Apply(_jobs, DateTimeOffset.UtcNow);
+        _tableHost.Children.Add(Ui.Heading("history.activity.recent", S.Text(UiStrings.HistoryActivityRecent), AutomationHeadingLevel.Level2));
+        _tableHost.Children.Add(Ui.Text("history.activity.recentDescription", S.Text(UiStrings.HistoryActivityRecentDescription), "ArkDeckCaptionStyle"));
+        _tableHost.Children.Add(Ui.Text("history.filter.resultCount", S.Format(UiStrings.HistoryFilterResultCount, (long)shown.Count, (long)_jobs.Count), "ArkDeckCaptionStyle"));
+        if (shown.Count == 0)
+        {
+            _tableHost.Children.Add(Ui.Stack(4,
+                Ui.Text("history.filter.empty", S.Text(UiStrings.HistoryFilterEmptyTitle), "ArkDeckSectionTitleStyle"),
+                Ui.Text("history.filter.empty.description", S.Text(UiStrings.HistoryFilterEmptyDescription), "ArkDeckCaptionStyle"),
+                Ui.Row(Ui.Button("history.filter.empty.reset", S.Text(UiStrings.HistoryFilterReset), (_, _) => SetFilter(HistoryFilterQuery.None)))));
+        }
+        else
+        {
             var table = Ui.Choice("history.table", S.Text(UiStrings.AppNavigationHistory));
-            foreach (var job in state.Jobs.Value!)
+            foreach (var job in shown)
             {
                 var stateText = Ui.JobState("history.state.", job.State) + (job.OutcomeUnknown ? S.Text(UiStrings.HistoryStateOutcomeUnknownSuffix) : string.Empty);
                 var row = Ui.Row(
@@ -66,21 +287,39 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             {
                 if (e.AddedItems.FirstOrDefault() is ListViewItem { Tag: string jobId }) await ShowDetailAsync(jobId);
             };
-            body.Children.Add(Ui.Card(table));
-            _detail = new StackPanel { Spacing = 8 };
-            body.Children.Add(Ui.Card(_detail, "history.detail"));
-            if (_selected is { } selected && state.Jobs.Value!.Any(j => j.JobId == selected))
-            {
-                DispatcherQueue.TryEnqueue(async () => await ShowDetailAsync(selected));
-            }
-            else
-            {
-                _selected = null;
-                _detail.Children.Add(Ui.Heading("history.detail.title", S.Text(UiStrings.HistoryDetailTitle)));
-                _detail.Children.Add(Ui.Text("history.detail.select", S.Text(UiStrings.HistoryDetailSelect), "ArkDeckCaptionStyle"));
-            }
+            _tableHost.Children.Add(table);
         }
-        body.Children.Add(Ui.Text("history.readOnlyNote", S.Text(UiStrings.HistoryReadOnlyNote), "ArkDeckCaptionStyle"));
+        if (_olderFailure is { } failure) _tableHost.Children.Add(Ui.Text("history.loadOlder.failure", failure, "ArkDeckCaptionStyle"));
+        if (_cursor is not null)
+        {
+            _tableHost.Children.Add(_loadingOlder
+                ? Ui.Progress("history.loadOlder.loading", S.Text(UiStrings.HistoryActionLoadOlder))
+                : Ui.Row(Ui.Button("history.loadOlder", S.Text(UiStrings.HistoryActionLoadOlder), async (_, _) => await LoadOlderAsync())));
+        }
+    }
+
+    /// <summary>macOS Load Older: the next <c>job.list</c> page, each Job once.</summary>
+    private async Task LoadOlderAsync()
+    {
+        if (_loadingOlder || _cursor is not { } cursor) return;
+        _loadingOlder = true;
+        _olderFailure = null;
+        RenderTable();
+        var state = await Task.Run(() => App.Loader.OlderHistoryAsync(cursor));
+        MainWindow.Instance.Report(state);
+        _loadingOlder = false;
+        if (state.Jobs.Value is { } older)
+        {
+            var known = _jobs.Select(j => j.JobId).ToHashSet(StringComparer.Ordinal);
+            _jobs.AddRange(older.Where(j => known.Add(j.JobId)));
+            _cursor = state.NextCursor;
+            Ui.Say(_filterStatus, S.Format(UiStrings.HistoryFilterResultCount, (long)_filter.Apply(_jobs, DateTimeOffset.UtcNow).Count, (long)_jobs.Count));
+        }
+        else
+        {
+            _olderFailure = state.Jobs.Unavailable!.ReasonText(S);
+        }
+        RenderTable();
     }
 
     private async Task ShowDetailAsync(string jobId)
@@ -117,28 +356,45 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
         var job = state.Status.Value!;
         if (job.OutcomeUnknown) _detail.Children.Add(Ui.Text("history.detail.attention", S.Text(UiStrings.HistoryDetailOutcomeUnknown), "ArkDeckSectionTitleStyle"));
         else if (job.WaitingForHuman) _detail.Children.Add(Ui.Text("history.detail.attention", S.Text(UiStrings.HistoryDetailWaitingForHuman), "ArkDeckSectionTitleStyle"));
+        OpenWorkspace(state, job);
+
+        // macOS summarySection: the Job and manifest summary.
+        var status = state.Shown?.Value?.Status;
+        string? StatusText(string key) => status is not null && status.TryGetValue(key, out var v) && v is ArkDeck.ClientKit.Json.JsonString s ? s.Value : null;
+        _detail.Children.Add(Ui.Heading("history.detail.summary", S.Text(UiStrings.HistoryDetailSummary), AutomationHeadingLevel.Level3));
         foreach (var (id, key, value) in new (string, string, string?)[]
                  {
                      ("history.detail.job", UiStrings.HistoryDetailJob, job.JobId),
+                     ("history.detail.session", UiStrings.HistoryDetailSession, job.SessionId ?? S.Text(UiStrings.HistoryValueNotReported)),
                      ("history.detail.operation", UiStrings.HistoryDetailOperation, job.Operation),
                      ("history.detail.target", UiStrings.HistoryDetailTarget, job.TargetId),
                      ("history.detail.state", UiStrings.HistoryDetailState, Ui.JobState("history.state.", job.State)),
+                     ("history.detail.outcomeCertainty", UiStrings.HistoryDetailOutcomeCertainty, S.Text(job.OutcomeUnknown ? UiStrings.HistoryOutcomeUnknown : UiStrings.HistoryOutcomeConfirmed)),
                      ("history.detail.mode", UiStrings.HistoryDetailMode, job.ExecutionMode),
+                     ("history.detail.effect", UiStrings.HistoryDetailEffect, StatusText("actualEffect") ?? "—"),
                      ("history.detail.created", UiStrings.HistoryDetailCreated, job.CreatedAtUtc),
-                     ("history.detail.finished", UiStrings.HistoryDetailFinished, job.FinishedAtUtc),
+                     ("history.detail.started", UiStrings.HistoryDetailStarted, StatusText("startedAtUtc") ?? "—"),
+                     ("history.detail.finished", UiStrings.HistoryDetailFinished, job.FinishedAtUtc ?? "—"),
                  })
         {
-            if (value is not null) _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
+            _detail.Children.Add(Ui.Fact(id, S.Text(key), value!));
+        }
+        _detail.Children.Add(Ui.Text("history.detail.projectionNote", S.Text(UiStrings.HistoryDetailProjectionNote), "ArkDeckCaptionStyle"));
+        if (job.OutstandingResidueCount > 0)
+        {
+            _detail.Children.Add(Ui.Text("history.detail.residue", S.Format(UiStrings.HistoryDetailResidue, job.OutstandingResidueCount)));
         }
 
-        OpenWorkspace(state, job);
-
+        Timeline(state.Shown);
+        Correlation(state, job);
         Evidence(state.Evidence);
+        Parameters(state.Evidence);
 
         _detail.Children.Add(Ui.Heading("history.detail.artifacts", S.Text(UiStrings.HistoryDetailArtifacts), AutomationHeadingLevel.Level3));
         if (state.Artifacts.Unavailable is { } artifactsWhy)
         {
             _detail.Children.Add(Ui.UnavailableNotice("history.artifacts.unavailable", UiStrings.WindowsHistoryArtifactsUnavailable, artifactsWhy));
+            Recovery(job);
             return;
         }
         var artifacts = state.Artifacts.Value!;
@@ -147,6 +403,7 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             // A planned Job carries no captured Artifacts by design (macOS emptyPlanned).
             _detail.Children.Add(Ui.Text("history.artifacts.empty",
                 S.Text(job.ExecutionMode == "planOnly" ? UiStrings.HistoryArtifactsEmptyPlanned : UiStrings.HistoryArtifactsEmpty), "ArkDeckCaptionStyle"));
+            Recovery(job);
             return;
         }
         var list = Ui.ActionList("history.artifacts", S.Text(UiStrings.HistoryDetailArtifacts));
@@ -160,6 +417,7 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
         {
             _detail.Children.Add(Ui.Text("history.artifacts.traceViewerDeferred", S.Text(UiStrings.WindowsTraceViewerDeferred), "ArkDeckCaptionStyle"));
         }
+        Recovery(job);
     }
 
     /// <summary>macOS's detail header actions: Open the workspace that produced the Job with the
@@ -209,6 +467,9 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
                      ("history.evidence.binding", UiStrings.HistoryEvidenceBinding, e.BindingRevision?.ToString(CultureInfo.InvariantCulture) ?? none),
                      ("history.evidence.authority", UiStrings.HistoryEvidenceAuthority, e.AuthorityKind ?? none),
                      ("history.evidence.authorityReference", UiStrings.HistoryEvidenceAuthorityReference, e.AuthorityReference ?? none),
+                     ("history.evidence.model", UiStrings.HistoryEvidenceModel, e.ObservedModel ?? none),
+                     ("history.evidence.firmware", UiStrings.HistoryEvidenceFirmware, e.ObservedFirmware ?? none),
+                     ("history.evidence.transport", UiStrings.HistoryEvidenceTransport, e.ObservedTransport ?? none),
                      ("history.evidence.terminalState", UiStrings.HistoryEvidenceTerminalState, e.TerminalState is { } t ? Ui.JobState("history.state.", t) : none),
                      ("history.evidence.mode", UiStrings.HistoryEvidenceMode, e.ExecutionMode),
                      ("history.evidence.effect", UiStrings.HistoryEvidenceEffect, e.ActualEffect ?? none),
@@ -229,6 +490,108 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
         {
             _detail.Children.Add(Ui.Text("history.evidence.blocker." + blocker, blocker, "ArkDeckMonoStyle"));
         }
+    }
+
+    /// <summary>macOS timelineSection: the Job's journal summary (<c>job.show</c>, paged).</summary>
+    private void Timeline(Loaded<JobShown>? shown)
+    {
+        if (shown is null) return;
+        if (shown.Unavailable is { } why)
+        {
+            _detail.Children.Add(Ui.Heading("history.detail.timeline", S.Text(UiStrings.HistoryDetailTimeline), AutomationHeadingLevel.Level3));
+            _detail.Children.Add(Ui.Text("history.detail.timeline.unavailable", why.ReasonText(S), "ArkDeckMonoStyle"));
+            return;
+        }
+        var entries = shown.Value!.Terminal.Timeline;
+        if (entries.Count == 0) return;
+        _detail.Children.Add(Ui.Heading("history.detail.timeline", S.Text(UiStrings.HistoryDetailTimeline), AutomationHeadingLevel.Level3));
+        var text = Ui.Text("history.detail.timeline.entries", string.Join("\n", entries), "ArkDeckMonoStyle");
+        text.IsTextSelectionEnabled = true;
+        AutomationProperties.SetName(text, S.Text(UiStrings.HistoryDetailTimeline));
+        _detail.Children.Add(text);
+    }
+
+    /// <summary>macOS correlationSection: the Job's Session, operation and Target as its status
+    /// states them, and its Artifacts with their digests; a link to its Session's Jobs.</summary>
+    private void Correlation(HistoryDetailState state, JobSummary job)
+    {
+        if (state.Shown?.Value is not { } shown || state.Artifacts.Value is not { } artifacts) return;
+        string? Text(string key) => shown.Status.TryGetValue(key, out var v) && v is ArkDeck.ClientKit.Json.JsonString s ? s.Value : null;
+        if (Text("sessionId") is not { } session || Text("targetId") != job.TargetId || Text("operation") != job.Operation) return;
+        _detail.Children.Add(Ui.Heading("history.detail.correlation", S.Text(UiStrings.HistoryDetailCorrelation), AutomationHeadingLevel.Level3));
+        _detail.Children.Add(Ui.Fact("history.correlation.job", S.Text(UiStrings.HistoryDetailJob), job.JobId));
+        _detail.Children.Add(Ui.Fact("history.correlation.session", S.Text(UiStrings.HistoryDetailSession), session));
+        _detail.Children.Add(Ui.Fact("history.correlation.operation", S.Text(UiStrings.HistoryDetailOperation), job.Operation));
+        _detail.Children.Add(Ui.Fact("history.correlation.target", S.Text(UiStrings.HistoryDetailTarget), job.TargetId));
+        _detail.Children.Add(Ui.Row(Ui.Button("history.correlation.showSession", S.Text(UiStrings.HistoryCorrelationShowSession),
+            (_, _) => SetFilter(HistoryFilterQuery.None with { SessionId = session }))));
+        var published = artifacts.Where(a => a.Digest is not null).ToArray();
+        if (published.Length == 0)
+        {
+            _detail.Children.Add(Ui.Text("history.correlation.noArtifacts", S.Text(UiStrings.HistoryCorrelationNoArtifacts), "ArkDeckCaptionStyle"));
+        }
+        else
+        {
+            _detail.Children.Add(Ui.Text("history.correlation.artifactCount", S.Format(UiStrings.HistoryCorrelationArtifactCount, (long)published.Length)));
+            foreach (var artifact in published)
+            {
+                _detail.Children.Add(Ui.Stack(2,
+                    Ui.Text($"history.correlation.artifact.{artifact.ArtifactId}", $"{artifact.Name} · {artifact.ArtifactId}", "ArkDeckCaptionStyle"),
+                    Ui.Text($"history.correlation.artifact.{artifact.ArtifactId}.sha256", artifact.Digest!, "ArkDeckMonoStyle")));
+            }
+        }
+        _detail.Children.Add(Ui.Text("history.correlation.readOnly", S.Text(UiStrings.HistoryCorrelationReadOnly), "ArkDeckCaptionStyle"));
+    }
+
+    /// <summary>macOS parameterSection: the Trace parameters before and after a capture, and the
+    /// typed inputs the Job recorded.</summary>
+    private void Parameters(Loaded<JobEvidenceFacts> loaded)
+    {
+        if (loaded.Value is not { } e) return;
+        _detail.Children.Add(Ui.Heading("history.detail.parameters", S.Text(UiStrings.HistoryDetailParameters), AutomationHeadingLevel.Level3));
+        if (e.TraceParameters is { Count: > 0 } trace)
+        {
+            var list = Ui.List("history.parameters.traceDiff", S.Text(UiStrings.HistoryDetailParameters));
+            foreach (var p in trace)
+            {
+                string Value(string state, string? value) => state switch
+                {
+                    "value" => value ?? S.Text(UiStrings.HistoryValueNotReported),
+                    "missing" => S.Text(UiStrings.HistoryParametersStateMissing),
+                    "unreadable" => S.Text(UiStrings.HistoryParametersStateUnreadable),
+                    _ => S.Text(UiStrings.HistoryParametersStateUnknown),
+                };
+                var line = $"{p.Name} · {S.Text(UiStrings.HistoryParametersColumnBefore)} {Value(p.BeforeState, p.BeforeValue)} · " +
+                           $"{S.Text(UiStrings.HistoryParametersColumnAfter)} {Value(p.AfterState, p.AfterValue)} · {S.Text("history.parameters.comparison." + p.Comparison)}";
+                list.Items.Add(Ui.Item("history.parameters.trace." + p.Name, line, Ui.Text($"history.parameters.trace.{p.Name}.text", line, "ArkDeckMonoStyle")));
+            }
+            _detail.Children.Add(list);
+            if (e.Parameters is { Count: > 0 }) _detail.Children.Add(Ui.Text("history.parameters.typedInputs", S.Text(UiStrings.HistoryParametersTypedInputs), "ArkDeckCaptionStyle"));
+        }
+        if (e.Parameters is null)
+        {
+            if (e.TraceParameters is not { Count: > 0 }) _detail.Children.Add(Ui.Text("history.parameters.unavailable", S.Text(UiStrings.HistoryParametersUnavailable), "ArkDeckCaptionStyle"));
+        }
+        else if (e.Parameters.Count == 0)
+        {
+            if (e.TraceParameters is not { Count: > 0 }) _detail.Children.Add(Ui.Text("history.parameters.empty", S.Text(UiStrings.HistoryParametersEmpty), "ArkDeckCaptionStyle"));
+        }
+        else
+        {
+            foreach (var (name, value) in e.DisplayParameters) _detail.Children.Add(Ui.Fact("history.parameter." + name, name, value));
+        }
+    }
+
+    /// <summary>macOS recoverySection: the record's unresolved condition, if any, read only.</summary>
+    private void Recovery(JobSummary job)
+    {
+        _detail.Children.Add(Ui.Heading("history.detail.recovery", S.Text(UiStrings.HistoryDetailRecovery), AutomationHeadingLevel.Level3));
+        var key = job.OutcomeUnknown ? UiStrings.HistoryRecoveryOutcomeUnknown
+            : job.WaitingForHuman ? UiStrings.HistoryRecoveryWaitingForHuman
+            : job.OutstandingResidueCount > 0 ? UiStrings.HistoryRecoveryResidue
+            : UiStrings.HistoryRecoveryNone;
+        _detail.Children.Add(Ui.Text("history.recovery.state", S.Text(key)));
+        _detail.Children.Add(Ui.Text("history.recovery.readOnly", S.Text(UiStrings.HistoryRecoveryReadOnly), "ArkDeckCaptionStyle"));
     }
 
     /// <summary>Opens one Job's record (the Job Inspector's "Open this record").</summary>

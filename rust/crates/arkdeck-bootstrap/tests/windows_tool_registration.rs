@@ -238,3 +238,98 @@ fn a_tuple_named_hdc_registers_inspects_lists_and_retires() {
         .unwrap();
     assert!(store.inspect(&reference).is_err());
 }
+
+/// The selection ledger over the Windows store (TASK-XPA-012): a configured
+/// `hdc.exe` a tuple names is adopted as the first selection, the startup
+/// selection names the retained `hdc.exe`, a second registered tool is a
+/// selection candidate and is prepared, failed and acknowledged as on macOS,
+/// and an `hdc.exe` no tuple names is never adopted.
+#[test]
+fn a_tuple_named_hdc_is_adopted_selected_and_replaced_only_by_another() {
+    let scratch = Scratch::new("hdc-selection");
+    scratch.directory("first");
+    scratch.directory("second");
+    let first_bytes = system("whoami.exe");
+    let second_bytes = system("hostname.exe");
+    let first = scratch.file(r"first\hdc.exe", &first_bytes);
+    let second = scratch.file(r"second\hdc.exe", &second_bytes);
+    let other = scratch.file(r"first\other.exe", &system("where.exe"));
+    let store_path = scratch.directory("bootstrap");
+    let named = [
+        arkdeck_contract::sha256_hex(&first_bytes),
+        arkdeck_contract::sha256_hex(&second_bytes),
+    ];
+    let store = ToolRegistryStore::open_existing(&store_path)
+        .unwrap()
+        .with_published_identities(Arc::new(move |sha256: &str| {
+            named.contains(&sha256.to_owned()).then(fixture_identity)
+        }));
+
+    // No selection, and an executable no tuple names: refused, unselected.
+    assert_eq!(store.startup_selection().unwrap(), None);
+    assert_eq!(
+        store.adopt_installed_hdc(&other, NOW).unwrap_err().code,
+        "admissionDenied"
+    );
+    assert_eq!(store.startup_selection().unwrap(), None);
+
+    // The configured `hdc.exe` is registered and adopted as the first
+    // selection; its startup executable is the retained `hdc.exe`.
+    let adopted = store.adopt_installed_hdc(&first, NOW).unwrap();
+    let selection = store.startup_selection().unwrap().unwrap();
+    assert_eq!(selection.active_generation, 1);
+    assert_eq!(selection.pending_action_id, None);
+    assert_eq!(
+        selection.executable_sha256,
+        arkdeck_contract::sha256_hex(&first_bytes)
+    );
+    let digest = selection
+        .tool_ref
+        .trim_start_matches("tool:sha256:")
+        .to_owned();
+    assert_eq!(
+        selection.executable,
+        store_path
+            .join(format!("tool-{digest}.hdc"))
+            .join("hdc.exe")
+    );
+    assert_eq!(std::fs::read(&selection.executable).unwrap(), first_bytes);
+    assert_eq!(adopted.active_tool["toolRef"], selection.tool_ref.as_str());
+    assert_eq!(adopted.active_tool["platform"], "windows");
+    // Once a selection exists, another configured file never replaces it.
+    store.adopt_installed_hdc(&second, NOW).unwrap();
+    assert_eq!(store.startup_selection().unwrap().unwrap(), selection);
+    let second_ref = store
+        .list()
+        .unwrap()
+        .into_iter()
+        .find(|row| row["executableSHA256"] == arkdeck_contract::sha256_hex(&second_bytes))
+        .unwrap()["toolRef"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // The active tool is no candidate; the second is, and is prepared,
+    // failed and acknowledged back to the first.
+    assert_eq!(
+        store
+            .selection_candidate(&selection.tool_ref, "1", None)
+            .unwrap_err()
+            .code,
+        "resourceConflict"
+    );
+    let candidate = store.selection_candidate(&second_ref, "1", None).unwrap();
+    assert_eq!(candidate.new_tool["platform"], "windows");
+    assert_eq!(candidate.new_tool["trust"]["registeredIdentity"], true);
+    let action = "control-action-5f0c1a52-0b4e-4c8a-9d2e-2b7f3c6a9e10";
+    store.prepare_selection(action, &second_ref, "1").unwrap();
+    let pending = store.startup_selection().unwrap().unwrap();
+    assert_eq!(pending.pending_action_id.as_deref(), Some(action));
+    assert_eq!(pending.tool_ref, second_ref);
+    assert!(pending.executable.ends_with("hdc.exe"));
+    store
+        .fail_pending_selection(action, "tool.selectedStartupVerificationFailed")
+        .unwrap();
+    store.acknowledge_selection_outcome(action).unwrap();
+    assert_eq!(store.startup_selection().unwrap().unwrap(), selection);
+}

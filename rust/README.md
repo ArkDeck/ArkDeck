@@ -62,6 +62,10 @@ On Windows two things run there:
   owner-only below the account's local application data, and resumes after a
   restart with the board (`agent resume --resume-token`). `target observe` and
   `diagnostics capture` complete, and each Job's calls are the Swift oracle's.
+  The operation's other leaves (`screen capture`, `ui-dump capture`,
+  `ui-dump component-detail`, `debug logs`, `trace capture`) complete there
+  too, over the Trace legs' fake, their device mutations proved against the
+  test daemon's own Job state (`MUTATION_ROOT`).
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
@@ -1054,7 +1058,13 @@ refusal's wording T2), the fake receives Swift's 11 and 16 calls in order,
 and the Jobs' index, records, Journals, Artifacts and Sessions are Swift's
 byte for byte, read with the host paths in the oracle's spelling, the
 Session platform as the oracle's and a manifest's derived values relabelled
-(`hdc_oracle::assert_read_only_replays`).
+(`hdc_oracle::assert_read_only_replays`). The same file replays the rest of
+`capture.diagnostics@1`'s oracles: the read legs (66 exchanges, read-only),
+and the file legs (77) and the Trace legs (72) under the mutation authority
+(`hdc_oracle::assert_authorized_replays`), with the fake's read-, file- and
+Trace-leg tables in process, received files landing under the replay's
+`receive` root, and the Trace probe's concurrent calls compared exchange by
+exchange, sorted.
 
 ## Windows Session owner, publication and snapshot pages (TASK-XPA-005/014)
 
@@ -2658,8 +2668,30 @@ well.
   the root is opened and a root without one answers `runtime.hdc.status` as
   unconfigured (`windows_lifecycle_process.rs`); the composed path is
   exercised with an injected tuple and a stand-in compiled at test time
-  (`windows_lifecycle::tests`). Tool selection's restart and the HDC
-  control-action owner stay macOS-only.
+  (`windows_lifecycle::tests`).
+- The account daemon's HDC (TASK-XPA-012), as macOS production composes it:
+  only when `ARKDECK_HDC_PATH` (an explicit absolute path) is set, and then
+  the account's Bootstrap registry's selection
+  (`%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`): while the registry holds none,
+  the configured `hdc.exe` is registered and adopted as the first selection,
+  admitted only when a registered Windows tuple names its digest (the
+  store's published identities are `WINDOWS_HDC_TUPLES`'); once a
+  selection exists the configured file is never what runs. The selection's
+  retained `hdc.exe` is admitted again by the tuple table, its endpoint must
+  be the tuple's (`OHOS_HDC_SERVER_PORT`), a pending selection that never
+  entered its launch window is settled failed, and Swift's startup
+  transaction (`tool_selection_startup`, now built on Windows) starts it as
+  the managed server and publishes or restores the selection.
+  `ARKDECK_HDC_SHA256` is refused, as on macOS. Beside it the union
+  control-action owner holds the HDC control-action owner and the
+  tool-selection owner (`tool-selection-control-actions`, over the same
+  registry), so `runtime tool select` is answered on Windows; its restart
+  runs through the managed server's lifecycle (`ToolSelectionDriver`). The
+  account daemon proves device-mutation continuity against its own Job
+  state, so its Jobs run over this HDC; no development root gains a
+  mutation authority. Exercised with an injected tuple and the compiled
+  stand-in (`windows_lifecycle::tests`); `arkdeck-bootstrap`'s
+  `tests/windows_tool_registration.rs` holds the Windows selection ledger.
 - The registration itself (CHG-2026-078 TASK-WHR-002): the c2 tuple in
   `WINDOWS_HDC_TUPLES`, the registered `deviceObservationSnapshot` grammar
   `parse_registered_windows_presence` (six columns; only `USB` rows are
@@ -2685,8 +2717,8 @@ well.
   composed on every Windows root (`control-action-snapshots`), over the HDC
   control-action owner (`hdc-control-actions`) only beside that managed
   server, so `runtime.hdc.impact-preview` and `runtime.hdc.restart` answer
-  `operationUnavailable` without one, as on macOS. Tool selection's restart
-  stays macOS-only.
+  `operationUnavailable` without one, as on macOS. The tool-selection owner
+  is composed beside the account daemon's selected HDC (above).
 - Its consumers (TASK-XPA-005): a dispatch names the registered Windows
   tuple its executable is pinned to (`HdcDispatch::registered_windows_tuple`;
   `ProcessDispatch` by its digest, on Windows only), and the candidate list,
@@ -3113,6 +3145,14 @@ macOS replay's checks: a parked Job is never signed again, a drifted
 certificate refuses before the signer runs, attempt directories are removed,
 neither password reaches any file, and results read back after the owners
 close.
+
+The same test also ports the macOS registered-preset replay over the
+Windows profile, in both project orders. It registers the project, pins the
+credential, composes after a restart, signs and releases the pin.
+`arkdeck-cli/tests/windows_signed_runtime.rs` shows that a development root
+reports signing unavailable and refuses `workspace preset register --kind
+signing` and `workspace sign` with nothing dispatched. Only an installed daemon
+signs, so `workspace.sign` stays Windows `partial` in the coverage.
 
 Signing has no presence gate on either platform. Runtime reads are never
 interactive: `interactionNotAllowed` on macOS, and `CredReadW` never prompts

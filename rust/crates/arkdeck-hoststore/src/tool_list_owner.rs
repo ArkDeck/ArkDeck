@@ -93,11 +93,23 @@ fn list_page_checkpoint(
             deveco_content::verify(record).map_err(deveco_error)?;
         }
     }
-    let mut rows = decoded
-        .projection
+    // Each HDC row with the store's own published identities (a Windows
+    // store's are the registered tuples'), as its inspection and retirement
+    // project it; `decode_tools`' projection knows only the macOS table.
+    let mut rows = document["records"]
         .as_array()
-        .ok_or_else(|| unreadable("projection"))?
-        .clone();
+        .ok_or_else(|| unreadable("records"))?
+        .iter()
+        .map(|record| {
+            record["reference"]
+                .as_str()
+                .and_then(|reference| store.row(&tools.bytes, reference))
+                .ok_or_else(|| unreadable("projection"))
+        })
+        .collect::<Result<Vec<Value>, WireError>>()?;
+    if rows.len() != decoded.projection.as_array().map_or(0, Vec::len) {
+        return Err(unreadable("projection"));
+    }
     rows.extend(index.records.iter().map(|record| record.value()));
     rows.sort_by(|a, b| a["toolRef"].as_str().cmp(&b["toolRef"].as_str()));
     let indexes = [bundles, tools, deveco];
