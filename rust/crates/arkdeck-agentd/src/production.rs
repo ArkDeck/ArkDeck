@@ -439,36 +439,6 @@ impl Inputs {
     }
 }
 
-/// Swift's production HDC (`main.swift` 462-584): only `ARKDECK_HDC_PATH`
-/// configures one. While the account's bootstrap registry holds no
-/// selection, that file is adopted as its first, as Swift's
-/// `adoptInstalledHDC` adopts it; the registry's startup selection — never
-/// the configured path once a selection exists — is the executable the
-/// managed server runs. A pending selection is returned to the startup
-/// transaction, which verifies its server before publishing or restoring it.
-pub(crate) fn registered_hdc(
-    registry: &arkdeck_hoststore::ToolRegistryStore,
-    configured: &Path,
-    now: &str,
-) -> Result<arkdeck_hoststore::StartupSelection, String> {
-    let refused = |error: arkdeck_contract::WireError| {
-        format!(
-            "the registered HDC is unavailable: {}: {}",
-            error.code, error.message
-        )
-    };
-    if registry.startup_selection().map_err(refused)?.is_none() {
-        registry
-            .adopt_installed_hdc(configured, now)
-            .map_err(refused)?;
-    }
-    let selection = registry
-        .startup_selection()
-        .map_err(refused)?
-        .ok_or("the registered HDC selection is absent after its adoption")?;
-    Ok(selection)
-}
-
 /// The USB relations the Target observations read, by the isolated owner's
 /// rule (`development_usb::relation_source`): beside the registered HDC this
 /// composition started as its managed server (`managed`; its registry selects
@@ -683,7 +653,8 @@ pub(crate) fn compose(
         }
         Some(configured) => {
             let registry = arkdeck_hoststore::ToolRegistryStore::open_existing(&layout.bootstrap)?;
-            let selection = registered_hdc(&registry, configured, now)?;
+            let selection =
+                crate::tool_selection_startup::registered_hdc(&registry, configured, now)?;
             let selection = if selection.pending_action_id.is_some() {
                 let records = arkdeck_hoststore::ToolSelectionRecords::open(
                     &layout.state.join("tool-selection-control-actions/records"),

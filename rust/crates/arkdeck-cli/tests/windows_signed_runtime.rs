@@ -44,6 +44,13 @@
 //!   `workspace read`, `workspace status`, `workspace diff`, `workspace
 //!   isolate` and `workspace sweep` run to a verified derived Artifact each,
 //!   and the reads again after a restart to the same bytes.
+//! - The same daemon's signing on a development root, which composes no
+//!   signing credential owner (as on macOS): `operation list` reports
+//!   `workspace.sign-openharmony-hap@1` unavailable
+//!   (`workspace_preset_unavailable`), `workspace preset register --kind
+//!   signing` is refused by the preset owner and `workspace sign` before
+//!   admission, each with nothing dispatched; the leaf stays Windows
+//!   `partial`.
 //! - A fake Runtime, which is this binary itself run as
 //!   `<exe> --fake-runtime <pipe>` (a `harness = false` target, so nothing but
 //!   its own lines reach its streams), serving `job watch` the same recorded
@@ -196,6 +203,10 @@ mod windows {
             (
                 "workspace_profile_leaves_run_end_to_end_through_the_pipe",
                 workspace_profile_leaves_run_end_to_end_through_the_pipe,
+            ),
+            (
+                "workspace_sign_is_unavailable_on_a_development_root",
+                workspace_sign_is_unavailable_on_a_development_root,
             ),
             (
                 "ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope",
@@ -1257,6 +1268,171 @@ mod windows {
         ] {
             assert_eq!(windows_statuses(feature), ["implemented"], "{feature}");
         }
+    }
+
+    /// `workspace sign` against a development root (TASK-XPA-011): a
+    /// development root composes no signing credential owner, as the macOS
+    /// development composition does not, so its registered OpenHarmony
+    /// project — whose profile resolves through the code-owned tools — offers
+    /// no signing. `operation list` reports the operation unavailable with
+    /// its reason, `workspace preset register --kind signing` is refused
+    /// before anything is written, and the leaf itself is refused before
+    /// admission with nothing dispatched. The leaf stays Windows `partial`:
+    /// only an installed daemon signs, over the account's own preset root
+    /// and Credential Manager, which no test here touches.
+    fn workspace_sign_is_unavailable_on_a_development_root(thumbprint: &str) {
+        let directory = Directory::new();
+        let (daemon, pin) = signed_copy(
+            &Path::new(CLI).with_file_name("arkdeck-agentd.exe"),
+            &directory,
+            thumbprint,
+        );
+        let canonical = std::fs::canonicalize(&directory.0).unwrap();
+        let canonical = canonical.to_str().unwrap();
+        let base = PathBuf::from(canonical.strip_prefix(r"\\?\").unwrap_or(canonical));
+        let root = base.join("root");
+        std::fs::create_dir(&root).unwrap();
+        let project = base.join("project");
+        for (relative, text) in [
+            ("build-profile.json5", "{}\n"),
+            ("entry/src/main/module.json5", "{}\n"),
+            ("entry/src/main/ets/pages/Index.ets", "struct Index {}\n"),
+        ] {
+            let file = project.join(relative);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, text).unwrap();
+        }
+        let (server, pipe) = serve(&daemon, &root);
+        let registered = answered(
+            &pipe,
+            &daemon,
+            &pin,
+            &[
+                "workspace",
+                "project",
+                "register",
+                "--registration-request-id",
+                "request-sign-refusal",
+                "--kind",
+                "openharmony",
+                "--root",
+                project.to_str().unwrap(),
+            ],
+        );
+        let reference = registered["projectRef"].as_str().unwrap().to_owned();
+        stop(server, &root);
+        let (server, pipe) = serve(&daemon, &root);
+        let attempt = |argv: &[&str]| {
+            let output = cli(&pipe, &daemon, &pin)
+                .args(argv)
+                .args(["--output", "json"])
+                .output()
+                .unwrap();
+            let envelope: Value = serde_json::from_slice(&output.stdout)
+                .unwrap_or_else(|_| panic!("{argv:?}: {output:?}"));
+            (output.status.code(), envelope)
+        };
+        let listed = answered(&pipe, &daemon, &pin, &["operation", "list"]);
+        let sign = listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|operation| operation["reference"] == "workspace.sign-openharmony-hap@1")
+            .cloned()
+            .unwrap();
+        assert_eq!(sign["availability"], "unavailable", "{sign}");
+        assert_eq!(
+            sign["reasonCodes"],
+            json!(["workspace_preset_unavailable"]),
+            "{sign}"
+        );
+        assert_eq!(
+            sign["reasons"],
+            json!(["workspace.presetUnavailable"]),
+            "{sign}"
+        );
+        let refused = |(code, envelope): (Option<i32>, Value),
+                       exit: i32,
+                       wire: &str,
+                       phase: &str,
+                       message: &str| {
+            assert_eq!(code, Some(exit), "{envelope}");
+            assert_eq!(envelope["ok"], false, "{envelope}");
+            assert_eq!(envelope["error"]["code"], wire, "{envelope}");
+            assert_eq!(envelope["error"]["message"], message, "{envelope}");
+            assert_eq!(envelope["error"]["details"]["phase"], phase, "{envelope}");
+            assert_eq!(
+                envelope["error"]["details"]["newDispatchCount"], 0,
+                "{envelope}"
+            );
+        };
+        let preset = attempt(&[
+            "workspace",
+            "preset",
+            "register",
+            "--registration-request-id",
+            "request-sign-preset",
+            "--project",
+            &reference,
+            "--kind",
+            "signing",
+            "--template",
+            "openharmony.local-sign@1",
+            "--timeout-seconds",
+            "600",
+            "--toolchain",
+            &format!("toolchain:sha256:{}", "a".repeat(64)),
+            "--toolchain-generation",
+            "1",
+            "--credential",
+            &format!("credential:sha256-{}", "b".repeat(64)),
+        ]);
+        refused(
+            preset,
+            69,
+            "operationUnavailable",
+            "workspacePresetOwner",
+            "signing credential reference owner is unavailable",
+        );
+        assert_eq!(
+            answered(
+                &pipe,
+                &daemon,
+                &pin,
+                &["workspace", "preset", "list", "--project", &reference]
+            )["presets"],
+            json!([])
+        );
+        let inputs = directory.0.join("sign.json");
+        std::fs::write(
+            &inputs,
+            json!({"projectRef": reference, "signingPresetRef": "preset-absent",
+                "unsignedHapArtifactLease":
+                    "lease-v1:job-input-hap:ART-81ae19b19ca7ea0d3ce99c554182c815"})
+            .to_string(),
+        )
+        .unwrap();
+        let signed = attempt(&[
+            "workspace",
+            "sign",
+            "--inputs-file",
+            inputs.to_str().unwrap(),
+            "--execution-id",
+            "exec-windows-sign-refused",
+        ]);
+        refused(
+            signed,
+            65,
+            "invalidInput",
+            "preAdmission",
+            "workspace preset is not registered for this project",
+        );
+        stop(server, &root);
+        // What this measured is what the coverage manifest counts.
+        assert_eq!(
+            windows_statuses("workspace.sign-openharmony-hap@1"),
+            ["partial"]
+        );
     }
 
     fn ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope(thumbprint: &str) {

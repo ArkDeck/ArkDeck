@@ -177,7 +177,6 @@ fn ordinary_start_failure_does_not_write_selection() {
 fn only_a_durable_launch_can_reach_selected_tool_startup() {
     use arkdeck_hoststore::ToolSelectionRecords;
     use serde_json::Value;
-    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
     use std::path::{Path, PathBuf};
     struct Root(PathBuf);
     impl Drop for Root {
@@ -197,21 +196,12 @@ fn only_a_durable_launch_can_reach_selected_tool_startup() {
         let name = cases[case]["file"].as_str().unwrap();
         let bytes = std::fs::read(source.join(name)).unwrap();
         let record: Value = serde_json::from_slice(&bytes).unwrap();
-        let root = Root(std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = Root(private_scratch(&format!(
             "selection-startup-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         )));
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&root.0)
-            .unwrap();
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(root.0.join("records"))
-            .unwrap();
-        std::fs::write(root.0.join(name), bytes).unwrap();
-        std::fs::set_permissions(root.0.join(name), std::fs::Permissions::from_mode(0o600))
-            .unwrap();
+        private_directory(&root.0.join("records"));
+        private_file(&root.0.join(name), &bytes);
         let records = ToolSelectionRecords::open(&root.0.join("records")).unwrap();
         let mut initial = selection(record["intent"]["tool"].as_str().unwrap(), true);
         initial.pending_action_id = Some(record["controlActionId"].as_str().unwrap().into());
@@ -241,4 +231,37 @@ fn only_a_durable_launch_can_reach_selected_tool_startup() {
             assert_eq!(*events.borrow(), ["tool.lifecycleFailedBeforeLaunch"]);
         }
     }
+}
+
+/// A fresh owner-only directory below this host's temporary directory, in
+/// its plain spelling.
+fn private_scratch(name: &str) -> std::path::PathBuf {
+    let base = std::env::temp_dir().canonicalize().unwrap();
+    let base = base.to_str().unwrap();
+    let root = std::path::PathBuf::from(base.strip_prefix(r"\\?\").unwrap_or(base)).join(name);
+    private_directory(&root);
+    root
+}
+#[cfg(unix)]
+fn private_directory(path: &std::path::Path) {
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new().mode(0o700).create(path).unwrap();
+}
+#[cfg(windows)]
+fn private_directory(path: &std::path::Path) {
+    arkdeck_platform::create_private_directory(path).unwrap();
+}
+#[cfg(unix)]
+fn private_file(path: &std::path::Path, bytes: &[u8]) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::write(path, bytes).unwrap();
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
+}
+#[cfg(windows)]
+fn private_file(path: &std::path::Path, bytes: &[u8]) {
+    use std::io::Write;
+    arkdeck_platform::create_private_file(path)
+        .unwrap()
+        .write_all(bytes)
+        .unwrap();
 }

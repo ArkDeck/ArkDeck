@@ -29,10 +29,21 @@ follows the Swift human-action oracle's `trust` and `connect` scenarios (`agent-
     as the oracle's `connect.againByAction` records it: the execution, its state, the oracle's Job
     and its state, the Target and the binding revision. Nothing is sent again.
   - A `--selection` is refused (`invalidInput`, zero dispatch).
-- **Coverage.** `agent.abandon` and `human-action.resume` join `WINDOWS_MEASURED_LEAVES`, and the
-  note above them is corrected. The coverage was regenerated with
-  `arkdeck maintainer contracts export`: both are Windows `implemented`. `oracle.json` is not
-  re-pinned.
+- **Coverage: `agent.abandon` counted, `human-action.resume` measured but not counted.**
+  `job plan|submit|run` and `agent run` are not counted on Windows, because their answers depend on
+  the operation (the lead's ruling of 2026-10-04). Comments beside the leaves say the same.
+  - `agent.abandon` joins `WINDOWS_MEASURED_LEAVES` (Windows `implemented`). It acts on the existing
+    execution alone (`AgentExecutions::abandon`): it checks the generation, moves the record to
+    `abandoned` and expires its waiting action, and refuses with `resourceConflict` once the
+    execution owns a Job. It never plans or submits, so its behaviour does not depend on which
+    operation the execution names.
+  - `human-action.resume` stays Windows `partial`, like `agent.resume`. Only its first half is
+    independent of the operation: finding the action, the expiry and selection checks, and the
+    fresh observation. Once the action resolves, it drives the execution through the same
+    admission as `agent run` (`AgentExecutions::drive`, then `submit_for_agent`), so its answer
+    depends on the operation.
+  - The coverage was regenerated with `arkdeck maintainer contracts export`, and `oracle.json` is not
+    re-pinned.
 
 ## Found, not changed here (contract gap, every host)
 

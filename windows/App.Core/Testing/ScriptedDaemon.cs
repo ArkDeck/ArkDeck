@@ -51,6 +51,13 @@ public static partial class ScriptedDaemon
     /// device cleanup items left.</summary>
     public const string LogJobId = "job-0000000000000000000000000000a0f3";
 
+    /// <summary><see cref="Recovery"/>'s Jobs in two <c>job.list</c> pages (the second after the
+    /// cursor <see cref="OlderCursor"/>), and the Runtime's saved History filter
+    /// (<c>history.filter.list|save|delete</c>, generation-guarded) kept for the session.</summary>
+    public const string History = "history";
+
+    public const string OlderCursor = "c-older-1";
+
     /// <summary>A Flash of <see cref="Recovery"/> whose outcome stays unknown, superseded by a
     /// later confirmed recovery epoch (so it needs no one now).</summary>
     public const string SupersededJobId = "job-0000000000000000000000000000a0f4";
@@ -75,7 +82,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -174,6 +181,7 @@ public static partial class ScriptedDaemon
             {
                 Recovers => connection <= 2 ? Unavailable : Foundation,
                 Recovery => Jobs,
+                History => Jobs,
                 Outage => connection <= 5 ? Foundation : Unavailable,
                 _ => scenario,
             };
@@ -230,13 +238,14 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? Debug(request, method) ?? method switch
+                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(Observations)),
                     "job.list" => Success(request, Parse(JobPage([.. DebugJobRows(), .. JobsNow().Select(j => JobJson(j, list: true))]))),
                     "job.status" => JobStatus(request),
                     "job.events" => JobEvents(request),
+                    "job.show" => JobShow(request),
                     _ when method.StartsWith("target.", StringComparison.Ordinal) => Target(request, method, [FixtureTargetId]),
                     "artifact.list" => ArtifactList(request),
                     "artifact.read" => ArtifactRead(request),
@@ -264,7 +273,7 @@ public static partial class ScriptedDaemon
             (FailedJobId, "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
             (TraceJobId, "trace.capture@1", "succeeded", "2026-09-30T08:00:00Z"),
             (QueuedJobId, "observe.device@1", _queuedCancelled ? "cancelled" : "queued", "2026-09-30T08:04:00Z"),
-            .. scenario == Recovery
+            .. scenario is Recovery or History
                 ? new[] { (ResumeSafeJobId, "debug.hap@1", "resumeAtConfirmedSafeBoundary", "2026-09-30T07:58:00Z"),
                           (WaitingForRecoveryJobId, "flash.full-restore@1", "waitingForRecovery", "2026-09-30T07:59:00Z"),
                           (LogJobId, "capture.diagnostics@1", "succeeded", "2026-09-30T07:57:00Z"),
@@ -283,6 +292,20 @@ public static partial class ScriptedDaemon
             }
             var other = JobsNow().FirstOrDefault(j => j.Id == id);
             return other.Id is null ? Failure(request, "notFound", "no such Job") : Success(request, Parse(JobJson(other, list: false)));
+        }
+
+        /// <summary>A Job's status presentation (<c>job.show</c>): its status and its state path as
+        /// the inline timeline.</summary>
+        private byte[] JobShow(JsonObject request)
+        {
+            var id = ((JsonString)request["params"]["jobId"]).Value;
+            var job = JobsNow().FirstOrDefault(j => j.Id == id);
+            if (job.Id is null) return Failure(request, "notFound", "no such Job");
+            string[] path = ["jobCreated", "queued->preflight", "preflight->running", $"running->{job.State}"];
+            var entries = string.Join(",", path.Select(e => $"\"{e}\""));
+            return Success(request, Parse($$$"""
+                {"actualStepKinds":null,"catalogDigest":"508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684","events":{"jobId":"{{{id}}}","method":"job.events"},"evidence":{"jobId":"{{{id}}}","method":"job.evidence"},"job":{{{JobJson(job, list: false)}}},"materializedBindingRevision":3,"materializedPlanDigest":"{{{Sha256Hex(Encoding.UTF8.GetBytes(id))}}}","materializedStableIdentitySha256":null,"providerId":"hdc","request":{"documentType":"runtime-operation-request","idempotencyKey":"idem-{{{id}}}","inputs":{},"operation":{"id":"{{{job.Operation.Split('@')[0]}}}","version":1},"requestId":"req-{{{id}}}","requestedOutputs":["derivedArtifacts"],"schemaVersion":"1.0.0","target":{"expectedBindingRevision":3,"targetId":"TGT-FIXTURE-1"}},"ringCoverage":null,"schemaVersion":"arkdeck.job/1","screenSequence":null,"timeline":{"entries":[{{{entries}}}],"kind":"inline"}}
+                """));
         }
 
         private byte[] JobEvents(JsonObject request)

@@ -8,6 +8,7 @@
 //! real account root, Mach service, LaunchAgent, HDC or USB device is
 //! touched.
 use super::*;
+use crate::tool_selection_startup::registered_hdc;
 use arkdeck_provider_hdc::{
     DAYU200_NORMAL_PRODUCT_ID, NoUsbRelations, ROCKUSB_VENDOR_ID, UsbRelation,
 };
