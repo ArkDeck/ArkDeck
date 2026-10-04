@@ -2999,6 +2999,14 @@ certificate refuses before the signer runs, attempt directories are removed,
 neither password reaches any file, and results read back after the owners
 close.
 
+The same test also ports the macOS registered-preset replay over the
+Windows profile, in both project orders. It registers the project, pins the
+credential, composes after a restart, signs and releases the pin.
+`arkdeck-cli/tests/windows_signed_runtime.rs` shows that a development root
+reports signing unavailable and refuses `workspace preset register --kind
+signing` and `workspace sign` with nothing dispatched. Only an installed daemon
+signs, so `workspace.sign` stays Windows `partial` in the coverage.
+
 Signing has no presence gate on either platform. Runtime reads are never
 interactive: `interactionNotAllowed` on macOS, and `CredReadW` never prompts
 on Windows.

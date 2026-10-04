@@ -27,6 +27,10 @@
 //! does: no password reaches any file below the root; a parked Job is never
 //! signed again; a drifted signing file refuses the dispatch before the
 //! signer runs; every attempt directory is gone; durable answers read back.
+//!
+//! It also ports the macOS replay of a registered signing preset
+//! (`registered_signing_preset`), in both project orders, over a registered
+//! project whose profile resolves on Windows through the code-owned tools.
 
 #[cfg(not(windows))]
 fn main() {}
@@ -52,7 +56,9 @@ mod windows {
     use arkdeck_hoststore::{
         ArtifactReadStore, CapabilityStore, DeviceHolds, JobAdmitter, JobPlanner, JobReconciler,
         JobResultReader, JobRunner, JobStore, MutationAuthority, MutationExecution, ProfilePresets,
-        SigningPresetRef, WorkspaceCommandPreset, WorkspaceComposition, WorkspaceProfile,
+        ResolvedToolchain, SigningPresetRef, SigningSetup, WorkspaceCommandPreset,
+        WorkspaceComposition, WorkspaceProfile, WorkspaceProjectStore, WorkspaceToolchainPinning,
+        credential_pinning,
     };
     use arkdeck_platform::{HostDirectory, Secret, create_private_file};
     use arkdeck_provider_workspace::SigningError;
@@ -66,7 +72,7 @@ mod windows {
     use std::fs::{self, File, OpenOptions};
     use std::io::Write;
     use std::path::{Path, PathBuf};
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
 
     /// The recording's root, as its receipt and the inputs name it.
     const SWIFT_ROOT: &str = "/tmp/arkdeck-workspace-sign-oracle";
@@ -232,6 +238,14 @@ mod windows {
         (
             "the_labels_read_only_host_derived_values",
             the_labels_read_only_host_derived_values,
+        ),
+        (
+            "a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart",
+            a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart,
+        ),
+        (
+            "a_registered_signing_project_need_not_be_the_first_project",
+            a_registered_signing_project_need_not_be_the_first_project,
         ),
     ];
 
@@ -1335,5 +1349,262 @@ mod windows {
         let mut readback_jobs: Vec<String> = jobs.values().cloned().collect();
         readback_jobs.push(job);
         owners.assert_reopened_readback(&readback_jobs);
+    }
+
+    fn ledger_owners(root: &Root) -> Value {
+        let ledger: Value = serde_json::from_slice(
+            &fs::read(root.join("preset/credential-owner-v1.json")).unwrap(),
+        )
+        .unwrap();
+        ledger["presetOwners"].clone()
+    }
+
+    /// The production composition of a registered signing preset, as the
+    /// macOS replay drives it (`registered_signing_preset`): registering it
+    /// pins the credential through the owner's ledger — refused, before the
+    /// store writes anything, for a credential bound to another project.
+    /// After a restart the preset composes through its toolchain pin and its
+    /// credential into its project's profile, whose code-owned tools now
+    /// resolve on Windows, and signs with it; the owner releases at start-up
+    /// a pin no preset record carries. Without the credential owner the same
+    /// preset stays unresolved and nothing is signed. Removing the preset
+    /// releases its pin.
+    fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
+        registered_signing_preset(false);
+    }
+
+    fn a_registered_signing_project_need_not_be_the_first_project() {
+        registered_signing_preset(true);
+    }
+
+    fn registered_signing_preset(signing_last: bool) {
+        let _held = exclusive();
+        let fixture = support::fixture("workspace-sign-oracle");
+        let root = Root::fixed();
+        seed(&root, &fixture);
+        for tree in ["source", "other"] {
+            write(&root.join(&format!("{tree}/build-profile.json5")), b"{}\n");
+            write(
+                &root.join(&format!("{tree}/entry/src/main/module.json5")),
+                b"{}\n",
+            );
+        }
+        private_dir(&root.join("workspace-projects"));
+        let store = root.join("preset");
+        let projects = Arc::new(
+            WorkspaceProjectStore::open(&root.join("workspace-projects"))
+                .unwrap()
+                .with_dependency_pinning(
+                    Some(WorkspaceToolchainPinning {
+                        acquire: Box::new(|_, _, _| Ok(())),
+                        release: Box::new(|_, _| Ok(())),
+                    }),
+                    Some(credential_pinning(
+                        store.clone(),
+                        Box::new(OracleSecrets::installed()),
+                    )),
+                ),
+        );
+        let call = |method: &str, params: Value| {
+            projects.handle(
+                method,
+                params.as_object().unwrap(),
+                &|| "2026-09-25T00:00:00.000Z".into(),
+                &|_| Ok(()),
+            )
+        };
+        let register = |request: &str, tree: &str| {
+            call(
+                "workspace.project.register",
+                json!({"registrationRequestId": request, "kind": "openharmony",
+                       "root": root.join(tree).to_str().unwrap()}),
+            )
+            .unwrap()["projectRef"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        let first = register("project", "source");
+        let second = register("other", "other");
+        // Startup records are sorted by project reference. Exercise both
+        // orders without weakening the foreign-project credential refusal.
+        let (project, other) = if (first > second) == signing_last {
+            (first, second)
+        } else {
+            (second, first)
+        };
+        // The installed receipt binds the credential to the registered
+        // project.
+        let receipt = fs::read_to_string(root.join("preset/preset-v1.json")).unwrap();
+        write(
+            &root.join("preset/preset-v1.json"),
+            receipt
+                .replace("\"SignOracleProject\"", &format!("\"{project}\""))
+                .as_bytes(),
+        );
+        let owner = CredentialOwner::new(SigningPresetStore::new(store.to_str().unwrap()));
+        let credential = owner.current().unwrap().credential_ref;
+        let signing = |request: &str, project: &str| {
+            call(
+                "workspace.preset.register",
+                json!({"registrationRequestId": request, "projectRef": project,
+                       "kind": "signing", "templateRef": "openharmony.local-sign@1",
+                       "timeoutSeconds": "600",
+                       "toolchainRef": format!("toolchain:sha256:{}", "a".repeat(64)),
+                       "toolchainGeneration": "1", "credentialRef": credential}),
+            )
+        };
+        // Another project's preset may not pin this credential; nothing is
+        // written, so the store keeps answering.
+        let foreign = signing("foreign", &other).unwrap_err();
+        assert_eq!(
+            (foreign.code.as_str(), foreign.message.as_str()),
+            (
+                "resourceConflict",
+                format!(
+                    "signing credential {credential} is bound to project {project}, not {other}"
+                )
+                .as_str()
+            )
+        );
+        assert_eq!(
+            call("workspace.preset.list", json!({"projectRef": other})).unwrap()["presets"],
+            json!([])
+        );
+        assert_eq!(ledger_owners(&root), json!([]));
+        let preset = signing("signing", &project).unwrap()["presetRef"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(ledger_owners(&root), json!([preset]));
+        // A pin a retired state directory left behind.
+        owner
+            .acquire(&credential, "preset-retired", &OracleSecrets::installed())
+            .unwrap();
+        // The resolved DevEco toolchain: never run here, so the stand-in
+        // stands for Node and the Hvigor script.
+        let stand_in = root.join("tools/java.exe").to_str().unwrap().to_owned();
+        let sdk = root.join("material").to_str().unwrap().to_owned();
+        let toolchains = |_: &str, _: u64, _: &str| {
+            Ok(ResolvedToolchain {
+                node_path: stand_in.clone(),
+                hvigor_script_path: stand_in.clone(),
+                sdk_root_path: sdk.clone(),
+                verified_resources: Vec::new(),
+            })
+        };
+        let request = |label: &str| {
+            json!({"requestJson": json!({
+                "documentType": "runtime-operation-request",
+                "idempotencyKey": format!("idempotency-{label}"),
+                "inputs": {"projectRef": project, "signingPresetRef": preset,
+                           "unsignedHapArtifactLease":
+                               "lease-v1:job-input-hap:ART-81ae19b19ca7ea0d3ce99c554182c815"},
+                "operation": {"id": "workspace.sign-openharmony-hap", "version": 1},
+                "requestId": format!("request-{label}"),
+                "requestedOutputs": ["derivedArtifacts"],
+                "schemaVersion": "1.0.0",
+                "target": {"targetId": "workspace-host"},
+            }).to_string()})
+        };
+        let home = r"C:\nonexistent-home";
+        // Without the credential owner the preset resolves to nothing, so it
+        // is never applied and a Job naming it is refused as Swift refuses
+        // it.
+        let (unsigned, notes) = WorkspaceComposition::compose(
+            Arc::clone(&projects),
+            &root.0,
+            home,
+            oracle_now,
+            &toolchains,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(notes.released_credential_owners, None);
+        let owners = Owners {
+            jobs: JobStore::open_owner(&root.join("jobs-state")).unwrap(),
+            artifacts: ArtifactReadStore::open(&root.join("artifacts")).unwrap(),
+            capabilities: CapabilityStore::open(&root.join("jobs-state/capabilities")).unwrap(),
+            holds: DeviceHolds::default(),
+            workspace: unsigned,
+            root,
+        };
+        let answer = owners.plan(&request("unsigned"));
+        assert_eq!(
+            answer,
+            refused(
+                "operationUnavailable",
+                "workspace preset configuration changed; restart the Runtime before submitting \
+                 a Job",
+                Some(proven())
+            )
+        );
+        assert_eq!(
+            ledger_owners(&owners.root),
+            json!([preset.as_str(), "preset-retired"])
+        );
+        // The restarted Runtime owns the default state directory.
+        let (signed, notes) = WorkspaceComposition::compose(
+            Arc::clone(&projects),
+            &owners.root.0,
+            home,
+            oracle_now,
+            &toolchains,
+            Some(
+                SigningSetup::with_secrets(
+                    store.clone(),
+                    owners.root.join("signing-attempts"),
+                    Box::new(OracleSecrets::installed()),
+                )
+                .releasing_orphaned_owners(),
+            ),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            notes.released_credential_owners,
+            Some(Ok(vec!["preset-retired".to_owned()]))
+        );
+        assert!(notes.unadopted.is_empty(), "{:?}", notes.unadopted);
+        assert_eq!(ledger_owners(&owners.root), json!([preset]));
+        let owners = Owners {
+            workspace: signed,
+            ..owners
+        };
+        assert_eq!(owners.plan(&request("sign"))["ok"], true);
+        let accepted = owners.submit(&request("sign"));
+        let job = accepted["result"]["jobId"].as_str().unwrap().to_owned();
+        let run = owners.run(&job);
+        assert_eq!(run["result"]["state"], "succeeded", "{run}");
+        let result = owners.result(&job);
+        let names: Vec<&str> = result["result"]["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|artifact| artifact["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, ["signed.hap", "signing-report.json"], "{result}");
+        assert_eq!(
+            fs::read_dir(owners.root.join("signing-attempts"))
+                .unwrap()
+                .count(),
+            0
+        );
+        // Removing the preset releases its pin.
+        call(
+            "workspace.preset.remove",
+            json!({"mutationRequestId": "remove", "projectRef": project,
+                   "presetRef": preset, "expectedGeneration": "1"}),
+        )
+        .unwrap();
+        assert_eq!(ledger_owners(&owners.root), json!([]));
+        for path in every_file(&owners.root.0) {
+            if path == owners.root.join("tools/java.exe") {
+                continue;
+            }
+            secret_free(&path.display().to_string(), &fs::read(&path).unwrap());
+        }
+        owners.assert_reopened_readback(&[job]);
     }
 }
