@@ -384,3 +384,70 @@ fn a_development_root_names_its_own_endpoint() {
     );
     assert!(!root.0.join("instance.json").exists());
 }
+
+/// One exchange of `method` with empty parameters on an open pipe handle.
+fn call(pipe: &mut std::fs::File, method: &str) -> Value {
+    let request = serde_json::json!({
+        "protocolVersion": arkdeck_contract::PROTOCOL_VERSION,
+        "contractIdentity": arkdeck_contract::CONTRACT_IDENTITY,
+        "id": method,
+        "method": method,
+        "params": {},
+    });
+    let mut frame = serde_json::to_vec(&request).unwrap();
+    frame.push(b'\n');
+    pipe.write_all(&frame).unwrap();
+    let mut reply = Vec::new();
+    let mut byte = [0u8; 1];
+    while byte[0] != b'\n' {
+        assert_eq!(pipe.read(&mut byte).unwrap(), 1, "the reply ended early");
+        reply.push(byte[0]);
+    }
+    serde_json::from_slice(&reply).unwrap()
+}
+
+/// The managed HDC owner is composed on Windows behind the HDC tuple gate
+/// (TASK-XPA-005, CHG-2026-078). No Windows HDC tuple is registered, so a
+/// development root composes none: it says so, its owner census names no
+/// `hdc` or `managedHdc`, `runtime.hdc.status` answers as Swift's daemon
+/// answers without an HDC host (`hdc.notConfigured`), launching nothing, and
+/// its stop is a plain one (exit 0, no Runtime recomposition asked).
+#[test]
+fn a_development_root_without_a_registered_hdc_composes_no_managed_server() {
+    let _turn = turn();
+    let root = Root::new();
+    let mut daemon = Daemon::start(&root.0);
+    let pipe = daemon.serving();
+    assert!(daemon.seen.iter().any(|line| line
+        == "arkdeck-agentd composes no HDC: no Windows HDC tuple is registered; device \
+            observation and target adoption are refused before any dispatch"));
+    let owners = daemon
+        .seen
+        .iter()
+        .find(|line| line.starts_with("arkdeck-agentd owners: "))
+        .unwrap()
+        .clone();
+    let owners: Vec<&str> = owners
+        .trim_start_matches("arkdeck-agentd owners: ")
+        .split(", ")
+        .collect();
+    assert!(
+        !owners.contains(&"hdc") && !owners.contains(&"managedHdc"),
+        "{owners:?}"
+    );
+    let mut connection = open_pipe(&pipe);
+    let status = call(&mut connection, "runtime.hdc.status");
+    assert_eq!(status["ok"], true, "{status}");
+    assert_eq!(
+        status["result"],
+        arkdeck_provider_hdc::unconfigured_status(None),
+        "{status}"
+    );
+    assert_eq!(status["result"]["reasonCode"], "hdc.notConfigured");
+    drop(connection);
+    let tail = daemon.stop(&root.0);
+    assert_eq!(
+        tail.last().map(String::as_str),
+        Some("arkdeck-agentd stopped")
+    );
+}

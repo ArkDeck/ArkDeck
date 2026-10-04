@@ -2557,8 +2557,8 @@ that server's own child (launch record, creation time, image file, Job
 membership, declared endpoint, listener) where macOS reads argv
 (`verifies_managed_process`). `arkdeck_provider_hdc::ProcessDispatch` and
 `ManagedHdcServer` now build on Windows; `mutation_identity_current()` stays
-`false` there (no Windows launch identity is published), and nothing composes
-them on Windows, since no Windows HDC tuple is registered.
+`false` there (no Windows launch identity is published), and only a registered
+Windows HDC tuple composes them (below), of which there is none yet.
 `tests/windows_tool_dispatch.rs` (platform) and `tests/windows_managed_hdc.rs`
 (provider) are `harness = false` targets whose fake tool and fake `hdc` are the
 test binary itself; no real HDC is launched. The run record is
@@ -2579,9 +2579,21 @@ well.
   replacement blocks the start, and once the proved replacement is ended,
   the next start owns the endpoint.
 - The daemon's own managed-HDC owner (`managed_hdc.rs`, with its restart
-  lifecycle) stays macOS-only. It needs a registered HDC, and a Windows
-  development root refuses `ARKDECK_DEVELOPMENT_HDC_PATH` and
-  `ARKDECK_DEVELOPMENT_HDC_SERVER` before starting anything.
+  lifecycle) builds on Windows and is composed behind the HDC tuple gate
+  (`windows_hdc_gate.rs`, CHG-2026-078). A development root whose
+  `ARKDECK_DEVELOPMENT_HDC_PATH` (with `ARKDECK_DEVELOPMENT_HDC_SERVER=managed`)
+  hashes to a registered tuple starts it as its managed server on the
+  tuple's endpoint, after its stores and before the ArkForge lane; its
+  dispatch registers the HDC, `runtime.hdc.status` and `target.availability`
+  answer from it, and the daemon stops it after the drain and before
+  releasing the root (exit 70 when the owner must be recomposed). The
+  status verifies the process by provenance (`ManagedHdcServer::verifies`).
+  `WINDOWS_HDC_TUPLES` is empty, so today every such input is refused before
+  the root is opened and a root without one answers `runtime.hdc.status` as
+  unconfigured (`windows_lifecycle_process.rs`); the composed path is
+  exercised with an injected tuple and a stand-in compiled at test time
+  (`windows_lifecycle::tests`). Tool selection's restart and the HDC
+  control-action owner stay macOS-only.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider

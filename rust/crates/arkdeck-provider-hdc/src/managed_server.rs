@@ -260,6 +260,15 @@ impl ManagedHdcServer {
             .map_err(|error| format!("managed HDC server listener identity changed: {error}"))
     }
 
+    /// Windows has no supported read of another process's argv: the process
+    /// a receipt names is verified as the very child this server launched,
+    /// alive, in its Job and listening on its endpoint
+    /// (`arkdeck_platform::ManagedServer::verifies`).
+    #[cfg(windows)]
+    pub fn verifies(&self, receipt: &ServerIdentityReceipt) -> bool {
+        self.server.verifies(receipt)
+    }
+
     /// Swift `stop`: ends the server and collects what it wrote.
     pub fn stop(self) -> io::Result<ServerStop> {
         self.server.stop()
