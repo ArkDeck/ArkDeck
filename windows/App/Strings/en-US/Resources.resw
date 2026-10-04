@@ -5130,4 +5130,120 @@ SHA-256: %4$@</value>
     <value>Recovery is waiting</value>
     <comment>jobRecovery.waiting.title (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="debug_artifacts_batch_phase_failed" xml:space="preserve">
+    <value>Queue stopped; remaining libraries were not submitted</value>
+    <comment>debug.artifacts.batch.phase.failed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_succeeded" xml:space="preserve">
+    <value>Every library reported verified success</value>
+    <comment>debug.artifacts.batch.phase.succeeded (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_stopped" xml:space="preserve">
+    <value>Queue stopped; inspect individual Job results</value>
+    <comment>debug.artifacts.batch.phase.stopped (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_running" xml:space="preserve">
+    <value>Deploying queue</value>
+    <comment>debug.artifacts.batch.phase.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_review" xml:space="preserve">
+    <value>Awaiting plan review</value>
+    <comment>debug.artifacts.batch.phase.review (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_preparing" xml:space="preserve">
+    <value>Validating queue</value>
+    <comment>debug.artifacts.batch.phase.preparing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_idle" xml:space="preserve">
+    <value>Ready</value>
+    <comment>debug.artifacts.batch.phase.idle (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_failed" xml:space="preserve">
+    <value>Stopped on failure or uncertainty</value>
+    <comment>debug.artifacts.batch.row.failed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_succeeded" xml:space="preserve">
+    <value>Verified</value>
+    <comment>debug.artifacts.batch.row.succeeded (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_running" xml:space="preserve">
+    <value>Running</value>
+    <comment>debug.artifacts.batch.row.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_submitting" xml:space="preserve">
+    <value>Submitting</value>
+    <comment>debug.artifacts.batch.row.submitting (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_prepared" xml:space="preserve">
+    <value>Plan ready</value>
+    <comment>debug.artifacts.batch.row.prepared (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_preparing" xml:space="preserve">
+    <value>Validating</value>
+    <comment>debug.artifacts.batch.row.preparing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_pending" xml:space="preserve">
+    <value>Pending</value>
+    <comment>debug.artifacts.batch.row.pending (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_run" xml:space="preserve">
+    <value>Deploy reviewed queue</value>
+    <comment>debug.artifacts.batch.run (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_warning" xml:space="preserve">
+    <value>Each library is a separate deployment with its own backup, app restart, readback and rollback. This is not an atomic batch: earlier successful deployments are kept if a later item fails.</value>
+    <comment>debug.artifacts.batch.warning (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_review" xml:space="preserve">
+    <value>Review library deployment queue</value>
+    <comment>debug.artifacts.batch.review (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_stop" xml:space="preserve">
+    <value>Stop after current Job</value>
+    <comment>debug.artifacts.batch.stop (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_prepare" xml:space="preserve">
+    <value>Validate and review queue</value>
+    <comment>debug.artifacts.batch.prepare (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_limit" xml:space="preserve">
+    <value>A deployment queue supports at most 16 libraries.</value>
+    <comment>debug.artifacts.batch.limit (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_remove" xml:space="preserve">
+    <value>Remove from queue</value>
+    <comment>debug.artifacts.batch.remove (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_add" xml:space="preserve">
+    <value>Add to deployment queue</value>
+    <comment>debug.artifacts.batch.add (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_detail" xml:space="preserve">
+    <value>All libraries use the bundle above and keep their filenames. Review every plan before starting. A failed or unknown result stops the queue; completed libraries remain deployed.</value>
+    <comment>debug.artifacts.batch.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_title" xml:space="preserve">
+    <value>Deployment queue</value>
+    <comment>debug.artifacts.batch.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_empty" xml:space="preserve">
+    <value>No lib&lt;name&gt;.so files were found in the selected folders.</value>
+    <comment>debug.artifacts.directory.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_detail" xml:space="preserve">
+    <value>Select up to 16 libraries. Search includes subfolders, skips symbolic links, and is limited to 500 entries and 100 libraries.</value>
+    <comment>debug.artifacts.directory.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_title" xml:space="preserve">
+    <value>Libraries in selected folders</value>
+    <comment>debug.artifacts.directory.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_wslSource" xml:space="preserve">
+    <value>For WSL builds, connect to its SSH server in Settings → Servers.</value>
+    <comment>debug.artifacts.wslSource (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_chooseDirectory" xml:space="preserve">
+    <value>Choose folder / mounted SMB…</value>
+    <comment>debug.artifacts.chooseDirectory (DebugLocalizable.xcstrings)</comment>
+  </data>
 </root>
