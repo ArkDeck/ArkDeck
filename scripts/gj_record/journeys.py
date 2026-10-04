@@ -392,12 +392,14 @@ def gj2(context: Context) -> None:
 # -- GJ-3 ---------------------------------------------------------------------
 
 
-def gj3(context: Context) -> None:
+def gj3(context: Context, fixture_sha256: str) -> None:
     judge = context.judge
     execution = context.execution_id("gj3")
     job, _ = context.settled(execution, "deploy.native-library.app-owned@1")
+    report = None
+    forward = None
     if job:
-        _, contents = context.job(job, execution, required=("publish-report.json", "verification-report.json"))
+        forward, contents = context.job(job, execution, required=("publish-report.json", "verification-report.json"))
         entries = context.timeline(job, execution)
         if entries is not None:
             for host_step in ("verify-elf-locally", "hash-library"):
@@ -421,8 +423,12 @@ def gj3(context: Context) -> None:
     rollback, _ = context.settled(rollback_id, "deploy.native-library.app-owned@1", completed=False)
     if rollback:
         context.job(rollback, rollback_id, terminal="failed")
+        rollback_fixture(context, rollback, rollback_id, fixture_sha256, forward, report)
         entries = context.timeline(rollback, rollback_id)
         if entries is not None:
+            # A fixture refused before publication (an ABI mismatch at
+            # admission, say) proves only that refusal, never the rollback.
+            context.verified(entries, "atomic-publish", rollback_id, ("publishedSha256",))
             context.verified(entries, "rollback-native-library", rollback_id, ("restored", "restoredSha256"))
             judge.that(
                 f"{rollback_id}: the previous library was restored",
@@ -434,6 +440,76 @@ def gj3(context: Context) -> None:
                 not any(e.startswith("native rollback failed closed") for e in entries),
                 None,
             )
+
+
+def rollback_fixture(
+    context: Context,
+    rollback: str,
+    label: str,
+    fixture_sha256: str,
+    forward: Step | None,
+    report: dict | None,
+) -> None:
+    """G3: the rollback fixture applies to the current Target.
+
+    The fixture's own import (`gj3-<d>-fixture`) is read back with `artifact
+    import inspect`, whose receipt carries the Runtime's ELF validation. It
+    must be the pinned fixture, imported for this Target at the forward leg's
+    binding revision, with the ABI the forward leg's library was verified
+    loaded under in the target process. The rollback Job must have consumed
+    exactly that import's lease.
+    """
+    run, judge = context.run, context.judge
+    request = context.execution_id("gj3", "fixture")
+    inspect = run.last(
+        "artifact.import.inspect", lambda s: s.ok and s.result.get("importRequestId") == request
+    )
+    if inspect is None:
+        judge.missing(f"{label}: fixture import", f"artifact import inspect --import-request-id {request}")
+        return
+    metadata = inspect.result.get("metadata") or {}
+    receipt = inspect.result.get("receipt") or {}
+    validation = receipt.get("validation") or {}
+    judge.that(
+        f"{label}: fixture import committed",
+        inspect.result.get("state") in ("committed", "released"),
+        inspect.result.get("state"),
+        inspect,
+    )
+    judge.expect(f"{label}: fixture is the pinned rollback fixture", metadata.get("sha256"), fixture_sha256, inspect)
+    judge.that(f"{label}: fixture has a build ID", bool(validation.get("buildId")), None, inspect)
+    if forward is not None:
+        evidence = forward.result.get("evidence") or {}
+        judge.expect(
+            f"{label}: fixture imported for this Target",
+            metadata.get("targetId"),
+            evidence.get("targetId"),
+            inspect,
+            forward,
+        )
+        judge.expect(
+            f"{label}: fixture imported at this binding revision",
+            str(metadata.get("bindingRevision")),
+            str(evidence.get("bindingRevision")),
+            inspect,
+            forward,
+        )
+    if report is not None:
+        judge.expect(
+            f"{label}: fixture ABI is the Target's loaded ABI", validation.get("abi"), report.get("abi"), inspect
+        )
+    show = run.last("job.show", lambda s: s.ok and (s.result.get("job") or {}).get("jobId") == rollback)
+    if show is None:
+        judge.missing(f"{label}: the rollback request", f"job show --job {rollback}")
+        return
+    inputs = (show.result.get("request") or {}).get("inputs") or {}
+    judge.expect(
+        f"{label}: the rollback Job consumed the fixture's lease",
+        inputs.get("libraryArtifactLease"),
+        receipt.get("lease"),
+        show,
+        inspect,
+    )
 
 
 # -- GJ-4 ---------------------------------------------------------------------
