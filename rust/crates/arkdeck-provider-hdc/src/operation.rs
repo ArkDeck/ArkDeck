@@ -5,7 +5,7 @@
 //! exact arguments the executor runs, and each receipt judged by the
 //! observation parsers or Swift's capture verdicts. What runs a lowered plan
 //! is an [`HdcDispatch`]; this module starts nothing itself.
-use crate::{ParseError, parse_client_version, parse_server_check, parse_target_list};
+use crate::{ParseError, parse_host_client_version, parse_host_target_list, parse_server_check};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -168,6 +168,13 @@ pub trait HdcDispatch {
     }
 
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure>;
+
+    /// The registered Windows HDC tuple (CHG-2026-078) the executable this
+    /// dispatches is pinned to, if any: its output is read by the Windows
+    /// registry's grammars. Unknown implementations name none.
+    fn registered_windows_tuple(&self) -> Option<&'static crate::WindowsHdcTuple> {
+        None
+    }
 }
 
 /// Swift `ProviderSemanticOutcome`.
@@ -373,10 +380,12 @@ impl Action {
     /// Swift `verify` for these actions, which never read the exit status.
     pub fn verify(&self, receipt: &Receipt, expected: Expected<'_>) -> Outcome {
         match self {
-            Self::ObserveTool => match parse_client_version(&receipt.stdout, receipt.truncated) {
-                Ok(version) => verified([("toolVersion", version)]),
-                Err(error) => parse_outcome(error, "empty observation output"),
-            },
+            Self::ObserveTool => {
+                match parse_host_client_version(&receipt.stdout, receipt.truncated) {
+                    Ok(version) => verified([("toolVersion", version)]),
+                    Err(error) => parse_outcome(error, "empty observation output"),
+                }
+            }
             Self::ObserveServer => match parse_server_check(&receipt.stdout, receipt.truncated) {
                 Ok(check) if check.versions_agree() => verified([
                     ("clientVersion", check.client_version),
@@ -557,7 +566,7 @@ fn parse_outcome(error: ParseError, empty: &str) -> Outcome {
 
 fn observe_device(receipt: &Receipt, expected: Expected<'_>) -> Outcome {
     let version = expected.tool_version.unwrap_or(HIGHEST_REGISTERED_VERSION);
-    let rows = match parse_target_list(&receipt.stdout, version, receipt.truncated) {
+    let rows = match parse_host_target_list(&receipt.stdout, version, receipt.truncated) {
         Ok(rows) => rows,
         Err(error) => return parse_outcome(error, "empty observation output"),
     };

@@ -561,6 +561,10 @@ impl DevelopmentHdc {
 }
 
 impl HdcDispatch for DevelopmentHdc {
+    fn registered_windows_tuple(&self) -> Option<&'static arkdeck_provider_hdc::WindowsHdcTuple> {
+        self.dispatch.registered_windows_tuple()
+    }
+
     fn mutation_identity_current(&self) -> bool {
         self.dispatch.mutation_identity_current()
             && self
