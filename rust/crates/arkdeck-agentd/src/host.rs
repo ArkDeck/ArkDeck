@@ -133,7 +133,7 @@ pub struct Host {
     workspace_projects: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceProjectStore>>,
     /// The workspace provider composed over the registered projects, which a
     /// workspace Job plans, admits and runs through.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     workspace: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceComposition>>,
     #[cfg(any(target_os = "macos", windows))]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
@@ -357,9 +357,9 @@ impl Host {
         self
     }
     /// The Job planner over this Windows composition's owners, as macOS
-    /// builds it: the Artifact and Import owners and the analyzers, and no
-    /// workspace or HDC provider (none is composed on Windows yet; the HDC
-    /// waits for the Windows HDC tuple's registration).
+    /// builds it: the Artifact and Import owners, the analyzers and the
+    /// workspace provider, and no HDC provider (it waits for the Windows HDC
+    /// tuple's registration).
     #[cfg(windows)]
     fn planner<'a>(&'a self, state_root: &'a std::path::Path) -> arkdeck_hoststore::JobPlanner<'a> {
         arkdeck_hoststore::JobPlanner {
@@ -371,7 +371,7 @@ impl Host {
                 .map(|(_, analyzers)| analyzers as &dyn arkdeck_hoststore::AnalyzerComposition),
             state_root,
             hdc: None,
-            workspace: None,
+            workspace: self.workspace.as_deref(),
         }
     }
     #[cfg(any(target_os = "macos", windows))]
@@ -831,9 +831,8 @@ impl Host {
     }
     /// Swift `startJob` on Windows: the owned Job runs in the background in
     /// the slot every `job.run` and `job.cancel` of it meets, through the
-    /// runner `job.run` composes here (the composed analyzers, and no HDC,
-    /// workspace provider or Flash lane), and its end is reported to the
-    /// execution.
+    /// runner `job.run` composes here (the composed analyzers and workspace
+    /// provider, and no HDC), and its end is reported to the execution.
     #[cfg(windows)]
     fn start_agent_run(&self, start: arkdeck_hoststore::AgentStart) {
         let (Some(agents), Some(jobs), Some(artifacts), Some(planning)) = (
@@ -858,6 +857,7 @@ impl Host {
         let flash_runtime = self.flash_runtime.clone();
         let flash_planning = self.flash_planning.clone();
         let flash_facts = self.flash_facts.clone();
+        let workspace = self.workspace.clone();
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
             Ok(mut runs) if !runs.contains_key(&start.job) => {
@@ -926,6 +926,7 @@ impl Host {
                         &home,
                         publisher.as_ref(),
                         Some(&slot.cancellation),
+                        workspace.as_deref(),
                     ),
                     flash,
                 }
@@ -1000,7 +1001,7 @@ impl Host {
     /// pinned now; one that is not a regular executable fails the start, as
     /// Swift's composition fails it. Without the project owner nothing is
     /// composed.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_workspace_operations(
         mut self,
         state_root: &std::path::Path,
@@ -1460,6 +1461,7 @@ impl Host {
             ("storage", self.storage.is_some()),
             ("history", self.history.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
+            ("workspaceOperations", self.workspace.is_some()),
             ("bootstrap", self.bootstrap.is_some()),
             ("planning", self.planning.is_some()),
             (
@@ -1524,7 +1526,7 @@ impl Host {
             history: None,
             #[cfg(any(target_os = "macos", windows))]
             workspace_projects: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             workspace: None,
             #[cfg(any(target_os = "macos", windows))]
             trace_cache: None,
@@ -1646,8 +1648,8 @@ impl Host {
 /// The Job runner a Windows composition runs a Job with (`job.run`, an
 /// agent execution's owned Job and `job.reconcile`'s finalization): the Job,
 /// Artifact and Import owners, the analyzers the planning composed, the
-/// Session publication writer and the mutation authority, with no HDC
-/// composition (no Windows HDC tuple is registered) or workspace provider.
+/// Session publication writer, the mutation authority and the workspace
+/// provider, with no HDC composition (no Windows HDC tuple is registered).
 /// One argument per owner, as the runner's own fields are: the background
 /// run passes its own clones.
 #[cfg(windows)]
@@ -1661,6 +1663,7 @@ fn windows_runner<'a>(
     home: &'a str,
     sessions: Option<&'a arkdeck_hoststore::SessionPublisher<'a>>,
     cancellation: Option<&'a arkdeck_hoststore::RunCancellation>,
+    workspace: Option<&'a arkdeck_hoststore::WorkspaceComposition>,
 ) -> arkdeck_hoststore::JobRunner<'a> {
     arkdeck_hoststore::JobRunner {
         imports,
@@ -1679,14 +1682,14 @@ fn windows_runner<'a>(
         cancellation,
         after_commit: None,
         hdc: None,
-        workspace: None,
+        workspace,
     }
 }
 
 impl HostServices for Host {
     /// `operation.list` on Windows: the macOS report with this composition's
-    /// owners — the planner, the Job and Artifact owners and the composed
-    /// analyzers, and no HDC, workspace provider or mutation authority.
+    /// owners — the planner, the Job and Artifact owners, the composed
+    /// analyzers and workspace provider, and no HDC.
     #[cfg(windows)]
     fn operation_availability(
         &self,
@@ -1712,7 +1715,7 @@ impl HostServices for Host {
                     .is_some_and(|(authority, jobs)| authority.state_proven_now(jobs)),
                 code_sign_helper: false,
                 hdc_tool_current: false,
-                workspace: None,
+                workspace: self.workspace.as_deref(),
             },
         )
     }
@@ -2493,6 +2496,7 @@ impl HostServices for Host {
                     &self.home,
                     publisher.as_ref(),
                     cancellation,
+                    self.workspace.as_deref(),
                 ),
                 flash,
             }
@@ -2782,6 +2786,7 @@ impl HostServices for Host {
             &self.home,
             None,
             None,
+            self.workspace.as_deref(),
         )
         .continue_cleanup_debt(params)
     }
@@ -2975,6 +2980,7 @@ impl HostServices for Host {
                 &self.home,
                 publisher.as_ref(),
                 None,
+                self.workspace.as_deref(),
             )
         });
         let reconciler = arkdeck_hoststore::JobReconciler {
@@ -3343,18 +3349,12 @@ impl HostServices for Host {
                 ])),
             };
             // A Runtime-owned copy's reference maps to the project it was
-            // copied from through the workspace provider. Windows composes no
-            // workspace provider, so it has made no copy, and every reference
-            // is compared as written (Swift `resolveRegistrationProjectRef`
-            // for a reference nothing maps).
-            #[cfg(target_os = "macos")]
+            // copied from through the workspace provider.
             let registration = |reference: &str| {
                 self.workspace
                     .as_ref()
                     .and_then(|workspace| workspace.census_registration(reference))
             };
-            #[cfg(windows)]
-            let registration = |_: &str| None;
             let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
                 (Some(jobs), WorkspaceReference::Project(project)) => {
                     jobs.require_no_active_workspace_project_reference(project, &registration)

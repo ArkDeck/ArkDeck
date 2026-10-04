@@ -79,14 +79,13 @@ const DOCUMENT_LIMIT: u64 = 64 * 1024;
 /// Inputs from which the isolated macOS owner composes an owner that this
 /// composition does not compose yet: each one set refuses the start. The
 /// development HDC is decided by the tuple gate instead (`windows_hdc_gate`).
-const NOT_COMPOSED: [&str; 7] = [
+const NOT_COMPOSED: [&str; 6] = [
     "ARKDECK_DEVELOPMENT_USB_RELATIONS",
     "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC",
     "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER",
     "ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY",
     "ARKDECK_APP_INGRESS",
     "ARKDECK_ARKTRACE_DESCRIPTOR",
-    "ARKDECK_WORKSPACE_INSPECTOR",
 ];
 
 /// Swift `AgentDaemonInstance`: who holds the instance lock. The same
@@ -183,14 +182,21 @@ impl Authority {
     ///   root) pins a preset's signing credential in the account's preset
     ///   root `<LocalAppData>\ArkDeck\Signing\OpenHarmony`, the secrets read
     ///   from Credential Manager bound to this daemon's own image
-    ///   (TASK-XPA-011), as the macOS installed daemon does. A build, test
-    ///   or signing preset pins its DevEco toolchain in the daemon's
-    ///   Bootstrap registry ([`Self::bootstrap_root`]), as on macOS. The
-    ///   workspace composition is not composed, so a project stays
-    ///   `runtimeRestartRequired`; this composition does not
-    ///   yet ask the Job owner whether a workspace Job names a project or
-    ///   preset, so every project or preset mutation is refused
-    ///   (`recordUnreadable`, no new dispatch);
+    ///   (TASK-XPA-011), as the macOS installed daemon does; a preset's
+    ///   DevEco toolchain is pinned in this composition's Bootstrap registry,
+    ///   as both macOS compositions pin it;
+    /// * the workspace provider (`WorkspaceComposition`, TASK-XPA-011) over
+    ///   the registered projects, composed at the start as macOS composes it:
+    ///   the Runtime-owned copies under the root's `evolution-workspaces`, the
+    ///   source inspection by the inspector the host configured
+    ///   (`ARKDECK_WORKSPACE_INSPECTOR`, pinned now; one that is no
+    ///   executable ends the start), the symbolizer `ARKDECK_ANALYZER_PATH`
+    ///   names, and, for the installed daemon only, signing over the
+    ///   account's preset store with its attempts in the root's
+    ///   `workspace-signing-attempts`. A registered project resolves to no
+    ///   profile on Windows (no code-owned source tool is trusted there
+    ///   yet), so every profile-served operation is unavailable with that
+    ///   reason and only the source inspection runs;
     /// * the Job planner and admitter over the Job store and the root
     ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
     ///   tuple is registered): a device operation is refused before admission
@@ -377,8 +383,19 @@ impl Authority {
         .map_err(|error| {
             format!("ARKDECK_ANALYZER_PATH is unusable: {error}; nothing was started")
         })?;
+        let analyzer_path = std::env::var_os("ARKDECK_ANALYZER_PATH");
         let host = host
             .with_workspace_projects(projects)
+            .with_workspace_operations(
+                self.root.path(),
+                &bootstrap,
+                self.signing_setup()?,
+                std::env::var_os("ARKDECK_WORKSPACE_INSPECTOR").as_deref(),
+                analyzer_path.as_deref(),
+            )
+            .map_err(|error| {
+                format!("the workspace provider is unusable: {error}; nothing was started")
+            })?
             .with_planning(self.root.path(), Some(analyzers));
         let host = host.with_trace_cache(self.trace_cache()?);
         let host = host.with_bootstrap(&bootstrap).map_err(|error| {
@@ -649,6 +666,28 @@ impl Authority {
             .and_then(|directory| directory.private_child(BOOTSTRAP_VERSION))
             .map_err(|error| unusable(&path, error))?;
         Ok(path)
+    }
+
+    /// The workspace provider's signing: none for a development root (as the
+    /// macOS isolated owner composes none: it must not read, pin or release
+    /// the account's signing material); for the installed daemon the
+    /// account's preset store, Credential Manager bound to this daemon's own
+    /// image and the attempts in the root's `workspace-signing-attempts`,
+    /// releasing at the start the pins no preset record carries, as the macOS
+    /// installed daemon does.
+    fn signing_setup(&self) -> Result<Option<arkdeck_hoststore::SigningSetup>, String> {
+        if self.development {
+            return Ok(None);
+        }
+        let (store, image) = signing_store()?;
+        arkdeck_hoststore::SigningSetup::keychain(
+            store,
+            self.root.path().join("workspace-signing-attempts"),
+            image,
+            true,
+        )
+        .map(Some)
+        .map_err(|error| format!("the signing credential store is unusable: {error}"))
     }
 
     /// The History filter owner over the root's private `history-filter`
@@ -1032,6 +1071,14 @@ fn launch_managed(
 /// in its canonical `X:\…` spelling (the spelling a receipt's identity is
 /// computed over).
 fn credential_pinning() -> Result<arkdeck_hoststore::WorkspaceCredentialPinning, String> {
+    let (root, image) = signing_store()?;
+    arkdeck_hoststore::keychain_credential_pinning(root, image)
+        .map_err(|error| format!("the signing credential store is unusable: {error}"))
+}
+
+/// The account's signing preset root and this process's own image, in its
+/// canonical `X:\…` spelling.
+fn signing_store() -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     let root = arkdeck_platform::arkdeck_application_support_root()
         .ok_or("this account has no local application data for the signing preset")?
         .join("Signing")
@@ -1043,8 +1090,7 @@ fn credential_pinning() -> Result<arkdeck_hoststore::WorkspaceCredentialPinning,
         .to_str()
         .ok_or("this daemon's image path is not text")?;
     let image = std::path::PathBuf::from(image.strip_prefix(r"\\?\").unwrap_or(image));
-    arkdeck_hoststore::keychain_credential_pinning(root, image)
-        .map_err(|error| format!("the signing credential store is unusable: {error}"))
+    Ok((root, image))
 }
 
 #[cfg(test)]

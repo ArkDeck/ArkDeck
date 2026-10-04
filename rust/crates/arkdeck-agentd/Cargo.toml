@@ -39,5 +39,12 @@ arkdeck-client.workspace = true
 name = "arkforged_owner_stop"
 harness = false
 
+# The workspace provider's inspector is this test binary itself, copied into
+# the development root, which must answer before any test framework reads
+# the arguments.
+[[test]]
+name = "windows_workspace_provider_process"
+harness = false
+
 [lints]
 workspace = true
