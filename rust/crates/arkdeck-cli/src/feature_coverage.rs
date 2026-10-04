@@ -461,6 +461,17 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // are the Swift oracle's. A pause is kept and resumed there too.
     "target.observe",
     "diagnostics.capture",
+    // The other leaves of `capture.diagnostics@1`, each a preset of its
+    // inputs, over the same daemon with the Trace legs' fake: the screen, UI
+    // dump and Trace captures (written, read back, received and removed under
+    // the Runtime's mutation authority), the component detail and the logs
+    // (`gj1_device_leaves.rs`); their legs replay Swift's oracles byte for
+    // byte at owner level (`arkdeck-hoststore/tests/windows_gj1_replays.rs`).
+    "screen.capture",
+    "ui-dump.capture",
+    "ui-dump.component-detail",
+    "debug.logs",
+    "trace.capture",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset

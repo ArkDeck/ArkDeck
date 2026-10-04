@@ -3,8 +3,9 @@
 //! (`hdc-answers.sh`) the driver sources, which a Windows host cannot run. The
 //! debug-hap and deploy-native-library fragments, the Flash host facts
 //! oracle's own (`flash-host-facts/hdc-answers.sh`), and `observe.device@1`'s
-//! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables) are
-//! ported here, case for case and in their order, over the same root: the call log the driver
+//! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables, and the
+//! read, file and Trace legs' fragments) are ported here, case for case and in
+//! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
 //! It reports its tool identity current, as the macOS dispatch over the fake's
@@ -30,6 +31,9 @@ pub enum Answers {
     FlashHostFacts,
     ObserveDevice,
     CaptureDiagnostics,
+    ReadLegs,
+    FileLegs,
+    TraceLegs,
 }
 
 impl Answers {
@@ -50,6 +54,11 @@ impl Answers {
             {
                 Self::CaptureDiagnostics
             }
+            line if line.starts_with("# capture.diagnostics@1 read-leg answers") => Self::ReadLegs,
+            line if line.starts_with("# capture.diagnostics@1 file-leg answers") => Self::FileLegs,
+            line if line.starts_with("# capture.diagnostics@1 Trace-leg answers") => {
+                Self::TraceLegs
+            }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -60,33 +69,69 @@ pub struct OracleFake {
     answers: Answers,
 }
 
-/// What one call answered: its exit status and both streams.
+/// What one call answered: its exit status and both streams, or an outcome
+/// nothing observes (a child that outlived its plan's budget, or died on a
+/// signal), reported as the process dispatch reports it.
 struct Answer {
     status: i32,
-    stdout: String,
-    stderr: String,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+    unobservable: Option<String>,
 }
 
 impl Answer {
     fn out(stdout: impl Into<String>) -> Self {
+        Self::bytes(stdout.into().into_bytes())
+    }
+    fn bytes(stdout: Vec<u8>) -> Self {
         Self {
             status: 0,
-            stdout: stdout.into(),
-            stderr: String::new(),
+            stdout,
+            stderr: Vec::new(),
+            unobservable: None,
         }
     }
     fn exit(status: i32) -> Self {
         Self {
             status,
-            stdout: String::new(),
-            stderr: String::new(),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            unobservable: None,
+        }
+    }
+    /// Exits `status` after printing `stdout`.
+    fn failing(status: i32, stdout: impl Into<String>) -> Self {
+        Self {
+            status,
+            ..Self::out(stdout)
+        }
+    }
+    /// Exits `status` after printing `stderr`.
+    fn refusing(status: i32, stderr: impl Into<String>) -> Self {
+        Self {
+            status,
+            stdout: Vec::new(),
+            stderr: stderr.into().into_bytes(),
+            unobservable: None,
         }
     }
     fn unregistered() -> Self {
+        Self::refusing(23, "unregistered fixture output\n")
+    }
+    /// `exec /bin/sleep <seconds>` past the plan's budget: the dispatch's
+    /// timeout, as `ProcessDispatch` reports it.
+    fn hangs() -> Self {
         Self {
-            status: 23,
-            stdout: String::new(),
-            stderr: "unregistered fixture output\n".into(),
+            unobservable: Some("process timed out before completion".into()),
+            ..Self::exit(0)
+        }
+    }
+    /// `kill -9 $$`: the dispatch's signal death, as `ProcessDispatch` reports
+    /// it.
+    fn killed() -> Self {
+        Self {
+            unobservable: Some(arkdeck_provider_hdc::signal_death(9)),
+            ..Self::exit(0)
         }
     }
 }
@@ -187,11 +232,7 @@ impl OracleFake {
         }
         if all.starts_with(&format!("{shell}rm -f /data/local/tmp/arkdeck-")) {
             if mode == "cleanupDebt" {
-                return Answer {
-                    status: 1,
-                    stdout: String::new(),
-                    stderr: format!("rm: {}: Permission denied\n", arg(6)),
-                };
+                return Answer::refusing(1, format!("rm: {}: Permission denied\n", arg(6)));
             }
             let _ = fs::remove_file(self.marker(arg(6)));
             return Answer::out("");
@@ -376,11 +417,7 @@ impl OracleFake {
                 "offline" => Answer::out(format!("{HDC_KEY}\t\tUSB\tOffline\tlocalhost\n")),
                 "empty" => Answer::out("[Empty]\r\n"),
                 "malformed" => Answer::out("no device table here\n"),
-                _ => Answer {
-                    status: 1,
-                    stdout: String::new(),
-                    stderr: "list targets failed\n".into(),
-                },
+                _ => Answer::refusing(1, "list targets failed\n"),
             };
         }
         if [HDC_KEY, NEW_KEY]
@@ -478,6 +515,435 @@ impl OracleFake {
     }
 }
 
+/// The devices the file and Trace legs' fixtures adopted: the first is the
+/// default a call names.
+const FILE_LEG_KEYS: [&str; 4] = [
+    KEY,
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "cccccccccccccccccccccccccccccccc",
+    "dddddddddddddddddddddddddddddddd",
+];
+const TRACE_LEG_KEYS: [&str; 2] = [KEY, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"];
+
+impl OracleFake {
+    /// `capture-diagnostics-read-legs/hdc-answers.sh`: the legs that only
+    /// read the device, by mode.
+    fn read_legs(argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        let shell = format!("-t {KEY} shell ");
+        if all == "list targets -v" {
+            return Answer::out(format!("{KEY}\t\tUSB\tConnected\tlocalhost\n"));
+        }
+        if let Some(answer) = Self::device_basics(&all, KEY) {
+            return answer;
+        }
+        if all == format!("{shell}hilog -x") {
+            return Answer::out("01-01 00:00:00 I app: hello\n");
+        }
+        if all == format!("{shell}hidumper -s WindowManagerService -a -a") {
+            return Answer::out("{\"windows\":[]}\n");
+        }
+        if all == format!("{shell}hidumper -s WindowManagerService -a -w 7 -element -lastpage 42") {
+            return match mode {
+                "degraded" => Answer::bytes(b"ComponentInfo \xff\xfe\n".to_vec()),
+                "hang" => Answer::hangs(),
+                _ => Answer::out("WindowId: 7\nComponentId: 42\ntype: Button\ntext: Sign in\n"),
+            };
+        }
+        if all == format!("{shell}hidumper -s 1201 -a -p Faultlogger -l") {
+            return match mode {
+                "degraded" => Answer::failing(
+                    1,
+                    "\nFault log list:\n******\n******\nNo fault log exist.\n",
+                ),
+                "truncated" => Answer::bytes(vec![b'x'; 8_400_000]),
+                "large" => {
+                    let mut stdout = vec![b'y'; 1_100_000];
+                    stdout.push(b'\n');
+                    Answer::bytes(stdout)
+                }
+                // The fragment's `HiviewService` banner is a `printf` whose
+                // format starts with `-`, which the oracle's `/bin/sh` read as
+                // an invalid option: it never reached stdout, and Swift's
+                // ledger does not carry it.
+                _ => Answer::out(
+                    "\n-------------------------------[ability]-------------------------------\n\n\
+                     Fault log list:\n******\n\
+                     cppcrash-com.example.demo-20010039-20260914000000\n\
+                     jscrash-com.example.demo-20010039-20260913235959\n******\n",
+                ),
+            };
+        }
+        if all.starts_with(&format!("{shell}hidumper -s 1201 -a -p Faultlogger -f ")) {
+            return match mode {
+                "degraded" => Answer::out("invalid parameters.\n"),
+                "headerless" => Answer::out("Fault log list:\n"),
+                _ => Answer::out(format!(
+                    "Generated by HiviewDFX@OpenHarmony\n\
+                     ================================================================\n\
+                     Device info:OpenHarmony 3.2\nModule name:com.example.demo\n\
+                     Process name:{}\n",
+                    last_word(argv, 8)
+                )),
+            };
+        }
+        if all.starts_with(&format!("{shell}pidof ")) {
+            return match mode {
+                "degraded" => Answer::out(""),
+                "ambiguous" => Answer::out("1234 render\n"),
+                "unavailable" => {
+                    Answer::failing(127, "/bin/sh: pidof: inaccessible or not found\n")
+                }
+                "killed" => Answer::killed(),
+                _ => Answer::out("1234\n"),
+            };
+        }
+        Answer::unregistered()
+    }
+
+    /// `capture-diagnostics-file-legs/hdc-answers.sh`: the component tree and
+    /// the screenshot, each written to a provider-owned path, read back,
+    /// received and removed, by mode, on the device the call names.
+    fn file_legs(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        let key = adopted(argv, &FILE_LEG_KEYS);
+        let shell = format!("-t {key} shell ");
+        let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
+        fs::create_dir_all(self.root.join("device-tmp")).unwrap();
+        if all == "list targets -v" {
+            return Answer::out(
+                FILE_LEG_KEYS
+                    .iter()
+                    .map(|adopted| format!("{adopted}\t\tUSB\tConnected\tlocalhost\n"))
+                    .collect::<String>(),
+            );
+        }
+        if let Some(answer) = Self::device_basics(&all, key) {
+            return answer;
+        }
+        if all.starts_with(&format!(
+            "{shell}uitest dumpLayout -p /data/local/tmp/arkdeck-"
+        )) {
+            match mode {
+                "emptyTree" => fs::write(self.device(arg(7)), b"").unwrap(),
+                "treeMissing" => return Answer::failing(1, "DumpLayout failed: no window\n"),
+                _ => fs::write(
+                    self.device(arg(7)),
+                    b"{\"attributes\":{\"text\":\"Sign in\",\"hint\":\"/private/tmp/arkdeck-hdc-oracle/home/Documents/draft.txt\"},\"children\":[]}\n",
+                )
+                .unwrap(),
+            }
+            return Answer::out(format!("DumpLayout saved to:{}\n", arg(7)));
+        }
+        if all.starts_with(&format!("{shell}snapshot_display -t ")) {
+            return self.snapshot(arg(6), arg(8), arg(6) == "jpeg" || mode == "notPNG");
+        }
+        if let Some(answer) = self.owned_file(&all, &shell, key, argv, mode) {
+            return answer;
+        }
+        if all.starts_with(&format!("{shell}rm -f /data/local/tmp/arkdeck-")) {
+            return match mode {
+                "cleanupRefused" => {
+                    Answer::failing(1, format!("rm: {}: Read-only file system\n", arg(6)))
+                }
+                "cleanupTimeout" => Answer::hangs(),
+                _ => {
+                    let _ = fs::remove_file(self.device(arg(6)));
+                    Answer::out("")
+                }
+            };
+        }
+        Answer::unregistered()
+    }
+
+    /// `capture-diagnostics-trace/hdc-answers.sh`: the Trace legs, blocking and
+    /// ring-buffered, and the Trace Runtime probe's reads, by mode. Each call
+    /// also appends its own line to `hdc-calls.log`, since the probe's reads
+    /// run concurrently.
+    fn trace_legs(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(self.root.join("hdc-calls.log"))
+            .unwrap()
+            .write_all(format!("{all}\n").as_bytes())
+            .unwrap();
+        let key = adopted(argv, &TRACE_LEG_KEYS);
+        let shell = format!("-t {key} shell ");
+        let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
+        let resource = |name: &str| fs::read(self.root.join("resources").join(name)).unwrap();
+        let ring = self.root.join("device-ring");
+        fs::create_dir_all(self.root.join("device-tmp")).unwrap();
+        if all == "list targets -v" {
+            return Answer::out(
+                TRACE_LEG_KEYS
+                    .iter()
+                    .map(|adopted| format!("{adopted}\t\tUSB\tConnected\tlocalhost\n"))
+                    .collect::<String>(),
+            );
+        }
+        if all == format!("{shell}param get const.product.name") {
+            return Answer::out("OpenHarmony Reference Device\n");
+        }
+        if all == format!("{shell}param get const.ohos.fullname") {
+            return Answer::out("OpenHarmony-4.1-release\n");
+        }
+        if all.starts_with(&format!("{shell}param get ")) {
+            return trace_parameter(arg(6), mode);
+        }
+        if let Some(answer) = Self::device_basics(&all, key) {
+            return answer;
+        }
+        if all == format!("{shell}hitrace --help") {
+            return Answer::bytes(resource("hitrace-help.stdout.bin"));
+        }
+        if all == format!("{shell}bytrace --help") {
+            return Answer::bytes(resource("bytrace-help.stdout.bin"));
+        }
+        if all == format!("{shell}hitrace -l") {
+            let lost = "[Fail]ExecuteCommand need connect-key?\n";
+            return match mode {
+                "tagListLost" => Answer::out(lost),
+                "afterTagListLost" if self.root.join("tag-list-read").exists() => Answer::out(lost),
+                "afterTagListLost" => {
+                    Self::touch(&self.root.join("tag-list-read"));
+                    Answer::bytes(resource("hitrace-tags.stdout.bin"))
+                }
+                _ => Answer::bytes(resource("hitrace-tags.stdout.bin")),
+            };
+        }
+        if all.starts_with(&format!("{shell}pidof ")) {
+            return Answer::out("1234\n");
+        }
+        if all == format!("{shell}hilog -x") {
+            return Answer::out("01-01 00:00:00 I app: hello\n");
+        }
+        if all == format!("{shell}hidumper -s WindowManagerService -a -a") {
+            return Answer::out("{\"windows\":[]}\n");
+        }
+        if all == format!("{shell}hidumper -s WindowManagerService -a -w 7 -element -lastpage 42") {
+            return Answer::out("WindowId: 7\nComponentId: 42\ntype: Button\ntext: Sign in\n");
+        }
+        if all == format!("{shell}hidumper -s 1201 -a -p Faultlogger -l") {
+            return Answer::out(
+                "Fault log list:\n******\ncppcrash-com.example.demo-20010039-20260914000000\n******\n",
+            );
+        }
+        if all.starts_with(&format!("{shell}hidumper -s 1201 -a -p Faultlogger -f ")) {
+            return Answer::out(format!(
+                "Generated by HiviewDFX@OpenHarmony\nProcess name:{}\n",
+                last_word(argv, 8)
+            ));
+        }
+        if all.starts_with(&format!(
+            "{shell}uitest dumpLayout -p /data/local/tmp/arkdeck-"
+        )) {
+            fs::write(
+                self.device(arg(7)),
+                b"{\"attributes\":{\"text\":\"Sign in\"},\"children\":[]}\n",
+            )
+            .unwrap();
+            return Answer::out(format!("DumpLayout saved to:{}\n", arg(7)));
+        }
+        if all.starts_with(&format!("{shell}snapshot_display -t ")) {
+            return self.snapshot(arg(6), arg(8), false);
+        }
+        if all.starts_with(&format!("{shell}hitrace -t ")) {
+            // The owned path is the last argument, after `-o`.
+            let owned = self.device(argv.last().map(String::as_str).unwrap_or_default());
+            match mode {
+                "emptyTrace" => fs::write(owned, b"").unwrap(),
+                "traceMissing" => return Answer::failing(1, "hitrace: capture failed\n"),
+                _ => fs::write(
+                    owned,
+                    b"# tracer: nop\n  hitrace-1 [000] ....  1.000000: tracing_mark_write: B|1|capture\n",
+                )
+                .unwrap(),
+            }
+            return Answer::out("hitrace enter, running_state is RECORDING_SHORT_TEXT\n");
+        }
+        if all.starts_with(&format!("{shell}hitrace --trace_begin -b ")) {
+            fs::write(&ring, b"").unwrap();
+            return Answer::out("hitrace enter, running_state is RECORDING_LONG_BEGIN\n");
+        }
+        if let Some(command) = all.strip_prefix(&format!("{shell}echo ARKDECKANCHOR")) {
+            let marker = format!("ARKDECKANCHOR{}", first_word(command));
+            OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&ring)
+                .unwrap()
+                .write_all(format!("{marker}\n").as_bytes())
+                .unwrap();
+            return Answer::out("");
+        }
+        if let Some(command) = all.strip_prefix(&format!("{shell}grep -c ARKDECKANCHOR")) {
+            if mode == "ringNotHeld" {
+                return Answer::out("0\n");
+            }
+            let marker = format!("ARKDECKANCHOR{}", first_word(command));
+            let held = fs::read_to_string(&ring)
+                .unwrap_or_default()
+                .lines()
+                .filter(|line| line.contains(&marker))
+                .count();
+            // `grep -c` prints its count and exits 1 when nothing matched.
+            return Answer::failing(i32::from(held == 0), format!("{held}\n"));
+        }
+        if all.starts_with(&format!("{shell}sleep ")) {
+            return Answer::out("");
+        }
+        if all.starts_with(&format!(
+            "{shell}hitrace --trace_dump -o /data/local/tmp/arkdeck-"
+        )) {
+            let mut dump = String::from("# tracer: nop\n");
+            for line in fs::read_to_string(&ring).unwrap_or_default().lines() {
+                dump.push_str(&format!(
+                    "  <...>-1 [000] ....  1.000000: tracing_mark_write: {line}\n"
+                ));
+            }
+            fs::write(self.device(arg(7)), dump).unwrap();
+            return Answer::out("hitrace enter, running_state is SNAPSHOT_DUMP\n");
+        }
+        if all == format!("{shell}hitrace --trace_finish_nodump") {
+            return Answer::out("hitrace enter, running_state is RECORDING_LONG_FINISH_NODUMP\n");
+        }
+        // The Trace legs' receive always copies; only the cleanup has modes.
+        if let Some(answer) = self.owned_file(&all, &shell, key, argv, "normal") {
+            return answer;
+        }
+        if all.starts_with(&format!("{shell}rm -f /data/local/tmp/arkdeck-")) {
+            if mode == "cleanupRefused" {
+                return Answer::failing(1, format!("rm: {}: Read-only file system\n", arg(6)));
+            }
+            let _ = fs::remove_file(self.device(arg(6)));
+            return Answer::out("");
+        }
+        Answer::unregistered()
+    }
+
+    /// The reads every leg's table shares, on device `key`: its product name,
+    /// its full build and the free space under `/data/local/tmp`.
+    fn device_basics(all: &str, key: &str) -> Option<Answer> {
+        if all == format!("-t {key} shell param get const.product.name") {
+            return Some(Answer::out("OpenHarmony Reference Device\n"));
+        }
+        if all == format!("-t {key} shell param get const.ohos.fullname") {
+            return Some(Answer::out("OpenHarmony-4.1-release\n"));
+        }
+        if all == format!("-t {key} shell df -k /data/local/tmp") {
+            return Some(Answer::out(
+                "Filesystem 1K-blocks Used Available Use% Mounted on\n\
+                 /dev/block/data 1048576 1024 1047552 1% /data\n",
+            ));
+        }
+        None
+    }
+
+    /// `device "$path"`: a device path below `/data/local/tmp`, kept in the
+    /// fake's `device-tmp` so that a Job's owned files outlive its calls.
+    fn device(&self, path: &str) -> PathBuf {
+        let name = path.strip_prefix("/data/local/tmp/").unwrap_or(path);
+        self.root.join("device-tmp").join(name)
+    }
+
+    /// `snapshot_display -t <type> -f <path>`: a still written at `path`, a
+    /// JPEG one when `jpeg`, a PNG one otherwise.
+    fn snapshot(&self, image_type: &str, path: &str, jpeg: bool) -> Answer {
+        let still: &[u8] = if jpeg {
+            b"\xff\xd8\xff\xe0JFIF still"
+        } else {
+            b"\x89PNG\r\n\x1a\nIHDR still"
+        };
+        fs::write(self.device(path), still).unwrap();
+        Answer::out(format!(
+            "process: display 0, file type: {image_type}, width: 720, height: 1280\n"
+        ))
+    }
+
+    /// An owned file's readback (`ls -l`) and receive (`file recv`), which the
+    /// file and Trace legs share: the receive lands the device's bytes at the
+    /// host path the call names, empty when `emptyLanding`, and nothing when
+    /// `nothingLanded`.
+    fn owned_file(
+        &self,
+        all: &str,
+        shell: &str,
+        key: &str,
+        argv: &[String],
+        mode: &str,
+    ) -> Option<Answer> {
+        let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
+        if all.starts_with(&format!("{shell}ls -l /data/local/tmp/arkdeck-")) {
+            let path = arg(6);
+            return Some(Answer::out(match fs::metadata(self.device(path)) {
+                Ok(metadata) if metadata.is_file() => format!(
+                    "-rw-rw-rw- 1 shell shell {} 2026-09-14 00:00 {path}\n",
+                    metadata.len()
+                ),
+                _ => format!("ls: {path}: No such file or directory\n"),
+            }));
+        }
+        if all.starts_with(&format!("-t {key} file recv /data/local/tmp/arkdeck-")) {
+            match mode {
+                "emptyLanding" => fs::write(arg(6), b"").unwrap(),
+                "nothingLanded" => {}
+                _ => {
+                    let _ = fs::copy(self.device(arg(5)), arg(6));
+                }
+            }
+            return Some(Answer::out("FileTransfer finish\n"));
+        }
+        None
+    }
+}
+
+/// The adopted device a call names (`-t <key>`), or the first one.
+fn adopted<'a>(argv: &[String], keys: &[&'a str]) -> &'a str {
+    match (argv.first().map(String::as_str), argv.get(1)) {
+        (Some("-t"), Some(named)) => keys
+            .iter()
+            .copied()
+            .find(|key| *key == named)
+            .unwrap_or(keys[0]),
+        _ => keys[0],
+    }
+}
+
+/// `${n##* }`: the last word of argument `n`.
+fn last_word(argv: &[String], n: usize) -> String {
+    let argument = argv.get(n - 1).map(String::as_str).unwrap_or_default();
+    argument.rsplit(' ').next().unwrap_or_default().to_owned()
+}
+
+/// The first word of `text`: `${marker%% *}`.
+fn first_word(text: &str) -> &str {
+    text.split(' ').next().unwrap_or_default()
+}
+
+/// The Trace legs' `parameter "$6"`: each probed parameter's answer, the
+/// animation trace's unreadable while the ring is not held.
+fn trace_parameter(name: &str, mode: &str) -> Answer {
+    if mode == "ringNotHeld" && name == "persist.rosen.animationtrace.enabled" {
+        return Answer::failing(1, "device offline\n");
+    }
+    match name {
+        "persist.ace.trace.syntax.enabled" => Answer::out("false\n"),
+        "persist.ace.trace.layout.enabled" => Answer::out(format!("{name} = true\n")),
+        "persist.ace.trace.build.enabled" => {
+            Answer::out(format!("Get parameter \"{name}\" fail! errNum is:106!\n"))
+        }
+        "persist.ace.trace.measure.debug.enabled" => Answer::out(format!("{name}=1\n")),
+        "persist.ace.trace.sync.debug.enabled" => Answer::out(""),
+        "persist.ace.debug.enabled" => Answer::out("0\n"),
+        "persist.ace.performance.monitor.enabled" => Answer::out("\n  true  \n\n"),
+        "persist.sys.graphic.openDebugTrace" => Answer::out("1\n"),
+        "persist.rosen.animationtrace.enabled" => Answer::out("false\n"),
+        _ => Answer::refusing(24, "unregistered fixture parameter\n"),
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -499,18 +965,30 @@ impl HdcDispatch for OracleFake {
             .write_all(line.as_bytes())
             .unwrap();
         let mode = self.mode();
-        let answer = match self.answers {
+        let mut answer = match self.answers {
             Answers::DebugHap => self.debug_hap(&plan.arguments, &mode),
             Answers::NativeLibrary => self.native_library(&plan.arguments, &mode),
             Answers::FlashHostFacts => Self::flash_host_facts(&plan.arguments, &mode),
             Answers::ObserveDevice => Self::observe_device(&plan.arguments, &mode),
             Answers::CaptureDiagnostics => Self::capture_diagnostics(&plan.arguments, &mode),
+            Answers::ReadLegs => Self::read_legs(&plan.arguments, &mode),
+            Answers::FileLegs => self.file_legs(&plan.arguments, &mode),
+            Answers::TraceLegs => self.trace_legs(&plan.arguments, &mode),
         };
+        if let Some(reason) = answer.unobservable {
+            return Err(DispatchFailure::Unobservable(reason));
+        }
+        // The runner keeps each stream's first `capture_bytes` bytes and says
+        // whether either went past them (`tool_process::capture`).
+        let truncated =
+            answer.stdout.len() > plan.capture_bytes || answer.stderr.len() > plan.capture_bytes;
+        answer.stdout.truncate(plan.capture_bytes);
+        answer.stderr.truncate(plan.capture_bytes);
         Ok(Receipt {
             exit_status: answer.status,
-            stdout: answer.stdout.into_bytes(),
-            stderr: answer.stderr.into_bytes(),
-            truncated: false,
+            stdout: answer.stdout,
+            stderr: answer.stderr,
+            truncated,
             duration: Duration::from_millis(1),
         })
     }

@@ -1645,7 +1645,7 @@ impl Host {
             receive_root: arkdeck_platform::foundation_temporary_directory()
                 .join("arkdeck-receive"),
             #[cfg(windows)]
-            receive_root: std::env::temp_dir().join("arkdeck-receive"),
+            receive_root: windows_receive_root(),
             #[cfg(target_os = "macos")]
             default_mutation_root: arkdeck_platform::runtime_home()
                 .map(std::path::PathBuf::from)
@@ -1746,6 +1746,29 @@ impl Host {
         slot.finish(&result);
         result
     }
+}
+
+/// Where a Windows composition's received files land: `arkdeck-receive`
+/// below the account's temporary directory (`GetTempPath2`), in its
+/// canonical, plain long spelling. `TEMP` may name it by an 8.3 short name
+/// (an account name longer than eight characters does), and a landing is
+/// inspected and published by the canonical path it resolves to, so a short
+/// spelling would leave every received file unpublishable
+/// (`artifactIntegrityFailed`). The receive argv names this path, and so does
+/// the plan digest.
+#[cfg(windows)]
+fn windows_receive_root() -> std::path::PathBuf {
+    let temporary = std::env::temp_dir();
+    let canonical = std::fs::canonicalize(&temporary)
+        .ok()
+        .map(
+            |path| match path.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+                Some(plain) => std::path::PathBuf::from(plain),
+                None => path,
+            },
+        )
+        .unwrap_or(temporary);
+    canonical.join("arkdeck-receive")
 }
 
 /// The Job runner a Windows composition runs a Job with (`job.run`, an
