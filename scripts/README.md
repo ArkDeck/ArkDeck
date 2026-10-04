@@ -46,6 +46,7 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 | `ui_dump_diagnosis/` | R2 raw INVALID_UNICODE 只读非内容诊断(TASK-UD-R2-DIAG-001) |
 | `ui_dump_redaction/` | UI Dump 派生 golden 脱敏器(host-only 隐私边界) |
 | `bench/` | Runtime 性能基线与回归比对 harness(CHG-2026-074 SPK-1/TASK-XPA-023);自起隔离 daemon 于私有 state 目录测量,不碰设备、不碰已安装 Runtime |
+| `gj_record/` | Golden Journey 真机记录生成器(CHG-2026-074 phase A G9):`capture` 逐条运行已发布 `arkdeck` 命令,把 stdout、退出码与顺序记进仓外 journal;`assemble` 按 headless runbook 判据从 Runtime 自身输出机械判定四态,写出脱敏的 `arkdeck.gj-headless-rerun/1` 记录;拒绝 fake/fixture/plan-only/开发根输入与过期 Catalog digest |
 
 产品工具的实例参数(设备身份、镜像 pins、fixtures、脱敏词表)一律钉在
 **各自目录内**(README + 数据文件),不进框架面;守卫与循环对它们零

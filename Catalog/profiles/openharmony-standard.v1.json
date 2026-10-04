@@ -6,8 +6,12 @@
   "title": "Standard OpenHarmony device over external-first HDC",
   "constraints": {
     "toolFamily": "hdc",
-    "transport": ["usb"],
-    "atomicPublishStrategies": ["renameWithinAppOwnedDirectory"],
+    "transport": [
+      "usb"
+    ],
+    "atomicPublishStrategies": [
+      "renameWithinAppOwnedDirectory"
+    ],
     "notes": "Provider facts (tool version/hash, server facts, device identity/mode/build) are resolved at runtime and pinned per session; this profile never carries executable paths or argv."
   },
   "supportedOperations": [
@@ -20,6 +24,7 @@
     "deploy.native-library.app-owned@1",
     "port-forward.create@1",
     "port-forward.remove@1",
+    "input.keyboard@1",
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1"

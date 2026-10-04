@@ -1,0 +1,11 @@
+{
+  "artifact" : "port-rule-readback.json",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+  "firmware" : "OpenHarmony-4.1-release",
+  "jobId" : "job-93e623244ddf54014148f9dcba868df5",
+  "model" : "OpenHarmony Reference Device",
+  "operation" : "port-forward.remove@1",
+  "present" : "false",
+  "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "transport" : "usb"
+}

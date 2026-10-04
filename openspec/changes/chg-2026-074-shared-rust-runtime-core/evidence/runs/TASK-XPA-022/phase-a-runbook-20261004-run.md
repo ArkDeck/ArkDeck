@@ -98,3 +98,11 @@ These are stale texts that contradict the code on `main`:
 
 - `PYTHONUTF8=1 sh scripts/check-sdd.sh`: 0 errors, 0 warnings.
 - `git diff --check`: clean.
+
+## Follow-up 2026-10-05: G8 closed
+
+#2532 ports `runtime signing install --build-profile` and `migrate-deveco` to Windows. §4.5 now
+installs the GJ-5 credential from the project's `build-profile.json5`, as the headless runbook §6
+does, with the typed prompt kept only as the fallback. G8 is marked closed in §4.6, §4.7 and §7.
+This supersedes delegated decision 3 above: the credential is installed from the build profile,
+and no maintainer handles a plaintext password.

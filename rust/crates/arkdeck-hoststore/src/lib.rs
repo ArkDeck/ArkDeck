@@ -186,7 +186,7 @@ pub use arktrace_profile::{
 pub use operation_availability::{
     OperationAvailabilityContext, hdc_operation_runs, operation_unavailability,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod debug_read;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]

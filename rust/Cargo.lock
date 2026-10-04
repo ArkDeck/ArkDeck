@@ -50,6 +50,7 @@ dependencies = [
  "arkdeck-provider-arkforge",
  "arkdeck-provider-hdc",
  "arkforge-ipc",
+ "arkforge-platform",
  "serde",
  "serde_json",
 ]

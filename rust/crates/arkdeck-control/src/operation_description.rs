@@ -118,13 +118,16 @@ mod tests {
             }
         }
         let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
-        // The historical view has 24 representatives; the candidate adds
-        // exactly its new diagnostic session. Compare every recognized real
-        // result above, and keep an exact count for each compiled Catalog.
+        // Keep every historical representative and both Catalog additions.
+        let has_keyboard = catalog.iter().any(|entry| entry["id"] == "input.keyboard");
         let has_session = catalog
             .iter()
             .any(|entry| entry["id"] == "capture.diagnostic-session");
-        assert_eq!(matched.len(), if has_session { 25 } else { 24 });
+        assert_eq!(
+            matched.len(),
+            24 + usize::from(has_keyboard) + usize::from(has_session)
+        );
+        assert_eq!(matched.contains("input.keyboard@1"), has_keyboard);
         assert_eq!(
             matched.contains("capture.diagnostic-session@1"),
             has_session

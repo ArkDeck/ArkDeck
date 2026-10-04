@@ -499,7 +499,7 @@ impl TargetStore {
                     resolved.binding_revision = Some(target.binding_revision);
                     resolved.stable_identity_sha256 = Some(target.identity.clone());
                 }
-                "hap" | "native-library" => {
+                "hap" | "native-library" | "keyboard-input" => {
                     // Swift binds the Import to the Target's current proven HDC
                     // route (`hdcExecutionRoute`): the adopted key, or through a
                     // proven post-Flash alias the key a fresh observation shows

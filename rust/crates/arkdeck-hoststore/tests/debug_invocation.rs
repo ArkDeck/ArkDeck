@@ -14,7 +14,12 @@
 //! answering as Swift's engine answered (the Job failed, classified
 //! `safeToReflash`): the attempt's derived request, its permit record and the
 //! settled evaluation must be Swift's.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-008) the same replay runs over the same owner: a
+//! recorded mode is the DACL the host store reads — a private directory
+//! (`700`), an owner-only document (`600`), a sealed payload (`400`) — and a
+//! document left is reported `600` when the store reads it as owner-only.
+#![cfg(any(target_os = "macos", windows))]
 
 use arkdeck_hoststore::{
     ArtifactReadStore, DriverResult, FlashInvocations, FlashPlanner, FlashPlanning,
@@ -24,6 +29,7 @@ use serde_json::{Map, Value, json};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -35,11 +41,17 @@ struct Root(PathBuf);
 
 impl Root {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let base = std::env::temp_dir().canonicalize().unwrap();
+        #[cfg(windows)]
+        let base = match base.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+            Some(plain) => PathBuf::from(plain),
+            None => base,
+        };
+        let root = base.join(format!(
             "arkdeck-debug-invocation-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        directory(&root);
         Self(root)
     }
 }
@@ -50,6 +62,7 @@ impl Drop for Root {
     }
 }
 
+#[cfg(unix)]
 fn directory(path: &Path) {
     fs::DirBuilder::new()
         .recursive(true)
@@ -57,6 +70,57 @@ fn directory(path: &Path) {
         .create(path)
         .unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+/// A private directory, and each missing ancestor, as the host store makes
+/// one.
+#[cfg(windows)]
+fn directory(path: &Path) {
+    if let Some(parent) = path.parent()
+        && fs::symlink_metadata(parent).is_err()
+    {
+        directory(parent);
+    }
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
+}
+
+/// A recorded file with its recorded mode: its permission bits on macOS; on
+/// Windows the owner-only document the store reads (`600`), or that document
+/// sealed by the store (`400`).
+fn lay_down_file(destination: &Path, bytes: &[u8], mode: &str) {
+    #[cfg(unix)]
+    {
+        fs::write(destination, bytes).unwrap();
+        let mode = u32::from_str_radix(mode, 8).unwrap();
+        fs::set_permissions(destination, fs::Permissions::from_mode(mode)).unwrap();
+    }
+    #[cfg(windows)]
+    {
+        let parent = arkdeck_platform::HostDirectory::open(destination.parent().unwrap()).unwrap();
+        let name = destination.file_name().unwrap().to_str().unwrap();
+        parent.create_document(name, bytes).unwrap();
+        match mode {
+            "600" => {}
+            "400" => parent.seal_document(name).unwrap(),
+            other => panic!("no Windows form of mode {other}"),
+        }
+    }
+}
+
+/// A document's mode as the oracle records it (see [`lay_down_file`]).
+fn recorded_mode(path: &Path) -> String {
+    #[cfg(unix)]
+    {
+        format!("{:o}", fs::metadata(path).unwrap().mode() & 0o777)
+    }
+    #[cfg(windows)]
+    {
+        arkdeck_platform::HostDirectory::open(path.parent().unwrap())
+            .and_then(|parent| {
+                parent.owner_only_document(path.file_name().unwrap().to_str().unwrap())
+            })
+            .map_or_else(|error| format!("not owner-only: {error}"), |_| "600".into())
+    }
 }
 
 /// The inputs as Swift left them: the Artifact root and Target store below
@@ -70,13 +134,11 @@ fn lay_down(root: &Path, cases: &Value) {
             root.join(path)
         };
         directory(destination.parent().unwrap());
-        fs::write(
+        lay_down_file(
             &destination,
-            fs::read(fixtures().join("inputs").join(path)).unwrap(),
-        )
-        .unwrap();
-        let mode = u32::from_str_radix(input["mode"].as_str().unwrap(), 8).unwrap();
-        fs::set_permissions(&destination, fs::Permissions::from_mode(mode)).unwrap();
+            &fs::read(fixtures().join("inputs").join(path)).unwrap(),
+            input["mode"].as_str().unwrap(),
+        );
     }
 }
 
@@ -267,14 +329,14 @@ impl Replay {
             .map(|entry| {
                 let entry = entry.unwrap();
                 let name = entry.file_name().into_string().unwrap();
-                let mode = entry.metadata().unwrap().mode() & 0o777;
+                let mode = recorded_mode(&entry.path());
                 let bytes = fs::read(entry.path()).unwrap();
                 let path = labels.label(&name);
                 (
                     path.clone(),
                     json!({
                         "path": path,
-                        "mode": format!("{mode:o}"),
+                        "mode": mode,
                         "document": labels.label(&String::from_utf8(bytes).unwrap()),
                     }),
                 )

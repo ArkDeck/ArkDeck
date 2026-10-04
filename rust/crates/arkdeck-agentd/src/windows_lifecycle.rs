@@ -192,8 +192,9 @@ pub(crate) struct Authority {
     /// keep Swift's production layout.
     development: bool,
     /// The registered Windows HDC the tuple gate admitted for a development
-    /// root, which [`Self::compose`] starts as its managed server. None
-    /// while no Windows HDC tuple is registered.
+    /// root, which [`Self::compose`] starts as its managed server. None for
+    /// the account's root, until the Windows tool-selection owner selects
+    /// one there, and for a development root that names none.
     hdc: Option<Box<crate::windows_hdc_gate::AdmittedHdc>>,
     /// The account daemon's HDC inputs (never a development root's).
     account_hdc: Option<Box<AccountHdc>>,
@@ -224,9 +225,9 @@ impl Authority {
     ///   macOS rule names (`development_usb::relation_source`): the
     ///   Runtime's own census (`UsbRegistryRelations::system()`, the Windows
     ///   SetupAPI census) only beside a registered HDC this composition
-    ///   started as its managed server. No Windows HDC tuple is registered
-    ///   yet (its integration change waits for the maintainer's samples),
-    ///   so no relation is read, nothing is observed or dispatched, and
+    ///   started as its managed server (the registered `c2` `hdc.exe`,
+    ///   CHG-2026-078). Without one (the account's root, for now) no
+    ///   relation is read, nothing is observed or dispatched, and
     ///   `target.adopt` is refused before admission with zero dispatch;
     /// * the Artifact read and export owner (`ArtifactReadStore`) over the
     ///   root's `artifacts` (the name the macOS isolated owner and production
@@ -239,10 +240,10 @@ impl Authority {
     ///   (`HumanActionResources`) in `human-action-snapshots`, the names both
     ///   macOS compositions give them: the same execution records and pages
     ///   as on macOS. `agent.*` and `human-action.*` answer from them; an
-    ///   execution admits its Job as `job.submit` does here, observes no
-    ///   Target (no Windows HDC tuple is registered), and no control action
-    ///   is built, so the human-action owner pages the executions' actions
-    ///   alone;
+    ///   execution admits its Job as `job.submit` does here and observes a
+    ///   Target only through a composed HDC; the human-action owner pages the
+    ///   executions' actions and, beside a managed server, the HDC control
+    ///   actions;
     /// * the Session owner and the Artifact usage owner
     ///   ([`Self::session_store`]): `runtime.storage.*`, `session.list|show|
     ///   pin|unpin`, `session.cleanup.*` and `session.export.*`;
@@ -271,13 +272,13 @@ impl Authority {
     ///   executable ends the start), the symbolizer `ARKDECK_ANALYZER_PATH`
     ///   names, and, for the installed daemon only, signing over the
     ///   account's preset store with its attempts in the root's
-    ///   `workspace-signing-attempts`. A registered project resolves to no
-    ///   profile on Windows (no code-owned source tool is trusted there
-    ///   yet), so every profile-served operation is unavailable with that
-    ///   reason and only the source inspection runs;
+    ///   `workspace-signing-attempts`. A registered project resolves to its
+    ///   profile through the code-owned tools (ruling 69: the daemon's own
+    ///   `grep`, `sed` and `patch`, the trusted `tar` and `git`); one that
+    ///   does not verify leaves it with no profile and that reason;
     /// * the Job planner and admitter over the Job store and the root
-    ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
-    ///   tuple is registered): a device operation is refused before admission
+    ///   (`job.plan`, `job.submit`), with the HDC provider only beside a
+    ///   composed HDC: without one a device operation is refused before admission
     ///   with zero dispatch, as macOS refuses it without an HDC provider;
     /// * the Trace cache owner (`TraceCacheStore`) over a `traces` directory
     ///   beside its `staging` ([`Self::trace_cache`]): a development root's
@@ -295,9 +296,10 @@ impl Authority {
     /// provider, its status answers `runtime.hdc.status`, the Runtime's own
     /// USB census is read beside it, and the daemon stops it after its drain
     /// (the returned [`crate::managed_hdc::Launched`]; a start that fails
-    /// after the launch stops it on the way out). No Windows HDC tuple is
-    /// registered yet, so the gate admits none, nothing is launched, and
-    /// `runtime.hdc.status` answers that no HDC is configured.
+    /// after the launch stops it on the way out). The gate admits only the
+    /// registered `c2` `hdc.exe` (CHG-2026-078), and only for a development
+    /// root; otherwise nothing is launched, and `runtime.hdc.status` answers
+    /// that no HDC is configured.
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each
@@ -566,8 +568,8 @@ impl Authority {
                 selected.endpoint.endpoint
             )),
             _ if self.development => report(
-                "arkdeck-agentd composes no HDC: no Windows HDC tuple is registered; device \
-                 observation and target adoption are refused before any dispatch",
+                "arkdeck-agentd composes no HDC: no registered Windows HDC is selected for this \
+                 root; device observation and target adoption are refused before any dispatch",
             ),
             _ => report(
                 "arkdeck-agentd composes no HDC: no executable is configured (set \
@@ -593,9 +595,9 @@ impl Authority {
     ///
     /// One validated `ARKDECK_ARKFORGE_BUNDLE_PATH` bundle names the
     /// `arkforged.exe` to start and pair, but its authority must name the
-    /// managed-control HDC's digest (`hdc_sha256`, the managed server's), and
-    /// no HDC is composed without the registered Windows HDC tuple: the lane
-    /// is refused before anything is launched, and the start reports why. Its planning, its facts (over the
+    /// managed-control HDC's digest (`hdc_sha256`, the managed server's).
+    /// Without a managed HDC (the account's root, for now) the lane is
+    /// refused before anything is launched, and the start reports why. Its planning, its facts (over the
     /// Windows USB census, open since the DAYU200 sample confirmed its
     /// mapping) and the device access observer of the lane's
     /// directory are composed either way, as on macOS; no executable lane is

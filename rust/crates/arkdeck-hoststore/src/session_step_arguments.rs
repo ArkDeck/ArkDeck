@@ -506,6 +506,11 @@ pub(super) fn validate(kind: &str, row: &Object) -> Result<Policy> {
             r.id("forwardId")?;
             MUTATION
         }
+        "injectKeyboardInput" => {
+            r.id("sourceArtifactId")?;
+            r.sha("sourceSha256")?;
+            MUTATION
+        }
         "injectPointerInput" => {
             let gesture = r.choice("gesture", &["tap", "longPress", "swipe"])?;
             r.integer("pointerX", 0, 32767)?;

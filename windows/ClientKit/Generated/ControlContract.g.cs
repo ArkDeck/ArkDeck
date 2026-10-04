@@ -201,7 +201,7 @@ public static class ControlContract
         ["job.status"] = "e03f5d8a7c8988a820c306fc8989e692ae3e24b5387f8e0e32f16a012a88a5bb",
         ["job.submit"] = "57e27f21828699e5a0eb5482a7c4c74bfdefe0fd24491c7c7857ba2f568982b2",
         ["job.timeline"] = "05e9959917e601ac46f2303a873b9910b04e0e1da9cc6393c7e0d4d33c33ed42",
-        ["operation.describe"] = "ade5730b851d8d3a41134ab697871239b9871ff2d65b2b2f431b773543454a16",
+        ["operation.describe"] = "48b993574d193741dfcc0e0176f7a87d337096608e91be538715b71ef8ffe046",
         ["operation.list"] = "6c414141c72c41d37cba1ffc8f4cfb915181e60c61dfc0ade9b11d9c87741027",
         ["recovery.flash-invocation.list"] = "e24cf2fe70b0c1bf6e33c8a9f080012f5bac7a1eb236b1b31340b6e74ed1a50d",
         ["runtime.bundle.inspect"] = "5a7a3987229345197f64fff7b40a65b01fd635bca4cdf9c2391322abdc407242",

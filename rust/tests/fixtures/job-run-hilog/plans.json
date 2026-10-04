@@ -9,7 +9,7 @@
       "result" : {
         "authorizationPolicy" : "defaultReadOnly",
         "bindingRevision" : null,
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "dispatchDisposition" : "notDispatched",
         "effectiveEffect" : "hostOnly",
         "executionMode" : "planOnly",
@@ -17,7 +17,7 @@
           "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-bfdf1c6973a8e0f2917400119782e8c5"
         },
         "jobAdmitted" : false,
-        "materializedPlanDigest" : "a59d6b4e89e1172107c8bf85ae9a4d019b85960c24d39f5e48096362330529bf",
+        "materializedPlanDigest" : "666c6ba92a77c4755560d3c0300856f9810ada34cb7337d7a7e93c4e297fbe7e",
         "operation" : "analyzer.summarize-hilog@1",
         "providerAdmissionBlocker" : null,
         "providerId" : "analyzer",

@@ -4,6 +4,11 @@
 //! the committed control frames (a refused parameter, the refusal without a
 //! daemon, two flashing modes), frame for frame. Host tests only: no daemon,
 //! board or USB host is involved.
+//!
+//! On Windows (TASK-XPA-010) the stand-in serves ArkForge's public named pipe
+//! for the lane directory (`arkforge_platform`'s transport, as `arkforged`
+//! serves it there), below a private directory of the temporary directory.
+//! Every frame is still Swift's.
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION};
 use arkdeck_control::Control;
 use arkdeck_provider_arkforge::DeviceAccessObserver;
@@ -11,6 +16,7 @@ use arkforge_ipc::framing::{read_frame, write_frame};
 use arkforge_ipc::messages::{Hello, HelloAck, Request, Response};
 use arkforge_ipc::{Api, PROTOCOL_MAJOR, PROTOCOL_MINOR, SessionKind, Status, wire};
 use serde_json::{Value, json};
+#[cfg(unix)]
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -23,6 +29,7 @@ const CORPUS: &str = include_str!(
 struct Root(PathBuf);
 
 impl Root {
+    #[cfg(unix)]
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let root = PathBuf::from("/private/tmp").join(format!(
@@ -34,12 +41,33 @@ impl Root {
         Self(root)
     }
 
+    #[cfg(windows)]
+    fn new() -> Self {
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "adda-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        arkdeck_platform::HostDirectory::open_or_create_private(&root).unwrap();
+        Self(root)
+    }
+
     /// One public session answering `discoverDevices` with these modes; the
     /// requests it received.
     fn serve(&self, modes: &'static [&'static str]) -> std::thread::JoinHandle<Vec<Api>> {
-        let listener = UnixListener::bind(self.0.join("public.sock")).unwrap();
-        std::thread::spawn(move || {
+        // Bound on the serving thread (a pipe listener stays on the thread
+        // that made it); this returns once it is bound.
+        let (bound, ready) = std::sync::mpsc::channel();
+        let directory = self.0.clone();
+        let handle = std::thread::spawn(move || {
+            #[allow(unused_mut)]
+            let mut listener = bind(&directory);
+            bound.send(()).unwrap();
+            #[cfg(unix)]
             let (mut stream, _) = listener.accept().unwrap();
+            #[cfg(windows)]
+            let mut stream = listener.accept().unwrap();
             let hello = Hello::decode(&read_frame(&mut stream).unwrap().unwrap()).unwrap();
             assert_eq!(hello.session_kind, SessionKind::Public);
             let ack = HelloAck {
@@ -72,8 +100,25 @@ impl Root {
             };
             write_frame(&mut stream, &response.encode()).unwrap();
             vec![request.api]
-        })
+        });
+        ready.recv().unwrap();
+        handle
     }
+}
+
+/// The public endpoint of the lane directory `directory`, bound.
+#[cfg(unix)]
+fn bind(directory: &std::path::Path) -> UnixListener {
+    UnixListener::bind(directory.join("public.sock")).unwrap()
+}
+
+#[cfg(windows)]
+fn bind(directory: &std::path::Path) -> arkforge_platform::LocalListener {
+    arkforge_platform::LocalListener::bind(&arkforge_platform::LocalEndpoint::for_runtime(
+        directory,
+        arkforge_platform::LocalChannel::Public,
+    ))
+    .unwrap()
 }
 
 impl Drop for Root {
@@ -145,7 +190,8 @@ fn each_answer_swifts_daemon_recorded_is_this_runtimes() {
     // A frame whose parameters Swift refuses never reaches the socket, even
     // when a daemon is serving it.
     let root = Root::new();
-    let listener = UnixListener::bind(root.0.join("public.sock")).unwrap();
+    #[allow(unused_mut)]
+    let mut listener = bind(&root.0);
     listener.set_nonblocking(true).unwrap();
     let refused = answer(
         &control(&root),
