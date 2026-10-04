@@ -286,14 +286,46 @@ const SEALS: [&str; 2] = ["checkpointSeal", "journalSeal"];
 /// from them read as Swift's (`debug_hap::HostLabels`); every other byte
 /// must be Swift's. On macOS nothing is respelled or relabelled.
 pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
+    replay(name, exchanges, calls, Mutations::Owned);
+}
+
+/// The oracle's Jobs, as [`assert_replays`] replays them.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum Mutations {
+    /// Each Job mutates the device under its one Runtime capability use, and
+    /// every answer is Swift's, message included.
+    Owned,
+    /// The Jobs are read-only, admitted and run with no mutation owner as the
+    /// oracle ran them (`observe.device@1`, `capture.diagnostics@1`), and a
+    /// refusal's message is Swift's wording (T2): reported, not compared.
+    ReadOnly,
+}
+
+/// [`assert_replays`] for an oracle of read-only Jobs ([`Mutations::ReadOnly`]):
+/// the same exchanges, calls and leftovers, with no capability store.
+pub fn assert_read_only_replays(name: &str, exchanges: usize, calls: usize) {
+    replay(name, exchanges, calls, Mutations::ReadOnly);
+}
+
+fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
+    let owned = mutations == Mutations::Owned;
     let _lock = debug_hap::exclusive();
     let fixture = super::fixture(name);
     let cases = document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc(&owners.dispatch);
-    let admitter = owners.admitter(&hdc, &owners.default_root);
+    let admitter = if owned {
+        owners.admitter(&hdc, &owners.default_root)
+    } else {
+        JobAdmitter {
+            planner: owners.planner(&hdc),
+            jobs: &owners.jobs,
+            now: fixed_now,
+            authority: None,
+        }
+    };
     let publisher = owners.publisher();
-    let runner = owners.runner(&hdc, &publisher, true);
+    let runner = owners.runner(&hdc, &publisher, owned);
     let reader = JobResultReader {
         jobs: &owners.jobs,
         artifacts: &owners.artifacts,
@@ -333,7 +365,11 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
         serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
     };
     let mut labels = debug_hap::HostLabels::default();
-    let swift_capabilities = document(&fixture, "store/capabilities/runtime-capabilities.json");
+    let swift_capabilities = if owned {
+        document(&fixture, "store/capabilities/runtime-capabilities.json")
+    } else {
+        Value::Null
+    };
     let (mut answers, mut replayed) = (Vec::new(), 0);
     for exchange in cases["exchanges"].as_array().unwrap() {
         let (name, method) = (&exchange["name"], exchange["method"].as_str().unwrap());
@@ -449,7 +485,7 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
 
     // Each Job consumed its one use before its first mutation; every later
     // mutation of its run, and a continuation's retry, continued under it.
-    for (case, job) in cases["jobs"].as_object().unwrap() {
+    for (case, job) in cases["jobs"].as_object().unwrap().iter().filter(|_| owned) {
         let timeline = owners.record(job.as_str().unwrap())["timeline"].clone();
         let consumed = timeline
             .as_array()
@@ -467,6 +503,34 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
         ..
     } = owners;
     drop(jobs);
+    assert_relabelled(
+        &fixture,
+        &replayed_root,
+        &default_root,
+        &answers,
+        &mut labels,
+        spelled,
+    );
+}
+
+/// What every replay of these oracles checks once its exchanges are made and
+/// its Job owner is closed: each recorded document beside the one the replay
+/// left in its place under `root` (its Job store `default_root`), from which
+/// the plan digests and what they derive are learned; then every answer,
+/// read through those labels, must be the recorded one (`answers` holds each
+/// exchange's name, the answer as `spelled` reads it, and the recorded
+/// answer), and everything left below the root must be Swift's.
+pub fn assert_relabelled(
+    fixture: &Path,
+    replayed_root: &Path,
+    default_root: &Path,
+    answers: &[(Value, Value, Value)],
+    labels: &mut debug_hap::HostLabels,
+    spelled: impl Fn(&[u8]) -> Vec<u8>,
+) {
+    let spelled_json = |value: &Value| -> Value {
+        serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
+    };
     // Each recorded document beside the one the replay left in its place:
     // the plan digests and what they derive, read as Swift's (nothing is
     // learned on macOS).
@@ -486,12 +550,12 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
             |document| vec![document],
         )
     };
-    for (path, _) in document(&fixture, "provenance.json")["files"]
+    for (path, _) in document(fixture, "provenance.json")["files"]
         .as_object()
         .unwrap()
     {
         let actual = [
-            ("store/", default_root.clone()),
+            ("store/", default_root.to_path_buf()),
             ("sessions/", replayed_root.join("Sessions")),
             ("session-owner/", replayed_root.join("session-owner")),
             ("artifacts/", replayed_root.join("artifacts")),
@@ -515,27 +579,42 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
             labels.learn_within(&json!(ours), &json!(theirs), seal, "sha256");
         }
     }
-    let index = super::index(&default_root);
+    let index = super::index(default_root);
     labels.learn_keys(
         &spelled_json(&index),
-        &document(&fixture, "store/index.json"),
+        &document(fixture, "store/index.json"),
         &["requestHash", "recordSHA256"],
     );
     // Every answer as Swift gave it, with the plan digests and the values
     // derived from them read as Swift's.
-    for (_, actual, expected) in &answers {
+    for (_, actual, expected) in answers {
         labels.learn(actual, expected, "/result/materializedPlanDigest");
         labels.learn_keys(actual, expected, &ANSWER_DERIVED);
     }
+    // A read-only oracle's refusal wording is Swift's (T2): reported.
+    let semantic = |answer: &Value| {
+        let mut answer = answer.clone();
+        if !owned && let Some(error) = answer.get_mut("error").and_then(Value::as_object_mut) {
+            error.remove("message");
+        }
+        answer
+    };
     let differences: Vec<String> = answers
         .iter()
         .filter_map(|(name, actual, expected)| {
             let actual = labels.swift(actual);
-            (actual != *expected).then(|| format!("{name}:\n  swift {expected}\n  rust  {actual}"))
+            if semantic(&actual) == semantic(expected) && actual != *expected {
+                eprintln!(
+                    "refusal wording (T2): {name}: swift {:?}, rust {:?}",
+                    expected["error"]["message"], actual["error"]["message"]
+                );
+            }
+            (semantic(&actual) != semantic(expected))
+                .then(|| format!("{name}:\n  swift {expected}\n  rust  {actual}"))
         })
         .collect();
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    super::assert_leftovers_relabelled(&fixture, &replayed_root, &default_root, |bytes| {
+    super::assert_leftovers_relabelled(fixture, replayed_root, default_root, |bytes| {
         labels.swift_bytes(&spelled(bytes))
     });
 }

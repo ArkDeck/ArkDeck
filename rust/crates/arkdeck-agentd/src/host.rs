@@ -287,11 +287,8 @@ impl Host {
         let Some(jobs) = &self.jobs else {
             return Ok(None);
         };
-        let recovered = arkdeck_hoststore::recover_active_jobs(
-            jobs,
-            self.capabilities.as_deref(),
-            arkdeck_hoststore::runtime_now,
-        )?;
+        let recovered =
+            arkdeck_hoststore::recover_active_jobs(jobs, self.capabilities.as_deref(), clock_now)?;
         // Recovery answered which records it could not read; `doctor` says so
         // rather than reading them again.
         let _ = self.quarantined.set(recovered.quarantined.clone());
@@ -395,7 +392,7 @@ impl Host {
     #[cfg(any(target_os = "macos", windows))]
     pub fn collect_expired_artifacts(&self) -> Option<Result<Vec<String>, String>> {
         let (jobs, artifacts) = (self.jobs.as_ref()?, self.artifacts.as_ref()?);
-        Some(match arkdeck_hoststore::runtime_now() {
+        Some(match clock_now() {
             Some(now) => arkdeck_hoststore::collect_expired_artifacts(jobs, artifacts, &now),
             None => Err("the Runtime clock is unavailable".into()),
         })
@@ -610,7 +607,7 @@ impl Host {
             dispatch,
             receive_root: Some(&self.receive_root),
             tool_sha256,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             code_sign_helper: self.code_sign_helper.as_ref(),
         })
     }
@@ -806,7 +803,7 @@ impl Host {
                     dispatch: &**dispatch,
                     receive_root: Some(&receive_root),
                     tool_sha256: dispatch.tool_sha256(),
-                    now: arkdeck_hoststore::runtime_now,
+                    now: clock_now,
                     code_sign_helper: helper.as_ref(),
                 }),
                 _ => None,
@@ -836,8 +833,8 @@ impl Host {
                     analyzer: Some(&analyzer),
                     quota: ARTIFACT_QUOTA,
                     home: &home,
-                    now: arkdeck_hoststore::runtime_now,
-                    precise_now: arkdeck_hoststore::runtime_precise_now,
+                    now: clock_now,
+                    precise_now: clock_precise_now,
                     sessions: publisher.as_ref(),
                     cancellation: Some(&slot.cancellation),
                     after_commit: None,
@@ -962,7 +959,7 @@ impl Host {
                         dispatch: &**dispatch,
                         receive_root: Some(&receive_root),
                         tool_sha256,
-                        now: arkdeck_hoststore::runtime_now,
+                        now: clock_now,
                         code_sign_helper: helper.as_ref(),
                     })
                 }
@@ -1116,7 +1113,7 @@ impl Host {
             projects,
             state_root,
             &self.home,
-            arkdeck_hoststore::runtime_now,
+            clock_now,
             &resolve,
             signing,
             symbolizer.map(|path| path.to_string_lossy()).as_deref(),
@@ -1303,7 +1300,7 @@ impl Host {
                 workspace: self.workspace.as_deref(),
             },
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         let accepted = match self.with_flash_admitter(admitter, |admitter| admitter.submit(request))
@@ -1784,8 +1781,8 @@ fn windows_runner<'a>(
         analyzer: Some(analyzers),
         quota: ARTIFACT_QUOTA,
         home,
-        now: arkdeck_hoststore::runtime_now,
-        precise_now: arkdeck_hoststore::runtime_precise_now,
+        now: clock_now,
+        precise_now: clock_precise_now,
         sessions,
         cancellation,
         after_commit: None,
@@ -2099,7 +2096,7 @@ impl HostServices for Host {
                 workspace: self.workspace.as_deref(),
             },
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         // An execution's request is admitted as `job.submit` admits it: a
@@ -2110,7 +2107,7 @@ impl HostServices for Host {
                     targets,
                     jobs,
                     admitter,
-                    now: arkdeck_hoststore::runtime_precise_now,
+                    now: clock_precise_now,
                     observations: self.observing(),
                 };
                 agents.advance(method, params, &engine)
@@ -2186,14 +2183,14 @@ impl HostServices for Host {
         let admitter = arkdeck_hoststore::JobAdmitter {
             planner: self.planner(state_root, hdc.as_ref()),
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         let engine = arkdeck_hoststore::AgentEngine {
             targets,
             jobs,
             admitter: &admitter,
-            now: arkdeck_hoststore::runtime_precise_now,
+            now: clock_precise_now,
             observations: self.observing(),
         };
         let answer = agents
@@ -2475,7 +2472,7 @@ impl HostServices for Host {
         let admitter = arkdeck_hoststore::JobAdmitter {
             planner: self.planner(state_root, hdc.as_ref()),
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         // A Flash is judged through the Flash admission (TASK-XPA-010).
@@ -2518,7 +2515,7 @@ impl HostServices for Host {
                 workspace: self.workspace.as_deref(),
             },
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         self.with_flash_admitter(admitter, |admitter| admitter.handle(params))
@@ -2705,8 +2702,8 @@ impl HostServices for Host {
                 analyzer: Some(analyzer),
                 quota: ARTIFACT_QUOTA,
                 home: &self.home,
-                now: arkdeck_hoststore::runtime_now,
-                precise_now: arkdeck_hoststore::runtime_precise_now,
+                now: clock_now,
+                precise_now: clock_precise_now,
                 sessions: publisher.as_ref(),
                 cancellation,
                 after_commit: None,
@@ -2852,8 +2849,8 @@ impl HostServices for Host {
                 .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
             quota: ARTIFACT_QUOTA,
             home: &self.home,
-            now: arkdeck_hoststore::runtime_now,
-            precise_now: arkdeck_hoststore::runtime_precise_now,
+            now: clock_now,
+            precise_now: clock_precise_now,
             // A continuation publishes no Session and cancels nothing.
             sessions: None,
             cancellation: None,
@@ -2939,7 +2936,7 @@ impl HostServices for Host {
         let cancel = || {
             arkdeck_hoststore::JobCanceller {
                 jobs,
-                now: arkdeck_hoststore::runtime_now,
+                now: clock_now,
                 sessions: publisher.as_ref(),
             }
             .handle(params)
@@ -3037,8 +3034,8 @@ impl HostServices for Host {
                     analyzer: Some(analyzer),
                     quota: ARTIFACT_QUOTA,
                     home: &self.home,
-                    now: arkdeck_hoststore::runtime_now,
-                    precise_now: arkdeck_hoststore::runtime_precise_now,
+                    now: clock_now,
+                    precise_now: clock_precise_now,
                     sessions: publisher.as_ref(),
                     cancellation: None,
                     after_commit: None,
@@ -3049,7 +3046,7 @@ impl HostServices for Host {
             jobs,
             artifacts,
             imports: self.imports.as_deref(),
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             sessions: publisher.as_ref(),
             hdc: hdc.as_ref(),
             capabilities: self.capabilities.as_deref(),
@@ -3109,7 +3106,7 @@ impl HostServices for Host {
             jobs,
             artifacts,
             imports: self.imports.as_deref(),
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             sessions: publisher.as_ref(),
             hdc: hdc.as_ref(),
             capabilities: self.capabilities.as_deref(),
@@ -3487,7 +3484,7 @@ impl HostServices for Host {
                 (None, _) => Err(unverified()),
             };
             #[cfg(target_os = "macos")]
-            let now = || arkdeck_hoststore::runtime_now().unwrap_or_default();
+            let now = || clock_now().unwrap_or_default();
             // The same whole-second UTC spelling.
             #[cfg(windows)]
             let now = utc_now;
@@ -3716,7 +3713,7 @@ impl HostServices for Host {
                 params,
                 &arkdeck_hoststore::InvocationBroker {
                     plan: &|request| planner.plan(request),
-                    now: &arkdeck_hoststore::runtime_now,
+                    now: &clock_now,
                     mint: &|| fresh_id().ok().map(|id| format!("debug-{id}")),
                     execute: &|request| self.debug_attempt(request),
                 },
@@ -4156,7 +4153,40 @@ pub(crate) fn toolchain_pinning(
     })
 }
 
+/// The Runtime clock the Host's owners read: the system's, or, in a Windows
+/// test build whose process took one, the fixed clock a test chose
+/// ([`TEST_CLOCK`]).
+#[cfg(all(any(target_os = "macos", windows), not(all(windows, test))))]
+use arkdeck_hoststore::{runtime_now as clock_now, runtime_precise_now as clock_precise_now};
+
+/// Test builds on Windows only: the fixed clock (`now`, `precise now`) a
+/// process of the signed test daemon (`tests/spawning/signed_daemon.rs`)
+/// takes before it composes anything, so a replay of a Swift oracle reads the
+/// oracle's own clock. The production daemon has no such clock.
+#[cfg(all(windows, test))]
+pub(crate) static TEST_CLOCK: std::sync::OnceLock<(String, String)> = std::sync::OnceLock::new();
+
+#[cfg(all(windows, test))]
+fn clock_now() -> Option<String> {
+    match TEST_CLOCK.get() {
+        Some((now, _)) => Some(now.clone()),
+        None => arkdeck_hoststore::runtime_now(),
+    }
+}
+
+#[cfg(all(windows, test))]
+fn clock_precise_now() -> Option<String> {
+    match TEST_CLOCK.get() {
+        Some((_, precise)) => Some(precise.clone()),
+        None => arkdeck_hoststore::runtime_precise_now(),
+    }
+}
+
 pub(crate) fn utc_now() -> String {
+    #[cfg(all(windows, test))]
+    if let Some((now, _)) = TEST_CLOCK.get() {
+        return now.clone();
+    }
     timestamp(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)

@@ -5178,4 +5178,120 @@ SHA-256：%4$@</value>
     <value>恢复正在等待</value>
     <comment>jobRecovery.waiting.title (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="debug_artifacts_batch_phase_failed" xml:space="preserve">
+    <value>队列已停止，剩余动态库未提交</value>
+    <comment>debug.artifacts.batch.phase.failed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_succeeded" xml:space="preserve">
+    <value>所有动态库均已验证成功</value>
+    <comment>debug.artifacts.batch.phase.succeeded (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_stopped" xml:space="preserve">
+    <value>队列已停止，请查看各 Job 结果</value>
+    <comment>debug.artifacts.batch.phase.stopped (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_running" xml:space="preserve">
+    <value>正在部署队列</value>
+    <comment>debug.artifacts.batch.phase.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_review" xml:space="preserve">
+    <value>等待检查计划</value>
+    <comment>debug.artifacts.batch.phase.review (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_preparing" xml:space="preserve">
+    <value>正在校验队列</value>
+    <comment>debug.artifacts.batch.phase.preparing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_idle" xml:space="preserve">
+    <value>待开始</value>
+    <comment>debug.artifacts.batch.phase.idle (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_failed" xml:space="preserve">
+    <value>因失败或不确定结果停止</value>
+    <comment>debug.artifacts.batch.row.failed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_succeeded" xml:space="preserve">
+    <value>验证成功</value>
+    <comment>debug.artifacts.batch.row.succeeded (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_running" xml:space="preserve">
+    <value>正在执行</value>
+    <comment>debug.artifacts.batch.row.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_submitting" xml:space="preserve">
+    <value>正在提交</value>
+    <comment>debug.artifacts.batch.row.submitting (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_prepared" xml:space="preserve">
+    <value>计划已就绪</value>
+    <comment>debug.artifacts.batch.row.prepared (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_preparing" xml:space="preserve">
+    <value>正在校验</value>
+    <comment>debug.artifacts.batch.row.preparing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_pending" xml:space="preserve">
+    <value>待处理</value>
+    <comment>debug.artifacts.batch.row.pending (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_run" xml:space="preserve">
+    <value>部署已检查的队列</value>
+    <comment>debug.artifacts.batch.run (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_warning" xml:space="preserve">
+    <value>每个动态库单独部署，分别执行备份、应用重启、读取验证和失败回滚。整批不具备原子性：后续文件失败时，先前成功的部署会保留。</value>
+    <comment>debug.artifacts.batch.warning (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_review" xml:space="preserve">
+    <value>检查动态库部署队列</value>
+    <comment>debug.artifacts.batch.review (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_stop" xml:space="preserve">
+    <value>当前 Job 完成后停止</value>
+    <comment>debug.artifacts.batch.stop (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_prepare" xml:space="preserve">
+    <value>校验并检查队列</value>
+    <comment>debug.artifacts.batch.prepare (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_limit" xml:space="preserve">
+    <value>部署队列最多支持 16 个动态库。</value>
+    <comment>debug.artifacts.batch.limit (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_remove" xml:space="preserve">
+    <value>从队列移除</value>
+    <comment>debug.artifacts.batch.remove (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_add" xml:space="preserve">
+    <value>加入部署队列</value>
+    <comment>debug.artifacts.batch.add (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_detail" xml:space="preserve">
+    <value>所有动态库使用上方 Bundle，保留原文件名。开始前逐项检查计划；失败或结果未知时停止队列，已完成的动态库保留部署结果。</value>
+    <comment>debug.artifacts.batch.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_title" xml:space="preserve">
+    <value>部署队列</value>
+    <comment>debug.artifacts.batch.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_empty" xml:space="preserve">
+    <value>所选文件夹中未找到 lib&lt;name&gt;.so 文件。</value>
+    <comment>debug.artifacts.directory.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_detail" xml:space="preserve">
+    <value>勾选最多 16 个动态库。扫描包含子目录，跳过符号链接，最多读取 500 个条目、展示 100 个动态库。</value>
+    <comment>debug.artifacts.directory.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_title" xml:space="preserve">
+    <value>所选文件夹中的动态库</value>
+    <comment>debug.artifacts.directory.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_wslSource" xml:space="preserve">
+    <value>WSL 构建产物可通过“设置 → 服务器”中的 SSH 连接访问。</value>
+    <comment>debug.artifacts.wslSource (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_chooseDirectory" xml:space="preserve">
+    <value>选择文件夹 / 已挂载 SMB…</value>
+    <comment>debug.artifacts.chooseDirectory (DebugLocalizable.xcstrings)</comment>
+  </data>
 </root>
