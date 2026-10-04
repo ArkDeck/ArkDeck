@@ -49,7 +49,7 @@ class API:
 
 class BranchTests(unittest.TestCase):
     def setUp(self):
-        temp = tempfile.TemporaryDirectory()
+        temp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.addCleanup(temp.cleanup)
         self.repo = subject.Repository(Path(temp.name))
         self.repo.git("init", "-q", "--initial-branch=main")
@@ -105,6 +105,16 @@ class BranchTests(unittest.TestCase):
     def test_merged_parent_is_not_inferred(self):
         self.repo.git("update-ref", "refs/remotes/origin/main", self.parent)
         self.assertEqual(self.choose(), "main")
+
+    def test_a_trailer_followed_by_an_appended_footer_is_still_read(self):
+        # An attribution footer appended after the author's trailers at commit
+        # time hides them from Git's trailer block; the base is still read.
+        self.child = self.commit("child\n\nStack-Base: main\n\nAI[100%] Human[0%]\n"
+                                 "Co-authored-by: tool <ai@local>")
+        self.assertEqual(self.choose(), "main")
+        self.child = self.commit("child\n\nStack-Base: main\nStack-Base: agent/parent")
+        with self.assertRaisesRegex(subject.IdentityError, "exactly one"):
+            self.choose()
 
     def test_missing_cross_repo_and_self_bases_are_rejected(self):
         for base in ("agent/missing", "agent/child", "other/branch"):

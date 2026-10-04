@@ -78,7 +78,24 @@ pub(crate) fn admit(
     };
     // Swift's selector over the inherited port, as the macOS isolated owner
     // selects its managed server's endpoint; it must pick the tuple's.
-    let inherited = variable(arkdeck_provider_hdc::SERVER_PORT_VARIABLE);
+    let selection = tuple_endpoint(tuple, variable(arkdeck_provider_hdc::SERVER_PORT_VARIABLE))?;
+    Ok(Some(AdmittedHdc {
+        path,
+        sha256,
+        tuple,
+        selection,
+    }))
+}
+
+/// Swift's endpoint selection over the inherited server port
+/// (`OHOS_HDC_SERVER_PORT`, `inherited`), which must pick the registered
+/// tuple's own endpoint: the managed server a Windows daemon starts for a
+/// registered HDC, a development root's or the account's, listens there and
+/// nowhere else.
+pub(crate) fn tuple_endpoint(
+    tuple: &WindowsHdcTuple,
+    inherited: Option<OsString>,
+) -> Result<EndpointSelection, String> {
     let selection = match &inherited {
         Some(port) => port
             .to_str()
@@ -86,29 +103,21 @@ pub(crate) fn admit(
         None => EndpointSelection::select(None).ok(),
     }
     .filter(|selection| selection.endpoint == tuple.endpoint);
-    let Some(selection) = selection else {
-        return Err(match inherited {
-            Some(_) => format!(
-                "{} names another endpoint than the registered HDC {}'s {}; nothing was started",
-                arkdeck_provider_hdc::SERVER_PORT_VARIABLE,
-                tuple.candidate,
-                tuple.endpoint
-            ),
-            None => format!(
-                "the registered HDC {}'s endpoint {} is not the default one: {} must name its \
-                 port; nothing was started",
-                tuple.candidate,
-                tuple.endpoint,
-                arkdeck_provider_hdc::SERVER_PORT_VARIABLE
-            ),
-        });
-    };
-    Ok(Some(AdmittedHdc {
-        path,
-        sha256,
-        tuple,
-        selection,
-    }))
+    selection.ok_or_else(|| match inherited {
+        Some(_) => format!(
+            "{} names another endpoint than the registered HDC {}'s {}; nothing was started",
+            arkdeck_provider_hdc::SERVER_PORT_VARIABLE,
+            tuple.candidate,
+            tuple.endpoint
+        ),
+        None => format!(
+            "the registered HDC {}'s endpoint {} is not the default one: {} must name its \
+             port; nothing was started",
+            tuple.candidate,
+            tuple.endpoint,
+            arkdeck_provider_hdc::SERVER_PORT_VARIABLE
+        ),
+    })
 }
 
 // Run by this binary's unit-test build only (`daemon_unit_tests!`).

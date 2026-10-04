@@ -464,5 +464,7 @@ fn agent_resume_completes_a_paused_execution_over_the_signed_test_daemon() {
     assert_eq!(calls(&fake_root).len(), before, "nothing is sent again");
     daemon.stop();
     let _ = std::fs::remove_dir_all(&scratch);
-    assert_windows_status(&["agent.resume"], "implemented");
+    // Measured, but not counted: a resume submits the execution's operation
+    // (the shared generic leaves' ruling of 2026-10-04).
+    assert_windows_status(&["agent.resume"], "partial");
 }

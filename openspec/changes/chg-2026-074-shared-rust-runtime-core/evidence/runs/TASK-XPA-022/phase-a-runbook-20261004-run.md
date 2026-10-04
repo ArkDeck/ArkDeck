@@ -106,3 +106,21 @@ installs the GJ-5 credential from the project's `build-profile.json5`, as the he
 does, with the typed prompt kept only as the fallback. G8 is marked closed in §4.6, §4.7 and §7.
 This supersedes delegated decision 3 above: the credential is installed from the build profile,
 and no maintainer handles a plaintext password.
+
+## Follow-up 2026-10-05: G1 closed
+
+Brought up to date with protected `main` `162c94f3`:
+
+- **G1 is closed** (#2524, #2526, #2536; live run #2530,
+  `runs/TASK-XPA-012/windows-account-hdc-live-c2-20261005-run.md`). The account daemon composes
+  the registered `c2` HDC from `ARKDECK_HDC_PATH` through its Bootstrap selection.
+- **§4.0.1:** the daemon table, plus the caveat that the awaiting-approval HDC restart and
+  tool-selection paths need #2501's health proof (in CI) and, for a selection, a second tuple.
+  No WIN-GJ step uses those paths.
+- **§4.0.2:** `ARKDECK_HDC_PATH` is set in the daemon session, and registering the tool by hand
+  is optional.
+- **§4.1–§4.5, §4.6, §4.7 and §7:** updated.
+- **G4 and G6 marked closed as well**, because main carries them: #2535 serves `flash
+  install-binding` on Windows, and #2531/#2535 measure device-access, lane-preview and bind-loader
+  through the CLI over stand-ins.
+- **Still open:** G2 (risk), G5 and G7. No row has run on the board.

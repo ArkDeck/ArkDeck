@@ -75,7 +75,7 @@
       "feature": "agent.resume",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "implemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

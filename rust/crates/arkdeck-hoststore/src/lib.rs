@@ -249,17 +249,15 @@ pub use hdc_control_action::{
     HdcControlActions, HdcLifecycleAudit, HdcLifecycleDriver, Impact, ImpactReading, ImpactSource,
     OwnerContext, Record,
 };
-// Tool selection's records on both; its owner reads the Bootstrap tool
-// registry, which is macOS-only (`absent_tool_selection_owner.rs`).
+// Tool selection's records and its owner, which reads the Bootstrap tool
+// registry, on both.
 #[cfg(any(target_os = "macos", windows))]
 mod tool_selection;
 #[cfg(any(target_os = "macos", windows))]
 pub use tool_selection::{
-    SelectionImpact, ToolFacts, ToolSelectionActions, ToolSelectionDriver, ToolSelectionIntent,
-    ToolSelectionRecord, ToolSelectionRecords,
+    SelectionImpact, ToolFacts, ToolSelectionActions, ToolSelectionAudit, ToolSelectionDriver,
+    ToolSelectionIntent, ToolSelectionRecord, ToolSelectionRecords, ToolSelectionRegistry,
 };
-#[cfg(target_os = "macos")]
-pub use tool_selection::{ToolSelectionAudit, ToolSelectionRegistry};
 #[cfg(any(target_os = "macos", windows))]
 mod hdc_impact_source;
 #[cfg(any(target_os = "macos", windows))]

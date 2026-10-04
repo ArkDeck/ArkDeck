@@ -28,10 +28,16 @@ Host: the Windows 11 x64 reference host, non-elevated, NTFS. No device, HDC or b
     - Its three Artifacts' references, digests and sizes are the oracle's (`connect.completed`).
     - `agent status` reads `completed`, and the Job `succeeded`.
   - A second resume answers the same Job, and nothing is sent to the device again.
-- **Coverage.** `agent.resume` joins `WINDOWS_MEASURED_LEAVES`, and the stale note that `agent run`
-  and `agent resume` were not measured is corrected. The coverage was regenerated with
-  `arkdeck maintainer contracts export`: `agent.resume` is Windows `implemented`. `oracle.json` is
-  not re-pinned.
+- **Coverage: measured, not counted.** `agent.resume` stays out of `WINDOWS_MEASURED_LEAVES` and
+  remains Windows `partial`; a comment beside the GJ-1 leaves says why. `job plan|submit|run` and
+  `agent run` are not counted on Windows because their answers depend on the operation (the lead's
+  ruling of 2026-10-04). A resume is not independent of the operation either. Its first half is:
+  it finds the action by its reference, checks its expiry and selection, and takes a fresh
+  observation. Once the action resolves, though, it drives the execution through the same
+  admission as `agent run` (`AgentExecutions::drive`, then `submit_for_agent`), so whether it is
+  admitted and runs depends on the execution's operation. Coverage was regenerated with
+  `arkdeck maintainer contracts export`, and `oracle.json` is not re-pinned. The stale note that
+  `agent run` and `agent resume` were measured is corrected.
 
 ## Left out
 
