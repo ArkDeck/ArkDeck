@@ -268,6 +268,30 @@ const CASES: &[Case] = &[
         compared: &[],
     },
     Case {
+        name: "sed empty file",
+        files: &[("a.ets", b"")],
+        patch: None,
+        tool: "sed",
+        arguments: &["-n", "1,2p", "{root}/a.ets"],
+        compared: &[],
+    },
+    Case {
+        name: "sed carriage returns",
+        files: &[("a.ets", b"one\r\ntwo\r\nthree")],
+        patch: None,
+        tool: "sed",
+        arguments: &["-n", "2,3p", "{root}/a.ets"],
+        compared: &[],
+    },
+    Case {
+        name: "sed last line only, unterminated",
+        files: &[("a.ets", b"one\ntwo")],
+        patch: None,
+        tool: "sed",
+        arguments: &["-n", "2,2p", "{root}/a.ets"],
+        compared: &[],
+    },
+    Case {
         name: "sed missing file",
         files: &[],
         patch: None,
@@ -292,6 +316,30 @@ const CASES: &[Case] = &[
         patch: None,
         tool: "grep",
         arguments: &["-r", "-n", "--include", "*.ets", "--", "bu.l[dt]", "{root}"],
+        compared: &[],
+    },
+    Case {
+        name: "grep unterminated last line",
+        files: &[("entry/a.ets", b"x\n  build() {}")],
+        patch: None,
+        tool: "grep",
+        arguments: &["-r", "-n", "--include", "*.ets", "--", "build", "{root}"],
+        compared: &[],
+    },
+    Case {
+        name: "grep carriage returns",
+        files: &[("entry/a.ets", b"build\r\nx\r\n")],
+        patch: None,
+        tool: "grep",
+        arguments: &["-r", "-n", "--include", "*.ets", "--", "build$", "{root}"],
+        compared: &[],
+    },
+    Case {
+        name: "grep empty file",
+        files: &[("entry/a.ets", b"")],
+        patch: None,
+        tool: "grep",
+        arguments: &["-r", "-n", "--include", "*.ets", "--", "build", "{root}"],
         compared: &[],
     },
     Case {
@@ -343,6 +391,22 @@ const CASES: &[Case] = &[
         compared: &["Sources/App.txt", "Sources/App.txt.orig", "Sources/App.txt.rej"],
     },
     Case {
+        name: "patch carriage returns",
+        files: &[("Sources/App.txt", b"zero\r\nold\r\nkeep\r\n")],
+        patch: Some(b"--- a/Sources/App.txt\n+++ b/Sources/App.txt\n@@ -1,3 +1,3 @@\n zero\r\n-old\r\n+new\r\n keep\r\n"),
+        tool: "patch",
+        arguments: &["-f", "-p1", "-d", "{root}", "-i", "{patch}"],
+        compared: &["Sources/App.txt", "Sources/App.txt.orig", "Sources/App.txt.rej"],
+    },
+    Case {
+        name: "patch adds a line to an unterminated file",
+        files: &[("Sources/App.txt", b"a")],
+        patch: Some(b"--- a/Sources/App.txt\n+++ b/Sources/App.txt\n@@ -1 +1,2 @@\n-a\n\\ No newline at end of file\n+a\n+b\n"),
+        tool: "patch",
+        arguments: &["-f", "-p1", "-d", "{root}", "-i", "{patch}"],
+        compared: &["Sources/App.txt", "Sources/App.txt.orig", "Sources/App.txt.rej"],
+    },
+    Case {
         name: "patch two files and a missing newline",
         files: &[("Sources/A.txt", b"a\n"), ("Sources/B.txt", b"b")],
         patch: Some(b"--- a/Sources/A.txt\n+++ b/Sources/A.txt\n@@ -1 +1,2 @@\n a\n+a2\n--- a/Sources/B.txt\n+++ b/Sources/B.txt\n@@ -1 +1 @@\n-b\n\\ No newline at end of file\n+c\n\\ No newline at end of file\n"),
@@ -358,6 +422,7 @@ const CASES: &[Case] = &[
 #[cfg(target_os = "macos")]
 #[test]
 fn the_macos_tools_answer_the_corpus_as_the_reimplementation_does() {
+    let mut mismatches = Vec::new();
     for case in CASES {
         let answer = |host: bool| {
             let scratch = Scratch::new("corpus");
@@ -403,6 +468,13 @@ fn the_macos_tools_answer_the_corpus_as_the_reimplementation_does() {
             };
             (status, unrooted(stdout), unrooted(stderr), files)
         };
-        assert_eq!(answer(false), answer(true), "{}", case.name);
+        let (reimplemented, host) = (answer(false), answer(true));
+        if reimplemented != host {
+            mismatches.push(format!(
+                "{}:\n  reimplementation {reimplemented:?}\n  /usr/bin/{} {host:?}",
+                case.name, case.tool
+            ));
+        }
     }
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }

@@ -5,6 +5,16 @@
 // compiles from these sources (`app_ingress`, `bootstrap_readers`, `host`,
 // `managed_hdc`) keep no test module beside them;
 // their unit tests are declared here.
+
+/// The unit tests of a module that `tests/spawning` also compiles on Windows
+/// (the Windows lifecycle and what its composition names) stay beside it,
+/// inside this macro: this binary's test build runs them, and that binary
+/// defines the macro to expand to nothing, so they never run there.
+#[allow(unused_macros)]
+macro_rules! daemon_unit_tests {
+    ($($item:item)*) => { $( #[cfg(test)] $item )* };
+}
+
 #[cfg(target_os = "macos")]
 mod app_ingress;
 #[cfg(all(test, target_os = "macos"))]

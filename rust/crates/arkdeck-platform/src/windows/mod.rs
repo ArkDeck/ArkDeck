@@ -39,6 +39,7 @@ mod server;
 pub(crate) mod shell;
 mod state;
 mod stop;
+mod system_tool;
 mod tool;
 mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
@@ -83,6 +84,7 @@ pub use state::{
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 pub use stop::{Latch, StopSignal, send_console_break};
+pub use system_tool::{SystemTool, TrustedSystemTool, trusted_system_tool};
 pub use verified_source::{VerifiedSource, create_private_directory, create_private_file};
 
 pub(crate) struct Handle(OwnedHandle);

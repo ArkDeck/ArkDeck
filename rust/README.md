@@ -40,12 +40,22 @@ released port or dropped listener stays held. A test whose path starts a child
 belongs in `tests/spawning`, which compiles the daemon's modules from their
 sources and runs one test at a time (`turn()`), as do the integration tests
 that listen or take a lock in their own process while spawning.
-On Windows only `flash_host_facts_control.rs` runs there (TASK-XPA-010): the
-Swift Flash host facts oracle through `Control` and the daemon's own host, over
-the shared fake's answers ported in process
-(`arkdeck-provider-hdc/tests/common/oracle_fake.rs`), which the host probes
-through a seam compiled into test builds only. The Windows daemon itself still
-composes no HDC.
+On Windows two things run there:
+- `flash_host_facts_control.rs` (TASK-XPA-010): the Swift Flash host facts
+  oracle through `Control` and the daemon's own host, over the shared fake's
+  answers ported in process (`arkdeck-provider-hdc/tests/common/oracle_fake.rs`).
+- The signed test daemon, `signed_daemon.rs` (TASK-XPA-009). That binary compiles
+  the Windows lifecycle and composition (`windows_lifecycle`) and is copied and
+  signed with the development signer. It serves a development root on its pipe,
+  and the real `arkdeck.exe` drives it with the production peer check.
+
+Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
+into test builds only. The production Windows daemon composes an HDC only for a
+registered Windows HDC tuple.
+
+A module that binary compiles keeps its unit tests beside it only inside
+`daemon_unit_tests!`. `src/main.rs` expands that block under `cfg(test)`, and
+`tests/spawning` expands it to nothing.
 
 Clippy and the workspace tests are the only checks that compile this checkout.
 `generate-contract.py --check` regenerates the manifest and bindings from the
@@ -3884,6 +3894,31 @@ reimplementation against the macOS tools in two ways:
 
 `windows_workspace_provider_process` runs the daemon image as each tool and
 compares its answer with the reimplementation's.
+
+Maintainer ruling 69 decides the rule. `grep`, `sed` and `patch` are
+reimplemented in process. `tar` and `git` are trusted by a registered absolute
+path and an Authenticode publisher, never through PATH.
+`arkdeck_platform::trusted_system_tool` measures each one:
+
+- **`tar`** is `<system directory>\tar.exe`, Microsoft-signed. Either its
+  embedded third-party component signature (root Microsoft Root CA 2011) or
+  the system catalog's Windows production signature (root 2010) is accepted.
+  The catalog is found by the Authenticode hash of the held handle.
+- **`git`** is `<Program Files>\Git\mingw64\bin\git.exe`, signed by Git for
+  Windows' signer (`O=`/`CN=` Johannes Schindelin). It is the real git, not
+  the `cmd\git.exe` launcher.
+
+The root, every directory below it and the file must have the exact spelling
+on disk. No reparse point is allowed, and only `SYSTEM`, `Administrators` or
+`TrustedInstaller` may own or change them. The SHA-256 comes from the same
+held handle that `WinVerifyTrust` verified.
+`WorkspaceCommandPreset::trusted_system` pins a preset by that digest, and its
+dispatch (`VerifiedTool::open`) runs only that image. The workspace profile's
+code-owned tool table does not use them yet, so the refusal above still
+stands. The tests run against the host's real `tar.exe` and Git for Windows.
+They also cover a copy outside the registered path, an altered or unsigned
+image, the other tool's publisher, another spelling, a junctioned root, a
+launch by another digest and a shadowing PATH.
 
 `cargo test -p arkdeck-agentd --test windows_workspace_provider_process`
 (`harness = false`) registers a project and restarts the daemon with this

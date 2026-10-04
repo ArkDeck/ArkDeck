@@ -45,6 +45,18 @@ pub(crate) type Unavailability = (&'static str, String);
 pub(crate) const WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE: &str = "workspace.toolchainUnavailable: \
     no trusted system archive (tar) or source-control (git) tool is composed on Windows yet";
 
+/// Why a code-owned system tool is unavailable on Windows (ruling 69).
+#[cfg(windows)]
+fn system_tool_unavailable(
+    tool: arkdeck_platform::SystemTool,
+    error: &dyn std::fmt::Display,
+) -> String {
+    format!(
+        "workspace.toolchainUnavailable: {} is not trusted on Windows: {error}",
+        tool.name()
+    )
+}
+
 /// Swift `RuntimeAvailabilityReasonCode.workspacePresetUnavailable`.
 pub(crate) const PRESET_UNAVAILABLE: &str = "workspace_preset_unavailable";
 
@@ -259,6 +271,36 @@ impl WorkspaceCommandPreset {
             fixed_arguments.iter().map(|&a| a.to_owned()).collect(),
             timeout_seconds,
             verified_resources,
+        )
+    }
+
+    /// On Windows (maintainer ruling 69): the code-owned system tool `tool`
+    /// — `tar` (`System32\tar.exe`) or `git` (Git for Windows) — at its
+    /// registered absolute path, signed by its pinned Authenticode publisher,
+    /// pinned by the SHA-256 of the image whose signature was verified
+    /// (`arkdeck_platform::trusted_system_tool`). Its dispatch opens the
+    /// executable by that digest, so what runs is what was verified. No
+    /// `PATH` lookup stands in for it; a tool that does not verify is
+    /// `workspace.toolchainUnavailable`.
+    #[cfg(windows)]
+    pub fn trusted_system(
+        preset_id: &str,
+        tool: arkdeck_platform::SystemTool,
+        timeout_seconds: i64,
+    ) -> Result<Self, String> {
+        let trusted = arkdeck_platform::trusted_system_tool(tool)
+            .map_err(|error| system_tool_unavailable(tool, &error))?;
+        let path = trusted
+            .path
+            .to_str()
+            .ok_or_else(|| system_tool_unavailable(tool, &"its path is not Unicode"))?;
+        Self::new(
+            preset_id,
+            ExecutableIdentity::new(path.to_owned(), trusted.sha256)?,
+            None,
+            Vec::new(),
+            timeout_seconds,
+            Vec::new(),
         )
     }
 
@@ -1714,5 +1756,162 @@ mod tests {
         .unwrap();
         assert_eq!(document, recorded, "{} ran another tool", pinned.path);
         fs::remove_dir_all(&root).unwrap();
+    }
+}
+
+/// The Windows system tools of maintainer ruling 69 as workspace presets:
+/// the real `System32\tar.exe` and the host's Git for Windows, launched
+/// through the production dispatch by the digest they were verified by.
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use crate::workspace_patch::{
+        ToolFailure, ToolInvocation, ToolReceipt, VerifiedToolDispatch, WorkspaceToolDispatch,
+    };
+    use arkdeck_platform::{SystemTool, trusted_system_tool};
+
+    /// Set in the child this file's PATH test starts with a shadowed PATH.
+    const SHADOW: &str = "ARKDECK_TEST_SYSTEM_TOOL_PATH_SHADOW";
+
+    fn run(preset: &WorkspaceCommandPreset, sha256: &str) -> Result<ToolReceipt, ToolFailure> {
+        let arguments = ["--version".to_owned()];
+        VerifiedToolDispatch.dispatch(&ToolInvocation {
+            executable_path: &preset.executable.path,
+            executable_sha256: sha256,
+            argument_zero: None,
+            arguments: &arguments,
+            environment: &[],
+            resources: &[],
+            working_directory: None,
+            timeout_seconds: 30,
+        })
+    }
+
+    fn version(preset: &WorkspaceCommandPreset) -> String {
+        let receipt = run(preset, &preset.executable.sha256).unwrap();
+        assert_eq!(receipt.exit_status, 0, "{receipt:?}");
+        String::from_utf8(receipt.stdout).unwrap()
+    }
+
+    fn presets() -> (WorkspaceCommandPreset, WorkspaceCommandPreset) {
+        (
+            WorkspaceCommandPreset::trusted_system("sealed-source-archive", SystemTool::Tar, 120)
+                .unwrap(),
+            WorkspaceCommandPreset::trusted_system("git", SystemTool::Git, 120).unwrap(),
+        )
+    }
+
+    #[test]
+    fn each_system_tool_is_its_registered_verified_image() {
+        let (tar, git) = presets();
+        for (preset, tool) in [(&tar, SystemTool::Tar), (&git, SystemTool::Git)] {
+            let trusted = trusted_system_tool(tool).unwrap();
+            assert_eq!(preset.executable.path, trusted.path.to_str().unwrap());
+            assert_eq!(preset.executable.sha256, trusted.sha256);
+            assert_eq!(
+                preset.executable,
+                ExecutableIdentity::hashing(&preset.executable.path).unwrap()
+            );
+            assert!(preset.argument_zero.is_none() && preset.fixed_arguments.is_empty());
+        }
+        assert!(tar.executable.path.ends_with(r"\System32\tar.exe"));
+        assert!(git.executable.path.ends_with(r"\Git\mingw64\bin\git.exe"));
+        assert!(version(&tar).starts_with("bsdtar "), "{}", version(&tar));
+        assert!(
+            version(&git).starts_with("git version "),
+            "{}",
+            version(&git)
+        );
+        assert!(version(&git).contains(".windows."), "{}", version(&git));
+    }
+
+    #[test]
+    fn a_launch_by_another_digest_runs_nothing() {
+        let (tar, git) = presets();
+        for preset in [&tar, &git] {
+            let other = support::sha256(preset.executable.sha256.as_bytes());
+            match run(preset, &other) {
+                Err(ToolFailure::Failed(reason)) => {
+                    assert!(reason.starts_with("dispatch refused:"), "{reason}");
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_refusal_names_the_tool_as_the_toolchain_unavailable() {
+        let refusal = system_tool_unavailable(
+            SystemTool::Git,
+            &"a system tool is not signed by its publisher",
+        );
+        assert_eq!(
+            refusal,
+            "workspace.toolchainUnavailable: git is not trusted on Windows: a system tool \
+             is not signed by its publisher"
+        );
+    }
+
+    /// A directory first on `PATH` holding `tar.exe` and `git.exe` that are
+    /// other programs (`whoami.exe` and a copy of `tar.exe`): neither the
+    /// measurement nor the launch looks there.
+    #[test]
+    fn a_shadowing_path_is_never_consulted() {
+        let system = std::path::PathBuf::from(
+            trusted_system_tool(SystemTool::Tar)
+                .unwrap()
+                .path
+                .parent()
+                .unwrap(),
+        );
+        let shadow = std::env::temp_dir().join(format!(
+            "arkdeck-path-shadow-{:032x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        fs::create_dir(&shadow).unwrap();
+        fs::copy(system.join("whoami.exe"), shadow.join("tar.exe")).unwrap();
+        fs::copy(system.join("tar.exe"), shadow.join("git.exe")).unwrap();
+        let mut path = std::ffi::OsString::from(shadow.as_os_str());
+        if let Some(inherited) = std::env::var_os("PATH") {
+            path.push(";");
+            path.push(inherited);
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "workspace_profile::windows_tests::shadowed_path_child",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("PATH", path)
+            .env(SHADOW, &shadow)
+            .output()
+            .unwrap();
+        fs::remove_dir_all(&shadow).unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(output.status.success(), "{stdout}");
+        assert!(stdout.contains("1 passed"), "{stdout}");
+        assert!(stdout.contains("shadowed path checked"), "{stdout}");
+    }
+
+    /// The child half of [`a_shadowing_path_is_never_consulted`]; a no-op
+    /// anywhere else.
+    #[test]
+    fn shadowed_path_child() {
+        let Some(shadow) = std::env::var_os(SHADOW) else {
+            return;
+        };
+        let shadow = std::path::PathBuf::from(shadow);
+        // The shadow is what a PATH search would find first.
+        let first = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+            .next()
+            .unwrap();
+        assert_eq!(first, shadow);
+        let (tar, git) = presets();
+        assert!(!tar.executable.path.starts_with(shadow.to_str().unwrap()));
+        assert!(!git.executable.path.starts_with(shadow.to_str().unwrap()));
+        assert!(version(&tar).starts_with("bsdtar "));
+        assert!(version(&git).starts_with("git version "));
+        println!("shadowed path checked");
     }
 }

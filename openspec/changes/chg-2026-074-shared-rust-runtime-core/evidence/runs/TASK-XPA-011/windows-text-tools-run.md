@@ -13,7 +13,7 @@
 
 | Area | Change |
 | --- | --- |
-| `arkdeck-hoststore` `workspace_text_tools.rs` (new) | `grep -r -n --include <glob> -- <pattern> <root>`: the root is walked in name order without following links, the glob is matched with `fnmatch`, the pattern is a POSIX BRE (literal bytes, `.`, brackets with classes, `*`, `^`, `$`; groups, intervals and back references are refused), output lines are `<path>:<n>:<line>`, and a file with a NUL in its first 32 KiB prints `Binary file … matches` once. `sed -n <a>,<b>p <file>`: lines `a` to `b`, only `a` when `b < a`, a missing final newline supplied; a missing file gives `sed: <file>: No such file or directory` and exit 1. `patch -f [-R] -p1 -d <root> -i <file>`: BSD patch's Plan A for unified diffs (exact line, then growing offsets after/before, then fuzz 1–2), BSD narration, a missing final newline kept, and for a hunk that does not apply its reject in BSD's unified form (`@@ -a,b +c,d @@`, both counts spelled out), a `.orig` backup of the original and exit 1. Any other argv is refused before anything is read |
+| `arkdeck-hoststore` `workspace_text_tools.rs` (new) | `grep -r -n --include <glob> -- <pattern> <root>`: the root is walked in name order without following links, the glob is matched with `fnmatch`, the pattern is a POSIX BRE (literal bytes, `.`, brackets with classes, `*`, `^`, `$`; groups, intervals and back references are refused), output lines are `<path>:<n>:<line>`, and a file with a NUL in its first 32 KiB prints `Binary file … matches` once. `sed -n <a>,<b>p <file>`: lines `a` to `b`, only `a` when `b < a`, a missing final newline kept missing (as macOS `/usr/bin/sed` answered on CI); a missing file gives `sed: <file>: No such file or directory` and exit 1. `patch -f [-R] -p1 -d <root> -i <file>`: BSD patch's Plan A for unified diffs (exact line, then growing offsets after/before, then fuzz 1–2), BSD narration, a missing final newline kept, and for a hunk that does not apply its reject in BSD's unified form (`@@ -a,b +c,d @@`, both counts spelled out), a `.orig` backup of the original and exit 1. Any other argv is refused before anything is read |
 | `arkdeck-agentd` `main.rs` | `--workspace-tool <grep\|sed\|patch> <argv>` (Windows): the daemon image is each tool, answered before any composition |
 | `workspace_profile.rs` | `CodeOwnedTools { inspection, reader, patch, archive, source_control }` is the role table, documented with the macOS and Windows rows. On Windows the three text roles are the daemon's own image with `--workspace-tool <tool>`, pinned by digest. `external_tools(root)` holds the `archive`/`source_control` slots, which still refuse until the trusted system tools are composed, so a project still resolves to no profile, now with the reason `no trusted system archive (tar) or source-control (git) tool is composed on Windows yet`. `ark_deck` on Windows answers macOS's own SwiftPM-absent reason |
 
@@ -26,7 +26,7 @@ same fixed paths, and the text tools module is used on macOS only by tests.
 | --- | --- |
 | `workspace_text_tools_oracle`, the recorded read oracle | The reimplemented `grep -r -n --include '*.ets' -- build <root>` prints the recorded `/usr/bin/grep` artifact (`Index.ets:4:  build() {}`) with this host's root spelling. `NoSuchSymbol` prints the recorded empty artifact with exit 1. `sed -n 2,4p` prints the recorded `/usr/bin/sed` artifact byte for byte. The missing file fails the read, as the recorded Job did |
 | `workspace_text_tools_oracle`, the recorded patch oracle | After the recorded unified diffs (old→new applied, stale→newer failing against `new`), the tree is `workspace-patch-oracle/tree.json` digest for digest: `App.txt`, `App.txt.orig`, the reject `App.txt.rej` (`e3e2501f…`, the BSD `@@ -1,1 +1,1 @@` form) and `Other.txt`. The applied diff then reverses cleanly |
-| `workspace_text_tools_oracle`, macOS only (runs on the macOS CI lane) | The host's `/usr/bin/grep`, `sed` and `patch`, run in the oracles' closed environment, must answer 14 corpus cases exactly as the reimplementation does: exit status, stdout, stderr and the files after. The cases cover ranges, a reversed range, past the end, a missing final newline, a missing file, a match, a BRE and no match, a clean git diff, an offset, fuzz, an already applied patch, a reverse, and two files with a missing newline. Not run on this Windows host; CI's macOS lane runs it |
+| `workspace_text_tools_oracle`, macOS only (runs on the macOS CI lane) | The host's `/usr/bin/grep`, `sed` and `patch`, run in the oracles' closed environment, must answer 21 corpus cases exactly as the reimplementation does: exit status, stdout, stderr and the files after. The cases cover ranges, a reversed range, past the end, a missing final newline, an empty file, carriage returns, an unterminated last line, a missing file, a match, a BRE, an unterminated last line, carriage returns, an empty file and no match, a clean git diff, an offset, fuzz, an already applied patch, a reverse, carriage returns, a line added to an unterminated file, and two files with a missing newline. Not run on this Windows host; CI's macOS lane runs it |
 | `windows_workspace_provider_process` `the_daemon_image_is_the_code_owned_grep_sed_and_patch` | The built daemon run as each tool, with no environment and no stdin, answers exactly as the reimplementation (status, stdout, stderr), and its patch is applied in place. An unknown tool exits 2 |
 | `workspace_text_tools` unit tests | sed, grep walk/glob/binary, the BRE matcher, and patch apply/reverse/offset/reject/missing newline |
 
@@ -59,3 +59,13 @@ same fixed paths, and the text tools module is used on macOS only by tests.
   Profiles resolve once it is wired; the next PR of this slice does that and covers the reads,
   the isolated copy, patching and checkpoints end to end.
 - **Anything device-bound.** The Windows HDC tuple is not registered.
+
+## Correction after the first macOS CI run (2026-10-04)
+
+The macOS lane's corpus test (run 37193615585) showed that `/usr/bin/sed` keeps a missing final
+newline missing (`one
+two`, not `one
+two
+`). The reimplementation now matches it; macOS stays
+the oracle. The same class of question (a final newline, an empty input, carriage returns) now
+has corpus cases for sed, grep and patch. The test reports every mismatch of a run at once.

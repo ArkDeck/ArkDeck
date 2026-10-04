@@ -17,7 +17,7 @@
 //!   macOS walk's order is the file system's, so a multi-file answer is
 //!   compared as a set there); links are not followed.
 //! - `sed -n <a>,<b>p <file>`: lines `a` through `b` (only `a` when `b < a`),
-//!   each with its newline, a missing final newline supplied.
+//!   each with its newline, a missing final newline kept missing.
 //! - `patch -f [-R] -p1 -d <root> -i <file>`: BSD patch's unified-diff apply
 //!   (Plan A): each file's hunks located at their line, then at growing
 //!   offsets, then with up to two lines of fuzz, written in place; BSD's
@@ -138,11 +138,16 @@ fn sed(arguments: &[String]) -> TextToolOutput {
         }
     };
     let mut stdout = Vec::new();
-    for (index, line) in lines_of(&bytes).iter().enumerate() {
+    let lines = lines_of(&bytes);
+    let unterminated = !bytes.is_empty() && !bytes.ends_with(b"\n");
+    for (index, line) in lines.iter().enumerate() {
         let number = index as u64 + 1;
         if number == first || (number > first && number <= last) {
             stdout.extend_from_slice(line);
-            stdout.push(b'\n');
+            // macOS sed keeps a missing final newline missing.
+            if !(unterminated && index + 1 == lines.len()) {
+                stdout.push(b'\n');
+            }
         }
     }
     TextToolOutput {
@@ -1109,11 +1114,11 @@ mod tests {
     }
 
     #[test]
-    fn sed_prints_a_line_range_with_bsd_s_newline_and_refusals() {
+    fn sed_prints_a_line_range_as_macos_sed_and_refuses() {
         let scratch = Scratch::new("sed");
         let file = scratch.write("a.txt", b"one\ntwo\nthree\nfour");
         let printed = run("sed", &["-n", "2,4p", &file]);
-        assert_eq!(printed.stdout, b"two\nthree\nfour\n");
+        assert_eq!(printed.stdout, b"two\nthree\nfour");
         assert_eq!(printed.status, 0);
         assert_eq!(run("sed", &["-n", "3,2p", &file]).stdout, b"three\n");
         assert_eq!(run("sed", &["-n", "9,12p", &file]).stdout, b"");
