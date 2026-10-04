@@ -18,12 +18,14 @@
 //!   compared as a set there); links are not followed.
 //! - `sed -n <a>,<b>p <file>`: lines `a` through `b` (only `a` when `b < a`),
 //!   each with its newline, a missing final newline kept missing.
-//! - `patch -f [-R] -p1 -d <root> -i <file>`: BSD patch's unified-diff apply
-//!   (Plan A): each file's hunks located at their line, then at growing
-//!   offsets, then with up to two lines of fuzz, written in place; BSD's
-//!   "Hmm..." narration, "Patching file … using Plan A...", per-hunk lines,
-//!   "done", and for a hunk that does not apply its rejects beside the file
-//!   and exit status 1.
+//! - `patch -f [-R] -p1 -d <root> -i <file>`: the unified-diff apply macOS's
+//!   `/usr/bin/patch` answers (GNU patch's): each file's hunks located at
+//!   their line, then at growing offsets, then with up to two lines of fuzz
+//!   (a fuzzed context line keeps the file's text), written in place;
+//!   `patching file '<name>'` per file; for a hunk that does not apply its
+//!   reject beside the file, `n out of m hunks failed--saving rejects to
+//!   '<name>.rej'` and exit status 1; the original kept as `<name>.orig`
+//!   when a hunk needed an offset or fuzz or failed.
 //!
 //! Any other argv is refused with exit status 2 (grep, patch) or 1 (sed)
 //! before anything is read, as the tools refuse an argv they do not accept.
@@ -594,10 +596,9 @@ impl Hunk {
     }
 }
 
-/// One file's patch: the text leading up to it, its two names and hunks.
+/// One file's patch: its two names and hunks.
 #[derive(Clone, Debug)]
 struct FilePatch {
-    leading: Vec<Vec<u8>>,
     old_name: Option<String>,
     new_name: Option<String>,
     hunks: Vec<Hunk>,
@@ -633,14 +634,13 @@ fn hunk_header(line: &[u8]) -> Option<(usize, usize, usize, usize)> {
     Some((old_first, old_count, new_first, new_count))
 }
 
-/// The unified diffs in `bytes`, each with the text leading up to it.
+/// The unified diffs in `bytes`.
 fn parse_patches(bytes: &[u8]) -> Result<Vec<FilePatch>, String> {
     let mut raw: Vec<&[u8]> = bytes.split_inclusive(|&byte| byte == b'\n').collect();
     if raw.last().is_some_and(|line| line.is_empty()) {
         raw.pop();
     }
     let mut patches = Vec::new();
-    let mut leading: Vec<Vec<u8>> = Vec::new();
     let mut index = 0;
     while index < raw.len() {
         let line = raw[index];
@@ -652,12 +652,9 @@ fn parse_patches(bytes: &[u8]) -> Result<Vec<FilePatch>, String> {
                 .get(index + 2)
                 .is_some_and(|next| next.starts_with(b"@@ -"));
         if !starts {
-            leading.push(line.to_vec());
             index += 1;
             continue;
         }
-        leading.push(line.to_vec());
-        leading.push(raw[index + 1].to_vec());
         let old_name = header_name(trim_newline(line));
         let new_name = header_name(trim_newline(raw[index + 1]));
         index += 2;
@@ -737,7 +734,6 @@ fn parse_patches(bytes: &[u8]) -> Result<Vec<FilePatch>, String> {
             });
         }
         patches.push(FilePatch {
-            leading: std::mem::take(&mut leading),
             old_name,
             new_name,
             hunks,
@@ -862,6 +858,36 @@ fn reject_text(hunk: &Hunk) -> Vec<u8> {
     text
 }
 
+/// A file name as GNU patch quotes it in its narration: in single quotes,
+/// an embedded single quote spelled `'\''`.
+fn quoted(name: &str) -> String {
+    format!("'{}'", name.replace('\'', "'\\''"))
+}
+
+/// The lines a hunk located at `at` leaves in place of its old side: each
+/// context line as the file has it (a fuzzed one included), each removed
+/// line gone, each added line inserted.
+fn applied(hunk: &Hunk, lines: &[(Vec<u8>, bool)], at: usize) -> Vec<(Vec<u8>, bool)> {
+    let mut cursor = at;
+    let mut replacement = Vec::new();
+    for line in &hunk.lines {
+        match line {
+            HunkLine::Context(text, newline) => {
+                replacement.push(
+                    lines
+                        .get(cursor)
+                        .cloned()
+                        .unwrap_or((text.clone(), *newline)),
+                );
+                cursor += 1;
+            }
+            HunkLine::Removed(..) => cursor += 1,
+            HunkLine::Added(text, newline) => replacement.push((text.clone(), *newline)),
+        }
+    }
+    replacement
+}
+
 fn patch(arguments: &[String]) -> TextToolOutput {
     let usage = || TextToolOutput {
         status: 2,
@@ -910,26 +936,7 @@ fn patch(arguments: &[String]) -> TextToolOutput {
     let directory = PathBuf::from(directory);
     let mut failed_any = false;
     for (number, file) in patches.iter().enumerate() {
-        output.stdout.extend_from_slice(if number == 0 {
-            b"Hmm...  Looks like a unified diff to me...\n".as_slice()
-        } else {
-            b"Hmm...  The next patch looks like a unified diff to me...\n".as_slice()
-        });
-        if !file.leading.is_empty() {
-            output.stdout.extend_from_slice(
-                b"The text leading up to this was:\n--------------------------\n",
-            );
-            for line in &file.leading {
-                output.stdout.push(b'|');
-                output.stdout.extend_from_slice(line);
-                if !line.ends_with(b"\n") {
-                    output.stdout.push(b'\n');
-                }
-            }
-            output
-                .stdout
-                .extend_from_slice(b"--------------------------\n");
-        }
+        let _ = number;
         let name = match (&file.old_name, &file.new_name) {
             (Some(old), _) if file.new_name.is_none() || !reverse => strip_components(old, 1)
                 .or_else(|| {
@@ -982,17 +989,19 @@ fn patch(arguments: &[String]) -> TextToolOutput {
         }
         output
             .stdout
-            .extend(format!("Patching file {name} using Plan A...\n").bytes());
+            .extend(format!("patching file {}\n", quoted(&name)).bytes());
         let mut lines = file_lines(original.as_deref().unwrap_or_default());
         let mut offset: isize = 0;
         let mut rejected: Vec<usize> = Vec::new();
+        // A hunk that needed an offset or fuzz keeps the original as a
+        // backup, as a failed one does (GNU `--backup-if-mismatch`).
+        let mut mismatched = false;
         let hunks: Vec<Hunk> = if reverse {
             file.hunks.iter().map(Hunk::reversed).collect()
         } else {
             file.hunks.clone()
         };
         for (index, hunk) in hunks.iter().enumerate() {
-            let number = index + 1;
             match locate(&lines, hunk, offset) {
                 Some((at, fuzz)) => {
                     let expected = if hunk.old_first == 0 {
@@ -1001,31 +1010,12 @@ fn patch(arguments: &[String]) -> TextToolOutput {
                         hunk.old_first - 1
                     };
                     offset = at as isize - expected as isize;
-                    let old_len = hunk.old().len();
-                    let replacement = hunk.new_side();
-                    let end = (at + old_len).min(lines.len());
+                    mismatched |= fuzz > 0 || offset != 0;
+                    let replacement = applied(hunk, &lines, at);
+                    let end = (at + hunk.old().len()).min(lines.len());
                     lines.splice(at..end, replacement);
-                    let reported = hunk.new_first as isize + offset;
-                    let mut message = format!("Hunk #{number} succeeded at {reported}");
-                    if fuzz > 0 {
-                        message.push_str(&format!(" with fuzz {fuzz}"));
-                    }
-                    if offset != 0 {
-                        message.push_str(&format!(
-                            " (offset {offset} line{})",
-                            if offset.abs() == 1 { "" } else { "s" }
-                        ));
-                    }
-                    message.push_str(".\n");
-                    output.stdout.extend(message.bytes());
                 }
-                None => {
-                    let at = hunk.new_first as isize + offset;
-                    output
-                        .stdout
-                        .extend(format!("Hunk #{number} failed at {at}.\n").bytes());
-                    rejected.push(index);
-                }
+                None => rejected.push(index),
             }
         }
         let mut written = Vec::new();
@@ -1055,22 +1045,22 @@ fn patch(arguments: &[String]) -> TextToolOutput {
                 reject.extend(reject_text(&hunks[index]));
             }
             let _ = fs::write(directory.join(&reject_name), reject);
-            // The original beside it, as BSD patch keeps it when a hunk
-            // does not apply.
-            if let Some(original) = &original {
-                let _ = fs::write(directory.join(format!("{name}.orig")), original);
-            }
             output.stdout.extend(
                 format!(
-                    "{} out of {} hunks failed--saving rejects to {reject_name}\n",
+                    "{} out of {} hunks failed--saving rejects to {}\n",
                     rejected.len(),
-                    hunks.len()
+                    hunks.len(),
+                    quoted(&reject_name)
                 )
                 .bytes(),
             );
         }
+        if (mismatched || !rejected.is_empty())
+            && let Some(original) = &original
+        {
+            let _ = fs::write(directory.join(format!("{name}.orig")), original);
+        }
     }
-    output.stdout.extend_from_slice(b"done\n");
     output.status = i32::from(failed_any);
     output
 }
@@ -1188,7 +1178,7 @@ mod tests {
     }
 
     #[test]
-    fn patch_applies_reverts_and_rejects_as_bsd_patch_narrates() {
+    fn patch_applies_reverts_and_rejects_as_macos_patch_narrates() {
         let scratch = Scratch::new("patch");
         scratch.write("Sources/App.txt", b"zero\nold\nkeep\n");
         let diff = b"diff --git a/Sources/App.txt b/Sources/App.txt\nindex 1..2 100644\n--- a/Sources/App.txt\n+++ b/Sources/App.txt\n@@ -1,2 +1,2 @@\n zero\n-old\n+new\n";
@@ -1196,20 +1186,8 @@ mod tests {
         let root = scratch.root();
         let applied = run("patch", &["-f", "-p1", "-d", &root, "-i", &input]);
         assert_eq!(applied.status, 0, "{applied:?}");
-        assert_eq!(
-            String::from_utf8(applied.stdout).unwrap(),
-            "Hmm...  Looks like a unified diff to me...\n\
-             The text leading up to this was:\n\
-             --------------------------\n\
-             |diff --git a/Sources/App.txt b/Sources/App.txt\n\
-             |index 1..2 100644\n\
-             |--- a/Sources/App.txt\n\
-             |+++ b/Sources/App.txt\n\
-             --------------------------\n\
-             Patching file Sources/App.txt using Plan A...\n\
-             Hunk #1 succeeded at 1.\n\
-             done\n"
-        );
+        assert_eq!(applied.stdout, b"patching file 'Sources/App.txt'\n");
+        assert!(!scratch.0.join("Sources/App.txt.orig").exists());
         assert_eq!(scratch.read("Sources/App.txt"), b"zero\nnew\nkeep\n");
         let reverted = run("patch", &["-f", "-R", "-p1", "-d", &root, "-i", &input]);
         assert_eq!(reverted.status, 0);
@@ -1217,21 +1195,28 @@ mod tests {
         // Offset by two lines.
         scratch.write("Sources/App.txt", b"a\nb\nzero\nold\nkeep\n");
         let offset = run("patch", &["-f", "-p1", "-d", &root, "-i", &input]);
-        assert!(
-            String::from_utf8_lossy(&offset.stdout)
-                .contains("Hunk #1 succeeded at 3 (offset 2 lines).\n"),
-            "{offset:?}"
-        );
+        assert_eq!(offset.stdout, b"patching file 'Sources/App.txt'\n");
         assert_eq!(scratch.read("Sources/App.txt"), b"a\nb\nzero\nnew\nkeep\n");
+        // The original kept, as for a hunk that needed an offset.
+        assert_eq!(
+            scratch.read("Sources/App.txt.orig"),
+            b"a\nb\nzero\nold\nkeep\n"
+        );
+        // Fuzz: a mismatched context line keeps the file's text.
+        scratch.write("Sources/App.txt", b"zero\nold\nchanged\n");
+        assert_eq!(
+            run("patch", &["-f", "-p1", "-d", &root, "-i", &input]).status,
+            0
+        );
+        assert_eq!(scratch.read("Sources/App.txt"), b"zero\nnew\nchanged\n");
         // Already applied: the hunk fails and is rejected.
         let failed = run("patch", &["-f", "-p1", "-d", &root, "-i", &input]);
         assert_eq!(failed.status, 1);
         let narration = String::from_utf8(failed.stdout).unwrap();
-        assert!(
-            narration.contains("Hunk #1 failed at 1.\n")
-                && narration
-                    .contains("1 out of 1 hunks failed--saving rejects to Sources/App.txt.rej\n"),
-            "{narration}"
+        assert_eq!(
+            narration,
+            "patching file 'Sources/App.txt'\n\
+             1 out of 1 hunks failed--saving rejects to 'Sources/App.txt.rej'\n"
         );
         assert!(scratch.0.join("Sources/App.txt.rej").exists());
         // A missing final newline is kept as the patch says.

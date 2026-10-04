@@ -13,7 +13,7 @@
 
 | Area | Change |
 | --- | --- |
-| `arkdeck-hoststore` `workspace_text_tools.rs` (new) | `grep -r -n --include <glob> -- <pattern> <root>`: the root is walked in name order without following links, the glob is matched with `fnmatch`, the pattern is a POSIX BRE (literal bytes, `.`, brackets with classes, `*`, `^`, `$`; groups, intervals and back references are refused), output lines are `<path>:<n>:<line>`, and a file with a NUL in its first 32 KiB prints `Binary file … matches` once. `sed -n <a>,<b>p <file>`: lines `a` to `b`, only `a` when `b < a`, a missing final newline kept missing (as macOS `/usr/bin/sed` answered on CI); a missing file gives `sed: <file>: No such file or directory` and exit 1. `patch -f [-R] -p1 -d <root> -i <file>`: BSD patch's Plan A for unified diffs (exact line, then growing offsets after/before, then fuzz 1–2), BSD narration, a missing final newline kept, and for a hunk that does not apply its reject in BSD's unified form (`@@ -a,b +c,d @@`, both counts spelled out), a `.orig` backup of the original and exit 1. Any other argv is refused before anything is read |
+| `arkdeck-hoststore` `workspace_text_tools.rs` (new) | `grep -r -n --include <glob> -- <pattern> <root>`: the root is walked in name order without following links, the glob is matched with `fnmatch`, the pattern is a POSIX BRE (literal bytes, `.`, brackets with classes, `*`, `^`, `$`; groups, intervals and back references are refused), output lines are `<path>:<n>:<line>`, and a file with a NUL in its first 32 KiB prints `Binary file … matches` once. `sed -n <a>,<b>p <file>`: lines `a` to `b`, only `a` when `b < a`, a missing final newline kept missing (as macOS `/usr/bin/sed` answered on CI); a missing file gives `sed: <file>: No such file or directory` and exit 1. `patch -f [-R] -p1 -d <root> -i <file>`: BSD patch's Plan A for unified diffs (exact line, then growing offsets after/before, then fuzz 1–2), macOS's (GNU) narration (`patching file '<name>'`), a missing final newline kept, and for a hunk that does not apply its reject in unified form (`@@ -a,b +c,d @@`, both counts spelled out) and exit 1; the original is kept as `.orig` when a hunk needed an offset or fuzz, or failed. Any other argv is refused before anything is read |
 | `arkdeck-agentd` `main.rs` | `--workspace-tool <grep\|sed\|patch> <argv>` (Windows): the daemon image is each tool, answered before any composition |
 | `workspace_profile.rs` | `CodeOwnedTools { inspection, reader, patch, archive, source_control }` is the role table, documented with the macOS and Windows rows. On Windows the three text roles are the daemon's own image with `--workspace-tool <tool>`, pinned by digest. `external_tools(root)` holds the `archive`/`source_control` slots, which still refuse until the trusted system tools are composed, so a project still resolves to no profile, now with the reason `no trusted system archive (tar) or source-control (git) tool is composed on Windows yet`. `ark_deck` on Windows answers macOS's own SwiftPM-absent reason |
 
@@ -69,3 +69,13 @@ two
 `). The reimplementation now matches it; macOS stays
 the oracle. The same class of question (a final newline, an empty input, carriage returns) now
 has corpus cases for sed, grep and patch. The test reports every mismatch of a run at once.
+
+## Second correction: macOS patch answers as GNU patch (2026-10-04)
+
+The macOS lane (xcode-27) showed what `/usr/bin/patch` answers on the runner. It narrates as GNU
+patch does: one `patching file '<name>'` line per file, and for failing hunks `n out of m hunks
+failed--saving rejects to '<name>.rej'`. There is no BSD "Hmm..." narration and no per-hunk
+line. A fuzzed context line keeps the file's text. The original is kept as `<name>.orig` when a
+hunk needed an offset or fuzz, or failed (GNU's `--backup-if-mismatch`). The reimplementation now
+answers that way. Three corpus cases were added: two hunks with the second failing, the creation
+of a file, and a reverse with an offset. The macOS lane settles them.
