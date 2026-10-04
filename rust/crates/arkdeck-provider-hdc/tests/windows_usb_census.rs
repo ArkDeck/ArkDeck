@@ -5,8 +5,11 @@
 //! scripted HDC's `list targets -v` (the `device candidates` read) and holds
 //! the adoption's final check over the identity readback (`target adopt`).
 //! No process, device or board is involved; the node's serial is the observe
-//! fixture's placeholder. On Windows the production reader also answers over
-//! this host's own device tree, which proves nothing about a device.
+//! fixture's placeholder, spelt in upper case in the instance ID as the
+//! 2026-10-04 DAYU200 sample spells it, against the lower-case connect key
+//! (`dayu200-usb-properties-20261004-run.md`; maintainer ruling 2026-10-04,
+//! items 4 and 5). On Windows the production reader also answers over this
+//! host's own device tree, which proves nothing about a device.
 use arkdeck_platform::{DeviceNode, NodeProperty, NodeValue, UsbHostDevice};
 use arkdeck_provider_hdc::{
     DAYU200_NORMAL_PRODUCT_ID, DispatchFailure, Expected, HdcDispatch, NoUsbRelations, ProcessPlan,
@@ -21,6 +24,7 @@ const CONNECT_KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 /// A present device node as the Windows census hands one to its rule.
 #[derive(Clone)]
 struct Node {
+    present: bool,
     instance_id: String,
     hardware_ids: Vec<&'static str>,
     location: &'static str,
@@ -35,6 +39,7 @@ impl DeviceNode for Node {
 
     fn property(&self, key: NodeProperty) -> Option<NodeValue> {
         match key {
+            NodeProperty::IsPresent => Some(NodeValue::Boolean(self.present)),
             NodeProperty::HardwareIds => Some(NodeValue::TextList(
                 self.hardware_ids
                     .iter()
@@ -50,10 +55,15 @@ impl DeviceNode for Node {
     }
 }
 
-/// The DAYU200 in its HDC-normal personality, attached at `arrival`.
+/// The DAYU200 in its HDC-normal personality, attached at `arrival`, its
+/// instance ID spelling the serial in upper case as the sample's does.
 fn board(arrival: u64) -> Node {
     Node {
-        instance_id: format!("USB\\VID_2207&PID_5000\\{CONNECT_KEY}"),
+        present: true,
+        instance_id: format!(
+            "USB\\VID_2207&PID_5000\\{}",
+            CONNECT_KEY.to_ascii_uppercase()
+        ),
         hardware_ids: vec!["USB\\VID_2207&PID_5000&REV_0223", "USB\\VID_2207&PID_5000"],
         location: "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(3)",
         name: Some("HDC Device"),
@@ -105,9 +115,18 @@ fn a_windows_census_node_proves_the_candidate_and_holds_the_adoption() {
 
     // The board beside nodes that are not it: another vendor's device, the
     // board's own interface node, the board with a Windows-generated suffix
-    // (no serial), and the Loader personality.
+    // (no serial), the Loader personality, and a phantom (non-present)
+    // Loader node as the sample's host remembers one.
     let nodes = vec![
         Node {
+            present: false,
+            instance_id: "USB\\VID_2207&PID_350A\\AAAAAAAAAAAAAAAA".into(),
+            hardware_ids: vec!["USB\\VID_2207&PID_350A&REV_0100"],
+            name: Some("USB download gadget"),
+            ..board(3)
+        },
+        Node {
+            present: true,
             instance_id: "USB\\VID_046D&PID_C52B\\bbbbbbbb".into(),
             hardware_ids: vec!["USB\\VID_046D&PID_C52B&REV_1211"],
             location: "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(1)",
@@ -134,7 +153,7 @@ fn a_windows_census_node_proves_the_candidate_and_holds_the_adoption() {
     assert_eq!(
         devices.len(),
         3,
-        "the interface and the generated suffix are passed over"
+        "the phantom, the interface and the generated suffix are passed over"
     );
     let reader = UsbRegistryRelations::new(move || Ok(devices.clone()));
     let reading = Reading::take(&dispatch, &reader).unwrap();
@@ -142,7 +161,10 @@ fn a_windows_census_node_proves_the_candidate_and_holds_the_adoption() {
     let row = &reading.rows()[0];
     assert_eq!(row.continuity(), "relationProven");
     let relation = row.relation.clone().unwrap();
-    assert_eq!(relation.serial, CONNECT_KEY);
+    assert_eq!(
+        relation.serial, CONNECT_KEY,
+        "the upper-case instance suffix, folded, is the lower-case connect key"
+    );
     assert_eq!(relation.attachment_id, 133_000_000_000_000_017);
     assert_eq!(relation.vendor_id, ROCKUSB_VENDOR_ID);
     assert_eq!(relation.product_id, DAYU200_NORMAL_PRODUCT_ID);
@@ -199,60 +221,129 @@ fn a_windows_census_node_proves_the_candidate_and_holds_the_adoption() {
     }
 }
 
-/// The production reader fails closed while CHG-2026-078 §4's field mapping
-/// awaits the DAYU200 sample: no relation is read, the refusal names every
-/// `TBD(sample)` field, and a relation proof over it is refused as a census
-/// that cannot be taken. The same nodes by the same rule
-/// (`usb_device_node_census`) still answer over this host's own device tree,
-/// and whatever DAYU200 they hold would be a usable relation once the
-/// mapping is confirmed. A host-only read, never device evidence; nothing
-/// identifying is printed.
-#[cfg(windows)]
+/// A phantom board node (the board unplugged, its node remembered with its
+/// last attachment's properties) is never a relation, so the candidate HDC
+/// still lists is unproved.
 #[test]
-fn the_system_census_reader_fails_closed_until_the_sample_confirms_its_mapping() {
-    let unconfirmed = arkdeck_platform::unconfirmed_census_fields();
-    assert_eq!(
-        unconfirmed,
-        [
-            "device",
-            "vendorId/productId",
-            "serial",
-            "topology",
-            "productName",
-            "attachment"
-        ]
-    );
-    let refusal = UsbRegistryRelations::system().relations().unwrap_err();
-    assert_eq!(refusal, "admissionRejected(\"USB registry unavailable\")");
-    let cause = arkdeck_platform::usb_host_devices().unwrap_err();
-    assert_eq!(
-        cause,
-        arkdeck_platform::RegistryUnavailable::MappingUnconfirmed
-    );
-    assert_eq!(
-        cause.to_string(),
-        format!(
-            "USB registry unavailable: the Windows census field mapping awaits the DAYU200 USB \
-             sample (CHG-2026-078 WHR-003); TBD(sample): {}",
-            unconfirmed.join(", ")
-        )
-    );
-    // The adoption's relation proof over it: refused before any device list.
+fn a_phantom_board_node_proves_nothing() {
     let dispatch = Scripted {
         calls: Cell::new(0),
     };
-    let refused = Reading::take(&dispatch, &UsbRegistryRelations::system()).unwrap_err();
-    assert_eq!(refused.0, "admissionRejected(\"USB registry unavailable\")");
-    assert_eq!(dispatch.calls.get(), 0, "no device list was read");
+    let phantom = Node {
+        present: false,
+        ..board(133_000_000_000_000_017)
+    };
+    let reader = UsbRegistryRelations::new(move || Ok(census(std::slice::from_ref(&phantom))));
+    assert!(reader.relations().unwrap().is_empty());
+    let reading = Reading::take(&dispatch, &reader).unwrap();
+    assert_eq!(reading.rows()[0].continuity(), "generationScoped");
+}
 
-    let devices =
-        arkdeck_platform::usb_device_node_census().expect("the host's USB device census answers");
-    let relations = UsbRegistryRelations::new(move || Ok(devices.clone()))
+/// The sample's replug: the same board into the same physical connector,
+/// enumerated first as USB 2 (`USB(10)`, `HS10`) and then as USB 3
+/// (`USB(26)`, `SS10`), each with its own `LastArrivalDate`. Each attachment
+/// proves its own relation; they share the device identity (the folded
+/// serial) and differ in attachment and topology, so the first attachment's
+/// adoption does not hold over the second.
+#[test]
+fn a_replug_onto_another_enumeration_is_the_same_identity_in_a_new_attachment() {
+    let dispatch = Scripted {
+        calls: Cell::new(0),
+    };
+    let usb2 = Node {
+        location: "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(10)",
+        ..board(133_000_000_000_000_009)
+    };
+    let usb3 = Node {
+        location: "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(26)",
+        ..board(133_000_000_003_811_709)
+    };
+    let prove = |node: Node| {
+        let reader = UsbRegistryRelations::new(move || Ok(census(std::slice::from_ref(&node))));
+        let reading = Reading::take(&dispatch, &reader).unwrap();
+        let row = reading.rows()[0].clone();
+        assert_eq!(row.continuity(), "relationProven");
+        (row.relation.unwrap(), reader.relations().unwrap())
+    };
+    let (first, _) = prove(usb2);
+    let (second, live) = prove(usb3);
+    assert_eq!(first.serial, second.serial);
+    assert_eq!(
+        stable_identity_sha256_for_serial(&first.serial),
+        stable_identity_sha256_for_serial(&second.serial),
+        "one device identity"
+    );
+    assert_ne!(
+        first.attachment_id, second.attachment_id,
+        "a new attachment"
+    );
+    assert_ne!(
+        first.location, second.location,
+        "topology is per attachment"
+    );
+    let identity = observe_device_identity(&dispatch, CONNECT_KEY, Expected::default()).unwrap();
+    assert!(!adoption_holds(&first, &live, &identity));
+    assert!(adoption_holds(&second, &live, &identity));
+}
+
+/// Topology is valid only within one attachment: a location that differs
+/// between the two brackets of one reading under the same arrival is not an
+/// unchanged relation, so nothing is proved (fail closed).
+#[test]
+fn a_topology_that_moves_within_one_attachment_proves_nothing() {
+    let dispatch = Scripted {
+        calls: Cell::new(0),
+    };
+    let reads = Cell::new(0_u32);
+    let reader = UsbRegistryRelations::new(move || {
+        reads.set(reads.get() + 1);
+        let location = if reads.get() == 1 {
+            "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(10)"
+        } else {
+            "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(26)"
+        };
+        Ok(census(&[Node {
+            location,
+            ..board(133_000_000_000_000_017)
+        }]))
+    });
+    let reading = Reading::take(&dispatch, &reader).unwrap();
+    assert_eq!(reading.rows()[0].continuity(), "generationScoped");
+}
+
+/// A port-derived instance suffix (one holding `&`, in either case) is no
+/// serial and no identity: the census passes the node over and the candidate
+/// stays unproved.
+#[test]
+fn a_port_derived_suffix_is_refused() {
+    let dispatch = Scripted {
+        calls: Cell::new(0),
+    };
+    for suffix in ["5&1a2b3c&0&3", "5&1A2B3C&0&3"] {
+        let node = Node {
+            instance_id: format!("USB@@VID_2207&PID_5000@@{suffix}"),
+            ..board(133_000_000_000_000_017)
+        };
+        assert!(census(std::slice::from_ref(&node)).is_empty(), "{suffix}");
+        let reader = UsbRegistryRelations::new(move || Ok(census(std::slice::from_ref(&node))));
+        let reading = Reading::take(&dispatch, &reader).unwrap();
+        assert_eq!(reading.rows()[0].continuity(), "generationScoped");
+    }
+}
+
+/// The production reader is open since the 2026-10-04 sample confirmed
+/// CHG-2026-078 §4's field mapping: it answers over this host's own device
+/// tree, every relation it reads is usable and spelt in lower case. A
+/// host-only read, never device evidence; nothing identifying is printed.
+#[cfg(windows)]
+#[test]
+fn the_system_census_reader_answers_once_the_sample_confirmed_its_mapping() {
+    assert!(arkdeck_platform::unconfirmed_census_fields().is_empty());
+    let relations = UsbRegistryRelations::system()
         .relations()
-        .unwrap();
+        .expect("the system census answers");
     eprintln!(
-        "{} DAYU200 relation(s) on this host by the unconfirmed rule: a host-only read, not \
-         device evidence",
+        "{} DAYU200 relation(s) on this host: a host-only read, not device evidence",
         relations.len()
     );
     for relation in &relations {
@@ -260,5 +351,11 @@ fn the_system_census_reader_fails_closed_until_the_sample_confirms_its_mapping()
         assert_eq!(relation.product_id, DAYU200_NORMAL_PRODUCT_ID);
         assert_ne!(relation.attachment_id, 0);
         assert!(relation.is_usable());
+        assert!(
+            !relation
+                .serial
+                .bytes()
+                .any(|byte| byte.is_ascii_uppercase())
+        );
     }
 }

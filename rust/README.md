@@ -2812,8 +2812,8 @@ composes, as the macOS compositions do:
 
 - the lane from `ARKDECK_ARKFORGE_BUNDLE_PATH`, with Swift's absences;
 - the Flash planning over it;
-- the Flash facts over the Windows USB census, which fails closed until the
-  DAYU200 sample confirms its mapping;
+- the Flash facts over the Windows USB census (open since the DAYU200 sample
+  confirmed its mapping);
 - the device access observer.
 
 The lane's authority binds the managed-control HDC's digest, and no HDC is
@@ -3272,25 +3272,36 @@ DeviceSet` / `Enumeration`), never a shorter list.
 
 `UsbHostDevice::from_device_node` is the per-node rule, failing closed as the
 macOS per-entry rule does. The property choice lives there and in
-`NodeProperty` only, and is **provisional** until the maintainer's DAYU200
-sample (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`)
-confirms it:
+`NodeProperty` only. It is CHG-2026-078 design §4 (the Windows profile's USB
+census row, TASK-WHR-003), confirmed by the maintainer's DAYU200 sample of
+2026-10-04 (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`)
+and maintainer ruling 2026-10-04, items 4 and 5; every `CENSUS_MAPPING` row is
+`Confirmed`, so `usb_host_devices()` is open (a row set back to `Tbd` closes it
+with `RegistryUnavailable::MappingUnconfirmed`):
 
-- entry: a device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`; interface nodes
-  (`&MI_xx`), hubs without numbers and other enumerators are passed over;
+- entry: a present device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`
+  (`DEVPKEY_Device_IsPresent` true, besides `DIGCF_PRESENT`); phantom nodes,
+  which keep their last attachment's properties, interface nodes (`&MI_xx`),
+  hubs without numbers and other enumerators are passed over;
 - vendor and product: the first `USB\VID_…&PID_…` entry of
   `DEVPKEY_Device_HardwareIds`, which must name the instance ID's numbers;
-- serial: the instance ID's suffix, taken as it is; a suffix holding `&` is a
-  Windows-generated, port-derived ID, so the node has no serial and is passed
-  over;
+- serial: the instance ID's suffix, ASCII-lowercase folded (the instance ID
+  spells the board's serial in upper case, the HDC connect key is lower case);
+  a suffix holding `&` is a Windows-generated, port-derived ID, so the node has
+  no serial and no identity and is passed over. The long-term device identity
+  is the folded serial;
 - topology: the first `DEVPKEY_Device_LocationPaths` entry, spelled as the
   decimal of the first eight bytes (big-endian) of its SHA-256 (the relation
-  rule accepts only a canonical decimal location; it is stable per port and
-  never equal to a macOS `locationID`);
+  rule accepts only a canonical decimal location; never equal to a macOS
+  `locationID`). It is valid only within one attachment: the sample's board
+  moved from `USB(10)` (USB 2) to `USB(26)` (USB 3) on a replug into the same
+  connector, which is the same identity in a new attachment;
 - product name: `DEVPKEY_Device_BusReportedDeviceDesc` (optional; without it
   the board is not the registered HDC-normal DAYU200 and proves nothing);
 - attachment: `DEVPKEY_Device_LastArrivalDate` (a `FILETIME`; none when absent
-  or zero, and then no relation is formed).
+  or zero, and then no relation is formed). One attachment is the pair
+  (instance ID, arrival), which a relation carries as its numbers and serial
+  with its attachment ID.
 
 `UsbRegistryRelations::system()` reads this census on Windows. The Windows
 daemon composes the Target observation owner it feeds (see
@@ -3299,11 +3310,15 @@ macOS rule: only beside a registered HDC the composition started as its managed
 server. No Windows HDC tuple is registered yet, so it reads no relation.
 
 Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
-sets, and this host's census answering with well-formed entries, shape only);
-the provider's `tests/windows_usb_census.rs` (a synthetic node through the
-Windows rule proving a scripted HDC's candidate and holding the adoption's final
-check, a replug or a missing name, arrival or serial proving nothing, and on
-Windows this host's tree through `system()`). None of it is device evidence.
+sets: the upper-case suffix folded, a phantom passed over, a new arrival a new
+attachment of the same identity; and this host's census answering with
+well-formed entries, shape only); the provider's `tests/windows_usb_census.rs`
+(a synthetic node with an upper-case suffix proving a scripted HDC's
+lower-case candidate and holding the adoption's final check; a phantom board, a
+port-derived suffix, a topology moving within one attachment, a replug between
+the brackets or a missing name, arrival or serial proving nothing; a USB 2 to
+USB 3 replug proving the same identity in a new attachment; and on Windows this
+host's tree through `system()`). None of it is device evidence.
 
 ## Windows Target owners (TASK-XPA-004)
 

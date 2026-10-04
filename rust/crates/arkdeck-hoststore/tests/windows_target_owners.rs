@@ -74,6 +74,7 @@ impl DeviceNode for Node {
     }
     fn property(&self, key: NodeProperty) -> Option<NodeValue> {
         match key {
+            NodeProperty::IsPresent => Some(NodeValue::Boolean(true)),
             NodeProperty::HardwareIds => Some(NodeValue::TextList(vec![
                 "USB\\VID_2207&PID_5000&REV_0223".into(),
                 "USB\\VID_2207&PID_5000".into(),
@@ -86,10 +87,11 @@ impl DeviceNode for Node {
 }
 
 /// The DAYU200 in its HDC-normal personality on one port, its serial the
-/// oracle's connect key.
+/// oracle's connect key, spelt in upper case as the 2026-10-04 sample's
+/// instance ID spells it (the census folds it).
 fn board(location: &'static str) -> Node {
     Node {
-        instance_id: format!("USB\\VID_2207&PID_5000\\{KEY}"),
+        instance_id: format!("USB\\VID_2207&PID_5000\\{}", KEY.to_ascii_uppercase()),
         location,
     }
 }

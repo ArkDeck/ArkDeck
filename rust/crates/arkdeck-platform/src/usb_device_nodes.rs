@@ -13,41 +13,48 @@
 //! every path.
 //!
 //! [`UsbHostDevice::from_device_node`] is the per-node rule, failing closed as
-//! macOS's per-entry rule does: a node without both numbers, a topology and a
-//! serial is no identity and is passed over; a property of an unexpected type
-//! counts as absent; the product name is optional; the attachment is absent
-//! when the node answers none or zero.
+//! macOS's per-entry rule does: a node that is not present, or without both
+//! numbers, a topology and a serial, is no identity and is passed over; a
+//! property of an unexpected type counts as absent; the product name is
+//! optional; the attachment is absent when the node answers none or zero.
 //!
-//! # Provisional property choice, and the gate that holds it
+//! # The confirmed property choice
 //!
 //! Which Windows property carries which census field is the mapping of
-//! CHG-2026-078 design §4, taken from the USB crib. It is written down once,
-//! in [`CENSUS_MAPPING`], each field `TBD(sample)` until the maintainer's
-//! DAYU200 USB-properties sample (WHR-003,
-//! `evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`)
-//! confirms it, and the rule implementing it is
+//! CHG-2026-078 design §4 (TASK-WHR-003, the Windows profile's USB census
+//! row), confirmed by the maintainer's DAYU200 USB-properties sample of
+//! 2026-10-04
+//! (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`) and
+//! maintainer ruling 2026-10-04, items 4 and 5. It is written down once, in
+//! [`CENSUS_MAPPING`], and the rule implementing it is
 //! [`UsbHostDevice::from_device_node`] together with [`NodeProperty`].
-//! **While any field is `TBD(sample)`, [`usb_host_devices`] (the census a USB
-//! relation is proved from) fails closed** with
-//! [`crate::RegistryUnavailable::MappingUnconfirmed`], naming the fields: no
-//! Target relation is ever proved from an unconfirmed mapping.
-//! [`usb_device_node_census`] reads the same nodes by the same rule for
-//! diagnostics and the host's own tests, and is never a relation source.
+//! [`usb_host_devices`] (the census a USB relation is proved from) opens only
+//! while every row is `Confirmed`; a row set back to `TBD(sample)` closes it
+//! again with [`crate::RegistryUnavailable::MappingUnconfirmed`].
 //!
-//! | census field | Windows source (provisional) |
+//! | census field | Windows source |
 //! | --- | --- |
-//! | the entry | a device-level node `USB\VID_hhhh&PID_hhhh\<suffix>` (no `&MI_xx` interface node) |
+//! | the entry | a **present** (`DEVPKEY_Device_IsPresent`, besides `DIGCF_PRESENT`) device-level node `USB\VID_hhhh&PID_hhhh\<suffix>` (no `&MI_xx` interface node); a phantom node keeps its last attachment's properties and is never an entry |
 //! | vendor, product | `DEVPKEY_Device_HardwareIds`, the first `USB\VID_hhhh&PID_hhhh…` entry, which must name the same numbers as the instance ID |
-//! | serial | the instance ID's third segment; a suffix holding `&` is a Windows-generated, port-derived ID: **no serial, the node is passed over** |
+//! | serial | the instance ID's third segment, **ASCII-lowercase folded** (the instance ID spells the device's serial in upper case, the HDC connect key is lower case); a suffix holding `&` is a Windows-generated, port-derived ID: **no serial, no identity, the node is passed over** |
 //! | topology | the first `DEVPKEY_Device_LocationPaths` entry, as the decimal of the first eight bytes (big-endian) of its UTF-8 SHA-256 (see below) |
 //! | product name | `DEVPKEY_Device_BusReportedDeviceDesc` (the device's own iProduct; `FriendlyName`/`DeviceDesc` come from the driver INF) |
-//! | attachment | `DEVPKEY_Device_LastArrivalDate` (a `FILETIME`, one arrival of the device) |
+//! | attachment | `DEVPKEY_Device_LastArrivalDate` (a `FILETIME`, new on every arrival, fixed within one) |
+//!
+//! One attachment is the pair (instance ID, `LastArrivalDate`): the instance
+//! ID (and `PDOName`) repeats across attachments, so neither names one alone.
+//! A relation carries the pair as its vendor, product and folded serial (the
+//! instance ID) with its attachment ID (the arrival), and two reads agree only
+//! when the whole pair does. The long-term device identity is the folded
+//! serial alone (`stable_identity_sha256_for_serial`, which lower-cases too).
 //!
 //! The topology is a Windows-only spelling: Windows has no packed 32-bit
 //! `locationID`, and the relation rule accepts only a canonical decimal
-//! location. The location path names the physical port chain up to the host
-//! controller, so its digest is stable for one port and differs between
-//! ports; it is never byte-equal to a macOS topology.
+//! location. It is never byte-equal to a macOS topology, and it is **valid
+//! only within one attachment**: the sample's board moved from `USB(10)`
+//! (`HS10`, USB 2) to `USB(26)` (`SS10`, USB 3) when replugged into the same
+//! physical connector. It is never part of the long-term identity: such a
+//! replug is the same device identity in a new attachment.
 use crate::usb_registry::UsbHostDevice;
 use sha2::{Digest, Sha256};
 
@@ -71,39 +78,39 @@ pub struct CensusField {
 }
 
 /// CHG-2026-078 design §4, the Windows USB relation census mapping, in the
-/// one place it is decided. When the processed DAYU200 USB sample (WHR-003)
-/// confirms a row, set it `Confirmed` (and change the rule if the sample
-/// refutes the source); the trusted census opens only when every row is.
+/// one place it is decided. Every row is confirmed by the DAYU200 USB sample of
+/// 2026-10-04 (`dayu200-usb-properties-20261004-run.md`) and maintainer ruling
+/// 2026-10-04, items 4 and 5; the trusted census opens only while every row is.
 pub const CENSUS_MAPPING: [CensusField; 6] = [
     CensusField {
         field: "device",
-        source: "the device-level node USB\\VID_hhhh&PID_hhhh\\<suffix>, never an &MI_xx interface node",
-        sample: CensusSample::Tbd,
+        source: "a present (DEVPKEY_Device_IsPresent) device-level node USB\\VID_hhhh&PID_hhhh\\<suffix>, never an &MI_xx interface node or a phantom",
+        sample: CensusSample::Confirmed,
     },
     CensusField {
         field: "vendorId/productId",
         source: "the first USB\\VID_hhhh&PID_hhhh entry of DEVPKEY_Device_HardwareIds, equal to the instance ID's",
-        sample: CensusSample::Tbd,
+        sample: CensusSample::Confirmed,
     },
     CensusField {
         field: "serial",
-        source: "the instance ID's third segment, case as is; a suffix holding & is port-derived: no serial",
-        sample: CensusSample::Tbd,
+        source: "the instance ID's third segment, ASCII-lowercase folded; a suffix holding & is port-derived: no serial, no identity",
+        sample: CensusSample::Confirmed,
     },
     CensusField {
         field: "topology",
-        source: "the first DEVPKEY_Device_LocationPaths entry, hashed (ruling 11)",
-        sample: CensusSample::Tbd,
+        source: "the first DEVPKEY_Device_LocationPaths entry, hashed (ruling 11); valid only within one attachment",
+        sample: CensusSample::Confirmed,
     },
     CensusField {
         field: "productName",
         source: "DEVPKEY_Device_BusReportedDeviceDesc",
-        sample: CensusSample::Tbd,
+        sample: CensusSample::Confirmed,
     },
     CensusField {
         field: "attachment",
-        source: "DEVPKEY_Device_LastArrivalDate, changing on every arrival",
-        sample: CensusSample::Tbd,
+        source: "DEVPKEY_Device_LastArrivalDate, with the instance ID: one attachment is the pair",
+        sample: CensusSample::Confirmed,
     },
 ];
 
@@ -121,9 +128,11 @@ fn unconfirmed(mapping: &[CensusField]) -> Vec<&'static str> {
 }
 
 /// A device property the Windows census reads. The `DEVPKEY` each one names is
-/// part of the provisional property choice (module documentation).
+/// part of the confirmed property choice (module documentation).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NodeProperty {
+    /// `DEVPKEY_Device_IsPresent`: a boolean.
+    IsPresent,
     /// `DEVPKEY_Device_HardwareIds`: a string list.
     HardwareIds,
     /// `DEVPKEY_Device_LocationPaths`: a string list.
@@ -144,6 +153,9 @@ pub enum NodeValue {
     TextList(Vec<String>),
     /// `DEVPROP_TYPE_FILETIME`, as its 64-bit count of 100 ns intervals.
     FileTime(u64),
+    /// `DEVPROP_TYPE_BOOLEAN`: `DEVPROP_TRUE` or `DEVPROP_FALSE` (any other
+    /// byte is [`NodeValue::Other`]).
+    Boolean(bool),
     /// Any other property type.
     Other,
 }
@@ -158,12 +170,17 @@ pub trait DeviceNode {
 
 impl UsbHostDevice {
     /// The Windows per-node rule, or `None` for a node the census passes over.
-    /// **Provisional** property choice: see the module documentation.
+    /// The confirmed property choice: see the module documentation.
     pub fn from_device_node<N: DeviceNode + ?Sized>(node: &N) -> Option<Self> {
         let list = |key| match node.property(key) {
             Some(NodeValue::TextList(values)) => Some(values),
             _ => None,
         };
+        // Present nodes only: a phantom keeps its last attachment's
+        // properties. A node that does not answer `true` is passed over.
+        if node.property(NodeProperty::IsPresent) != Some(NodeValue::Boolean(true)) {
+            return None;
+        }
         let instance_id = node.instance_id()?;
         let (vendor_id, product_id, serial) = device_instance(&instance_id)?;
         // The bus-reported hardware ID must name the numbers the instance ID
@@ -197,9 +214,11 @@ impl UsbHostDevice {
 }
 
 /// A device-level USB instance ID, `USB\VID_hhhh&PID_hhhh\<serial>`: its
-/// numbers and its serial. An interface node (`…&MI_xx`), another
-/// enumerator, a malformed ID and a Windows-generated suffix (one holding
-/// `&`) are `None`.
+/// numbers and its serial, ASCII-lowercase folded (maintainer ruling
+/// 2026-10-04, item 4: the instance ID spells the serial in upper case, the
+/// HDC connect key in lower case). An interface node (`…&MI_xx`), another
+/// enumerator, a malformed ID and a Windows-generated, port-derived suffix
+/// (one holding `&`) are `None`: no serial, no identity.
 fn device_instance(instance_id: &str) -> Option<(u16, u16, String)> {
     let mut segments = instance_id.split('\\');
     let (enumerator, device, suffix) = (segments.next()?, segments.next()?, segments.next()?);
@@ -212,7 +231,7 @@ fn device_instance(instance_id: &str) -> Option<(u16, u16, String)> {
         return None;
     }
     let (vendor, product) = usb_numbers(device)?;
-    Some((vendor, product, suffix.to_owned()))
+    Some((vendor, product, suffix.to_ascii_lowercase()))
 }
 
 /// `VID_hhhh&PID_hhhh`, optionally followed by `&…` (a hardware ID's
@@ -232,8 +251,8 @@ fn usb_numbers(text: &str) -> Option<(u16, u16)> {
 }
 
 /// The topology of one location path: the decimal of the first eight bytes,
-/// big-endian, of the SHA-256 of its UTF-8. Provisional (module
-/// documentation).
+/// big-endian, of the SHA-256 of its UTF-8 (ruling 11). Valid only within one
+/// attachment (module documentation).
 fn location_topology(location: &str) -> String {
     let digest = Sha256::digest(location.as_bytes());
     let mut first = [0_u8; 8];
@@ -254,8 +273,9 @@ impl StripPrefixIgnoreCase for str {
 }
 
 /// The census a USB relation is proved from: every device-level USB identity
-/// present on the host ([`usb_device_node_census`]), once every field of
-/// [`CENSUS_MAPPING`] is confirmed; until then it fails closed with
+/// present on the host ([`usb_device_node_census`]), while every field of
+/// [`CENSUS_MAPPING`] is confirmed (as it is since the 2026-10-04 sample);
+/// otherwise it fails closed with
 /// [`crate::RegistryUnavailable::MappingUnconfirmed`] and reads nothing.
 #[cfg(windows)]
 pub fn usb_host_devices() -> Result<Vec<UsbHostDevice>, crate::RegistryUnavailable> {
@@ -265,11 +285,11 @@ pub fn usb_host_devices() -> Result<Vec<UsbHostDevice>, crate::RegistryUnavailab
     usb_device_node_census()
 }
 
-/// Every device-level USB identity present on the host by the provisional
-/// rule, in device information set order: nodes the per-node rule passes
-/// over are not listed, and nothing is deduplicated. Read-only: see the
-/// module documentation. For diagnostics and the host's own tests only:
-/// never a relation source while the mapping is unconfirmed.
+/// Every device-level USB identity present on the host by the per-node rule,
+/// in device information set order: nodes the rule passes over are not
+/// listed, and nothing is deduplicated. Read-only: see the module
+/// documentation. A relation source only through [`usb_host_devices`], which
+/// holds the mapping gate.
 #[cfg(windows)]
 pub fn usb_device_node_census() -> Result<Vec<UsbHostDevice>, crate::RegistryUnavailable> {
     setupapi::census(|node| UsbHostDevice::from_device_node(node))
@@ -285,9 +305,10 @@ mod setupapi {
         SetupDiGetClassDevsW, SetupDiGetDevicePropertyW,
     };
     use windows_sys::Win32::Devices::Properties::{
-        DEVPKEY_Device_BusReportedDeviceDesc, DEVPKEY_Device_HardwareIds,
-        DEVPKEY_Device_LastArrivalDate, DEVPKEY_Device_LocationPaths, DEVPROP_TYPE_FILETIME,
-        DEVPROP_TYPE_STRING, DEVPROP_TYPE_STRING_LIST, DEVPROPTYPE,
+        DEVPKEY_Device_BusReportedDeviceDesc, DEVPKEY_Device_HardwareIds, DEVPKEY_Device_IsPresent,
+        DEVPKEY_Device_LastArrivalDate, DEVPKEY_Device_LocationPaths, DEVPROP_FALSE, DEVPROP_TRUE,
+        DEVPROP_TYPE_BOOLEAN, DEVPROP_TYPE_FILETIME, DEVPROP_TYPE_STRING, DEVPROP_TYPE_STRING_LIST,
+        DEVPROPTYPE,
     };
     use windows_sys::Win32::Foundation::{
         DEVPROPKEY, ERROR_INSUFFICIENT_BUFFER, ERROR_NO_MORE_ITEMS, GetLastError,
@@ -315,6 +336,7 @@ mod setupapi {
 
     fn key(property: NodeProperty) -> &'static DEVPROPKEY {
         match property {
+            NodeProperty::IsPresent => &DEVPKEY_Device_IsPresent,
             NodeProperty::HardwareIds => &DEVPKEY_Device_HardwareIds,
             NodeProperty::LocationPaths => &DEVPKEY_Device_LocationPaths,
             NodeProperty::BusReportedDeviceDesc => &DEVPKEY_Device_BusReportedDeviceDesc,
@@ -400,6 +422,11 @@ mod setupapi {
                     }
                     NodeValue::FileTime(u64::from_ne_bytes(time))
                 }
+                DEVPROP_TYPE_BOOLEAN if bytes == 1 => match units[0].to_ne_bytes()[0] {
+                    DEVPROP_TRUE => NodeValue::Boolean(true),
+                    DEVPROP_FALSE => NodeValue::Boolean(false),
+                    _ => NodeValue::Other,
+                },
                 _ => NodeValue::Other,
             })
         }
@@ -471,6 +498,7 @@ mod tests {
 
     fn name(key: NodeProperty) -> &'static str {
         match key {
+            NodeProperty::IsPresent => "IsPresent",
             NodeProperty::HardwareIds => "HardwareIds",
             NodeProperty::LocationPaths => "LocationPaths",
             NodeProperty::BusReportedDeviceDesc => "BusReportedDeviceDesc",
@@ -521,6 +549,7 @@ mod tests {
             properties: BTreeMap::new(),
         }
         .id(Some(&format!("USB\\VID_2207&PID_5000\\{SERIAL}")))
+        .with(NodeProperty::IsPresent, Some(NodeValue::Boolean(true)))
         .with(
             NodeProperty::HardwareIds,
             list(&["USB\\VID_2207&PID_5000&REV_0223", "USB\\VID_2207&PID_5000"]),
@@ -565,11 +594,18 @@ mod tests {
     }
 
     #[test]
-    fn the_topology_is_stable_per_port_and_differs_between_ports() {
+    fn the_topology_is_one_location_path_and_differs_between_paths() {
         assert_eq!(location_topology(LOCATION), location_topology(LOCATION));
         assert_ne!(
             location_topology(LOCATION),
             location_topology("PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(4)")
+        );
+        // The sample's two attachments into one physical connector, USB 2
+        // and then USB 3: two location paths, so two topologies. Topology is
+        // valid only within one attachment.
+        assert_ne!(
+            location_topology("PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(10)"),
+            location_topology("PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(26)")
         );
         // Known value: SHA-256("") begins e3b0c44298fc1c14.
         assert_eq!(location_topology(""), 0xe3b0_c442_98fc_1c14_u64.to_string());
@@ -577,7 +613,7 @@ mod tests {
 
     #[test]
     fn a_windows_generated_instance_suffix_is_no_serial() {
-        for suffix in ["5&1a2b3c&0&3", "6&abc&0", "&"] {
+        for suffix in ["5&1a2b3c&0&3", "5&1A2B3C&0&3", "6&abc&0", "&", "AAAA&0"] {
             let node = board().id(Some(&format!("USB\\VID_2207&PID_5000\\{suffix}")));
             assert_eq!(UsbHostDevice::from_device_node(&node), None, "{suffix}");
         }
@@ -611,12 +647,109 @@ mod tests {
             );
         }
         // Instance IDs are case-insensitive in their fixed parts; the
-        // serial is taken as it is.
+        // serial is ASCII-lowercase folded.
         let node = board().id(Some("usb\\vid_2207&pid_5000\\AbC123"));
         assert_eq!(
             UsbHostDevice::from_device_node(&node).unwrap().serial,
-            "AbC123"
+            "abc123"
         );
+    }
+
+    /// Maintainer ruling 2026-10-04, item 4: the instance ID spells the
+    /// board's serial in upper-case hex, the HDC connect key is lower-case
+    /// hex; the census folds the suffix, ASCII only, and the folded serial is
+    /// the identity.
+    #[test]
+    fn an_upper_case_suffix_folds_to_the_lower_case_connect_key() {
+        let upper = SERIAL.to_ascii_uppercase();
+        let node = board().id(Some(&format!("USB\\VID_2207&PID_5000\\{upper}")));
+        let device = UsbHostDevice::from_device_node(&node).unwrap();
+        assert_eq!(device.serial, SERIAL);
+        assert_eq!(
+            Some(device),
+            UsbHostDevice::from_device_node(&board()),
+            "the same identity whichever case the instance ID spells"
+        );
+        // Only ASCII is folded: a non-ASCII letter stays as it is.
+        let node = board().id(Some("USB\\VID_2207&PID_5000\\AB\u{c4}C"));
+        assert_eq!(
+            UsbHostDevice::from_device_node(&node).unwrap().serial,
+            "ab\u{c4}c"
+        );
+    }
+
+    /// Maintainer ruling 2026-10-04, item 5: present nodes only. A phantom
+    /// (the sample's remembered loader node) keeps its last attachment's
+    /// properties and is never an entry, nor is a node that does not answer
+    /// its presence as a boolean.
+    #[test]
+    fn a_phantom_node_is_never_an_entry() {
+        for value in [
+            Some(NodeValue::Boolean(false)),
+            None,
+            Some(NodeValue::Other),
+            Some(NodeValue::Text("true".into())),
+            Some(NodeValue::FileTime(1)),
+        ] {
+            assert_eq!(
+                UsbHostDevice::from_device_node(
+                    &board().with(NodeProperty::IsPresent, value.clone())
+                ),
+                None,
+                "{value:?}"
+            );
+        }
+        let loader_phantom = board()
+            .id(Some("USB\\VID_2207&PID_350A\\aaaaaaaaaaaaaaaa"))
+            .with(
+                NodeProperty::HardwareIds,
+                list(&["USB\\VID_2207&PID_350A&REV_0100", "USB\\VID_2207&PID_350A"]),
+            )
+            .with(NodeProperty::IsPresent, Some(NodeValue::Boolean(false)));
+        assert_eq!(UsbHostDevice::from_device_node(&loader_phantom), None);
+        assert!(
+            UsbHostDevice::from_device_node(
+                &loader_phantom.with(NodeProperty::IsPresent, Some(NodeValue::Boolean(true)))
+            )
+            .is_some(),
+            "the same node, present, is an entry"
+        );
+    }
+
+    /// Ruling item 5: one attachment is (instance ID, `LastArrivalDate`). A
+    /// new arrival of the same instance is a new attachment of the same
+    /// identity, wherever it enumerated.
+    #[test]
+    fn a_new_arrival_is_a_new_attachment_of_the_same_identity() {
+        let first = UsbHostDevice::from_device_node(
+            &board()
+                .with(
+                    NodeProperty::LocationPaths,
+                    list(&["PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(10)"]),
+                )
+                .with(NodeProperty::LastArrivalDate, Some(NodeValue::FileTime(9))),
+        )
+        .unwrap();
+        let replugged = UsbHostDevice::from_device_node(
+            &board()
+                .id(Some(&format!(
+                    "USB\\VID_2207&PID_5000\\{}",
+                    SERIAL.to_ascii_uppercase()
+                )))
+                .with(
+                    NodeProperty::LocationPaths,
+                    list(&["PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(26)"]),
+                )
+                .with(NodeProperty::LastArrivalDate, Some(NodeValue::FileTime(11))),
+        )
+        .unwrap();
+        assert_eq!(first.serial, replugged.serial, "the same identity");
+        assert_eq!(
+            (first.vendor_id, first.product_id),
+            (replugged.vendor_id, replugged.product_id)
+        );
+        assert_ne!(first.registry_entry_id, replugged.registry_entry_id);
+        assert_ne!(first.topology, replugged.topology);
     }
 
     #[test]
@@ -690,12 +823,13 @@ mod tests {
         assert_eq!(usb_numbers("VÍD_2207&PID_5000"), None);
     }
 
-    /// The gate: every §4 field is `TBD(sample)` until the sample confirms it,
-    /// and only a mapping with none left opens the trusted census.
+    /// The gate: the 2026-10-04 sample confirmed every §4 field, so the
+    /// trusted census is open; a row set back to `TBD(sample)` would close it.
     #[test]
-    fn the_census_mapping_is_unconfirmed_until_every_field_is() {
+    fn every_census_field_is_confirmed_and_a_tbd_row_closes_the_gate() {
+        assert!(unconfirmed_census_fields().is_empty());
         assert_eq!(
-            unconfirmed_census_fields(),
+            CENSUS_MAPPING.map(|row| row.field),
             [
                 "device",
                 "vendorId/productId",
@@ -706,27 +840,24 @@ mod tests {
             ]
         );
         let mut mapping = CENSUS_MAPPING;
-        for row in &mut mapping[..5] {
-            row.sample = CensusSample::Confirmed;
-        }
-        assert_eq!(unconfirmed(&mapping), ["attachment"]);
-        mapping[5].sample = CensusSample::Confirmed;
-        assert!(unconfirmed(&mapping).is_empty());
+        mapping[2].sample = CensusSample::Tbd;
+        assert_eq!(unconfirmed(&mapping), ["serial"]);
         assert!(
             crate::RegistryUnavailable::MappingUnconfirmed
                 .to_string()
-                .ends_with("TBD(sample): device, vendorId/productId, serial, topology, productName, attachment")
+                .starts_with("USB registry unavailable: the Windows census field mapping")
         );
     }
 
-    /// The trusted census reads nothing while the mapping is unconfirmed.
+    /// The trusted census answers over this host's device tree, by the same
+    /// rule as the diagnostic census. Only the shape is asserted.
     #[cfg(windows)]
     #[test]
-    fn the_trusted_census_fails_closed_while_the_mapping_is_unconfirmed() {
-        assert_eq!(
-            usb_host_devices(),
-            Err(crate::RegistryUnavailable::MappingUnconfirmed)
-        );
+    fn the_trusted_census_answers_once_the_mapping_is_confirmed() {
+        let devices = usb_host_devices().expect("the trusted census answers");
+        for device in &devices {
+            assert!(!device.serial.bytes().any(|byte| byte.is_ascii_uppercase()));
+        }
     }
 
     /// This host's census through the production reader: it must answer, and
@@ -740,6 +871,7 @@ mod tests {
             assert!(!device.serial.is_empty());
             assert!(!device.serial.contains('&'));
             assert!(!device.serial.contains('\\'));
+            assert!(!device.serial.bytes().any(|byte| byte.is_ascii_uppercase()));
             let location: u64 = device.topology.parse().expect("a decimal topology");
             assert_eq!(location.to_string(), device.topology);
             assert_ne!(device.registry_entry_id, Some(0));
