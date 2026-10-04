@@ -1593,6 +1593,51 @@ public static class UiStrings
     public const string WindowsSettingsTracePurgeDone = "windows.settings.trace.purgeDone";
     public const string WindowsSettingsTracePurgeFailed = "windows.settings.trace.purgeFailed";
     public const string WindowsSettingsTracePurgeNote = "windows.settings.trace.purgeNote";
+    public const string SettingsGeneralAppIcon = "settings.general.appIcon";
+    public const string SettingsGeneralAppIconKeycap = "settings.general.appIcon.keycap";
+    public const string SettingsGeneralAppIconWaveform = "settings.general.appIcon.waveform";
+    public const string SettingsTabUpdates = "settings.tab.updates";
+    public const string SettingsTabDiagnostics = "settings.tab.diagnostics";
+    public const string SettingsDiagnosticsSubtitle = "settings.diagnostics.subtitle";
+    public const string SettingsDiagnosticsDefaultScope = "settings.diagnostics.defaultScope";
+    public const string SettingsDiagnosticsMetadata = "settings.diagnostics.metadata";
+    public const string SettingsDiagnosticsRedactedHDC = "settings.diagnostics.redactedHDC";
+    public const string SettingsDiagnosticsRedactedHDCDetail = "settings.diagnostics.redactedHDC.detail";
+    public const string SettingsDiagnosticsRawExcluded = "settings.diagnostics.rawExcluded";
+    public const string SettingsDiagnosticsRawExcludedDetail = "settings.diagnostics.rawExcluded.detail";
+    public const string SettingsDiagnosticsExport = "settings.diagnostics.export";
+    public const string SettingsDiagnosticsPreviewFirst = "settings.diagnostics.previewFirst";
+    public const string SettingsDiagnosticsChooseAndPreview = "settings.diagnostics.chooseAndPreview";
+    public const string SettingsDiagnosticsDestination = "settings.diagnostics.destination";
+    public const string SettingsDiagnosticsSize = "settings.diagnostics.size";
+    public const string SettingsDiagnosticsScopeHash = "settings.diagnostics.scopeHash";
+    public const string SettingsDiagnosticsDeviceRaw = "settings.diagnostics.deviceRaw";
+    public const string SettingsDiagnosticsExcluded = "settings.diagnostics.excluded";
+    public const string SettingsDiagnosticsNotExcluded = "settings.diagnostics.notExcluded";
+    public const string SettingsDiagnosticsEntries = "settings.diagnostics.entries";
+    public const string SettingsDiagnosticsWarning = "settings.diagnostics.warning";
+    public const string SettingsDiagnosticsExportNow = "settings.diagnostics.exportNow";
+    public const string SettingsDiagnosticsExported = "settings.diagnostics.exported";
+    public const string SettingsDiagnosticsNoAutomaticUpload = "settings.diagnostics.noAutomaticUpload";
+    public const string UpdateTitle = "update.title";
+    public const string UpdateCheckNow = "update.checkNow";
+    public const string UpdateStatusIdle = "update.status.idle";
+    public const string UpdateStatusChecking = "update.status.checking";
+    public const string UpdateStatusAvailable = "update.status.available";
+    public const string UpdateStatusCurrent = "update.status.current";
+    public const string UpdateStatusFailed = "update.status.failed";
+    public const string WindowsSettingsGeneralAppIconDetail = "windows.settings.general.appIcon.detail";
+    public const string WindowsUpdatePrivacy = "windows.update.privacy";
+    public const string WindowsUpdateNotPackaged = "windows.update.notPackaged";
+    public const string WindowsUpdateChannel = "windows.update.channel";
+    public const string WindowsUpdateNoFeed = "windows.update.noFeed";
+    public const string WindowsUpdateInstall = "windows.update.install";
+    public const string WindowsUpdateInstallUnavailable = "windows.update.installUnavailable";
+    public const string WindowsUpdateHandedOff = "windows.update.handedOff";
+    public const string WindowsUpdateManual = "windows.update.manual";
+    public const string WindowsSettingsDiagnosticsMetadataDetail = "windows.settings.diagnostics.metadataDetail";
+    public const string WindowsSettingsDiagnosticsFailed = "windows.settings.diagnostics.failed";
+    public const string WindowsSettingsDiagnosticsReveal = "windows.settings.diagnostics.reveal";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3182,5 +3227,50 @@ public static class UiStrings
         WindowsSettingsTracePurgeDone,
         WindowsSettingsTracePurgeFailed,
         WindowsSettingsTracePurgeNote,
+        SettingsGeneralAppIcon,
+        SettingsGeneralAppIconKeycap,
+        SettingsGeneralAppIconWaveform,
+        SettingsTabUpdates,
+        SettingsTabDiagnostics,
+        SettingsDiagnosticsSubtitle,
+        SettingsDiagnosticsDefaultScope,
+        SettingsDiagnosticsMetadata,
+        SettingsDiagnosticsRedactedHDC,
+        SettingsDiagnosticsRedactedHDCDetail,
+        SettingsDiagnosticsRawExcluded,
+        SettingsDiagnosticsRawExcludedDetail,
+        SettingsDiagnosticsExport,
+        SettingsDiagnosticsPreviewFirst,
+        SettingsDiagnosticsChooseAndPreview,
+        SettingsDiagnosticsDestination,
+        SettingsDiagnosticsSize,
+        SettingsDiagnosticsScopeHash,
+        SettingsDiagnosticsDeviceRaw,
+        SettingsDiagnosticsExcluded,
+        SettingsDiagnosticsNotExcluded,
+        SettingsDiagnosticsEntries,
+        SettingsDiagnosticsWarning,
+        SettingsDiagnosticsExportNow,
+        SettingsDiagnosticsExported,
+        SettingsDiagnosticsNoAutomaticUpload,
+        UpdateTitle,
+        UpdateCheckNow,
+        UpdateStatusIdle,
+        UpdateStatusChecking,
+        UpdateStatusAvailable,
+        UpdateStatusCurrent,
+        UpdateStatusFailed,
+        WindowsSettingsGeneralAppIconDetail,
+        WindowsUpdatePrivacy,
+        WindowsUpdateNotPackaged,
+        WindowsUpdateChannel,
+        WindowsUpdateNoFeed,
+        WindowsUpdateInstall,
+        WindowsUpdateInstallUnavailable,
+        WindowsUpdateHandedOff,
+        WindowsUpdateManual,
+        WindowsSettingsDiagnosticsMetadataDetail,
+        WindowsSettingsDiagnosticsFailed,
+        WindowsSettingsDiagnosticsReveal,
     ];
 }

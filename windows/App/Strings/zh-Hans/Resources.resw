@@ -6354,4 +6354,184 @@ SHA-256：%4$@</value>
     <value>只清除未在使用的派生数据库。原始 Trace 文件从不是缓存对象。</value>
     <comment>windows.settings.trace.purgeNote (Windows only)</comment>
   </data>
+  <data name="settings_general_appIcon" xml:space="preserve">
+    <value>应用图标</value>
+    <comment>settings.general.appIcon (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_appIcon_keycap" xml:space="preserve">
+    <value>终端</value>
+    <comment>settings.general.appIcon.keycap (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_appIcon_waveform" xml:space="preserve">
+    <value>诊断</value>
+    <comment>settings.general.appIcon.waveform (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_updates" xml:space="preserve">
+    <value>更新</value>
+    <comment>settings.tab.updates (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_diagnostics" xml:space="preserve">
+    <value>诊断</value>
+    <comment>settings.tab.diagnostics (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_subtitle" xml:space="preserve">
+    <value>先预览范围受限的本地诊断包，再显式导出。</value>
+    <comment>settings.diagnostics.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_defaultScope" xml:space="preserve">
+    <value>默认范围</value>
+    <comment>settings.diagnostics.defaultScope (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_metadata" xml:space="preserve">
+    <value>应用与平台元数据</value>
+    <comment>settings.diagnostics.metadata (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_redactedHDC" xml:space="preserve">
+    <value>已脱敏的 HDC 状态</value>
+    <comment>settings.diagnostics.redactedHDC (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_redactedHDC_detail" xml:space="preserve">
+    <value>工具路径与服务端点只以“已脱敏”或“未验证”状态表示。</value>
+    <comment>settings.diagnostics.redactedHDC.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_rawExcluded" xml:space="preserve">
+    <value>排除设备原始数据</value>
+    <comment>settings.diagnostics.rawExcluded (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_rawExcluded_detail" xml:space="preserve">
+    <value>默认不包含 UI Dump、Trace、hilog、设备标识符和 Session 产物字节。</value>
+    <comment>settings.diagnostics.rawExcluded.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_export" xml:space="preserve">
+    <value>导出诊断包</value>
+    <comment>settings.diagnostics.export (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_previewFirst" xml:space="preserve">
+    <value>选择一个新位置以计算精确条目、大小和范围哈希；预览不会写入诊断包。</value>
+    <comment>settings.diagnostics.previewFirst (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_chooseAndPreview" xml:space="preserve">
+    <value>选择位置并预览…</value>
+    <comment>settings.diagnostics.chooseAndPreview (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_destination" xml:space="preserve">
+    <value>导出位置</value>
+    <comment>settings.diagnostics.destination (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_size" xml:space="preserve">
+    <value>预计大小</value>
+    <comment>settings.diagnostics.size (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_scopeHash" xml:space="preserve">
+    <value>范围 SHA-256</value>
+    <comment>settings.diagnostics.scopeHash (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_deviceRaw" xml:space="preserve">
+    <value>设备原始数据</value>
+    <comment>settings.diagnostics.deviceRaw (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_excluded" xml:space="preserve">
+    <value>已排除</value>
+    <comment>settings.diagnostics.excluded (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_notExcluded" xml:space="preserve">
+    <value>未排除——请勿导出</value>
+    <comment>settings.diagnostics.notExcluded (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_entries" xml:space="preserve">
+    <value>包含条目</value>
+    <comment>settings.diagnostics.entries (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_warning" xml:space="preserve">
+    <value>分享前请检查预览；即使经过脱敏，诊断包仍可能披露构建与平台信息。</value>
+    <comment>settings.diagnostics.warning (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_exportNow" xml:space="preserve">
+    <value>导出已确认的预览</value>
+    <comment>settings.diagnostics.exportNow (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_exported" xml:space="preserve">
+    <value>已将确认过的诊断包导出到本地。</value>
+    <comment>settings.diagnostics.exported (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_noAutomaticUpload" xml:space="preserve">
+    <value>ArkDeck 绝不会自动上传此诊断包；只有完成预览并由你显式点击后才会导出。</value>
+    <comment>settings.diagnostics.noAutomaticUpload (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="update_title" xml:space="preserve">
+    <value>软件更新</value>
+    <comment>update.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_checkNow" xml:space="preserve">
+    <value>立即检查</value>
+    <comment>update.checkNow (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_idle" xml:space="preserve">
+    <value>可以检查更新。</value>
+    <comment>update.status.idle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_checking" xml:space="preserve">
+    <value>正在检查更新……</value>
+    <comment>update.status.checking (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_available" xml:space="preserve">
+    <value>有可用更新，需要你手动开始下载。</value>
+    <comment>update.status.available (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_current" xml:space="preserve">
+    <value>当前没有已验证的较新版本。</value>
+    <comment>update.status.current (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_failed" xml:space="preserve">
+    <value>更新验证失败，未安装或替换任何内容。</value>
+    <comment>update.status.failed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_settings_general_appIcon_detail" xml:space="preserve">
+    <value>选择 ArkDeck 窗口和标题栏使用的图标。更改立即生效；已安装包的开始菜单和任务栏磁贴保留其图标。</value>
+    <comment>windows.settings.general.appIcon.detail (Windows only)</comment>
+  </data>
+  <data name="windows_update_privacy" xml:space="preserve">
+    <value>Windows 应用安装程序检查 ArkDeck 的更新源，并在安装前询问。ArkDeck 不在检查中附加任何设备或用户标识、遥测或凭据。</value>
+    <comment>windows.update.privacy (Windows only)</comment>
+  </data>
+  <data name="windows_update_notPackaged" xml:space="preserve">
+    <value>此副本不是以 MSIX 包安装的，因此没有更新通道。要升级，请安装更新的副本。</value>
+    <comment>windows.update.notPackaged (Windows only)</comment>
+  </data>
+  <data name="windows_update_channel" xml:space="preserve">
+    <value>更新源</value>
+    <comment>windows.update.channel (Windows only)</comment>
+  </data>
+  <data name="windows_update_noFeed" xml:space="preserve">
+    <value>此包不是从应用安装程序更新源安装的，因此 Windows 不会为其提供更新。</value>
+    <comment>windows.update.noFeed (Windows only)</comment>
+  </data>
+  <data name="windows_update_install" xml:space="preserve">
+    <value>使用应用安装程序安装</value>
+    <comment>windows.update.install (Windows only)</comment>
+  </data>
+  <data name="windows_update_installUnavailable" xml:space="preserve">
+    <value>没有可安装的更新。请先检查。</value>
+    <comment>windows.update.installUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_update_handedOff" xml:space="preserve">
+    <value>应用安装程序已打开。请在其中继续；ArkDeck 自己不下载、不替换自身。</value>
+    <comment>windows.update.handedOff (Windows only)</comment>
+  </data>
+  <data name="windows_update_manual" xml:space="preserve">
+    <value>Windows 应用安装程序下载包、校验其签名，并在你确认后安装。</value>
+    <comment>windows.update.manual (Windows only)</comment>
+  </data>
+  <data name="windows_settings_diagnostics_metadataDetail" xml:space="preserve">
+    <value>包括 ArkDeck 版本、构建号、Windows 版本和架构。</value>
+    <comment>windows.settings.diagnostics.metadataDetail (Windows only)</comment>
+  </data>
+  <data name="windows_settings_diagnostics_failed" xml:space="preserve">
+    <value>诊断包未写入</value>
+    <comment>windows.settings.diagnostics.failed (Windows only)</comment>
+  </data>
+  <data name="windows_settings_diagnostics_reveal" xml:space="preserve">
+    <value>在文件资源管理器中显示</value>
+    <comment>windows.settings.diagnostics.reveal (Windows only)</comment>
+  </data>
 </root>

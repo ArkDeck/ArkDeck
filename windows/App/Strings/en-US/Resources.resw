@@ -6354,4 +6354,184 @@ SHA-256: %4$@</value>
     <value>Only inactive derived databases are purged. Original Trace files are never cache targets.</value>
     <comment>windows.settings.trace.purgeNote (Windows only)</comment>
   </data>
+  <data name="settings_general_appIcon" xml:space="preserve">
+    <value>App icon</value>
+    <comment>settings.general.appIcon (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_appIcon_keycap" xml:space="preserve">
+    <value>Terminal</value>
+    <comment>settings.general.appIcon.keycap (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_appIcon_waveform" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>settings.general.appIcon.waveform (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_updates" xml:space="preserve">
+    <value>Updates</value>
+    <comment>settings.tab.updates (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_diagnostics" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>settings.tab.diagnostics (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_subtitle" xml:space="preserve">
+    <value>Preview a bounded, local diagnostic bundle before explicitly exporting it.</value>
+    <comment>settings.diagnostics.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_defaultScope" xml:space="preserve">
+    <value>Default scope</value>
+    <comment>settings.diagnostics.defaultScope (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_metadata" xml:space="preserve">
+    <value>Application and platform metadata</value>
+    <comment>settings.diagnostics.metadata (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_redactedHDC" xml:space="preserve">
+    <value>Redacted HDC state</value>
+    <comment>settings.diagnostics.redactedHDC (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_redactedHDC_detail" xml:space="preserve">
+    <value>Tool path and server endpoint are represented only by redacted or unverified states.</value>
+    <comment>settings.diagnostics.redactedHDC.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_rawExcluded" xml:space="preserve">
+    <value>Device raw excluded</value>
+    <comment>settings.diagnostics.rawExcluded (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_rawExcluded_detail" xml:space="preserve">
+    <value>UI Dump, Trace, hilog, device identifiers, and Session artifact bytes are not included by default.</value>
+    <comment>settings.diagnostics.rawExcluded.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_export" xml:space="preserve">
+    <value>Export diagnostic bundle</value>
+    <comment>settings.diagnostics.export (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_previewFirst" xml:space="preserve">
+    <value>Choose a new destination to calculate the exact entries, size, and scope hash. Previewing does not write a bundle.</value>
+    <comment>settings.diagnostics.previewFirst (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_chooseAndPreview" xml:space="preserve">
+    <value>Choose destination and preview…</value>
+    <comment>settings.diagnostics.chooseAndPreview (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_destination" xml:space="preserve">
+    <value>Destination</value>
+    <comment>settings.diagnostics.destination (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_size" xml:space="preserve">
+    <value>Estimated size</value>
+    <comment>settings.diagnostics.size (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_scopeHash" xml:space="preserve">
+    <value>Scope SHA-256</value>
+    <comment>settings.diagnostics.scopeHash (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_deviceRaw" xml:space="preserve">
+    <value>Device raw</value>
+    <comment>settings.diagnostics.deviceRaw (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_excluded" xml:space="preserve">
+    <value>Excluded</value>
+    <comment>settings.diagnostics.excluded (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_notExcluded" xml:space="preserve">
+    <value>Not excluded — do not export</value>
+    <comment>settings.diagnostics.notExcluded (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_entries" xml:space="preserve">
+    <value>Included entries</value>
+    <comment>settings.diagnostics.entries (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_warning" xml:space="preserve">
+    <value>Review the preview before sharing. Even a redacted bundle may reveal build and platform details.</value>
+    <comment>settings.diagnostics.warning (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_exportNow" xml:space="preserve">
+    <value>Export approved preview</value>
+    <comment>settings.diagnostics.exportNow (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_exported" xml:space="preserve">
+    <value>The approved diagnostic bundle was exported locally.</value>
+    <comment>settings.diagnostics.exported (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_diagnostics_noAutomaticUpload" xml:space="preserve">
+    <value>ArkDeck never uploads this bundle automatically. Export is available only after this preview and your explicit button press.</value>
+    <comment>settings.diagnostics.noAutomaticUpload (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="update_title" xml:space="preserve">
+    <value>Software Update</value>
+    <comment>update.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_checkNow" xml:space="preserve">
+    <value>Check Now</value>
+    <comment>update.checkNow (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_idle" xml:space="preserve">
+    <value>Ready to check for updates.</value>
+    <comment>update.status.idle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_checking" xml:space="preserve">
+    <value>Checking for updates…</value>
+    <comment>update.status.checking (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_available" xml:space="preserve">
+    <value>An update is available. Download requires your action.</value>
+    <comment>update.status.available (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_current" xml:space="preserve">
+    <value>No newer verified update is available.</value>
+    <comment>update.status.current (Localizable.xcstrings)</comment>
+  </data>
+  <data name="update_status_failed" xml:space="preserve">
+    <value>Update verification failed. Nothing was installed or replaced.</value>
+    <comment>update.status.failed (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_settings_general_appIcon_detail" xml:space="preserve">
+    <value>Choose the icon of ArkDeck's window and title bar. Changes apply immediately; the Start menu and taskbar tiles of the installed package keep its icon.</value>
+    <comment>windows.settings.general.appIcon.detail (Windows only)</comment>
+  </data>
+  <data name="windows_update_privacy" xml:space="preserve">
+    <value>Windows App Installer checks ArkDeck's update feed and asks before installing. ArkDeck adds no device or user identifier, telemetry or credential to the check.</value>
+    <comment>windows.update.privacy (Windows only)</comment>
+  </data>
+  <data name="windows_update_notPackaged" xml:space="preserve">
+    <value>This copy was not installed as an MSIX package, so it has no update channel. To upgrade, install a newer copy.</value>
+    <comment>windows.update.notPackaged (Windows only)</comment>
+  </data>
+  <data name="windows_update_channel" xml:space="preserve">
+    <value>Update feed</value>
+    <comment>windows.update.channel (Windows only)</comment>
+  </data>
+  <data name="windows_update_noFeed" xml:space="preserve">
+    <value>This package was not installed from an App Installer feed, so Windows offers no update for it.</value>
+    <comment>windows.update.noFeed (Windows only)</comment>
+  </data>
+  <data name="windows_update_install" xml:space="preserve">
+    <value>Install with App Installer</value>
+    <comment>windows.update.install (Windows only)</comment>
+  </data>
+  <data name="windows_update_installUnavailable" xml:space="preserve">
+    <value>No update is available to install. Check first.</value>
+    <comment>windows.update.installUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_update_handedOff" xml:space="preserve">
+    <value>App Installer is open. Continue there; ArkDeck neither downloads nor replaces itself.</value>
+    <comment>windows.update.handedOff (Windows only)</comment>
+  </data>
+  <data name="windows_update_manual" xml:space="preserve">
+    <value>Windows App Installer downloads the package, verifies its signature and installs it after your confirmation.</value>
+    <comment>windows.update.manual (Windows only)</comment>
+  </data>
+  <data name="windows_settings_diagnostics_metadataDetail" xml:space="preserve">
+    <value>Includes ArkDeck version, build, Windows version, and architecture.</value>
+    <comment>windows.settings.diagnostics.metadataDetail (Windows only)</comment>
+  </data>
+  <data name="windows_settings_diagnostics_failed" xml:space="preserve">
+    <value>The diagnostic bundle was not written</value>
+    <comment>windows.settings.diagnostics.failed (Windows only)</comment>
+  </data>
+  <data name="windows_settings_diagnostics_reveal" xml:space="preserve">
+    <value>Show in File Explorer</value>
+    <comment>windows.settings.diagnostics.reveal (Windows only)</comment>
+  </data>
 </root>
