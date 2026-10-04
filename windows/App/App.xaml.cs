@@ -16,6 +16,10 @@ public partial class App : Application
 
     public static LaunchOptions Options { get; private set; } = new(null, null, null);
 
+    /// <summary>The App's remote build sources (App-side SSH, no Runtime call); this executable
+    /// answers the SSH client's prompts in its askpass mode (Program).</summary>
+    public static ArkDeck.App.Core.RemoteSources.RemoteBuildSourceProvider RemoteSources { get; private set; } = null!;
+
     private Window? _window;
 
     public App()
@@ -29,6 +33,7 @@ public partial class App : Application
         Strings = new Localizer(ResourceLookup(language), language);
 
         Loader = new SurfaceLoader(DaemonConfiguration.Create(Options, Environment.GetEnvironmentVariable, AppContext.BaseDirectory));
+        RemoteSources = ArkDeck.App.Core.RemoteSources.RemoteBuildSourceProvider.Create(Environment.ProcessPath!, Options.RemoteSourcesRoot);
         InitializeComponent();
 
     }
