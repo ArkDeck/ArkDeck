@@ -177,7 +177,23 @@ ARTIFACT_EXPORT_OWNER_ERROR_CODES = [
 #   Only the top-level trust was recorded with null (an unsigned HDC); a
 #   child's null is what a Windows DevEco child answers, whose Authenticode
 #   signature has no team (TASK-XPA-011).
+# - the signature of a control action's preview tool: `HDCControlActionRecord`
+#   writes one preview projection, which `runtime.hdc.impact-preview`,
+#   `runtime.hdc.restart` and `control-action.*` publish as recorded (an
+#   identifier and a team each a string or null) and `human-action.resume`
+#   carries twice, as the challenge's `controlAction` and as the consumed
+#   action. An unsigned tool's null identifier (DevEco's Windows `hdc.exe`,
+#   Authenticode NotSigned; no Swift oracle records one) is admitted there
+#   exactly as its siblings admit it (TASK-XPA-005; delegated 2026-10-04).
 SHARED_MEMBERS = {
+    ("runtime.hdc.impact-preview", "result.preview.tool.signature.identifier"): [
+        ("human-action.resume", "result.controlAction.preview.tool.signature.identifier"),
+        ("human-action.resume", "result.preview.tool.signature.identifier"),
+    ],
+    ("runtime.hdc.impact-preview", "result.preview.tool.signature.teamIdentifier"): [
+        ("human-action.resume", "result.controlAction.preview.tool.signature.teamIdentifier"),
+        ("human-action.resume", "result.preview.tool.signature.teamIdentifier"),
+    ],
     ("runtime.tool.register", "result.trust.teamIdentifier"): [
         ("runtime.tool.register", "result.childTools[].trust.teamIdentifier"),
         ("runtime.tool.inspect", "result.childTools[].trust.teamIdentifier"),

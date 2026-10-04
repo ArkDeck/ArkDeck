@@ -5114,6 +5114,226 @@ SHA-256：%4$@</value>
     <value>核验并重新绑定 Loader</value>
     <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="overview_record_device_label" xml:space="preserve">
+    <value>本页描述的设备</value>
+    <comment>overview.record.device.label (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_none" xml:space="preserve">
+    <value>暂无在线设备</value>
+    <comment>overview.record.device.none (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_noneDetail" xml:space="preserve">
+    <value>请连接一台已接管的设备后刷新。</value>
+    <comment>overview.record.device.noneDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_choose" xml:space="preserve">
+    <value>选择一台设备…</value>
+    <comment>overview.record.device.choose (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_binding" xml:space="preserve">
+    <value>binding %lld</value>
+    <comment>overview.record.binding (Localizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_openHistory" xml:space="preserve">
+    <value>在历史记录中检查</value>
+    <comment>jobRecovery.action.openHistory (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_count" xml:space="preserve">
+    <value>%d 条记录待检查</value>
+    <comment>jobRecovery.count (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_list" xml:space="preserve">
+    <value>恢复记录</value>
+    <comment>jobRecovery.list (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_guidance" xml:space="preserve">
+    <value>Runtime 正在等待安全边界，之后才能完成恢复记录；此 App 不能强制停止当前步骤。</value>
+    <comment>jobRecovery.archivePending.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_title" xml:space="preserve">
+    <value>恢复归档正在等待</value>
+    <comment>jobRecovery.archivePending.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_guidance" xml:space="preserve">
+    <value>条件允许时请保持设备状态不变。在通过已批准的 Runtime 路径核对未决影响前，不要开始其他设备操作。</value>
+    <comment>jobRecovery.outcomeUnknown.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_title" xml:space="preserve">
+    <value>设备影响未知</value>
+    <comment>jobRecovery.outcomeUnknown.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_guidance" xml:space="preserve">
+    <value>Runtime 已记录确认过的安全边界。请先检查记录，再通过已批准的 Runtime 路径恢复。</value>
+    <comment>jobRecovery.resumeSafe.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_title" xml:space="preserve">
+    <value>已有安全恢复边界</value>
+    <comment>jobRecovery.resumeSafe.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_guidance" xml:space="preserve">
+    <value>请保持设备当前状态不变，并在 Runtime 记录中检查所需的恢复步骤。</value>
+    <comment>jobRecovery.waiting.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_title" xml:space="preserve">
+    <value>恢复正在等待</value>
+    <comment>jobRecovery.waiting.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_failed" xml:space="preserve">
+    <value>队列已停止，剩余动态库未提交</value>
+    <comment>debug.artifacts.batch.phase.failed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_succeeded" xml:space="preserve">
+    <value>所有动态库均已验证成功</value>
+    <comment>debug.artifacts.batch.phase.succeeded (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_stopped" xml:space="preserve">
+    <value>队列已停止，请查看各 Job 结果</value>
+    <comment>debug.artifacts.batch.phase.stopped (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_running" xml:space="preserve">
+    <value>正在部署队列</value>
+    <comment>debug.artifacts.batch.phase.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_review" xml:space="preserve">
+    <value>等待检查计划</value>
+    <comment>debug.artifacts.batch.phase.review (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_preparing" xml:space="preserve">
+    <value>正在校验队列</value>
+    <comment>debug.artifacts.batch.phase.preparing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_phase_idle" xml:space="preserve">
+    <value>待开始</value>
+    <comment>debug.artifacts.batch.phase.idle (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_failed" xml:space="preserve">
+    <value>因失败或不确定结果停止</value>
+    <comment>debug.artifacts.batch.row.failed (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_succeeded" xml:space="preserve">
+    <value>验证成功</value>
+    <comment>debug.artifacts.batch.row.succeeded (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_running" xml:space="preserve">
+    <value>正在执行</value>
+    <comment>debug.artifacts.batch.row.running (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_submitting" xml:space="preserve">
+    <value>正在提交</value>
+    <comment>debug.artifacts.batch.row.submitting (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_prepared" xml:space="preserve">
+    <value>计划已就绪</value>
+    <comment>debug.artifacts.batch.row.prepared (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_preparing" xml:space="preserve">
+    <value>正在校验</value>
+    <comment>debug.artifacts.batch.row.preparing (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_row_pending" xml:space="preserve">
+    <value>待处理</value>
+    <comment>debug.artifacts.batch.row.pending (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_run" xml:space="preserve">
+    <value>部署已检查的队列</value>
+    <comment>debug.artifacts.batch.run (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_warning" xml:space="preserve">
+    <value>每个动态库单独部署，分别执行备份、应用重启、读取验证和失败回滚。整批不具备原子性：后续文件失败时，先前成功的部署会保留。</value>
+    <comment>debug.artifacts.batch.warning (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_review" xml:space="preserve">
+    <value>检查动态库部署队列</value>
+    <comment>debug.artifacts.batch.review (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_stop" xml:space="preserve">
+    <value>当前 Job 完成后停止</value>
+    <comment>debug.artifacts.batch.stop (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_prepare" xml:space="preserve">
+    <value>校验并检查队列</value>
+    <comment>debug.artifacts.batch.prepare (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_limit" xml:space="preserve">
+    <value>部署队列最多支持 16 个动态库。</value>
+    <comment>debug.artifacts.batch.limit (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_remove" xml:space="preserve">
+    <value>从队列移除</value>
+    <comment>debug.artifacts.batch.remove (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_add" xml:space="preserve">
+    <value>加入部署队列</value>
+    <comment>debug.artifacts.batch.add (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_detail" xml:space="preserve">
+    <value>所有动态库使用上方 Bundle，保留原文件名。开始前逐项检查计划；失败或结果未知时停止队列，已完成的动态库保留部署结果。</value>
+    <comment>debug.artifacts.batch.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_batch_title" xml:space="preserve">
+    <value>部署队列</value>
+    <comment>debug.artifacts.batch.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_empty" xml:space="preserve">
+    <value>所选文件夹中未找到 lib&lt;name&gt;.so 文件。</value>
+    <comment>debug.artifacts.directory.empty (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_detail" xml:space="preserve">
+    <value>勾选最多 16 个动态库。扫描包含子目录，跳过符号链接，最多读取 500 个条目、展示 100 个动态库。</value>
+    <comment>debug.artifacts.directory.detail (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_directory_title" xml:space="preserve">
+    <value>所选文件夹中的动态库</value>
+    <comment>debug.artifacts.directory.title (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_wslSource" xml:space="preserve">
+    <value>WSL 构建产物可通过“设置 → 服务器”中的 SSH 连接访问。</value>
+    <comment>debug.artifacts.wslSource (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="debug_artifacts_chooseDirectory" xml:space="preserve">
+    <value>选择文件夹 / 已挂载 SMB…</value>
+    <comment>debug.artifacts.chooseDirectory (DebugLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_fact_recoveryRelation" xml:space="preserve">
+    <value>恢复关系</value>
+    <comment>jobInspector.fact.recoveryRelation (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_progress" xml:space="preserve">
+    <value>Job 正在进行</value>
+    <comment>jobInspector.progress (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_residue" xml:space="preserve">
+    <value>设备上仍有 %d 个清理项。</value>
+    <comment>jobInspector.residue (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_result_supersededByRecovery" xml:space="preserve">
+    <value>此 Job 的结果仍未知，但后续已确认的完整覆写恢复已建立当前目标状态。</value>
+    <comment>jobInspector.result.supersededByRecovery (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_result_targetAliasResolved" xml:space="preserve">
+    <value>此 Job 的结果仍未知，但后续已确认的完整刷机证明其目标是别名，并建立了当前设备状态。</value>
+    <comment>jobInspector.result.targetAliasResolved (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_state_currentEpochEstablished" xml:space="preserve">
+    <value>当前状态已建立</value>
+    <comment>jobInspector.state.currentEpochEstablished (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_action_readLog" xml:space="preserve">
+    <value>在本机读取日志</value>
+    <comment>jobInspector.action.readLog (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_tail" xml:space="preserve">
+    <value>最多显示末尾 200 行。打开此记录可查看全部产物。</value>
+    <comment>jobInspector.log.tail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_privacy" xml:space="preserve">
+    <value>此处仅预览标准日志。敏感产物需在 History 中显式读取。</value>
+    <comment>jobInspector.log.privacy (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_notText" xml:space="preserve">
+    <value>日志不是有效的 UTF-8 文本。</value>
+    <comment>jobInspector.log.notText (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
     <value>当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。</value>
     <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>
@@ -5189,25 +5409,5 @@ SHA-256：%4$@</value>
   <data name="jobRecovery_archive_publicationPending" xml:space="preserve">
     <value>中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。</value>
     <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="overview_record_device_label" xml:space="preserve">
-    <value>本页描述的设备</value>
-    <comment>overview.record.device.label (Localizable.xcstrings)</comment>
-  </data>
-  <data name="overview_record_device_none" xml:space="preserve">
-    <value>暂无在线设备</value>
-    <comment>overview.record.device.none (Localizable.xcstrings)</comment>
-  </data>
-  <data name="overview_record_device_noneDetail" xml:space="preserve">
-    <value>请连接一台已接管的设备后刷新。</value>
-    <comment>overview.record.device.noneDetail (Localizable.xcstrings)</comment>
-  </data>
-  <data name="overview_record_device_choose" xml:space="preserve">
-    <value>选择一台设备…</value>
-    <comment>overview.record.device.choose (Localizable.xcstrings)</comment>
-  </data>
-  <data name="overview_record_binding" xml:space="preserve">
-    <value>binding %lld</value>
-    <comment>overview.record.binding (Localizable.xcstrings)</comment>
   </data>
 </root>

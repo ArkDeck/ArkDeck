@@ -185,7 +185,7 @@ public static class ControlContract
         ["history.filter.list"] = "283c58015b509cdcec8dc4e4f15b822d57fd182a24c6ed4a7176d7ba14580454",
         ["history.filter.save"] = "485249378098c89cedb949571f96d99f01e6b32348da24701baf47b90037b96b",
         ["human-action.list"] = "b994974bb907a57c3622cb21afbf6751222ce897d3792657cbdc00b65b880ae5",
-        ["human-action.resume"] = "2029d643b6cf6fd5ba9a17911062e39b322413e9ef98ce58d862b87f9b20d8ff",
+        ["human-action.resume"] = "3936f6d940b471907520641fb329c8e4edc111ad726d019a359ad05668d60d2a",
         ["human-action.show"] = "adb2331b75d1e6b2ccd5c9c618546312fc7cee219bb902024a5090d3efd41dfd",
         ["job.archive"] = "f06ce5b7ddc01a0bb7de81ace242ff2f5e008cb50070115bb864a9dd37070b96",
         ["job.archive.preview"] = "9c32e5471c87297727f25211a5330505dc0ca271e92289f352a30046ea0f164f",

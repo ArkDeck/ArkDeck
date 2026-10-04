@@ -8,7 +8,7 @@
 //!
 //! On Windows a bound server is then settled past the registered
 //! server-startup listing (CHG-2026-078 r3, [`settle_startup_listing`]).
-use crate::{ObservationFailure, PresenceSnapshot, ServerCheck, parse_server_check};
+use crate::{ObservationFailure, PresenceSnapshot, ServerCheck, parse_host_server_check};
 use arkdeck_platform::{
     LoopbackServerLease, ManagedServer, ServerExit, ServerIdentityReceipt, ServerLaunch,
     ServerStop, ToolLimits, ToolRequest, ToolTermination, VerifiedTool,
@@ -181,10 +181,22 @@ impl ManagedHdcServer {
             return Err(StartFailure::Occupied(occupant(tool, endpoint)));
         }
         let spelled = endpoint.to_string();
-        let environment = [(
+        let mut environment = vec![(
             OsString::from(SERVER_PORT_VARIABLE),
             OsString::from(endpoint.port().to_string()),
         )];
+        // The Windows HDC server keeps its single-instance mutex file and
+        // its logs in the temporary directory. With none named, Windows
+        // resolves it to the Windows directory, where it may not write: the
+        // registered `3.2.0g` then reports "Other instance already running"
+        // and exits 0 at once (measured 2026-10-04, CHG-2026-078 c2). So it
+        // is named this daemon's own, the account's, as an interactive start
+        // would name it; HDC's own one-server-per-account guard is kept.
+        if cfg!(windows) {
+            let temporary = std::env::temp_dir().into_os_string();
+            environment.push((OsString::from("TEMP"), temporary.clone()));
+            environment.push((OsString::from("TMP"), temporary));
+        }
         let arguments = ["-s", spelled.as_str(), "-m"].map(OsString::from);
         let mut server =
             ManagedServer::launch(tool, &arguments, &environment, FOREGROUND_CAPTURE_BYTES)
@@ -233,7 +245,7 @@ impl ManagedHdcServer {
                     if execution.termination == ToolTermination::Exited(0)
                         && execution.stderr.is_empty()
                         && let Ok(check) =
-                            parse_server_check(&execution.stdout, execution.truncated)
+                            parse_host_server_check(&execution.stdout, execution.truncated)
                         && check.versions_agree()
                     {
                         break check;

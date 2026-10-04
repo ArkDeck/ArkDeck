@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import importlib.util
 import pathlib
 import subprocess
@@ -368,6 +369,68 @@ class GitPlanTests(unittest.TestCase):
 
     def event(self, *, before: str, after: str, ref: str) -> dict[str, str]:
         return {"before": before, "after": after, "ref": ref}
+
+    def queue_event(self, head=None, base=None):
+        return {"action": "checks_requested", "merge_group": {
+            "head_sha": head or self.oid("HEAD"), "base_sha": base or self.base,
+            "head_ref": "refs/heads/gh-readonly-queue/main/pr-23",
+            "base_ref": "refs/heads/main",
+        }}
+
+    def test_merge_group_covers_all_queued_changes_after_main_advances(self):
+        lower = self.commit_file("Packages/ArkDeckKit/Tests/Lower.swift", "lower")
+        head = self.commit_file("rust/crates/upper.rs", "upper")
+        self.git("update-ref", "refs/remotes/origin/main", lower)
+        result = PLAN.plan_from_event(self.root, self.queue_event())
+        self.assertEqual(result.base_revision, self.base)
+        self.assertEqual(result.head_revision, head)
+        self.assertTrue(result.lanes.swift)
+        self.assertTrue(result.lanes.rust)
+        self.assertEqual(set(result.changed_files), {
+            "Packages/ArkDeckKit/Tests/Lower.swift", "rust/crates/upper.rs"})
+
+    def test_merge_group_docs_only_selects_no_compiled_lane(self):
+        self.commit_file("docs/example.md", "docs")
+        result = PLAN.plan_from_event(self.root, self.queue_event(), last_success="f" * 40)
+        self.assertEqual(result.lanes, PLAN.LaneSelection(False, False, False, False, False))
+
+    def test_merge_group_missing_base_selects_every_lane(self):
+        self.commit_file("docs/example.md", "docs")
+        for base in (None, "f" * 40, "HEAD~1", "0" * 40):
+            with self.subTest(base=base):
+                event = self.queue_event()
+                event["merge_group"]["base_sha"] = base
+                result = PLAN.plan_from_event(self.root, event)
+                self.assertEqual(result.lanes, PLAN.LaneSelection(True, True, True, True, True))
+
+    def test_merge_group_rejects_wrong_head_action_or_branch(self):
+        self.commit_file("docs/example.md", "docs")
+        for key, value in (("head_sha", self.base), ("head_sha", "HEAD"),
+                           ("base_ref", "refs/heads/other"), ("head_ref", "refs/heads/agent/example")):
+            with self.subTest(key=key, value=value):
+                event = self.queue_event()
+                event["merge_group"][key] = value
+                with self.assertRaises(PLAN.PlanError):
+                    PLAN.plan_from_event(self.root, event)
+        event = self.queue_event()
+        event["action"] = "destroyed"
+        with self.assertRaises(PLAN.PlanError):
+            PLAN.plan_from_event(self.root, event)
+
+    def test_merge_group_rejects_unrelated_base(self):
+        head = self.commit_file("docs/example.md", "docs")
+        self.git("checkout", "--orphan", "unrelated")
+        other = self.commit_file("other.md", "other")
+        self.git("checkout", "--detach", head)
+        with self.assertRaisesRegex(PLAN.PlanError, "not an ancestor"):
+            PLAN.plan_from_event(self.root, self.queue_event(base=other))
+
+    def test_cli_dispatches_merge_group_event(self):
+        self.commit_file("docs/example.md", "docs")
+        event_path = self.root / "queue.json"
+        event_path.write_text(json.dumps(self.queue_event()))
+        with mock.patch("sys.stdout"):
+            self.assertEqual(PLAN.main(["--repo-root", str(self.root), "--event", str(event_path)]), 0)
 
     def test_first_agent_push_uses_origin_main_instead_of_all_zero_before(self):
         self.git("switch", "-qc", "agent/docs")

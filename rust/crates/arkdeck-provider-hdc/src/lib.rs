@@ -78,12 +78,13 @@ pub use native_library::{
     published_without_attestation, readback_attestation, sha256_token,
 };
 pub use observation::{
-    DeviceCandidate, ParseError, ServerCheck, parse_client_version, parse_server_check,
-    parse_target_list,
+    DeviceCandidate, ParseError, ServerCheck, is_windows_family, parse_client_version,
+    parse_host_client_version, parse_host_server_check, parse_host_target_list, parse_server_check,
+    parse_target_list, parse_windows_target_list,
 };
 pub use operation::{
     Action, DispatchFailure, Expected, HdcDispatch, Outcome, ProcessPlan, Property, Receipt,
-    property_value, stable_identity_sha256,
+    ServerObservation, property_value, stable_identity_sha256,
 };
 pub use operation::{
     DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT, device_arguments,

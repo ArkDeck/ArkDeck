@@ -564,7 +564,7 @@
     "Catalog/profiles": "d5aca23595db3f140e550a358718a382f03aa8b4d4b47d6196a9ad88b2cb1912",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "bf8e2c395df9936bf34fa49496eece69d5857cfdf0bb00d2a9db02cc458959ca",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "89e2a61ca5d94da4a6fc141a751e90d965b484612cde9d1773752c1272120876"
+    "spec/control/methods": "a7bf663bb06f353ac5d0d962267a86aa78893e1a694f6e0de5bbdcb0dd1adb77"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1548,8 +1548,8 @@
       "sha256": "b994974bb907a57c3622cb21afbf6751222ce897d3792657cbdc00b65b880ae5"
     },
     "spec/control/methods/human-action.resume.json": {
-      "blob": "d3be77d75a470207fe10d29a123873ebbb169214",
-      "sha256": "2029d643b6cf6fd5ba9a17911062e39b322413e9ef98ce58d862b87f9b20d8ff"
+      "blob": "06af6a2114de1b0f5f4ede9e045fdc7fa710ad31",
+      "sha256": "3936f6d940b471907520641fb329c8e4edc111ad726d019a359ad05668d60d2a"
     },
     "spec/control/methods/human-action.show.json": {
       "blob": "b33d654d4f6c2ebfd520adb29d31393c6ea41492",
@@ -1796,7 +1796,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "9aa9382d310f25a101e2f6898a18cd7bae4d1c0cf088fb9959310ddd570b7fdd",
+  "inputDigest": "9498649c60e61b2fd86d056ddde866873420d8b025a6c22409a0fb7f6f09b9d4",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

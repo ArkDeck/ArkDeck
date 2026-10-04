@@ -248,3 +248,50 @@ PR #2468 keeps #2467 as its direct base. This push creates fresh head checks;
 previous-head results are not reused as evidence for the new merge. The existing
 Agent PR workflow's fixed-main metadata assertion remains a separately reported
 compatibility issue; it does not justify retargeting this dependent PR.
+
+## CI repair after the recovery parent was published, 2026-10-04
+
+The three contract-parity jobs in run `37198785153` failed because their
+isolated views omitted `openspec/integrations`; the registration tests could
+not read the exact Windows/macOS registries and lock. Published fix #2498
+copies those inputs into each view without skipping tests. The branch now
+merges main `b73ae1a16`, including that fix, stack-aware PR automation #2490,
+and the shared oracle compilation fix #2511.
+
+The recovery parent #2467 was squash-merged. Source conflicts were reconciled
+against its original reviewed head `e253848b6` so only archive changes are
+added to the published implementation. All existing bilingual values are
+preserved, with 19 archive keys added; consumers are regenerated from source.
+Recovery, archive eligibility, identity and capability checks are unchanged.
+
+### Local targeted checks
+
+Logs are under `/tmp/arkdeck-macos-ci-20261004/`; completed checks exit 0.
+
+- `check-isolated-registration.py` uses the repository's actual `materialize`
+  function and verifies every copied integration file byte-for-byte. The exact
+  failed `windows_hdc_registration` target passes 8 tests in the published view
+  and 8 in the candidate view (`isolated-registration.log`).
+- `rust/scripts/test_contract_checks.py`: 54 pass (`contract-view-tests.log`),
+  using the existing dependency-equipped Python environment. Initial runs with
+  the host Python lacked `jsonschema`/`yaml` and are not counted as passes.
+- Daemon `app_ingress_tests`: 41 pass; hoststore `job_archive::` unit tests:
+  7 pass (`archive-ingress.log`, `archive-owner.log`).
+- All-target Clippy for agentd, hoststore, control and CLI passes
+  (`archive-clippy.log`). Its initial compilation failure was the undefined
+  `owned` argument on main, resolved by inheriting published #2511.
+- Swift `RuntimeJobArchiveApplicationFacadeTests`: 4 pass (`archive-swift.log`).
+- The focused archive/recovery prototype tests pass (`archive-interactions.log`).
+  Contract and Windows ClientKit generation agree on 110 methods and 1,073
+  recorded shapes; 1,349 UI resources preserve the macOS values. Owned bundle
+  digests, Rust formatting, SDD and diff checks pass.
+- `ARKDECK_XCODE_JOBS=2 sh scripts/ci/run-xcodebuild.sh`: exit 0,
+  `TEST BUILD SUCCEEDED` (`archive-app.log`). No full local unified gate or
+  device execution is claimed.
+
+### CI
+
+PR #2468 now targets main after #2467's publication. Run `37198785153` and
+Agent PR run `37198784985` remain historical failures; the new merge must pass
+fresh required checks. Its run IDs and current results are recorded in the PR
+description after push. Maintainer review remains required.

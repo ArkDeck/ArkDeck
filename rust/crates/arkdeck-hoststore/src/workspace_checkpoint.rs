@@ -239,7 +239,7 @@ pub(crate) fn require_bounded_sources(paths: &[String], root: &str) -> Result<()
     let mut total: u64 = 0;
     for path in paths {
         // Swift reads each size through the link, as `resourceValues` does.
-        let size = fs::metadata(format!("{root}/{path}"))
+        let size = fs::metadata(support::join(root, path))
             .map(|metadata| metadata.len())
             .map_err(|error| {
                 format!("workspace checkpoint source {path} is unreadable: {error}")
