@@ -213,11 +213,11 @@ pub struct Host {
     /// Swift `ProductRockchipPostFlashAliasReconciler`: the post-flash alias
     /// of the Application Support root, repaired against the one board the
     /// Runtime's USB census reads, over this host's Target store.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     flash_alias: Option<arkdeck_hoststore::FlashAliasReconciler>,
     /// The reads of Swift's `RuntimeDebugInvocationController`, over the
     /// invocation documents of the Job owner's state directory.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     flash_invocations: Option<arkdeck_hoststore::FlashInvocations>,
     /// Swift's bootloader status observer and Rockchip facts port: the
     /// binding and the alias of the Application Support root, the census,
@@ -1150,7 +1150,7 @@ impl Host {
     }
     /// `flash.reconcile-alias` repairs the post-flash alias this reconciler
     /// keeps, against this host's Target store.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_flash_alias_reconciler(
         mut self,
         reconciler: arkdeck_hoststore::FlashAliasReconciler,
@@ -1160,7 +1160,7 @@ impl Host {
     }
     /// `debug.status` and `recovery.flash-invocation.list` read this owner's
     /// invocation documents.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_flash_invocations(mut self, owner: arkdeck_hoststore::FlashInvocations) -> Self {
         self.flash_invocations = Some(owner);
         self
@@ -1279,7 +1279,7 @@ impl Host {
     /// destructive capability — then run as `job.run` runs it, and classified
     /// by the Job and its capability use. Once a Job exists its attempt is
     /// never reported refused: an outcome that cannot be read is unknown.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn debug_attempt(&self, request: &[u8]) -> arkdeck_hoststore::DriverResult {
         let refused = |detail: String| arkdeck_hoststore::DriverResult {
             job_id: None,
@@ -1290,15 +1290,23 @@ impl Host {
             return refused("the Job owner is not composed".into());
         };
         let hdc = self.hdc();
+        #[cfg(target_os = "macos")]
+        let planner = arkdeck_hoststore::JobPlanner {
+            imports: self.imports.as_deref(),
+            artifacts: self.artifacts.as_deref(),
+            analyzer: Some(analyzer),
+            state_root,
+            hdc: hdc.as_ref(),
+            workspace: self.workspace.as_deref(),
+        };
+        // The Windows Job planner over the same owners (`Self::planner`).
+        #[cfg(windows)]
+        let planner = {
+            let _ = analyzer;
+            self.planner(state_root, hdc.as_ref())
+        };
         let admitter = arkdeck_hoststore::JobAdmitter {
-            planner: arkdeck_hoststore::JobPlanner {
-                imports: self.imports.as_deref(),
-                artifacts: self.artifacts.as_deref(),
-                analyzer: Some(analyzer),
-                state_root,
-                hdc: hdc.as_ref(),
-                workspace: self.workspace.as_deref(),
-            },
+            planner,
             jobs,
             now: clock_now,
             authority: self.authority(),
@@ -1578,6 +1586,8 @@ impl Host {
             ("managedHdc", self.managed_hdc().is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("codeSignHelper", self.code_sign_helper.is_some()),
+            ("flashAliasReconciler", self.flash_alias.is_some()),
+            ("flashInvocations", self.flash_invocations.is_some()),
             ("flashHostFacts", self.flash_facts.is_some()),
             ("deviceAccess", self.device_access.is_some()),
             ("lanePlanPreview", self.lane_plan_preview.is_some()),
@@ -1675,9 +1685,9 @@ impl Host {
             human_actions: None,
             #[cfg(any(target_os = "macos", windows))]
             control_actions: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             flash_alias: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             flash_invocations: None,
             #[cfg(any(target_os = "macos", windows))]
             flash_facts: None,
@@ -2411,6 +2421,61 @@ impl HostServices for Host {
                 .ok()
                 .and_then(|request| crate::app_ingress::jobs::kind(&request))
                 .is_some()
+    }
+
+    #[cfg(target_os = "macos")]
+    fn app_job_archive_allowed(&self, job_id: &str) -> bool {
+        let Some(jobs) = &self.jobs else {
+            return false;
+        };
+        let Ok(record) = jobs.read_snapshot(job_id) else {
+            return false;
+        };
+        let Ok(value) = record.value() else {
+            return false;
+        };
+        let request = value
+            .get("originalSubmissionRequest")
+            .filter(|v| v.is_object())
+            .unwrap_or(&record.request);
+        matches!(
+            record.state.as_str(),
+            "waitingForRecovery" | "userAbandonRequested" | "interrupted"
+        ) && serde_json::to_string(request)
+            .ok()
+            .and_then(|r| crate::app_ingress::jobs::kind(&r))
+            .is_some()
+    }
+    #[cfg(any(target_os = "macos", windows))]
+    fn job_archive(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
+            code: "rejected".into(),
+            message: "Job owner is unavailable".into(),
+            details: None,
+        })?;
+        let probe = arkdeck_hoststore::SystemStorageProbe;
+        let publisher =
+            self.storage
+                .as_deref()
+                .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
+                    sessions,
+                    claims: &self.claims,
+                    probe: &probe,
+                });
+        let archiver = arkdeck_hoststore::JobArchiver {
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+            sessions: publisher.as_ref(),
+        };
+        if method == "job.archive.preview" {
+            archiver.preview(params)
+        } else {
+            archiver.archive(params)
+        }
     }
 
     #[cfg(target_os = "macos")]
@@ -3525,7 +3590,11 @@ impl HostServices for Host {
         })?;
         store.handle(method, params, &utc_now())
     }
-    #[cfg(target_os = "macos")]
+    /// `debug.probe` and `debug.template.run` over this host's HDC
+    /// composition (on Windows, the registered tuple's managed server, or a
+    /// test build's fake), as Swift's daemon composes its Debug probe
+    /// (TASK-XPA-008).
+    #[cfg(any(target_os = "macos", windows))]
     fn debug_read(
         &self,
         target_id: &str,
@@ -3553,7 +3622,7 @@ impl HostServices for Host {
     }
     /// Swift composes the reconciler over its Target store; a host without
     /// either answers as Swift's daemon without the reconciler does.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn flash_reconcile_alias(
         &self,
         target_id: &str,
@@ -3687,7 +3756,7 @@ impl HostServices for Host {
             }),
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn flash_invocation(
         &self,
         method: &str,

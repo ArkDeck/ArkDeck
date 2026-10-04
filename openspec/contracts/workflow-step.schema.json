@@ -35,6 +35,7 @@
         "stopApplication",
         "createPortForward",
         "removePortForward",
+        "injectKeyboardInput",
         "injectPointerInput",
         "clearLogBuffer",
         "resizeLogBuffer",
@@ -1586,6 +1587,7 @@
                   "stopApplication",
                   "createPortForward",
                   "removePortForward",
+                  "injectKeyboardInput",
                   "injectPointerInput",
                   "clearLogBuffer",
                   "resizeLogBuffer",
@@ -1702,6 +1704,7 @@
                   "stopApplication",
                   "createPortForward",
                   "removePortForward",
+                  "injectKeyboardInput",
                   "injectPointerInput",
                   "clearLogBuffer",
                   "resizeLogBuffer",
@@ -2775,6 +2778,25 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "injectKeyboardInput"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/keyboardInputArguments"
+              }
+            }
+          }
         }
       ]
     },
@@ -3459,6 +3481,25 @@
           "type": "string",
           "maxLength": 200,
           "pattern": "^[a-z]+-[A-Za-z0-9._-]{1,180}$"
+        }
+      }
+    },
+    "keyboardInputArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceArtifactId",
+        "sourceSha256"
+      ],
+      "properties": {
+        "sourceArtifactId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "sourceSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
         }
       }
     }

@@ -417,6 +417,7 @@ pub use windows::{
 #[cfg(windows)]
 pub use windows::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
+    trusted_write_only_directory,
 };
 // The system tools a Windows Runtime trusts for workspace operations
 // (TASK-XPA-011, maintainer ruling 69): `tar` and `git` by their registered

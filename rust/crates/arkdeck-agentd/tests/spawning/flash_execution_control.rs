@@ -395,6 +395,20 @@ impl arkdeck_provider_hdc::HdcDispatch for ScriptedHdc {
 
 /// The Windows Host of a Flash fixture: as the macOS one, with the fake HDC
 /// given through the test seam and the mutation root the fixture's Job state.
+/// The one DAYU200 the fixture's USB census names, in HDC-normal mode at the
+/// binding's topology.
+pub(crate) fn census()
+-> Result<Vec<arkdeck_platform::UsbHostDevice>, arkdeck_platform::RegistryUnavailable> {
+    Ok(vec![arkdeck_platform::UsbHostDevice {
+        serial: "150100424a544e4600".into(),
+        vendor_id: 0x2207,
+        product_id: 0x5000,
+        topology: "42".into(),
+        product_name: Some("HDC Device".into()),
+        registry_entry_id: Some(1),
+    }])
+}
+
 #[cfg(windows)]
 pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::host::Host {
     use execution_fakes::{FakeHost, FakeLane};

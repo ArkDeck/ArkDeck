@@ -407,8 +407,8 @@ fn call(pipe: &mut std::fs::File, method: &str, params: Value) -> Value {
 }
 
 /// The managed HDC owner is composed on Windows behind the HDC tuple gate
-/// (TASK-XPA-005, CHG-2026-078). No Windows HDC tuple is registered, so a
-/// development root composes none: it says so, its owner census names no
+/// (TASK-XPA-005, CHG-2026-078). A development root that names no
+/// registered Windows HDC composes none: it says so, its owner census names no
 /// `hdc` or `managedHdc`, `runtime.hdc.status` answers as Swift's daemon
 /// answers without an HDC host (`hdc.notConfigured`), launching nothing, and
 /// its stop is a plain one (exit 0, no Runtime recomposition asked).
@@ -419,8 +419,9 @@ fn a_development_root_without_a_registered_hdc_composes_no_managed_server() {
     let mut daemon = Daemon::start(&root.0);
     let pipe = daemon.serving();
     assert!(daemon.seen.iter().any(|line| line
-        == "arkdeck-agentd composes no HDC: no Windows HDC tuple is registered; device \
-            observation and target adoption are refused before any dispatch"));
+        == "arkdeck-agentd composes no HDC: no registered Windows HDC is selected for \
+            this root; device observation and target adoption are refused before any \
+            dispatch"));
     let owners = daemon
         .seen
         .iter()
@@ -453,8 +454,8 @@ fn a_development_root_without_a_registered_hdc_composes_no_managed_server() {
 }
 
 /// Swift's union control-action owner on the Windows daemon (TASK-XPA-005),
-/// beside no managed HDC server while no Windows HDC tuple is registered
-/// (CHG-2026-078), answers as the macOS isolated owner answers without one
+/// beside no managed HDC server (a root that names no registered Windows HDC,
+/// CHG-2026-078), answers as the macOS isolated owner answers without one
 /// (`control_action_process.rs`): the impact preview and the restart are
 /// refused with zero dispatch, an unknown action does not exist, the empty
 /// listing is a snapshot page stored owner-only in

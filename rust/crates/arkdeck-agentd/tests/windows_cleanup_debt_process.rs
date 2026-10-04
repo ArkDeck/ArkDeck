@@ -13,7 +13,7 @@
 //!   restart: `cleanupDebt.list` answers the committed control-frame
 //!   corpus's recorded list of this ledger exactly; the corpus's refusal of a
 //!   continuation naming no debt is answered as recorded, and a debt the
-//!   ledger does not owe is refused. No Windows HDC tuple is registered, so a
+//!   ledger does not owe is refused. The test's root composes no HDC, so a
 //!   continuation of either owed debt is refused (`rejected`, the HDC provider
 //!   unavailable) after the ledger and the Job are read and before any
 //!   readback or retry: the ledger's bytes never change.

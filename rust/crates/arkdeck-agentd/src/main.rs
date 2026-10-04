@@ -340,9 +340,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // that is there and does not verify is reported and the daemon serves.
     // The Windows packages carry it beside the daemon (the xcopy and RC
     // scripts), and it is composed before the owners, so the census the
-    // composition reports names it: no Windows HDC tuple is registered yet,
-    // so there it only stands ready for the native deployment the tuple
-    // will make available.
+    // composition reports names it. Native deployment needs a composed HDC
+    // as well (on Windows, the registered tuple's managed server).
     #[cfg(any(target_os = "macos", windows))]
     let host = match code_sign_helper::bundled() {
         Ok(Some(helper)) => host.with_code_sign_helper(helper),
@@ -965,9 +964,9 @@ fn main() {
 
 #[cfg(all(test, target_os = "macos"))]
 mod debug_invocation_control;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod device_access_control;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod flash_host_reads_control;
 #[cfg(all(test, any(target_os = "macos", windows)))]
 mod flash_plan_control;

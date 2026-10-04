@@ -135,7 +135,7 @@
           "sessionId" : "session-job-015b9785301763965a34ec80b54d9c0b",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "dec66c796cfa8ef8591dc78f67b96ade552a387ea4cd8c0ccb45274d01ffdefa",
+            "manifestSha256" : "d65400d11f666ba4e61ee74454628112438b730d6f89f7b80a839f8a236d6281",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -235,7 +235,7 @@
           "sessionId" : "session-job-6a9bd2498485cd9fdd3272d6c87868ee",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "d246bc7d52144a963dc2c3822d38aaf2e2830ff0cd58066f9e365204afd55544",
+            "manifestSha256" : "a23ae502626dff51f61687a8daea947eab6ec21899f0c8b7fdababd290db89d5",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -306,7 +306,7 @@
           "sessionId" : "session-job-6a9bd2498485cd9fdd3272d6c87868ee",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "d246bc7d52144a963dc2c3822d38aaf2e2830ff0cd58066f9e365204afd55544",
+            "manifestSha256" : "a23ae502626dff51f61687a8daea947eab6ec21899f0c8b7fdababd290db89d5",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -346,7 +346,7 @@
         "ok" : true,
         "result" : [
           {
-            "capabilityId" : "CAP-RT-POLICY-C459EA41301AD6016C23B595565BA9EC79AB6C9C-G1",
+            "capabilityId" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
             "consumptionCount" : 1,
             "effectCeiling" : "destructive",
             "lineageAllowsNewExecution" : false,

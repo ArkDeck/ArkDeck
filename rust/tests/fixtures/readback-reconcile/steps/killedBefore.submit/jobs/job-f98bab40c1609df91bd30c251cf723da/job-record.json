@@ -1,10 +1,10 @@
 {
   "actualEffect" : "deviceMutation",
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-f98bab40c1609df91bd30c251cf723da",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "7e2baff998fb2b3210f15e520a1b7ea06784369acb2cfede4cde6964eb9ed391",
+  "materializedPlanDigest" : "feec83554aa10cbdefb14a9cd8028efff759003d96cd7a25abeca0807aa9e1aa",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "port-forward.create@1",
   "originalSubmissionRequest" : {
@@ -33,7 +33,7 @@
   "providerID" : "hdc",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-940E23EAF59E9E265C9B5B3A7BC46343F93EDF79-G1"
+      "capabilityId" : "CAP-RT-POLICY-10FCCD43EE5A225F3B0F71ABD3A20C1CD3BFD8FA-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-readback-killedBefore",

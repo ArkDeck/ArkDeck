@@ -104,8 +104,8 @@ fn every_owned_product_is_the_published_bytes() {
         }
     }
     // Every product of the bundle: the ten contracts, and the eight samples,
-    // the seven envelopes, the 212 argv fixtures and their index.
-    assert_eq!(produced.len(), 238);
+    // the seven envelopes, the 216 argv fixtures and their index.
+    assert_eq!(produced.len(), 242);
 }
 
 /// Every compiled control method has one coverage ruling, and every ruling a

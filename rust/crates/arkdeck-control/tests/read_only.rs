@@ -77,23 +77,28 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
         } else {
             let actual = actual.as_array().unwrap();
             let expected = recorded["result"].as_array().unwrap();
-            let session = actual
-                .iter()
-                .find(|row| row["reference"] == "capture.diagnostic-session@1");
-            if METHODS.contains(&"diagnostic.session.status") {
-                assert_eq!(actual.len(), expected.len() + 1);
-                let session = session.expect("the current Catalog publishes Diagnostic Session");
-                assert_eq!(session["minimumEffect"], "deviceMutation");
-                assert_eq!(session["binding"], "confirmedDevice");
-                assert_eq!(session["availability"], "unavailable");
-                assert_eq!(session["reasonCodes"], json!(["provider_not_registered"]));
-            } else {
-                assert_eq!(actual.len(), expected.len());
-                assert!(
-                    session.is_none(),
-                    "the old published Catalog cannot advertise the new operation"
-                );
+            let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
+            let additions = ["input.keyboard", "capture.diagnostic-session"];
+            let mut added = 0;
+            for id in additions {
+                let present = catalog.iter().any(|entry| entry["id"] == id);
+                let reference = format!("{id}@1");
+                let row = actual.iter().find(|row| row["reference"] == reference);
+                if present {
+                    added += 1;
+                    let row = row.expect("current Catalog advertises the added operation");
+                    assert_eq!(row["minimumEffect"], "deviceMutation");
+                    assert_eq!(row["binding"], "confirmedDevice");
+                    assert_eq!(row["availability"], "unavailable");
+                    assert_eq!(row["reasonCodes"], json!(["provider_not_registered"]));
+                } else {
+                    assert!(
+                        row.is_none(),
+                        "historical Catalog cannot advertise {reference}"
+                    );
+                }
             }
+            assert_eq!(actual.len(), expected.len() + added);
             for expected in expected {
                 let actual = actual
                     .iter()

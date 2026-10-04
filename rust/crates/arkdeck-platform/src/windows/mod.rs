@@ -76,6 +76,7 @@ pub use inspected_directory::InspectedDirectory;
 pub use managed::ManagedServer;
 pub use pinned_file::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
+    trusted_write_only_directory,
 };
 pub(crate) use process::spawn;
 pub use server::{LoopbackServerLease, PortHolder, end_proved_process, port_holders};

@@ -27,7 +27,7 @@ pub mod ui_dump;
 pub mod update_feed;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_leaves::{install_binding, install_binding_human, install_binding_result};
 mod device_wait;
 pub mod diagnostics_resources;
@@ -95,7 +95,7 @@ pub mod runtime_service_install;
 pub mod runtime_service_verify;
 #[cfg(windows)]
 pub mod runtime_service_windows;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod signing_inputs;
 pub mod signing_leaves;
 
@@ -271,6 +271,9 @@ fn unconfirmed(method: &str, error: &ClientError) -> String {
         }
         "job.reconcile" => {
             "the Job reconcile reply is unconfirmed; read the Job with job status to learn what it settled; the original effect is never replayed"
+        }
+        "job.archive" => {
+            "the archive reply is unconfirmed; inspect job archive preview before taking another action"
         }
         "agent.run" => {
             "the agent run reply is unconfirmed; read the execution with agent status, or run the same execution again, instead of starting a new one"
@@ -531,6 +534,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--offset"
                 | "--max-bytes"
                 | "--job"
+                | "--expected-review-sha256"
+                | "--user-confirmation-id"
                 | "--capability"
                 | "--order"
                 | "--state"
@@ -622,6 +627,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
                         "--job" => "jobId",
+                        "--expected-review-sha256" => "expectedReviewSha256",
+                        "--user-confirmation-id" => "userConfirmationId",
                         "--marker-id" => "markerId",
                         "--label" => "label",
                         "--capability" => "capabilityId",
@@ -756,6 +763,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "import", "hap"] => "artifact.import.hap",
         ["artifact", "import", "workspace-patch"] => "artifact.import.workspace-patch",
         ["artifact", "import", "native-library"] => "artifact.import.native-library",
+        ["artifact", "import", "keyboard-input"] => "artifact.import.keyboard-input",
         ["artifact", "import", "flash-bundle"] => "artifact.import.flash-bundle",
         ["artifact", "import", "abort"] => "artifact.import.abort",
         ["artifact", "import", "inspect"] => "artifact.import.inspect",
@@ -825,6 +833,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "run"] => "job.run",
         ["job", "cancel"] => "job.cancel",
         ["job", "reconcile"] => "job.reconcile",
+        ["job", "archive", "preview"] => "job.archive.preview",
+        ["job", "archive", "apply"] => "job.archive.apply",
         ["capability", "list"] => "capability.list",
         ["capability", "inspect"] => "capability.inspect",
         ["device", "candidates"] => "device.candidates",
@@ -843,6 +853,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["analyze", "crash-signature"] => "analyze.crash-signature",
         ["target", "observe"] => "target.observe",
         ["input", "tap"] => "input.tap",
+        ["input", "keyboard"] => "input.keyboard",
         ["input", "long-press"] => "input.long-press",
         ["input", "swipe"] => "input.swipe",
         ["port-forward", "create"] => "port-forward.create",
@@ -1186,6 +1197,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         }
         "artifact.import.hap"
         | "artifact.import.native-library"
+        | "artifact.import.keyboard-input"
         | "artifact.import.workspace-patch" => &["importRequestId", "targetId", "file", "timeout"],
         "artifact.import.flash-bundle" => &[
             "importRequestId",
@@ -1413,7 +1425,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         "job.status" | "job.show" | "job.evidence" | "job.result" | "job.run" => {
             &["jobId", "timeout"]
         }
-        "job.cancel" | "job.reconcile" => &["jobId"],
+        "job.cancel" | "job.reconcile" | "job.archive.preview" => &["jobId"],
+        "job.archive.apply" => &["jobId", "expectedReviewSha256", "userConfirmationId"],
         "capability.inspect" => &["capabilityId"],
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
@@ -1561,6 +1574,28 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             "cleanup continue requires --job <id> and one of --remote-path <recorded path> / \
              --bundle <recorded bundle>",
         ));
+    }
+    if !help && matches!(command, "job.archive.apply" | "job.archive.preview") {
+        let bounded = |key: &str| {
+            method_options
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(|s| {
+                    !s.is_empty() && s.len() <= 128 && !s.chars().any(char::is_control)
+                })
+        };
+        if !bounded("jobId")
+            || (command == "job.archive.apply"
+                && (!bounded("userConfirmationId")
+                    || !method_options
+                        .get("expectedReviewSha256")
+                        .is_some_and(session_resources::digest)))
+        {
+            return Err(CliError::new(
+                "invalidOption",
+                "job archive requires --job; apply also requires --expected-review-sha256 and --user-confirmation-id",
+            ));
+        }
     }
     if !help && command == "capability.inspect" && !method_options.contains_key("capabilityId") {
         return Err(CliError::new(
@@ -1785,7 +1820,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         .or(continuation_timeout);
     Ok(Invocation {
         command,
-        method: if command == "diagnostics.session.status" {
+        method: if command == "job.archive.apply" {
+            "job.archive"
+        } else if command == "diagnostics.session.status" {
             "diagnostic.session.status"
         } else if command == "diagnostics.session.mark" {
             "diagnostic.session.mark"
@@ -1799,6 +1836,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             command,
             "artifact.import.hap"
                 | "artifact.import.native-library"
+                | "artifact.import.keyboard-input"
                 | "artifact.import.workspace-patch"
                 | "artifact.import.flash-bundle"
         ) {
@@ -1938,6 +1976,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.run"
                     | "job.cancel"
                     | "job.reconcile"
+                    | "job.archive.apply"
+                    | "job.archive.preview"
                     | "job.result"
                     | "capability.inspect"
                     | "agent.run"

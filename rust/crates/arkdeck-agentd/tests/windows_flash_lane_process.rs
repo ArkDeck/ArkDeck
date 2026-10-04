@@ -4,9 +4,9 @@
 //! The lane is composed as the macOS compositions compose it beside the Job
 //! state: one validated `ARKDECK_ARKFORGE_BUNDLE_PATH` bundle names the
 //! `arkforged.exe` to start and pair over stdin. Its authority support binds
-//! the managed-control HDC's digest, and no Windows HDC tuple is registered
-//! (its integration change waits for the maintainer's samples), so no HDC is
-//! composed and the lane is refused before anything is launched:
+//! the managed-control HDC's digest, and the test's root names no registered
+//! Windows HDC, so no HDC is composed and the lane is refused before
+//! anything is launched:
 //!
 //! * without a bundle, and with a retired lane name, the start reports
 //!   Swift's absence, and so does a Flash `job.plan` and `job.submit`,
@@ -373,7 +373,7 @@ fn assert_no_lane_daemon(pipe: &str, runtime: &Path) {
 fn assert_census(daemon: &mut Daemon) {
     let owners = daemon.line_starting("arkdeck-agentd owners: ");
     assert!(
-        owners.ends_with("traceCache, flashHostFacts, deviceAccess, loaderBinding"),
+        owners.ends_with("traceCache, flashAliasReconciler, flashInvocations, flashHostFacts, deviceAccess, loaderBinding"),
         "{owners}"
     );
 }
