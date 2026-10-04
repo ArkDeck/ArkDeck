@@ -2599,8 +2599,12 @@ well.
   the root is opened and a root without one answers `runtime.hdc.status` as
   unconfigured (`windows_lifecycle_process.rs`); the composed path is
   exercised with an injected tuple and a stand-in compiled at test time
-  (`windows_lifecycle::tests`). Tool selection's restart and the HDC
-  control-action owner stay macOS-only.
+  (`windows_lifecycle::tests`). Swift's union control-action owner is
+  composed on every Windows root (`control-action-snapshots`), over the HDC
+  control-action owner (`hdc-control-actions`) only beside that managed
+  server, so `runtime.hdc.impact-preview` and `runtime.hdc.restart` answer
+  `operationUnavailable` without one, as on macOS. Tool selection's restart
+  stays macOS-only.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider

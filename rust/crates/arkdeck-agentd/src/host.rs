@@ -204,8 +204,9 @@ pub struct Host {
     human_actions: Option<arkdeck_hoststore::HumanActionResources>,
     /// The union control-action owner, over the HDC control-action owner
     /// when the isolated owner starts a managed HDC server, and never over a
-    /// tool-selection owner. None on Windows, where no control action is
-    /// built yet (the HDC lifecycle's wait for the Windows HDC tuple).
+    /// tool-selection owner. On Windows the managed server is composed only
+    /// behind a registered HDC tuple (`windows_hdc_gate`), so the union
+    /// owner pages no HDC control action there yet.
     #[cfg(any(target_os = "macos", windows))]
     control_actions: Option<arkdeck_hoststore::ControlActionResources>,
     /// Swift `ProductRockchipPostFlashAliasReconciler`: the post-flash alias
@@ -518,7 +519,7 @@ impl Host {
     /// control actions of this union owner; `runtime.hdc.impact-preview`
     /// previews and `runtime.hdc.restart` requests an impact approval through
     /// its HDC control-action owner, if it has one.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_control_actions(
         mut self,
         resources: arkdeck_hoststore::ControlActionResources,
@@ -526,12 +527,12 @@ impl Host {
         self.control_actions = Some(resources);
         self
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn with_hdc_impact<R>(
         &self,
         run: impl FnOnce(Option<&dyn arkdeck_hoststore::ImpactSource>) -> R,
     ) -> R {
-        #[cfg(test)]
+        #[cfg(all(test, target_os = "macos"))]
         if let Some(source) = &self.test_hdc_impact {
             return run(Some(&**source));
         }
@@ -572,6 +573,9 @@ impl Host {
                 })
                 .map_err(|error| error.wire().message)
         };
+        // The process verification `runtime.hdc.status` uses: the kernel's
+        // argv read on macOS, the launch's provenance on Windows.
+        let verifier = managed.process_verifier();
         let source = arkdeck_hoststore::ManagedServerImpact {
             executable: managed.executable().clone(),
             endpoint: managed.endpoint().to_owned(),
@@ -579,7 +583,7 @@ impl Host {
             supervisor: Some(managed),
             identity: &identity,
             signature: &arkdeck_provider_hdc::NativeSignature,
-            verifier: &arkdeck_provider_hdc::SystemManagedProcess,
+            verifier: &verifier,
             dispatch: &**hdc,
             jobs: &current_jobs,
             targets: &target_records,
@@ -1472,6 +1476,7 @@ impl Host {
             ),
             ("agentExecutions", self.agents.is_some()),
             ("humanActions", self.human_actions.is_some()),
+            ("controlActions", self.control_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
             ("hdc", self.hdc.is_some()),
             ("managedHdc", self.managed_hdc().is_some()),
@@ -2071,14 +2076,24 @@ impl HostServices for Host {
     /// `agent.resume` and `human-action.resume` on Windows: the agent
     /// execution owner over the Target, Job and Artifact owners, admitting an
     /// execution's request as `job.submit` admits it here. No Target is
-    /// observed (no Windows HDC tuple is registered) and no control action is
-    /// built, so a resume reference names an execution's action alone.
+    /// observed (no Windows HDC tuple is registered); a resume reference
+    /// names an execution's action, or a control action's impact approval.
     #[cfg(windows)]
     fn agent_execution(
         &self,
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
+        // As on macOS, the resume reference is looked up in the combined
+        // human-action owner first: a control action's impact approval is
+        // answered there, never by the agent execution owner.
+        if matches!(method, "agent.resume" | "human-action.resume")
+            && let (Some(agents), Some(resources), Some(controls)) =
+                (&self.agents, &self.human_actions, &self.control_actions)
+            && let Some(answer) = resources.resume_control_action(method, params, agents, controls)
+        {
+            return answer;
+        }
         let (Some(agents), Some((state_root, _)), Some(jobs), Some(artifacts), Some(targets)) = (
             &self.agents,
             &self.planning,
@@ -2134,7 +2149,7 @@ impl HostServices for Host {
         )
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn interactive_human_action_resume(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
@@ -2186,14 +2201,17 @@ impl HostServices for Host {
                                 "interactive HDC lifecycle execution is unavailable",
                             )
                         })?;
-                        controls.consume_with_drivers(
-                            id,
-                            reference,
-                            response,
-                            jobs,
-                            source,
-                            (driver, Some(driver)),
-                        )
+                        // No tool-selection owner on Windows (its Bootstrap
+                        // selection is macOS-only).
+                        #[cfg(target_os = "macos")]
+                        let drivers = (
+                            driver as &dyn arkdeck_hoststore::HdcLifecycleDriver,
+                            Some(driver as &dyn arkdeck_hoststore::ToolSelectionDriver),
+                        );
+                        #[cfg(windows)]
+                        let drivers = (driver as &dyn arkdeck_hoststore::HdcLifecycleDriver, None);
+                        controls
+                            .consume_with_drivers(id, reference, response, jobs, source, drivers)
                     })
                 })()
             } else {
@@ -2260,8 +2278,11 @@ impl HostServices for Host {
     /// isolated composition makes — over the HDC control-action owner and the
     /// impact source of its managed HDC server, when it started one — or,
     /// without it, as Swift's handler answers with no control-action owner.
-    /// Production also composes the registered tool-selection owner.
-    #[cfg(target_os = "macos")]
+    /// Production also composes the registered tool-selection owner. On
+    /// Windows no tool-selection owner is composed (no Windows HDC can be
+    /// registered while no Windows HDC tuple is, CHG-2026-078), and the HDC
+    /// control-action owner only beside a registered tuple's managed server.
+    #[cfg(any(target_os = "macos", windows))]
     fn control_action(
         &self,
         method: &str,
@@ -2271,27 +2292,6 @@ impl HostServices for Host {
             return arkdeck_hoststore::control_action_without_owner(method, params);
         };
         self.with_hdc_impact(|source| owner.answer(method, params, source))
-    }
-
-    /// `runtime.tool.select` on Windows, as Swift's handler answers it with no
-    /// tool-selection owner: no Windows HDC can be registered while no Windows
-    /// HDC tuple is (CHG-2026-078), so there is nothing to select. The HDC
-    /// lifecycle's and the control actions' methods keep the read-only
-    /// foundation's refusal until their owners are built.
-    #[cfg(windows)]
-    fn control_action(
-        &self,
-        method: &str,
-        _params: &serde_json::Map<String, serde_json::Value>,
-    ) -> Result<serde_json::Value, WireError> {
-        if method == "runtime.tool.select" {
-            return arkdeck_hoststore::control_action_without_owner(method, _params);
-        }
-        Err(WireError {
-            code: "rejected".into(),
-            message: "this method is unavailable in the read-only Rust foundation".into(),
-            details: None,
-        })
     }
 
     #[cfg(any(target_os = "macos", windows))]
