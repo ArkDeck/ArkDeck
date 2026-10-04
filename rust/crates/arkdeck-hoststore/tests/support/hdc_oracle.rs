@@ -503,6 +503,34 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         ..
     } = owners;
     drop(jobs);
+    assert_relabelled(
+        &fixture,
+        &replayed_root,
+        &default_root,
+        &answers,
+        &mut labels,
+        spelled,
+    );
+}
+
+/// What every replay of these oracles checks once its exchanges are made and
+/// its Job owner is closed: each recorded document beside the one the replay
+/// left in its place under `root` (its Job store `default_root`), from which
+/// the plan digests and what they derive are learned; then every answer,
+/// read through those labels, must be the recorded one (`answers` holds each
+/// exchange's name, the answer as `spelled` reads it, and the recorded
+/// answer), and everything left below the root must be Swift's.
+pub fn assert_relabelled(
+    fixture: &Path,
+    replayed_root: &Path,
+    default_root: &Path,
+    answers: &[(Value, Value, Value)],
+    labels: &mut debug_hap::HostLabels,
+    spelled: impl Fn(&[u8]) -> Vec<u8>,
+) {
+    let spelled_json = |value: &Value| -> Value {
+        serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
+    };
     // Each recorded document beside the one the replay left in its place:
     // the plan digests and what they derive, read as Swift's (nothing is
     // learned on macOS).
@@ -522,12 +550,12 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
             |document| vec![document],
         )
     };
-    for (path, _) in document(&fixture, "provenance.json")["files"]
+    for (path, _) in document(fixture, "provenance.json")["files"]
         .as_object()
         .unwrap()
     {
         let actual = [
-            ("store/", default_root.clone()),
+            ("store/", default_root.to_path_buf()),
             ("sessions/", replayed_root.join("Sessions")),
             ("session-owner/", replayed_root.join("session-owner")),
             ("artifacts/", replayed_root.join("artifacts")),
@@ -551,15 +579,15 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
             labels.learn_within(&json!(ours), &json!(theirs), seal, "sha256");
         }
     }
-    let index = super::index(&default_root);
+    let index = super::index(default_root);
     labels.learn_keys(
         &spelled_json(&index),
-        &document(&fixture, "store/index.json"),
+        &document(fixture, "store/index.json"),
         &["requestHash", "recordSHA256"],
     );
     // Every answer as Swift gave it, with the plan digests and the values
     // derived from them read as Swift's.
-    for (_, actual, expected) in &answers {
+    for (_, actual, expected) in answers {
         labels.learn(actual, expected, "/result/materializedPlanDigest");
         labels.learn_keys(actual, expected, &ANSWER_DERIVED);
     }
@@ -586,7 +614,7 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         })
         .collect();
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    super::assert_leftovers_relabelled(&fixture, &replayed_root, &default_root, |bytes| {
+    super::assert_leftovers_relabelled(fixture, replayed_root, default_root, |bytes| {
         labels.swift_bytes(&spelled(bytes))
     });
 }
