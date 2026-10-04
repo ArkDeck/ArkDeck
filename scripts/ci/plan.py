@@ -454,6 +454,43 @@ def _is_ancestor(repo_root: pathlib.Path, ancestor: str, descendant: str) -> boo
     return result.returncode == 0
 
 
+def plan_from_merge_group_event(
+    repo_root: pathlib.Path, event: Mapping[str, object]
+) -> CIPlan:
+    """Validate the entire queued combination against its immutable event base.
+
+    origin/main may already have advanced (or the temporary branch disappeared)
+    by the time a runner starts. Neither changes the comparison for this run.
+    """
+    group = event.get("merge_group")
+    if event.get("action") != "checks_requested" or not isinstance(group, dict):
+        raise PlanError("expected a merge_group checks_requested event")
+    head, base = group.get("head_sha"), group.get("base_sha")
+    if not isinstance(head, str) or _full_oid(head) is None or head == ZERO_OID:
+        raise PlanError("merge_group head_sha must be a full commit OID")
+    if _commit_oid(repo_root, "HEAD") != head:
+        raise PlanError("merge_group head_sha does not match the exact checked-out HEAD")
+    if group.get("base_ref") != "refs/heads/main":
+        raise PlanError("merge_group base_ref must be refs/heads/main")
+    head_ref = group.get("head_ref")
+    if not isinstance(head_ref, str) or not head_ref.startswith("refs/heads/gh-readonly-queue/main/"):
+        raise PlanError("merge_group head_ref must belong to the main merge queue")
+    if not isinstance(base, str) or _full_oid(base) is None or _commit_oid(repo_root, base) is None:
+        return _all_lanes_plan(head_revision=head, base_kind="merge-group-base",
+                               reason="merge-group-base-unavailable-fail-closed")
+    if not _is_ancestor(repo_root, base, head):
+        raise PlanError("merge_group base_sha is not an ancestor of head_sha")
+    return plan_between(repo_root, base_revision=base, head_revision=head,
+                        use_merge_base=False, base_kind="merge-group-base")
+
+
+def plan_from_event(repo_root: pathlib.Path, event: Mapping[str, object], *,
+                    last_success: str | None = None) -> CIPlan:
+    if "merge_group" in event:
+        return plan_from_merge_group_event(repo_root, event)
+    return plan_from_push_event(repo_root, event, last_success=last_success)
+
+
 def plan_from_push_event(
     repo_root: pathlib.Path,
     event: Mapping[str, object],
@@ -744,7 +781,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 event = json.load(stream)
             if not isinstance(event, dict):
                 raise PlanError("event root must be an object")
-            plan = plan_from_push_event(
+            plan = plan_from_event(
                 repo_root, event, last_success=arguments.main_last_success or None
             )
         else:

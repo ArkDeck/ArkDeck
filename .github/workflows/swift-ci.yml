@@ -26,6 +26,8 @@ name: Swift CI
 on:
   push:
     branches: [main, "agent/**"]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
