@@ -2,7 +2,8 @@
 //! tool owner captures `hdc.exe` into a private store on NTFS and admits it
 //! only when a registered Windows HDC tuple names its executable.
 //!
-//! No Windows tuple is registered (`WINDOWS_HDC_TUPLES` is empty), so a store
+//! The tests' `hdc.exe` is no registered Windows tuple (`WINDOWS_HDC_TUPLES`
+//! holds DevEco's `hdc.exe` only, CHG-2026-078), so a store
 //! as the daemon composes it today refuses every `hdc.exe`, writing nothing.
 //! The admitted path is exercised with an identity injected for a copy of a
 //! `System32` program standing in for `hdc.exe`: a fixture identity, never a
@@ -82,8 +83,9 @@ fn with_no_registered_windows_tuple_every_hdc_is_refused_writing_nothing() {
     scratch.directory("sdk");
     let hdc = scratch.file(r"sdk\hdc.exe", &system("whoami.exe"));
     let store_path = scratch.directory("bootstrap");
-    // A store whose composer gave it no identities, and one composed over an
-    // empty table, as the daemon composes `WINDOWS_HDC_TUPLES` today
+    // A store whose composer gave it no identities, and one whose identities
+    // name no tuple for this `hdc.exe`, as the daemon's composition of
+    // `WINDOWS_HDC_TUPLES` (DevEco's `hdc.exe` only) names none for it
     // (`windows_bootstrap_owners_process.rs` refuses through the daemon).
     for store in [
         ToolRegistryStore::open_existing(&store_path).unwrap(),

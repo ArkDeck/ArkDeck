@@ -2969,9 +2969,10 @@ directory), created owner-only at the start. The census names `bootstrap` after
   content digest and record (`"platform":"windows"`). Registration admits only an executable a
   registered Windows HDC tuple names: the daemon composes `arkdeck-provider-hdc`'s
   `WINDOWS_HDC_TUPLES` into the store's identities, checked on the source before the store is
-  locked and again on the captured bytes before anything is published. **The table is empty
-  (CHG-2026-078), so every `hdc.exe` is refused** (`admissionDenied`) and nothing is written;
-  with no HDC to select, `runtime.tool.select` answers Swift's no-owner refusal.
+  locked and again on the captured bytes before anything is published. **The table holds
+  DevEco Studio 26.0.0.43's `hdc.exe` only (CHG-2026-078, c2, `3.2.0g`), so every other
+  `hdc.exe` is refused** (`admissionDenied`) and nothing is written; with no HDC to select,
+  `runtime.tool.select` answers Swift's no-owner refusal.
 - **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
   team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
   `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.
