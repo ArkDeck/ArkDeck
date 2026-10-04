@@ -481,6 +481,19 @@ def derive_method_schemas(source):
             inspection = load_frames(FRAME_CORPUS_DIRECTORY / "runtime.bundle.inspect.jsonl")
             projections = [frame["result"] for frame, _ in inspection if frame["ok"]]
             schema["$defs"]["result"] = infer(projections + results, closed=True, path="result", maps=maps)
+        if method == "runtime.tool.select" and results:
+            # `select` answers the tool-selection action's one projection
+            # (`RuntimeToolSelectionControlAction.projection`) in whatever state
+            # the action holds: Swift's daemon returned it as it is, blocked,
+            # drifted or settled, and its CLI printed it. The recorded frames
+            # hold only the awaiting-approval answer; the Swift store oracle
+            # (`ToolSelectionStoreOracleContractTests`) recorded that projection
+            # in every state. Admit those Swift-produced projections too; never
+            # manufacture a producer frame.
+            oracle = repository_root / "rust/tests/fixtures/tool-selection-store/projections.json"
+            projections = json.loads(oracle.read_text())
+            schema["$defs"]["result"] = infer(projections + results, closed=True, path="result", maps=maps)
+            schema["x-arkdeck-sampleCounts"]["result"] = len(results) + len(projections)
         if method in {"runtime.tool.list", "runtime.tool.remove"} and results:
             # Both leaves return the existing Tool projection. Preserve its
             # native optional trust/dependency/selection fields from actual

@@ -218,7 +218,7 @@ public static class ControlContract
         ["runtime.tool.list"] = "bdee84736418e7179fc33a8c66ad962f206d6e6ef4d65913fb9a0b5b0e49c63c",
         ["runtime.tool.register"] = "2043336675788967beda8e58bbfb2df64a0e29bdec95774c7c227de3e64942bf",
         ["runtime.tool.remove"] = "c80decaa1fc59f999e5f90e42817f41bc0f7539f633757225d5b69d78149e17c",
-        ["runtime.tool.select"] = "5799df2dffea78ae22331663f19ab3cc440ea7adaceb68f1ddcdda146a23ff90",
+        ["runtime.tool.select"] = "19bd8eac6bb2218bbaa84db4e6ec46ac4688dacb72deb4dc4b3f055716bdce5a",
         ["session.cleanup.apply"] = "fe4d62e7c865bd03399cddd3bec41534138276b9e7dc6aadb8d0748338c72c27",
         ["session.cleanup.preview"] = "2e8e22df1526935017a49afb68467e41a0e97a0b136a9cdd3b168942a43cf0f0",
         ["session.export.apply"] = "2b89eaff7882ea429454e3251230aaac8c9fb432a3b6784ebe780c841a84c7e0",

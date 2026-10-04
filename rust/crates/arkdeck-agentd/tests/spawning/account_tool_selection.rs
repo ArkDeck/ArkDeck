@@ -21,15 +21,13 @@
 //!
 //! The real `arkdeck.exe`, pinned to the signed copy, lists the registered
 //! tool as the account's selection and asks to select it. The tool-selection
-//! owner answers (it is composed: the answer is not Swift's "owner
-//! unavailable" refusal), but with a blocked action, whose shape the
-//! published `runtime.tool.select` result contract (sampled from Swift's
-//! awaiting-approval answer) does not hold, so the control layer answers
-//! `internalError`, as the macOS daemon answers a blocked selection. An
-//! answer in the contract's shape needs a healthy server proof, which only a
-//! registered tuple's commandless identity gives: the leaf is measured only
-//! with DevEco's `hdc.exe` (a live run), so it is not counted in
-//! `WINDOWS_MEASURED_LEAVES` here. Every account daemon starter is held off
+//! owner answers with its typed action, as Swift's daemon answered and its
+//! CLI printed it: the active tool is no candidate, so the action is drifted
+//! (`tool.selectionFactsUnavailable`) and nothing is dispatched. An
+//! awaiting-approval answer needs a second registered tool and a healthy
+//! server proof, which only a registered tuple's server gives (#2501), so the
+//! leaf is not counted in `WINDOWS_MEASURED_LEAVES` here. Every account
+//! daemon starter is held off
 //! for the whole run (`StarterLock`), as the account-location tests hold
 //! them. Nothing installed, no `hdc` and no device is involved.
 use crate::host::Host;
@@ -394,9 +392,8 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
     assert_eq!(selected[0]["platform"], "windows");
     let tool = selected[0]["toolRef"].as_str().unwrap().to_owned();
 
-    // The tool-selection owner is composed and answers; its blocked action
-    // is outside the published result contract (see the module's
-    // documentation), and nothing is dispatched.
+    // The tool-selection owner answers with its typed drifted action, in
+    // the published result contract's shape, and nothing is dispatched.
     let (status, selection) = daemon.cli(&[
         "runtime",
         "tool",
@@ -408,15 +405,16 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
         "--action-request-id",
         "request-account-tool-select",
     ]);
-    assert_ne!(status, Some(0), "{selection}");
-    assert_ne!(
-        selection["error"]["message"], "the Runtime tool-selection owner is unavailable",
-        "{selection}"
-    );
+    assert_eq!(status, Some(0), "{selection}");
+    assert_eq!(selection["ok"], true, "{selection}");
+    let action = &selection["result"];
+    assert_eq!(action["kind"], "runtimeToolSelection", "{selection}");
+    assert_eq!(action["state"], "previewDrifted", "{selection}");
     assert_eq!(
-        selection["error"]["details"]["wireCode"], "internalError",
+        action["blockerReasonCode"], "tool.selectionFactsUnavailable",
         "{selection}"
     );
+    assert_eq!(action["dispatchCount"], 0, "{selection}");
     // Nothing was selected: the account's selection is unchanged.
     let (status, again) = daemon.cli(&["runtime", "tool", "list"]);
     assert_eq!(status, Some(0), "{again}");
