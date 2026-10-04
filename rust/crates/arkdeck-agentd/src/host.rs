@@ -3986,8 +3986,9 @@ pub fn fresh_id() -> io::Result<String> {
 /// Swift's `RuntimeWorkspaceToolchainPinning` over its
 /// `BootstrapDevEcoToolchainRegistry`: a workspace preset's pin on its DevEco
 /// toolchain, held by the preset in the registry at `bootstrap`. A refusal
-/// keeps the registry's code and message, as Swift rethrows it.
-#[cfg(target_os = "macos")]
+/// keeps the registry's code and message, as Swift rethrows it. On Windows
+/// the same registry owner over the daemon's Bootstrap registry.
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn toolchain_pinning(
     bootstrap: &std::path::Path,
 ) -> io::Result<arkdeck_hoststore::WorkspaceToolchainPinning> {
