@@ -21,7 +21,12 @@
 //! with every module they name; their unit tests are declared by
 //! `src/main.rs` alone. Host tests only: every HDC here is a fake, and
 //! nothing installed is read or written.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows only the Flash host facts replay runs here, over the shared
+//! fake's answers ported in process (`oracle_fake.rs`), which the Host's
+//! test-only seam probes: no Windows daemon composes an HDC until its tuple
+//! is registered (TASK-XPA-010).
+#![cfg(any(target_os = "macos", windows))]
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
@@ -32,6 +37,7 @@ fn turn() -> MutexGuard<'static, ()> {
 }
 
 // The daemon's modules, from its sources. The tests drive part of each.
+#[cfg(target_os = "macos")]
 #[allow(dead_code)]
 #[path = "../../src/app_ingress.rs"]
 mod app_ingress;
@@ -44,18 +50,31 @@ mod host;
 #[allow(dead_code)]
 #[path = "../../src/managed_hdc.rs"]
 mod managed_hdc;
+/// The shared fake HDC's answers in process (Windows cannot run its driver).
+#[cfg(windows)]
+#[path = "../../../arkdeck-provider-hdc/tests/common/oracle_fake.rs"]
+mod oracle_fake;
+#[cfg(target_os = "macos")]
 #[allow(dead_code)]
 #[path = "../../src/tool_selection_startup.rs"]
 mod tool_selection_startup;
 
+#[cfg(target_os = "macos")]
 mod app_ingress_fake_hdc;
+#[cfg(target_os = "macos")]
 mod debug_read_control;
+#[cfg(target_os = "macos")]
 mod flash_broker_control;
+#[cfg(target_os = "macos")]
 mod flash_execution_control;
 mod flash_host_facts_control;
+#[cfg(target_os = "macos")]
 mod flash_socket_control;
+#[cfg(target_os = "macos")]
 mod managed_hdc_server;
+#[cfg(target_os = "macos")]
 mod target_observation_control;
+#[cfg(target_os = "macos")]
 mod trace_probe_control;
 
 /// A module compiled here from the daemon's sources keeps no test beside it:

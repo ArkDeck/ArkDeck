@@ -40,6 +40,12 @@ released port or dropped listener stays held. A test whose path starts a child
 belongs in `tests/spawning`, which compiles the daemon's modules from their
 sources and runs one test at a time (`turn()`), as do the integration tests
 that listen or take a lock in their own process while spawning.
+On Windows only `flash_host_facts_control.rs` runs there (TASK-XPA-010): the
+Swift Flash host facts oracle through `Control` and the daemon's own host, over
+the shared fake's answers ported in process
+(`arkdeck-provider-hdc/tests/common/oracle_fake.rs`), which the host probes
+through a seam compiled into test builds only. The Windows daemon itself still
+composes no HDC.
 
 Clippy and the workspace tests are the only checks that compile this checkout.
 `generate-contract.py --check` regenerates the manifest and bindings from the
