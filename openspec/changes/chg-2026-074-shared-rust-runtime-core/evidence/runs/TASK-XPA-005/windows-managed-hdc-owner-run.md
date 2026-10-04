@@ -39,7 +39,8 @@ is: no bypass, no macOS authority reused for identity or trust.
 Behaviour change on Windows: `runtime.hdc.status` used to be refused as the read-only foundation's
 (`rejected`); it now answers as Swift's daemon answers without an HDC host
 (`unconfigured_status`, `hdc.notConfigured`), on a development root, the account's daemon and the
-private-endpoint foundation alike, as on macOS. Every other answer is unchanged while no tuple is
+private-endpoint foundation alike, as on macOS. The contract-parity read-only check
+(`rust/scripts/check-readonly.py`) now expects that answer on Windows as it does on macOS. Every other answer is unchanged while no tuple is
 registered. macOS behaviour is unchanged: `cfg` attributes, comments, and the status verifier
 bound to a local.
 

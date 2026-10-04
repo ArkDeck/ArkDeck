@@ -443,8 +443,10 @@ def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpo
         if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.resume", "human-action.list", "human-action.show"} and platform.system() in {"Darwin", "Windows"}:
             expected = "operationUnavailable"
         # The macOS daemon starts no managed HDC server, so it answers the live HDC
-        # status as Swift's daemon without its HDC host does.
-        if method == "runtime.hdc.status" and platform.system() == "Darwin":
+        # status as Swift's daemon without its HDC host does. The Windows daemon
+        # composes the same managed HDC owner (behind the HDC tuple gate, which
+        # admits none while no Windows tuple is registered) and answers the same.
+        if method == "runtime.hdc.status" and platform.system() in {"Darwin", "Windows"}:
             expected = None
         # Keeping no state, it composes no control-action owner either: it answers as
         # Swift's handler without one, which wants an exact identity for show and reconcile.
