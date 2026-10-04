@@ -7583,6 +7583,36 @@
       "table": "HistoryLocalizable",
       "en": "Artifacts",
       "zh-Hans": "Artifacts"
+    },
+    {
+      "key": "overview.record.device.label",
+      "table": "Localizable",
+      "en": "Device this page describes",
+      "zh-Hans": "本页描述的设备"
+    },
+    {
+      "key": "overview.record.device.none",
+      "table": "Localizable",
+      "en": "No online device",
+      "zh-Hans": "暂无在线设备"
+    },
+    {
+      "key": "overview.record.device.noneDetail",
+      "table": "Localizable",
+      "en": "Connect an adopted device, then refresh.",
+      "zh-Hans": "请连接一台已接管的设备后刷新。"
+    },
+    {
+      "key": "overview.record.device.choose",
+      "table": "Localizable",
+      "en": "Choose a device…",
+      "zh-Hans": "选择一台设备…"
+    },
+    {
+      "key": "overview.record.binding",
+      "table": "Localizable",
+      "en": "binding %lld",
+      "zh-Hans": "binding %lld"
     }
   ]
 }
