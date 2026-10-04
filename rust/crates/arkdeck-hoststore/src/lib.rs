@@ -22,6 +22,7 @@ mod workspace_composition;
 #[cfg(any(target_os = "macos", windows))]
 pub use workspace_composition::{
     CompositionNotes, ResolvedToolchain, ToolchainResolver, WorkspaceComposition,
+    hvigor_environment,
 };
 #[cfg(any(target_os = "macos", windows))]
 mod workspace_isolation;

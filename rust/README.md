@@ -4218,6 +4218,15 @@ preset; register the toolchain again. The tool runner also names its child by th
 wrapper bootstrap hands Node's image path to `cmd.exe`, which cannot run a `\\?\` one. Managed
 servers and consoles keep `\\?\`.
 
+Node and `cmd.exe` look up a bare command name (`java`, `cmd.exe`, `wmic`) in the working
+directory before `PATH`, and a Hvigor child's working directory is the copy of the person's
+project. So a registered toolchain's Node children also get
+`NoDefaultCurrentDirectoryInExePath=1`, and a command planted in the project never runs ahead of
+the pinned JDK or the system's tools. The live test plants images and scripts under those names
+and builds anyway. Hvigor still runs the project's own `hvigorfile.ts` and declared plugins, by
+design, as on macOS
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-cwd-run.md)).
+
 The daemon's `--symbolize-crash` mode answers the Swift symbolizer oracle on Windows
 (`crash_symbolizer_mode`). The CLI test and symbolize leaves stay `partial`. A test preset also
 needs the project's `ohpm` dependencies. `ohpm` links those with in-tree junctions, which the

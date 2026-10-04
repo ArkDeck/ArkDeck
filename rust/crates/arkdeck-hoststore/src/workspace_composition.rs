@@ -227,6 +227,23 @@ pub(crate) struct BuildLowering {
     pub(crate) search_directory: Option<String>,
 }
 
+/// What a registered toolchain's Node children find beyond the base: the SDK
+/// root (`DEVECO_SDK_HOME`), and on Windows
+/// `NoDefaultCurrentDirectoryInExePath=1`. Node (libuv) and `cmd.exe` then
+/// never resolve a bare command name (`java`, `cmd.exe`, `wmic`) in the
+/// working directory, which is the copy of the person's project, ahead of
+/// the search path (TASK-XPA-011).
+pub fn hvigor_environment(sdk_root_path: &str) -> Vec<(String, String)> {
+    let mut environment = vec![("DEVECO_SDK_HOME".to_owned(), sdk_root_path.to_owned())];
+    if cfg!(windows) {
+        environment.push((
+            "NoDefaultCurrentDirectoryInExePath".to_owned(),
+            "1".to_owned(),
+        ));
+    }
+    environment
+}
+
 /// The parts of Swift's child base a Hvigor build reads beyond this Runtime's
 /// clean one: the home it keeps its caches in and its temporary directory,
 /// as the daemon's own environment names them.
@@ -516,10 +533,7 @@ fn resolve_registered(
                 }
                 resolved.environment.insert(
                     crate::workspace_support::foundation_standardized(&toolchain.node_path),
-                    vec![(
-                        "DEVECO_SDK_HOME".to_owned(),
-                        toolchain.sdk_root_path.clone(),
-                    )],
+                    hvigor_environment(&toolchain.sdk_root_path),
                 );
                 resolved
                     .by_project

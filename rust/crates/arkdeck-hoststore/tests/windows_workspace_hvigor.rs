@@ -44,6 +44,7 @@ mod windows {
         ArtifactReadStore, CapabilityStore, DeviceHolds, JobAdmitter, JobPlanner, JobResultReader,
         JobRunner, JobStore, MutationAuthority, MutationExecution, ProfilePresets,
         VerifiedResource, WorkspaceCommandPreset, WorkspaceComposition, WorkspaceProfile,
+        hvigor_environment,
     };
     use serde_json::{Map, Value, json};
     use std::fs;
@@ -64,12 +65,13 @@ mod windows {
         let task = arguments.get(1).map(String::as_str).unwrap_or_default();
         let named = |key: &str| std::env::var(key).unwrap_or_else(|_| "<unset>".into());
         let environment = format!(
-            "DEVECO_SDK_HOME={}\nUSERPROFILE={}\nTEMP={}\nHOME={}\nPATH={}\n",
+            "DEVECO_SDK_HOME={}\nUSERPROFILE={}\nTEMP={}\nHOME={}\nPATH={}\nNoDefaultCurrentDirectoryInExePath={}\n",
             named("DEVECO_SDK_HOME"),
             named("USERPROFILE"),
             named("TEMP"),
             named("HOME"),
             named("PATH"),
+            named("NoDefaultCurrentDirectoryInExePath"),
         );
         match task {
             "assembleHap" => {
@@ -385,16 +387,19 @@ mod windows {
         }
         let tools = toolchain(&root.0);
         let profile = profile(&source, &tools);
+        // What the composition gives a registered toolchain's Node children.
+        let environment = hvigor_environment(&text(&tools.sdk));
+        let overlay: Vec<(&str, &str)> = environment
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+            .collect();
         let workspace = WorkspaceComposition::with_profiles(
             vec![profile],
             &root.0.join("evolution-workspaces"),
             now,
         )
         .unwrap()
-        .with_child_environment(
-            &text(&tools.node),
-            &[("DEVECO_SDK_HOME", &text(&tools.sdk))],
-        )
+        .with_child_environment(&text(&tools.node), &overlay)
         .with_child_search_directory(&text(&tools.node), &text(&tools.jdk));
         let owners = Owners::new(&root.0, workspace);
 
@@ -452,6 +457,11 @@ mod windows {
             );
         }
         assert!(environment.contains("HOME=<unset>\n"), "{environment}");
+        // Node and `cmd.exe` never resolve a bare command in the copy.
+        assert!(
+            environment.contains("NoDefaultCurrentDirectoryInExePath=1\n"),
+            "{environment}"
+        );
         // The pinned JDK's directory, then the system directory: nothing else.
         let system =
             std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32");
