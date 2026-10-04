@@ -5294,4 +5294,44 @@ SHA-256: %4$@</value>
     <value>Choose folder / mounted SMB…</value>
     <comment>debug.artifacts.chooseDirectory (DebugLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobInspector_fact_recoveryRelation" xml:space="preserve">
+    <value>Recovery relation</value>
+    <comment>jobInspector.fact.recoveryRelation (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_progress" xml:space="preserve">
+    <value>Job in progress</value>
+    <comment>jobInspector.progress (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_residue" xml:space="preserve">
+    <value>%d cleanup items remain on the device.</value>
+    <comment>jobInspector.residue (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_result_supersededByRecovery" xml:space="preserve">
+    <value>This Job's outcome remains unknown, but a later confirmed complete-overwrite recovery established the current target state.</value>
+    <comment>jobInspector.result.supersededByRecovery (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_result_targetAliasResolved" xml:space="preserve">
+    <value>This Job's outcome remains unknown, but a later confirmed full Flash proved its target was an alias and established the current device state.</value>
+    <comment>jobInspector.result.targetAliasResolved (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_state_currentEpochEstablished" xml:space="preserve">
+    <value>Current state established</value>
+    <comment>jobInspector.state.currentEpochEstablished (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_action_readLog" xml:space="preserve">
+    <value>Read log locally</value>
+    <comment>jobInspector.action.readLog (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_tail" xml:space="preserve">
+    <value>Showing at most the last 200 lines. Open this record for all artifacts.</value>
+    <comment>jobInspector.log.tail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_privacy" xml:space="preserve">
+    <value>Only standard logs are previewed here. Read sensitive artifacts explicitly in History.</value>
+    <comment>jobInspector.log.privacy (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_notText" xml:space="preserve">
+    <value>The log is not valid UTF-8 text.</value>
+    <comment>jobInspector.log.notText (JobsLocalizable.xcstrings)</comment>
+  </data>
 </root>

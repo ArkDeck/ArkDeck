@@ -582,4 +582,15 @@ impl HdcDispatch for DevelopmentHdc {
         }
         self.dispatch.dispatch(plan)
     }
+
+    /// The commandless server observation, behind the same gate: once the
+    /// managed server is not the one launched, nothing is observed.
+    fn observe_server(&self) -> Result<arkdeck_provider_hdc::ServerObservation, DispatchFailure> {
+        if let Some(managed) = &self.managed {
+            managed.current().map_err(|reason| {
+                DispatchFailure::Refused(format!("dispatch refused: {reason}"))
+            })?;
+        }
+        self.dispatch.observe_server()
+    }
 }
