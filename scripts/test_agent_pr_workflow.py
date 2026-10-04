@@ -336,16 +336,19 @@ def validate_automatic_check_contract(
         if token in capability_text:
             raise WorkflowContractError(f"forbidden workflow capability: {token}")
 
-    if extract_event_names(sdd_text) != ("push", "pull_request"):
-        raise WorkflowContractError("SDD Guard event set must be push + pull_request")
+    if extract_event_names(sdd_text) != ("push", "merge_group", "pull_request"):
+        raise WorkflowContractError("SDD Guard event set must be push + merge_group + pull_request")
     if EXPECTED_PUSH_FLOW not in sdd_text:
         raise WorkflowContractError("SDD Guard push branches drifted")
     if extract_pull_request_types(sdd_text) != ("reopened", "edited"):
         raise WorkflowContractError(
             "SDD Guard pull_request types must be reopened + edited"
         )
-    if extract_event_names(swift_text) != ("push",):
-        raise WorkflowContractError("Swift CI must be push-only")
+    if extract_event_names(swift_text) != ("push", "merge_group"):
+        raise WorkflowContractError("Swift CI must run on push + merge_group")
+    for text in (swift_text, sdd_text):
+        if "  merge_group:\n    types: [checks_requested]\n" not in text:
+            raise WorkflowContractError("required checks must handle merge_group checks_requested")
     if EXPECTED_PUSH_FLOW not in swift_text:
         raise WorkflowContractError("Swift CI push branches drifted")
     if "\n    paths:" in swift_text or "\n    paths-ignore:" in swift_text:
@@ -384,6 +387,8 @@ def validate_automatic_check_contract(
         ("plan", plan_job), ("swift-tests", swift_tests_job),
         ("app-build", app_build_job), ("ds-interactions", ds_job),
         ("windows-clientkit", windows_job),
+        ("sdd-guard", _job_block(sdd_text, "guard")),
+        ("sdd-tokens", _job_block(sdd_text, "ds-tokens")),
     ):
         for required in (
             "ARKDECK_CI_SHA: ${{ github.sha }}",
@@ -628,7 +633,8 @@ RUST_SECRET_DECLARATION = (
 RUST_SHARED_JOB_TOKENS = (
     "        shell: bash\n        working-directory: rust\n",
     "git config core.autocrlf false",
-    '"+refs/heads/main:refs/remotes/origin/main"',
+    '"+${ARKDECK_CI_BASE}:refs/remotes/origin/main"',
+    "ARKDECK_CI_BASE: ${{ github.event.merge_group.base_sha || 'refs/heads/main' }}",
     '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
     'test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"',
     "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",

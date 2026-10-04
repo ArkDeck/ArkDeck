@@ -50,3 +50,20 @@ sandbox 内 `gh auth status` 报未登录或 token 无效时，用受控权限�
 机器人通过 GitHub Stacks REST API 登记依赖链；只创建新栈或在既有栈顶追加新层，并读回
 membership 与顺序。已有不同子层、多个栈交叠或 API 不可用时会明确失败，保留 PR 与 base，
 不重写分支、不拆掉已有栈、不把元数据失败计作通过。先解决报告的依赖问题，再重新 push。
+
+## 合并队列
+
+`guard` 与 `swift` 同时处理 `merge_group: checks_requested`。队列按事件固定的 base/head SHA
+检查完整组合，Rust published baseline 也固定到该 base；临时分支变化不改变检查对象。
+每层 push 的 required checks 继续保留，不用上层通过替代下层验证。
+
+[队列设置](../../.github/merge-queue.json) 是待发布的 GitHub ruleset 配置；提交该文件不会启用
+队列。只有这组工作流经维护者 review 合入 protected `main` 后才能应用。启用前备份并核对
+远端 branch protection 与 rulesets，保留 `guard`、`swift`、review、linear history 及现有
+权限边界。采用 `ALLGREEN`、squash、1 个并行候选构建、每组最多 3 个 PR、360 分钟检查超时，
+不为凑组增加等待；后续根据实际队列耗时调整，不把增大合并组当作减少 CI 构建。
+
+`agent-ref-boundary` 也匹配 `gh-readonly-queue/main/**`。应用前让 GitHub merge queue bot 能够
+创建、更新和删除临时队列分支；只给该内置 bot 添加 bypass，不开放其他 actor 的分支写入。
+应用后读回 queue 配置和必需检查；由维护者 review 后入队的首个真实 PR 验证 `merge_group`
+上的 `guard`、`swift`。不得用手工上传 status 或旧 PR 的绿色检查替代组合验证。

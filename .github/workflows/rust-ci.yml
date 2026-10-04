@@ -54,6 +54,7 @@ jobs:
         working-directory: .
         env:
           ARKDECK_CI_SHA: ${{ github.sha }}
+          ARKDECK_CI_BASE: ${{ github.event.merge_group.base_sha || 'refs/heads/main' }}
         run: |
           set -eu
           git init .
@@ -61,7 +62,7 @@ jobs:
           git config core.autocrlf false
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
+            "+${ARKDECK_CI_BASE}:refs/remotes/origin/main" \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
@@ -206,6 +207,7 @@ jobs:
         working-directory: .
         env:
           ARKDECK_CI_SHA: ${{ github.sha }}
+          ARKDECK_CI_BASE: ${{ github.event.merge_group.base_sha || 'refs/heads/main' }}
         run: |
           set -eu
           git init .
@@ -213,7 +215,7 @@ jobs:
           git config core.autocrlf false
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
+            "+${ARKDECK_CI_BASE}:refs/remotes/origin/main" \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
@@ -405,6 +407,7 @@ jobs:
         working-directory: .
         env:
           ARKDECK_CI_SHA: ${{ github.sha }}
+          ARKDECK_CI_BASE: ${{ github.event.merge_group.base_sha || 'refs/heads/main' }}
         run: |
           set -eu
           git init .
@@ -412,7 +415,7 @@ jobs:
           git config core.autocrlf false
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
+            "+${ARKDECK_CI_BASE}:refs/remotes/origin/main" \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
