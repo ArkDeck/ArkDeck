@@ -98,13 +98,13 @@ fn the_export_writes_the_bundle_this_build_renders() {
         written.push(format!("fixtures/{}", product.relative_path));
     }
     assert_eq!(result["written"], json!(written));
-    assert_eq!(written.len(), 235);
+    assert_eq!(written.len(), 237);
     // The atomic writes leave nothing beside the products.
     let check = run("check", &scratch, true);
     assert_eq!(check.status.code(), Some(0), "{check:?}");
     let report = &envelope(&check)["result"];
     assert_eq!(report["clean"], true);
-    assert_eq!(report["checked"], 235);
+    assert_eq!(report["checked"], 237);
     assert_eq!(report["unexpected"], json!([]));
 }
 
@@ -127,7 +127,7 @@ fn a_drifted_bundle_is_reported_then_fails_without_a_second_document() {
     assert_eq!(answer["ok"], true);
     let report = &answer["result"];
     assert_eq!(report["clean"], false);
-    assert_eq!(report["checked"], 235);
+    assert_eq!(report["checked"], 237);
     assert_eq!(report["drifted"], json!(["fixtures/argv/job.status.json"]));
     assert_eq!(report["missing"], json!(["contracts/cli-page.schema.json"]));
     assert_eq!(
@@ -163,7 +163,7 @@ fn the_human_rendering_is_swifts() {
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
         format!(
-            "bundleVersion: arkdeck.cli.contracts/1\nchecked: 235\nclean: true\ncontractsDirectory: {}\ndrifted: (none)\nfixturesDirectory: {}\nmissing: (none)\nunexpected: (none)\n",
+            "bundleVersion: arkdeck.cli.contracts/1\nchecked: 237\nclean: true\ncontractsDirectory: {}\ndrifted: (none)\nfixturesDirectory: {}\nmissing: (none)\nunexpected: (none)\n",
             contracts.display(),
             fixtures.display()
         )
@@ -274,7 +274,7 @@ fn the_committed_bundle_checks_clean() {
     );
     let report = &envelope(&output)["result"];
     assert_eq!(report["clean"], true);
-    assert_eq!(report["checked"], 235);
+    assert_eq!(report["checked"], 237);
 }
 
 #[test]
@@ -433,8 +433,82 @@ fn normalized(bytes: &[u8], root: &str) -> String {
     }
 }
 
-/// What Swift's CLI answered in each recorded case, this CLI answers byte for
-/// byte, and it leaves the same tree behind.
+/// Rebase only the declared bundle additions and regenerated contract inputs
+/// onto the historical oracle. Keep path handling, cleanup, links, refusals,
+/// envelope shape and rendering assertions exact; never rewrite the recording.
+#[cfg(unix)]
+fn current_bundle_case(recorded: &Value) -> Value {
+    const ADDED: [&str; 2] = [
+        "fixtures/argv/job.archive.apply.json",
+        "fixtures/argv/job.archive.preview.json",
+    ];
+    const REGENERATED: [&str; 4] = [
+        "contracts/cli-command-registry.yaml",
+        "contracts/cli-feature-coverage.json",
+        "contracts/runtime-control-plane.schema.json",
+        "fixtures/index.json",
+    ];
+    let mut expected = recorded.clone();
+    let stdout = recorded["stdout"].as_str().unwrap();
+    expected["stdout"] = if recorded["mode"] == "json" {
+        let mut envelope: Value = serde_json::from_str(stdout).unwrap();
+        if let Some(checked) = envelope["result"].get_mut("checked") {
+            assert_eq!(*checked, 235);
+            *checked = json!(237);
+        }
+        if let Some(written) = envelope["result"].get_mut("written") {
+            let written = written.as_array_mut().unwrap();
+            assert_eq!(written.len(), 235);
+            for path in ADDED {
+                let at = written
+                    .iter()
+                    .position(|item| item.as_str().unwrap() > path)
+                    .unwrap();
+                written.insert(at, json!(path));
+            }
+        }
+        json!(format!("{}\n", serde_json::to_string(&envelope).unwrap()))
+    } else {
+        let additions = ADDED.map(|path| format!("  - {path}\n")).join("");
+        json!(stdout.replace("checked: 235\n", "checked: 237\n").replace(
+            "  - fixtures/argv/job.cancel.json\n",
+            &format!("{additions}  - fixtures/argv/job.cancel.json\n")
+        ))
+    };
+    if recorded["verb"] == "export" {
+        let products = contract_products()
+            .into_iter()
+            .map(|product| ("contracts", product))
+            .chain(
+                fixture_products()
+                    .into_iter()
+                    .map(|product| ("fixtures", product)),
+            );
+        let tree = expected["tree"].as_array_mut().unwrap();
+        for (kind, product) in products {
+            let key = format!("{kind}/{}", product.relative_path);
+            if !ADDED.contains(&key.as_str()) && !REGENERATED.contains(&key.as_str()) {
+                continue;
+            }
+            let directory = recorded[format!("{kind}Directory")].as_str().unwrap();
+            let path = format!("{directory}/{}", product.relative_path);
+            let entry = json!({"path":path, "sha256":arkdeck_contract::sha256_hex(&product.bytes)});
+            if ADDED.contains(&key.as_str()) {
+                assert!(!tree.iter().any(|row| row["path"] == path));
+                tree.push(entry);
+            } else {
+                let row = tree.iter_mut().find(|row| row["path"] == path).unwrap();
+                assert!(row.get("sha256").is_some());
+                *row = entry;
+            }
+        }
+        tree.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
+    }
+    expected
+}
+
+/// Historical responses and filesystem effects, with only the declared new
+/// inputs rebased above. The recorded cleanup and refusal semantics stay exact.
 #[cfg(unix)]
 #[test]
 fn swifts_recorded_answers_replay() {
@@ -444,7 +518,8 @@ fn swifts_recorded_answers_replay() {
     .unwrap();
     let cases = oracle["cases"].as_array().unwrap();
     assert!(cases.len() >= 10, "{} cases", cases.len());
-    for case in cases {
+    for recorded in cases {
+        let case = &current_bundle_case(recorded);
         let name = case["name"].as_str().unwrap();
         let scratch = Scratch::new("oracle");
         // As Foundation names it, so the answer names the same root.

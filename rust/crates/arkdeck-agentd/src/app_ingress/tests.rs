@@ -126,6 +126,8 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "job.timeline",
             "job.evidence",
             "job.reconcile",
+            "job.archive.preview",
+            "job.archive",
             "artifact.list",
             "artifact.read",
             "artifact.quota",

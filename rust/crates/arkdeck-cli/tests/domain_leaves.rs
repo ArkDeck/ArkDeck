@@ -895,11 +895,26 @@ fn replay_resume(scenario: &Value) -> Result<(), String> {
 
     // The resume.
     let exited = Arc::new(AtomicBool::new(false));
+    let mut resume_health = scenario["resumeHealth"].clone();
+    // These domain fixtures predate later wire methods. Keep their business
+    // facts (especially the intentional changed-Catalog case) exact, while
+    // negotiating the current wire contract just like the pause peer does.
+    assert_eq!(resume_health["protocolVersion"], PROTOCOL_VERSION);
+    assert_eq!(
+        resume_health["contractIdentity"],
+        "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633"
+    );
+    assert_eq!(
+        resume_health["publishedMethods"].as_array().unwrap().len(),
+        105
+    );
+    resume_health["contractIdentity"] = json!(CONTRACT_IDENTITY);
+    resume_health["publishedMethods"] = json!(METHODS);
     let server = serve_answering(
         &socket,
         scenario["resumeScript"].as_array().unwrap().clone(),
         exited.clone(),
-        scenario["resumeHealth"].clone(),
+        resume_health,
     );
     let mut command = Command::new(env!("CARGO_BIN_EXE_arkdeck"));
     command.args(["agent", "resume", "--resume-token", &token]);

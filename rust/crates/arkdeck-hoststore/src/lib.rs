@@ -297,8 +297,12 @@ mod job_result;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_result::JobResultReader;
 #[cfg(any(target_os = "macos", windows))]
+mod job_archive;
+#[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_cancel;
+#[cfg(any(target_os = "macos", windows))]
+pub use job_archive::JobArchiver;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_cancel::{CancelledRun, JobCanceller, RunCancellation, cancel_running};
 #[cfg(any(target_os = "macos", windows))]

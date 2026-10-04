@@ -2834,6 +2834,42 @@
     },
     {
       "classification": "direct",
+      "conformanceFixture": "argv/job.archive.apply.json",
+      "equivalentCommands": [],
+      "feature": "job.archive",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.archive",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job archive apply --job <job-id> --user-confirmation-id <id> --expected-review-sha256 <sha256>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.archive.preview.json",
+      "equivalentCommands": [],
+      "feature": "job.archive.preview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.archive.preview",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job archive preview --job <job-id>"
+    },
+    {
+      "classification": "direct",
       "conformanceFixture": "argv/job.cancel.json",
       "equivalentCommands": [],
       "feature": "job.cancel",
@@ -4690,7 +4726,7 @@
   "summary": {
     "blocked": [],
     "byClassification": {
-      "direct": 126,
+      "direct": 128,
       "generic": 1,
       "internal": 4,
       "local": 90,
@@ -4702,9 +4738,9 @@
       "app": 68,
       "catalog": 30,
       "cli": 53,
-      "daemon": 105
+      "daemon": 107
     },
-    "entries": 256,
+    "entries": 258,
     "fullFunction": true
   }
 }

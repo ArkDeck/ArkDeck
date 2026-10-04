@@ -5,7 +5,7 @@
       "additionalProperties": false,
       "properties": {
         "contractIdentity": {
-          "const": "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633"
+          "const": "a385fef3a995b3b67404eef9d081d14f42fdedc6eaee6a809593fee27768116b"
         },
         "id": {
           "minLength": 1,
@@ -60,6 +60,8 @@
             "human-action.list",
             "human-action.resume",
             "human-action.show",
+            "job.archive",
+            "job.archive.preview",
             "job.cancel",
             "job.events",
             "job.evidence",
@@ -222,7 +224,7 @@
   "title": "arkdeck.runtime-control-plane/1",
   "x-arkdeck-bundleVersion": "arkdeck.cli.contracts/1",
   "x-arkdeck-cliVersion": "0.1.0",
-  "x-arkdeck-contractIdentity": "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633",
+  "x-arkdeck-contractIdentity": "a385fef3a995b3b67404eef9d081d14f42fdedc6eaee6a809593fee27768116b",
   "x-arkdeck-currentProtocolVersion": "1.0.0",
   "x-arkdeck-methodSchemaDirectory": "spec/control/methods",
   "x-arkdeck-methods": [
@@ -460,6 +462,16 @@
       "method": "human-action.show",
       "published": true,
       "schema": "spec/control/methods/human-action.show.json"
+    },
+    {
+      "method": "job.archive",
+      "published": true,
+      "schema": "spec/control/methods/job.archive.json"
+    },
+    {
+      "method": "job.archive.preview",
+      "published": true,
+      "schema": "spec/control/methods/job.archive.preview.json"
     },
     {
       "method": "job.cancel",

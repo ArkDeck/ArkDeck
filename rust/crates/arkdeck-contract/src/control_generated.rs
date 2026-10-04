@@ -4,7 +4,7 @@ pub const PROTOCOL_VERSION: &str = "1.0.0";
 pub const MAX_REQUEST_BYTES: usize = 4194304;
 pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
-    "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633";
+    "a385fef3a995b3b67404eef9d081d14f42fdedc6eaee6a809593fee27768116b";
 pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
 pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
@@ -55,6 +55,8 @@ pub const METHODS: &[&str] = &[
     "human-action.list",
     "human-action.resume",
     "human-action.show",
+    "job.archive",
+    "job.archive.preview",
     "job.cancel",
     "job.events",
     "job.evidence",
@@ -303,6 +305,14 @@ pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
     (
         "human-action.show",
         include_str!("../../../../spec/control/methods/human-action.show.json"),
+    ),
+    (
+        "job.archive",
+        include_str!("../../../../spec/control/methods/job.archive.json"),
+    ),
+    (
+        "job.archive.preview",
+        include_str!("../../../../spec/control/methods/job.archive.preview.json"),
     ),
     (
         "job.cancel",

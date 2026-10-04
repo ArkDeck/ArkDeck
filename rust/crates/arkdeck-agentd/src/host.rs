@@ -2336,6 +2336,61 @@ impl HostServices for Host {
     }
 
     #[cfg(target_os = "macos")]
+    fn app_job_archive_allowed(&self, job_id: &str) -> bool {
+        let Some(jobs) = &self.jobs else {
+            return false;
+        };
+        let Ok(record) = jobs.read_snapshot(job_id) else {
+            return false;
+        };
+        let Ok(value) = record.value() else {
+            return false;
+        };
+        let request = value
+            .get("originalSubmissionRequest")
+            .filter(|v| v.is_object())
+            .unwrap_or(&record.request);
+        matches!(
+            record.state.as_str(),
+            "waitingForRecovery" | "userAbandonRequested" | "interrupted"
+        ) && serde_json::to_string(request)
+            .ok()
+            .and_then(|r| crate::app_ingress::jobs::kind(&r))
+            .is_some()
+    }
+    #[cfg(any(target_os = "macos", windows))]
+    fn job_archive(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
+            code: "rejected".into(),
+            message: "Job owner is unavailable".into(),
+            details: None,
+        })?;
+        let probe = arkdeck_hoststore::SystemStorageProbe;
+        let publisher =
+            self.storage
+                .as_deref()
+                .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
+                    sessions,
+                    claims: &self.claims,
+                    probe: &probe,
+                });
+        let archiver = arkdeck_hoststore::JobArchiver {
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+            sessions: publisher.as_ref(),
+        };
+        if method == "job.archive.preview" {
+            archiver.preview(params)
+        } else {
+            archiver.archive(params)
+        }
+    }
+
+    #[cfg(target_os = "macos")]
     fn job_plan(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,

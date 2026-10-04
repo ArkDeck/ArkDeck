@@ -222,3 +222,27 @@ pub fn finalized(
             "outcomeCertainty":outcome_certainty}),
     ))
 }
+
+/// A confirmed quiescent archive decision made by the user. The caller must
+/// establish those facts before this event is passed to the durable writer.
+pub fn abandon_intent(envelope: &Envelope, confirmation: &str, last_step: Option<&str>) -> Value {
+    Value::Object(record(
+        envelope,
+        "abandonIntent",
+        json!({
+            "userConfirmationId":confirmation, "lastConfirmedStep":last_step,
+            "outcomeCertainty":"confirmed", "managedProcessState":"notRunning", "deviceHazards":[]
+        }),
+    ))
+}
+/// A quiescent abandonment outcome, correlated to its original decision.
+pub fn abandon_outcome(envelope: &Envelope, intent: &str) -> Value {
+    Value::Object(record(
+        envelope,
+        "abandonOutcome",
+        json!({
+            "correlatesToAbandonIntentEventId":intent, "result":"archivedInterrupted",
+            "releaseAuthorized":true, "unresolvedHazards":[]
+        }),
+    ))
+}

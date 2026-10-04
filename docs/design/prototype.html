@@ -1399,6 +1399,25 @@ const INSPECTOR_COPY={
   "jobRecovery.action.stillUnknown":["原操作结果仍然未知", "The original outcome is still unknown"],
   "jobRecovery.action.refused":["恢复操作不可用", "Recovery action unavailable"],
   "jobRecovery.action.unconfirmed":["未能确认请求结果。请先刷新此 Job，再决定后续操作。", "The response was not confirmed. Refresh this Job before taking another action."],
+  "jobRecovery.archive.review":["检查归档条件…", "Review archive…"],
+  "jobRecovery.archive.working":["正在核对归档状态…", "Checking archive state…"],
+  "jobRecovery.archive.unavailable":["暂时无法归档。请刷新此 Job 并检查恢复状态。", "Archive is unavailable. Refresh this Job and inspect its recovery state."],
+  "jobRecovery.archive.complete":["已按中断状态归档，Session 保留原始证据。", "Archived as interrupted. The Session retains the original evidence."],
+  "jobRecovery.archive.publicationPending":["中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。", "The interruption is recorded; Session publication is pending. Review archive again to finish publishing."],
+  "jobRecovery.archive.title":["归档中断的 Job", "Archive interrupted Job"],
+  "jobRecovery.archive.detail":["归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。", "Archive ends this Job and keeps its evidence. It does not recover the device or clean up device state. Runtime must prove that no managed process, unknown outcome, or unresolved hazard remains."],
+  "jobRecovery.archive.lastStep":["最后确认的步骤", "Last confirmed step"],
+  "jobRecovery.archive.existingDecision":["已有归档决策记录。此操作仅补齐原决策的审计或 Session 发布。", "A previous archive decision is already recorded. This action only finishes its audit or Session publication."],
+  "jobRecovery.archive.dismiss":["返回", "Back"],
+  "jobRecovery.archive.confirm":["按中断状态归档", "Archive as interrupted"],
+  "jobRecovery.archive.finish":["完成已记录的归档", "Finish recorded archive"],
+  "jobRecovery.archive.blocker.unknown":["仍有操作结果未知，需保留此 Job 进行恢复。", "An action still has an unknown outcome. Keep this Job available for recovery."],
+  "jobRecovery.archive.blocker.mutation":["当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。", "This Runtime cannot yet prove that a device-changing Job can release all its holds."],
+  "jobRecovery.archive.blocker.hazards":["未解决的风险或设备残留仍需与此 Job 关联。", "Unresolved hazards or device residues must remain associated with this Job."],
+  "jobRecovery.archive.blocker.process":["尚不能证明托管进程或补偿状态可安全结束。", "The managed process or compensation state is not proven safe to close."],
+  "jobRecovery.archive.blocker.active":["Runtime 仍在处理此 Job，请等待其到达安全边界。", "Runtime is still handling this Job. Wait for it to reach a safe boundary."],
+  "jobRecovery.archive.blocker.storage":["Session 存储不可用，请恢复存储后再归档。", "Session storage is unavailable. Restore storage before archiving."],
+  "jobRecovery.archive.blocker.refresh":["归档前需要重新核对 Job 记录与日志的恢复状态。", "The Job record or journal needs a fresh recovery check before archive."],
   "jobRecovery.action.rebind":["核验并重新绑定 Loader", "Verify and rebind Loader"],
   "jobRecovery.action.rebind.detail":["核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。", "Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome."],
   "jobRecovery.action.rebound":["Loader 绑定已核验；请查看此 Job 的当前恢复状态", "Loader binding verified; review the Job’s current recovery state"],
@@ -1452,6 +1471,13 @@ function inspectorCompactStatus(rows,running){
   if(running.includes(focused))parts.push(`${inspectorCopy("jobInspector.elapsed")} 00:41`);
   return parts.join(" · ");
 }
+function inspectorCanArchive(job){
+  return !inspectorEstablishedEpoch(job)&&['waitingForRecovery','userAbandonRequested','interrupted'].includes(job.state);
+}
+function requestInspectorArchive(id){
+  const job=inspectorJobs().find(row=>row.id===id);if(!job||!inspectorCanArchive(job))return;
+  modal(`<div class="modal" data-sync-id="jobRecovery.archive.sheet"><h3>${inspectorCopy('jobRecovery.archive.title')}</h3><p>${inspectorCopy('jobRecovery.archive.detail')}</p><dl class="kv"><dt>Job</dt><dd>${esc(job.id)}</dd><dt>${inspectorCopy('jobInspector.fact.target')}</dt><dd>${esc(job.dev||'—')}</dd></dl><p role="status" data-sync-id="jobRecovery.archive.result">${lc('界面演示没有 Runtime 归档证明，不能结束此 Job。','This UI demo has no Runtime archive proof and cannot end this Job.')}</p><div class="mfoot"><button class="btn" onclick="closeModal()">${inspectorCopy('jobRecovery.archive.dismiss')}</button><button class="btn" data-sync-id="jobRecovery.archive.confirm" disabled>${inspectorCopy('jobRecovery.archive.confirm')}</button></div></div>`);
+}
 function inspectorRecoveryAction(job){
   if(inspectorEstablishedEpoch(job))return null;
   if(job.state==='waitingForRecovery')return 'reconcile';
@@ -1471,6 +1497,7 @@ function inspectorRecoveryHTML(job){
   const action=inspectorRecoveryAction(job),rebind=inspectorCanRebind(job);
   return `${action?`<button class="btn" data-sync-id="jobRecovery.perform" onclick="requestInspectorRecovery('${job.id}','${action}')">${inspectorCopy('jobRecovery.action.'+action)}</button><p class="hint">${inspectorCopy('jobRecovery.action.'+action+'.detail')}</p>`:''}
     ${rebind?`<button class="btn" data-sync-id="jobRecovery.rebind" onclick="requestInspectorRecovery('${job.id}','rebind')">${inspectorCopy('jobRecovery.action.rebind')}</button><p class="hint">${inspectorCopy('jobRecovery.action.rebind.detail')}</p>`:''}
+    ${inspectorCanArchive(job)?`<button class="btn" data-sync-id="jobRecovery.archive.review" onclick="requestInspectorArchive('${job.id}')">${inspectorCopy('jobRecovery.archive.review')}</button>`:''}
     ${S.inspectorRecovery===job.id?`<p class="hint" role="status" data-sync-id="jobRecovery.action.result">${lc('界面演示：','UI demo: ')}${inspectorCopy('jobRecovery.action.unconfirmed')}</p>`:''}`;
 }
 function inspectorDetailHTML(selected){

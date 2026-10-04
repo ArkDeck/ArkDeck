@@ -5695,6 +5695,159 @@
     "requiresExactlyOneOf": []
     "summary": "settle an unknown outcome by readback; never replays the effect"
   - "catalogOperation": null
+    "command": "job.archive.apply"
+    "connectsToRuntime": true
+    "kind": "executable"
+    "lifecycleStatus": "current"
+    "mutuallyExclusive":
+      - - "--output"
+        - "--json"
+    "options":
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--job"
+        "placeholder": "job-id"
+        "published": true
+        "required": true
+        "stability": "standard"
+        "summary": "durable job identity"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--user-confirmation-id"
+        "placeholder": "id"
+        "published": true
+        "required": true
+        "stability": "standard"
+        "summary": "the user decision identity; keep an existing archive confirmation unchanged"
+      - "form": "value"
+        "grammar":
+          "kind": "hexDigest"
+          "length": 64
+        "name": "--expected-review-sha256"
+        "placeholder": "sha256"
+        "published": true
+        "required": true
+        "stability": "standard"
+        "summary": "the exact SHA-256 returned by job archive preview"
+      - "form": "value"
+        "grammar":
+          "kind": "enumeration"
+          "values":
+            - "human"
+            - "json"
+            - "jsonl"
+        "name": "--output"
+        "placeholder": "human|json"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
+      - "form": "flag"
+        "name": "--json"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "legacy: print the raw reply as JSON, without the result envelope"
+      - "form": "value"
+        "grammar":
+          "kind": "pattern"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        "name": "--control-request-id"
+        "placeholder": "id"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "correlate this control-plane call; not a Job or request identity"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--socket"
+        "placeholder": "absolute-path"
+        "published": false
+        "required": false
+        "stability": "macosCompatibilityOnly"
+        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
+    "outputModes":
+      - "human"
+      - "json"
+    "path":
+      - "job"
+      - "archive"
+      - "apply"
+    "positionals": []
+    "replacementArgvPattern": null
+    "requiresExactlyOneOf": []
+    "summary": "record the user archive decision against an unchanged Runtime review; never recover or replay an effect"
+  - "catalogOperation": null
+    "command": "job.archive.preview"
+    "connectsToRuntime": true
+    "kind": "executable"
+    "lifecycleStatus": "current"
+    "mutuallyExclusive":
+      - - "--output"
+        - "--json"
+    "options":
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--job"
+        "placeholder": "job-id"
+        "published": true
+        "required": true
+        "stability": "standard"
+        "summary": "durable job identity"
+      - "form": "value"
+        "grammar":
+          "kind": "enumeration"
+          "values":
+            - "human"
+            - "json"
+            - "jsonl"
+        "name": "--output"
+        "placeholder": "human|json"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
+      - "form": "flag"
+        "name": "--json"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "legacy: print the raw reply as JSON, without the result envelope"
+      - "form": "value"
+        "grammar":
+          "kind": "pattern"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        "name": "--control-request-id"
+        "placeholder": "id"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "correlate this control-plane call; not a Job or request identity"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--socket"
+        "placeholder": "absolute-path"
+        "published": false
+        "required": false
+        "stability": "macosCompatibilityOnly"
+        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
+    "outputModes":
+      - "human"
+      - "json"
+    "path":
+      - "job"
+      - "archive"
+      - "preview"
+    "positionals": []
+    "replacementArgvPattern": null
+    "requiresExactlyOneOf": []
+    "summary": "inspect the Runtime proof and exact Job/journal review for archive"
+  - "catalogOperation": null
     "command": "session.list"
     "connectsToRuntime": true
     "kind": "executable"
