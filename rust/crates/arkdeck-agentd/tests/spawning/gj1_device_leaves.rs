@@ -104,7 +104,7 @@ fn assert_completed(envelope: &Value, command: &str, operation: &str, artifacts:
 }
 
 /// Each feature's Windows status in the coverage this build renders.
-fn assert_windows_status(features: &[&str], expected: &str) {
+pub(crate) fn assert_windows_status(features: &[&str], expected: &str) {
     let product = arkdeck_cli::machine_contracts::contract_products()
         .into_iter()
         .find(|product| product.relative_path == "cli-feature-coverage.json")

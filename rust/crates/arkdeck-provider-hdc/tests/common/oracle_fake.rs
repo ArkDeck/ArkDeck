@@ -269,6 +269,12 @@ impl OracleFake {
         const HELPER: &str = "86497e1a8f9b586169218df912895785c1c0f2d8bb3f87b2b700f6f86264f5c1";
         let target = format!("{DIRECTORY}/libexample.so");
         let all = argv.join(" ");
+        // The Swift oracle's Jobs never listed the device; the CLI's domain
+        // leaf observes it first (`debug native deploy`), as `debug hap`
+        // does over the debug HAP table: the fixture's one target.
+        if all == "list targets -v" {
+            return Self::fixture_device(&all, mode).unwrap();
+        }
         let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
         let running = self.root.join("device-running");
         let published = self.root.join("device-published");
