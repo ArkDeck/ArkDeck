@@ -887,6 +887,61 @@ mod windows_registration_tests {
         assert!(root.join("tools").join("node").join("node.exe").is_file());
     }
 
+    /// A workspace preset's pin on a Windows toolchain, through the same
+    /// acquire and release as macOS (`deveco_pins.rs`): the content is
+    /// re-verified, a pin at a stale generation is refused, a pinned
+    /// toolchain is not retired, a release lets it retire, and a second pin
+    /// or release changes nothing. The DevEco content is not touched.
+    #[test]
+    fn a_preset_pins_a_windows_toolchain_until_it_releases_it() {
+        let scratch = Scratch::new("deveco-pins");
+        let Some(root) = scratch.deveco(true) else {
+            return;
+        };
+        let _publisher = Publisher::development();
+        let store = scratch.store();
+        let value = store.register(&root, NOW).unwrap();
+        let reference = value["toolRef"].as_str().unwrap().to_owned();
+        let pinned = store
+            .acquire(&reference, "1", "workspacePreset", "preset-build")
+            .unwrap();
+        assert_eq!(
+            pinned["references"],
+            json!([{"kind": "workspacePreset", "id": "preset-build"}]),
+            "{pinned}"
+        );
+        let written = scratch.index();
+        assert_eq!(
+            store
+                .acquire(&reference, "1", "workspacePreset", "preset-build")
+                .unwrap(),
+            pinned
+        );
+        assert_eq!(scratch.index(), written, "a held pin is kept as it is");
+        assert_eq!(
+            store
+                .acquire(&reference, "2", "workspacePreset", "preset-other")
+                .unwrap_err()
+                .code,
+            "resourceConflict"
+        );
+        assert_eq!(
+            store.retire(&reference, "1").unwrap_err().code,
+            "resourceConflict",
+            "a pinned toolchain is retained"
+        );
+        store
+            .release(&reference, "workspacePreset", "preset-build")
+            .unwrap();
+        let released = scratch.index();
+        store
+            .release(&reference, "workspacePreset", "preset-build")
+            .unwrap();
+        assert_eq!(scratch.index(), released, "an absent pin stays absent");
+        assert_eq!(store.retire(&reference, "1").unwrap()["state"], "removed");
+        assert!(root.join("tools").join("node").join("node.exe").is_file());
+    }
+
     #[test]
     fn an_unsigned_node_or_another_publisher_is_refused_before_anything_is_written() {
         let scratch = Scratch::new("deveco-registration-refusals");
