@@ -10,11 +10,11 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-14T00:00:00Z",
-    "consumptionFingerprintSHA256" : "ead4f0b3178aa08fb4a7b256d581a0bf3624e429f8c8aecee41be02e8e8d8d74",
+    "consumptionFingerprintSHA256" : "2dd0e70d9ee1273005e7b2e6d01413da87baa1cd3c7398757a5d1d1362736c76",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-8DFDD6AEA270B91592E86321C3CF5C3AFCD08B64-G1",
+    "reference" : "CAP-RT-POLICY-B1B4D3E29432A1C695E2E547D4E64C59FF09F6BA-G1",
     "runtimeCapabilityCorrelation" : {
-      "planDigestSHA256" : "520c5a0a8f0d02d4aa8ea63093e5436003d35d305fca67c31277cdcbc000be5d",
+      "planDigestSHA256" : "5a2a8e0159990405d0a89321b595281fcb96db574580321c67006b5995538109",
       "reservationID" : "idem-capture-ring",
       "stepSetDigestSHA256" : "1210e8525d6b23456313ec969974b404039e8d84dd74321f8d18421b9f29962e",
       "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
@@ -22,7 +22,7 @@
     },
     "validUntilUTC" : "2026-10-14T00:00:00Z"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -87,7 +87,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-55c4a0176fed6e2b546d97a9cae80f52",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "520c5a0a8f0d02d4aa8ea63093e5436003d35d305fca67c31277cdcbc000be5d",
+  "materializedPlanDigest" : "5a2a8e0159990405d0a89321b595281fcb96db574580321c67006b5995538109",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "capture.diagnostics@1",
   "originalSubmissionRequest" : {
@@ -121,7 +121,7 @@
   "providerID" : "hdc",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-8DFDD6AEA270B91592E86321C3CF5C3AFCD08B64-G1"
+      "capabilityId" : "CAP-RT-POLICY-B1B4D3E29432A1C695E2E547D4E64C59FF09F6BA-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-capture-ring",
@@ -154,11 +154,11 @@
     "ringHeldAnchor" : true
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "11284",
       "lastSequence" : 18,
-      "sha256" : "7218c5348762c28abb9b8159667ca0b60f386d089e8557a89002c794139e33f0"
+      "sha256" : "8c1cccbed41695f6f80ff71f54bbb71b1350924bd3024e676a33ff91f7e63934"
     },
     "claims" : [
       {
@@ -174,20 +174,20 @@
     "journalSeal" : {
       "byteCount" : "11670",
       "lastSequence" : 19,
-      "sha256" : "f5e2d4e5096a960346f6201ff1275f561f9621cb63e7d7441a573edae16d21f5"
+      "sha256" : "dfadcb58d5ec65cca6053173074beebd6b90c8c149d204a33c3858267fa9d326"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "6452",
-      "manifestSHA256" : "632588d81ebd82a1df9beb4117a22e2248374c6e4d2ae8213e9b551e352f2a5c",
+      "manifestSHA256" : "cd6c6fb9e74b92ce29fb4b16c6afdf455414e4aaf90fbbb868ed887e88e09902",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "succeeded"
     },
     "receipt" : {
       "catalogGeneration" : "2",
-      "manifestSHA256" : "632588d81ebd82a1df9beb4117a22e2248374c6e4d2ae8213e9b551e352f2a5c",
+      "manifestSHA256" : "cd6c6fb9e74b92ce29fb4b16c6afdf455414e4aaf90fbbb868ed887e88e09902",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-55c4a0176fed6e2b546d97a9cae80f52",

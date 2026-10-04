@@ -11,7 +11,7 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -76,7 +76,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-7e24d6078f4999c47d0ca0c66a54e128",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "c6eaa3ac9bc29ea216b589a6e7eb0b401c45619c1f4fa5ef2acfc8571b72a4e5",
+  "materializedPlanDigest" : "168a9403453168631b0e1603f1652f763d1748611f9a623283f4589e9d9af37c",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "capture.diagnostics@1",
   "originalSubmissionRequest" : {
@@ -128,7 +128,7 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "claims" : [
 
     ],

@@ -183,6 +183,8 @@ package enum ArkDeckAgentXPC {
   /// the returned Job identifier before forwarding run or cancel. Recovery
   /// reopens only a durable App request in the Runtime-confirmed permitted state.
   package static let gatedAppJobMethods: Set<String> = [
+    "job.archive",
+    "job.archive.preview",
     "job.cancel",
     "job.reconcile",
     "job.run",

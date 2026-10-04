@@ -51,7 +51,7 @@ unknown replay。任何一步需要绕过这些面，就是 `BLOCKED_BY_PRODUCT_
 
 | 事实 | 读取方式 |
 |---|---|
-| Catalog digest 与 operation 集合 | `arkdeck operation list --output json` → `result.catalogDigest` 及实际返回的 operation；与本轮 protected-main 构建生成的 Catalog 核对，记录 canonical operation 数及每项 availability，不从文件数或历史 29/30 推算 |
+| Catalog digest 与 operation 集合 | digest 取 `arkdeck runtime health --output json` → `result.catalogDigest`（Rust CLI 的 `operation list` 的 `result` 是 operation 数组，不带 digest）；operation 集合取 `arkdeck operation list --output json` 实际返回的项；与本轮 protected-main 构建生成的 Catalog 核对，记录 canonical operation 数及每项 availability，不从文件数或历史 29/30 推算 |
 | Runtime 构建与可执行文件哈希 | `arkdeck runtime service status --output json`、`arkdeck runtime bundle list --output json`；与已验证发布包的完整 protected-main commit 配对记录 |
 | CLI 构建 | `arkdeck --version --output json` → `buildIdentity` |
 | 目标与 binding revision | `arkdeck target show --target <TGT> --output json`；记录本次读取值，刷机后的 revision 必须重新读取 |
@@ -64,11 +64,12 @@ arkdeck doctor --deep --require-healthy --output json
 arkdeck runtime service status --output json
 arkdeck runtime hdc status --output json
 arkdeck runtime tool list --output json
+arkdeck runtime health --output json
 arkdeck operation list --output json
 ```
 
 记录 `doctor` 的实际退出码与具名 findings；确认本轮要运行的 operation 可用，并核对
-`operation list` 的 digest、operation 集合与该 published build 一致。某项 operation 不可用时，
+`runtime health` 的 `catalogDigest` 与 `operation list` 的 operation 集合与该 published build 一致。某项 operation 不可用时，
 记录具体条件，只停止依赖它的 Journey；不要求与本轮无关的 operation 全部 `available`。
 需要正常模式的 Journey 还须由 HDC status 与 target availability 确认当前 DAYU200。
 Runtime 不是预定 protected-main 构建时，先按
@@ -582,7 +583,7 @@ Task 的目录不混用。
   "goldenJourney": "GJ-1",
   "state": "REAL_DEVICE_PASS",
   "evidenceKind": "redacted-metadata-derived-from-real-runtime",
-  "catalogDigest": "<actual catalog SHA-256 from operation list>",
+  "catalogDigest": "<actual catalog SHA-256 from runtime health>",
   "runtimeSourceRevision": "<main sha>",
   "runtimeExecutableSHA256": "<sha256>",
   "cliBuildIdentity": "<from --version>",
@@ -613,7 +614,7 @@ operation 每个一行，记录总数及不可用原因，让
 
 ```json
 {
-  "catalogDigest": "<actual catalog SHA-256 from operation list>",
+  "catalogDigest": "<actual catalog SHA-256 from runtime health>",
   "operations": [
     { "operationReference": "observe.device@1", "state": "realDevicePass", "jobIDs": ["job-…"] },
     { "operationReference": "input.tap@1", "state": "notExercised", "jobIDs": [] }

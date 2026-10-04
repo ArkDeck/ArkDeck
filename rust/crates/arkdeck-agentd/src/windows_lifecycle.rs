@@ -119,8 +119,9 @@ pub(crate) struct Authority {
     /// keep Swift's production layout.
     development: bool,
     /// The registered Windows HDC the tuple gate admitted for a development
-    /// root, which [`Self::compose`] starts as its managed server. None
-    /// while no Windows HDC tuple is registered.
+    /// root, which [`Self::compose`] starts as its managed server. None for
+    /// the account's root, until the Windows tool-selection owner selects
+    /// one there, and for a development root that names none.
     hdc: Option<Box<crate::windows_hdc_gate::AdmittedHdc>>,
     // Dropped in this order: the owner lock, then the guard, then the root's
     // pinned directories.
@@ -146,9 +147,9 @@ impl Authority {
     ///   macOS rule names (`development_usb::relation_source`): the
     ///   Runtime's own census (`UsbRegistryRelations::system()`, the Windows
     ///   SetupAPI census) only beside a registered HDC this composition
-    ///   started as its managed server. No Windows HDC tuple is registered
-    ///   yet (its integration change waits for the maintainer's samples),
-    ///   so no relation is read, nothing is observed or dispatched, and
+    ///   started as its managed server (the registered `c2` `hdc.exe`,
+    ///   CHG-2026-078). Without one (the account's root, for now) no
+    ///   relation is read, nothing is observed or dispatched, and
     ///   `target.adopt` is refused before admission with zero dispatch;
     /// * the Artifact read and export owner (`ArtifactReadStore`) over the
     ///   root's `artifacts` (the name the macOS isolated owner and production
@@ -161,10 +162,10 @@ impl Authority {
     ///   (`HumanActionResources`) in `human-action-snapshots`, the names both
     ///   macOS compositions give them: the same execution records and pages
     ///   as on macOS. `agent.*` and `human-action.*` answer from them; an
-    ///   execution admits its Job as `job.submit` does here, observes no
-    ///   Target (no Windows HDC tuple is registered), and no control action
-    ///   is built, so the human-action owner pages the executions' actions
-    ///   alone;
+    ///   execution admits its Job as `job.submit` does here and observes a
+    ///   Target only through a composed HDC; the human-action owner pages the
+    ///   executions' actions and, beside a managed server, the HDC control
+    ///   actions;
     /// * the Session owner and the Artifact usage owner
     ///   ([`Self::session_store`]): `runtime.storage.*`, `session.list|show|
     ///   pin|unpin`, `session.cleanup.*` and `session.export.*`;
@@ -193,13 +194,13 @@ impl Authority {
     ///   executable ends the start), the symbolizer `ARKDECK_ANALYZER_PATH`
     ///   names, and, for the installed daemon only, signing over the
     ///   account's preset store with its attempts in the root's
-    ///   `workspace-signing-attempts`. A registered project resolves to no
-    ///   profile on Windows (no code-owned source tool is trusted there
-    ///   yet), so every profile-served operation is unavailable with that
-    ///   reason and only the source inspection runs;
+    ///   `workspace-signing-attempts`. A registered project resolves to its
+    ///   profile through the code-owned tools (ruling 69: the daemon's own
+    ///   `grep`, `sed` and `patch`, the trusted `tar` and `git`); one that
+    ///   does not verify leaves it with no profile and that reason;
     /// * the Job planner and admitter over the Job store and the root
-    ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
-    ///   tuple is registered): a device operation is refused before admission
+    ///   (`job.plan`, `job.submit`), with the HDC provider only beside a
+    ///   composed HDC: without one a device operation is refused before admission
     ///   with zero dispatch, as macOS refuses it without an HDC provider;
     /// * the Trace cache owner (`TraceCacheStore`) over a `traces` directory
     ///   beside its `staging` ([`Self::trace_cache`]): a development root's
@@ -217,9 +218,10 @@ impl Authority {
     /// provider, its status answers `runtime.hdc.status`, the Runtime's own
     /// USB census is read beside it, and the daemon stops it after its drain
     /// (the returned [`crate::managed_hdc::Launched`]; a start that fails
-    /// after the launch stops it on the way out). No Windows HDC tuple is
-    /// registered yet, so the gate admits none, nothing is launched, and
-    /// `runtime.hdc.status` answers that no HDC is configured.
+    /// after the launch stops it on the way out). The gate admits only the
+    /// registered `c2` `hdc.exe` (CHG-2026-078), and only for a development
+    /// root; otherwise nothing is launched, and `runtime.hdc.status` answers
+    /// that no HDC is configured.
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each
@@ -398,6 +400,31 @@ impl Authority {
                 format!("the workspace provider is unusable: {error}; nothing was started")
             })?
             .with_planning(self.root.path(), Some(analyzers));
+        // Swift's Flash invocation owner keeps its documents in the state
+        // directory its engine plans in, and creates their directories at its
+        // start, as both macOS compositions compose it: the recovery broker
+        // writes an attempt's permit there and the planner reads it from
+        // there (TASK-XPA-010).
+        // The state directory is named as the file system resolves the
+        // opened handle (`StateRoot::private_child`), the canonical plain
+        // spelling the owner's private-directory check opens and compares,
+        // which a short (`AD-FAK~1`) or verbatim spelling of the root is not.
+        let unusable = |error: &dyn std::fmt::Display| {
+            format!(
+                "the Flash invocation owner {} is unusable: {error}; nothing was started",
+                self.root.path().display()
+            )
+        };
+        let documents = self
+            .root
+            .private_child("runtime-debug-invocations")
+            .map_err(|error| unusable(&error))?;
+        let state = documents
+            .parent()
+            .ok_or_else(|| unusable(&"the invocation documents have no state directory"))?;
+        let invocations =
+            arkdeck_hoststore::FlashInvocations::open(state).map_err(|error| unusable(&error))?;
+        let host = host.with_flash_invocations(invocations);
         let host = host.with_trace_cache(self.trace_cache()?);
         let host = host.with_bootstrap(&bootstrap).map_err(|error| {
             format!(
@@ -434,8 +461,8 @@ impl Authority {
                 hdc.tuple.candidate, hdc.sha256, hdc.selection.endpoint
             )),
             _ => report(
-                "arkdeck-agentd composes no HDC: no Windows HDC tuple is registered; device \
-                 observation and target adoption are refused before any dispatch",
+                "arkdeck-agentd composes no HDC: no registered Windows HDC is selected for this \
+                 root; device observation and target adoption are refused before any dispatch",
             ),
         }
         let hdc_sha256 = managed
@@ -459,9 +486,9 @@ impl Authority {
     ///
     /// One validated `ARKDECK_ARKFORGE_BUNDLE_PATH` bundle names the
     /// `arkforged.exe` to start and pair, but its authority must name the
-    /// managed-control HDC's digest (`hdc_sha256`, the managed server's), and
-    /// no HDC is composed without the registered Windows HDC tuple: the lane
-    /// is refused before anything is launched, and the start reports why. Its planning, its facts (over the
+    /// managed-control HDC's digest (`hdc_sha256`, the managed server's).
+    /// Without a managed HDC (the account's root, for now) the lane is
+    /// refused before anything is launched, and the start reports why. Its planning, its facts (over the
     /// Windows USB census, open since the DAYU200 sample confirmed its
     /// mapping) and the device access observer of the lane's
     /// directory are composed either way, as on macOS; no executable lane is
@@ -498,6 +525,14 @@ impl Authority {
                 &composed.runtime_directory,
             ))
             .with_lane_plan_preview(composed.lane_plan_preview())
+            // Swift's post-flash alias reconciler over the same Application
+            // Support root, reading the board from the same Windows USB census
+            // as the facts, as the macOS compositions compose it.
+            .with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
+                &application_support,
+                arkdeck_platform::usb_host_devices,
+                crate::host::utc_now,
+            ))
             // The Loader binding coordinator, as the macOS compositions
             // compose it: the same root and census, ArkForge's half of the
             // Loader observation through the lane's directory, and the
@@ -532,9 +567,9 @@ impl Authority {
     /// owner (`HdcControlActions`, in `hdc-control-actions`) only beside the
     /// managed server a registered HDC tuple admits, as the macOS isolated
     /// owner composes it only beside its own; both directories are created
-    /// before that server is launched. No Windows HDC tuple is registered
-    /// yet, so the union owner pages no action, and an impact preview or
-    /// restart is refused as Swift's daemon refuses it with no HDC host.
+    /// before that server is launched. Without that server the union owner
+    /// pages no HDC action, and an impact preview or restart is refused as
+    /// Swift's daemon refuses it with no HDC host.
     fn control_actions(&self) -> Result<arkdeck_hoststore::ControlActionResources, String> {
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(
@@ -957,6 +992,42 @@ fn already_running(root: &StateRoot) -> Result<Start, String> {
     }
 }
 
+/// The guard is held by another daemon: Swift's second instance answer when
+/// this root's instance document names it. When it does not (a daemon of
+/// another root that shares this guard and pipe, as the account's daemon of
+/// another profile does), the start is refused naming the guard, the pipe
+/// and the process that serves it, so the holder can be found.
+fn guard_held(
+    root: &StateRoot,
+    scope: &arkdeck_platform::InstanceScope,
+    endpoint: &LocalEndpoint,
+) -> Result<Start, String> {
+    if let Some(instance) = read_instance(root) {
+        return Ok(Start::AlreadyRunning(instance));
+    }
+    let served = match arkdeck_platform::pipe_server_pid(endpoint) {
+        Ok(Some(pid)) => format!(
+            ", and its pipe {} is served by pid {pid}",
+            endpoint.as_path().display()
+        ),
+        Ok(None) => format!(
+            ", and its pipe {} is not served",
+            endpoint.as_path().display()
+        ),
+        Err(error) => format!(
+            ", and the process serving its pipe {} is unknown: {error}",
+            endpoint.as_path().display()
+        ),
+    };
+    Err(format!(
+        "another Runtime holds this daemon's single-instance guard {}{served}; it left no \
+         instance document in the state root {}, so it serves another root; nothing was \
+         started",
+        scope.guard_name(),
+        root.path().display()
+    ))
+}
+
 /// Decides the composition and, for one that owns a state root, takes it
 /// (see the module's documentation).
 pub(crate) fn start(
@@ -1017,7 +1088,7 @@ pub(crate) fn start(
         .map_err(|error| unusable("the single-instance guard", error))?
     {
         GuardAcquisition::Owned { guard, abandoned } => (guard, abandoned),
-        GuardAcquisition::Held => return already_running(&root),
+        GuardAcquisition::Held => return guard_held(&root, &scope, &expected),
     };
     let Some(owner) = root
         .lock_owner()

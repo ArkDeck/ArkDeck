@@ -5,7 +5,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : null,
-          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "analyzer-run",
@@ -83,7 +83,7 @@
             }
           ],
           "bindingRevision" : null,
-          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "evidence" : {
@@ -116,7 +116,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+            "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : null,
@@ -142,7 +142,7 @@
             "outstandingResidueCount" : null,
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "19b8eec1d6b1f6af82c0813b5e2cd15f08c9b9ea44a583737736c1d32c8cab68",
+              "manifestSha256" : "f97587bc4a033581daf0c0fd018d438712a75ae59a55a7012184be6c663ede36",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -196,7 +196,7 @@
             }
           ],
           "bindingRevision" : null,
-          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "evidence" : {
@@ -229,7 +229,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+            "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : null,
@@ -255,7 +255,7 @@
             "outstandingResidueCount" : null,
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "19b8eec1d6b1f6af82c0813b5e2cd15f08c9b9ea44a583737736c1d32c8cab68",
+              "manifestSha256" : "f97587bc4a033581daf0c0fd018d438712a75ae59a55a7012184be6c663ede36",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -353,7 +353,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+            "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : null,
@@ -408,7 +408,7 @@
             "sessionId" : "session-job-a87bf66007211b6ce4701dadfebfefe9",
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "19b8eec1d6b1f6af82c0813b5e2cd15f08c9b9ea44a583737736c1d32c8cab68",
+              "manifestSha256" : "f97587bc4a033581daf0c0fd018d438712a75ae59a55a7012184be6c663ede36",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -465,7 +465,7 @@
           "blockers" : [
 
           ],
-          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,

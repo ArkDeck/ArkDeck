@@ -60,7 +60,8 @@ pub use credential::{
 };
 pub use daemon_fingerprint::trusted_daemon_fingerprint;
 pub use daemon_start::{
-    DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
+    DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, pipe_server_pid,
+    verify_daemon_image,
 };
 pub use deveco_files::{
     DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
@@ -75,6 +76,7 @@ pub use inspected_directory::InspectedDirectory;
 pub use managed::ManagedServer;
 pub use pinned_file::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
+    trusted_write_only_directory,
 };
 pub(crate) use process::spawn;
 pub use server::{LoopbackServerLease, end_proved_process};

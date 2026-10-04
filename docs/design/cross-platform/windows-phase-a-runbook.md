@@ -1,6 +1,8 @@
 # Windows phase A runbook (maintainer)
 
-- **Version:** 2026-09-30. Written against protected `main` `565f8b1d` (#2394).
+- **Version:** 2026-10-04. Written against protected `main` `982d4e6d` (#2518). The first version
+  (2026-09-30, `565f8b1d`) is superseded. §2 is done, and §4 is rewritten for what `main` composes
+  now.
 - **Scope:** CHG-2026-074 r12/r13, Windows phase A. This runbook is the maintainer's ordered
   checklist. Phase S (software) is the agents'.
 - **Status:** a runbook, not a run record. Nothing here is evidence until a step is run and
@@ -172,6 +174,16 @@ development MSIX.
 
 ## 2. Sampling, then the Windows HDC registration
 
+**Status: done (2026-10-04).** The samples are on `main` (#2456, #2457), and the maintainer chose
+candidate `c2` (DevEco Studio 26.0.0.43 `hdc.exe`, 3.2.0g). WHR-001..003 have merged (#2459,
+#2472, #2469):
+
+- the Windows HDC registry, fixtures, profile section and lock;
+- the USB census mapping, every row `Confirmed`.
+
+The gate admits only `c2`. The steps below are kept as the record of how it was done. They are
+re-run only if the maintainer registers another DevEco release (a new integration change).
+
 ### 2.1 HDC sample (both candidates)
 
 - **Gate:** `rust/scripts/windows-hdc-sample.ps1` is on `main` (yes).
@@ -272,103 +284,469 @@ The harness exits 1 whenever any row is `FAIL`, and 2 when every row is
 
 ## 4. GJ-1..5 on the DAYU200
 
-- **Source runbook:** `docs/design/cli-golden-journey-headless-runbook.md` §0–§7, followed as
-  written with the Windows differences below. The judging criteria are that runbook's, unchanged.
-- **Record:** per Journey, `runs/<task>/windows-gj<N>-<date>-run.md` in §7's template. The Windows
-  column uses the Windows host, build, Catalog digest and HDC tuple.
+- **Source runbook.** `docs/design/cli-golden-journey-headless-runbook.md` §0–§7 is followed as
+  written, with the Windows differences below. Its judging criteria are unchanged.
+- **Who does what.**
+  - An agent drives every step through the published CLI and the Runtime's typed operations
+    (`scripts/agent-guides/acceptance.md`).
+  - The maintainer does the physical actions: plugging, unplugging and board images, plus every
+    step marked **maintainer gate** below.
+  - Device effects go only through `agent run --operation …` / `agent resume` and the typed
+    resource commands. Raw `hdc` is never used for a device effect. A read-only `hdc` call is
+    allowed only where a step names one as a host fact (`hdc -v` and `hdc list targets -v` for
+    the pre-window check in §4.0.4).
+- **Record.** Each Journey gets two records:
+  - the redacted machine record, at
+    `docs/design/references/v1.6-goal/gj-headless-rerun-<date>-windows.json` (the CHG-2026-074
+    verification matrix's Golden Journeys row), in the headless runbook §7 shape
+    (`arkdeck.gj-headless-rerun/1`);
+  - a run note, at `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/<task>/windows-gj<N>-<date>-run.md`.
 
-### 4.0 Windows installation and differences (all Journeys)
+  The `<task>` is the Journey's owning task: XPA-006 for GJ-1, XPA-008 for GJ-2, XPA-009 for GJ-3,
+  XPA-010 for GJ-4 and XPA-011 for GJ-5. The record's Windows fields are the host, OS build,
+  Catalog digest, the registered HDC tuple (`c2`) and the installed daemon's SHA-256.
 
-1. **Install the product.** Unpack the RC xcopy zip into a new directory, then configure the CLI
-   with the daemon path and pin.
-   - Production (§1.3): use the publisher organisation and EKU.
-   - Development: use `ARKDECK_DAEMON_SIGNER_SHA256=<pin>` (§1.1).
+### 4.0 Before any Journey (all rows)
+
+#### 4.0.1 Which daemon
+
+The rows require a **trusted installed daemon** (`conformance-cases.yaml`, each WIN-GJ row's
+preconditions). That is the account daemon of an installed RC, started by the CLI at
+`%LOCALAPPDATA%\ArkDeck\Agentd`, not a development root. A development root's evidence is never
+`REAL_DEVICE_PASS` (`rust/crates/arkdeck-agentd/src/main.rs`, `development_usb.rs`).
+
+On protected `main` `982d4e6d` the two compose different things:
+
+| | Account daemon (installed RC) | Development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`) |
+| --- | --- | --- |
+| Managed registered HDC (`c2`, 8710) | **no** (`windows_lifecycle.rs`: the HDC gate runs only for a development root) | yes, with `ARKDECK_DEVELOPMENT_HDC_PATH=<DevEco hdc.exe>` and `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` |
+| Read-only HDC observer (`ARKDECK_HDC_PATH` + `ARKDECK_HDC_SHA256`) | yes. It observes an existing server and answers `device candidates`; `target adopt` and every Job need the managed HDC | refused beside a development root |
+| Device mutation authority (`deviceMutation`, `destructive`) | yes, over its own `jobs-state` | **no**. Its proof is pinned to the account's `jobs-state`, and `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY` refuses the start |
+| Signing credential owner (GJ-5) | yes, Credential Manager bound to the daemon image | no |
+| Counts as phase A evidence | yes | no (rehearsal only) |
+
+So every WIN-GJ row waits for **gap G1**: the account daemon must select the registered HDC and
+start it as its managed server. That is the Windows tool-selection owner port, which is in
+flight. The `runtime tool register --kind hdc` registry already admits the `c2` digest into
+`%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`; nothing selects it into a running daemon yet. When G1
+lands, §4.0.3 step 3 below is how the HDC is selected. Until then, a Journey may be rehearsed on
+a development root (§4.0.5), but that rehearsal is never a row result.
+
+#### 4.0.2 Install and configure (agent; maintainer gate for the pin)
+
+1. **Install.** Unpack the RC xcopy zip (§1.2 or §1.3) into a new directory.
+   - There is no `runtime service install|update` on Windows (`unsupportedOnPlatform`,
+     decision 11, ruling 78). The first CLI call starts the daemon.
+   - The headless runbook's §1 update path (`runtime bundle register` → `runtime service update`)
+     is replaced by reinstalling the RC.
+2. **Configure.** Set the environment **in the PowerShell session that will start the daemon**.
+   The client-started daemon inherits that environment (minus `ARKDECK_ENDPOINT`). If a daemon is
+   already running, stop it first with `arkdeck runtime service restart` from this session, then
+   check `runtime service status`.
 
    ```powershell
-   Expand-Archive <rc zip> D:\ArkDeck-rc-<date>
-   $env:ARKDECK_DAEMON_PATH = 'D:\ArkDeck-rc-<date>\arkdeck-agentd.exe'
-   $env:ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = '<org>'; $env:ARKDECK_DAEMON_PUBLISHER_EKU = '<eku>'
-   Set-Alias arkdeck D:\ArkDeck-rc-<date>\bin\arkdeck.exe
+   $rc = 'D:\ArkDeck-rc-<date>'
+   $env:ARKDECK_DAEMON_PATH = "$rc\arkdeck-agentd.exe"
+   # development RC (§1.1): the signer pin
+   $env:ARKDECK_DAEMON_SIGNER_SHA256 = '<pin>'
+   # or production RC (§1.3): both, never one
+   # $env:ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = '<O=>'; $env:ARKDECK_DAEMON_PUBLISHER_EKU = '1.3.6.1.4.1.311.97.<profile>'
+   Set-Alias arkdeck "$rc\bin\arkdeck.exe"
    ```
 
-   There is no `runtime service install`/`update` on Windows (`unsupportedOnPlatform`,
-   decision 11). The first CLI call starts the daemon (`%LOCALAPPDATA%\ArkDeck\Agentd`), and
-   `runtime service status|verify|restart` manage it. The headless runbook's §1 update path
-   (`runtime bundle register` → `runtime service update`) is replaced by reinstalling the RC.
-2. **Paths.** Input files live under `$out\inputs\` (the headless runbook's
-   `/private/tmp/…/inputs/`). `--file` and `--destination` take `X:\…` drive paths.
-3. **Preconditions** (headless runbook §1), with Windows expectations:
-   - `doctor --deep --require-healthy` answers;
-   - `runtime service status` names the installed daemon and its signer or package;
-   - `runtime hdc status` and `runtime tool list` name the registered Windows HDC.
-     **Gate:** §2.3 adoption on `main`. Before that they answer `operationUnavailable`, and every
-     HDC Journey below stops.
-   - `operation list` names the Journey's operations `available`.
-4. **Board.** The DAYU200 is connected directly (no hub), with its normal image. DevEco Studio is
-   closed. A board authorisation prompt is a HAR, recorded as §0 of the headless runbook says.
+   Leave every `ARKDECK_DEVELOPMENT_*` variable unset. A development variable on the account
+   daemon refuses the start.
+3. **The registered HDC.** The DevEco Studio 26.0.0.43 `sdk\default\openharmony\toolchains\hdc.exe`
+   is the only registered Windows tuple (CHG-2026-078; `c2`, 3.2.0g, SHA-256
+   `c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e`, `127.0.0.1:8710`).
+   - Register it once into the account's Bootstrap registry:
 
-### 4.1 GJ-1 Device Observe
+     ```powershell
+     arkdeck runtime tool register --kind hdc --file '<DevEco>\sdk\default\openharmony\toolchains\hdc.exe' --output json
+     arkdeck runtime tool list --output json
+     ```
 
-- **Gate:** §2.3 adoption.
-- **Steps:** headless runbook §2 and §2.1, unchanged commands:
-  1. `device candidates`;
-  2. `target adopt`, `target show`, `target availability`;
-  3. `agent run --operation observe.device@1` and `capture.diagnostics@1`;
-  4. `job result`/`evidence`, `artifact list`/`read`;
-  5. `runtime service restart`, then read both Jobs back;
-  6. the HAR crash-resume.
-- **Expected:** that runbook's criteria. In addition, `target show`'s
-  `stablePhysicalIdentitySha256` must not change across the replug. The Windows USB relation
-  (ruling 11 topology) is recorded, redacted.
+   - Any other `hdc.exe` is `admissionDenied`, including the one on `PATH` (c1, 3.2.0x).
+   - **G1:** the selection into the account daemon goes here once the tool-selection port lands
+     (`runtime tool select --tool <ref> --expected-active-generation <n> --action-request-id <id>`,
+     today Swift's no-owner refusal on every Rust composition, or the composition that port
+     defines). Until then, `runtime hdc status` answers `unconfigured` on the account daemon, and
+     the rows stop at §4.0.3.
+4. **Paths.** Raw outputs go in `$out` (§0), and inputs in `$out\inputs\`. `--file`,
+   `--destination` and every path in an inputs file take `X:\…` drive paths.
 
-### 4.2 GJ-2 HAP Debug
+#### 4.0.3 Fixed facts (agent, every window)
 
-- **Gate:**
-  - §4.1 passed;
-  - `artifact import hap` and `debug.hap@1` `available` on Windows (TASK-XPA-008, Import owner
-    and deviceMutation admission).
-- **Steps:** headless runbook §3. The HAP is the same signed single-entry HAP as the macOS round.
-- **Expected:** that runbook's criteria. Every step is `verified`, with
-  `outstandingResidueCount == 0`.
+Read these values and record them. Never copy them from memory or from an earlier window
+(headless runbook §0 table):
 
-### 4.3 GJ-3 Native Debug
+```powershell
+arkdeck --version --output json                                   # buildIdentity
+arkdeck doctor --deep --require-healthy --output json --control-request-id gjw-doctor
+arkdeck runtime service status --output json                      # daemon image, signer or publisher
+arkdeck runtime hdc status --output json --control-request-id gjw-hdc
+arkdeck runtime tool list --output json --control-request-id gjw-tools
+arkdeck runtime health --output json --control-request-id gjw-health # catalogDigest
+arkdeck operation list --output json --control-request-id gjw-ops # operations + availability
+```
 
-- **Gate:**
-  - §4.2 passed;
-  - `deploy.native-library.app-owned@1` `available` on Windows (TASK-XPA-009, including the
-    code-sign helper on Windows);
-  - the rollback fixture checked for the current target.
-- **Steps:** headless runbook §4. **Expected:** that runbook's criteria.
+The Rust `operation list` answers the operations as a bare array; the Runtime's Catalog digest is
+`runtime health`'s `catalogDigest`.
 
-### 4.4 GJ-4 Flash Recovery (destructive)
+Expected:
 
-- **Gate:**
-  - the maintainer authorises this window per HardwareCampaign (§1.1 of the agent prompt);
-  - AF-W1 is green (ArkForge's self-hosted Windows acceptance workflow);
-  - TASK-XPA-010's Windows lane is on `main`;
-  - its Windows configuration surface replaces the macOS `runtime service update
-    --arkforge-bundle … --arkforge-campaign …`, which does not exist on Windows. Its exact
-    command is **TBD by TASK-XPA-010** and goes here when that slice lands.
-- **Steps:** headless runbook §5, with the flash prerequisites, `install-binding` (hdc-normal
-  first), the bundle import, the lane preview, `flash.full-restore@1` and the postflight
-  observe.
-- **Expected:** that runbook's criteria, including the machine readback `OpenHarmony-7.0.0.37`.
-  Stop at the first missing proof; nothing is forced.
+- `doctor` ends `ok: true`, with `hdc.identityObserved` and `arkDeckManaged`.
+- `runtime hdc status` shows `availability: available` with the `c2` digest and
+  `newDispatchCount: 0`. `serverHealth` stays `unknown`
+  (`hdc.commandlessIdentityDoesNotProveHealth`); that is expected and not a failure.
+- `operation list` shows the Journey's operations `available`. An operation that is not
+  available stops only the Journeys that use it. Its reason code is recorded verbatim.
 
-### 4.5 GJ-5 Bounded AI Debug Loop
+#### 4.0.4 Board and host (maintainer)
 
-- **Gate:**
-  - §4.2 passed;
-  - the workspace, analyzer and signing operations `available` on Windows (TASK-XPA-011): the
-    workspace composition, the DevEco toolchain registry, and signing through Credential Manager
-    (#2372);
-  - DevEco Studio installed; its SDK path confirmed by the maintainer (WM3 crib);
-  - the credential installed with `runtime signing install --build-profile <DevEco
-    build-profile.json5> --keystore <storeFile> --key-alias debugKey --project-ref <ref>`.
-    The secret is entered at the console prompt; it is never put in argv or the environment.
-- **Steps:** headless runbook §6, with Windows paths.
-- **Expected:** that runbook's criteria and discipline: no raw device command, no App, no repository
-  write.
+- The DAYU200 is connected **directly** (no hub) to one fixed port, in HDC-normal mode, with
+  the image named in the row (OpenHarmony 7.0.0.37 for the published fixtures).
+- DevEco Studio and every other HarmonyOS tool are **closed**. Nothing else listens on 8710; if
+  something does, close its owner normally (§0). The daemon refuses an endpoint that is already
+  held and names the holder.
+- Optional host-fact check, read-only, recorded as a host fact, not as row evidence:
+  `& '<DevEco>\…\hdc.exe' -v` and `list targets -v` **before** the daemon starts. Never `kill`,
+  `start`, `tmode`, `install`, `shell` or `file send`.
+
+#### 4.0.5 Rehearsal on a development root (agent; not row evidence)
+
+Until G1 lands, a read-only Journey step can be rehearsed against the registered `hdc.exe` with a
+development-signed daemon. This is the `windows_hdc_live_process.rs` setup, run on 2026-10-04 for
+`device candidates` and `target adopt`:
+
+```powershell
+$env:ARKDECK_DEVELOPMENT_STATE_ROOT = '<a new directory outside %LOCALAPPDATA%\ArkDeck>'
+$env:ARKDECK_DEVELOPMENT_HDC_PATH   = '<DevEco>\sdk\default\openharmony\toolchains\hdc.exe'
+$env:ARKDECK_DEVELOPMENT_HDC_SERVER = 'managed'
+```
+
+A development root holds no device mutation authority, so GJ-2..5 cannot be rehearsed there.
+Rehearsal results go in the run note under "rehearsal", never into the `gj-headless-rerun`
+record.
+
+#### 4.0.6 How a row becomes `REAL_DEVICE_PASS`
+
+No person writes `REAL_DEVICE_PASS`. The Runtime produces every fact a row is judged on:
+
+- each Job's `terminalState`, `outcomeUnknown`, `blockers`, `actualStepKinds`,
+  `outstandingResidueCount` and `humanActions`;
+- each Artifact's digest-checked read;
+- the RuntimeCapability references;
+- the Catalog digest.
+
+The agent runs every step through `scripts/gj_record` (G9; its README has the details):
+
+1. **Capture.** `python -m gj_record capture --out $out --step <label> -- <arkdeck.exe> <args…>`
+   runs each command. It keeps the stdout, the exit code and the order in a journal under `$out`,
+   outside the repository. The executions use the runbook's IDs (`gj1-<d>`, `gj1-<d>-har`, …).
+2. **Assemble.** `python -m gj_record assemble --out $out --date <date>
+   --runtime-source-revision <protected-main sha> --record
+   docs/design/references/v1.6-goal/gj-headless-rerun-<date>-windows.json` writes the record from
+   those outputs only:
+   - SHA-256s, IDs, counts and UTC times;
+   - no connect key, serial, path or account.
+3. **State.** `assemble` derives each Journey's `state` mechanically:
+   - `REAL_DEVICE_PASS` when every criterion of that Journey's headless runbook section holds on
+     the read values;
+   - otherwise the first failing criterion with its raw value.
+
+   Each criterion is listed with the captured files it was read from.
+4. **Refusals.** `assemble` writes no record at all from:
+   - a development root, a plan-only or simulated Job, or another HDC;
+   - an edited output;
+   - a revision off protected `main`, or a Catalog digest other than `main`'s;
+   - a record that would carry an identifying literal.
+
+The record is reviewed and merged by the maintainer.
+
+Never:
+
+- edit a Runtime record, a capability or evidence;
+- replay an unknown;
+- mark a row passed from a fixture, a rehearsal or an older digest.
+
+### 4.1 GJ-1 Device Observe (WIN-GJ1-001)
+
+- **Gates:** §4.0 complete. G1.
+- **Maintainer:** board connected (§4.0.4). Unplug and replug **at the agent's call** for §2.1
+  of the headless runbook, into the **same** port.
+- **Agent, in order** (headless runbook §2 and §2.1; commands unchanged):
+  1. `device candidates`.
+  2. `target adopt --candidate <key> --observation <id> --observation-generation <n>` if not
+     adopted.
+  3. `target show` and `target availability`.
+  4. `agent run --operation observe.device@1 --target <TGT> --execution-id gj1-<date>
+     --maximum-wait 5m`, then `agent status`, `job result`, `job evidence`, `artifact list`, and
+     `artifact read` for each Artifact.
+  5. `runtime service verify --job <observe-job>`.
+  6. `capture.diagnostics@1` with `gj1-capture.json` `{ "durationSeconds": 5 }`, then
+     `job evidence`, `artifact list` and `artifact read`.
+  7. `runtime service restart`, then `job show` and `job result` for **both** Jobs.
+  8. §2.1 HAR crash-resume:
+     1. The maintainer unplugs the board.
+     2. The agent runs `agent run --operation observe.device@1` without `--target`; expect exit 75
+        and `newDispatchCount: 0`.
+     3. The agent discards that stdout.
+     4. The maintainer replugs the board.
+     5. Using only the execution ID: `agent status`, `human-action list --owner-kind
+        agentExecution --owner <exec>`, `human-action show`, `agent resume --resume-reference
+        <ref>`, then `job result`.
+- **Windows specifics:**
+  - The stable identity is the SHA-256 of the USB instance-ID serial (rulings 11 and 79). It must
+    not change across the replug. `target show`'s `stablePhysicalIdentitySha256` and
+    `bindingRevision` are recorded before and after.
+  - The topology hash is valid only within one attachment, so it may change. It is recorded
+    redacted.
+- **Records:** observe Job, capture Job, HAR execution, `humanActions`, both reads after the
+  restart.
+- **Destructive:** none. Every effect is `readOnly`.
+- **Software readiness:** `device candidates` and `target adopt` were measured live on a
+  development root (2026-10-04). `target observe` and `diagnostics capture` were measured against
+  the fake HDC (#2518).
+- **Blocking gaps:** G1. G2 for `observe.device@1` on the real tuple: `probeHDCServer` lowers to
+  the commandless observation (#2509), and `observe.device@1` and `capture.diagnostics@1` have
+  not yet run once against the real `hdc.exe`.
+
+### 4.2 GJ-2 HAP Debug (WIN-GJ2-001)
+
+- **Gates:**
+  - WIN-GJ1-001 passed on the same digest.
+  - G1.
+  - `debug.hap@1` `available` on the account daemon.
+- **Input (maintainer supplies):** the same signed single-entry HAP as the macOS round, plus its
+  `bundleName` and `abilityName`, in `$out\inputs\`.
+- **Agent:** headless runbook §3, unchanged:
+  1. `artifact import hap --import-request-id gj2-<date>-entry --target <TGT> --file
+     $out\inputs\entry-signed.hap`.
+  2. `artifact import inspect`.
+  3. `gj2.json` (§3's shape).
+  4. `agent run --operation debug.hap@1 … --execution-id gj2-<date> --maximum-wait 10m`.
+  5. `job wait`, `job result`, `job evidence`, `artifact list`.
+- **Authority:** `deviceMutation`. The account daemon generates, reserves and consumes the
+  RuntimeCapability from the materialized plan (`POL-AGENT-002`). The agent never passes
+  `--capability`, and no human confirmation stands in for it.
+- **Destructive:** no. A device mutation (install and uninstall of the test HAP) inside the
+  maintainer's device window.
+- **Software readiness:** 63/63 Swift exchanges and 108 HDC calls replayed end to end through
+  the real CLI and the signed test daemon (#2505), against the fake HDC.
+- **Blocking gaps:** G1 (the account daemon has the mutation authority but no HDC).
+
+### 4.3 GJ-3 Native Debug (WIN-GJ3-001)
+
+- **Gates:**
+  - WIN-GJ2-001 passed on the same digest.
+  - G1.
+  - `deploy.native-library.app-owned@1` `available`.
+  - The code-sign helper is composed: the census line includes `codeSignHelper`, and `doctor`
+    does not print `native deployment stays unavailable`.
+- **The helper:** the package installs it at
+  `<rc>\ArkDeckKit_ArkDeckWorkflows.bundle\OpenHarmonyNativeCodeSign\arkdeck-code-sign-enable`
+  (214 016 bytes, SHA-256 `86497e1a…f5c1`, pinned in the RC manifest). There is no configuration
+  for it; `ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER` is refused.
+- **Inputs (maintainer supplies):**
+  - the signed `armeabi-v7a` `.so`, `targetBundle` and `libraryLogicalName`;
+  - **the rollback fixture**: the signed fixture the macOS rounds pinned, SHA-256 `260a533a…6d3a`
+    (`runs/TASK-XPA-003/run.md`; `ROLLBACK_FIXTURE_SHA256` in `scripts/gj_record/record.py`).
+- **Agent:**
+  1. Headless runbook §4: `artifact import native-library`, `gj3.json`,
+     `agent run --operation deploy.native-library.app-owned@1`, `job wait`, `job evidence`.
+  2. The rollback leg, as a separate execution with the rollback fixture:
+     1. `artifact import native-library --import-request-id gj3-<d>-fixture --target <TGT>
+        --file $out\inputs\<fixture>.so`.
+     2. `artifact import inspect --import-request-id gj3-<d>-fixture`.
+     3. `agent run --operation deploy.native-library.app-owned@1 --inputs-file
+        gj3-rollback.json --execution-id gj3-<d>-rollback` with that import's lease.
+     4. `job show` and `job result`.
+  3. **The fixture check (G3).** `gj_record assemble` applies it to the outputs of steps 1–2. The
+     fixture applies to the current Target only when all of these hold:
+     - the import is the pinned digest;
+     - it was imported for this Target at the forward leg's binding revision;
+     - the Runtime's ELF validation of it names a build ID;
+     - its ABI is the ABI the forward leg's library was verified loaded under
+       (`verification-report.json`'s `abi`);
+     - the rollback Job consumed exactly that import's lease;
+     - the rollback Job got past `atomic-publish` before it rolled back.
+
+     A fixture refused at admission, for example on ABI, proves only that refusal. Without an
+     applicable fixture the rollback leg stays unverified and the row is not
+     `REAL_DEVICE_PASS`.
+- **Authority:** `deviceMutation`, a Runtime-issued capability as in GJ-2.
+- **Destructive:** no (app-owned library). The rollback leg is a device mutation that the
+  Runtime itself reverts.
+- **Software readiness:** 40/40 exchanges and 225 HDC calls replayed end to end (#2505).
+- **Blocking gaps:**
+  - G1.
+  - G3 is closed: `gj_record` checks the fixture's applicability (step 3 above).
+
+### 4.4 GJ-4 Flash Recovery (WIN-GJ4-001) — **destructive**
+
+- **Maintainer gates** (all needed, in this order):
+  1. The maintainer authorises this window per HardwareCampaign (agent prompt §1.1), and names
+     the campaign. Every flash step below is **destructive**.
+  2. AF-W1 is green: ArkForge's Windows acceptance on a real Windows host. This is an external
+     dependency, and it is still `blocked` (`tasks.md` TASK-XPA-010).
+  3. The ArkForge Windows bundle (`bin\arkforged.exe`, `bin\arkforge.exe`, the
+     `org.openharmony.dayu200` profile) is validated and its path is given to the agent.
+- **Configuration** (replaces the macOS `runtime service update --arkforge-*`, which Windows
+  does not have). Set it in the daemon-starting session (§4.0.2), then restart the daemon from
+  that session:
+
+  ```powershell
+  $env:ARKDECK_ARKFORGE_BUNDLE_PATH = '<absolute path to the validated ArkForge.bundle>'
+  $env:ARKDECK_ARKFORGE_CAMPAIGN    = 'gj4-<date>'   # the maintainer-named campaign; omit to stay assessment-only
+  arkdeck runtime service restart --output json
+  arkdeck runtime service status --output json
+  arkdeck operation list --output json
+  ```
+
+  - The retired `ARKDECK_ARKFORGED_PATH`, `ARKDECK_ARKFORGED_SHA256` and
+    `ARKDECK_ARKFORGE_PROFILE_PATH` are refused at the start.
+  - Without a campaign, the lane is assessment-only (`hardwareGated`) and nothing flashes.
+  - To end the staging, clear `ARKDECK_ARKFORGE_CAMPAIGN`, restart, and read back.
+- **Input (maintainer supplies):** `OpenHarmony-7.0.0.37` archive, SHA-256
+  `4fd35765…c674` (730 783 514 bytes).
+- **Agent:** headless runbook §5:
+  1. `flash device-access`, `flash bootloader-status`, `flash prerequisites --target <TGT>
+     --device-profile dayu200`.
+  2. **`flash install-binding`: see G4.**
+  3. `artifact import flash-bundle … --device-profile dayu200`.
+  4. `flash lane-preview … --archive-sha256 4fd35765…c674`.
+  5. `flash bind-loader --target <TGT> --expected-binding-revision <n>`.
+  6. `gj4.json`, then `agent run --operation flash.full-restore@1 --target <TGT> --inputs-file
+     gj4.json --execution-id gj4-<date> --maximum-wait 30m`. **Destructive**: the Runtime
+     issues the capability only from fresh facts and the full plan.
+  7. `job wait`, `job evidence`.
+  8. Postflight: `device candidates`, `target show` (record the new binding revision),
+     `agent run --operation observe.device@1`.
+- **Maintainer during the run:**
+  - Board physical actions only when the Runtime publishes a human action. Each is consumed with
+    `agent resume`.
+  - Never a manual Loader entry outside a published action.
+- **Stop rule:** stop at the first missing proof. An unknown stays unknown, and nothing is
+  replayed or forced.
+- **Software readiness:**
+  - Lane launch and pairing, plan, admission, run and reconcile are proved against fakes (#2504).
+  - The recovery broker is composed (#2519).
+  - No real `arkforged.exe` has run.
+- **Blocking gaps:**
+  - G1.
+  - G4: `flash install-binding` is macOS-only (`flash_leaves.rs` `cfg(target_os = "macos")`), so
+    the cross-mode binding cannot be established on Windows. This blocks a first takeover. A board
+    whose binding already exists on this host is not a Windows case.
+  - G5: AF-W1.
+  - G6: `flash device-access`, `flash lane-preview` and `flash bind-loader` have not been
+    measured through the CLI on Windows.
+
+### 4.5 GJ-5 Bounded AI Debug Loop (WIN-GJ5-001)
+
+- **Gates:**
+  - WIN-GJ2-001 passed on the same digest.
+  - G1.
+  - The workspace Jobs `available` on the account daemon. Workspace mutations, build, test and
+    signing need the account daemon: a development root composes neither mutation authority nor
+    signing.
+- **Host prerequisites (maintainer):**
+  - DevEco Studio installed. Its install shape is confirmed by the WM3 crib
+    (`runs/TASK-XPA-011/deveco-windows-install-shape-crib-20260930.md`).
+  - Git for Windows installed machine-wide at `C:\Program Files\Git` (ruling 69: `mingw64\bin\git.exe`
+    signed by its publisher; a per-user install is refused).
+  - `System32\tar.exe` present (Windows ships it).
+- **Toolchain and project (agent):**
+
+  ```powershell
+  arkdeck runtime tool register --kind deveco --root '<DevEco Studio dir>' --output json
+  arkdeck runtime tool list --output json
+  arkdeck workspace project register --registration-request-id gj5-<date>-project --kind openharmony --root '<project X:\…>' --output json
+  arkdeck workspace preset register --registration-request-id gj5-<date>-build --project <ref> --kind build --template <template> --toolchain <toolchain ref> --toolchain-generation <n> --module <module> --product <product> --build-mode <mode> --timeout-seconds 900 --output json
+  ```
+
+  - The DevEco launcher must be Huawei-signed, and `node.exe` OpenJS-signed. Node and hvigor
+    are never taken from `PATH`.
+- **Signing credential: maintainer gate.**
+  - The passwords never go in argv or the environment, and the agent never sees them.
+  - `--build-profile` reads DevEco's encrypted passwords from the project's `build-profile.json5`
+    and the material DevEco keeps beside the keystore, decoding them in memory, at macOS parity
+    (#2532). No password is typed. This is the headless runbook §6 install:
+
+    ```powershell
+    arkdeck runtime signing install --build-profile '<project>\build-profile.json5' `
+      --java '<DevEco>\jbr\bin\java.exe' `
+      --jar '<DevEco>\sdk\default\openharmony\toolchains\lib\hap-sign-tool.jar' `
+      --keystore '<the build profile''s storeFile .p12>' --certificate '<certpath .cer>' --profile '<profile .p7b>' `
+      --key-alias debugKey --project-ref <ref> --output json
+    arkdeck workspace preset register --registration-request-id gj5-<date>-sign --project <ref> --kind signing --template openharmony.local-sign@1 --credential <credential> --timeout-seconds 600 --output json
+    arkdeck runtime service restart --output json
+    ```
+
+    - `--keystore` must be the build profile's single `storeFile`, or the install is refused.
+    - The build profile and the material directories must be trusted-write-only and in their
+      spelling on disk, and each material file must have a single link (`rust/README.md`,
+      Windows signing).
+    - Without `--build-profile`, the same command prompts for the keystore and key passwords at
+      the console (echo off).
+    - A credential installed from typed passwords moves onto the build profile's encrypted ones
+      with `runtime signing migrate-deveco --build-profile <…> --daemon <the installed, pinned
+      arkdeck-agentd.exe>`.
+
+  - The material is the DevEco **debug** signing of this board (device-ids include its UDID). The
+    sample `install-sdk-release` material is rejected by the board (`9568329`).
+  - The daemon image must satisfy the signing pin before Credential Manager is opened.
+- **Inputs (maintainer supplies):**
+  - the crash-probe fixture project and its signed HAP;
+  - the fixed patch `gj5-fix.patch` (headless runbook §1).
+- **Agent:** headless runbook §6 in full:
+  1. repro;
+  2. `analyzer.extract-crash-signature@1`;
+  3. isolate, then `artifact import workspace-patch` and `workspace.apply-patch@1`;
+  4. build, sign, `artifact export`, re-import;
+  5. verify;
+  6. the zero-dispatch negative case, with the full Job-set comparison.
+- **Authority:** the repro and verify `debug.hap@1` steps are `deviceMutation`. The workspace
+  mutations need the account daemon's authority.
+- **Destructive:** none.
+- **Software readiness:**
+  - The reads, isolate and sweep are measured (#2500), and patch, checkpoint and revert are in
+    flight (#2506).
+  - The sign Job replays the Swift oracle (#2495), and signing through a registered preset is
+    measured (#2508, open).
+  - The hvigor build has not run on Windows.
+- **Blocking gaps:**
+  - G1.
+  - G7: the hvigor build and test Jobs have not been measured on Windows.
+  - G8 is closed (#2532): `--build-profile` decodes DevEco's stored passwords on Windows.
+  - `hap-sign-tool.jar` carries Mark-of-the-Web (ZoneId=3) in the sampled install. Whether it
+    affects the signer has not been observed; record it.
+
+### 4.6 Gaps that block rows
+
+| Gap | What | Blocks | Owner |
+| --- | --- | --- | --- |
+| G1 | The account daemon does not select and start the registered `c2` HDC (the Windows tool-selection owner); only a development root composes the managed HDC, and it holds no mutation authority | WIN-GJ1..5 | tool-selection port, in flight |
+| G2 | `observe.device@1` and `capture.diagnostics@1` not yet run once against the real `hdc.exe` (fake only; `probeHDCServer` lowered to the commandless observation, #2509) | WIN-GJ1 (risk, not a stop) | first rehearsal after G1 |
+| G3 | **Closed** by `scripts/gj_record`: the rollback fixture's pinned digest, Target, binding revision, ABI and lease are checked against the current Target (§4.3 step 3) | none | done |
+| G4 | `flash install-binding` is macOS-only | WIN-GJ4 first takeover | TASK-XPA-010 |
+| G5 | AF-W1 (ArkForge Windows acceptance) | WIN-GJ4 | external, maintainer |
+| G6 | `flash device-access`, `lane-preview`, `bind-loader` not measured through the CLI on Windows | WIN-GJ4 (risk) | TASK-XPA-010 |
+| G7 | hvigor build and test Jobs not measured on Windows; workspace mutations in flight (#2506) | WIN-GJ5 | TASK-XPA-011 |
+| G8 | **Closed** (#2532): `runtime signing install --build-profile` and `migrate-deveco` decode DevEco's stored passwords on Windows | none | done |
+| G9 | **Closed** by `scripts/gj_record`: it assembles the redacted `gj-headless-rerun` record from the captured CLI JSON and applies each row's criteria (§4.0.6) | none | done |
+
+### 4.7 Readiness per row (main `982d4e6d`)
+
+| Row | Software path on Windows | Real-device blockers | Maintainer gate | Destructive |
+| --- | --- | --- | --- | --- |
+| WIN-GJ1-001 | candidates and adopt live on a development root; observe and capture on the fake (#2518) | G1 (G2 risk) | board window; unplug and replug | no |
+| WIN-GJ2-001 | full oracle replay end to end (#2505) | G1 | device window; HAP input | no (device mutation) |
+| WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged | G1 | device window; `.so` and rollback fixture | no (device mutation) |
+| WIN-GJ4-001 | lane, plan, run, reconcile on fakes (#2504); broker (#2519) | G1, G4, G5, G6 | HardwareCampaign go; ArkForge bundle; image archive | **yes** (`flash.full-restore@1`) |
+| WIN-GJ5-001 | reads, isolate, sweep measured; sign replayed; patch (#2506) and registered signing (#2508) in flight | G1, G7 | DevEco install; signing install from the build profile; inputs | no (device mutation) |
+
+None of the rows can produce `REAL_DEVICE_PASS` before G1 is on `main`.
 
 ## 5. Clean-host smoke
 
@@ -436,16 +814,16 @@ Nothing flips on hosted CI, fixtures or plan-only runs (AGENTS.md "什么不算�
 
 ## 7. Order at a glance
 
-| # | Step | Blocked on |
-| --- | --- | --- |
-| 1 | §1.1 dev signer check | — |
-| 2 | §2.1/§2.2 HDC and USB samples | — (the board is connected) |
-| 3 | §2.3 WHR-001 (agent), candidate choice, WHR-002/003 merge | samples; maintainer decision |
-| 4 | §1.2 dev MSIX publisher, §3 SPK-3 rows 1–5 | certificate creation, second account, elevated terminal, second host |
-| 5 | XPA-004/005 adoption of the Windows registry | WHR-002 on `main` (agents) |
-| 6 | §4.1 GJ-1, §3 row 6 | step 5 |
-| 7 | §4.2 GJ-2, §4.3 GJ-3, §4.5 GJ-5 | their Windows owners on `main` (agents) |
-| 8 | §1.3 production signing | Artifact Signing account; `package-rc.ps1` production mode (agents) |
-| 9 | §4.4 GJ-4 | AF-W1, TASK-XPA-010, the maintainer's go |
-| 10 | §5 clean-host smoke | step 8 |
-| 11 | §6 flip | everything above recorded |
+| # | Step | State on `main` `982d4e6d` | Blocked on |
+| --- | --- | --- | --- |
+| 1 | §1.1 dev signer check | open (maintainer) | — |
+| 2 | §2 HDC and USB samples, WHR-001..003 | **done** | — |
+| 3 | §1.2 dev MSIX publisher, §3 SPK-3 rows 1–5 | open (maintainer) | certificate creation, second account, elevated terminal, second host |
+| 4 | G1: the account daemon selects and starts the registered HDC | in flight (agents) | the Windows tool-selection port |
+| 5 | §4.1 GJ-1, §3 row 6 | blocked | step 4 |
+| 6 | §4.2 GJ-2, §4.3 GJ-3 | blocked | step 4 |
+| 7 | §4.5 GJ-5 | blocked | step 4, G7 (agents) |
+| 8 | §1.3 production signing | open (maintainer) | Artifact Signing account |
+| 9 | §4.4 GJ-4 | blocked | step 4, G4 (agents), G5 AF-W1, the maintainer's HardwareCampaign go |
+| 10 | §5 clean-host smoke | open | step 8 |
+| 11 | §6 flip | blocked | everything above recorded |

@@ -981,7 +981,9 @@ impl JobRunner<'_> {
         };
         // Swift `resolvedInputArtifact`: the lease the operation's entry
         // input names.
-        let entry = if run.record.operation() == device_steps::NATIVE {
+        let entry = if run.record.operation() == "input.keyboard@1" {
+            "keyboardArtifactLease"
+        } else if run.record.operation() == device_steps::NATIVE {
             "libraryArtifactLease"
         } else {
             "hapArtifactLease"
@@ -1009,6 +1011,12 @@ impl JobRunner<'_> {
                         "input Artifact lease became unreadable before {step_id}: {error}"
                     ))
                 })?;
+                if run.record.operation() == "input.keyboard@1"
+                    && (leased.row["privacy"] != "sensitive"
+                        || leased.row["mediaType"] != arkdeck_contract::KEYBOARD_MEDIA_TYPE)
+                {
+                    return Err(rejected("keyboard input requires a private typed Artifact"));
+                }
                 if let Some(refusal) = unbound(&leased, &run.record) {
                     return Err(rejected(refusal));
                 }
@@ -1209,7 +1217,22 @@ impl JobRunner<'_> {
             self.run_diagnostic_trace(run, hdc, plan, target_id, revision)
         } else {
             arkdeck_provider_hdc::run(plan, hdc.dispatch)
-        };
+        }
+        .map_err(|error| {
+            if !matches!(action, StepAction::Keyboard(_)) {
+                return error;
+            }
+            // A private argv must never become a durable error string. Keep
+            // the dispatcher's execution certainty while discarding its text.
+            match error {
+                DispatchFailure::Refused(_) => DispatchFailure::Refused(
+                    "private keyboard dispatch was refused before execution".into(),
+                ),
+                DispatchFailure::Unobservable(_) => DispatchFailure::Unobservable(
+                    "private keyboard outcome unavailable; input is never replayed".into(),
+                ),
+            }
+        });
         let receipt = match dispatched {
             Ok(receipt) => receipt,
             Err(DispatchFailure::Unobservable(reason)) => {

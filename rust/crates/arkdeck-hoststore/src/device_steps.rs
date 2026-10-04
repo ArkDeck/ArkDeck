@@ -44,10 +44,11 @@ pub(crate) fn diagnostic_capture(reference: &str) -> bool {
 }
 
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 12] = [
+pub(crate) const DEVICE_OPERATIONS: [&str; 13] = [
     "observe.device@1",
     "debug.template@1",
     "capture.diagnostics@1",
+    "input.keyboard@1",
     DIAGNOSTIC_SESSION,
     "input.tap@1",
     "input.long-press@1",
@@ -61,13 +62,14 @@ pub(crate) const DEVICE_OPERATIONS: [&str; 12] = [
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
 /// for a complete evidence preflight.
-const EVIDENCE_OPERATIONS: [&str; 9] = [
+const EVIDENCE_OPERATIONS: [&str; 10] = [
     "observe.device@1",
     "capture.diagnostics@1",
     DIAGNOSTIC_SESSION,
     "debug.hap@1",
     "port-forward.create@1",
     "port-forward.remove@1",
+    "input.keyboard@1",
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
@@ -182,6 +184,7 @@ pub(crate) enum StepAction {
     Hdc(Action),
     Template(arkdeck_provider_hdc::DebugReadTemplate),
     Pointer(PointerAction),
+    Keyboard(arkdeck_provider_hdc::KeyboardInput),
     Port(PortAction),
     Hap(HapAction),
     Native(Box<NativeAction>),
@@ -202,6 +205,7 @@ impl StepAction {
                 Map::from_iter([("templateId".into(), json!(template.raw()))]),
             ),
             Self::Pointer(action) => action.persisted(),
+            Self::Keyboard(action) => action.persisted(),
             Self::Port(action) => action.persisted(),
             Self::Hap(action) => action.persisted(),
             Self::Native(action) => action.persisted(),
@@ -252,6 +256,7 @@ impl StepAction {
             (Self::Hdc(action), Some(sole)) => action.verify(sole, expected),
             (Self::Template(template), Some(sole)) => template.verify(sole),
             (Self::Pointer(action), Some(sole)) => action.verify(sole),
+            (Self::Keyboard(action), Some(sole)) => action.verify(sole),
             (Self::Port(action), Some(sole)) => action.verify(sole),
         }
     }
@@ -261,6 +266,7 @@ impl StepAction {
             Self::Hdc(action) => action.effect(),
             Self::Template(_) => "readOnly",
             Self::Pointer(action) => action.effect(),
+            Self::Keyboard(_) => "deviceMutation",
             Self::Port(action) => action.effect(),
             Self::Hap(action) => action.effect(),
             Self::Native(action) => action.effect(),
@@ -307,6 +313,9 @@ impl StepAction {
                 .map(|key| FilePlan::Process(template.plan(key)))
                 .ok_or_else(|| format!("{step_id} requires a bound connect key")),
             Self::Pointer(action) => action.lower(step_id, connect_key),
+            Self::Keyboard(action) => connect_key
+                .map(|key| FilePlan::Process(action.plan(key)))
+                .ok_or_else(|| "keyboard input requires a bound connect key".into()),
             Self::Port(action) => action.lower(step_id, connect_key),
             Self::Hap(action) => action.lower(step_id, connect_key, context.resolved),
             Self::Native(action) => action.lower(
@@ -447,6 +456,26 @@ pub(crate) fn action_in(
     now_utc: &str,
     context: &StepContext<'_>,
 ) -> Result<StepAction, ActionRefusal> {
+    if reference == "input.keyboard@1" && step.kind == "injectKeyboardInput" {
+        let artifact = context
+            .resolved
+            .first()
+            .filter(|_| context.resolved.len() == 1)
+            .ok_or_else(|| {
+                ActionRefusal::Invalid(
+                    "keyboard input requires exactly one private Artifact".into(),
+                )
+            })?;
+        let epoch = inputs
+            .get("inputEpochUtc")
+            .and_then(Value::as_str)
+            .ok_or_else(|| {
+                ActionRefusal::Invalid("keyboard input requires an intent timestamp".into())
+            })?;
+        return arkdeck_provider_hdc::KeyboardInput::from_artifact(artifact, epoch, now_utc)
+            .map(StepAction::Keyboard)
+            .map_err(ActionRefusal::Invalid);
+    }
     if reference == NATIVE {
         return native_action(step, inputs, context);
     }
@@ -688,6 +717,7 @@ pub(crate) fn journal_arguments_in(
             hap_journal_arguments(hap, step, inputs, context.job_id, context.resolved)
         }
         StepAction::Native(native) => native_arguments(step, native, context),
+        StepAction::Keyboard(keyboard) => Some(Value::Object(keyboard.persisted().1)),
         StepAction::File { action, .. } => file_journal_arguments(action, step, context.job_id),
         _ => journal_arguments_for(step, reference, inputs, action),
     }
@@ -881,6 +911,7 @@ pub(crate) enum StepInputs {
 pub(crate) fn step_inputs(reference: &str, kind: &str) -> StepInputs {
     match (reference, kind) {
         (HAP, "sendFile") => StepInputs::All,
+        ("input.keyboard@1", "injectKeyboardInput") => StepInputs::Entry,
         (HAP, "installPackage" | "runApprovedRemoteRead") | (NATIVE, _) => StepInputs::Entry,
         _ => StepInputs::None,
     }

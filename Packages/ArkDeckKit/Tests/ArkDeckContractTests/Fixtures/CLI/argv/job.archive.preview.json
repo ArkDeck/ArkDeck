@@ -1,0 +1,144 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "job",
+        "archive",
+        "preview",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.archive.preview",
+        "handlerArguments": [
+          "job",
+          "archive",
+          "preview",
+          "--job",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "preview",
+        "--help"
+      ],
+      "expected": {
+        "command": "job.archive.preview",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "preview",
+        "--job",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "preview",
+        "--job",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "preview"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "preview",
+        "--job",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.archive.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "job",
+        "archive",
+        "preview",
+        "--job",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.archive.preview",
+        "handlerArguments": [
+          "job",
+          "archive",
+          "preview",
+          "--job",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "job.archive.preview",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "job",
+    "archive",
+    "preview"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

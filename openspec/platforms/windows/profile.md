@@ -122,7 +122,8 @@ Windows 平台决定，每条指向其证据。上文 W0 段列为「后续任�
      `identityRefused` 与 PID，从不信任。启动过程不发送任何帧，丢失的请求从不重放。
    - `runtime service status|verify|restart` 在 Windows 上沿用 macOS 的信封与退出码
      （`daemonService` 对应 `launchAgent`）；`restart` 经 stop event 与有界 guard 获取实现；
-     `install`/`update`/`uninstall` 为 `unsupportedOnPlatform`。
+     `install`/`update` 为 `unsupportedOnPlatform`；`uninstall` 经 stop event 停止客户端启动的
+     daemon，回答 `arkdeck-windows-daemon-uninstall/v1`，安装文件由安装包自身移除（#2411）。
 4. **持久化原语（PersistentFileAccess / VolumeIdentityResolver 相关的 host store）。** NTFS 上：
    - 原子替换 = POSIX 语义 rename（`FileRenameInformationEx`，`POSIX_SEMANTICS`
      [+ `REPLACE_IF_EXISTS`]，相对目录句柄），**不用 `MoveFileExW`**：后者在任一读者持有目标时失败

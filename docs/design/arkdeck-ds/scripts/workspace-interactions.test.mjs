@@ -2092,6 +2092,22 @@ test('every WorkspaceHeaderBar summary in the App is mirrored and anchored', () 
   }
 });
 
+// The prototype has no Runtime transport and cannot fabricate keyboard receipts.
+test('private keyboard panel discloses clipboard scope and never simulates a send', () => {
+  for (const language of ['zh', 'en']) {
+    const h = harness(`?page=device-control&lang=${language}`);
+    const before = h.run('JSON.stringify(S.deviceControl.events)');
+    const panel = h.run('devicePrivateKeyboardHTML()');
+    assert.equal((panel.match(/<option>/g) || []).length, 10);
+    assert.match(panel, /type="password"/);
+    assert.match(panel, /device.input.clipboardConsent/);
+    assert.match(panel, /disabled data-sync-id="device.input.sendKey"/);
+    assert.match(panel, /disabled data-sync-id="device.input.sendText"/);
+    assert.match(panel, /512/);
+    assert.doesNotMatch(panel, /onclick=|oninput=|onchange=/);
+    assert.equal(h.run('JSON.stringify(S.deviceControl.events)'), before);
+  }
+});
 
 test('recovery controls keep unknown work parked and bind only the exact Flash target', () => {
   const h=harness('?page=overview&jobState=unknown');
@@ -2126,4 +2142,19 @@ test('recovery controls keep unknown work parked and bind only the exact Flash t
   assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),'resume');
   h.run("S.jobs[0].supersededByRecoveryEpochID='epoch-fixture'");
   assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),null);
+});
+
+
+test('archive preview never changes Job state or grants archive without Runtime proof', () => {
+  const h=harness('?page=overview&jobState=unknown');
+  const before=h.run('JSON.stringify(inspectorJobs())');
+  assert.equal(h.run('inspectorCanArchive(inspectorJobs()[0])'),true);
+  assert.match(h.run('inspectorRecoveryHTML(inspectorJobs()[0])'),/jobRecovery.archive.review/);
+  h.run("requestInspectorArchive('job-demo-global')");
+  assert.equal(h.run('JSON.stringify(inspectorJobs())'),before);
+  assert.match(h.run('$("modalHost").innerHTML'),/jobRecovery.archive.confirm" disabled/);
+  for(const state of ['running','succeeded','resumeAtConfirmedSafeBoundary']) {
+    h.run(`S.jobs=[{id:'changed',state:'${state}'}]`);
+    assert.equal(h.run('inspectorCanArchive(inspectorJobs()[0])'),false);
+  }
 });

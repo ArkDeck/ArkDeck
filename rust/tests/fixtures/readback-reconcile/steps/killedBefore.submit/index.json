@@ -7,7 +7,7 @@
       "createdAtUTC" : "2026-09-14T00:00:00Z",
       "idempotencyKey" : "idem-readback-killedBefore",
       "jobId" : "job-f98bab40c1609df91bd30c251cf723da",
-      "recordSHA256" : "4e8c95a9a2b7230ec90e8223587a3941639a7cf91b4406abed8661a55dfd4f53",
+      "recordSHA256" : "596849f973b754fd6651137845d82fde8f9b307f29540f63bfee5dbfc2950abc",
       "requestHash" : "73003b0bb886e6ff1e6602f1949de15d4359accd31bb5fd1ed33dd7d645fd6dd",
       "state" : "preflight",
       "updatedAtUTC" : "2026-09-14T00:00:00Z",

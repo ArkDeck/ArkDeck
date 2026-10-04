@@ -2,8 +2,8 @@
 //! `job.plan` and `job.submit` hops of `observe.device@1`, as the real daemon
 //! composes them over an isolated development root.
 //!
-//! No Windows HDC tuple is registered (its integration change waits for the
-//! maintainer's samples), so the daemon composes no HDC provider, and no
+//! The test's development root names no registered Windows HDC, so the
+//! daemon composes no HDC provider, and no
 //! workspace or analyzer provider either. The planner and the admitter are
 //! the macOS code with those owners absent, so:
 //!
@@ -414,7 +414,7 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     let before = root.snapshot();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, controlActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, controlActions, traceCache, flashAliasReconciler, flashInvocations, flashHostFacts, deviceAccess, loaderBinding"
                 .to_owned()
         ),
         "{:?}",
