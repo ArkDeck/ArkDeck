@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -30,7 +31,7 @@ class GitHub:
         if payload is not None:
             args += ["--input", "-"]
         result = subprocess.run(args, input=json.dumps(payload) if payload is not None else None,
-                                text=True, capture_output=True, check=True)
+                                text=True, encoding="utf-8", capture_output=True, check=True)
         return json.loads(result.stdout)
 
     def pages(self, path: str) -> list[dict]:
@@ -50,7 +51,7 @@ class Repository:
         self.root = root
 
     def git(self, *args: str) -> str:
-        return subprocess.run(["git", "-C", str(self.root), *args], text=True,
+        return subprocess.run(["git", "-C", str(self.root), *args], text=True, encoding="utf-8",
                               capture_output=True, check=True).stdout.strip()
 
     def ancestor(self, base: str, head: str) -> bool:
@@ -74,10 +75,19 @@ class Repository:
         self.git("check-ref-format", f"refs/heads/{branch}")
 
     def trailer(self, oid: str) -> str | None:
-        values = self.git("show", "-s", "--format=%(trailers:key=Stack-Base,valueonly)", oid).splitlines()
+        # Read from every line of the body, not only Git's trailer block: a
+        # tool that appends a paragraph after the author's trailers (an
+        # attribution footer added at commit time) leaves `Stack-Base` out of
+        # the last paragraph, where `%(trailers)` would no longer see it.
+        body = self.git("show", "-s", "--format=%B", oid).splitlines()[1:]
+        values = [match.group(1) for line in body
+                  if (match := STACK_BASE_RE.fullmatch(line.strip()))]
         if len(values) > 1:
             raise IdentityError("use exactly one Stack-Base trailer")
-        return values[0].strip() if values else None
+        return values[0] if values else None
+
+
+STACK_BASE_RE = re.compile(r"Stack-Base:\s*(\S+)")
 
 
 def by_branch(pulls: list[dict], repository: str, branch: str) -> dict | None:

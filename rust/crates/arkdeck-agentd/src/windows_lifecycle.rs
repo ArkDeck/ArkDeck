@@ -9,7 +9,12 @@
 //! * the account's daemon (no input): `%LOCALAPPDATA%\ArkDeck\Agentd`, its
 //!   `instance.lock`, the guard `Local\ArkDeck.Agentd.<user SID>` and the
 //!   logon-scoped pipe `\\.\pipe\arkdeck-agentd-<logon SID>`. This is the
-//!   daemon decision 11's client starts (`arkdeck_client::start`);
+//!   daemon decision 11's client starts (`arkdeck_client::start`). As the
+//!   macOS production daemon, it composes an HDC only when `ARKDECK_HDC_PATH`
+//!   is set, and then the account's Bootstrap registry's selection (the
+//!   configured file adopted as its first while there is none), admitted only
+//!   by a registered Windows HDC tuple and started as its managed server
+//!   ([`AccountHdc`]);
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
@@ -74,6 +79,8 @@ fn product(root: &StateRoot) -> std::path::PathBuf {
 /// Swift `AgentDaemonServer`'s instance document, the name and shape the
 /// macOS composition writes (`production.rs`).
 const INSTANCE_DOCUMENT: &str = "instance.json";
+/// The tool-selection owner's directory, the name macOS production gives it.
+const TOOL_SELECTION_ACTIONS: &str = "tool-selection-control-actions";
 const DOCUMENT_LIMIT: u64 = 64 * 1024;
 
 /// Inputs from which the isolated macOS owner composes an owner that this
@@ -111,6 +118,72 @@ impl Instance {
     }
 }
 
+/// The account daemon's HDC inputs, read before its root is opened, from
+/// which [`Authority::compose`] composes the Bootstrap registry's selection
+/// as macOS production composes it (`production::registered_hdc`).
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct AccountHdc {
+    /// `ARKDECK_HDC_PATH`: an explicit absolute path, adopted as the
+    /// registry's first selection while it holds none (Swift's
+    /// `adoptInstalledHDC`); once a selection exists it is never the
+    /// executable started.
+    pub(crate) configured: std::path::PathBuf,
+    /// The inherited `OHOS_HDC_SERVER_PORT`, which must select the
+    /// registered tuple's endpoint.
+    pub(crate) server_port: Option<OsString>,
+}
+
+impl AccountHdc {
+    /// The account's HDC inputs, or the refusal: none without
+    /// `ARKDECK_HDC_PATH`, as the macOS production daemon composes none;
+    /// `ARKDECK_HDC_SHA256` is refused, as there (the registry pins the
+    /// identity).
+    pub(crate) fn from(
+        variable: &dyn Fn(&str) -> Option<OsString>,
+    ) -> Result<Option<Self>, String> {
+        if variable("ARKDECK_HDC_SHA256").is_some() {
+            return Err(
+                "ARKDECK_HDC_SHA256 is not read: the account's Bootstrap registry pins the HDC \
+                 identity; nothing was started"
+                    .into(),
+            );
+        }
+        let Some(configured) = variable("ARKDECK_HDC_PATH") else {
+            return Ok(None);
+        };
+        let configured = std::path::PathBuf::from(configured);
+        if !configured.is_absolute() {
+            return Err("ARKDECK_HDC_PATH must be an explicit absolute path".into());
+        }
+        Ok(Some(Self {
+            configured,
+            server_port: variable(arkdeck_provider_hdc::SERVER_PORT_VARIABLE),
+        }))
+    }
+}
+
+/// The published identity a Windows HDC digest has against `tuples`: the
+/// registered tuple's reported version, naming no profile, as
+/// `bootstrap_readers::windows_hdc_identity` answers it for the registry.
+fn tuple_identities(
+    tuples: &'static [arkdeck_provider_hdc::WindowsHdcTuple],
+) -> arkdeck_hoststore::PublishedIdentities {
+    std::sync::Arc::new(move |sha256: &str| {
+        arkdeck_provider_hdc::tuple_in(tuples, sha256).map(
+            |tuple| serde_json::json!({"version": tuple.reported_version, "profileReferences": []}),
+        )
+    })
+}
+
+/// The account's Bootstrap selection, admitted: the selected registered
+/// tool, the tuple its digest names and the endpoint its managed server
+/// starts on.
+struct SelectedHdc {
+    selection: arkdeck_hoststore::StartupSelection,
+    tuple: &'static arkdeck_provider_hdc::WindowsHdcTuple,
+    endpoint: arkdeck_provider_hdc::EndpointSelection,
+}
+
 /// What a daemon owning a state root holds while it serves.
 pub(crate) struct Authority {
     pub(crate) endpoint: LocalEndpoint,
@@ -123,6 +196,11 @@ pub(crate) struct Authority {
     /// the account's root, until the Windows tool-selection owner selects
     /// one there, and for a development root that names none.
     hdc: Option<Box<crate::windows_hdc_gate::AdmittedHdc>>,
+    /// The account daemon's HDC inputs (never a development root's).
+    account_hdc: Option<Box<AccountHdc>>,
+    /// The registered Windows HDC tuples a selection is admitted by
+    /// (`WINDOWS_HDC_TUPLES`; a test names its own).
+    tuples: &'static [arkdeck_provider_hdc::WindowsHdcTuple],
     // Dropped in this order: the owner lock, then the guard, then the root's
     // pinned directories.
     owner: OwnerLock,
@@ -338,7 +416,15 @@ impl Authority {
         let host = host
             .with_agent_executions(agents)
             .with_human_actions(humans);
-        let host = host.with_control_actions(self.control_actions()?);
+        // The Bootstrap registry the account's HDC selection is read from,
+        // and the selection, admitted and any pending pre-launch boundary
+        // settled, before anything is launched.
+        let bootstrap = self.bootstrap_root()?;
+        let selected = match &self.account_hdc {
+            Some(account) if !self.development => Some(self.selected_hdc(account, &bootstrap)?),
+            _ => None,
+        };
+        let controls = self.control_actions(selected.is_some(), &bootstrap)?;
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(
@@ -357,7 +443,6 @@ impl Authority {
         // A development root composes no signing credential owner, as the
         // macOS isolated owner composes none: a preset that pins a credential
         // is refused there.
-        let bootstrap = self.bootstrap_root()?;
         let toolchains = crate::host::toolchain_pinning(&bootstrap).map_err(|error| {
             format!(
                 "the Bootstrap registry {} is unusable: {error}; nothing was started",
@@ -432,10 +517,23 @@ impl Authority {
                 bootstrap.display()
             )
         })?;
-        // The managed server, the first thing this composition launches.
-        let (host, managed) = match &self.hdc {
-            Some(hdc) => {
+        // The managed server, the first thing this composition launches: a
+        // development root's admitted HDC, or the account's selected one,
+        // started and its pending selection settled as Swift's startup
+        // transaction settles it (`tool_selection_startup`).
+        let (launched, sha256) = match (&self.hdc, &selected) {
+            (Some(hdc), _) => {
                 let (dispatch, launched) = launch_managed(hdc)?;
+                (Some((dispatch, launched)), Some(hdc.sha256.clone()))
+            }
+            (None, Some(selected)) => {
+                let (dispatch, launched, sha256) = self.launch_selected(selected, &bootstrap)?;
+                (Some((dispatch, launched)), Some(sha256))
+            }
+            (None, None) => (None, None),
+        };
+        let (host, managed) = match launched {
+            Some((dispatch, launched)) => {
                 let server = std::sync::Arc::clone(launched.server());
                 server.monitor_foreground_exit().map_err(|error| {
                     format!("the managed HDC server cannot be watched: {error}")
@@ -447,6 +545,7 @@ impl Authority {
             }
             None => (host, None),
         };
+        let host = host.with_control_actions(controls);
         // A registered HDC is composed only as this root's managed server.
         let (registered, managed_server) = (managed.is_some(), managed.is_some());
         let host = match relation_source(registered, managed_server, false) {
@@ -454,21 +553,31 @@ impl Authority {
                 .with_usb_registry_relations(arkdeck_provider_hdc::UsbRegistryRelations::system()),
             RelationSource::File | RelationSource::Nothing => host,
         };
-        match &self.hdc {
-            Some(hdc) if managed.is_some() => report(&format!(
+        match (&self.hdc, &selected) {
+            (Some(hdc), _) if managed.is_some() => report(&format!(
                 "arkdeck-agentd composes the registered Windows HDC {} (SHA-256 {}) as its \
                  managed server on {}",
                 hdc.tuple.candidate, hdc.sha256, hdc.selection.endpoint
             )),
-            _ => report(
+            (None, Some(selected)) if managed.is_some() => report(&format!(
+                "arkdeck-agentd composes the selected registered Windows HDC {} ({}, SHA-256 {}) \
+                 as its managed server on {}",
+                selected.tuple.candidate,
+                selected.selection.tool_ref,
+                sha256.as_deref().unwrap_or_default(),
+                selected.endpoint.endpoint
+            )),
+            _ if self.development => report(
                 "arkdeck-agentd composes no HDC: no registered Windows HDC is selected for this \
                  root; device observation and target adoption are refused before any dispatch",
             ),
+            _ => report(
+                "arkdeck-agentd composes no HDC: no executable is configured (set \
+                 ARKDECK_HDC_PATH); device observation and target adoption are refused before \
+                 any dispatch",
+            ),
         }
-        let hdc_sha256 = managed
-            .is_some()
-            .then(|| self.hdc.as_ref().map(|hdc| hdc.sha256.as_str()))
-            .flatten();
+        let hdc_sha256 = managed.is_some().then_some(sha256.as_deref()).flatten();
         let (host, composed) = self.compose_arkforge(host, hdc_sha256);
         report(&format!(
             "arkdeck-agentd owners: {}",
@@ -562,15 +671,22 @@ impl Authority {
     /// `control-action-snapshots`, the name both macOS compositions give it:
     /// `control-action.list`, `.show` and `.reconcile` page and look up its
     /// actions, and `runtime.hdc.impact-preview` and `runtime.hdc.restart`
-    /// are answered through it. It is over no tool-selection owner (the
-    /// Bootstrap selection is macOS-only), and over the HDC control-action
-    /// owner (`HdcControlActions`, in `hdc-control-actions`) only beside the
+    /// are answered through it. It is over the HDC control-action owner
+    /// (`HdcControlActions`, in `hdc-control-actions`) only beside the
     /// managed server a registered HDC tuple admits, as the macOS isolated
-    /// owner composes it only beside its own; both directories are created
-    /// before that server is launched. Without that server the union owner
-    /// pages no HDC action, and an impact preview or restart is refused as
-    /// Swift's daemon refuses it with no HDC host.
-    fn control_actions(&self) -> Result<arkdeck_hoststore::ControlActionResources, String> {
+    /// owner composes it only beside its own, and over the tool-selection
+    /// owner (`ToolSelectionActions`, in `tool-selection-control-actions`,
+    /// over the Bootstrap registry `bootstrap`) only beside the account's
+    /// selected one (`selected`), as macOS production composes it; every
+    /// directory is created before that server is launched. Without a managed
+    /// server the union owner pages no action, and an impact preview, a
+    /// restart or a tool selection is refused as Swift's daemon refuses it
+    /// with no HDC host.
+    fn control_actions(
+        &self,
+        selected: bool,
+        bootstrap: &Path,
+    ) -> Result<arkdeck_hoststore::ControlActionResources, String> {
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(
                 "the control-action store {} is unusable: {error}; nothing was started",
@@ -585,7 +701,7 @@ impl Authority {
         let path = child("control-action-snapshots")?;
         let resources = arkdeck_hoststore::ControlActionResources::open(&path)
             .map_err(|error| unusable(&path, &error))?;
-        if self.hdc.is_none() {
+        if self.hdc.is_none() && !selected {
             return Ok(resources);
         }
         let path = child("hdc-control-actions")?;
@@ -593,7 +709,166 @@ impl Authority {
             .map_err(|error| unusable(&path, &error.message))?;
         let actions = arkdeck_hoststore::HdcControlActions::open(&path, context)
             .map_err(|error| unusable(&path, &error))?;
-        Ok(resources.with_hdc(actions))
+        let resources = resources.with_hdc(actions);
+        if !selected {
+            return Ok(resources);
+        }
+        let path = child(TOOL_SELECTION_ACTIONS)?;
+        let context = arkdeck_hoststore::OwnerContext::production()
+            .map_err(|error| unusable(&path, &error.message))?;
+        let actions = arkdeck_hoststore::ToolSelectionActions::open(
+            &path,
+            context,
+            Box::new(self.tool_registry(bootstrap)?),
+        )
+        .map_err(|error| unusable(&path, &error))?;
+        Ok(resources.with_tools(actions))
+    }
+
+    /// The account's Bootstrap tool registry, identifying an HDC only by a
+    /// registered Windows tuple ([`Self::tuples`]).
+    fn tool_registry(
+        &self,
+        bootstrap: &Path,
+    ) -> Result<arkdeck_hoststore::ToolRegistryStore, String> {
+        arkdeck_hoststore::ToolRegistryStore::open_existing(bootstrap)
+            .map(|store| store.with_published_identities(tuple_identities(self.tuples)))
+            .map_err(|error| {
+                format!(
+                    "the Bootstrap registry {} is unusable: {error}; nothing was started",
+                    bootstrap.display()
+                )
+            })
+    }
+
+    /// Swift's production HDC (`production::registered_hdc`) on Windows:
+    /// while the account's Bootstrap registry holds no selection, the
+    /// configured file is adopted as its first (registered only when a
+    /// registered Windows tuple names its digest); the registry's startup
+    /// selection is the executable the managed server runs. It is admitted
+    /// again by the tuple table, and its endpoint must be the tuple's. A
+    /// pending selection that never entered its launch window is settled
+    /// failed, and the prior active tool is started instead
+    /// (`tool_selection_startup::recover_prelaunch`). Nothing is launched
+    /// here.
+    fn selected_hdc(&self, account: &AccountHdc, bootstrap: &Path) -> Result<SelectedHdc, String> {
+        let registry = self.tool_registry(bootstrap)?;
+        let selection = crate::tool_selection_startup::registered_hdc(
+            &registry,
+            &account.configured,
+            &crate::host::utc_now(),
+        )?;
+        let selection = if selection.pending_action_id.is_some() {
+            let records = self.tool_selection_records()?;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .ok()
+                .and_then(|elapsed| u64::try_from(elapsed.as_millis()).ok())
+                .ok_or("tool-selection startup time is unavailable")?;
+            crate::tool_selection_startup::recover_prelaunch(&registry, &records, selection, now)?
+        } else {
+            selection
+        };
+        let tuple = arkdeck_provider_hdc::tuple_in(self.tuples, &selection.executable_sha256)
+            .ok_or_else(|| {
+                format!(
+                    "the selected HDC {} (SHA-256 {}) is not a registered Windows HDC: \
+                     OPENHARMONY-HDC-WINDOWS-PROBES (CHG-2026-078) registers no tuple with that \
+                     digest; nothing was started",
+                    selection.tool_ref, selection.executable_sha256
+                )
+            })?;
+        let endpoint = crate::windows_hdc_gate::tuple_endpoint(tuple, account.server_port.clone())?;
+        Ok(SelectedHdc {
+            selection,
+            tuple,
+            endpoint,
+        })
+    }
+
+    /// The tool-selection owner's durable records, `records` in its private
+    /// `tool-selection-control-actions`, created owner-only when absent.
+    fn tool_selection_records(&self) -> Result<arkdeck_hoststore::ToolSelectionRecords, String> {
+        let unusable = |path: &Path, error: std::io::Error| {
+            format!(
+                "the tool-selection store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let path = self
+            .root
+            .private_child(TOOL_SELECTION_ACTIONS)
+            .map_err(|error| unusable(&self.root.path().join(TOOL_SELECTION_ACTIONS), error))?;
+        let records = path.join("records");
+        arkdeck_platform::HostDirectory::open(&path)
+            .and_then(|directory| directory.private_child("records"))
+            .and_then(|_| arkdeck_hoststore::ToolSelectionRecords::open(&records))
+            .map_err(|error| unusable(&records, error))
+    }
+
+    /// The account's selected HDC started as its managed server through
+    /// Swift's startup transaction (`tool_selection_startup::start_and_settle`):
+    /// a pending selection is published once its server is ready, or failed
+    /// and the prior active tool started instead; every tool it starts is a
+    /// registered tuple's on that tuple's endpoint. Answers the process
+    /// dispatch every HDC plan takes to it, the launch, and the digest of the
+    /// tool that runs.
+    fn launch_selected(
+        &self,
+        selected: &SelectedHdc,
+        bootstrap: &Path,
+    ) -> Result<
+        (
+            arkdeck_provider_hdc::ProcessDispatch,
+            crate::managed_hdc::Launched,
+            String,
+        ),
+        String,
+    > {
+        let registry = self.tool_registry(bootstrap)?;
+        let tuples = self.tuples;
+        let endpoint = selected.endpoint;
+        let (launched, selection) = crate::tool_selection_startup::start_and_settle(
+            &registry,
+            selected.selection.clone(),
+            |selection| {
+                if arkdeck_provider_hdc::tuple_in(tuples, &selection.executable_sha256).is_none() {
+                    return Err(format!(
+                        "the selected HDC {} is not a registered Windows HDC; nothing was started",
+                        selection.tool_ref
+                    ));
+                }
+                let tool = arkdeck_platform::VerifiedTool::open(
+                    &selection.executable,
+                    &selection.executable_sha256,
+                )
+                .map_err(|error| error.to_string())?;
+                crate::managed_hdc::ManagedHdc::start(
+                    &tool,
+                    &selection.executable.to_string_lossy(),
+                    endpoint,
+                )
+                .map(crate::managed_hdc::Launched::new)
+            },
+        )?;
+        let dispatch = arkdeck_platform::VerifiedTool::open(
+            &selection.executable,
+            &selection.executable_sha256,
+        )
+        .map_err(|error| {
+            format!(
+                "the selected HDC {} cannot be pinned: {error}; nothing was started",
+                selection.executable.display()
+            )
+        })?;
+        Ok((
+            arkdeck_provider_hdc::ProcessDispatch::new(
+                dispatch,
+                Some(&endpoint.endpoint.port().to_string()),
+            ),
+            launched,
+            selection.executable_sha256,
+        ))
     }
 
     /// The Job store owner over its private child of the root (created
@@ -943,6 +1218,19 @@ impl Authority {
         Ok(sessions)
     }
 
+    /// The registered tuples this authority admits a selected HDC by,
+    /// replaced: a test build's injected fixture tuple (the signed test
+    /// daemon's), never a production input.
+    #[cfg(all(windows, test))]
+    #[allow(dead_code)]
+    pub(crate) fn with_tuples(
+        mut self,
+        tuples: &'static [arkdeck_provider_hdc::WindowsHdcTuple],
+    ) -> Self {
+        self.tuples = tuples;
+        self
+    }
+
     /// After a complete drain: the owner lock, then the guard, on the thread
     /// that took the guard.
     pub(crate) fn release(self) {
@@ -1062,6 +1350,12 @@ pub(crate) fn start(
         }
         None => None,
     };
+    // The account's HDC is the Bootstrap registry's selection, configured by
+    // `ARKDECK_HDC_PATH` as on macOS; its inputs are decided here too.
+    let account_hdc = match development {
+        Some(_) => None,
+        None => AccountHdc::from(variable)?.map(Box::new),
+    };
     let root = match development {
         Some(root) => StateRoot::development(Path::new(root)),
         None => StateRoot::account(),
@@ -1137,6 +1431,8 @@ pub(crate) fn start(
             endpoint: expected,
             development: development.is_some(),
             hdc: hdc.map(Box::new),
+            account_hdc,
+            tuples: arkdeck_provider_hdc::WINDOWS_HDC_TUPLES,
             owner,
             guard,
             root,
@@ -1433,6 +1729,159 @@ fn main() {
         drop(server);
         drop(launched);
         assert!(std::net::TcpStream::connect(endpoint).is_err());
+    }
+
+    #[test]
+    fn the_accounts_hdc_inputs_are_decided_before_anything_is_opened() {
+        let none = |_: &str| None::<OsString>;
+        assert_eq!(AccountHdc::from(&none), Ok(None));
+        let only_sha = |name: &str| (name == "ARKDECK_HDC_SHA256").then(|| OsString::from("a"));
+        assert!(
+            matches!(AccountHdc::from(&only_sha), Err(message) if message.starts_with("ARKDECK_HDC_SHA256"))
+        );
+        let relative = |name: &str| (name == "ARKDECK_HDC_PATH").then(|| OsString::from("hdc.exe"));
+        assert_eq!(
+            AccountHdc::from(&relative),
+            Err("ARKDECK_HDC_PATH must be an explicit absolute path".into())
+        );
+        let configured = |name: &str| match name {
+            "ARKDECK_HDC_PATH" => Some(OsString::from(r"C:\sdk\hdc.exe")),
+            "OHOS_HDC_SERVER_PORT" => Some(OsString::from("8710")),
+            _ => None,
+        };
+        assert_eq!(
+            AccountHdc::from(&configured),
+            Ok(Some(AccountHdc {
+                configured: std::path::PathBuf::from(r"C:\sdk\hdc.exe"),
+                server_port: Some(OsString::from("8710")),
+            }))
+        );
+    }
+
+    /// The account's HDC as macOS production composes it, over a root that
+    /// stands in for the account's directories: the configured file is
+    /// adopted as the Bootstrap registry's first selection only when a
+    /// registered tuple names it (here a table naming the stand-in's digest,
+    /// as the gate's tests inject one); the registry's retained copy, never
+    /// the configured file, is started as the managed server on the tuple's
+    /// endpoint; the tool-selection owner is composed beside it and answers
+    /// `runtime.tool.select`; a later start reads the same selection without
+    /// the configured file.
+    #[test]
+    fn the_accounts_selected_registered_hdc_is_started_beside_the_tool_selection_owner() {
+        use arkdeck_control::HostServices;
+        let stand_in = StandIn::compile();
+        let bytes = std::fs::read(stand_in.path()).unwrap();
+        let sha256: &'static str = Box::leak(arkdeck_contract::sha256_hex(&bytes).into_boxed_str());
+        let endpoint = loopback_ports::free_endpoint();
+        let table: &'static [arkdeck_provider_hdc::WindowsHdcTuple] =
+            Box::leak(Box::new([arkdeck_provider_hdc::WindowsHdcTuple {
+                candidate: "stand-in",
+                executable_sha256: sha256,
+                reported_version: "3.2.0d",
+                version_stdout: b"Ver: 3.2.0d\r\n",
+                endpoint,
+            }]));
+        let temporary = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+        let temporary = temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .map_or(temporary.clone(), std::path::PathBuf::from);
+        let directory = temporary.join(format!(
+            "arkdeck-account-hdc-{:x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        arkdeck_platform::create_private_directory(&directory).unwrap();
+        // The configured file in a private directory of this user, as an
+        // installed DevEco keeps its `hdc.exe`.
+        let sdk = directory.join("sdk");
+        arkdeck_platform::create_private_directory(&sdk).unwrap();
+        let path = sdk.join("hdc.exe");
+        std::io::Write::write_all(
+            &mut arkdeck_platform::create_private_file(&path).unwrap(),
+            &bytes,
+        )
+        .unwrap();
+        let Start::Serve(serving) = start(Some(directory.as_os_str()), None, "t", &|_| None).unwrap()
+        else {
+            panic!("the root is this test's own");
+        };
+        let mut authority = serving.authority.unwrap();
+        let port = OsString::from(endpoint.port().to_string());
+        let account = AccountHdc {
+            configured: path.clone(),
+            server_port: Some(port.clone()),
+        };
+        let bootstrap = authority.bootstrap_root().unwrap();
+        // With the registered table (DevEco's `hdc.exe` only) the stand-in
+        // is never adopted, and nothing is selected.
+        let refused = authority.selected_hdc(&account, &bootstrap).err().unwrap();
+        assert!(refused.contains("admissionDenied"), "{refused}");
+        authority.tuples = table;
+        // Another endpoint than the tuple's is refused before any launch.
+        let elsewhere = AccountHdc {
+            configured: path.clone(),
+            server_port: Some(OsString::from("1")),
+        };
+        assert!(authority.selected_hdc(&elsewhere, &bootstrap).is_err());
+        let selected = authority.selected_hdc(&account, &bootstrap).unwrap();
+        assert_eq!(selected.tuple.candidate, "stand-in");
+        assert_eq!(selected.endpoint.endpoint, endpoint);
+        assert_eq!(selected.selection.active_generation, 1);
+        assert_eq!(selected.selection.pending_action_id, None);
+        assert_eq!(selected.selection.executable_sha256, sha256);
+        assert!(selected.selection.executable.starts_with(&bootstrap));
+        assert!(selected.selection.executable.ends_with("hdc.exe"));
+        assert_ne!(selected.selection.executable, path);
+
+        let controls = authority.control_actions(true, &bootstrap).unwrap();
+        let (dispatch, launched, started) =
+            authority.launch_selected(&selected, &bootstrap).unwrap();
+        assert_eq!(started, sha256);
+        assert!(std::net::TcpStream::connect(endpoint).is_ok());
+        let server = std::sync::Arc::clone(launched.server());
+        // The impact source a selection reads: the managed server beside
+        // the Job owner and the Target store, as `compose` gives them.
+        let host = crate::host::Host::from_environment()
+            .with_jobs(authority.job_store().unwrap())
+            .with_targets(
+                arkdeck_hoststore::TargetStore::open(
+                    &authority.root.private_child("targets").unwrap(),
+                )
+                .unwrap(),
+            )
+            .with_managed_development_hdc(dispatch, std::sync::Arc::clone(&server))
+            .with_control_actions(controls);
+        // The tool-selection owner answers: the active tool is no candidate,
+        // so the action records why, and nothing is selected or launched.
+        let params = serde_json::json!({
+            "actionRequestId": "request-account-hdc",
+            "tool": selected.selection.tool_ref,
+            "expectedActiveGeneration": "1",
+        });
+        let answer = host.control_action("runtime.tool.select", params.as_object().unwrap());
+        let action = answer.unwrap();
+        assert_eq!(action["kind"], "runtimeToolSelection", "{action}");
+        assert_eq!(action["blockerReasonCode"], "tool.selectionFactsUnavailable");
+        assert_eq!(action["dispatchCount"], 0);
+        drop(host);
+        // A later start reads the durable selection, not a configured file.
+        let later = AccountHdc {
+            configured: temporary.join("absent").join("hdc.exe"),
+            server_port: Some(port),
+        };
+        assert_eq!(
+            authority.selected_hdc(&later, &bootstrap).unwrap().selection,
+            selected.selection
+        );
+        let stopped = launched.stop().unwrap();
+        assert!(stopped.server.is_ok(), "{stopped:?}");
+        drop(server);
+        drop(launched);
+        assert!(std::net::TcpStream::connect(endpoint).is_err());
+        authority.release();
+        drop(serving.listener);
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     #[test]

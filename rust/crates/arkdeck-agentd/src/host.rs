@@ -1655,7 +1655,7 @@ impl Host {
             receive_root: arkdeck_platform::foundation_temporary_directory()
                 .join("arkdeck-receive"),
             #[cfg(windows)]
-            receive_root: std::env::temp_dir().join("arkdeck-receive"),
+            receive_root: windows_receive_root(),
             #[cfg(target_os = "macos")]
             default_mutation_root: arkdeck_platform::runtime_home()
                 .map(std::path::PathBuf::from)
@@ -1756,6 +1756,29 @@ impl Host {
         slot.finish(&result);
         result
     }
+}
+
+/// Where a Windows composition's received files land: `arkdeck-receive`
+/// below the account's temporary directory (`GetTempPath2`), in its
+/// canonical, plain long spelling. `TEMP` may name it by an 8.3 short name
+/// (an account name longer than eight characters does), and a landing is
+/// inspected and published by the canonical path it resolves to, so a short
+/// spelling would leave every received file unpublishable
+/// (`artifactIntegrityFailed`). The receive argv names this path, and so does
+/// the plan digest.
+#[cfg(windows)]
+fn windows_receive_root() -> std::path::PathBuf {
+    let temporary = std::env::temp_dir();
+    let canonical = std::fs::canonicalize(&temporary)
+        .ok()
+        .map(
+            |path| match path.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+                Some(plain) => std::path::PathBuf::from(plain),
+                None => path,
+            },
+        )
+        .unwrap_or(temporary);
+    canonical.join("arkdeck-receive")
 }
 
 /// The Job runner a Windows composition runs a Job with (`job.run`, an
@@ -2286,15 +2309,10 @@ impl HostServices for Host {
                                 "interactive HDC lifecycle execution is unavailable",
                             )
                         })?;
-                        // No tool-selection owner on Windows (its Bootstrap
-                        // selection is macOS-only).
-                        #[cfg(target_os = "macos")]
                         let drivers = (
                             driver as &dyn arkdeck_hoststore::HdcLifecycleDriver,
                             Some(driver as &dyn arkdeck_hoststore::ToolSelectionDriver),
                         );
-                        #[cfg(windows)]
-                        let drivers = (driver as &dyn arkdeck_hoststore::HdcLifecycleDriver, None);
                         controls
                             .consume_with_drivers(id, reference, response, jobs, source, drivers)
                     })
@@ -2363,10 +2381,11 @@ impl HostServices for Host {
     /// isolated composition makes — over the HDC control-action owner and the
     /// impact source of its managed HDC server, when it started one — or,
     /// without it, as Swift's handler answers with no control-action owner.
-    /// Production also composes the registered tool-selection owner. On
-    /// Windows no tool-selection owner is composed (no Windows HDC can be
-    /// registered while no Windows HDC tuple is, CHG-2026-078), and the HDC
-    /// control-action owner only beside a registered tuple's managed server.
+    /// Production also composes the registered tool-selection owner, and so
+    /// does the Windows account daemon beside the managed server it starts
+    /// from its Bootstrap selection (`windows_lifecycle`); on Windows the HDC
+    /// control-action owner is composed only beside a registered tuple's
+    /// managed server.
     #[cfg(any(target_os = "macos", windows))]
     fn control_action(
         &self,

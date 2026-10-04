@@ -127,11 +127,76 @@ No contract input, Catalog, generated file or coverage changed, so no generator 
 
 ## Left out, and why
 
-- **The registered-project replay** (macOS `registered_signing_preset`: register a project,
-  pin the credential through `workspace.preset.register`, compose after a restart, sign). It
-  resolves the project's profile through the code-owned tool table, which is the GJ-5 layer
-  that wires the Windows `grep`/`sed`/`patch`/`tar`/`git`. It follows as the next layer.
-- **The CLI leaf** for signing (`WINDOWS_MEASURED_LEAVES`, a signed-CLI process test, the
-  coverage regeneration and the oracle pins). It needs that registered project in a daemon, so
-  it ships in the same next layer.
+- **The registered-project replay** and **the CLI leaf** needed the code-owned tool table. They
+  follow in layer 2, below. The leaf is measured as a refusal and stays `partial` (decision 4).
 - **A presence gate.** Decided against; see decision 1.
+
+## Layer 2: a registered signing preset, and the development root's refusal
+
+This layer stacks on the GJ-5 workspace-lanes layer, which resolves a registered OpenHarmony
+project's profile on Windows through the code-owned tools (the in-process `grep`/`sed`/`patch`
+and the trusted `tar`/`git`).
+
+| Area | macOS (unchanged) | Windows (new) |
+| --- | --- | --- |
+| `windows_workspace_sign_oracle.rs` | `registered_signing_preset` in `workspace_sign_oracle.rs` | the same two cases (signing project first and last), over the Windows root |
+| `arkdeck-cli/tests/windows_signed_runtime.rs` | — | `workspace_sign_is_unavailable_on_a_development_root`, against the dev-signed daemon |
+
+The registered-preset replay goes through these steps:
+
+1. Two projects are registered.
+2. A credential pin from the foreign project is refused as `resourceConflict` before anything
+   is written. The preset list and the ledger stay empty.
+3. `workspace.preset.register --kind signing` pins the credential in the owner's ledger.
+4. Composition without the credential owner refuses a plan with "workspace preset
+   configuration changed; restart the Runtime before submitting a Job".
+5. Composition with the owner releases the orphaned `preset-retired` pin and composes the
+   project's profile and signing preset. The stand-in stands for Node and Hvigor, which never
+   run here.
+6. The Job signs to `signed.hap` and `signing-report.json`, and leaves no attempt directory.
+7. Removing the preset releases its pin.
+8. No password appears in any file, and the results read back after the owners close.
+
+The development root's refusal:
+
+- A development root composes no signing credential owner (`windows_lifecycle.rs`
+  `signing_setup`), as the macOS development composition does not.
+- `operation list` reports `workspace.sign-openharmony-hap@1` as `unavailable` with
+  `workspace_preset_unavailable` and `workspace.presetUnavailable`.
+- `workspace preset register --kind signing` exits 69 with `operationUnavailable`, "signing
+  credential reference owner is unavailable", phase `workspacePresetOwner` and
+  `newDispatchCount` 0. The preset list stays empty.
+- `workspace sign` exits 65 with `invalidInput`, "workspace preset is not registered for this
+  project", phase `preAdmission` and `newDispatchCount` 0.
+- These answers come from the code shared with macOS (`workspace_project_document.rs`, the
+  composition's availability).
+
+### Delegated minor decision, pending the next rulings batch
+
+4. **`workspace.sign` stays Windows `partial` in the coverage.**
+   - macOS counts a direct leaf as `implemented` by its classification
+     (`feature_coverage.rs` `implementation_status`), not by a measurement. Windows counts only
+     the leaves in `WINDOWS_MEASURED_LEAVES`, each measured end to end through a signed CLI.
+   - Only an installed daemon signs, over the account's own preset root
+     (`<LocalAppData>\ArkDeck\Signing\OpenHarmony`) and the production Credential Manager
+     namespace. A development root composes none, and no test touches the account's state.
+     The lead ruled out a daemon input for this on 2026-10-04 (same spirit as rulings 26 and 51).
+   - So the leaf is measured here as a refusal and through the owner-level replays, and stays
+     `partial`. No coverage file or pin changes.
+   - Measuring it end to end later would follow #2479: a `cfg(all(windows, test))` seam on the
+     in-process signed test daemon that composes signing over a fixture preset root and the
+     `ArkDeck-fixture/…` namespace, never compiled into `arkdeck-agentd.exe`.
+
+### Layer 2 gates
+
+On the workspace-lanes head `12937add`:
+
+| Check | Result |
+| --- | --- |
+| `cargo fmt --all --check`; `PYTHONUTF8=1 sh scripts/check-sdd.sh`; `git diff --check` | exit 0; `check_sdd: 0 error(s), 0 warning(s)`; clean |
+| `cargo clippy --workspace --all-targets -- -D warnings` (Windows) | exit 0 |
+| the macOS and Linux cross-check clippy (stubbed toolchain; type and lint only) | exit 0, both |
+| `cargo test -p arkdeck-hoststore`, `-p arkdeck-cli`, `ARKDECK_DEV_SIGNER_THUMBPRINT` set | exit 0: hoststore 112 `test result: ok` (502 passed); CLI 70 (254 passed), plus the `harness = false` `windows_signed_runtime` (7 ok, among them `workspace_sign_is_unavailable_on_a_development_root`); 0 failed; no `SKIPPED` line |
+| the same with `TEMP`/`TMP` on an 8.3 short path on C: (`…\Temp\LONGTE~3`) | exit 0, the same counts |
+
+No contract input, Catalog, generated file or coverage changed, so no generator ran.

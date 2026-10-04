@@ -34,7 +34,7 @@ fn root() -> PathBuf {
 }
 
 /// A directory `rebuild` creates: owner-only (0700 on macOS).
-fn private_dir(path: &Path) {
+pub fn private_dir(path: &Path) {
     #[cfg(unix)]
     {
         fs::create_dir(path).unwrap();
@@ -378,10 +378,20 @@ impl HostLabels {
         let Ok(text) = String::from_utf8(bytes.to_vec()) else {
             return bytes.to_vec();
         };
-        text.split('"')
+        let text = text
+            .split('"')
             .map(|segment| self.swift.get(segment).map_or(segment, String::as_str))
             .collect::<Vec<_>>()
-            .join("\"")
+            .join("\"");
+        // A Runtime capability's ID is also named inside a refusal's words
+        // (`lineageBlocked("… capability <ID>-G1 use 1 …")`): each learned ID,
+        // long and derived from a plan digest, is read as Swift's there too.
+        self.swift
+            .iter()
+            .filter(|(host, _)| host.starts_with("CAP-"))
+            .fold(text, |text, (host, swift)| {
+                text.replace(host.as_str(), swift)
+            })
             .into_bytes()
     }
 

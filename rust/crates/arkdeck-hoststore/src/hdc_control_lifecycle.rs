@@ -62,6 +62,23 @@ fn launch_path_form(payload: &Value) -> bool {
     return text(payload, "inodeLaunchPath").is_some()
         && payload["inodeLaunchPath"] == payload["authorizedExecutable"];
 }
+/// An executable a lifecycle command names: an absolute path, `/`-rooted on
+/// macOS; on Windows a drive-absolute `X:\…` path too, the spelling the
+/// Windows managed server's verified tool has (`VerifiedTool`).
+fn absolute_executable(path: &str) -> bool {
+    #[cfg(windows)]
+    {
+        let bytes = path.as_bytes();
+        if bytes.len() > 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && bytes[2] == b'\\'
+        {
+            return true;
+        }
+    }
+    path.starts_with('/')
+}
 fn uuid(value: &str) -> bool {
     crate::session_cleanup_records::uuid(value)
 }
@@ -915,6 +932,37 @@ impl HdcControlActions {
                 }
                 Err(error)
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A lifecycle command names its executable by an absolute path: `/`-rooted
+    /// on macOS, and on Windows the drive-absolute path the managed server's
+    /// verified tool has; a relative path is no command anywhere.
+    #[test]
+    fn a_command_names_an_absolute_executable() {
+        let step = "00000000-0000-4000-8000-000000000001";
+        let command = |executable: &str| {
+            json!({"stepId": step, "executable": executable,
+                "argv": ["-s", "127.0.0.1:8710", "kill", "-r"], "endpoint": "127.0.0.1:8710"})
+        };
+        assert!(valid_payload("actualCommand", &command("/retained/hdc")));
+        assert_eq!(
+            valid_payload(
+                "actualCommand",
+                &command(r"C:\Bootstrap\tool-a.hdc\hdc.exe")
+            ),
+            cfg!(windows)
+        );
+        for relative in ["hdc", r"Bootstrap\hdc.exe", r"C:hdc.exe", ""] {
+            assert!(
+                !valid_payload("actualCommand", &command(relative)),
+                "{relative}"
+            );
         }
     }
 }

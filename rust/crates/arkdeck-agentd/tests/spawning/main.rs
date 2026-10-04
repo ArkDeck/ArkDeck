@@ -72,7 +72,7 @@ mod managed_hdc;
 /// as the hoststore replays' support compiles them.
 #[cfg(windows)]
 use support::oracle_fake;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[allow(dead_code)]
 #[path = "../../src/tool_selection_startup.rs"]
 mod tool_selection_startup;
@@ -108,6 +108,8 @@ mod windows_hdc_gate;
 #[path = "../../src/windows_lifecycle.rs"]
 mod windows_lifecycle;
 
+#[cfg(windows)]
+mod account_tool_selection;
 #[cfg(target_os = "macos")]
 mod app_ingress_fake_hdc;
 #[cfg(windows)]
