@@ -60,7 +60,8 @@ pub use credential::{
 };
 pub use daemon_fingerprint::trusted_daemon_fingerprint;
 pub use daemon_start::{
-    DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
+    DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, pipe_server_pid,
+    verify_daemon_image,
 };
 pub use deveco_files::{
     DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,

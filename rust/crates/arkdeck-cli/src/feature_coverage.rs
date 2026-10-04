@@ -452,6 +452,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // 2026-10-04 through the real CLI and daemon (the same process test).
     "device.candidates",
     "target.adopt",
+    // GJ-1's device leaves (TASK-XPA-005): `target observe`
+    // (`observe.device@1`) and `diagnostics capture` (`capture.diagnostics@1`)
+    // run end to end through the real signed CLI against a signed test
+    // daemon, the production Windows composition with the shared fake HDC
+    // in process and a synthetic census naming the oracle's board
+    // (`arkdeck-agentd/tests/spawning/gj1_device_leaves.rs`); each Job's calls
+    // are the Swift oracle's. A pause is kept and resumed there too.
+    "target.observe",
+    "diagnostics.capture",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset
@@ -541,6 +550,19 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.patch",
     "workspace.revert",
     "workspace.checkpoint",
+    // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
+    // state through `flash run`, and the Flash host reads over the same
+    // composition, by the real CLI against a signed copy of the daemon's test
+    // build over its control pipe, with the Swift Flash run oracle's fake lane
+    // and Rockchip host and an in-process fake HDC
+    // (`tests/spawning/flash_socket_control.rs`). No board is flashed. The
+    // shared generic leaves the same test drives (`agent run`, `job plan|
+    // submit|run`) are not counted until every operation they reach on
+    // Windows answers as Swift does (the lead's ruling of 2026-10-04 for
+    // GJ-2/3).
+    "flash.run",
+    "flash.bootloader-status",
+    "flash.prerequisites",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -1251,6 +1273,7 @@ mod tests {
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
+            // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),

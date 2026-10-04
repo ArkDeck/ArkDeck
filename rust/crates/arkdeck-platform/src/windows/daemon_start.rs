@@ -6,6 +6,8 @@
 //!
 //! * [`pipe_present`]: whether a daemon's pipe exists now, without connecting
 //!   to it or waiting for it.
+//! * [`pipe_server_pid`]: which process serves a daemon's pipe, for a start
+//!   that finds another daemon's guard held to name it.
 //! * [`StarterLock`]: a named mutex beside the daemon's own guard that
 //!   clients take in turn, so that concurrent starters launch one daemon. It
 //!   never stands in for the daemon's single-instance guard, which stays the
@@ -28,7 +30,8 @@ use std::ptr::null;
 use std::time::Duration;
 use windows_sys::Win32::Foundation::*;
 use windows_sys::Win32::Security::Authorization::SE_KERNEL_OBJECT;
-use windows_sys::Win32::System::Pipes::WaitNamedPipeW;
+use windows_sys::Win32::Storage::FileSystem::{CreateFileW, FILE_READ_ATTRIBUTES, OPEN_EXISTING};
+use windows_sys::Win32::System::Pipes::{GetNamedPipeServerProcessId, WaitNamedPipeW};
 use windows_sys::Win32::System::Threading::*;
 
 /// Checks the pinned daemon image as [`DetachedDaemon::launch`] checks it
@@ -73,6 +76,39 @@ pub fn await_pipe_instance(endpoint: &LocalEndpoint, timeout: Duration) -> io::R
     } else {
         Err(error)
     }
+}
+
+/// The process serving the pipe `endpoint` names: `None` when there is no
+/// such pipe, or every instance is busy. It opens one client instance, for
+/// attributes only, sends nothing, and closes it; the server sees a
+/// connection that ends at once.
+pub fn pipe_server_pid(endpoint: &LocalEndpoint) -> io::Result<Option<u32>> {
+    let name = endpoint_name(endpoint)?;
+    // SAFETY: a NUL-terminated local pipe name; no security attributes and
+    // no template; the handle is owned at once.
+    let raw = unsafe {
+        CreateFileW(
+            name.as_ptr(),
+            FILE_READ_ATTRIBUTES,
+            0,
+            null(),
+            OPEN_EXISTING,
+            0,
+            std::ptr::null_mut(),
+        )
+    };
+    if raw == INVALID_HANDLE_VALUE {
+        let error = io::Error::last_os_error();
+        return match error.raw_os_error().map(|code| code as u32) {
+            Some(ERROR_FILE_NOT_FOUND | ERROR_PIPE_BUSY) => Ok(None),
+            _ => Err(error),
+        };
+    }
+    let pipe = Handle::new(raw)?;
+    let mut pid = 0;
+    // SAFETY: a live client handle of the pipe and valid output storage.
+    bool_result(unsafe { GetNamedPipeServerProcessId(pipe.raw(), &mut pid) })?;
+    Ok((pid != 0).then_some(pid))
 }
 
 /// The starters' turn for one scope: held by one client thread at a time.

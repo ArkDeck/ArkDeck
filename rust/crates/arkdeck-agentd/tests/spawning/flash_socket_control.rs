@@ -16,11 +16,19 @@
 //!
 //! Each case runs in a child of this binary (`--exact … --ignored`), so the
 //! server thread it leaves ends with that child.
+//!
+//! On Windows (TASK-XPA-010) the child is a copy of this binary signed with
+//! the host-trusted development signer (`signed_daemon::signed_copy`), serving
+//! on a private named pipe, so the CLI verifies the peer's image and signer
+//! pin (`ARKDECK_DAEMON_PATH`, `ARKDECK_DAEMON_SIGNER_SHA256`) as it verifies
+//! an installed daemon. The Host's HDC is the in-process fake of
+//! `flash_execution_control`, given through the test seam.
 use crate::flash_execution_control::{Root, execution_fakes, flash_host, request};
 use arkdeck_control::Control;
 use arkdeck_platform::{LocalEndpoint, LocalListener};
 use serde_json::Value;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -31,13 +39,23 @@ use std::time::Duration;
 /// builds both, and testing this crate alone needs `cargo build -p
 /// arkdeck-cli` first.
 fn cli_path() -> PathBuf {
-    Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")).with_file_name("arkdeck")
+    Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")).with_file_name(if cfg!(windows) {
+        "arkdeck.exe"
+    } else {
+        "arkdeck"
+    })
 }
+
+/// The signer pin of the signed copy a Windows case runs in, which its CLI
+/// verifies the peer against; set only for that child.
+#[cfg(windows)]
+const PIN: &str = "ARKDECK_TEST_FLASH_SOCKET_PIN";
 
 /// A private directory short enough for a Unix socket name.
 struct SocketDirectory(PathBuf);
 
 impl SocketDirectory {
+    #[cfg(unix)]
     fn new() -> Self {
         let path = PathBuf::from(format!(
             "/private/tmp/afs-{:016x}",
@@ -48,8 +66,29 @@ impl SocketDirectory {
         Self(path)
     }
 
+    #[cfg(unix)]
     fn socket(&self) -> PathBuf {
         self.0.join("control.sock")
+    }
+
+    /// A private directory below the temporary directory, for the inputs.
+    #[cfg(windows)]
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "afs-{:016x}",
+            u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap())
+        ));
+        arkdeck_platform::HostDirectory::open_or_create_private(&path).unwrap();
+        Self(path)
+    }
+
+    /// A private ArkDeck pipe named after the directory.
+    #[cfg(windows)]
+    fn socket(&self) -> PathBuf {
+        PathBuf::from(format!(
+            r"\\.\pipe\arkdeck-test-{}",
+            self.0.file_name().unwrap().to_string_lossy()
+        ))
     }
 }
 
@@ -62,9 +101,14 @@ impl Drop for SocketDirectory {
 /// Serves `host` on `socket` with the production control transport, from a
 /// thread that ends with this process.
 fn serve(host: crate::host::Host, socket: &Path) {
-    let listener = LocalListener::bind(&LocalEndpoint::new(socket)).unwrap();
     let control = Arc::new(Control::new(host).unwrap());
+    let endpoint = LocalEndpoint::new(socket);
+    // The listener is bound on the serving thread (a Windows pipe listener
+    // stays on the thread that made it), and this returns once it is bound.
+    let (bound, ready) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
+        let listener = LocalListener::bind(&endpoint).unwrap();
+        bound.send(()).unwrap();
         let _ = arkdeck_agentd::serve_control(
             listener,
             control,
@@ -73,6 +117,7 @@ fn serve(host: crate::host::Host, socket: &Path) {
             Duration::from_secs(5),
         );
     });
+    ready.recv().unwrap();
 }
 
 /// The `arkdeck` CLI against `socket`, asked for its machine answer: its
@@ -84,17 +129,24 @@ fn cli(socket: &Path, arguments: &[&str]) -> (Option<i32>, Value) {
             command.env_remove(key);
         }
     }
-    let output = command
+    command
         .args(arguments)
-        .args(["--output", "json", "--socket"])
-        .arg(socket)
+        .args(["--output", "json"])
         // The identity the CLI names; the peer on this socket is this binary.
-        .env("ARKDECK_DAEMON_PATH", std::env::current_exe().unwrap())
-        .output()
-        .expect(
-            "the arkdeck CLI beside the daemon: run the workspace tests, or \
+        .env("ARKDECK_DAEMON_PATH", std::env::current_exe().unwrap());
+    #[cfg(unix)]
+    command.arg("--socket").arg(socket);
+    // On Windows `--socket` is macOS-only: the endpoint is named as an
+    // installation names it, with the signer pin this signed copy carries.
+    #[cfg(windows)]
+    command.env("ARKDECK_ENDPOINT", socket).env(
+        "ARKDECK_DAEMON_SIGNER_SHA256",
+        std::env::var_os(PIN).expect("the signed copy's pin"),
+    );
+    let output = command.output().expect(
+        "the arkdeck CLI beside the daemon: run the workspace tests, or \
              `cargo build -p arkdeck-cli` before testing this crate alone",
-        );
+    );
     let envelope = serde_json::from_slice(&output.stdout).unwrap_or_else(|_| {
         panic!(
             "{arguments:?}: {}\n{}",
@@ -117,6 +169,9 @@ enum Entry {
     AgentRun,
     AgentRunAlias,
     FlashRun,
+    /// `job plan`, `job submit` and `job run` of the oracle's recorded
+    /// request, the reviewed plan digest the plan named.
+    JobLeaves,
 }
 
 fn inputs_file(directory: &Path, exchange: &str) -> (PathBuf, Value) {
@@ -128,13 +183,30 @@ fn inputs_file(directory: &Path, exchange: &str) -> (PathBuf, Value) {
 
 fn run_case(entry: Entry, outcome: &str) {
     let _turn = crate::turn();
-    let output = Command::new(std::env::current_exe().unwrap())
+    #[cfg(unix)]
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    // On Windows the case runs in a signed copy of this binary, which the CLI
+    // verifies; without a development signer nothing is checked (reported).
+    #[cfg(windows)]
+    let (scratch, mut command) = {
+        let scratch = SocketDirectory::new();
+        let Some((executable, pin)) =
+            crate::signed_daemon::signed_copy(&scratch.0.join("signed-bin"))
+        else {
+            return;
+        };
+        let mut command = Command::new(executable);
+        command.env(PIN, pin);
+        (scratch, command)
+    };
+    let output = command
         .env(
             "ARKDECK_TEST_FLASH_SOCKET_ENTRY",
             match entry {
                 Entry::AgentRun => "agent",
                 Entry::AgentRunAlias => "alias",
                 Entry::FlashRun => "flash",
+                Entry::JobLeaves => "job",
             },
         )
         .env("ARKDECK_TEST_FLASH_SOCKET_OUTCOME", outcome)
@@ -152,6 +224,14 @@ fn run_case(entry: Entry, outcome: &str) {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    // The one case the child ran passed, not a filter that matched none.
+    assert!(
+        String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    #[cfg(windows)]
+    drop(scratch);
 }
 
 #[test]
@@ -180,6 +260,16 @@ fn flash_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket() {
 }
 
 #[test]
+fn job_plan_submit_and_run_flash_to_completion_over_the_control_socket() {
+    run_case(Entry::JobLeaves, "completed");
+}
+
+#[test]
+fn job_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket() {
+    run_case(Entry::JobLeaves, "unknown");
+}
+
+#[test]
 #[ignore = "subprocess fixture: invoked by the flash socket cases"]
 fn flash_socket_process_fixture() {
     let _turn = crate::turn();
@@ -187,6 +277,7 @@ fn flash_socket_process_fixture() {
         Ok("agent") => Entry::AgentRun,
         Ok("alias") => Entry::AgentRunAlias,
         Ok("flash") => Entry::FlashRun,
+        Ok("job") => Entry::JobLeaves,
         other => panic!("no entry named: {other:?}"),
     };
     let unknown = std::env::var("ARKDECK_TEST_FLASH_SOCKET_OUTCOME").as_deref() == Ok("unknown");
@@ -248,6 +339,43 @@ fn flash_socket_process_fixture() {
                 "gj4-socket-fixture",
             ],
         ),
+        Entry::JobLeaves => {
+            let mut request: Value = serde_json::from_str(&request(exchange)).unwrap();
+            let file = sockets.0.join("request.json");
+            fs::write(&file, request.to_string()).unwrap();
+            let file_argument = file.to_string_lossy().into_owned();
+            let (status, plan) = cli(&socket, &["job", "plan", "--request-file", &file_argument]);
+            assert_eq!(status, Some(0), "{plan}");
+            request["reviewedPlanDigest"] = plan["result"]["materializedPlanDigest"].clone();
+            assert!(request["reviewedPlanDigest"].is_string(), "{plan}");
+            fs::write(&file, request.to_string()).unwrap();
+            let (status, admitted) = cli(
+                &socket,
+                &["job", "submit", "--request-file", &file_argument],
+            );
+            assert_eq!(status, Some(0), "{admitted}");
+            let job_id = job_of(&admitted).unwrap_or_else(|| panic!("{admitted}"));
+            let (status, run) = cli(&socket, &["job", "run", "--job", &job_id]);
+            assert_eq!(run["ok"], true, "{run}");
+            // The Flash host reads over the same Host, through the same CLI.
+            for arguments in [
+                vec!["flash", "bootloader-status"],
+                vec![
+                    "flash",
+                    "prerequisites",
+                    "--target",
+                    &target,
+                    "--device-profile",
+                    "dayu200",
+                ],
+            ] {
+                let (status, answer) = cli(&socket, &arguments);
+                assert_eq!(status, Some(0), "{arguments:?}: {answer}");
+                assert_eq!(answer["result"]["targetId"], target.as_str(), "{answer}");
+                assert_eq!(answer["result"]["bindingRevision"], 1, "{answer}");
+            }
+            (if unknown { None } else { status }, admitted)
+        }
     };
     let calls = fakes.calls();
     let job_id = job_of(&answer).unwrap_or_else(|| panic!("{status:?} {answer}; {calls:?}"));
@@ -266,7 +394,9 @@ fn flash_socket_process_fixture() {
             "{job_status}; {answer}"
         );
         assert_eq!(job_status["result"]["outcomeUnknown"], true, "{job_status}");
-        assert_ne!(status, Some(0), "{answer}");
+        if !matches!(entry, Entry::JobLeaves) {
+            assert_ne!(status, Some(0), "{answer}");
+        }
         // The unknown intent is never replayed: another run of the same Job
         // is refused and dispatches nothing.
         let again = job(&socket, "run", &job_id);

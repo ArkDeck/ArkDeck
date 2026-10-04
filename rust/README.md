@@ -52,6 +52,16 @@ On Windows two things run there:
   For that, the test daemon alone takes three inputs: the oracle's clock, the
   replay root's own Job state as the mutation root, and the recorded code-sign
   helper's facts.
+  and the real `arkdeck.exe` drives it with the production peer check. Started
+  with a board (`SignedDaemon::start_with_board`), it also reads a synthetic
+  USB census naming one HDC-normal DAYU200 by the fixture's serial, through the
+  production census relations (`Host::with_usb_registry_relations`), so the
+  fake's device is proved the adopted Target's.
+- `gj1_device_leaves.rs` (TASK-XPA-005): GJ-1's device leaves through that
+  daemon, end to end. `target observe` pauses without the board, keeps its run
+  owner-only below the account's local application data, and resumes after a
+  restart with the board (`agent resume --resume-token`). `target observe` and
+  `diagnostics capture` complete, and each Job's calls are the Swift oracle's.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
@@ -2916,6 +2926,23 @@ composed on Windows. So a verified bundle is refused before its
 `arkforged.exe` is launched, with Swift's words. A Flash `job.plan` or
 `job.submit` is refused before admission with that reason and zero
 dispatch (`windows_flash_lane_process.rs`).
+
+Over a composed HDC (TASK-XPA-005's Job composition) a Flash runs end to end
+on Windows against fakes: the Swift Flash run oracle's fake lane and
+Rockchip host (`arkdeck-hoststore/tests/support/flash_lane.rs`) and an
+in-process fake HDC given through the test seam (`Host::with_test_hdc`).
+`tests/spawning/flash_execution_control.rs` plans, admits, runs and
+reconciles `flash.full-restore@1` through the Host and Control; an unknown
+outcome stays unknown and is never replayed. `flash_socket_control.rs` drives
+the same Flash with the real CLI (`flash run`, `agent run`, `job plan|submit|
+run`, and `flash bootloader-status|prerequisites` over the same
+composition) against a copy of the test binary signed with the development
+signer, serving on a private pipe, which the CLI verifies as it verifies an
+installed daemon. An agent execution admits its Flash through the Flash
+admission on Windows too, as on macOS (`Host::agent_execution`).
+`flash_plan_control.rs` answers a Flash `job.plan` and `job.submit` in each
+composition as Swift's daemon does, on Windows as on macOS. No board is
+flashed and no `arkforged` runs.
 
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
