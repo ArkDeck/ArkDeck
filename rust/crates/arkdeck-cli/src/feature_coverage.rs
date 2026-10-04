@@ -405,9 +405,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.cancel",
     "job.reconcile",
     // The agent execution and human-action owners over Swift's
-    // physical-assistance records (TASK-XPA-005). `agent run` and
-    // `agent resume` are measured below, over the signed test daemon's fake
-    // HDC; not `abandon` nor `human-action resume`.
+    // physical-assistance records (TASK-XPA-005). `agent run`, `resume` and
+    // `abandon` and `human-action resume` are measured below, over the
+    // signed test daemon's fake HDC.
     "agent.list",
     "agent.status",
     "human-action.list",
@@ -480,6 +480,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // the Swift human-action oracle's `connect` scenario records it
     // (`gj1_device_leaves.rs`); its client-side `--resume-token` path too.
     "agent.resume",
+    // GJ-1's human-action loop (`gj1_device_leaves.rs`, the Swift
+    // human-action oracle's `trust` and `connect` scenarios): an execution
+    // paused on the device's trust prompt abandoned under its current
+    // generation (a stale one refused), its expired action refusing either
+    // resume; a connect action resumed by `human-action resume`.
+    "agent.abandon",
+    "human-action.resume",
     // The Debug probe over the Target store and the HDC (TASK-XPA-008;
     // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
     // against the signed test daemon over the Swift oracle's answers). Not
@@ -1316,7 +1323,7 @@ mod tests {
             ("capability.install", "implemented"),
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
-            ("human-action.resume", "partial"),
+            ("human-action.resume", "implemented"),
             // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),

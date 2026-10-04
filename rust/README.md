@@ -69,6 +69,11 @@ On Windows two things run there:
   `agent resume --resume-reference` completes an agent execution paused for a
   person to connect the device, as the Swift human-action oracle's `connect`
   scenario records it: the oracle's own Job and Artifacts.
+  The oracle's `trust` scenario runs there too: `agent abandon` of an
+  execution paused on the device's trust prompt (a stale generation refused),
+  after which its expired action refuses both `agent resume` and
+  `human-action resume`; and `human-action resume` of a completed execution's
+  action answers it.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
