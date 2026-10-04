@@ -560,6 +560,20 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "flash.run",
     "flash.bootloader-status",
     "flash.prerequisites",
+    // The protected Flash recovery broker over the Flash invocation owner
+    // (TASK-XPA-010): an invocation started, its pinned full restore executed
+    // to a terminal state, shown and listed (`recovery flash-invocation …`
+    // and `debug …`), by the same CLI against the same signed test daemon. Not `flash reconcile-alias`, whose reconciler the
+    // CLI reaches but whose repair no fake lineage exercises there (the
+    // flash-host-reads oracle replays it through the Windows Host).
+    "recovery.flash-invocation.start",
+    "recovery.flash-invocation.evaluate",
+    "recovery.flash-invocation.status",
+    "recovery.flash-invocation.list",
+    // Their `debug start|evaluate|status` spellings, the same handlers.
+    "debug.start",
+    "debug.evaluate",
+    "debug.status",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the

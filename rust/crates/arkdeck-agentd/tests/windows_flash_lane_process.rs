@@ -373,7 +373,7 @@ fn assert_no_lane_daemon(pipe: &str, runtime: &Path) {
 fn assert_census(daemon: &mut Daemon) {
     let owners = daemon.line_starting("arkdeck-agentd owners: ");
     assert!(
-        owners.ends_with("traceCache, flashHostFacts, deviceAccess, loaderBinding"),
+        owners.ends_with("traceCache, flashAliasReconciler, flashInvocations, flashHostFacts, deviceAccess, loaderBinding"),
         "{owners}"
     );
 }

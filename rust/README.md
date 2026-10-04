@@ -2944,6 +2944,19 @@ admission on Windows too, as on macOS (`Host::agent_execution`).
 composition as Swift's daemon does, on Windows as on macOS. No board is
 flashed and no `arkforged` runs.
 
+The Windows daemon composes Swift's Flash invocation owner beside the Job
+state it plans in, and the post-flash alias reconciler over its Application
+Support root and the Windows USB census, as the macOS compositions do; the
+census names `flashAliasReconciler` and `flashInvocations` at their macOS
+positions. `flash_host_reads_control.rs` replays the Swift flash-host-reads
+oracle (`flash.reconcile-alias`, `debug.status`,
+`recovery.flash-invocation.list`, 61 exchanges) through the Windows Host,
+`tests/spawning/flash_broker_control.rs` executes the recovery broker's
+pinned full restore through it, and `flash_socket_control.rs` drives
+`recovery flash-invocation start|evaluate|status|list` (and the `debug`
+spellings) and `flash reconcile-alias` through the real CLI against the
+signed test daemon.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in
