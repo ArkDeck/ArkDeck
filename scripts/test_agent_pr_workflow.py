@@ -279,34 +279,17 @@ def validate_automatic_check_contract(
         "    permissions:\n      contents: read\n      pull-requests: write\n",
         "    outputs:\n      pr-number: ${{ steps.validate.outputs.pr-number }}\n",
         "          fetch-depth: 0\n",
-        "python scripts/agent_pr_identity.py",
-        '--commit-task "$HEAD_SHA"',
-        'none|TASK-*)',
-        'if [ "$TASK_ID" != "none" ]; then',
-        "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"",
-        "gh api --method GET --paginate --slurp",
-        "--pull-list \"$CANDIDATES\"",
-        "--allow-zero",
-        "--pull-request \"$PULL_REQUEST\"",
-        "--expected-head-oid \"$HEAD_SHA\"",
-        "--expected-author 'github-actions[bot]'",
-        'if [ "$VALIDATED_NUMBER" != "$PR_NUMBER" ]; then',
-        'echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"',
+        "python3 scripts/ci/agent_pr.py",
+        '--repository "$GITHUB_REPOSITORY"',
+        '--branch "$BRANCH"',
+        '--head-sha "$HEAD_SHA"',
+        '--github-output "$GITHUB_OUTPUT"',
     )
     for token in required_open:
         if token not in open_job:
             raise WorkflowContractError(f"open-pr job missing contract token: {token}")
-    task_read_index = open_job.index("--commit-task")
-    task_body_index = open_job.index("printf 'Task: %s\\n\\n'")
-    create_index = open_job.index("--body-file")
-    if not task_read_index < task_body_index < create_index:
-        raise WorkflowContractError(
-            "Agent PR must read the commit Task and write it before creating the PR"
-        )
-    if open_job.rindex("--allow-zero") > create_index:
-        raise WorkflowContractError(
-            "Agent PR may tolerate zero candidates only before creating the PR"
-        )
+    if "concurrency:\n  group: agent-pr-stacks\n  queue: max\n  cancel-in-progress: false\n" not in agent_text:
+        raise WorkflowContractError("Agent PR metadata writes must retain every pending push")
     # The PR allowed-paths guard was retired by CHG-2026-077. Its names must
     # not come back into either workflow without this contract being rewritten
     # on purpose.
@@ -1831,7 +1814,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             (
                 "retired guard script",
                 agent.replace(
-                    "python scripts/agent_pr_identity.py",
+                    "python3 scripts/ci/agent_pr.py",
                     "python scripts/check_pr_paths.py",
                 ),
                 sdd,
@@ -1852,11 +1835,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift,
             ),
             (
-                "Task line dropped",
-                agent.replace(
-                    "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"\n",
-                    "true\n",
-                ),
+                "event SHA dropped",
+                agent.replace('--head-sha "$HEAD_SHA"', '--head-sha HEAD'),
                 sdd,
                 swift,
             ),
