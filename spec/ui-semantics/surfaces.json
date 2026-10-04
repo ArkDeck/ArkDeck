@@ -36,6 +36,11 @@
       "elements": [
         { "automationId": "overview.title", "origin": "windows", "role": "text", "name": ["@app.navigation.overview"] },
         { "automationId": "overview.refresh", "origin": "windows", "role": "button", "name": ["@windows.action.refresh"] },
+        { "automationId": "overview.record.device.label", "origin": "macos", "role": "text", "name": ["@overview.record.device.label"] },
+        { "automationId": "overview.record.device.name", "origin": "macos", "role": "text", "name": ["@overview.record.device.none"] },
+        { "automationId": "overview.record.device.facts", "origin": "macos", "role": "text", "name": ["@overview.record.device.noneDetail"] },
+        { "automationId": "overview.record.remoteServer.label", "origin": "macos", "role": "text", "name": ["@overview.record.remoteServer.label"] },
+        { "automationId": "overview.record.remoteServer.state", "origin": "macos", "role": "text", "name": ["@overview.record.remoteServer.unbound"] },
         { "automationId": "overview.environment", "origin": "windows", "role": "text", "name": ["@overview.environment.title"] },
         { "automationId": "overview.doctor.overall", "origin": "windows", "role": "text", "name": [{ "format": "windows.overview.doctor.overall", "args": ["@windows.overview.doctor.overall.blocked"] }] },
         { "automationId": "overview.doctor.counts", "origin": "windows", "role": "text", "name": [{ "format": "windows.overview.doctor.counts", "args": ["2", "0", "1"] }] },
