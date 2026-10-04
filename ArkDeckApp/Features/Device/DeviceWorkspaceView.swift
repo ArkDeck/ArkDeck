@@ -125,7 +125,8 @@ struct DeviceWorkspaceView: View {
           if model.frameIsStale { staleOverlay }
           if screenFocused, model.canSendInput {
             Image(systemName: "plus.circle")
-              .font(.system(size: 24, weight: .semibold))
+              .font(WorkspaceFont.sectionTitle)
+              .imageScale(.large)
               .foregroundStyle(.white)
               .background(Circle().fill(.black.opacity(0.8)))
               .position(

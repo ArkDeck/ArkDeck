@@ -21,4 +21,4 @@ All UI captures are explicit fixtures; no device operation was executed. The fiv
 
 ## CI
 
-Pending the feature PR push. GitHub CI is the unified gate; local targeted results do not constitute maintainer approval or a published Runtime change.
+PR #2458, initial Swift CI run `37174481779`: App build passed; the design interaction lane rejected the keyboard pointer's new off-scale 24-point font. The pointer now uses `WorkspaceFont.sectionTitle` with the standard large symbol scale. The unchanged interaction assertions pass locally (83 tests, exit 0; `/private/tmp/arkdeck-macos-closeout-20261004/device-preview-ds-fixed.log`). Follow-up CI is pending this fix's push. GitHub CI is the unified gate; local targeted results do not constitute maintainer approval or a published Runtime change.
