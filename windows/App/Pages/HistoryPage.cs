@@ -131,6 +131,16 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             if (value is not null) _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
         }
 
+        // macOS "Open Diagnostics": the record's read-only context in Diagnostics (the other
+        // workspaces' hand-off is not ported yet).
+        if (DiagnosticsState.ContextOf(job) is { } context)
+        {
+            var open = Ui.Button("history.openDiagnostics", S.Text(UiStrings.HistoryActivityOpenDiagnostics), (_, _) => MainWindow.Instance.OpenDiagnostics(context));
+            ToolTipService.SetToolTip(open, S.Text(UiStrings.HistoryContextReadOnly));
+            AutomationProperties.SetHelpText(open, S.Text(UiStrings.HistoryContextReadOnly));
+            _detail.Children.Add(Ui.Row(open));
+        }
+
         Evidence(state.Evidence);
 
         _detail.Children.Add(Ui.Heading("history.detail.artifacts", S.Text(UiStrings.HistoryDetailArtifacts), AutomationHeadingLevel.Level3));

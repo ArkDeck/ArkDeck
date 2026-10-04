@@ -70,6 +70,9 @@
                 <NavigationViewItem x:Name="NavViewer" Tag="viewer" AccessKey="V" AutomationProperties.AutomationId="app.navigation.viewer">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8A1;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavDiagnostics" Tag="diagnostics" AccessKey="G" AutomationProperties.AutomationId="app.navigation.diagnostics">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE95E;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <!-- Settings as a footer item, where Windows apps keep it (the built-in item has no
                  stable AutomationId, so it stays hidden). -->
