@@ -1245,8 +1245,8 @@ mod tests {
     }
 
     /// A contract view may compile another method set than the rulings: the
-    /// manifest then covers the methods it has a ruling for, and the two
-    /// differences are problems rather than a panic.
+    /// manifest covers methods it has a ruling for. Missing published methods
+    /// and the deliberately altered pair are reported exactly, never hidden.
     #[test]
     fn another_method_set_is_covered_where_ruled_and_reported() {
         let mut methods: Vec<&str> = METHODS
@@ -1267,12 +1267,21 @@ mod tests {
             document["summary"]["bySource"]["daemon"],
             serde_json::json!(METHODS.len() - 1)
         );
-        assert_eq!(
-            problems_for(&methods),
-            [
-                "daemon method job.unruled has no coverage ruling",
-                "coverage names a daemon method the registry does not classify: job.status",
-            ]
-        );
+        let mut expected = vec![
+            "daemon method job.unruled has no coverage ruling".to_owned(),
+            "coverage names a daemon method the registry does not classify: job.status".to_owned(),
+        ];
+        for method in [
+            "diagnostic.session.status",
+            "diagnostic.session.mark",
+            "diagnostic.session.stop",
+        ] {
+            if !METHODS.contains(&method) {
+                expected.push(format!(
+                    "coverage names a daemon method the registry does not classify: {method}"
+                ));
+            }
+        }
+        assert_eq!(problems_for(&methods), expected);
     }
 }
