@@ -6,7 +6,8 @@
 //! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables, and the
 //! read, file and Trace legs' fragments) and the Debug probe oracle's
 //! (`debug-probe/hdc-answers.sh`), and the GJ-1 pointer inputs'
-//! (`pointer-input/hdc-answers.sh`) are ported here, case for case and in
+//! (`pointer-input/hdc-answers.sh`) and screen record's
+//! (`screen-sequence/hdc-answers.sh`) are ported here, case for case and in
 //! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
@@ -39,6 +40,7 @@ pub enum Answers {
     HumanAction,
     DebugProbe,
     PointerInput,
+    ScreenSequence,
 }
 
 impl Answers {
@@ -71,6 +73,7 @@ impl Answers {
             line if line.starts_with("# input.tap@1, input.long-press@1 and input.swipe@1") => {
                 Self::PointerInput
             }
+            line if line.starts_with("# capture.screen-sequence@1 answers") => Self::ScreenSequence,
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -1099,6 +1102,124 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `screen-sequence/hdc-answers.sh`: the fixture's device, the free space
+    /// under `/data/local/tmp` (`lowStorage` short of it), and a sequence's
+    /// frame directory, stills, archive, readback, receive and cleanup, kept
+    /// in the fake's `device-tmp`, by mode: a frame directory left with a
+    /// stray file (`residue`), a second still that fails (`gap`), an archive
+    /// that cannot be written (`missingArchive`) or is empty
+    /// (`emptyArchive`).
+    fn screen_sequence(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        let shell = format!("-t {KEY} shell ");
+        let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        if all == format!("{shell}df -k /data/local/tmp") {
+            let available = if mode == "lowStorage" {
+                "16"
+            } else {
+                "1047552"
+            };
+            return Answer::out(format!(
+                "Filesystem 1K-blocks Used Available Use% Mounted on\n\
+                 /dev/block/data 1048576 1024 {available} 1% /data\n"
+            ));
+        }
+        let owned =
+            |verb: &str| all.starts_with(&format!("{shell}{verb} /data/local/tmp/arkdeck-"));
+        if owned("mkdir -p") {
+            let directory = self.device(arg(6));
+            fs::create_dir_all(&directory).unwrap();
+            if mode == "residue" {
+                fs::write(directory.join(".nomedia"), b"").unwrap();
+            }
+            return Answer::exit(0);
+        }
+        if all.starts_with(&format!("{shell}snapshot_display ")) {
+            let (mut image, mut width, mut height, mut frame) = ("jpeg", "720", "1280", "");
+            let mut rest = &argv[4..];
+            while rest.len() > 1 {
+                match rest[0].as_str() {
+                    "-t" => image = &rest[1],
+                    "-w" => width = &rest[1],
+                    "-h" => height = &rest[1],
+                    "-f" => frame = &rest[1],
+                    _ => {}
+                }
+                rest = &rest[2..];
+            }
+            let name = frame.rsplit('/').next().unwrap_or_default();
+            if mode == "gap" && name == format!("0002.{image}") {
+                return Answer::failing(1, "error: snapshot display failed\n");
+            }
+            fs::write(self.device(frame), format!("{name} {width}x{height}\n")).unwrap();
+            return Answer::out(format!(
+                "file type: {image}, width: {width}, height: {height}\n"
+            ));
+        }
+        if owned("tar -c -f") {
+            let archive = self.device(arg(7));
+            match mode {
+                "missingArchive" => {
+                    return Answer::failing(
+                        1,
+                        format!("tar: {}: No space left on device\n", arg(7)),
+                    );
+                }
+                "emptyArchive" => fs::write(&archive, b"").unwrap(),
+                _ => {
+                    // `"$(device "$9")"/*`: the stills in name order, dot files
+                    // aside.
+                    let mut stills: Vec<PathBuf> = fs::read_dir(self.device(arg(9)))
+                        .map(|entries| {
+                            entries
+                                .map(|entry| entry.unwrap().path())
+                                .filter(|path| {
+                                    !path.file_name().unwrap().to_string_lossy().starts_with('.')
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    stills.sort();
+                    let mut bytes = Vec::new();
+                    for still in stills {
+                        bytes.extend(fs::read(still).unwrap());
+                    }
+                    fs::write(&archive, bytes).unwrap();
+                }
+            }
+            return Answer::exit(0);
+        }
+        if let Some(answer) = self.owned_file(&all, &shell, KEY, argv, mode) {
+            return answer;
+        }
+        if owned("rm -f") {
+            for path in &argv[5..] {
+                let _ = fs::remove_file(self.device(path));
+            }
+            return Answer::exit(0);
+        }
+        if owned("rmdir") {
+            if fs::remove_dir(self.device(arg(5))).is_err() {
+                return Answer::failing(1, format!("rmdir: {}: Directory not empty\n", arg(5)));
+            }
+            return Answer::exit(0);
+        }
+        if owned("ls -ld") {
+            let path = arg(6);
+            return Answer::out(if self.device(path).is_dir() {
+                format!("drwxrwxrwx 2 shell shell 3452 2026-09-14 00:00 {path}\n")
+            } else {
+                format!("ls: {path}: No such file or directory\n")
+            });
+        }
+        Answer::unregistered()
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -1132,6 +1253,7 @@ impl HdcDispatch for OracleFake {
             Answers::HumanAction => self.human_action(&plan.arguments, &mode),
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
             Answers::PointerInput => Self::pointer_input(&plan.arguments, &mode),
+            Answers::ScreenSequence => self.screen_sequence(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));

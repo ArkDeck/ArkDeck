@@ -483,6 +483,12 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "input.tap",
     "input.long-press",
     "input.swipe",
+    // `screen record` (`capture.screen-sequence@1`), the same way over the
+    // Swift screen-sequence oracle's fake: the frames written, archived,
+    // read back, received and removed under the Runtime's mutation
+    // authority, each Job's calls the oracle's (its owned paths named by
+    // this run's Job) (`gj1_inputs.rs`).
+    "screen.record",
     // Not `agent resume` (nor `human-action resume`), although
     // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
     // oracle's `connect` scenario: once its action resolves, a resume

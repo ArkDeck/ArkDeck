@@ -1,14 +1,15 @@
-//! GJ-1's pointer inputs end to end on Windows (TASK-XPA-005): the real
-//! signed `arkdeck.exe` sends `input tap`, `input long-press` and `input
-//! swipe` (`input.tap@1`, `input.long-press@1`, `input.swipe@1`) to the
+//! GJ-1's pointer inputs and screen record end to end on Windows
+//! (TASK-XPA-005): the real signed `arkdeck.exe` sends `input tap`, `input
+//! long-press` and `input swipe` (`input.tap@1`, `input.long-press@1`,
+//! `input.swipe@1`) and `screen record` (`capture.screen-sequence@1`) to the
 //! signed test daemon (`signed_daemon.rs`), which composes the production
 //! Windows development root with the shared fake HDC's answers in process
 //! (`oracle_fake.rs`), a synthetic USB census naming the fixture's board, the
 //! oracle's fixed clock, and its own Job state for the device mutations'
 //! continuity (`MUTATION_ROOT`).
 //!
-//! Every case the Swift pointer-input oracle recorded
-//! (`rust/tests/fixtures/pointer-input`) is sent in the oracle's order, with
+//! Every case each Swift oracle recorded (`rust/tests/fixtures/pointer-input`,
+//! `screen-sequence`) is sent in the oracle's order, with
 //! the fake in the case's mode: a Job the oracle ran ends in the oracle's
 //! state, with the oracle's step kinds, after exactly the oracle's calls of
 //! that Job (the device list reads aside, which the CLI's own observation
@@ -62,6 +63,19 @@ fn oracle_jobs(fixture: &Path) -> Vec<Vec<String>> {
     jobs
 }
 
+/// `call` with a receive's host path spelled by its file name alone: the
+/// oracle's is below its macOS root, this run's below the daemon's.
+fn received_as_named(call: &str) -> String {
+    match call.split_once(" file recv ") {
+        Some((head, rest)) => {
+            let (device, host) = rest.rsplit_once(' ').unwrap_or((rest, ""));
+            let name = host.rsplit(['/', '\\']).next().unwrap_or_default();
+            format!("{head} file recv {device} {name}")
+        }
+        None => call.to_owned(),
+    }
+}
+
 /// The Runtime's answer behind a refused leaf's envelope: its wire code and
 /// words.
 fn refusal(envelope: &Value) -> (Value, Value) {
@@ -108,6 +122,18 @@ fn replay(
         ],
     );
     let mut jobs = oracle_jobs(fixture).into_iter();
+    // Each Runtime capability this run consumed, named as the oracle's. A
+    // gesture's capability is session-scoped and named by its frame alone,
+    // so it is the oracle's; another's name covers its plan digest, which
+    // covers a receive's host path, spelled otherwise on Windows, so it is
+    // relabelled one to one (as the GJ-2/3 replays relabel, rulings 48 and
+    // 61).
+    let mut labels: Vec<(String, String)> = Vec::new();
+    let relabelled = |text: &str, labels: &[(String, String)]| {
+        labels.iter().fold(text.to_owned(), |text, (host, swift)| {
+            text.replace(host, swift)
+        })
+    };
     let inputs = scratch.join("inputs.json");
     for name in order(&cases) {
         let case = &cases["cases"][&name];
@@ -134,7 +160,7 @@ fn replay(
         let sent: Vec<String> = calls(&fake_root)[before..]
             .iter()
             .filter(|call| *call != "list targets -v")
-            .cloned()
+            .map(|call| received_as_named(call))
             .collect();
         match case["ends"].as_str() {
             // A Job the oracle ran: its end, its steps and its calls.
@@ -167,7 +193,41 @@ fn replay(
                     ends == "waitingForRecovery",
                     "{name}: {receipt}"
                 );
-                assert_eq!(sent, jobs.next().unwrap(), "{name}: the oracle's Job calls");
+                if let (Some(host), Some(swift)) = (
+                    receipt["authority"]["reference"].as_str(),
+                    evidence["result"]["authority"]["reference"].as_str(),
+                ) {
+                    match labels.iter().find(|(known, _)| known == host) {
+                        Some((_, known)) => assert_eq!(known, swift, "{name}"),
+                        None => {
+                            assert!(
+                                labels.iter().all(|(_, known)| known != swift),
+                                "{name}: {swift} is named twice"
+                            );
+                            labels.push((host.to_owned(), swift.to_owned()));
+                        }
+                    }
+                }
+                // The oracle's calls, its Job's name in them this run's.
+                let oracle_job = cases["jobs"][&name].as_str().unwrap();
+                let expected: Vec<String> = jobs
+                    .next()
+                    .unwrap()
+                    .iter()
+                    .map(|call| received_as_named(&call.replace(oracle_job, job)))
+                    .collect();
+                assert_eq!(sent, expected, "{name}: the oracle's Job calls");
+                // Its Artifacts, as many as the oracle's.
+                if let Some(listed) = exchange(&cases, &format!("{name}.artifacts")) {
+                    assert_eq!(
+                        receipt["artifacts"].as_array().unwrap().len(),
+                        listed["answer"]["result"]["items"]
+                            .as_array()
+                            .unwrap()
+                            .len(),
+                        "{name}: {receipt}"
+                    );
+                }
             }
             // A request the oracle's Runtime refused: the same refusal,
             // nothing sent.
@@ -179,11 +239,12 @@ fn replay(
                     .map(|exchange| &exchange["answer"])
                     .find(|answer| answer["ok"] == false)
                     .unwrap_or_else(|| panic!("{name}: the oracle refused nothing"));
+                let (code, message) = refusal(&envelope);
                 assert_eq!(
-                    refusal(&envelope),
+                    (code, relabelled(message.as_str().unwrap(), &labels)),
                     (
                         recorded["error"]["code"].clone(),
-                        recorded["error"]["message"].clone()
+                        recorded["error"]["message"].as_str().unwrap().to_owned()
                     ),
                     "{name}"
                 );
@@ -195,8 +256,10 @@ fn replay(
     // The standing capabilities the runs consumed: the oracle's.
     let (status, listed) = daemon.cli(&["capability", "list"]);
     assert_eq!(status, Some(0), "{listed}");
+    let listed: Value =
+        serde_json::from_str(&relabelled(&listed["result"].to_string(), &labels)).unwrap();
     assert_eq!(
-        listed["result"],
+        listed,
         exchange(&cases, "capabilities.list").unwrap()["answer"]["result"],
         "{listed}"
     );
@@ -229,4 +292,33 @@ fn pointer_inputs_answer_as_the_swift_oracle_over_the_signed_test_daemon() {
         &["input.tap@1", "input.long-press@1", "input.swipe@1"],
         "implemented",
     );
+}
+
+/// `screen record` (`capture.screen-sequence@1`) over the Swift
+/// screen-sequence oracle's fake: every case the oracle recorded, a captured,
+/// a scaled and a gapped sequence, the low-storage, empty-archive and residue
+/// failures, the missing archive's unknown outcome and the refusals after it,
+/// each with the oracle's calls (its Job's owned paths named by this run's
+/// Job) and as many Artifacts as the oracle's.
+#[test]
+fn screen_record_answers_as_the_swift_oracle_over_the_signed_test_daemon() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-screen-record");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let fixture = fixtures("screen-sequence");
+    let (daemon, _) = replay(
+        &scratch,
+        &executable,
+        &pin,
+        &fixture,
+        &|operation| match operation {
+            "capture.screen-sequence" => vec!["screen", "record"],
+            other => panic!("no screen leaf for {other}"),
+        },
+    );
+    daemon.stop();
+    let _ = std::fs::remove_dir_all(&scratch);
+    assert_windows_status(&["capture.screen-sequence@1"], "implemented");
 }
