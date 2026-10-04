@@ -386,8 +386,12 @@ arkdeck doctor --deep --require-healthy --output json --control-request-id gjw-d
 arkdeck runtime service status --output json                      # daemon image, signer or publisher
 arkdeck runtime hdc status --output json --control-request-id gjw-hdc
 arkdeck runtime tool list --output json --control-request-id gjw-tools
-arkdeck operation list --output json --control-request-id gjw-ops # catalogDigest + availability
+arkdeck runtime health --output json --control-request-id gjw-health # catalogDigest
+arkdeck operation list --output json --control-request-id gjw-ops # operations + availability
 ```
+
+The Rust `operation list` answers the operations as a bare array; the Runtime's Catalog digest is
+`runtime health`'s `catalogDigest`.
 
 Expected:
 
@@ -435,18 +439,30 @@ No person writes `REAL_DEVICE_PASS`. The Runtime produces every fact a row is ju
 - the RuntimeCapability references;
 - the Catalog digest.
 
-The agent saves the CLI's JSON for every step under `$out`. It then assembles the redacted record
-from those saved outputs only:
+The agent runs every step through `scripts/gj_record` (G9; its README has the details):
 
-- SHA-256s, IDs, counts and UTC times;
-- no connect key, serial, path or account.
+1. **Capture.** `python -m gj_record capture --out $out --step <label> -- <arkdeck.exe> <args…>`
+   runs each command. It keeps the stdout, the exit code and the order in a journal under `$out`,
+   outside the repository. The executions use the runbook's IDs (`gj1-<d>`, `gj1-<d>-har`, …).
+2. **Assemble.** `python -m gj_record assemble --out $out --date <date>
+   --runtime-source-revision <protected-main sha> --record
+   docs/design/references/v1.6-goal/gj-headless-rerun-<date>-windows.json` writes the record from
+   those outputs only:
+   - SHA-256s, IDs, counts and UTC times;
+   - no connect key, serial, path or account.
+3. **State.** `assemble` derives each Journey's `state` mechanically:
+   - `REAL_DEVICE_PASS` when every criterion of that Journey's headless runbook section holds on
+     the read values;
+   - otherwise the first failing criterion with its raw value.
 
-The `state` field is derived mechanically: `REAL_DEVICE_PASS` when every criterion of that
-Journey's headless runbook section holds on the read values and the digest equals
-`operation list`'s, and otherwise the first failing criterion with its raw value. The record is
-reviewed and merged by the maintainer. No repository script generates it yet (**gap G9**), so
-the agent applies the criteria by hand from the saved JSON and lists, per criterion, the saved
-file it read.
+   Each criterion is listed with the captured files it was read from.
+4. **Refusals.** `assemble` writes no record at all from:
+   - a development root, a plan-only or simulated Job, or another HDC;
+   - an edited output;
+   - a revision off protected `main`, or a Catalog digest other than `main`'s;
+   - a record that would carry an identifying literal.
+
+The record is reviewed and merged by the maintainer.
 
 Never:
 
@@ -694,7 +710,7 @@ Never:
 | G6 | `flash device-access`, `lane-preview`, `bind-loader` not measured through the CLI on Windows | WIN-GJ4 (risk) | TASK-XPA-010 |
 | G7 | hvigor build and test Jobs not measured on Windows; workspace mutations in flight (#2506) | WIN-GJ5 | TASK-XPA-011 |
 | G8 | Signing passwords must be known in plaintext; `--build-profile`/`migrate-deveco` unsupported | WIN-GJ5 | maintainer (material), or a ruling |
-| G9 | No generator assembles the redacted `gj-headless-rerun` record from saved CLI JSON; the agent applies the criteria by hand (§4.0.6) | none (process) | optional tooling |
+| G9 | **Closed** by `scripts/gj_record`: it assembles the redacted `gj-headless-rerun` record from the captured CLI JSON and applies each row's criteria (§4.0.6) | none | done |
 
 ### 4.7 Readiness per row (main `982d4e6d`)
 
