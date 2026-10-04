@@ -608,3 +608,80 @@ fn an_export_never_deletes_a_link_or_through_one() {
         b"{}\n"
     );
 }
+
+/// The recorded oracle's pins of `cli-feature-coverage.json` that are not
+/// `digest`, by case and path, with the number of pins seen. The Unix replay
+/// rebases those rows onto the current product (`current_bundle_case`), so
+/// it cannot notice a stale pin; this check holds them on every host.
+fn stale_feature_coverage_pins(oracle: &Value, digest: &str) -> (usize, Vec<String>) {
+    let mut pins = 0;
+    let mut stale = Vec::new();
+    for case in oracle["cases"].as_array().unwrap() {
+        for row in case["tree"].as_array().into_iter().flatten() {
+            let path = row["path"].as_str().unwrap();
+            if path == "contracts/cli-feature-coverage.json"
+                || path.ends_with("/contracts/cli-feature-coverage.json")
+            {
+                pins += 1;
+                if row["sha256"].as_str() != Some(digest) {
+                    stale.push(format!("{}: {path}", case["name"].as_str().unwrap()));
+                }
+            }
+        }
+    }
+    (pins, stale)
+}
+
+/// Every pin of the feature-coverage manifest in the maintainer-contracts
+/// oracle names the manifest this build exports (the committed one, which
+/// `the_committed_bundle_checks_clean` holds to it). A change to the manifest
+/// must re-pin the oracle in the same PR. This runs on every host, so no
+/// lane selection skips it. A contract view carries only part of the
+/// bundle, so there this waits for the checkout, as that test does.
+#[test]
+fn the_oracle_pins_the_exported_feature_coverage() {
+    if published_view() {
+        return;
+    }
+    let product = contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .unwrap();
+    let digest = arkdeck_contract::sha256_hex(&product.bytes);
+    let oracle: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/maintainer-contracts/oracle.json"
+    ))
+    .unwrap();
+    let (pins, stale) = stale_feature_coverage_pins(&oracle, &digest);
+    assert_eq!(
+        pins, 6,
+        "the oracle pins the manifest in six recorded trees"
+    );
+    assert!(
+        stale.is_empty(),
+        "stale cli-feature-coverage.json pins in \
+         rust/tests/fixtures/maintainer-contracts/oracle.json (re-pin them to {digest}): {stale:?}"
+    );
+}
+
+/// A stale pin, in any recorded tree, is named and fails the check.
+#[test]
+fn a_stale_feature_coverage_pin_is_named() {
+    let digest = "a".repeat(64);
+    let oracle = json!({"cases": [
+        {"name": "fresh", "tree": [
+            {"path": "contracts/cli-feature-coverage.json", "sha256": digest},
+            {"path": "contracts/cli-command-registry.yaml", "sha256": "b".repeat(64)}
+        ]},
+        {"name": "check", "stdout": ""},
+        {"name": "moved", "tree": [
+            {"path": "new/contracts/cli-feature-coverage.json", "sha256": "c".repeat(64)},
+            {"path": "new/contracts", "directory": true}
+        ]}
+    ]});
+    let (pins, stale) = stale_feature_coverage_pins(&oracle, &digest);
+    assert_eq!(pins, 2);
+    assert_eq!(stale, ["moved: new/contracts/cli-feature-coverage.json"]);
+    let (_, other) = stale_feature_coverage_pins(&oracle, &"c".repeat(64));
+    assert_eq!(other, ["fresh: contracts/cli-feature-coverage.json"]);
+}
