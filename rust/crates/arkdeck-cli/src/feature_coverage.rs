@@ -452,6 +452,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // 2026-10-04 through the real CLI and daemon (the same process test).
     "device.candidates",
     "target.adopt",
+    // GJ-1's device leaves (TASK-XPA-005): `target observe`
+    // (`observe.device@1`) and `diagnostics capture` (`capture.diagnostics@1`)
+    // run end to end through the real signed CLI against a signed test
+    // daemon, the production Windows composition with the shared fake HDC
+    // in process and a synthetic census naming the oracle's board
+    // (`arkdeck-agentd/tests/spawning/gj1_device_leaves.rs`); each Job's calls
+    // are the Swift oracle's. A pause is kept and resumed there too.
+    "target.observe",
+    "diagnostics.capture",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset
