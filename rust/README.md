@@ -1020,7 +1020,7 @@ owner and, where one is composed, its HDC: the HDC composition the planner,
 the admitter (with the capability authority), the runner, the reconciler,
 the cleanup-debt continuation and an agent execution's owned Job all read
 (`Host::hdc`, as on macOS), with the receive root below the account's
-temporary directory (`%TEMP%rkdeck-receive`). That HDC exists only as a
+temporary directory (`%TEMP%\arkdeck-receive`). That HDC exists only as a
 registered Windows HDC tuple's managed server (`windows_hdc_gate`,
 CHG-2026-078), and `operation.list` then asks after its tool identity as
 macOS does. Without one, `job.plan` and `job.submit` of `observe.device@1`
