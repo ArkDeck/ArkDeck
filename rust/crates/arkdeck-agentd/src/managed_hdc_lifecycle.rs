@@ -4,9 +4,11 @@
 //! a command, audit, Supervisor state or replacement process identity.
 use super::*;
 use arkdeck_contract::{WireError, canonical_json, sha256_hex};
-use arkdeck_hoststore::{
-    HdcLifecycleAudit, HdcLifecycleDriver, ImpactReading, ToolSelectionAudit, ToolSelectionDriver,
-};
+use arkdeck_hoststore::{HdcLifecycleAudit, HdcLifecycleDriver, ImpactReading};
+// The tool selection owner reads the Bootstrap tool registry's selection,
+// which only macOS composes (`arkdeck_hoststore::ToolSelectionAudit`).
+#[cfg(target_os = "macos")]
+use arkdeck_hoststore::{ToolSelectionAudit, ToolSelectionDriver};
 use arkdeck_provider_hdc::{
     LifecycleAction, LifecycleBudget, LifecycleCommand, LifecycleOutcome, PostDispatchObservation,
     PreparedLifecycle,
@@ -152,6 +154,7 @@ impl LifecycleAudit for HdcLifecycleAudit<'_> {
         HdcLifecycleAudit::append(self, kind, id, payload).map(|_| ())
     }
 }
+#[cfg(target_os = "macos")]
 impl LifecycleAudit for ToolSelectionAudit<'_> {
     fn append(&self, kind: &str, id: &str, payload: Value) -> Result<(), WireError> {
         ToolSelectionAudit::append(self, kind, id, payload)
@@ -167,6 +170,7 @@ impl HdcLifecycleDriver for ManagedHdc {
     }
 }
 
+#[cfg(target_os = "macos")]
 impl ToolSelectionDriver for ManagedHdc {
     fn restart_selected(
         &self,

@@ -812,12 +812,14 @@ pub use managed_server::ManagedServer;
 mod verified_launch;
 #[cfg(target_os = "macos")]
 pub use verified_launch::{VerifiedNamespace, VerifiedResource};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "analyzer_process.rs"]
 mod analyzer_process;
 #[cfg(target_os = "macos")]
+pub use analyzer_process::VerifiedSource;
+#[cfg(any(target_os = "macos", windows))]
 pub use analyzer_process::{
-    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource,
+    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination,
 };
 
 #[cfg(test)]

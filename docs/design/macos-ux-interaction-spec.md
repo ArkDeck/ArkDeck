@@ -18,11 +18,11 @@
 | Overview | 当前目标、SSH source、调试线、环境与来源检查；校验过的 readOnly `observe.device@1` / `capture.diagnostics@1` 可复制原始 typed inputs 和 thread 至新草稿 | 仅导航不会提交；变更操作、旧 Marker 时间、目标/binding 漂移和 unknown 禁止复用。新 Job 在目标工作区显式启动，不复制 authority/lease/Runtime Session |
 | Device detail / trust | 真实候选状态、binding/observation、重命名和重新检测、有界授权等待 | App 不执行 target.adopt；TCP/UART 添加不能画为已发布 App 功能 |
 | Flash | 导入镜像、fresh exact plan、前置条件、同页影响说明、Runtime 执行/进度/结果、细节 disclosure、Loader 激活绑定 | 不提供人工确认覆盖未知 outcome、不从成功字符串推定 postflight |
-| Debug | Artifacts / Logs / Apps / Network / Commands 五个 tab；单个已签名 app-owned `.so` 的本地/只读 SSH 来源、校验、计划、部署及 readback/rollback；HAP、bounded logs、typed 网络规则和闭集命令 | `.abc`、批量替换、SMB/WSL/目录 connector、独立设备重启、设备日志 buffer 清理及未发布 package lifecycle 保持 unavailable |
+| Debug | Artifacts / Logs / Apps / Network / Commands 五个 tab；已签名 app-owned `.so` 的本地文件、目录/已挂载 SMB、只读 SSH（含 WSL）来源和最多 16 项串行部署队列；逐项校验、计划、部署及 readback/rollback | `.abc`、App 管理 SMB 挂载、WSL 本机进程 connector、独立设备重启、设备日志 buffer 清理及未发布 package lifecycle 保持 unavailable |
 | Viewer | 空态优先；精确 target、同 Job screenshot/tree 校验；截图/树/搜索联动；属性、布局、可访问性、原始和高级 Dump 五种 inspector | Fault/Crash 与 System Diagnostic Snapshot 不是 Viewer 首版能力；设计中旧“UI Dump”导航不再适用 |
 | Trace | 两段式采集/查看入口；已验证 raw `trace.htrace` 打开独立原生 Viewer；时长单位转换与校验 | 原型不应在 unavailable 时启用开始，也不能把非法输入静默改成 10 |
 | Trace Viewer | 最近文件、筛选、搜索、Timeline、事件/范围/标注、两种停靠、加载/取消/错误与帮助；App 普通文案中英双语；通用稿已有 loaded 样本和锁定目录的 19 条快捷键 | 原始字段、进程名和许可证正文不翻译；合成 loaded 图不构成真实 trace/设备验收 |
-| Device | 按需截图、一次 typed 点击/长按/滑动、旧图拒绝输入、2–300 帧有界采集与本机 .mov 合成/校验、实测帧率/缺帧/配额状态 | 无持续预览、键盘输入、设备端编码与按秒启停录屏 |
+| Device | 按需截图、最多 60 秒／30 帧的显式预览、键盘虚拟指针与 typed 点击/长按/滑动、旧图拒绝输入、2–300 帧有界采集与本机 .mov 合成/校验、实测帧率/缺帧/配额状态 | 无设备文字／按键注入、设备端编码与按秒启停录屏 |
 | Diagnostics | History 精确来源 → Session reader → index/summary/markers 校验 → timeline/缺口/Artifact；显式读取文本/JSON；已发布 Trace 可转入独立 Viewer | 交互式 arm/append-marker/stop、会话内视频与时钟校准未接通。published bounded ringBuffered 与部分自动 Marker 已存在，不能误报为全缺失；无校准/事件时间时明确无法对齐/未记录时刻 |
 | History | 八类筛选、保存/分页、证据、参数、导出与精确来源上下文；Diagnostics 历史 Session 已加载并保留来源 | 不重放；未知 operation 不猜类型；Flash 来源目标已消失时显示缺失，不静默换设备 |
 | Settings | 独立七标签：General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics；Trace 内 Cache / Licenses | 不再内嵌完整更新设置；当前 App 诊断包不提供 device raw 勾选，敏感 Artifact 从 History 单独导出 |
@@ -225,10 +225,11 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 
 ### 5.7 Debug 工作台
 
-本节描述 2026-08-27 的当前实现。生产可用性必须读取 exact target/binding 的 Runtime facts；原型中的 demo 状态不能替代它们。更完整的来源管理、批量替换和独立重启仍是设计输入，见本节末尾，不能画成已发布能力。
+本节按 2026-10-04 的 App 实现回写。生产可用性必须读取 exact target/binding 的 Runtime facts；原型中的 demo 状态不能替代它们。目录来源与队列复用既有单库 operation，不新增设备路径或副作用准入。
 
 - 五个 tab：Artifacts / Logs / Apps / Network / Commands，Artifacts 为默认项。使用 roving focus、左右方向键及 Home / End，切换不强制焦点进入内容区。设备 scope 显式显示 target / binding；来源连接成功不代表设备已接管。
-- **Artifacts** 当前只接单个 signed app-owned `.so` 的 `deploy.native-library.app-owned@1`。来源为本地文件选择器，或已在 Settings → Servers 验证的 SSH 来源；SSH browser 只在登记 root 下 browse/read/import，允许返回上级但不能越 root。没有四 connector 管理器、checkbox 批量选择或 `.abc` 筛选。
+- **Artifacts** 每个 Job 仍是单个 signed app-owned `.so` 的 `deploy.native-library.app-owned@1`。可多选本地文件，或选择 1–4 个文件夹（含 Finder 已挂载的 SMB 共享）；递归扫描最多 500 个非隐藏条目、展示 100 个动态库，不跟随符号链接。目录结果逐项勾选加入队列。已在 Settings → Servers 验证的 SSH 来源继续在登记 root 下 browse/read/import，也用于 macOS 访问 WSL 构建产物。应用不挂载共享、不启动 WSL、不运行远端命令。
+- 队列最多 16 个不同库名，同一 exact target/binding 和 bundle。先逐项导入并生成计划，全部校验完成后展示各文件 hash、ABI、plan digest 与步骤，用户一次启动后串行提交。每个 Job 独立备份、重启 Ability、验证与补偿；队列不承诺整批原子性。任何失败、丢失回复、unknown 或不匹配回执都停止剩余提交，先前成功结果保留。选择/目标/binding/bundle 变化或离开页面使旧 review 失效；当前已提交 Job 可完成，后续项不再提交。没有自动重试或断点续投。
 - 阅读顺序为 target/binding → 来源及单文件 → bundle/library 标识 → host validation → 预览计划 → Runtime 结果。改变 target/binding/来源/标识须使旧 preparation 失效；不能拿上一目标的成功反馈继续提交。
 - 本地文件和 SSH relative path 只用于导入 Artifact lease。设备目标路径由 published operation/profile materialize，App 不允许任意 device path、raw command、SSH 命令或 PTY。SSH 密码/私钥/口令仅进入 Keychain；首次 host-key 固定与指纹漂移拒绝由来源配置负责。
 - 计划 sheet 展示精确 target/binding、bundle、逻辑库名、hash、ABI/ELF/Build ID/code-sign、effect、备份/原子发布/readback/rollback。兼容性预检与不可变备份是两层不同保护；不能用“有备份”代替兼容性证明。无 preparation 或校验失败时不得启用提交。
@@ -239,7 +240,7 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 - **Network** 使用 `port-forward.create@1` / `port-forward.remove@1`，支持 forward/reverse，端口只接受 1024…65535 的十进制字段。真实 Runtime Job 与 exact inverse/readback 补偿可见，不接受 shell fragment。
 - **Commands** 只允许 `debug.template@1` 已发布的 closed read-only template；App 提交 typed request，Runtime 创建并运行可取消的 Job，页面显示精确 Job、terminal、timeline 与可导出的 bounded Artifact。lowered argv 只在派生 report Artifact 中披露，绝不成为 UI 输入。Root、任意终端等不提供执行入口。
 
-**尚未实现的设计输入**：SMB/WSL connector、多 root/批量来源搜索与多选、`.abc` deployment、独立 device restart、设备日志 buffer 清除。保留相应需求与安全边界；只有对应 behavior/Catalog/Provider/recovery/readback 发布后才进入当前可操作稿。当前原型不画这些功能的虚假成功态，也不以删规格来消除实现缺口。
+**尚未实现的设计输入**：App 管理的 SMB 挂载与凭据、WSL 本机进程 connector、保存目录书签与跨来源全文搜索、`.abc` deployment、独立 device restart、设备日志 buffer 清除。保留相应需求与安全边界；只有对应 behavior/Catalog/Provider/recovery/readback 发布后才进入当前可操作稿。当前原型不画这些功能的虚假成功态，也不以删规格来消除实现缺口。
 
 ### 5.8 Flash
 
@@ -327,7 +328,7 @@ GJ-5 由外部 Agent 调用已发布的 `agent` / `job` / `artifact` 等面推�
 - `docs/design/references/v0.5/` 固定保存 1180×760 的简体中文与英文设备详情参考截图；原型通过显式 locale / reference state 生成，不依赖浏览器记忆状态。v0.6 Flash 先在交互原型中评审，确认后再固定同尺寸中英文参考截图并进入 SwiftUI 对齐。
 - Viewer 以 `prototype.html?page=dump` 的首次空态为默认可点击事实；点击「抓取视图」后进入与 `prototype.html?page=dump&viewerState=captured` 相同的检查器态。检查器默认选中 `Toggle #42`，可从截图与完整树双向切换节点，且下方属性、布局、无障碍和 raw 内容同步更新；水平分隔条可用指针和键盘调整。
 - Trace 以 `prototype.html?page=trace` 为实现同步稿：只保留显式设备、抓取场景、秒/分钟时长、快捷时长、「开始抓取」以及独立「打开 Trace 查看器」入口。秒快捷值为 `5s / 10s / 15s / 30s`，默认选中 `10s`；分钟快捷值为 `1 min / 2 min / 3 min`。旧自定义 tag、参数 snapshot、Artifact 状态卡不得作为后续实现输入恢复。
-- Debug 以 `prototype.html?page=debug` 为实现同步稿:五个 tab（Artifacts / Logs / Apps / Network / Commands，Artifacts 默认）使用 roving focus 与左右方向键、Home / End;每组以 section 标题加细线分组，不再逐组画有边界卡片;Runtime 可用性只在标题旁一行呈现，被阻止时才在配置之上展开 reason code。Artifacts 走查「本地文件 / 远端服务器 → 选择或浏览一个已签名 `.so` → 填写所属 Bundle 与 `lib<name>.so` → 校验并检查替换计划（plan digest 与七个 materialized step）→ 备份、替换、重启并验证 → 获取日志并验证」;远端浏览只在已验证编译根目录内列出 `lib*.so`，空态跳转「设置 › 服务器」，服务器编辑必须走查密码 / OpenSSH 私钥分支、端口与绝对路径的字段级错误聚焦，以及主机密钥固定提示。旧的本机目录 / SMB / WSL 来源浏览、按名称与类型搜索、勾选批量替换和独立设备重启不得作为后续实现输入恢复，只能以 unavailable 呈现。原型底部的 production-boundary callout 不得删除。
+- Debug 以 `prototype.html?page=debug` 为实现同步稿:五个 tab（Artifacts / Logs / Apps / Network / Commands，Artifacts 默认）使用 roving focus 与左右方向键、Home / End;每组以 section 标题加细线分组，不再逐组画有边界卡片;Runtime 可用性只在标题旁一行呈现，被阻止时才在配置之上展开 reason code。Artifacts 走查「本地文件 / 远端服务器 → 选择或浏览一个已签名 `.so` → 填写所属 Bundle 与 `lib<name>.so` → 校验并检查替换计划（plan digest 与七个 materialized step）→ 备份、替换、重启并验证 → 获取日志并验证」;远端浏览只在已验证编译根目录内列出 `lib*.so`，空态跳转「设置 › 服务器」，服务器编辑必须走查密码 / OpenSSH 私钥分支、端口与绝对路径的字段级错误聚焦，以及主机密钥固定提示。目录/已挂载 SMB 的勾选和串行部署队列按本节现行边界呈现，WSL 使用 SSH；旧的任意路径、App 挂载凭据、WSL 本机执行器和独立设备重启不作为已发布能力恢复。原型底部的 production-boundary callout 不得删除。
 - v1.3 Diagnostics 以 `prototype.html?page=diagnostics` 为可点击事实：sidebar 同时保留 Trace、Diagnostics 与 Device，切换时各自的 preset、时长、筛选、选择和运行状态不得串扰。默认打开的演示 Session 即第一版默认形态（无录屏、Marker 截图事后拍摄），另有「含录屏」与「Partial + 无法对齐」两个可切换 Session。点击 Marker 截图、可选视频帧、Trace event、HiLog marker 或 Timeline slider 都必须更新同一个时间光标并同步可用画面、`Δt` 与邻近日志；已选 event identity 不被非事件点击清空，光标离开时显示偏离标注。可返回采集页走查「开始诊断 → required channels ready（环形缓冲）→ 自动 Marker 触发 → 标记并截图（pending → +N ms）→ 停止并生成结果 → 生成新 marker-only Session」；`⌘M` 必须可用，默认屏幕录制必须关闭，Partial 横幅、无法对齐降级、截图失败原位说明、对齐 disclosure 和 production-boundary callout 不得删除。
 - v1.5 Device 以 `prototype.html?page=device-control` 走查当前实现：默认无画面、40 帧和空日志；截图后一次输入 pending → settled → stale，再点拒绝；unknown 不重发，明确失败保留图可用性。验证按帧录屏采集／合成／校验、缺帧、空间拒绝、缩短及空间不可读；「再录一段」仅重置。Trace 切换不清空 Device 状态；评审场景切换不接受旧回调。移除原 v1.3 的持续预览、键盘虚拟指针、60 秒倒计时与 MP4 路径设想。
 - 参考截图只校验导航层级、宽屏分栏、信息密度、context menu 和文案长度，不是生产 Runtime 截图，更不是硬件验收证据；截图中必须持续标明演示数据。
@@ -344,7 +345,7 @@ GJ-5 由外部 Agent 调用已发布的 `agent` / `job` / `artifact` 等面推�
 - Viewer：首次进入先显示真实空态；抓取成功后使用左侧截图 + 右侧上下检查器。树与属性之间保留紧凑的可拖动结构分隔线，不使用圆角卡片。普通截图边界默认隐藏，当前选中边界、树行与 inspector 使用同一 accent selection，并保留 ID / type 文字线索。
 - Diagnostic：参考宽屏使用“上方当前画面 + 当前时间上下文、下方全宽 Timeline”，不做三个等宽文件查看器。Trace event 是主选择身份，Marker 截图、可选视频与日志可反向移动共享光标但不伪造也不清空 event identity。默认不持续录屏；Marker 截图按拍摄时刻显示并固定标注 `+N ms`；画面 metadata 与对齐状态固定可见（第一版两态）；自动与手动 Marker 在 track 上样式区分；Timeline 用结构分隔，不把每条 Track 包成卡片。
 - Device：宽屏右侧 Inspector 整体独立滚动，包含录屏结果、操作日志和性能提示；窄窗仍为页面单一纵向滚动。长设备名与 binding 摘要截断时保留完整 help，截图按钮保持完整标签。与当前 App 相同的无二级导航布局。顶部 target / binding 与截图动作，左图右 Inspector（窄窗纵向）；空态居中，无手机壳或虚构默认截图。录屏按帧数，结果在原分组内显示，性能提示和静止画面边界常显。详见 v1.5 中英文参考图。
-- Debug：当前窗口记住选中的目标设备，返回工作区刷新时以该目标调用 probe；初始空列表和读取失败不清掉选择，换目标后的旧请求不能覆盖新目标结果。仍核对当前目标列表与历史来源，不恢复任何 Runtime authority。Artifacts 是首个且默认 tab；编译来源配置和搜索结果各自成组，避免把来源管理、文件勾选与设备执行混成一张表。来源编辑器先选 SSH / 本机目录 / SMB / WSL，再渐进披露对应连接字段；SSH 再选密码或密钥，隐藏分支不进入 tab order。替换后的重启与日志反馈原位出现，不另开 dashboard；兼容性阻止、备份确认、替换 readback、重启后验证使用不同文案和状态，不用一个绿色「成功」吞并全部阶段。
+- Debug：当前窗口记住选中的目标设备，返回工作区刷新时以该目标调用 probe；初始空列表和读取失败不清掉选择，换目标后的旧请求不能覆盖新目标结果。仍核对当前目标列表与历史来源，不恢复任何 Runtime authority。Artifacts 是首个且默认 tab；编译来源配置和搜索结果各自成组，避免把来源管理、文件勾选与设备执行混成一张表。SSH 编辑器选择密码或密钥，隐藏分支不进入 tab order；本机目录与已挂载 SMB 使用系统文件夹选择器，不提供无实现的连接字段。替换后的重启与日志反馈原位出现，不另开 dashboard；兼容性阻止、备份确认、替换 readback、重启后验证使用不同文案和状态，不用一个绿色「成功」吞并全部阶段。
 - 页面标题只在 toolbar：任何工作区的内容区都不再画与 toolbar 同名的主标题。原型此前每页一个 `<h1>` 且标题栏显示「ArkDeck — 页面名」，两者不重复；SwiftUI 的 `navigationTitle` 只显示裸页面名，内容区再画一遍就成了字面重复，违反 §3 与 §6 的「一个 detail 只有一个可感知主标题」。需要解释的页面改用一行 secondary 说明 + 页面级控件（Debug 的 scope 行即此形态）。原型已同步移除全部 `<h1>`，改由 `data-page-title` 提供标题栏文本。
 - 统一页面测量 920：Flash、设备详情与 Trace 此前各自取 760 / 920 / 1000。在 1180 参考窗口下 detail pane 约 926，920 正好填满而不留死白，在更宽的显示器上仍有界。正文段落另按约 620 收窄，Flash 的「一条平静阅读路径」不靠整页变窄来实现。
 - 容器圆角 11：与 §2 同心圆角一致，外层 container 11、内嵌 box 9、control 7。

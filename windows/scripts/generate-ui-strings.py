@@ -59,6 +59,7 @@ INPUTS = (
     "ArkDeckApp/Resources/TraceLocalizable.xcstrings",
     "ArkDeckApp/Resources/TraceViewerLocalizable.xcstrings",
     "ArkDeckApp/Resources/UIDumpLocalizable.xcstrings",
+    "ArkDeckApp/Resources/DiagnosticsLocalizable.xcstrings",
 )
 
 

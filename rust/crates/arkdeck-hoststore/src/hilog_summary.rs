@@ -13,8 +13,10 @@
 //! less one trailing carriage return, decoded as Swift decodes them (an
 //! ill-formed sequence replaced) and matched against Swift's header pattern,
 //! an `NSRegularExpression` whose ICU semantics [`header_level`] spells out.
+#[cfg(target_os = "macos")]
 use crate::session_graphemes::graphemes;
 use arkdeck_contract::sha256_hex;
+#[cfg(target_os = "macos")]
 use arkdeck_platform::{ProfilePath, ProfileReadError};
 use serde_json::{Map, Value, json};
 use std::ffi::OsString;
@@ -247,7 +249,11 @@ pub fn hilog_source(values: &[OsString]) -> Option<String> {
         return None;
     };
     let value = value.to_string_lossy().into_owned();
+    #[cfg(target_os = "macos")]
     let absolute = graphemes(&value).next() == Some("/");
+    // On Windows the one path is a local drive's absolute path (`D:\…`).
+    #[cfg(windows)]
+    let absolute = crate::session::absolute_root(&value);
     absolute.then_some(value)
 }
 
@@ -255,6 +261,7 @@ pub fn hilog_source(values: &[OsString]) -> Option<String> {
 /// Characters: an absolute path; with `inode_alias`, a `/.vol/` path of
 /// exactly four parts whose device and inode are canonical decimals (a
 /// positive inode); otherwise its non-empty components, none `.` or `..`.
+#[cfg(target_os = "macos")]
 pub fn profile_path(path: &str, inode_alias: bool) -> Result<ProfilePath, ProfileReadError> {
     let characters: Vec<&str> = graphemes(path).collect();
     if characters.first() != Some(&"/") {
@@ -490,6 +497,7 @@ mod tests {
         ));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn paths_are_read_over_characters() {
         assert_eq!(

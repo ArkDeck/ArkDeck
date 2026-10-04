@@ -16,9 +16,7 @@
 //! That line never carries the path or the bytes, where Swift's Foundation
 //! error text names the path.
 use std::ffi::OsString;
-use std::fs::File;
 use std::io::{self, Write};
-use std::os::fd::AsFd;
 
 pub(crate) const FLAG: &str = "--analyze-crash-ledger";
 const USAGE: &str = "--analyze-crash-ledger requires one absolute artifact path\n";
@@ -37,7 +35,7 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
             // Delivered, or the mode fails: written through its own handle on
             // stdout, where the standard library's would take a stdout that
             // is not open for writing as a stream to discard.
-            File::from(io::stdout().as_fd().try_clone_to_owned()?).write_all(&document)
+            crate::hilog_summary_analyzer::own_stdout()?.write_all(&document)
         });
     match answered {
         Ok(()) => 0,

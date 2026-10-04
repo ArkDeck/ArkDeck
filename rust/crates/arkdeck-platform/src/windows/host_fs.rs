@@ -903,7 +903,7 @@ pub(crate) fn canonical(path: &Path, opened: &File) -> io::Result<()> {
 /// Create `path` and every missing ancestor with the private directory
 /// descriptor (Unix `DirBuilder::new().recursive(true).mode(0o700)`).
 /// Existing levels are left as they are.
-pub(crate) fn create_private_directories(path: &Path) -> io::Result<()> {
+pub fn create_private_directories(path: &Path) -> io::Result<()> {
     use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
     use windows_sys::Win32::Storage::FileSystem::CreateDirectoryW;
     let mut missing = Vec::new();

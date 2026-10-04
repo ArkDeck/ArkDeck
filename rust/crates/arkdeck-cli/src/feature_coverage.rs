@@ -501,6 +501,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "history.filter.list",
     "history.filter.save",
     "history.filter.delete",
+    // The analyzer provider's host-only analyses (TASK-XPA-011). Not the
+    // ArkTrace analyses, which no ArkTrace distribution serves on Windows
+    // (TASK-XPA-021).
+    "analyze.crash-signature",
+    "analyze.hilog-summary",
+    // The workspace provider's source inspection (TASK-XPA-011). Not the
+    // profile-served workspace leaves: no code-owned source tool is trusted
+    // on Windows yet, so no registered project resolves to a profile.
+    "workspace.inspect",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the

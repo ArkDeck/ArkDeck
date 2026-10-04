@@ -74,7 +74,7 @@ impl AnalyzerProfiles {
     /// unavailable as `analyzer.arktraceNotFound`.
     pub fn without_arktrace(self) -> Self {
         self.with_arktrace_unavailable(
-            crate::arktrace_profile::ArkTraceProfileError::NotFound.reason(),
+            crate::arktrace_pins::ArkTraceProfileError::NotFound.reason(),
         )
     }
 
@@ -83,8 +83,8 @@ impl AnalyzerProfiles {
     /// reason.
     pub fn with_arktrace_unavailable(mut self, reason: &str) -> Self {
         for analyzer_ref in [
-            crate::arktrace_profile::SUMMARY_REF,
-            crate::arktrace_profile::ANALYSIS_REF,
+            crate::arktrace_pins::SUMMARY_REF,
+            crate::arktrace_pins::ANALYSIS_REF,
         ] {
             self.unavailable
                 .insert(analyzer_ref.to_owned(), reason.to_owned());
@@ -163,7 +163,8 @@ pub(crate) fn host_unavailable_reason(
         .map(|reason| ("provider_tool_unavailable", reason.to_owned()))
 }
 
-#[cfg(test)]
+// Unix fixtures (modes, the macOS tree snapshot).
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use crate::analyzer_operations::CRASH_SIGNATURE;
@@ -275,13 +276,13 @@ mod tests {
         .unwrap()
         .sha256;
         let mut profile = AnalyzerProfile::crash_signature(&analyzer).unwrap();
-        profile.pinned_files = vec![crate::arktrace_profile::PinnedFile {
+        profile.pinned_files = vec![crate::arktrace_pins::PinnedFile {
             path: pinned.to_str().unwrap().to_owned(),
             sha256: arkdeck_contract::sha256_hex(b"{}\n"),
             byte_count: 3,
             require_executable: false,
         }];
-        profile.pinned_trees = vec![crate::arktrace_profile::PinnedTree {
+        profile.pinned_trees = vec![crate::arktrace_pins::PinnedTree {
             path: tree_path,
             sha256: tree_digest,
         }];

@@ -30,7 +30,7 @@ use std::io;
 #[cfg(target_os = "macos")]
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use std::path::PathBuf;
 
 #[path = "debug_hap_plan.rs"]
@@ -42,7 +42,7 @@ mod flash_plan;
 mod native_library_plan;
 #[path = "screen_sequence_plan.rs"]
 mod screen_sequence_plan;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "workspace_plan.rs"]
 mod workspace_plan;
 #[cfg(any(target_os = "macos", windows))]
@@ -59,9 +59,9 @@ pub(crate) use flash_plan::{
 pub(crate) use native_library_plan::read_library;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
@@ -97,7 +97,7 @@ const MATERIALIZED: [&str; 28] = [
     "workspace.symbolize-crash@1",
 ];
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 /// Swift `AnalyzerProfile`: one analyzer a host configured, its pinned
 /// executable and the closed invocation the Runtime lowers for it. The
 /// crash-ledger analyzer is the executable a host names with
@@ -117,15 +117,15 @@ pub struct AnalyzerProfile {
     pub canonical_namespace_root: Option<String>,
     /// The files and trees held, digest-bound, while the executable runs,
     /// and measured again at every availability read.
-    pub pinned_files: Vec<crate::arktrace_profile::PinnedFile>,
-    pub pinned_trees: Vec<crate::arktrace_profile::PinnedTree>,
+    pub pinned_files: Vec<crate::arktrace_pins::PinnedFile>,
+    pub pinned_trees: Vec<crate::arktrace_pins::PinnedTree>,
     /// The reviewed ArkTrace contract of a `trace-summary@1` profile.
-    pub arktrace_summary: Option<crate::arktrace_profile::ArkTraceContract>,
+    pub arktrace_summary: Option<crate::arktrace_envelope::ArkTraceContract>,
     /// The same of a `trace-analysis@1` profile.
-    pub arktrace_analysis: Option<crate::arktrace_profile::ArkTraceContract>,
+    pub arktrace_analysis: Option<crate::arktrace_envelope::ArkTraceContract>,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
@@ -151,7 +151,32 @@ fn hashed_executable(path: &Path) -> io::Result<(PathBuf, String)> {
     Ok((executable, sha256_hex(&bytes)))
 }
 
-#[cfg(target_os = "macos")]
+/// On Windows: an explicit local absolute path, resolved to its spelling on
+/// disk, naming a PE image this caller may execute, and the SHA-256 of its
+/// bytes, measured through one handle opened without following a reparse
+/// point.
+#[cfg(windows)]
+fn hashed_executable(path: &Path) -> io::Result<(PathBuf, String)> {
+    if !path.is_absolute() {
+        return Err(invalid(
+            "provider executable path must be explicit and absolute",
+        ));
+    }
+    let executable = arkdeck_platform::host_resolved_path(path)
+        .ok_or_else(|| invalid("provider executable must be a regular executable file"))?;
+    let measure = arkdeck_platform::measure_host_file(&executable, MAXIMUM_ANALYZER_BYTES)
+        .ok()
+        .filter(|measure| measure.executable)
+        .ok_or_else(|| invalid("provider executable must be a regular executable file"))?;
+    let sha256: String = measure
+        .sha256
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    Ok((executable, sha256))
+}
+
+#[cfg(any(target_os = "macos", windows))]
 impl AnalyzerProfile {
     /// The crash-ledger profile of the executable at `path`.
     pub fn crash_signature(path: &Path) -> io::Result<Self> {
@@ -208,6 +233,7 @@ impl AnalyzerProfile {
     /// Swift `ArkTraceProfileFileReader.matches(requireExecutable: true)` at
     /// every plan: the profiled path still names these exact executable bytes,
     /// through no symbolic link, as Swift's bounded physical reader reads it.
+    #[cfg(target_os = "macos")]
     pub(crate) fn still_matches(&self) -> bool {
         self.executable_path
             .to_str()
@@ -223,6 +249,23 @@ impl AnalyzerProfile {
             })
     }
 
+    /// On Windows: the profiled path still names these exact executable
+    /// bytes, measured through no reparse point, and a PE image this caller
+    /// may execute.
+    #[cfg(windows)]
+    pub(crate) fn still_matches(&self) -> bool {
+        arkdeck_platform::measure_host_file(&self.executable_path, MAXIMUM_ANALYZER_BYTES)
+            .is_ok_and(|measure| {
+                measure.executable
+                    && measure
+                        .sha256
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect::<String>()
+                        == self.executable_sha256
+            })
+    }
+
     /// Swift `runtimeAvailability`'s identity checks: the executable and
     /// every pin still what the profile was loaded with.
     pub fn holds(&self) -> bool {
@@ -232,6 +275,7 @@ impl AnalyzerProfile {
     /// Swift `runtimeAvailability`'s pins: every pinned file still reads with
     /// its digest, length and execute bit, and every pinned tree with its
     /// digest.
+    #[cfg(target_os = "macos")]
     pub(crate) fn pins_still_match(&self) -> bool {
         self.pinned_files.iter().all(|pin| {
             crate::hilog_summary::profile_path(&pin.path, false).is_ok_and(|path| {
@@ -247,6 +291,13 @@ impl AnalyzerProfile {
             crate::hilog_summary::profile_path(&tree.path, false)
                 .is_ok_and(|path| arkdeck_platform::tree_matches(&path, &tree.path, &tree.sha256))
         })
+    }
+
+    /// On Windows no profile pins anything: only the ArkTrace profiles do,
+    /// and none loads there (TASK-XPA-021).
+    #[cfg(windows)]
+    pub(crate) fn pins_still_match(&self) -> bool {
+        self.pinned_files.is_empty() && self.pinned_trees.is_empty()
     }
 }
 
@@ -311,9 +362,7 @@ pub struct JobPlanner<'a> {
     pub artifacts: Option<&'a ArtifactReadStore>,
     pub imports: Option<&'a crate::ImportUploadStore>,
     /// The analyzers the host composed, which an analyzer operation is
-    /// planned against (none on Windows yet: their ArkTrace profiles need a
-    /// trace_streamer Windows does not have).
-    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+    /// planned against.
     pub analyzer: Option<&'a dyn crate::AnalyzerComposition>,
     pub state_root: &'a Path,
     /// The HDC composition a device-bound operation materializes against;
@@ -427,7 +476,6 @@ impl<'a> JobPlanner<'a> {
     /// first, then the host's reason, as `materializeTypedPlanBeforeAuthorization`
     /// refuses an analyzer the provider calls unavailable, before anything is
     /// admitted.
-    #[cfg(target_os = "macos")]
     pub(crate) fn unmaterialized_analyzer(
         &self,
         request: &OperationRequest,
@@ -447,16 +495,6 @@ impl<'a> JobPlanner<'a> {
                 format!("{reference} is runtime unavailable: {reason}"),
             ),
         })
-    }
-
-    /// Without an analyzer composition the host names no reason, so
-    /// nothing is refused here, as on macOS without one.
-    #[cfg(windows)]
-    pub(crate) fn unmaterialized_analyzer(
-        &self,
-        _request: &OperationRequest,
-    ) -> Option<PlanRefusal> {
-        None
     }
 
     /// The exact catalog operation a request names, when this Runtime
@@ -762,7 +800,6 @@ impl<'a> JobPlanner<'a> {
         };
         // `workspace.symbolize-crash@1` reads a crash a device capture
         // collected from another target; Swift checks that product exactly.
-        #[cfg(target_os = "macos")]
         if request.operation_id == "workspace.symbolize-crash" {
             return match crate::workspace_tests_symbolize::dump_refusal(
                 &leased.row,
@@ -786,27 +823,8 @@ impl<'a> JobPlanner<'a> {
         Ok(leased)
     }
 
-    /// Without an analyzer composition, Swift `AnalyzerProvider.runtimeAvailability`
-    /// finds no profile for the operation's analyzer (`runtime_availability`
-    /// with none): the analyzer operations are the only ones planned here.
-    #[cfg(windows)]
-    fn materialize(
-        &self,
-        _request: &OperationRequest,
-        descriptor: &CatalogOperation,
-    ) -> Result<String, PlanRefusal> {
-        Err(refusal(
-            "invalidInput",
-            format!(
-                "{} is runtime unavailable: analyzer.profileUnavailable",
-                descriptor.reference()
-            ),
-        ))
-    }
-
     /// The materialized plan document's digest, as Swift
     /// `materializeTypedPlanBeforeAuthorization` computes it.
-    #[cfg(target_os = "macos")]
     fn materialize(
         &self,
         request: &OperationRequest,
@@ -916,26 +934,6 @@ impl<'a> JobPlanner<'a> {
         });
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(sha256_hex(&bytes))
-    }
-}
-
-/// No workspace composition is built on Windows yet
-/// (`absent_owners::WorkspaceComposition`), so a workspace operation meets
-/// `workspace_plan`'s refusal without one.
-#[cfg(windows)]
-impl JobPlanner<'_> {
-    fn materialize_workspace(
-        &self,
-        _request: &OperationRequest,
-        descriptor: &CatalogOperation,
-    ) -> Result<(String, BTreeMap<String, String>), PlanRefusal> {
-        let Some(workspace) = self.workspace else {
-            return Err(refusal(
-                "invalidInput",
-                format!("provider {} is not registered", descriptor.provider),
-            ));
-        };
-        match *workspace {}
     }
 }
 

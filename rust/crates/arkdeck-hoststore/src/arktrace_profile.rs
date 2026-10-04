@@ -32,36 +32,14 @@ use std::fs::File;
 use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 
-pub const SUMMARY_REF: &str = "trace-summary@1";
-pub const ANALYSIS_REF: &str = "trace-analysis@1";
+// The profile facts every host reads, including Windows, which has no
+// ArkTrace distribution yet (TASK-XPA-021): the analyzers' names, the
+// loader's reasons and the pins a profile holds.
+pub use crate::arktrace_pins::{
+    ANALYSIS_REF, ArkTraceProfileError, PinnedFile, PinnedTree, SUMMARY_REF,
+};
 
 const MAXIMUM_PROFILE_FILE_BYTES: u64 = 128 * 1024 * 1024;
-
-/// Swift `ArkTraceSummaryProfileError`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ArkTraceProfileError {
-    NotFound,
-    DescriptorInvalid,
-    ManifestDrift,
-    ContractMismatch,
-    ToolDrift,
-    ParserDrift,
-    SelfTestFailed,
-}
-
-impl ArkTraceProfileError {
-    pub fn reason(self) -> &'static str {
-        match self {
-            Self::NotFound => "analyzer.arktraceNotFound",
-            Self::DescriptorInvalid => "analyzer.arktraceDescriptorInvalid",
-            Self::ManifestDrift => "analyzer.arktraceManifestDrift",
-            Self::ContractMismatch => "analyzer.arktraceContractMismatch",
-            Self::ToolDrift => "analyzer.arktraceToolDrift",
-            Self::ParserDrift => "analyzer.arktraceParserDrift",
-            Self::SelfTestFailed => "analyzer.arktraceSelfTestFailed",
-        }
-    }
-}
 
 /// Why a load failed: one of the loader's own reasons, or any other error
 /// (a reader or file system failure), which the daemon reports as a
@@ -101,22 +79,6 @@ use ArkTraceProfileError::{
     ContractMismatch, DescriptorInvalid, ManifestDrift, NotFound, ParserDrift, SelfTestFailed,
     ToolDrift,
 };
-
-/// Swift `AnalyzerPinnedFile`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PinnedFile {
-    pub path: String,
-    pub sha256: String,
-    pub byte_count: u64,
-    pub require_executable: bool,
-}
-
-/// Swift `AnalyzerPinnedTree`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PinnedTree {
-    pub path: String,
-    pub sha256: String,
-}
 
 pub use crate::arktrace_envelope::ArkTraceContract;
 

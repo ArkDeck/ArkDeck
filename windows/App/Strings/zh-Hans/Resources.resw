@@ -1040,7 +1040,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.preview (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_productionBoundary" xml:space="preserve">
-    <value>当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。</value>
+    <value>每个 Job 通过已发布 operation 部署一个已签名 app-owned .so；队列串行运行，失败或结果不确定时停止。仍执行 ELF、ABI、Build ID、hash、备份与读取验证。.abc 替换和独立设备重启仍不可用。</value>
     <comment>debug.artifacts.productionBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_remoteBindingFailed" xml:space="preserve">
@@ -1184,7 +1184,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.sheet.warning (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_detail" xml:space="preserve">
-    <value>从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。</value>
+    <value>从本地文件、文件夹、已挂载 SMB 共享或已验证 SSH 构建源选择已签名的 app-owned 动态库；只有所选字节进入 Artifact 导入。</value>
     <comment>debug.artifacts.source.detail (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_kind" xml:space="preserve">
@@ -1204,7 +1204,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.source.title (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_sourceBoundary" xml:space="preserve">
-    <value>SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。</value>
+    <value>文件夹访问使用文件选择器授权；SMB 共享需先在 Finder 挂载。SSH（包括 WSL）在已保存根目录内只读访问，并固定主机密钥。</value>
     <comment>debug.artifacts.sourceBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_target" xml:space="preserve">
@@ -4317,5 +4317,321 @@ SHA-256：%4$@</value>
   <data name="windows_viewer_advancedDump_noIds" xml:space="preserve">
     <value>当前采集中，此组件没有数字形式的 hostWindowId/componentId 组合</value>
     <comment>windows.viewer.advancedDump.noIds (Windows only)</comment>
+  </data>
+  <data name="app_navigation_diagnostics" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>app.navigation.diagnostics (Localizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_diagnostics" xml:space="preserve">
+    <value>打开诊断工具</value>
+    <comment>history.activity.open.diagnostics (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_readOnly" xml:space="preserve">
+    <value>这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。</value>
+    <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_unavailable" xml:space="preserve">
+    <value>诊断会话采集尚不可用</value>
+    <comment>diagnostics.capture.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_unavailable_detail" xml:space="preserve">
+    <value>交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。</value>
+    <comment>diagnostics.capture.unavailable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_calibrated" xml:space="preserve">
+    <value>已校准</value>
+    <comment>diagnostics.alignment.calibrated (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_cannotAlign" xml:space="preserve">
+    <value>无法对齐</value>
+    <comment>diagnostics.alignment.cannotAlign (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_explain" xml:space="preserve">
+    <value>标记走的是主机时间。没有校准，这里的任何东西都无法与设备记录的内容对齐。</value>
+    <comment>diagnostics.alignment.explain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_sameClock" xml:space="preserve">
+    <value>同一时钟</value>
+    <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_arm" xml:space="preserve">
+    <value>布防会话</value>
+    <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_mark" xml:space="preserve">
+    <value>打标记（⌘M）</value>
+    <comment>diagnostics.capture.mark (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_auto" xml:space="preserve">
+    <value>自动标记</value>
+    <comment>diagnostics.mark.auto (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_manual" xml:space="preserve">
+    <value>手动标记</value>
+    <comment>diagnostics.mark.manual (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_empty" xml:space="preserve">
+    <value>这次会话没有任何标记。</value>
+    <comment>diagnostics.marks.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_title" xml:space="preserve">
+    <value>标记</value>
+    <comment>diagnostics.marks.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_missing_title" xml:space="preserve">
+    <value>缺失的产物</value>
+    <comment>diagnostics.missing.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_detail" xml:space="preserve">
+    <value>这些标记种类从未被反推，所以它们的缺席不说明这次运行发生了什么。</value>
+    <comment>diagnostics.notDerived.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_title" xml:space="preserve">
+    <value>未检查的种类</value>
+    <comment>diagnostics.notDerived.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial" xml:space="preserve">
+    <value>不完整</value>
+    <comment>diagnostics.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial_detail" xml:space="preserve">
+    <value>这次会话缺少它自己声明过的产物。</value>
+    <comment>diagnostics.partial.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_driftedAway" xml:space="preserve">
+    <value>光标已离开该事件</value>
+    <comment>diagnostics.selection.driftedAway (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_timeOnly" xml:space="preserve">
+    <value>当前仅选择了时间点</value>
+    <comment>diagnostics.selection.timeOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none" xml:space="preserve">
+    <value>尚无诊断会话</value>
+    <comment>diagnostics.session.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none_detail" xml:space="preserve">
+    <value>从 History 打开 capture.diagnostics 记录，读取校验后的产物。读取已保存的采集无需连接设备。</value>
+    <comment>diagnostics.session.none.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_failed" xml:space="preserve">
+    <value>截图失败</value>
+    <comment>diagnostics.shot.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_none" xml:space="preserve">
+    <value>此处未拍摄截图</value>
+    <comment>diagnostics.shot.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_standsFor" xml:space="preserve">
+    <value>截图只代表拍摄时刻，不代表标记时刻的画面。</value>
+    <comment>diagnostics.shot.standsFor (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_takenAfter" xml:space="preserve">
+    <value>拍摄于标记之后</value>
+    <comment>diagnostics.shot.takenAfter (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar" xml:space="preserve">
+    <value>这一时刻没有可证明对应的画面</value>
+    <comment>diagnostics.shot.tooFar (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar_detail" xml:space="preserve">
+    <value>最近的一张截图距这个标记太远，不能代表它。</value>
+    <comment>diagnostics.shot.tooFar.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable" xml:space="preserve">
+    <value>此处无法判定</value>
+    <comment>diagnostics.shot.undecidable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable_detail" xml:space="preserve">
+    <value>这个标记附近确有一张截图，但它可能被拍摄的时间区间宽于容差，因此无法断定它就是这一时刻。</value>
+    <comment>diagnostics.shot.undecidable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_loading" xml:space="preserve">
+    <value>正在读取会话产物…</value>
+    <comment>diagnostics.session.loading (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_failed" xml:space="preserve">
+    <value>无法读取此会话</value>
+    <comment>diagnostics.session.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_retry" xml:space="preserve">
+    <value>重新读取</value>
+    <comment>diagnostics.session.retry (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_reload" xml:space="preserve">
+    <value>重新加载会话</value>
+    <comment>diagnostics.session.reload (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_readOnly" xml:space="preserve">
+    <value>已保存的采集 · 只读。查看不会启动新 Job。</value>
+    <comment>diagnostics.session.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_timeline" xml:space="preserve">
+    <value>Runtime 时间线</value>
+    <comment>diagnostics.session.timeline (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_covered" xml:space="preserve">
+    <value>Runtime 已在环形快照中找到覆盖锚点。</value>
+    <comment>diagnostics.ring.covered (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_lost" xml:space="preserve">
+    <value>环形快照未保留覆盖锚点，较早事件可能缺失。</value>
+    <comment>diagnostics.ring.lost (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_title" xml:space="preserve">
+    <value>会话产物</value>
+    <comment>diagnostics.artifacts.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_privacy" xml:space="preserve">
+    <value>文本预览仅留在此 App。敏感内容仅在选择后读取，不会导出或上传。</value>
+    <comment>diagnostics.artifacts.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_read" xml:space="preserve">
+    <value>在本机读取</value>
+    <comment>diagnostics.artifacts.read (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_readSensitive" xml:space="preserve">
+    <value>在本机读取敏感内容</value>
+    <comment>diagnostics.artifacts.readSensitive (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openElsewhere" xml:space="preserve">
+    <value>已发布的 Trace 可在 Trace Viewer 打开；其他文件可从 History 显式导出。不会使用 Job 时间推算截图时刻。</value>
+    <comment>diagnostics.artifacts.openElsewhere (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_clipped" xml:space="preserve">
+    <value>预览显示前 120,000 个字符。可从 History 导出产物以读取完整文件。</value>
+    <comment>diagnostics.preview.clipped (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_timeMissing" xml:space="preserve">
+    <value>未记录时刻</value>
+    <comment>diagnostics.mark.timeMissing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace" xml:space="preserve">
+    <value>在 Viewer 中打开敏感 Trace</value>
+    <comment>diagnostics.artifacts.openTrace (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace_privacy" xml:space="preserve">
+    <value>将所选 Job 的不可变 Trace 读取到本机查看器缓存，不上传。</value>
+    <comment>diagnostics.artifacts.openTrace.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_replacedInvalidUTF8" xml:space="preserve">
+    <value>部分字节不是有效 UTF-8，在此预览中显示为 �。原始 Artifact 及其 SHA-256 未改变。</value>
+    <comment>diagnostics.preview.replacedInvalidUTF8 (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_invalidStructuredText" xml:space="preserve">
+    <value>这份结构化文本不是有效 UTF-8。请在 History 中检查或导出原始 Artifact。</value>
+    <comment>diagnostics.preview.invalidStructuredText (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_title" xml:space="preserve">
+    <value>HiLog 摘要</value>
+    <comment>diagnostics.hilog.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed" xml:space="preserve">
+    <value>无法核验 HiLog 摘要</value>
+    <comment>diagnostics.hilog.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed_detail" xml:space="preserve">
+    <value>请返回 History 检查此 Job 与 Artifact；重新加载只会重读同一记录。</value>
+    <comment>diagnostics.hilog.failed.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_readOnly" xml:space="preserve">
+    <value>只读查看已保存的摘要。打开或重新加载不会再次执行分析。</value>
+    <comment>diagnostics.hilog.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_complete" xml:space="preserve">
+    <value>全部非空行的行首已识别</value>
+    <comment>diagnostics.hilog.coverage.complete (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_partial" xml:space="preserve">
+    <value>部分行首未识别</value>
+    <comment>diagnostics.hilog.coverage.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_unrecognized" xml:space="preserve">
+    <value>没有识别到行首</value>
+    <comment>diagnostics.hilog.coverage.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_empty" xml:space="preserve">
+    <value>没有非空行</value>
+    <comment>diagnostics.hilog.coverage.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_detail" xml:space="preserve">
+    <value>这些统计仅描述默认 HiLog 行首；不证明采集完整、正文编码有效、没有故障或设备健康。</value>
+    <comment>diagnostics.hilog.coverage.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_lines" xml:space="preserve">
+    <value>物理行数</value>
+    <comment>diagnostics.hilog.lines (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_D" xml:space="preserve">
+    <value>D · 调试</value>
+    <comment>diagnostics.hilog.level.D (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_I" xml:space="preserve">
+    <value>I · 信息</value>
+    <comment>diagnostics.hilog.level.I (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_W" xml:space="preserve">
+    <value>W · 警告</value>
+    <comment>diagnostics.hilog.level.W (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_E" xml:space="preserve">
+    <value>E · 错误</value>
+    <comment>diagnostics.hilog.level.E (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_F" xml:space="preserve">
+    <value>F · 致命</value>
+    <comment>diagnostics.hilog.level.F (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_unrecognized" xml:space="preserve">
+    <value>未识别行数</value>
+    <comment>diagnostics.hilog.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_blank" xml:space="preserve">
+    <value>空行数</value>
+    <comment>diagnostics.hilog.blank (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source" xml:space="preserve">
+    <value>已记录来源</value>
+    <comment>diagnostics.hilog.source (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source_detail" xml:space="preserve">
+    <value>来源 Artifact 标识与 Job 输入一致。来源哈希与大小来自分析器记录；此页面不会读取或重新核验原始日志。可从 History 导出摘要。</value>
+    <comment>diagnostics.hilog.source.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceJob" xml:space="preserve">
+    <value>来源 Job</value>
+    <comment>diagnostics.hilog.sourceJob (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceArtifact" xml:space="preserve">
+    <value>来源 Artifact</value>
+    <comment>diagnostics.hilog.sourceArtifact (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceBytes" xml:space="preserve">
+    <value>已记录来源字节数</value>
+    <comment>diagnostics.hilog.sourceBytes (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_digests" xml:space="preserve">
+    <value>查看已记录哈希</value>
+    <comment>diagnostics.hilog.digests (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceDigest" xml:space="preserve">
+    <value>已记录来源 SHA-256</value>
+    <comment>diagnostics.hilog.sourceDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_toolDigest" xml:space="preserve">
+    <value>已记录分析器 SHA-256</value>
+    <comment>diagnostics.hilog.toolDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_outputDigest" xml:space="preserve">
+    <value>分析器输出 SHA-256</value>
+    <comment>diagnostics.hilog.outputDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_artifactDigest" xml:space="preserve">
+    <value>已核验摘要 Artifact SHA-256</value>
+    <comment>diagnostics.hilog.artifactDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_diagnostics_capture_mark" xml:space="preserve">
+    <value>打标记（Ctrl+M）</value>
+    <comment>windows.diagnostics.capture.mark (Windows only)</comment>
   </data>
 </root>

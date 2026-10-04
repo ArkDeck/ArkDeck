@@ -107,8 +107,6 @@ pub(crate) fn release_in(
 /// script, SDK root and every other pinned child — once the record is
 /// verified. The resolution requires the owner's own pin at the record's
 /// current generation, so a preset can only run the toolchain it pinned.
-/// macOS only: the workspace composition that runs it is macOS-only.
-#[cfg(target_os = "macos")]
 pub(crate) fn resolve_in(
     index: &mut Index,
     reference: &str,
@@ -225,7 +223,6 @@ impl DevEcoRegistryStore {
 
     /// Resolves the toolchain the owner's exact pin names, as Swift's
     /// `resolve`: the record re-measured, nothing written.
-    #[cfg(target_os = "macos")]
     pub fn resolve(
         &self,
         reference: &str,
@@ -308,7 +305,8 @@ impl DevEcoRegistryStore {
     }
 }
 
-#[cfg(test)]
+// The fixtures are POSIX trees (modes, links).
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
     use std::path::PathBuf;

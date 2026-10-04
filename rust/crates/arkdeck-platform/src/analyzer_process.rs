@@ -4,15 +4,23 @@
 //! retained across the run and handed over as the `/.vol` alias of a
 //! descriptor bound to its digest. The child's environment is the clean one
 //! every identity-bound spawn here gets; no ambient variable is inherited.
-use super::tool_process::{MAX_CAPTURE_BYTES, MAX_TIMEOUT};
-use super::{
-    ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool, denied, hash_file,
-    invalid, same_metadata,
-};
+//!
+//! On Windows (TASK-XPA-011) the same runner hands the child the canonical
+//! path of the Windows `VerifiedSource`, whose held file and namespace make
+//! that path name exactly the retained, hashed bytes.
+use super::tool_request::{MAX_CAPTURE_BYTES, MAX_TIMEOUT};
+use super::{ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool, invalid};
+#[cfg(target_os = "macos")]
+use super::{denied, hash_file, same_metadata};
+#[cfg(windows)]
+use crate::windows::VerifiedSource;
 use std::ffi::OsString;
+#[cfg(target_os = "macos")]
 use std::fs::{File, Metadata};
 use std::io;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::MetadataExt;
+#[cfg(target_os = "macos")]
 use std::path::Path;
 use std::time::Duration;
 
@@ -57,11 +65,13 @@ pub enum AnalyzerRunError {
 /// A regular file bound, through one retained descriptor, to its expected
 /// length and SHA-256. A child reads it through the `/.vol` alias of that
 /// descriptor's inode, so no later path lookup can select other bytes.
+#[cfg(target_os = "macos")]
 pub struct VerifiedSource {
     _file: File,
     metadata: Metadata,
 }
 
+#[cfg(target_os = "macos")]
 impl VerifiedSource {
     pub fn open(path: &Path, sha256: &str, byte_count: u64) -> io::Result<Self> {
         if byte_count == 0 || sha256.len() != 64 {

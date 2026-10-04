@@ -248,6 +248,11 @@ class PathClassificationTests(unittest.TestCase):
             "rust/tests/fixtures/debug-probe",
             "rust/tests/fixtures/observe-device",
             "rust/tests/fixtures/import-upload-current",
+            "rust/tests/fixtures/diagnostics-inspect",
+            "rust/tests/fixtures/job-run-hilog",
+            "rust/tests/fixtures/hilog-summary-analyzer",
+            "Catalog/operations/capture.diagnostics.v1.json",
+            "Catalog/operations/analyzer.summarize-hilog.v1.json",
             "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift",
         ]
         for path in declared:
