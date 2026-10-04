@@ -461,8 +461,8 @@ impl Authority {
     /// managed-control HDC's digest (`hdc_sha256`, the managed server's), and
     /// no HDC is composed until the Windows HDC tuple is registered: the lane
     /// is refused before anything is launched, and the start reports why. Its planning, its facts (over the
-    /// Windows USB census, which fails closed until the DAYU200 sample
-    /// confirms its mapping) and the device access observer of the lane's
+    /// Windows USB census, open since the DAYU200 sample confirmed its
+    /// mapping) and the device access observer of the lane's
     /// directory are composed either way, as on macOS; no executable lane is
     /// installed without an HDC, so an admissible Flash is refused before
     /// admission with zero dispatch.
