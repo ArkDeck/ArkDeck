@@ -3040,9 +3040,30 @@ remove` (and the `signing …` spellings) on Windows; the daemon it binds is the
 one it would start (`ARKDECK_DAEMON_PATH` or `arkdeck-agentd.exe` beside it),
 and the maintenance leaves first require that image to satisfy a configured
 signing pin (`ARKDECK_DAEMON_SIGNER_SHA256` or the publisher identity) before
-Credential Manager is opened. `migrate-deveco` and `install --build-profile`,
-which read DevEco's encrypted password material, are `unsupportedOnPlatform`
-on Windows. The installed Windows daemon composes the workspace presets'
+Credential Manager is opened.
+
+`install --build-profile` and `migrate-deveco` read DevEco's encrypted
+passwords on Windows too, at macOS parity, so the maintainer never handles a
+plaintext password:
+
+- **Build profile.** It is read through one handle that follows no reparse
+  point, in its spelling on disk, and must be trusted-write-only. Its single
+  `storeFile` is the JSON string DevEco writes (a `\\`-escaped drive path).
+- **Password material.** It sits beside the keystore
+  (`material\fd\<slot>\<file>` ×3, `material\ac`, `material\ce`), the
+  layout DevEco writes on macOS too. Each directory must be trusted-write-only
+  and in its spelling on disk. Each file is read as the file it measured, and
+  must have a single link.
+- **`migrate-deveco --daemon`.** It must name the installed, pinned daemon.
+
+`arkdeck-provider-workspace`'s `deveco_password` test replays the Swift vectors
+on Windows. The CLI's `windows_signing_leaves` test installs and migrates from
+a Windows-spelled build profile and decodes it with the Swift vectors. With
+`ARKDECK_LIVE_DEVECO_BUILD_PROFILE`, it decodes one of the host's DevEco build
+profiles through the host's own material, checking only the shape and printing
+nothing.
+
+The installed Windows daemon composes the workspace presets'
 credential pinning over the account's preset root, bound to its own image, and
 Windows attempts go under `SigningPresetStore::attempts_root`
 (`<preset root>\Attempts`).

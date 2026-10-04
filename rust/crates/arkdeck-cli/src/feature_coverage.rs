@@ -602,10 +602,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "agentd.status",
     "agentd.verify",
     "agentd.uninstall",
-    // DevEco's password material is not read on Windows (TASK-XPA-011); the
-    // other signing leaves are served there over Credential Manager.
-    "runtime.signing.migrate-deveco",
-    "signing.migrate-deveco",
     "runtime.update.check",
     "runtime.update.download",
     "runtime.update.handoff",
