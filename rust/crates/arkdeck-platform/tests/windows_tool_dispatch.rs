@@ -46,9 +46,15 @@ mod windows {
     use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener};
     use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
-    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
+    use windows_sys::Win32::Foundation::{
+        CloseHandle, HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    };
+    use windows_sys::Win32::System::Console::{
+        GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+    };
     use windows_sys::Win32::System::Threading::{
-        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, WaitForSingleObject,
+        OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, PROCESS_TERMINATE,
+        TerminateProcess, WaitForSingleObject,
     };
 
     // ---- the fake tool --------------------------------------------------
@@ -123,6 +129,41 @@ mod windows {
                 // the Job ends them both.
                 let _ = grandchild.wait();
                 park();
+            }
+            // `spawn-exit <report> <go> [keep]`: starts a grandchild that never
+            // ends, names it in `<report>` (written whole, then renamed),
+            // and exits 0 once `<go>` exists: what an HDC lifecycle client
+            // that starts a server does.
+            "spawn-exit" => {
+                let report = PathBuf::from(&rest[0]);
+                let go = PathBuf::from(&rest[1]);
+                // Unless `keep` follows, the grandchild inherits none of this
+                // child's standard handles, as a careful launcher does; with
+                // it, the grandchild holds this child's pipes open.
+                if rest.get(2).and_then(|flag| flag.to_str()) != Some("keep") {
+                    for handle in [STD_OUTPUT_HANDLE, STD_ERROR_HANDLE, STD_INPUT_HANDLE] {
+                        // SAFETY: this process's own standard handle; only its
+                        // inheritance flag changes.
+                        unsafe {
+                            SetHandleInformation(GetStdHandle(handle), HANDLE_FLAG_INHERIT, 0)
+                        };
+                    }
+                }
+                let grandchild = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--fake-tool", "hang"])
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                    .unwrap();
+                let partial = report.with_extension("partial");
+                fs::write(&partial, grandchild.id().to_string()).unwrap();
+                fs::rename(&partial, &report).unwrap();
+                let deadline = Instant::now() + Duration::from_secs(30);
+                while !go.exists() && Instant::now() < deadline {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                std::process::exit(0);
             }
             // `listen <ready> <address>… [-s <endpoint> -m]`: holds one TCP
             // listener on each address until killed, and names itself
@@ -212,6 +253,18 @@ mod windows {
         (
             "a_cancellation_before_the_spawn_leaves_no_child_and_one_during_the_run_drains_the_tree",
             a_cancellation_before_the_spawn_leaves_no_child_and_one_during_the_run_drains_the_tree,
+        ),
+        (
+            "an_ordinary_run_ends_what_its_child_started_even_after_a_clean_exit",
+            an_ordinary_run_ends_what_its_child_started_even_after_a_clean_exit,
+        ),
+        (
+            "only_a_lifecycle_run_lets_what_its_child_started_outlive_it",
+            only_a_lifecycle_run_lets_what_its_child_started_outlive_it,
+        ),
+        (
+            "a_lifecycle_run_is_not_held_by_the_pipes_a_survivor_kept",
+            a_lifecycle_run_is_not_held_by_the_pipes_a_survivor_kept,
         ),
         (
             "a_nonzero_exit_is_reported_as_such",
@@ -428,7 +481,9 @@ mod windows {
 
     /// A process this test observes by a handle it opened while the process
     /// was known to be the one named, so its PID can never name another.
-    struct Observed(HANDLE);
+    /// A process handle; one opened `open_to_end` also ends its process when
+    /// dropped, so a failed assertion leaves nothing of this test running.
+    struct Observed(HANDLE, bool);
 
     impl Observed {
         fn open(pid: u32) -> Self {
@@ -441,7 +496,27 @@ mod windows {
                 )
             };
             assert!(!handle.is_null(), "process {pid} could not be opened");
-            Self(handle)
+            Self(handle, false)
+        }
+
+        /// With the right to end it too: a process this test caused and
+        /// must not leave running.
+        fn open_to_end(pid: u32) -> Self {
+            // SAFETY: owned handle, closed on drop.
+            let handle = unsafe {
+                OpenProcess(
+                    PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE | PROCESS_TERMINATE,
+                    0,
+                    pid,
+                )
+            };
+            assert!(!handle.is_null(), "process {pid} could not be opened");
+            Self(handle, true)
+        }
+
+        fn end(&self) {
+            // SAFETY: live owned handle; ending an ended process is harmless.
+            unsafe { TerminateProcess(self.0, 1) };
         }
 
         fn ended_within(&self, within: Duration) -> bool {
@@ -454,6 +529,9 @@ mod windows {
 
     impl Drop for Observed {
         fn drop(&mut self) {
+            if self.1 {
+                self.end();
+            }
             // SAFETY: the handle is owned by this value and closed once.
             unsafe { CloseHandle(self.0) };
         }
@@ -746,6 +824,85 @@ mod windows {
         assert!(execution.duration < Duration::from_secs(60));
         let grandchild = observed.into_inner().unwrap();
         assert!(grandchild.ended_within(Duration::ZERO));
+    }
+
+    /// A `spawn-exit` run: the grandchild is opened (with `open`) once it is
+    /// named, while the child still waits, and only then is the child let
+    /// exit 0.
+    fn spawn_exit(
+        tool: &VerifiedTool,
+        scratch: &Scratch,
+        lifecycle: bool,
+        keep: bool,
+        open: fn(u32) -> Observed,
+    ) -> Observed {
+        let (report, go) = (scratch.0.join("grandchild"), scratch.0.join("go"));
+        let observed: RefCell<Option<Observed>> = RefCell::new(None);
+        let mut arguments = args(&["spawn-exit", report.to_str().unwrap(), go.to_str().unwrap()]);
+        if keep {
+            arguments.push("keep".into());
+        }
+        let request = ToolRequest {
+            arguments: &arguments,
+            environment: &[],
+            working_directory: None,
+            limits: limits(Duration::from_secs(30), 4096),
+        };
+        let cancelled = || {
+            if observed.borrow().is_none()
+                && let Some(pid) = reported_pid(&report)
+            {
+                *observed.borrow_mut() = Some(open(pid));
+                fs::write(&go, b"").unwrap();
+            }
+            false
+        };
+        let execution = if lifecycle {
+            tool.run_lifecycle_tool(&request, &cancelled)
+        } else {
+            tool.run_tool(&request, &cancelled)
+        }
+        .unwrap();
+        assert_eq!(execution.termination, ToolTermination::Exited(0));
+        observed.into_inner().expect("the grandchild was named")
+    }
+
+    /// A process the child started, running when the child exits 0, is ended
+    /// with the child's Job before `run_tool` returns: an ordinary tool's
+    /// descendants never outlive it.
+    fn an_ordinary_run_ends_what_its_child_started_even_after_a_clean_exit() {
+        let scratch = Scratch::new("spawnexit");
+        let grandchild = spawn_exit(&this_tool(), &scratch, false, false, Observed::open);
+        assert!(grandchild.ended_within(Duration::ZERO));
+    }
+
+    /// The lifecycle run alone lets the process its child started break away
+    /// from the child's Job, as `hdc kill -r`'s replacement server outlives
+    /// the client on macOS; the child itself is ended as ever. The test ends
+    /// the survivor it caused.
+    fn only_a_lifecycle_run_lets_what_its_child_started_outlive_it() {
+        let scratch = Scratch::new("detach");
+        let survivor = spawn_exit(&this_tool(), &scratch, true, false, Observed::open_to_end);
+        let alive = !survivor.ended_within(Duration::from_millis(500));
+        survivor.end();
+        assert!(survivor.ended_within(Duration::from_secs(10)));
+        assert!(
+            alive,
+            "the process the lifecycle client started was ended with it"
+        );
+    }
+
+    /// A process the lifecycle client started that holds the client's pipes
+    /// does not hold the run: its capture ends with the client, shortly
+    /// after it exited, and the client's exit is its outcome.
+    fn a_lifecycle_run_is_not_held_by_the_pipes_a_survivor_kept() {
+        let scratch = Scratch::new("keep");
+        let started = Instant::now();
+        let survivor = spawn_exit(&this_tool(), &scratch, true, true, Observed::open_to_end);
+        assert!(started.elapsed() < Duration::from_secs(20));
+        assert!(!survivor.ended_within(Duration::ZERO));
+        survivor.end();
+        assert!(survivor.ended_within(Duration::from_secs(10)));
     }
 
     fn a_nonzero_exit_is_reported_as_such() {

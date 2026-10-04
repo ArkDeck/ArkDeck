@@ -25,6 +25,11 @@ pub(crate) struct RunningChild {
     job: Handle,
     assigned: bool,
     cleaned: bool,
+    /// The Job's members as its termination found them, held until each has
+    /// ended: a process leaves the Job's active count during its exit,
+    /// before its own object is signalled, so the count alone could report
+    /// the tree gone while one of its processes is still ending.
+    ending: std::sync::Mutex<Vec<Handle>>,
     /// The child's PID and its `GetProcessTimes` creation time, both read
     /// while it was still suspended.
     pub(crate) pid: u32,
@@ -97,6 +102,13 @@ impl RunningChild {
     /// Windows form of a group kill. There is no TERM on Windows, so no
     /// grace precedes it (gate inventory §8 question 4).
     pub(crate) fn terminate_group(&self) -> io::Result<()> {
+        if self.assigned {
+            let members = self.members()?;
+            self.ending
+                .lock()
+                .map_err(|_| io::Error::other("the Job's member list is unavailable"))?
+                .extend(members);
+        }
         // SAFETY: this unnamed job holds only this child and its
         // descendants; before job assignment the child is still suspended.
         bool_result(unsafe {
@@ -115,7 +127,21 @@ impl RunningChild {
         if !matches!(wait, WAIT_OBJECT_0 | WAIT_TIMEOUT) {
             return Err(io::Error::last_os_error());
         }
-        Ok(wait == WAIT_OBJECT_0 && (!self.assigned || self.active_processes()? == 0))
+        Ok(wait == WAIT_OBJECT_0
+            && (!self.assigned || self.active_processes()? == 0)
+            && self.members_ended())
+    }
+
+    /// Every member the Job's termination found has ended.
+    fn members_ended(&self) -> bool {
+        let Ok(members) = self.ending.lock() else {
+            return false;
+        };
+        // SAFETY: each handle is a live, owned process handle opened with
+        // SYNCHRONIZE; a zero wait only reads kernel state.
+        members
+            .iter()
+            .all(|member| unsafe { WaitForSingleObject(member.raw(), 0) } == WAIT_OBJECT_0)
     }
 
     fn active_processes(&self) -> io::Result<u32> {
@@ -131,6 +157,55 @@ impl RunningChild {
             )
         })?;
         Ok(accounting.ActiveProcesses)
+    }
+
+    /// A handle on each process of the Job now, each proved a member after
+    /// it was opened, so that a PID reused since the list was read is never
+    /// waited for. A process that ended before it could be opened is not
+    /// held.
+    fn members(&self) -> io::Result<Vec<Handle>> {
+        const CAPACITY: usize = 1024;
+        // `JOBOBJECT_BASIC_PROCESS_ID_LIST`: two `u32` counts, then the PIDs
+        // as pointer-sized values.
+        let mut list = vec![0usize; 1 + CAPACITY];
+        // SAFETY: the buffer is pointer-aligned, zeroed and its byte length
+        // is passed; the class matches the documented layout.
+        let queried = unsafe {
+            QueryInformationJobObject(
+                self.job.raw(),
+                JobObjectBasicProcessIdList,
+                list.as_mut_ptr().cast(),
+                (list.len() * size_of::<usize>()) as u32,
+                null_mut(),
+            )
+        };
+        if queried == 0 {
+            let error = io::Error::last_os_error();
+            // More members than the list holds: those beyond it are still
+            // counted by `active_processes`.
+            if error.raw_os_error() != Some(ERROR_MORE_DATA as i32) {
+                return Err(error);
+            }
+        }
+        let listed = ((list[0] as u64) >> 32) as usize;
+        let mut members = Vec::new();
+        for &pid in &list[1..1 + listed.min(CAPACITY)] {
+            // SAFETY: synchronize-and-query access; a null result is skipped.
+            let raw = unsafe {
+                OpenProcess(
+                    PROCESS_SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
+                    0,
+                    pid as u32,
+                )
+            };
+            let Ok(member) = Handle::new(raw) else {
+                continue;
+            };
+            if self.job_contains(member.raw())? {
+                members.push(member);
+            }
+        }
+        Ok(members)
     }
 
     /// The process `process` names is a member of this child's Job object.
@@ -158,7 +233,7 @@ impl RunningChild {
             } else {
                 0
             };
-            if wait == WAIT_OBJECT_0 && active == 0 {
+            if wait == WAIT_OBJECT_0 && active == 0 && self.members_ended() {
                 self.cleaned = true;
                 return Ok(());
             }
@@ -315,7 +390,32 @@ pub(crate) fn spawn_in(
     environment: &[(OsString, OsString)],
     working_directory: Option<&[u16]>,
 ) -> io::Result<RunningChild> {
-    spawn_with(tool, args, environment, working_directory, None, None)
+    spawn_with(
+        tool,
+        args,
+        environment,
+        working_directory,
+        None,
+        None,
+        false,
+    )
+}
+
+/// `spawn_in` for the one command whose own children must outlive it: the
+/// HDC lifecycle client (`hdc kill -r`), whose replacement server macOS
+/// leaves running in a session of its own. The child itself is in its
+/// kill-on-close Job, ended as every child is; the Job lets the processes
+/// it creates break away silently, so a server it starts is no member. Such
+/// a server is adopted only by a fresh commandless proof, and ended only
+/// while one still names it (`end_proved_process`). Every other tool keeps
+/// the Job its descendants cannot leave.
+pub(crate) fn spawn_detaching(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&[u16]>,
+) -> io::Result<RunningChild> {
+    spawn_with(tool, args, environment, working_directory, None, None, true)
 }
 
 /// `spawn_in` with `input` — the inheritable read end of an [`input_pipe`] —
@@ -336,6 +436,7 @@ pub(crate) fn spawn_paired(
         Some(working_directory),
         None,
         Some(input),
+        false,
     )
 }
 
@@ -377,6 +478,7 @@ pub(crate) fn spawn_attached(
         working_directory,
         Some(console),
         None,
+        false,
     )
 }
 
@@ -387,6 +489,7 @@ fn spawn_with(
     working_directory: Option<&[u16]>,
     console: Option<HPCON>,
     input: Option<&Handle>,
+    breakaway: bool,
 ) -> io::Result<RunningChild> {
     if !tool
         .path
@@ -466,7 +569,12 @@ fn spawn_with(
     // SAFETY: unnamed job, no inherited/shared handles.
     let job = Handle::new(unsafe { CreateJobObjectW(null(), null()) })?;
     let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        | if breakaway {
+            JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK
+        } else {
+            0
+        };
     // SAFETY: limit structure size and class agree.
     bool_result(unsafe {
         SetInformationJobObject(
@@ -548,6 +656,7 @@ fn spawn_with(
         job,
         assigned: false,
         cleaned: false,
+        ending: std::sync::Mutex::default(),
         pid: info.dwProcessId,
         started: 0,
         stdout: None,
@@ -694,6 +803,7 @@ mod tests {
             job: Handle::new(unsafe { CreateEventW(null(), 1, 0, null()) }).unwrap(),
             assigned: true,
             cleaned: false,
+            ending: std::sync::Mutex::default(),
             pid: 0,
             started: 0,
             stdout: None,
