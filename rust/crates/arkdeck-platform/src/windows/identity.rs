@@ -615,14 +615,142 @@ pub(crate) fn authenticode_chain(
         dwProvFlags: WTD_CACHE_ONLY_URL_RETRIEVAL | WTD_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT,
         ..Default::default()
     };
+    // SAFETY: `file_info` and `path`, which `data` points to, outlive the call.
+    Ok(unsafe { verified_signer_chain(&mut data) })
+}
+
+/// `WinVerifyTrust`'s answer for an image signed through a system catalog
+/// (as most of `System32` is, `tar.exe` among them) rather than by an
+/// embedded signature: the catalog member hash is computed from `file`
+/// itself, the catalog that lists that hash is found through the catalog
+/// database, and that catalog's signature is verified with the same policy
+/// as [`authenticode_chain`]. The first signer's chain when it verifies,
+/// otherwise `TRUST_E_NOSIGNATURE` when no catalog lists the image, or the
+/// status `WinVerifyTrust` answered.
+pub(crate) fn catalog_chain(
+    file: &File,
+    path: &std::path::Path,
+) -> io::Result<Result<Vec<Vec<u8>>, i32>> {
+    use windows_sys::Win32::Security::Cryptography::BCRYPT_SHA256_ALGORITHM;
+    use windows_sys::Win32::Security::Cryptography::Catalog::{
+        CATALOG_INFO, CryptCATAdminAcquireContext2, CryptCATAdminCalcHashFromFileHandle2,
+        CryptCATAdminEnumCatalogFromHash, CryptCATAdminReleaseCatalogContext,
+        CryptCATAdminReleaseContext, CryptCATCatalogInfoFromContext,
+    };
+    struct Admin(isize);
+    impl Drop for Admin {
+        fn drop(&mut self) {
+            if self.0 != 0 {
+                // SAFETY: a context this guard acquired and owns.
+                unsafe {
+                    CryptCATAdminReleaseContext(self.0, 0);
+                }
+            }
+        }
+    }
+    struct CatalogContext<'a>(&'a Admin, isize);
+    impl Drop for CatalogContext<'_> {
+        fn drop(&mut self) {
+            // SAFETY: a catalog context enumerated from this admin context.
+            unsafe {
+                CryptCATAdminReleaseCatalogContext((self.0).0, self.1, 0);
+            }
+        }
+    }
+    let mut admin = Admin(0);
+    // SAFETY: an output handle; the default subsystem (the system
+    // catalogs) and SHA-256 member hashes.
+    bool_result(unsafe {
+        CryptCATAdminAcquireContext2(
+            &mut admin.0,
+            std::ptr::null(),
+            BCRYPT_SHA256_ALGORITHM,
+            std::ptr::null(),
+            0,
+        )
+    })?;
+    let mut hash = [0u8; 64];
+    let mut length = hash.len() as u32;
+    // SAFETY: a live admin context and file handle, and an output buffer of
+    // `length` bytes.
+    bool_result(unsafe {
+        CryptCATAdminCalcHashFromFileHandle2(
+            admin.0,
+            file.as_raw_handle(),
+            &mut length,
+            hash.as_mut_ptr(),
+            0,
+        )
+    })?;
+    let length = length.min(hash.len() as u32);
+    let hash = &mut hash[..length as usize];
+    // SAFETY: a live admin context and the hash just computed; no previous
+    // catalog context.
+    let context =
+        unsafe { CryptCATAdminEnumCatalogFromHash(admin.0, hash.as_ptr(), length, 0, null_mut()) };
+    if context == 0 {
+        return Ok(Err(TRUST_E_NOSIGNATURE));
+    }
+    let context = CatalogContext(&admin, context);
+    let mut catalog = CATALOG_INFO {
+        cbStruct: size_of::<CATALOG_INFO>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: a live catalog context and an initialised output structure.
+    bool_result(unsafe { CryptCATCatalogInfoFromContext(context.1, &mut catalog, 0) })?;
+    let tag: Vec<u16> = hash
+        .iter()
+        .map(|byte| format!("{byte:02X}"))
+        .collect::<String>()
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+    let member = wide(path.as_os_str())?;
+    let mut catalog_info = WINTRUST_CATALOG_INFO {
+        cbStruct: size_of::<WINTRUST_CATALOG_INFO>() as u32,
+        pcwszCatalogFilePath: catalog.wszCatalogFile.as_ptr(),
+        pcwszMemberTag: tag.as_ptr(),
+        pcwszMemberFilePath: member.as_ptr(),
+        hMemberFile: file.as_raw_handle(),
+        pbCalculatedFileHash: hash.as_mut_ptr(),
+        cbCalculatedFileHash: length,
+        hCatAdmin: admin.0,
+        ..Default::default()
+    };
+    let mut data = WINTRUST_DATA {
+        cbStruct: size_of::<WINTRUST_DATA>() as u32,
+        dwUIChoice: WTD_UI_NONE,
+        fdwRevocationChecks: WTD_REVOKE_WHOLECHAIN,
+        dwUnionChoice: WTD_CHOICE_CATALOG,
+        Anonymous: WINTRUST_DATA_0 {
+            pCatalog: &mut catalog_info,
+        },
+        dwStateAction: WTD_STATEACTION_VERIFY,
+        dwProvFlags: WTD_CACHE_ONLY_URL_RETRIEVAL | WTD_REVOCATION_CHECK_CHAIN_EXCLUDE_ROOT,
+        ..Default::default()
+    };
+    // SAFETY: `catalog_info` and everything it points to (the catalog path,
+    // the tag, the member path, the hash and the admin context) outlive the
+    // call.
+    let answer = unsafe { verified_signer_chain(&mut data) };
+    drop(context);
+    Ok(answer)
+}
+
+/// Run `WinVerifyTrust` (generic Authenticode policy) over `data`, copy out
+/// the first signer's chain, leaf first, and close the state.
+///
+/// # Safety
+/// Every pointer `data` holds must stay valid for the call.
+unsafe fn verified_signer_chain(data: &mut WINTRUST_DATA) -> Result<Vec<Vec<u8>>, i32> {
     let mut action = WINTRUST_ACTION_GENERIC_VERIFY_V2;
-    // SAFETY: file/path/data remain alive throughout verify, inspect and close;
-    // the certificates are copied out before the state is closed.
+    // SAFETY: guaranteed by the caller; the certificates are copied out
+    // before the state is closed.
     let (status, chain) = unsafe {
         let status = WinVerifyTrust(
             INVALID_HANDLE_VALUE,
             &mut action,
-            std::ptr::from_mut(&mut data).cast(),
+            std::ptr::from_mut(data).cast(),
         );
         let mut chain = Vec::new();
         if status == 0 {
@@ -657,15 +785,15 @@ pub(crate) fn authenticode_chain(
         WinVerifyTrust(
             INVALID_HANDLE_VALUE,
             &mut action,
-            std::ptr::from_mut(&mut data).cast(),
+            std::ptr::from_mut(data).cast(),
         );
         (status, chain)
     };
     if status != 0 || chain.is_empty() {
         // An accepted image with no readable chain is not accepted.
-        return Ok(Err(if status != 0 { status } else { -1 }));
+        return Err(if status != 0 { status } else { -1 });
     }
-    Ok(Ok(chain))
+    Ok(chain)
 }
 
 #[cfg(test)]
