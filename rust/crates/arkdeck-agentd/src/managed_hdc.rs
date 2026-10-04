@@ -117,6 +117,10 @@ impl ManagedHdc {
                     "the managed HDC server did not start: {reason}; nothing was launched, and \
                      that server is neither adopted nor stopped"
                 ),
+                StartFailure::PortInUse(reason) => format!(
+                    "the managed HDC server did not start: {reason}; nothing was launched, and \
+                     no holder is adopted or stopped"
+                ),
                 StartFailure::Refused(error) => {
                     format!("the managed HDC server launch was refused: {error}")
                 }
