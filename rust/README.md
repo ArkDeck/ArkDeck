@@ -3933,6 +3933,12 @@ changes in the hoststore make this work:
 
 The workspace mutations (`apply-patch`, `revert-patch`, `create-checkpoint`)
 need the device-mutation authority, which a development root does not hold.
+The installed (account) daemon's admission holds that authority (#2499), so an
+apply, a checkpoint (through the trusted `tar.exe`) and
+a revert run on a Runtime-owned copy under the Runtime's own capability.
+`windows_workspace_mutation_process` measures them over a fake account, through
+the pipe and through the signed CLI
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-mutations-run.md)).
 `windows_workspace_provider_process` and
 `windows_signed_runtime::workspace_profile_leaves_run_end_to_end_through_the_pipe`
 measure the rest, and `workspace read|status|diff|isolate|sweep` are in

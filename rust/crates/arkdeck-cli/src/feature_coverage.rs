@@ -521,13 +521,16 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.inspect",
     // The profile-served reads, the isolated copy and the sweep (TASK-XPA-011):
     // the code-owned tools of the ruling of 2026-10-04 resolve the profile.
-    // Not the workspace mutations, which a development root's mutation
-    // authority does not hold.
     "workspace.read",
     "workspace.status",
     "workspace.diff",
     "workspace.isolate",
     "workspace.sweep",
+    // The workspace mutations on a Runtime-owned copy (TASK-XPA-011), under
+    // the Runtime's own capability, through the installed composition.
+    "workspace.patch",
+    "workspace.revert",
+    "workspace.checkpoint",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
