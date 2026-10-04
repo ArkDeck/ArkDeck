@@ -36,24 +36,46 @@ impl<'a> ObservationInput<'a> {
 pub enum ObservationFailure {
     Unknown(&'static str),
     Unavailable(&'static str),
+    /// `unknown`, and retryable: the registered Windows server-startup
+    /// listing ([`WINDOWS_SERVER_STARTUP_LISTING`]), printed while a server
+    /// that has just started has not enumerated yet. It is never a device
+    /// set, never "no device" and never a disappearance.
+    NotYetObservable(&'static str),
 }
 
 impl ObservationFailure {
     pub fn classification(&self) -> &'static str {
         match self {
-            Self::Unknown(_) => "unknown",
+            Self::Unknown(_) | Self::NotYetObservable(_) => "unknown",
             Self::Unavailable(_) => "unavailable",
         }
+    }
+
+    /// Only the server-startup listing may be retried; every other failure
+    /// is final for its observation.
+    pub fn is_not_yet_observable(&self) -> bool {
+        matches!(self, Self::NotYetObservable(_))
     }
 }
 
 impl fmt::Display for ObservationFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Unknown(reason) | Self::Unavailable(reason) => f.write_str(reason),
+            Self::Unknown(reason) | Self::Unavailable(reason) | Self::NotYetObservable(reason) => {
+                f.write_str(reason)
+            }
         }
     }
 }
+
+/// The registered Windows `3.2.0g` server-startup listing (CHG-2026-078 r3):
+/// `[Empty]` CR TAB `hdc` CR LF, 14 bytes, exit 0, empty stderr. The
+/// registered tool printed exactly these bytes, and only these, to
+/// `list targets -v` from the moment a server it had just started listened
+/// until about 1.26 s after the start, and never afterwards (CHG-2026-074
+/// `evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md`). It
+/// is `notYetObservable`, never "no device".
+pub const WINDOWS_SERVER_STARTUP_LISTING: &[u8] = b"[Empty]\r\thdc\r\n";
 
 impl std::error::Error for ObservationFailure {}
 
@@ -180,11 +202,14 @@ fn snapshot(mut connected: Vec<String>) -> PresenceSnapshot {
 /// - a row of exactly the sampled UART form (`COM<digits>`, an empty name,
 ///   `UART`, `Ready`, `unknown...`, `hdc`) is a host serial port, not a
 ///   device, and is excluded, so a snapshot of only such rows is empty;
-/// - the `[Empty]` marker and zero-byte stdout were never observed on
-///   Windows and are `unknown`, as is any other form: another column count
-///   or sixth column, any other UART row, an unknown literal, a duplicate
-///   key, non-empty stderr, a non-zero exit or a truncated read. One such row
-///   invalidates the whole snapshot.
+/// - exactly [`WINDOWS_SERVER_STARTUP_LISTING`] with exit 0 and empty stderr
+///   is [`ObservationFailure::NotYetObservable`] (CHG-2026-078 r3): the
+///   server has not enumerated yet, so it is never "no device";
+/// - any other `[Empty]` form (`[Empty]` CR LF, LF, the marker beside rows)
+///   and zero-byte stdout are `unknown`, as is any other form: another
+///   column count or sixth column, any other UART row, an unknown literal, a
+///   duplicate key, non-empty stderr, a non-zero exit or a truncated read.
+///   One such row invalidates the whole snapshot.
 ///
 /// It never applies to a macOS tool, and the macOS grammar
 /// ([`parse_registered_presence`]) never applies to a Windows tool.
@@ -216,6 +241,11 @@ pub fn parse_registered_windows_presence(
     if execution.stdout.is_empty() {
         return Err(ObservationFailure::Unknown(
             "zero-byte stdout is outside the registered Windows raw family",
+        ));
+    }
+    if execution.stdout == WINDOWS_SERVER_STARTUP_LISTING {
+        return Err(ObservationFailure::NotYetObservable(
+            "the HDC server has not enumerated yet (the registered Windows server-startup listing)",
         ));
     }
     let text = std::str::from_utf8(execution.stdout)

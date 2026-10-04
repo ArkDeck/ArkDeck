@@ -256,6 +256,11 @@ impl Token {
         let storage = self.information(TokenUser)?;
         Sid::copy(storage.header::<TOKEN_USER>()?.User.Sid)
     }
+    /// The Terminal Services session of the token.
+    pub(crate) fn session(&self) -> io::Result<u32> {
+        let storage = self.information(TokenSessionId)?;
+        storage.header::<u32>()
+    }
     fn elevated(&self) -> io::Result<bool> {
         let storage = self.information(TokenElevation)?;
         Ok(storage.header::<TOKEN_ELEVATION>()?.TokenIsElevated != 0)

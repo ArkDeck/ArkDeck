@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-078-windows-hdc-registration
-revision: 2
-status: approved # r2 (2026-10-04): samples processed (#2456), maintainer ruling 2026-10-04 applied; effective only when the maintainer reviews and merges this r2 PR
+revision: 3
+status: approved # r2 (2026-10-04): samples processed (#2456), maintainer ruling 2026-10-04 applied. r3 (2026-10-04): the Windows server-startup listing; effective only when the maintainer reviews and merges the r3 PR
 class: integration
 core_change_level: none
 owner: lvye
@@ -10,6 +10,37 @@ platforms: [windows]
 ---
 
 # Register Windows HDC tuples, output families and the Windows USB relation census
+
+## Revision r3: the Windows server-startup listing
+
+After r2 and the TASK-WHR-002 registration, the Windows daemon's managed server (CHG-2026-074
+TASK-XPA-005) read `list targets -v` from the registered c2 `hdc.exe` with no board attached and
+got `[Empty]` CR TAB `hdc` CR LF (14 bytes, exit 0, empty stderr), a form the 2026-10-04 samples
+never showed. Registry 1.0.0 classifies it `unknown`.
+
+- **Maintainer ruling 2026-10-04 ("按建议").** Register exactly the observed `[Empty]` byte form as
+  "no device"; every other form stays `unknown`.
+- **Evidence-driven refinement.** A read-only reproduction against the agent's own server on
+  `127.0.0.1:8710` (CHG-2026-074 `evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md`) showed the form is a server-startup race, not an answer:
+  - the registered server printed it in 15 of 15 listener-waited starts;
+  - it appeared only from the moment the listener answered until at most 1.26 s after the server's
+    start, and never after the first enumerated listing;
+  - it did not depend on the server's or the client's environment.
+
+  Read as "no device", a board that is attached would be reported absent during that window, a
+  fabricated disappearance that design §"Failure, cancellation, and recovery" forbids. r3
+  therefore applies the strictly more conservative reading, which the maintainer confirms by
+  reviewing and merging this r3 PR.
+- **r3 registers** that exact form, and no other, as `notYetObservable`: `unknown` and retryable,
+  never `observedEmpty` and never a disappearance.
+  - A managed start settles past it by listing again for at most 3 s (more than twice the longest
+    window observed).
+  - If it persists past the bound, the server stays up and every observation stays `unknown` (fail
+    closed).
+  - A consumer that reads it at any other time treats it as `unknown`.
+- **Versions.** `OPENHARMONY-HDC-WINDOWS-PROBES@1.1.0`, profile `OPENHARMONY-TOOLS@0.7.1`, lock
+  `INTEGRATION-PROFILES-0.8.1`, and the fixture `c2/server-startup/`. Every other r2 decision is
+  unchanged.
 
 ## Revision r2: the samples and the maintainer ruling of 2026-10-04
 
@@ -178,7 +209,8 @@ This change prepares their registration. In r1 every value that had to come from
 
 - **Failure modes.** Every tuple, output, endpoint or listener mismatch is `unsupported`,
   `unknown` or `unavailable`, never a partial set. Zero-byte stdout and the `[Empty]` marker are
-  `unknown` on Windows, never empty. Only the sampled UART row form is excluded as a non-device
+  `unknown` on Windows, never empty; the one observed `[Empty]` form, the server-startup listing,
+  is `notYetObservable` (r3), still never empty. Only the sampled UART row form is excluded as a non-device
   row; any other UART form is `unknown`. A port-derived USB instance suffix is no serial and no
   identity (fail closed).
 - **Case fold.** The ASCII-lowercase fold of the USB serial is safe. Windows treats device

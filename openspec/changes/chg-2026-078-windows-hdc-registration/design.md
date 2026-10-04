@@ -44,7 +44,7 @@ macOS 3.2.0d/3.2.0f tuples, even if `-v` prints the same version text. A DevEco 
 changes the executable hash is a new, unregistered tuple until a later change registers it
 (ruling item 1).
 
-## 2. Registry `OPENHARMONY-HDC-WINDOWS-PROBES@1.0.0`
+## 2. Registry `OPENHARMONY-HDC-WINDOWS-PROBES@1.1.0` (1.0.0 until r3)
 
 It is drafted in full in `drafts/windows-probes.yaml`. It is a JSON-compatible YAML 1.2 file
 with the same schema as `device-observation-probes.yaml` and `supervisor-observation-probes.yaml`.
@@ -55,7 +55,7 @@ macOS one. For candidate 2 the suffix is `-3.2.0g-windows-c7951849`.
 | --- | --- | --- | --- | --- |
 | `version` | golden | `-v` | `Ver: 3.2.0g` CR LF, 13 B; stderr empty; exit 0; starts no server (0 → 0 listeners) | `supported` |
 | `healthyCheckserver` | golden bytes only | `checkserver` | with the server up: `Client version:Ver: 3.2.0g, server version:Ver: 3.2.0g` CR LF, 56 B. With **no** server it **starts one** (0 → 1 listeners, about 1.44 s) and prints the same form | `unsupported` as a probe; never invoked (ruling item 3) |
-| `deviceObservationSnapshot` | `hdcCommand`, existing-server-only | `list targets -v` | 6 TAB columns, CR LF rows (below); device row kept and flipped to `Offline` on removal; UART rows in every phase; `[Empty]` and zero bytes not observed | `supported` with the rule below (ruling item 2) |
+| `deviceObservationSnapshot` | `hdcCommand`, existing-server-only | `list targets -v` | 6 TAB columns, CR LF rows (below); device row kept and flipped to `Offline` on removal; UART rows in every phase once enumerated; zero bytes not observed; the server-startup listing `[Empty]` CR TAB `hdc` CR LF until enumerated (r3) | `supported` with the rule below (ruling item 2; r3 for the startup listing) |
 | `serverIdentityGeneration` | `platformProcessObservation`, commandless | `[]` | one listener on `127.0.0.1:8710` (IPv4 loopback only); owner image SHA-256 = the selected tool; the same PID and creation time in every bracket of every phase across unplug and replug; started by `checkserver` with no server; stopped by `kill` | `supported`; this is Windows server health (ruling item 3) |
 
 The endpoint is **`127.0.0.1:8710`**, as observed. No `0.0.0.0`, `::` or dual-stack listener was
@@ -95,8 +95,36 @@ Registered interpretation:
   - a duplicate connect key;
   - a CR left inside a field;
   - non-empty stderr, a non-zero exit, or truncation.
-- **Not observed, so `unknown`.** The `[Empty]` marker (never emitted on the sampled host) and
-  zero-byte stdout are `unknown` on Windows. They are not registered as empty.
+- **Not observed, so `unknown`.** Zero-byte stdout and every `[Empty]` form other than the
+  server-startup listing below are `unknown` on Windows. They are not registered as empty.
+
+### Server-startup listing (r3)
+
+A server the registered tool has just started answers `list targets -v` with exactly
+`[Empty]` CR TAB `hdc` CR LF (hex `5b456d7074795d0d096864630d0a`, 14 bytes), exit 0 and empty
+stderr, until it has enumerated (CHG-2026-074 `evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md`):
+
+- it was seen in 15 of 15 listener-waited starts, from the moment the listener answered until at
+  most 1.257 s after the server's spawn (at most 0.712 s after the listener answered);
+- the first enumerated listing came 0.967 to 1.495 s after the spawn, and the form never followed
+  an enumerated listing;
+- the server's and the client's environment (the daemon's reduced one, with or without
+  `TEMP`/`TMP`, or the full one) made no difference.
+
+Registered rule (maintainer ruling 2026-10-04, refined by this evidence):
+
+- **Disposition.** That exact form is `notYetObservable`: `unknown` and retryable. It is never
+  `observedEmpty`, never a device set and never a disappearance. Any byte of difference (LF only,
+  no TAB, no `hdc`, rows beside it, non-empty stderr, a non-zero exit) is plain `unknown`.
+- **Settle.** After a managed start is bound to its launch, the Runtime lists again every poll
+  interval for at most **3 s**, more than twice the longest window observed, until a registered
+  enumerated listing is read.
+- **Past the bound.** The server stays up, and every observation stays what the parser says, so
+  nothing is observed from it (fail closed).
+- **Elsewhere.** A consumer that reads the form at any other time treats it as `unknown`.
+- **Not known.** Whether a host without serial ports would print the form permanently was not
+  sampled. If it does, every observation there stays `unknown` until a later change samples and
+  registers that host's form.
 
 ### CR/LF rule
 
@@ -200,7 +228,9 @@ ruling 2026-10-04:
 - a server or listener absent is `unavailable`;
 - multiple or ambiguous owners, pre/post drift, an unknown literal, a wrong column count,
   non-empty stderr, a non-zero exit, a timeout or a truncated read give `unknown`;
-- zero-byte stdout is `unknown`, and so is the `[Empty]` marker on Windows (never observed);
+- zero-byte stdout is `unknown`, and so is every `[Empty]` form on Windows except the
+  server-startup listing, which is `notYetObservable` (`unknown`, retryable; r3) and settled past
+  after a managed start for at most 3 s;
 - only the sampled UART row form is excluded as a non-device row, and any other UART form is
   `unknown`;
 - `checkserver` is never dispatched as a probe, because it can start a server;

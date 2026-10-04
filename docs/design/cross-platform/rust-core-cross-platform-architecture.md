@@ -365,7 +365,7 @@ flowchart TB
 | ArkDeckProcess：`IdentityBoundPTYExecutor`（签名口令一次交换）、`PersistentDeviceShellChannel`（带退出码框架的持久 `hdc shell`） | **migrate + platform port** | `arkdeck-platform::pty` | Windows 用 ConPTY（`CreatePseudoConsole`）；秘密永不进 argv/env/receipt 的规则不变（`IdentityBoundPTYExecutor.swift:4-6`） |
 | ArkDeckWorkflows：`RuntimeJobEngine`、`RuntimeAdmissionService`、`RuntimeRecoveryService`、`Artifacts/*`、`Bootstrap/*`（DeviceBootstrapMachine）、`AgentDeviceOperations`（AgentRuntimeExecutor/HAR）、`RuntimeSessionStorageStore`、`Settings` 存储、`RuntimeJobReadProjection` | **migrate** | `arkdeck-runtime` | 10,252 行单文件引擎按 admission/execution/recovery/artifact/agent-execution 拆模块；语义逐条对照 §D.4 表 |
 | ArkDeckWorkflows：`DeviceProviders/*`（HDC adapter、Descriptor-bound dispatcher、Debug/Trace probes、Pointer input、Rockchip live-mode probe、native code sign helper） | **migrate** | `arkdeck-provider-hdc` | `deviceArguments`（`DeviceProviderAdapters.swift:1731-1740`）为唯一 `-t` 注入点；code-sign helper（C）改为随 Rust 构建或 Rust 重写 |
-| ArkDeckWorkflows：`WorkspaceProvider/*`（git、hvigor/node、hap-sign-tool、DevEco 口令解码、isolated copies） | **migrate + platform port** | `arkdeck-provider-workspace` | `/usr/bin/git` 硬路径（`WorkspaceOperationsProvider.swift:281,421`）改为 registered toolchain ref；Keychain+`LAContext`（`OpenHarmonyLocalSigning.swift:275-359`）→ Credential Manager（DPAPI）+ presence 门改走 HAR console challenge |
+| ArkDeckWorkflows：`WorkspaceProvider/*`（git、hvigor/node、hap-sign-tool、DevEco 口令解码、isolated copies） | **migrate + platform port** | `arkdeck-provider-workspace` | `/usr/bin/git` 硬路径（`WorkspaceOperationsProvider.swift:281,421`）改为 registered toolchain ref；Keychain+`LAContext`（`OpenHarmonyLocalSigning.swift:275-359`）→ Credential Manager（DPAPI）；不设 presence 门：Runtime 读口令从不交互（macOS 以 `interactionNotAllowed` 的 `LAContext`，Windows 的 `CredReadW` 本就不弹窗），只有维护 CLI 可交互（2026-10-04 lead 按 (a) 裁定，见 TASK-XPA-011 run record `windows-workspace-sign-oracle-run.md`） |
 | ArkDeckWorkflows：`AnalyzerProvider/*`（crash signature、hilog summary、ArkTrace summary/analysis envelope 校验） | **migrate（纯计算优先）** | `arkdeck-provider-analyzer` | 三个派生分析器 ~2k 行纯计算；trace 类依赖 trace_streamer/ArkTrace，Windows 先 **defer**（诚实 unavailable） |
 | ArkDeckWorkflows：`ArkForgeLaneHost/Session/ControlPerformer/ExecutionAuthority/ManagedControlPort/LoaderObservation`、`RockchipRuntimeComposition` | **migrate（Rust↔Rust）** | `arkdeck-provider-arkforge` | 直接消费 `arkforge-client` 与 `adapters/arkforge-arkdeck-adapter`，去掉 Swift SDK 中转；StepPermit CBOR 向量沿用 |
 | ArkDeckWorkflows：`RockchipDeviceBinding`（IOKit USB 枚举） | **wrap** | 经 `arkforged discoverDevices` | ArkForge 已有原生 IOKit/WinUSB 枚举（`ArkForge/crates/arkforged/src/service.rs:58-80`），ArkDeck 不再自持 IOKit。过渡（2026-09-24，维护者委托裁定 Q1=B）：target adoption 的可信 USB relation 暂由 `arkdeck-platform` 只读读取 I/O Registry（`usb_host_devices`，与 Swift `TargetUSBRelation.registeredDAYU200()` 同源；不打开设备、不发 USB 传输），M4 之后再评估收回 `arkforged` |
@@ -965,7 +965,7 @@ flowchart TD
 - 用户结果：外部 agent 只用已发布面完成 repro → crash signature → isolate/patch/build/sign → deploy → verify → 负向 `revisionConflict` 零派发，九项预算记录。
 - 平台/GJ：Windows GJ-5 `REAL_DEVICE_PASS`。
 - 依赖：XPA-008；并行 XPA-009/010。
-- Reachability：workspace provider（git/node+hvigor/hap-sign-tool 经 registered toolchain refs；Credential Manager 存 keystore 口令；presence 门走 HAR console challenge）、analyzer provider（crash signature/hilog summary 纯计算）、`agent run` 预算。
+- Reachability：workspace provider（git/node+hvigor/hap-sign-tool 经 registered toolchain refs；Credential Manager 存 keystore 口令，Runtime 读取不交互、无 presence 门）、analyzer provider（crash signature/hilog summary 纯计算）、`agent run` 预算。
 - AC：runbook GJ-5 判据；`analyzer.*trace*` 在 Windows 明确 `unavailable(reasonCode)` 而非失败（若 XPA-021 未交付）。
 - 验证：contract、differential（分析器输出字节相等）、真机。
 - 硬件：Windows + DAYU200 + DevEco SDK。
@@ -1138,7 +1138,7 @@ flowchart TD
 | R10 | 双 CLI 期（Swift/Rust）机器契约事实源混乱 | 中/中 | `contracts check` 两边不一致 | 规则：Rust CLI 只能等于已发布 bundle，直到 XPA-018 翻转；CI 双向 check | XPA-018 |
 | R11 | PRODUCT-LOOP §12 视本方案为「与 GJ 无关的跨平台抽象」 | 中/高 | 维护者 review | 每个 Task 绑定一个 GJ hop 或 re-pass；Spike 不占 PR；change 明确引用 §12 五条允许情形之 1/5（Windows 闭环无法用现有边界完成；统一安全内核） | G1 |
 | R12 | GJ 状态语义（按 digest）不覆盖 runtime 更换 | 中/中 | 切换后无人复跑 | 假设 A4 → 决策 4；每次 owner 搬迁 PR 内 headless 复跑 | 各 cutover |
-| R13 | 口令/凭据在 Windows 的存在性门（`LAContext` 等价）不可从 daemon 触发 | 中/中 | `UserConsentVerifier` 需窗口 | HAR console challenge 路径复用（已存在 `human-action.resume` 门） | XPA-011/015 |
+| R13 | 口令/凭据在 Windows 的存在性门（`LAContext` 等价）不可从 daemon 触发 | 中/中 | `UserConsentVerifier` 需窗口 | 已关闭（2026-10-04）：与已发布的 macOS 一致不设存在性门——macOS Runtime 读取用 `interactionNotAllowed` 的 `LAContext` 从不交互，`CredReadW` 也从不弹窗；不新增 HAR console challenge（TASK-XPA-011 run record `windows-workspace-sign-oracle-run.md`） | XPA-011/015 |
 | R14 | Trace Viewer 在 Windows 无法对等，形成「隐藏缺口」 | 高/中 | 决策 5 未定 | 诚实 `unavailable` + CLI 等价路径；支持声明按 capability 范围 | XPA-021 |
 | R15 | 迁移拖长导致 macOS 修复要在 Swift 与 Rust 双做 | 高/中 | 同一缺陷两处修 | 先 Windows 走通再回流；sidecar 期尽量短；每族 provider 一 PR | 组 2 顺序 |
 | R16（r3/r5） | Windows pipe 名被先占（假服务端，含同用户进程）；façade 丢失来源上下文 | 低/高 | 客户端 owner SID 或实例身份不符；经 façade 的 `human-action.resume` 拿不到 console 挑战 | 客户端两层认证（owner SID + 本连接服务端 PID 的映像/签名）+ `FIRST_PIPE_INSTANCE` fail-closed + `doctor` 报告；同用户任意代码明示在边界外（§L.1 第 17 条）；origin 前导行（§F.2）+ 经 façade 的交互确认契约测试 | XPA-002/003 |

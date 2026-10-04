@@ -28,7 +28,7 @@ pub(crate) enum Action {
     Cancel(String),
 }
 
-fn kind(text: &str) -> Option<Kind> {
+pub(crate) fn kind(text: &str) -> Option<Kind> {
     let request = OperationRequest::decode(text.as_bytes()).ok()?;
     // Even a null/unused authorization member is outside the App boundary.
     let raw = strict_json(text.as_bytes()).ok()?;
@@ -179,14 +179,28 @@ impl Gate {
             id: id.to_owned(),
         })
     }
+    /// A separate explicit continuation of a durable safe boundary. The
+    /// Runtime checked the original closed App request before this claim;
+    /// its runner rechecks the journal and authority before any new effect.
+    pub(super) fn begin_recovery(&self, id: &str) -> Option<Run<'_>> {
+        let mut state = self.0.lock().ok()?;
+        if state.running.contains_key(id) || state.runnable.contains_key(id) {
+            return None;
+        }
+        state.running.insert(id.to_owned(), Kind::Continuation);
+        Some(Run {
+            gate: self,
+            id: id.to_owned(),
+        })
+    }
     pub(crate) fn owns(&self, id: &str) -> bool {
         self.0
             .lock()
             .is_ok_and(|state| state.runnable.contains_key(id) || state.running.contains_key(id))
     }
 }
-/// Removing both entries on every return preserves fail-closed one-shot behavior
-/// after an unknown receipt or a panicking owner. No Job is adopted after restart.
+/// Remove each claim after a return or panic. A later explicit continuation
+/// requires a new durable safe-boundary check; the old runnable claim is lost.
 pub(super) struct Run<'a> {
     gate: &'a Gate,
     id: String,

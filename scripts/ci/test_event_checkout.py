@@ -15,12 +15,14 @@ import unittest
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/swift-ci.yml"
 JOBS = ("plan", "swift-tests", "app-build", "ds-interactions", "rust-policy", "rust-workspace",
-        "rust-contracts")
+        "rust-contracts", "sdd-guard", "sdd-ds-tokens")
 
 
 def checkout_script(job: str) -> str:
     workflow = WORKFLOW.with_name("rust-ci.yml") if job.startswith("rust-") else WORKFLOW
-    job = job.removeprefix("rust-")
+    if job.startswith("sdd-"):
+        workflow = WORKFLOW.with_name("sdd-guard.yml")
+    job = job.removeprefix("rust-").removeprefix("sdd-")
     text = workflow.read_text()
     match = re.search(rf"^  {re.escape(job)}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", text, re.M | re.S)
     if match is None:
@@ -76,21 +78,24 @@ class EventCheckoutTests(unittest.TestCase):
     def checkout(self, job: str, ref: str, sha: str):
         work = self.root / (job + "-" + ref.replace("/", "-"))
         work.mkdir()
-        env = self.env | {"ARKDECK_CI_REF": ref, "ARKDECK_CI_SHA": sha}
+        env = self.env | {"ARKDECK_CI_REF": ref, "ARKDECK_CI_SHA": sha,
+                          "ARKDECK_CI_BASE": self.event_sha if "gh-readonly-queue" in ref else "refs/heads/main"}
         result = subprocess.run(["sh", "-c", checkout_script(job)], cwd=work,
                                 env=env, capture_output=True, text=True, timeout=20)
         return work, result
 
     def test_each_lane_builds_event_sha_after_main_or_pr_ref_advances(self):
         for job in JOBS:
-            for ref in ("refs/heads/main", "refs/pull/23/merge"):
+            for ref in ("refs/heads/main", "refs/pull/23/merge",
+                        "refs/heads/gh-readonly-queue/main/pr-23"):
                 with self.subTest(job=job, ref=ref):
                     work, result = self.checkout(job, ref, self.event_sha)
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(self.git("rev-parse", "HEAD", cwd=work).stdout.strip(), self.event_sha)
                     self.assertEqual((work / "tracked.txt").read_text(), "event contents")
                     if job == "plan" or job.startswith("rust-"):
-                        self.assertEqual(self.git("rev-parse", "origin/main", cwd=work).stdout.strip(), self.tip_sha)
+                        expected_base = self.event_sha if job.startswith("rust-") and "gh-readonly-queue" in ref else self.tip_sha
+                        self.assertEqual(self.git("rev-parse", "origin/main", cwd=work).stdout.strip(), expected_base)
 
     def test_missing_event_sha_fails_without_falling_back_to_new_ref(self):
         for job in JOBS:
