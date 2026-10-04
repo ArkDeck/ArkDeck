@@ -424,7 +424,7 @@ impl JobArchiver<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{SessionStore, StorageClaims, SystemStorageProbe};
+    use crate::{SessionStore, StorageClaims, StorageProbe, SystemStorageProbe};
     use std::{fs, path::PathBuf};
     const ID: &str = "job-082b8363fce0462b4571a62147751099";
     const AT: &str = "2026-10-04T06:00:00Z";
@@ -544,6 +544,15 @@ mod tests {
                 probe: &SystemStorageProbe,
             }
         }
+        fn assert_published(&self, result: &Value) {
+            let record = self.jobs.read_snapshot(ID).unwrap();
+            assert_eq!(
+                result["sessionPublished"],
+                true,
+                "result={result}; durable marker={:?}",
+                record.session_publication()
+            );
+        }
         fn journal(&self) -> Vec<Value> {
             self.jobs
                 .journal_bytes(ID)
@@ -602,6 +611,19 @@ mod tests {
         );
     }
     #[test]
+    fn system_storage_snapshot_works_for_private_archive_root() {
+        let f = Fixture::new();
+        let root = arkdeck_platform::HostDirectory::open(&f.path.join("Sessions")).unwrap();
+        let snapshot = SystemStorageProbe
+            .snapshot(&root)
+            .expect("archive Session root capacity");
+        assert_eq!(
+            snapshot.volume_identity,
+            root.export_facts().unwrap().volume_identity
+        );
+        assert!(!snapshot.read_only);
+    }
+    #[test]
     fn storage_failure_keeps_the_durable_decision_and_can_finish_its_publication() {
         struct MissingStorage;
         impl crate::StorageProbe for MissingStorage {
@@ -640,10 +662,7 @@ mod tests {
         };
         let preview = archive.preview(&params()).unwrap();
         assert_eq!(preview["mode"], "finishPublication");
-        assert_eq!(
-            archive.archive(&decision(&preview)).unwrap()["sessionPublished"],
-            true
-        );
+        f.assert_published(&archive.archive(&decision(&preview)).unwrap());
         assert_eq!(
             f.journal()
                 .iter()
@@ -705,7 +724,7 @@ mod tests {
         let request = decision(&preview);
         let result = archive.archive(&request).unwrap();
         assert_eq!(result["state"], "interrupted");
-        assert_eq!(result["sessionPublished"], true, "{result}");
+        f.assert_published(&result);
         record_frame("job.archive", &request, &result);
         let manifest: Value = serde_json::from_slice(
             &fs::read(
@@ -868,10 +887,7 @@ mod tests {
             };
             let preview = archive.preview(&params()).unwrap();
             assert_eq!(preview["userConfirmationId"], "user-archive-fixture");
-            assert_eq!(
-                archive.archive(&decision(&preview)).unwrap()["sessionPublished"],
-                true
-            );
+            f.assert_published(&archive.archive(&decision(&preview)).unwrap());
         }
     }
     #[test]

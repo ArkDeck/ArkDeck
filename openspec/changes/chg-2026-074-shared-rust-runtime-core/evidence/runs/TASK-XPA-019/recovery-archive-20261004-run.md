@@ -101,3 +101,19 @@ A green CI result does not approve or publish device execution.
 Diagnostics PR #2465 also completed its selected checks at head
 `600da7c8231e8400668753a1f33860c9f21a9156`: Swift aggregate run `37182721655`
 and SDD run `37182721439` are green, including Rust parity on all three platforms.
+
+### Windows publication failure investigation
+
+Local targeted checks: the seven archive tests, including a real private-root
+storage capacity probe, pass on macOS (exit 0;
+`/tmp/arkdeck-macos-closeout-20261004/recovery-archive-storage-diagnostics.log`).
+Hoststore Clippy with all targets and denied warnings passes (exit 0;
+`recovery-archive-storage-clippy.log`). Failure assertions now include the actual
+durable publication marker, without changing their required success result.
+
+CI: PR #2468 run `37184325231` failed the Windows workspace and contract parity
+lanes at the three archive Session-publication success assertions. The result
+was `storageUnavailable`, not a failed abandonment decision. macOS workspace,
+Linux, App, Swift, design and Windows ClientKit lanes passed. This diagnostic
+head adds the missing failure detail and a real capacity probe so the Windows
+cause can be fixed from evidence; it does not claim the failure is repaired.
