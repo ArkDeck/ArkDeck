@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684"
+  public static let catalogDigest = "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -498,6 +498,39 @@ extension RuntimeOperationCatalog {
         verificationStepIDs: ["verify-flash-readback", "reboot-device", "wait-for-hdc", "rebind-and-verify-build"])
     ),
     CatalogOperationDescriptor(
+      id: "input.keyboard",
+      version: 1,
+      title: "Send one private key or UTF-8 text input to the focused default display",
+      provider: .hdc,
+      minimumEffect: .deviceMutation,
+      permittedEffects: [.deviceMutation],
+      authorization: [.deviceMutation: .standingCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "inputEpochUtc", type: .string, isRequired: true, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$", maxLength: 32, summary: "UTC time of the explicit input decision. Dispatch refuses future, invalid or older-than-ten-second intents; this is not a claim of current application focus or screen capture time."),
+        CatalogFieldDescriptor(name: "keyboardArtifactLease", type: .artifactLease, isRequired: true, summary: "Immutable sensitive keyboard-input JSON Import; only its lease enters the Job.")
+      ],
+      outputs: [
+
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
+        CatalogStepDescriptor(stepID: "inject-keyboard-input", kind: .injectKeyboardInput, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 60,
+      outputByteBudget: 1048576,
+      preflightAttempts: 2,
+      artifacts: [
+
+      ],
+      profiles: ["openharmony-standard@1", "dayu200"]
+    ),
+    CatalogOperationDescriptor(
       id: "input.long-press",
       version: 1,
       title: "Inject one long-press at exact device coordinates",
@@ -518,7 +551,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "y", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the long-press, anchored at the pointer-down position.")
       ],
       outputs: [
-        
+
       ],
       steps: [
         CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
@@ -531,7 +564,7 @@ extension RuntimeOperationCatalog {
       outputByteBudget: 1048576,
       preflightAttempts: 2,
       artifacts: [
-        
+
       ],
       profiles: ["openharmony-standard@1", "dayu200"]
     ),
@@ -558,7 +591,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "toY", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the pointer-up position.")
       ],
       outputs: [
-        
+
       ],
       steps: [
         CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
@@ -571,7 +604,7 @@ extension RuntimeOperationCatalog {
       outputByteBudget: 1048576,
       preflightAttempts: 2,
       artifacts: [
-        
+
       ],
       profiles: ["openharmony-standard@1", "dayu200"]
     ),
@@ -595,7 +628,7 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "y", type: .integer, isRequired: true, minimum: 0, maximum: 32767, summary: "Device-pixel Y of the tap, anchored at the pointer-down position.")
       ],
       outputs: [
-        
+
       ],
       steps: [
         CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
@@ -608,7 +641,7 @@ extension RuntimeOperationCatalog {
       outputByteBudget: 1048576,
       preflightAttempts: 2,
       artifacts: [
-        
+
       ],
       profiles: ["openharmony-standard@1", "dayu200"]
     ),

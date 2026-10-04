@@ -2,7 +2,7 @@
   "records" : [
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1",
+        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -16,7 +16,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -39,7 +39,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:flash.full-restore@1"
+          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -63,21 +63,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "destructive",
           "jobID" : "job-e5349f3aa917c597f9044c2c9a1230e6",
-          "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
           "operationReference" : "flash.full-restore@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-e5349f3aa917c597f9044c2c9a1230e6",
               "outcome" : "outcomeUnknown",
-              "previousRecordSHA256" : "6d3c3fb4ac3547a5cdd883c6122fdd7ce6cd80cda8ba2c17d57528b870a2e7d3",
-              "recordSHA256" : "6079f3fe3c92ad8b3d94c68e5f0f6aad308e718b91635e949c6fe5ba97a02541",
+              "previousRecordSHA256" : "f002a0eb8aa8337a5e04ab13dfe0b84afd9c4242ec843248f81093beb774e84e",
+              "recordSHA256" : "659737101ea96d1ea71ed10c9002e733fbf1c204df3d3d6f4e947154213bb1b1",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "waitingForRecovery"
             }
           ],
-          "queryFingerprintSHA256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
-          "receiptSHA256" : "6d3c3fb4ac3547a5cdd883c6122fdd7ce6cd80cda8ba2c17d57528b870a2e7d3",
+          "queryFingerprintSHA256" : "8a47cbdbf4b18cc425e3b4da0c9a613cdd4c90324952b93682f425792fff2cc4",
+          "receiptSHA256" : "f002a0eb8aa8337a5e04ab13dfe0b84afd9c4242ec843248f81093beb774e84e",
           "remainingUsesAfter" : 0,
           "reservationID" : "idem-flash-original",
           "targetStableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"
@@ -87,7 +87,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-B471EC589BCAD096209B47979C5A70C5A4571F26-G1",
+        "capabilityID" : "CAP-RT-POLICY-473B4C25F444F21129375EF53988D6FF9531A04C-G1",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -101,7 +101,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -124,7 +124,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:flash.full-restore@1"
+          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [

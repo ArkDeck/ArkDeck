@@ -1,7 +1,7 @@
 {
   "artifacts" : [
     {
-      "artifactID" : "ART-31111f4329c8be2736b5e5febaf69f25",
+      "artifactID" : "ART-4a8b4f343cef8fcb3ef9dc04446e21c9",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -25,7 +25,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-a8542c33a62a4286b4976973db7f1579",
-      "sha256" : "e8eb1897357090d9946eb675cb367dad0a8f93e68cb2492069341a381c76c0ca",
+      "sha256" : "926094d13164a284a7e1c00fbc4c2023498326965a562ae985bca7c66637a178",
       "sourceOperation" : "deploy.native-library.app-owned@1",
       "status" : {
         "published" : {

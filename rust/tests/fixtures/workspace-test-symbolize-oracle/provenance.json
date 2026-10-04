@@ -11,18 +11,19 @@
     "artifacts/job-input-crash/index.json": "c908cfb4d1b581f6e25f50bd8f50fc4b94b9c6685b41d3e5ae017963c3e57a8d",
     "artifacts/job-input-host-crash/ART-95b04c40eac2d2504d1244a3f0c5be0a": "861af16021f6d9e470087ec96616137c657d715fcae88f0983e47fe3c77d860c",
     "artifacts/job-input-host-crash/index.json": "9a5be8ab1b626456c5e50f91227c0acd1c40b9c84f3bd1632e713cd6eee45c52",
-    "capabilities/runtime-capabilities.json": "8772e5dc3ea27296aab0b9638c9eb2d33499a0feaa98c634a0b996f31025ff48",
-    "capabilities/runtime-capabilities.ledger": "89cd37e65d0a651c3eb9d23d6c9c90ee2ff0ee40d2aae1e0f908db34c43e5ebf",
-    "frames.jsonl": "aecfc4f031df2a42cdb5d8d25cf9d324873fe3912760c194a8f3c2e92b7fd996",
+    "capabilities/runtime-capabilities.json": "775e98fc0d77029256693cff4dc87d0f36bb4425a7ed285ef72c089efb72a4f3",
+    "capabilities/runtime-capabilities.ledger": "aace6a5d8809d15bc684edc354b11584c027878474f08ce4df015874108976c3",
+    "frames.jsonl": "fe0a7d6eead8b5047466e7197695c8034f531a0d6e46f52e9d3d68bc215bda19",
     "hvigorw.js": "22625b64e49821b7139da1605680b370e89c992bdeb4afc067a84fa0a69666fe",
     "node.sh": "72bfc165918855613fedb8be50effd540f3f2e5830c6074b7da9cbc857a731a0",
-    "parked-symbolize-record.json": "bf6942a47dd68f003703b94a15ee07d2a3cd2196a2ca890fb47732c3b9b085f5",
-    "parked-tests-record.json": "b86dd423655418319007eed67962f9a6c45ec585c99d03db4e069e509f150345",
+    "parked-symbolize-record.json": "babcb9547cf4d59b4cb8c7755f74f86ac82c4e0f75b42c40fd1b3eafff784723",
+    "parked-tests-record.json": "f523f9ecfe6c6d138b7e123f89214823e8aafc09863c70aaa1b892f064424298",
     "symbolizer.sh": "9abdfad5fcbef9ccb0435607a02960c19967b857e2f7b5c19fc301793294935f"
   },
   "frames": "job.plan, job.submit, job.run, job.reconcile and job.result of every workspace.run-tests@1, workspace.symbolize-crash@1 and workspace.prepare-isolated-copy@1 Job, in the order the control plane answered them (37 frames)",
   "recordedBy": "WorkspaceTestSymbolizeOracleContractTests.testTheControlPlaneRunsTestsAndSymbolizesAsRecorded",
   "replayedBy": "the Rust port of workspace.run-tests@1 and workspace.symbolize-crash@1 (TASK-XPA-015, M3)",
   "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceOperationsProvider, with EvolutionWorkspaceManager as its isolation manager, and DescriptorBoundProcessDispatcher naming DEVECO_SDK_HOME for the stand-in Node launcher, over a fabricated project under /private/tmp/arkdeck-workspace-test-symbolize-oracle; the dispatch loses its receipt only where the sequence says so",
-  "why": "the job.* corpora carry no frame of these operations and are deduplicated by shape, so they cannot be replayed as one sequence"
+  "why": "the job.* corpora carry no frame of these operations and are deduplicated by shape, so they cannot be replayed as one sequence",
+  "catalogRegeneration": "../catalog-extension-recording.json"
 }

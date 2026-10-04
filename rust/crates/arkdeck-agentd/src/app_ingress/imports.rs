@@ -1,6 +1,6 @@
 //! The Import upload requests the App sends (ClientKit
-//! `RuntimeAppArtifactUpload`): their exact closed shapes, and the two kinds
-//! the Debug workspace uploads. Identity, bounds, Target binding, generation
+//! `RuntimeAppArtifactUpload`): their exact closed shapes and typed uploads.
+//! Identity, bounds, Target binding, generation
 //! and App ownership stay with the Import owner, which only App frames reach
 //! as App-owned (`Control::handle_app_frame`).
 use super::canonical_decimal;
@@ -74,7 +74,7 @@ pub(super) fn closed(method: &str, params: &Map<String, Value>) -> bool {
 
 /// Swift's App transport (`AgentXPCListener.admission`): a begin is admitted
 /// only when its metadata is a complete, valid Import intent of one of the
-/// App's uploads, a HAP, a native library or a Flash bundle. Any other is
+/// App's uploads, a HAP, native library, Flash bundle or private keyboard input. Any other is
 /// refused at the door, before the owner.
 pub(super) fn admitted_begin(request: &Request) -> bool {
     let Some(params) = request.params.as_ref() else {
@@ -83,7 +83,7 @@ pub(super) fn admitted_begin(request: &Request) -> bool {
     ImportIntent::from_wire(params).is_ok_and(|intent| {
         matches!(
             intent.kind.as_str(),
-            "hap" | "native-library" | "flash-bundle"
+            "hap" | "native-library" | "flash-bundle" | "keyboard-input"
         )
     })
 }

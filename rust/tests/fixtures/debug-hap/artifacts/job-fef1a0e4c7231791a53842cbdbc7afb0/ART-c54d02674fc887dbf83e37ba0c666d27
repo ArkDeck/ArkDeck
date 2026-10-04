@@ -1,0 +1,12 @@
+{
+  "artifact" : "process-readback.json",
+  "bundleName" : "com.example.demo",
+  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "firmware" : "OpenHarmony-4.1-release",
+  "jobId" : "job-fef1a0e4c7231791a53842cbdbc7afb0",
+  "model" : "OpenHarmony Reference Device",
+  "operation" : "debug.hap@1",
+  "running" : "true",
+  "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "transport" : "usb"
+}

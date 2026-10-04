@@ -9,7 +9,7 @@
       "result" : {
         "authorizationPolicy" : "defaultReadOnly",
         "bindingRevision" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "dispatchDisposition" : "notDispatched",
         "effectiveEffect" : "hostOnly",
         "executionMode" : "planOnly",
@@ -23,7 +23,7 @@
           "timestampNs" : 16000000000
         },
         "jobAdmitted" : false,
-        "materializedPlanDigest" : "8a71a19a393824f972f1ef6b7eb73723e3948f48f0f1d313d8084f5e1d1b1c9b",
+        "materializedPlanDigest" : "cb681af42d816bbd498f8dc4c35ed2c028699238a3ac315d3c5fd0e1c2f40790",
         "operation" : "analyzer.analyze-trace@1",
         "providerAdmissionBlocker" : null,
         "providerId" : "analyzer",

@@ -2,7 +2,7 @@
   "records" : [
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-2DC18C8E5975B65BF26A590D33418DDAB5BC8E63-G1",
+        "capabilityID" : "CAP-RT-POLICY-5FA64B4B5F44D8E6F7EBDF19BBE56A150F5B792D-G1",
         "effectCeiling" : "deviceMutation",
         "exactInputs" : {
           "buildPresetRef" : "oracle-debug",
@@ -27,7 +27,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.build-openharmony@1"
+          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:workspace.build-openharmony@1"
         },
         "maximumUses" : 10000,
         "operationScope" : [
@@ -52,21 +52,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "deviceMutation",
           "jobID" : "job-ae22d6e48bcd5a65a9bf9cc5ef3d3915",
-          "materializedPlanDigest" : "8439605ff78155490c9617894751c7d76e2274e5aa42b4f68bcbee1156f5bb24",
+          "materializedPlanDigest" : "123582f7cb97c16678bcec95ef896d425cbfc290f2517b8e2dfbd285308a42db",
           "operationReference" : "workspace.build-openharmony@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-ae22d6e48bcd5a65a9bf9cc5ef3d3915",
               "outcome" : "confirmed",
-              "previousRecordSHA256" : "e0292fac0493daca90ac3289fe98f750e73f9eab979f03724bc0d1e9252fd51a",
-              "recordSHA256" : "da269ccd988066350b7be9df2af05e0ccfa3fa9360414a83c0ed12a853762d40",
+              "previousRecordSHA256" : "7d9115dbdf8c28ad76b3bec65e320e19e3d652e28316806a645c014162b8da56",
+              "recordSHA256" : "9a7d606ac2f536b3293430f00079d4c09af127f3538a5c2e0fd1c87ded4a1700",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "succeeded"
             }
           ],
-          "queryFingerprintSHA256" : "32b8b8ee82fb1d1efe4265908c019a2fc80efc522a7df503463b0e0ed3d21096",
-          "receiptSHA256" : "e0292fac0493daca90ac3289fe98f750e73f9eab979f03724bc0d1e9252fd51a",
+          "queryFingerprintSHA256" : "1b9b9e3c88b49e554521a38fd7a3945873796c564a0e658312d11ace01386fee",
+          "receiptSHA256" : "7d9115dbdf8c28ad76b3bec65e320e19e3d652e28316806a645c014162b8da56",
           "remainingUsesAfter" : 9999,
           "reservationID" : "idempotency-build"
         }
@@ -75,7 +75,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-D9CB69D02F509FBAF2B9DCB8C284A12D9DC38F72-G1",
+        "capabilityID" : "CAP-RT-POLICY-3F2B09D1DE8E5EDAAABB3F61172087443BFF689D-G1",
         "effectCeiling" : "deviceMutation",
         "exactInputs" : {
           "buildPresetRef" : "oracle-missing-module",
@@ -100,7 +100,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.build-openharmony@1"
+          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:workspace.build-openharmony@1"
         },
         "maximumUses" : 10000,
         "operationScope" : [

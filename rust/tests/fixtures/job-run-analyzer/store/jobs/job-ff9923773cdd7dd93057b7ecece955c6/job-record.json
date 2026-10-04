@@ -8,11 +8,11 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-ff9923773cdd7dd93057b7ecece955c6",
-  "materializedPlanDigest" : "ba01622ab0eafea813574d1027e1beb6ad2ef92e8265127bc2bb8a8d0069cf76",
+  "materializedPlanDigest" : "4033cc475cf06d3d58aa0428a1c24dc5b95cc544a8e07454c193248f652a9fff",
   "operationFailure" : {
     "category" : "storage",
     "code" : "artifactPublicationFailed",

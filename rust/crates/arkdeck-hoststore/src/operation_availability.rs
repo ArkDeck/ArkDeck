@@ -21,7 +21,8 @@ pub struct OperationAvailabilityContext<'a> {
 
 /// The executable operations that mutate a device: each consumes a Runtime
 /// capability use first, so none is available without the mutation owner.
-const MUTATIONS: [&str; 8] = [
+const MUTATIONS: [&str; 9] = [
+    "input.keyboard@1",
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",

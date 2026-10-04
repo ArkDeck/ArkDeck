@@ -8,6 +8,7 @@
 //! is in no `checks` entry, so the host states what those findings state, and
 //! the replay proves their wording, severity, scope and order and what they
 //! make of the report's readiness.
+mod support;
 use arkdeck_contract::*;
 use arkdeck_control::{
     ArtifactStoreFacts, Control, DoctorFacts, HdcStatus, HostServices, TargetStoreFacts,
@@ -180,7 +181,7 @@ fn every_recorded_report_is_reproduced_from_the_inputs_it_states() {
         let answer = call(&control, recorded.get("params").cloned());
         assert_eq!(
             answer.outcome.unwrap(),
-            *result,
+            support::current_catalog_report(result),
             "doctor.jsonl line {}",
             line + 1
         );

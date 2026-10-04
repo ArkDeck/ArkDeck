@@ -8,11 +8,11 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-a8a90d4107e7ad2edefd43c27dd619aa",
-  "materializedPlanDigest" : "727c3147b1f2af4ba87a2bc4603c8e795f7a8b2aa589fddbe95662fdbcf70e27",
+  "materializedPlanDigest" : "509a19289cf9f68d00cbdd715fb7d41de1977377417a18e7c152b3aff1286fe1",
   "operationFailure" : {
     "category" : "execution",
     "code" : "executionFailed",

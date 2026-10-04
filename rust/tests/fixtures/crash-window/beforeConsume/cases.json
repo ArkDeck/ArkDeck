@@ -199,7 +199,7 @@
             "probeDevice",
             "runApprovedRemoteRead"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
           "events" : {
             "jobId" : "job-170e24af76bacc6d8185503ed380ebea",
             "method" : "job.events"
@@ -252,12 +252,12 @@
             "workspaceKind" : "toolkit"
           },
           "materializedBindingRevision" : 1,
-          "materializedPlanDigest" : "2ba2413414359eb134a297290725ac23f9f3391369cf8efab75a153f82f1e7da",
+          "materializedPlanDigest" : "bc016c7bca0cfc445703af19062d4e0eaf74e583db498347236ebd55d1be23ee",
           "materializedStableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
           "providerId" : "hdc",
           "request" : {
             "authorization" : {
-              "capabilityId" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1"
+              "capabilityId" : "CAP-RT-POLICY-E18B623397A5ACD1F87256F3F143C0EE01F3ED88-G1"
             },
             "documentType" : "runtime-operation-request",
             "idempotencyKey" : "idem-crash-tap",
@@ -362,7 +362,7 @@
           "blockers" : [
             "resultNotReady"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
           "executionMode" : "execute",
           "finishedAtUtc" : null,
           "firstEvidenceStepAtUtc" : null,
@@ -432,7 +432,7 @@
         "ok" : true,
         "result" : [
           {
-            "capabilityId" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1",
+            "capabilityId" : "CAP-RT-POLICY-E18B623397A5ACD1F87256F3F143C0EE01F3ED88-G1",
             "consumptionCount" : 0,
             "effectCeiling" : "deviceMutation",
             "lineageAllowsNewExecution" : true,
@@ -453,7 +453,7 @@
         "ok" : true,
         "result" : {
           "capability" : {
-            "capabilityID" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1",
+            "capabilityID" : "CAP-RT-POLICY-E18B623397A5ACD1F87256F3F143C0EE01F3ED88-G1",
             "effectCeiling" : "deviceMutation",
             "exactBindingRevision" : 1,
             "exactInputs" : {
@@ -476,7 +476,7 @@
             "issuedAtUTC" : "2026-09-14T00:00:00Z",
             "issuer" : {
               "kind" : "runtimeDefaultPolicy",
-              "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:input.tap@1"
+              "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:input.tap@1"
             },
             "maximumUses" : 2000,
             "operationScope" : [
@@ -504,7 +504,7 @@
       "method" : "capability.inspect",
       "name" : "capabilities.inspect0",
       "params" : {
-        "capabilityId" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1"
+        "capabilityId" : "CAP-RT-POLICY-E18B623397A5ACD1F87256F3F143C0EE01F3ED88-G1"
       }
     }
   ],

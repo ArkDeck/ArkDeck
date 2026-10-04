@@ -32,7 +32,7 @@
         "blockers" : [
 
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -111,7 +111,7 @@
           "blockers" : [
 
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -166,7 +166,7 @@
           "sessionId" : "session-job-107679f20983827cfcdcabfb4debb2f8",
           "sessionPublication" : {
             "catalogGeneration" : "3",
-            "manifestSha256" : "1e50dc00cec995f4bf372ba6295e117c9f576e5ada3a8be599555b4fd86d7569",
+            "manifestSha256" : "35095d7285dad2dd5541fb3883d33cc2322f142709a47fcb5fe8b9d40121ffa2",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -190,7 +190,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "events" : {
           "jobId" : "job-107679f20983827cfcdcabfb4debb2f8",
           "method" : "job.events"
@@ -229,7 +229,7 @@
           "sessionId" : "session-job-107679f20983827cfcdcabfb4debb2f8",
           "sessionPublication" : {
             "catalogGeneration" : "3",
-            "manifestSha256" : "1e50dc00cec995f4bf372ba6295e117c9f576e5ada3a8be599555b4fd86d7569",
+            "manifestSha256" : "35095d7285dad2dd5541fb3883d33cc2322f142709a47fcb5fe8b9d40121ffa2",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -242,7 +242,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "718b8c0fc370f327dea43d39fed6a10479d24936fde55f6c2e3bc78a4f0ef1c0",
+        "materializedPlanDigest" : "9061df5ad2f967d3644c649e23431f437ff4023fd5ec416e6f84142a0d28bf09",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -317,7 +317,7 @@
         "sessionId" : "session-job-107679f20983827cfcdcabfb4debb2f8",
         "sessionPublication" : {
           "catalogGeneration" : "3",
-          "manifestSha256" : "1e50dc00cec995f4bf372ba6295e117c9f576e5ada3a8be599555b4fd86d7569",
+          "manifestSha256" : "35095d7285dad2dd5541fb3883d33cc2322f142709a47fcb5fe8b9d40121ffa2",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -354,7 +354,7 @@
         "blockers" : [
           "artifactIntegrityFailed"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -409,7 +409,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -470,7 +470,7 @@
           "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
+            "manifestSha256" : "df1ac5fcbc0ded415413b7cee2aed6e00c87c20ccce5b80718f32a256ac5723a",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -494,7 +494,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "events" : {
           "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "method" : "job.events"
@@ -539,7 +539,7 @@
           "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
+            "manifestSha256" : "df1ac5fcbc0ded415413b7cee2aed6e00c87c20ccce5b80718f32a256ac5723a",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -552,7 +552,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "4e0612fdf11bdbd6a6d26cb786b6adc7477cb08dfa584cccdf22c7ad2bf66ca8",
+        "materializedPlanDigest" : "da3789aab6e5ecf0173af16de28fac63014b666aa468f68e40d3c9890d73e972",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -634,7 +634,7 @@
         "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
         "sessionPublication" : {
           "catalogGeneration" : "1",
-          "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
+          "manifestSha256" : "df1ac5fcbc0ded415413b7cee2aed6e00c87c20ccce5b80718f32a256ac5723a",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -671,7 +671,7 @@
         "blockers" : [
           "artifactIntegrityFailed"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -726,7 +726,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -787,7 +787,7 @@
           "sessionId" : "session-job-e1ca83b654fb71dcfc681bf7e9e67dff",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "f0e72636d92278b55ddfcd8d966f32abce1307cacc81ec7e292d5d500309c904",
+            "manifestSha256" : "77ef5f804385fcfe96f0d33fb651e08f72416e2fd7b4f51fb542833611de9e21",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -809,7 +809,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "events" : {
           "jobId" : "job-e1ca83b654fb71dcfc681bf7e9e67dff",
           "method" : "job.events"
@@ -854,7 +854,7 @@
           "sessionId" : "session-job-e1ca83b654fb71dcfc681bf7e9e67dff",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "f0e72636d92278b55ddfcd8d966f32abce1307cacc81ec7e292d5d500309c904",
+            "manifestSha256" : "77ef5f804385fcfe96f0d33fb651e08f72416e2fd7b4f51fb542833611de9e21",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -867,7 +867,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "849dc30ade63d0dc2a9b89699df2df150b3ac287f8dc00e1c45b80dafda3c15a",
+        "materializedPlanDigest" : "ad57a9af1b463e56526f0a80e994de51065a50c62a4371a324b36a57dca6095d",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -947,7 +947,7 @@
         "sessionId" : "session-job-e1ca83b654fb71dcfc681bf7e9e67dff",
         "sessionPublication" : {
           "catalogGeneration" : "2",
-          "manifestSha256" : "f0e72636d92278b55ddfcd8d966f32abce1307cacc81ec7e292d5d500309c904",
+          "manifestSha256" : "77ef5f804385fcfe96f0d33fb651e08f72416e2fd7b4f51fb542833611de9e21",
           "reasonCode" : null,
           "state" : "published"
         },

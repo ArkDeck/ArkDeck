@@ -4,7 +4,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "events" : {
           "jobId" : "job-19068673bce19fa55ee6207e00812877",
           "method" : "job.events"
@@ -57,7 +57,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedPlanDigest" : "9b13c4d052ba74cd17b313b9ada7ee463f3995a123045618cc79d5a8315bf50a",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -143,7 +143,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "events" : {
           "jobId" : "job-784851134c779544a6094593216ee759",
           "method" : "job.events"
@@ -196,7 +196,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedPlanDigest" : "9b13c4d052ba74cd17b313b9ada7ee463f3995a123045618cc79d5a8315bf50a",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -285,7 +285,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "events" : {
           "jobId" : "job-c410a0cd501276830e1a2091883a1098",
           "method" : "job.events"
@@ -338,7 +338,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedPlanDigest" : "9b13c4d052ba74cd17b313b9ada7ee463f3995a123045618cc79d5a8315bf50a",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -431,7 +431,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
         "events" : {
           "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
           "method" : "job.events"
@@ -484,7 +484,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedPlanDigest" : "9b13c4d052ba74cd17b313b9ada7ee463f3995a123045618cc79d5a8315bf50a",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {

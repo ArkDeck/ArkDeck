@@ -2,7 +2,7 @@
   "records" : [
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1",
+        "capabilityID" : "CAP-RT-POLICY-F2AAEF3EDD205B862867AC0798A23E1ADCD106FA-G1",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -26,7 +26,7 @@
           ],
           "postFlashVerification" : "basic"
         },
-        "exactPlanDigest" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+        "exactPlanDigest" : "51080032c46ef1d5811ae9a106d3ca2eee57ce17f2809d46c209b929e942fc38",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "deviceProfile" : {
@@ -45,7 +45,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:flash.dayu200"
+          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.dayu200"
         },
         "maximumUses" : 1,
         "operationScope" : [

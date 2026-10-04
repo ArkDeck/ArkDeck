@@ -146,6 +146,11 @@ impl ImportIntent {
                     && (64..=64 * 1024 * 1024).contains(&self.byte_count)
                     && self.device_profile.is_none()
             }
+            "keyboard-input" => {
+                self.name == "keyboard-input.json"
+                    && self.byte_count <= crate::KEYBOARD_PAYLOAD_MAX_BYTES as u64
+                    && self.device_profile.is_none()
+            }
             "flash-bundle" => {
                 self.name == "images.tar.gz"
                     && self.byte_count <= IMPORT_STAGING_QUOTA
@@ -172,12 +177,13 @@ impl ImportIntent {
             "hap" if self.name.ends_with(".hsp") => "application/vnd.openharmony.hsp",
             "hap" => "application/vnd.openharmony.hap",
             "workspace-patch" => "text/x-diff",
+            "keyboard-input" => crate::KEYBOARD_MEDIA_TYPE,
             "native-library" => "application/x-elf",
             _ => "application/gzip",
         }
     }
     pub fn privacy(&self) -> &'static str {
-        if self.kind == "workspace-patch" {
+        if matches!(self.kind.as_str(), "workspace-patch" | "keyboard-input") {
             "sensitive"
         } else {
             "standard"

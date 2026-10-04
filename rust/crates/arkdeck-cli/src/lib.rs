@@ -752,6 +752,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "import", "hap"] => "artifact.import.hap",
         ["artifact", "import", "workspace-patch"] => "artifact.import.workspace-patch",
         ["artifact", "import", "native-library"] => "artifact.import.native-library",
+        ["artifact", "import", "keyboard-input"] => "artifact.import.keyboard-input",
         ["artifact", "import", "flash-bundle"] => "artifact.import.flash-bundle",
         ["artifact", "import", "abort"] => "artifact.import.abort",
         ["artifact", "import", "inspect"] => "artifact.import.inspect",
@@ -836,6 +837,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["analyze", "crash-signature"] => "analyze.crash-signature",
         ["target", "observe"] => "target.observe",
         ["input", "tap"] => "input.tap",
+        ["input", "keyboard"] => "input.keyboard",
         ["input", "long-press"] => "input.long-press",
         ["input", "swipe"] => "input.swipe",
         ["port-forward", "create"] => "port-forward.create",
@@ -1176,6 +1178,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         }
         "artifact.import.hap"
         | "artifact.import.native-library"
+        | "artifact.import.keyboard-input"
         | "artifact.import.workspace-patch" => &["importRequestId", "targetId", "file", "timeout"],
         "artifact.import.flash-bundle" => &[
             "importRequestId",
@@ -1783,6 +1786,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             command,
             "artifact.import.hap"
                 | "artifact.import.native-library"
+                | "artifact.import.keyboard-input"
                 | "artifact.import.workspace-patch"
                 | "artifact.import.flash-bundle"
         ) {

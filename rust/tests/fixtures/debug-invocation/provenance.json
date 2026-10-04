@@ -1,10 +1,28 @@
 {
-  "producer" : "DebugInvocationOracleContractTests",
-  "root" : "/private/tmp/arkdeck-debug-invocation-oracle",
-  "steps" : [
+  "producer": "DebugInvocationOracleContractTests",
+  "root": "/private/tmp/arkdeck-debug-invocation-oracle",
+  "steps": [
     "artifact.import (flash-bundle, production policy)",
     "RuntimeDebugInvocationController over a scripted driver (documents laid down)",
     "RuntimeControlPlaneHandler debug.start, debug.evaluate, debug.status",
     "RuntimeJobEngineDebugAttemptDriver over RuntimeJobEngine.planOnly"
-  ]
+  ],
+  "catalogRegeneration": "../catalog-extension-recording.json",
+  "files": {
+    "cases.json": "eb1fa0e7c0431f151be7e58c08946e817e39f4fe8fd526d03b68fa0c57b0e3e0",
+    "execute.json": "bead5c801555ce2c822c2ebdee8c3fe050ba75d9c49e2e9941d3dd201d309b38",
+    "inputs/artifacts/.imports-v1/identities/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb.json": "b43b6d86470cf7ad78f4cf81cea8a0d7a7d5c691c7bd02484f5e428c76109d76",
+    "inputs/artifacts/.imports-v1/records/0ca4a4867b80cf2c9e87861a65a886e9e0572b168876d25abb5674a7b2e7ebab.json": "a0a58e243afdaa52418460b22b0585d79bb3d9fb8e95bc2b4913caf21f36961d",
+    "inputs/artifacts/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb/.payload-verification-v1.json": "06a1e3cee11448bbf435dc18a43d732247cce0a2980946613031f093e60dde8c",
+    "inputs/artifacts/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb/ART-6c4614c81b2ed07d84f0b3106d7e461f": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "inputs/artifacts/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb/index.json": "7895f89a014e0dabd5305fe3f8f593b671f9594472f923d2d9025fa265d4b286",
+    "inputs/runtime-debug-invocations/debug-3ade2450-d368-46da-9349-119270ac9e1c.json": "2888e89b33d934ecc9038cf7b318cd697cae9c0be7307e74454073ccaeca6ae1",
+    "inputs/runtime-debug-invocations/debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd.json": "44002cdca02040d8621c361b1833fc6292a7cb7f7201493c081a950e6bf43142",
+    "inputs/runtime-debug-invocations/debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23.json": "190753963f7f849334ce99a0ca9d4132613494bbc91de187a36bf9df513fed6f",
+    "inputs/runtime-debug-invocations/debug-d8f03948-39cc-4e0f-8c4e-a5727d246893.json": "f1a7829613282b374ee9e49bfac37497c6d070e2467b51390ecfd3adf677f6fd",
+    "inputs/targets/.target-display-names.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inputs/targets/.targets.lock": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inputs/targets/target-display-names.json": "75b50df5a3c0623ccfd44fb9f522003c4dfafb7e07a98a34f91ce96b8150d36d",
+    "inputs/targets/targets.json": "dcd181e5f2eff196bf31fcd0abe8416ed992316c63bf79aae84c78c0b9eefe5a"
+  }
 }

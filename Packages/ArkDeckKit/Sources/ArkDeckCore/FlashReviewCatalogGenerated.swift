@@ -3,7 +3,7 @@
 public enum FlashReviewCatalogGenerated {
   public static let json = #"""
 {
-  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "catalogDigest": "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
   "dispatchDisposition": "notDispatched",
   "jobAdmitted": false,
   "operation": "flash.full-restore@1",

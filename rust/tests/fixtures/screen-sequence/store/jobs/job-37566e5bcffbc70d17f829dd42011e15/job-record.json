@@ -5,13 +5,13 @@
     "runApprovedRemoteRead",
     "preflightDeviceStorage"
   ],
-  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-37566e5bcffbc70d17f829dd42011e15",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+  "materializedPlanDigest" : "fdb2666d52a4fdec7994eb06e4595aefc6d49a080dc4d60bd3aae1e9f955b197",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationFailure" : {
     "category" : "execution",
@@ -45,7 +45,7 @@
   "providerID" : "hdc",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1"
+      "capabilityId" : "CAP-RT-POLICY-C2021126297F82765879B29A054F7B80CA7DBEE4-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-sequence-lowStorage",
@@ -67,7 +67,7 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
     "claims" : [
 
     ],

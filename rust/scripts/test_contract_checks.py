@@ -358,6 +358,46 @@ class ContractChecksTests(unittest.TestCase):
         runner.materialize(view, current, candidate, self.published_info)
         self.assertEqual((view / runner.CODE_SIGN_HELPER).read_bytes(), b"\x7fELF helper bytes")
 
+    def test_catalog_change_replays_original_fixtures_with_current_implementation(self):
+        self.write("rust/tests/fixtures/example/cases.json", b"old plan digest\n")
+        self.write("rust/tests/fixtures/example/old-artifact", b"old artifact\n")
+        self.write("rust/tests/fixtures/contracts-bundle/owned.json", b"old CLI products\n")
+        self.git("add", ".")
+        self.git("-c", "user.name=Contract test", "-c", "user.email=contract@example.invalid",
+                 "commit", "-qm", "Record old Catalog fixtures")
+        commit = self.git("rev-parse", "HEAD").decode().strip()
+        old_info = {**self.published_info, "commit": commit}
+        companions = runner.published_catalog_companions(commit)
+        self.assertNotIn("rust/tests/fixtures/contracts-bundle/owned.json", companions)
+        self.write("rust/tests/fixtures/contracts-bundle/owned.json", b"current CLI products\n")
+        self.write("rust/tests/fixtures/example/cases.json", b"new plan digest\n")
+        self.write("rust/tests/fixtures/example/new-artifact", b"new artifact\n")
+        self.write("rust/tests/fixtures/new-operation/cases.json", b"new implementation fixture\n")
+        self.write("rust/current-implementation.rs", b"current source\n")
+        self.write(runner.REVIEW_PROJECTION, b"new Catalog projection\n")
+        published = self.root / "published-view"
+        runner.materialize(published, self.published, old_info, old_info,
+                           catalog_companions=companions)
+        self.assertEqual((published / "rust/current-implementation.rs").read_bytes(), b"current source\n")
+        fixtures = published / "rust/tests/fixtures"
+        self.assertEqual((fixtures / "contracts-bundle/owned.json").read_bytes(), b"current CLI products\n")
+        self.assertEqual((fixtures / "example/cases.json").read_bytes(), b"old plan digest\n")
+        self.assertEqual((fixtures / "example/old-artifact").read_bytes(), b"old artifact\n")
+        self.assertFalse((fixtures / "example/new-artifact").exists())
+        self.assertEqual((fixtures / "new-operation/cases.json").read_bytes(), b"new implementation fixture\n")
+        self.assertEqual((published / runner.REVIEW_PROJECTION).read_bytes(), b"// current App projection\n")
+        provenance = json.loads((published / "catalog-fixture-provenance.json").read_bytes())
+        self.assertEqual(provenance["sourceCommit"], commit)
+        self.assertEqual(provenance["files"]["rust/tests/fixtures/example/cases.json"],
+                         contract.sha(b"old plan digest\n"))
+        # Candidate inputs and the source checkout are untouched by old-view replay.
+        self.assertEqual((self.root / "rust/tests/fixtures/example/cases.json").read_bytes(), b"new plan digest\n")
+        current = contract.working_inputs()
+        candidate = self.root / "candidate-view"
+        runner.materialize(candidate, current, contract.candidate(current, commit, commit), old_info)
+        self.assertEqual((candidate / "rust/tests/fixtures/example/cases.json").read_bytes(), b"new plan digest\n")
+        self.assertEqual((candidate / runner.REVIEW_PROJECTION).read_bytes(), b"new Catalog projection\n")
+
     def test_candidate_new_keywords_stay_isolated_from_the_published_baseline(self):
         before_pin = contract.BASELINE.read_bytes()
         before_generated = contract.GENERATED.read_bytes()

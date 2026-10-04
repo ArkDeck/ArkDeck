@@ -33,8 +33,7 @@
 //! shape, so the expired impact approval is shown by a line whose action no
 //! other line makes, and nothing here can create the record to answer it.
 use arkdeck_contract::{
-    CATALOG_DIGEST, CONTRACT_IDENTITY, DeviceObservationsResult, PROTOCOL_VERSION, WireError,
-    sha256_hex,
+    CONTRACT_IDENTITY, DeviceObservationsResult, PROTOCOL_VERSION, WireError, sha256_hex,
 };
 use arkdeck_control::{Control, HdcStatus, HostServices};
 use arkdeck_hoststore::{
@@ -805,9 +804,12 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     // unobserved and a blocked preview, read, reconciled and paged.
     let blocked = corpora.action("host-blocked");
     let unobserved = corpora.action("host-unobserved");
-    assert_eq!(blocked.catalog, CATALOG_DIGEST);
+    // Replay the captured owner's Catalog identity, including every digest in
+    // its exact review tuple. A later candidate operation cannot rewrite this
+    // historical oracle or weaken the production identity checks.
+    let catalog = blocked.catalog.as_str();
     let scenario = Scenario::new(HOST_START);
-    let control = scenario.start("epoch-1", CATALOG_DIGEST);
+    let control = scenario.start("epoch-1", catalog);
     let required = "an exact restart intent and request identity are required";
     for line in [
         corpora.refusal("runtime.hdc.impact-preview", required, Value::Null),
@@ -883,7 +885,7 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     // is the merge-base's contract, which this slice's lines are not in.
     if let Some(generation_changed) = corpora.optional_action("host-generation-changed") {
         let scenario = Scenario::new(HOST_START);
-        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        let control = scenario.start("epoch-1", catalog);
         scenario.identities(&generation_changed);
         scenario.observe(Some(&generation_changed));
         // Its reconcile answered exactly as another blocked action's did, so
@@ -900,7 +902,7 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     let restarted = corpora.action("host-restarted");
     let expiring = corpora.action("host-expiring");
     let scenario = Scenario::new(HOST_START);
-    let control = scenario.start("epoch-a", CATALOG_DIGEST);
+    let control = scenario.start("epoch-a", catalog);
     scenario.identities(&restarted);
     scenario.observe(Some(&restarted));
     let before = reply(
@@ -914,7 +916,7 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     drop(control);
     scenario.advance(60_000);
     scenario.observe(None);
-    let control = scenario.start("epoch-b", CATALOG_DIGEST);
+    let control = scenario.start("epoch-b", catalog);
     let line = corpora.answered("control-action.show", "host-restarted", "previewDrifted");
     replay(&mut corpora, &control, line, None);
     scenario.identities(&expiring);
@@ -956,9 +958,9 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
             continue;
         }
         let action = corpora.action(request);
-        assert_eq!(action.catalog, CATALOG_DIGEST);
+        assert_eq!(action.catalog, catalog);
         let scenario = Scenario::new(HOST_START);
-        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        let control = scenario.start("epoch-1", catalog);
         scenario.identities(&action);
         scenario.observe(Some(&action));
         let line = corpora.answered("runtime.hdc.impact-preview", request, "blocked");
@@ -979,9 +981,9 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     // each refusal Swift gives before one.
     if corpora.shows("host-restart") {
         let action = corpora.action("host-restart");
-        assert_eq!(action.catalog, CATALOG_DIGEST);
+        assert_eq!(action.catalog, catalog);
         let scenario = Scenario::new(HOST_START);
-        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        let control = scenario.start("epoch-1", catalog);
         scenario.identities(&action);
         scenario.observe(Some(&action));
         let line = corpora.answered("runtime.hdc.impact-preview", "host-restart", "previewReady");
@@ -1058,7 +1060,7 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         let unproven = corpora.action("host-restart-unproven");
         let drifted = corpora.action("host-restart-drifted");
         let scenario = Scenario::new(HOST_START);
-        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        let control = scenario.start("epoch-1", catalog);
         scenario.identities(&unproven);
         scenario.observe(Some(&unproven));
         let unproven_ready = ready(&control, &unproven, "host-restart-unproven");
@@ -1089,7 +1091,7 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         let expiring = corpora.action("host-approval-expiring");
         let drifting = corpora.action("host-approval-drifting");
         let scenario = Scenario::new(HOST_START);
-        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        let control = scenario.start("epoch-1", catalog);
         scenario.identities(&expiring);
         scenario.observe(Some(&expiring));
         let expiring_ready = ready(&control, &expiring, "host-approval-expiring");
@@ -1156,9 +1158,9 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         let action = corpora.action(request);
         let other_request = format!("{request}-unproven");
         let other = corpora.action(&other_request);
-        assert_eq!(action.catalog, CATALOG_DIGEST);
+        assert_eq!(action.catalog, catalog);
         let scenario = Scenario::new(HOST_START);
-        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        let control = scenario.start("epoch-1", catalog);
         scenario.identities(&action);
         scenario.observe(Some(&action));
         let line = corpora.answered("runtime.hdc.impact-preview", request, "previewReady");

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ArkDeck private keyboard input",
+  "description": "Sensitive raw Artifact, at most 4096 encoded bytes. Text is additionally bounded to 512 UTF-8 bytes by both producer and Runtime. Never embed this payload in Job inputs or journal arguments.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "key"
+      ],
+      "properties": {
+        "kind": {
+          "const": "key"
+        },
+        "key": {
+          "enum": [
+            "enter",
+            "backspace",
+            "tab",
+            "escape",
+            "arrowUp",
+            "arrowDown",
+            "arrowLeft",
+            "arrowRight",
+            "home",
+            "back"
+          ]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "text",
+        "allowDeviceClipboard"
+      ],
+      "properties": {
+        "kind": {
+          "const": "text"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+        },
+        "allowDeviceClipboard": {
+          "const": true
+        }
+      }
+    }
+  ]
+}

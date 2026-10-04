@@ -1,3 +1,4 @@
+mod support;
 use arkdeck_contract::*;
 use arkdeck_control::{Control, HdcStatus, HostServices};
 use serde_json::{Value, json};
@@ -72,12 +73,33 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
         );
         let actual = response.outcome.unwrap();
         if method == "doctor" {
-            assert_eq!(actual, recorded["result"]);
+            assert_eq!(actual, support::current_catalog_report(&recorded["result"]));
         } else {
             let actual = actual.as_array().unwrap();
             let expected = recorded["result"].as_array().unwrap();
-            assert_eq!(actual.len(), expected.len());
-            for (actual, expected) in actual.iter().zip(expected) {
+            let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
+            let has_keyboard = catalog.iter().any(|entry| entry["id"] == "input.keyboard");
+            let keyboard = actual
+                .iter()
+                .find(|row| row["reference"] == "input.keyboard@1");
+            assert_eq!(actual.len(), expected.len() + usize::from(has_keyboard));
+            if has_keyboard {
+                let keyboard = keyboard.expect("current Catalog advertises keyboard input");
+                assert_eq!(keyboard["minimumEffect"], "deviceMutation");
+                assert_eq!(keyboard["binding"], "confirmedDevice");
+                assert_eq!(keyboard["availability"], "unavailable");
+                assert_eq!(keyboard["reasonCodes"], json!(["provider_not_registered"]));
+            } else {
+                assert!(
+                    keyboard.is_none(),
+                    "historical Catalog cannot advertise keyboard input"
+                );
+            }
+            for expected in expected {
+                let actual = actual
+                    .iter()
+                    .find(|row| row["reference"] == expected["reference"])
+                    .unwrap();
                 // The Swift recording has an HDC provider. Compare shared
                 // descriptors exactly, and only compare availability where
                 // both hosts lack the operation provider.

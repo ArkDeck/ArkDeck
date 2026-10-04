@@ -262,7 +262,13 @@
                 "imageBundleLease": {
                   "type": "string"
                 },
+                "inputEpochUtc": {
+                  "type": "string"
+                },
                 "intent": {
+                  "type": "string"
+                },
+                "keyboardArtifactLease": {
                   "type": "string"
                 },
                 "kind": {
@@ -641,7 +647,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 4,
-    "request": 114,
-    "result": 110
+    "request": 115,
+    "result": 111
   }
 }

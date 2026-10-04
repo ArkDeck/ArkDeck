@@ -132,3 +132,6 @@ pub use windows_registry::{
     WINDOWS_HDC_TUPLES, WindowsHdcTuple, malformed as malformed_windows_tuple, tuple_in,
     windows_tuple,
 };
+
+mod keyboard_input;
+pub use keyboard_input::KeyboardInput;

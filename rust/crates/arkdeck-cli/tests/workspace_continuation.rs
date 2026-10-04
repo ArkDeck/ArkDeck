@@ -19,7 +19,39 @@ use serde_json::{Value, json};
 const ORACLE: &str = include_str!("../../../tests/fixtures/workspace-continuation/cases.json");
 
 fn oracle() -> Value {
-    serde_json::from_str(ORACLE).unwrap()
+    // Preserve the recorded refusal mutations; only the baseline Catalog and
+    // wire negotiation pins advance for this replay against the current CLI.
+    let recorded: Value = serde_json::from_str(ORACLE).unwrap();
+    let text = ORACLE
+        .replace(
+            recorded["cliCatalogDigest"].as_str().unwrap(),
+            arkdeck_contract::CATALOG_DIGEST,
+        )
+        .replace(
+            recorded["health"]["contractIdentity"].as_str().unwrap(),
+            arkdeck_contract::CONTRACT_IDENTITY,
+        );
+    let mut current: Value = serde_json::from_str(&text).unwrap();
+    fn wire(value: &mut Value, recorded_methods: &Value) {
+        match value {
+            Value::Object(fields) => {
+                if fields.get("publishedMethods") == Some(recorded_methods) {
+                    fields.insert("publishedMethods".into(), json!(arkdeck_contract::METHODS));
+                }
+                for child in fields.values_mut() {
+                    wire(child, recorded_methods);
+                }
+            }
+            Value::Array(values) => {
+                for child in values {
+                    wire(child, recorded_methods);
+                }
+            }
+            _ => {}
+        }
+    }
+    wire(&mut current, &recorded["health"]["publishedMethods"]);
+    current
 }
 
 /// An answer as the oracle records it: `{value}`, or the refusal's code,

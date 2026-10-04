@@ -32,7 +32,7 @@
   {
     "name" : "duplicateWithReviewedPlan",
     "params" : {
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a\",\"reviewedPlanDigest\":\"1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a\",\"reviewedPlanDigest\":\"9b13c4d052ba74cd17b313b9ada7ee463f3995a123045618cc79d5a8315bf50a\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
     },
     "response" : {
       "ok" : true,
@@ -81,7 +81,7 @@
   {
     "name" : "admittedWithReviewedPlan",
     "params" : {
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-b-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-b\",\"reviewedPlanDigest\":\"1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-b-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-b\",\"reviewedPlanDigest\":\"9b13c4d052ba74cd17b313b9ada7ee463f3995a123045618cc79d5a8315bf50a\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
     },
     "response" : {
       "ok" : true,
