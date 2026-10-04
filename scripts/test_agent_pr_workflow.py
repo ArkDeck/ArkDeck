@@ -21,7 +21,7 @@ SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
 RUST_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "rust-ci.yml"
 RELEASE_RC_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "release-rc.yml"
 SWIFTPM_CACHE_KEY = (
-    "          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0"
+    "          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0"
     "-image-${{ steps.runner-image.outputs.version }}"
     "-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}\n"
 )
@@ -407,6 +407,7 @@ def validate_automatic_check_contract(
         '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
         "python3 scripts/ci/test_plan.py",
         "python3 scripts/ci/test_event_checkout.py",
+        "python3 scripts/ci/test_cache_scope.py",
         "python3 scripts/test_agent_pr_workflow.py",
         "python3 scripts/ci/plan.py",
         '--event "$GITHUB_EVENT_PATH"',
@@ -443,6 +444,9 @@ def validate_automatic_check_contract(
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         SWIFTPM_CACHE_KEY,
         "          restore-keys: |\n"
+        "            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
+        "image-${{ steps.runner-image.outputs.version }}-"
+        "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
         "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "image-${{ steps.runner-image.outputs.version }}-"
         "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
@@ -453,7 +457,7 @@ def validate_automatic_check_contract(
         "--num-workers 8",
         "        if: >-\n"
         "          success() &&\n"
-        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.cache-scope.outputs.can-save == 'true' &&\n"
         "          steps.swift-build-cache.outputs.cache-hit != 'true'\n",
         "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     )
@@ -465,13 +469,15 @@ def validate_automatic_check_contract(
         "python3 scripts/ci/test_run_xcodebuild.py",
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         "          restore-keys: |\n"
+        "            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
+        "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
         "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
         "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
         "sh scripts/ci/run-xcodebuild.sh",
         "        if: >-\n"
         "          success() &&\n"
-        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.cache-scope.outputs.can-save == 'true' &&\n"
         "          steps.app-build-cache.outputs.cache-hit != 'true'\n",
         "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     )
@@ -550,6 +556,12 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(
                 f"Swift test job missing contract token: {token}"
             )
+    for kind, block in (("swiftpm", swift_tests_job), ("xcode", app_build_job)):
+        expected = f'run: python3 scripts/ci/cache_scope.py --kind {kind} --github-output "$GITHUB_OUTPUT"'
+        if expected not in block or block.index(expected) > block.index("actions/cache/restore@"):
+            raise WorkflowContractError("build caches must choose their scope before restoring")
+        if block.count("          key: ${{ steps.cache-scope.outputs.prefix }}-") != 2:
+            raise WorkflowContractError("build cache restore/save must share a scoped key")
     if swift_tests_job.count(SWIFTPM_CACHE_KEY) != 2:
         raise WorkflowContractError(
             "Swift test job must restore and save the SwiftPM cache under one exact key"
@@ -917,7 +929,8 @@ def validate_cache_retention_contract(text: str) -> None:
         "permissions:\n  contents: read\n",
         "      github.event.workflow_run.conclusion == 'success' &&\n",
         "      github.event.workflow_run.event == 'push' &&\n",
-        "      github.event.workflow_run.head_branch == 'main' &&\n",
+        "      (github.event.workflow_run.head_branch == 'main' ||\n"
+        "        startsWith(github.event.workflow_run.head_branch, 'agent/')) &&\n",
         "      github.event.workflow_run.head_repository.full_name == github.repository\n",
         "    permissions:\n      contents: read\n      actions: write\n",
         "          ARKDECK_CI_SHA: ${{ github.sha }}\n",
@@ -2122,12 +2135,12 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 ),
             ),
             (
-                "Agent branch cache write",
+                "unscoped cache write",
                 agent,
                 sdd,
                 swift.replace(
-                    "          github.ref == 'refs/heads/main' &&\n",
-                    "          startsWith(github.ref, 'refs/heads/agent/') &&\n",
+                    "          steps.cache-scope.outputs.can-save == 'true' &&\n",
+                    "          true &&\n",
                     1,
                 ),
             ),
