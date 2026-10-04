@@ -1,0 +1,900 @@
+{
+  "schema": "arkdeck-windows-usb-sample-sanitized/v1",
+  "phase": "before",
+  "nodes": [
+    {
+      "instanceId": "USB\\VID_2207&PID_5000\\aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "present": false,
+      "class": "USBDevice",
+      "status": "Unknown",
+      "problem": "CM_PROB_PHANTOM",
+      "properties": {
+        "DEVPKEY_Device_DeviceDesc": {
+          "type": "String",
+          "data": "WinUSB \u8bbe\u5907"
+        },
+        "DEVPKEY_Device_HardwareIds": {
+          "type": "StringList",
+          "data": [
+            "USB\\VID_2207&PID_5000&REV_0223",
+            "USB\\VID_2207&PID_5000"
+          ]
+        },
+        "DEVPKEY_Device_CompatibleIds": {
+          "type": "StringList",
+          "data": [
+            "USB\\MS_COMP_WINUSB",
+            "USB\\COMPAT_VID_2207&Class_FF&SubClass_50&Prot_01",
+            "USB\\COMPAT_VID_2207&Class_FF&SubClass_50",
+            "USB\\COMPAT_VID_2207&Class_FF",
+            "USB\\Class_FF&SubClass_50&Prot_01",
+            "USB\\Class_FF&SubClass_50",
+            "USB\\Class_FF"
+          ]
+        },
+        "DEVPKEY_Device_Service": {
+          "type": "String",
+          "data": "WINUSB"
+        },
+        "DEVPKEY_Device_Class": {
+          "type": "String",
+          "data": "USBDevice"
+        },
+        "DEVPKEY_Device_ClassGuid": {
+          "type": "Guid",
+          "data": "<container-1>"
+        },
+        "DEVPKEY_Device_Driver": {
+          "type": "String",
+          "data": "{88bae032-5a81-49f0-bc3d-a4ff138216d6}\\0009"
+        },
+        "DEVPKEY_Device_ConfigFlags": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "DEVPKEY_Device_Manufacturer": {
+          "type": "String",
+          "data": "WinUSB \u8bbe\u5907"
+        },
+        "DEVPKEY_Device_FriendlyName": {
+          "type": "String",
+          "data": "\"HDC Device\""
+        },
+        "DEVPKEY_Device_LocationInfo": {
+          "type": "String",
+          "data": "Port_#0026.Hub_#0001"
+        },
+        "DEVPKEY_Device_Capabilities": {
+          "type": "UInt32",
+          "data": 20
+        },
+        "DEVPKEY_Device_EnumeratorName": {
+          "type": "String",
+          "data": "USB"
+        },
+        "DEVPKEY_Device_Address": {
+          "type": "UInt32",
+          "data": 26
+        },
+        "DEVPKEY_Device_BaseContainerId": {
+          "type": "Guid",
+          "data": "<container-2>"
+        },
+        "DEVPKEY_NAME": {
+          "type": "String",
+          "data": "\"HDC Device\""
+        },
+        "DEVPKEY_Device_InstanceId": {
+          "type": "String",
+          "data": "USB\\VID_2207&PID_5000\\aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "DEVPKEY_Device_Parent": {
+          "type": "String",
+          "data": "USB\\ROOT_HUB30\\4&73f3995&0&0"
+        },
+        "DEVPKEY_Device_Siblings": {
+          "type": "StringList",
+          "data": []
+        },
+        "DEVPKEY_Device_SafeRemovalRequired": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_ContainerId": {
+          "type": "Guid",
+          "data": "<container-2>"
+        },
+        "DEVPKEY_Device_IsPresent": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_HasProblem": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 15": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_IsRebootRequired": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_InLocalMachineContainer": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{A8B865DD-2E3D-4094-AD97-E593A70C75D6} 26": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{3464F7A4-2444-40B1-980A-E0903CB6D912} 10": {
+          "type": "UInt32",
+          "data": 3
+        },
+        "DEVPKEY_Device_BusReportedDeviceDesc": {
+          "type": "String",
+          "data": "\"HDC Device\""
+        },
+        "DEVPKEY_Device_ConfigurationId": {
+          "type": "String",
+          "data": "winusb.inf:USB\\MS_COMP_WINUSB,WINUSB.NT"
+        },
+        "DEVPKEY_Device_PhysicalDeviceLocation": {
+          "type": "Binary",
+          "data": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            5,
+            0,
+            0,
+            0,
+            0,
+            255,
+            255,
+            255,
+            255
+          ]
+        },
+        "DEVPKEY_Device_BiosDeviceName": {
+          "type": "String",
+          "data": "\\_SB.PCI0.XHC.RHUB.SS10"
+        },
+        "{80497100-8C73-48B9-AAD9-CE387E19C56E} 6": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 3": {
+          "type": "String",
+          "data": "winusb.inf:392c3d5382e8b16c:WINUSB.NT:10.0.26100.9549:USB\\MS_COMP_WINUSB"
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 10": {
+          "type": "String",
+          "data": "USB\\ROOT_HUB30\\4&73f3995&0&0"
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 26": {
+          "type": "Binary",
+          "data": [
+            0
+          ]
+        },
+        "DEVPKEY_Device_InstallDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 1
+          }
+        },
+        "DEVPKEY_Device_FirstInstallDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 1
+          }
+        },
+        "DEVPKEY_Device_LastArrivalDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 7
+          }
+        },
+        "DEVPKEY_Device_LastRemovalDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 8
+          }
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 2": {
+          "type": "String",
+          "data": "{00000000-0000-0000-ffff-ffffffffffff}\\0000\\1"
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 3": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 4": {
+          "type": "UInt32",
+          "data": 1
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 5": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 6": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 13": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 14": {
+          "type": "UInt32",
+          "data": 4278190080
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 15": {
+          "type": "UInt32",
+          "data": 2
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 16": {
+          "type": "Boolean",
+          "data": true
+        },
+        "DEVPKEY_Device_LocationPaths": {
+          "type": "StringList",
+          "data": [
+            "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(26)",
+            "ACPI(_SB_)#ACPI(PCI0)#ACPI(XHC_)#ACPI(RHUB)#ACPI(SS10)"
+          ]
+        },
+        "DEVPKEY_Device_DriverDate": {
+          "type": "FileTime",
+          "data": {
+            "order": null
+          }
+        },
+        "DEVPKEY_Device_DriverVersion": {
+          "type": "String",
+          "data": "10.0.26100.9549"
+        },
+        "DEVPKEY_Device_DriverDesc": {
+          "type": "String",
+          "data": "WinUsb Device"
+        },
+        "DEVPKEY_Device_DriverInfPath": {
+          "type": "String",
+          "data": "winusb.inf"
+        },
+        "DEVPKEY_Device_DriverInfSection": {
+          "type": "String",
+          "data": "WINUSB.NT"
+        },
+        "DEVPKEY_Device_MatchingDeviceId": {
+          "type": "String",
+          "data": "USB\\MS_COMP_WINUSB"
+        },
+        "DEVPKEY_Device_DriverProvider": {
+          "type": "String",
+          "data": "Microsoft"
+        },
+        "DEVPKEY_Device_DriverRank": {
+          "type": "UInt32",
+          "data": 16719872
+        },
+        "{B5A825B8-3907-40B5-ABCA-8451E2453D5F} 3": {
+          "type": "UInt32",
+          "data": 1
+        }
+      }
+    },
+    {
+      "instanceId": "USB\\VID_2207&PID_350A\\aaaaaaaaaaaaaaaa",
+      "present": false,
+      "class": "Rockusb Device",
+      "status": "Unknown",
+      "problem": "CM_PROB_PHANTOM",
+      "properties": {
+        "DEVPKEY_Device_DeviceDesc": {
+          "type": "String",
+          "data": "Rockusb Device"
+        },
+        "DEVPKEY_Device_HardwareIds": {
+          "type": "StringList",
+          "data": [
+            "USB\\VID_2207&PID_350A&REV_0223",
+            "USB\\VID_2207&PID_350A"
+          ]
+        },
+        "DEVPKEY_Device_CompatibleIds": {
+          "type": "StringList",
+          "data": [
+            "USB\\COMPAT_VID_2207&Class_FF&SubClass_06&Prot_05",
+            "USB\\COMPAT_VID_2207&Class_FF&SubClass_06",
+            "USB\\COMPAT_VID_2207&Class_FF",
+            "USB\\Class_FF&SubClass_06&Prot_05",
+            "USB\\Class_FF&SubClass_06",
+            "USB\\Class_FF"
+          ]
+        },
+        "DEVPKEY_Device_Service": {
+          "type": "String",
+          "data": "Rockusb"
+        },
+        "DEVPKEY_Device_Class": {
+          "type": "String",
+          "data": "Rockusb Device"
+        },
+        "DEVPKEY_Device_ClassGuid": {
+          "type": "Guid",
+          "data": "<container-3>"
+        },
+        "DEVPKEY_Device_Driver": {
+          "type": "String",
+          "data": "{79dfc2a8-2574-493c-ae71-52958e41dd00}\\0000"
+        },
+        "DEVPKEY_Device_ConfigFlags": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "DEVPKEY_Device_Manufacturer": {
+          "type": "String",
+          "data": "Fuzhou Rockchip"
+        },
+        "DEVPKEY_Device_LocationInfo": {
+          "type": "String",
+          "data": "Port_#0010.Hub_#0001"
+        },
+        "DEVPKEY_Device_Capabilities": {
+          "type": "UInt32",
+          "data": 148
+        },
+        "DEVPKEY_Device_EnumeratorName": {
+          "type": "String",
+          "data": "USB"
+        },
+        "DEVPKEY_Device_Address": {
+          "type": "UInt32",
+          "data": 10
+        },
+        "DEVPKEY_Device_BaseContainerId": {
+          "type": "Guid",
+          "data": "<container-4>"
+        },
+        "DEVPKEY_NAME": {
+          "type": "String",
+          "data": "Rockusb Device"
+        },
+        "DEVPKEY_Device_InstanceId": {
+          "type": "String",
+          "data": "USB\\VID_2207&PID_350A\\aaaaaaaaaaaaaaaa"
+        },
+        "DEVPKEY_Device_Parent": {
+          "type": "String",
+          "data": "USB\\ROOT_HUB30\\4&73f3995&0&0"
+        },
+        "DEVPKEY_Device_Siblings": {
+          "type": "StringList",
+          "data": []
+        },
+        "DEVPKEY_Device_SafeRemovalRequired": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_ContainerId": {
+          "type": "Guid",
+          "data": "<container-4>"
+        },
+        "DEVPKEY_Device_IsPresent": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_HasProblem": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 15": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_IsRebootRequired": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_InLocalMachineContainer": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{A8B865DD-2E3D-4094-AD97-E593A70C75D6} 26": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{3464F7A4-2444-40B1-980A-E0903CB6D912} 10": {
+          "type": "UInt32",
+          "data": 3
+        },
+        "DEVPKEY_Device_BusReportedDeviceDesc": {
+          "type": "String",
+          "data": "USB download gadget"
+        },
+        "DEVPKEY_Device_ConfigurationId": {
+          "type": "String",
+          "data": "oem19.inf:USB\\VID_2207&PID_350A,Rockusb_DDI.NT"
+        },
+        "DEVPKEY_Device_PhysicalDeviceLocation": {
+          "type": "Binary",
+          "data": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            5,
+            0,
+            0,
+            0,
+            0,
+            255,
+            255,
+            255,
+            255
+          ]
+        },
+        "DEVPKEY_Device_BiosDeviceName": {
+          "type": "String",
+          "data": "\\_SB.PCI0.XHC.RHUB.HS10"
+        },
+        "{80497100-8C73-48B9-AAD9-CE387E19C56E} 6": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 3": {
+          "type": "String",
+          "data": "oem19.inf:ed86ca11feb06cf9:Rockusb_DDI.NT:4.90.0.0:USB\\VID_2207&PID_350A"
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 10": {
+          "type": "String",
+          "data": "USB\\ROOT_HUB30\\4&73f3995&0&0"
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 26": {
+          "type": "Binary",
+          "data": [
+            0
+          ]
+        },
+        "DEVPKEY_Device_InstallDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 3
+          }
+        },
+        "DEVPKEY_Device_FirstInstallDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 2
+          }
+        },
+        "DEVPKEY_Device_LastArrivalDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 4
+          }
+        },
+        "DEVPKEY_Device_LastRemovalDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 5
+          }
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 2": {
+          "type": "String",
+          "data": "{00000000-0000-0000-ffff-ffffffffffff}\\0000\\1"
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 3": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 4": {
+          "type": "UInt32",
+          "data": 1
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 5": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 6": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 13": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 14": {
+          "type": "UInt32",
+          "data": 4278190080
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 15": {
+          "type": "UInt32",
+          "data": 2
+        },
+        "{8DBC9C86-97A9-4BFF-9BC6-BFE95D3E6DAD} 16": {
+          "type": "Boolean",
+          "data": true
+        },
+        "DEVPKEY_Device_LocationPaths": {
+          "type": "StringList",
+          "data": [
+            "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(10)",
+            "ACPI(_SB_)#ACPI(PCI0)#ACPI(XHC_)#ACPI(RHUB)#ACPI(HS10)"
+          ]
+        },
+        "DEVPKEY_Device_DriverDate": {
+          "type": "FileTime",
+          "data": {
+            "order": null
+          }
+        },
+        "DEVPKEY_Device_DriverVersion": {
+          "type": "String",
+          "data": "4.90.0.0"
+        },
+        "DEVPKEY_Device_DriverDesc": {
+          "type": "String",
+          "data": "Rockusb Device"
+        },
+        "DEVPKEY_Device_DriverInfPath": {
+          "type": "String",
+          "data": "oem19.inf"
+        },
+        "DEVPKEY_Device_DriverInfSection": {
+          "type": "String",
+          "data": "Rockusb_DDI.NT"
+        },
+        "DEVPKEY_Device_MatchingDeviceId": {
+          "type": "String",
+          "data": "USB\\VID_2207&PID_350A"
+        },
+        "DEVPKEY_Device_DriverProvider": {
+          "type": "String",
+          "data": "Fuzhou Rockchip"
+        },
+        "DEVPKEY_Device_DriverRank": {
+          "type": "UInt32",
+          "data": 16711681
+        },
+        "{B5A825B8-3907-40B5-ABCA-8451E2453D5F} 3": {
+          "type": "UInt32",
+          "data": 1
+        }
+      }
+    },
+    {
+      "instanceId": "USB\\ROOT_HUB30\\4&73F3995&0&0",
+      "present": true,
+      "class": "USB",
+      "status": "OK",
+      "problem": "CM_PROB_NONE",
+      "properties": {
+        "DEVPKEY_Device_DeviceDesc": {
+          "type": "String",
+          "data": "USB \u6839\u96c6\u7ebf\u5668(USB 3.0)"
+        },
+        "DEVPKEY_Device_HardwareIds": {
+          "type": "StringList",
+          "data": [
+            "USB\\ROOT_HUB30&VID8086&PID06ED&REV0000",
+            "USB\\ROOT_HUB30&VID8086&PID06ED",
+            "USB\\ROOT_HUB30"
+          ]
+        },
+        "DEVPKEY_Device_CompatibleIds": {
+          "type": "StringList",
+          "data": []
+        },
+        "DEVPKEY_Device_Service": {
+          "type": "String",
+          "data": "USBHUB3"
+        },
+        "DEVPKEY_Device_Class": {
+          "type": "String",
+          "data": "USB"
+        },
+        "DEVPKEY_Device_ClassGuid": {
+          "type": "Guid",
+          "data": "<container-5>"
+        },
+        "DEVPKEY_Device_Driver": {
+          "type": "String",
+          "data": "{36fc9e60-c465-11cf-8056-444553540000}\\0001"
+        },
+        "DEVPKEY_Device_ConfigFlags": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "DEVPKEY_Device_Manufacturer": {
+          "type": "String",
+          "data": "(\u6807\u51c6 USB \u96c6\u7ebf\u5668)"
+        },
+        "DEVPKEY_Device_PDOName": {
+          "type": "String",
+          "data": "\\Device\\USBPDO-0"
+        },
+        "DEVPKEY_Device_Capabilities": {
+          "type": "UInt32",
+          "data": 128
+        },
+        "DEVPKEY_Device_BusTypeGuid": {
+          "type": "Guid",
+          "data": "<container-6>"
+        },
+        "DEVPKEY_Device_LegacyBusType": {
+          "type": "UInt32",
+          "data": 15
+        },
+        "DEVPKEY_Device_BusNumber": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "DEVPKEY_Device_EnumeratorName": {
+          "type": "String",
+          "data": "USB"
+        },
+        "DEVPKEY_Device_Address": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "DEVPKEY_Device_PowerData": {
+          "type": "Binary",
+          "data": [
+            56,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            93,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            4,
+            0,
+            0,
+            0,
+            4,
+            0,
+            0,
+            0,
+            3,
+            0,
+            0,
+            0,
+            3,
+            0,
+            0,
+            0,
+            4,
+            0,
+            0,
+            0,
+            5,
+            0,
+            0,
+            0
+          ]
+        },
+        "DEVPKEY_Device_RemovalPolicy": {
+          "type": "UInt32",
+          "data": 1
+        },
+        "DEVPKEY_Device_RemovalPolicyDefault": {
+          "type": "UInt32",
+          "data": 1
+        },
+        "DEVPKEY_Device_InstallState": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "DEVPKEY_Device_BaseContainerId": {
+          "type": "Guid",
+          "data": "<container-7>"
+        },
+        "DEVPKEY_NAME": {
+          "type": "String",
+          "data": "USB \u6839\u96c6\u7ebf\u5668(USB 3.0)"
+        },
+        "DEVPKEY_Device_InstanceId": {
+          "type": "String",
+          "data": "USB\\ROOT_HUB30\\4&73F3995&0&0"
+        },
+        "DEVPKEY_Device_DevNodeStatus": {
+          "type": "UInt32",
+          "data": 25165834
+        },
+        "DEVPKEY_Device_ProblemCode": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "DEVPKEY_Device_BusRelations": {
+          "type": "StringList",
+          "data": []
+        },
+        "DEVPKEY_Device_Parent": {
+          "type": "String",
+          "data": "<other-device>"
+        },
+        "DEVPKEY_Device_Children": {
+          "type": "StringList",
+          "data": []
+        },
+        "DEVPKEY_Device_SafeRemovalRequired": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_ContainerId": {
+          "type": "Guid",
+          "data": "<container-7>"
+        },
+        "DEVPKEY_Device_IsPresent": {
+          "type": "Boolean",
+          "data": true
+        },
+        "DEVPKEY_Device_HasProblem": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 15": {
+          "type": "Boolean",
+          "data": true
+        },
+        "DEVPKEY_Device_IsRebootRequired": {
+          "type": "Boolean",
+          "data": false
+        },
+        "DEVPKEY_Device_ReportedDeviceIdsHash": {
+          "type": "UInt32",
+          "data": 3760312602
+        },
+        "DEVPKEY_Device_InLocalMachineContainer": {
+          "type": "Boolean",
+          "data": true
+        },
+        "DEVPKEY_Device_Stack": {
+          "type": "StringList",
+          "data": [
+            "\\Driver\\USBHUB3",
+            "\\Driver\\ACPI",
+            "\\Driver\\USBXHCI"
+          ]
+        },
+        "{A8B865DD-2E3D-4094-AD97-E593A70C75D6} 26": {
+          "type": "Boolean",
+          "data": false
+        },
+        "{3464F7A4-2444-40B1-980A-E0903CB6D912} 10": {
+          "type": "UInt32",
+          "data": 3
+        },
+        "DEVPKEY_Device_ConfigurationId": {
+          "type": "String",
+          "data": "usbhub3.inf:USB\\ROOT_HUB30,Generic.Install.NT"
+        },
+        "DEVPKEY_Device_BiosDeviceName": {
+          "type": "String",
+          "data": "\\_SB.PCI0.XHC.RHUB"
+        },
+        "{80497100-8C73-48B9-AAD9-CE387E19C56E} 6": {
+          "type": "UInt32",
+          "data": 0
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 3": {
+          "type": "String",
+          "data": "usbhub3.inf:392c3d53434318dc:Generic.Install.NT:10.0.26100.9549:USB\\ROOT_HUB30"
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 10": {
+          "type": "String",
+          "data": "<other-device>"
+        },
+        "{83DA6326-97A6-4088-9453-A1923F573B29} 26": {
+          "type": "Binary",
+          "data": [
+            0
+          ]
+        },
+        "DEVPKEY_Device_InstallDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 0
+          }
+        },
+        "DEVPKEY_Device_FirstInstallDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 0
+          }
+        },
+        "DEVPKEY_Device_LastArrivalDate": {
+          "type": "FileTime",
+          "data": {
+            "order": 6
+          }
+        },
+        "DEVPKEY_Device_LocationPaths": {
+          "type": "StringList",
+          "data": [
+            "PCIROOT(0)#PCI(1400)#USBROOT(0)",
+            "ACPI(_SB_)#ACPI(PCI0)#ACPI(XHC_)#ACPI(RHUB)"
+          ]
+        },
+        "DEVPKEY_Device_DriverDate": {
+          "type": "FileTime",
+          "data": {
+            "order": null
+          }
+        },
+        "DEVPKEY_Device_DriverVersion": {
+          "type": "String",
+          "data": "10.0.26100.9549"
+        },
+        "DEVPKEY_Device_DriverDesc": {
+          "type": "String",
+          "data": "USB Root Hub (USB 3.0)"
+        },
+        "DEVPKEY_Device_DriverInfPath": {
+          "type": "String",
+          "data": "usbhub3.inf"
+        },
+        "DEVPKEY_Device_DriverInfSection": {
+          "type": "String",
+          "data": "Generic.Install.NT"
+        },
+        "DEVPKEY_Device_MatchingDeviceId": {
+          "type": "String",
+          "data": "USB\\ROOT_HUB30"
+        },
+        "DEVPKEY_Device_DriverProvider": {
+          "type": "String",
+          "data": "Microsoft"
+        },
+        "DEVPKEY_Device_DriverRank": {
+          "type": "UInt32",
+          "data": 8388610
+        }
+      }
+    }
+  ]
+}
