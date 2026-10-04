@@ -967,9 +967,11 @@ impl JobRecord {
             | "deploy.native-library.app-owned"
             | "port-forward.create"
             | "port-forward.remove" => Some("debug"),
-            "input.tap" | "input.long-press" | "input.swipe" | "capture.screen-sequence" => {
-                Some("toolkit")
-            }
+            "input.keyboard"
+            | "input.tap"
+            | "input.long-press"
+            | "input.swipe"
+            | "capture.screen-sequence" => Some("toolkit"),
             "observe.device" | "observe.devices" => Some("viewer"),
             "analyzer.analyze-trace" | "analyzer.summarize-trace" => Some("trace"),
             "analyzer.extract-crash-signature"
@@ -1082,7 +1084,9 @@ mod hap_provenance_tests {
             record["catalogDigest"],
             "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684"
         );
-        if arkdeck_contract::METHODS.contains(&"diagnostic.session.status") {
+        if crate::operation_catalog::CatalogOperation::lookup("input.keyboard", Some(1)).is_some()
+            || arkdeck_contract::METHODS.contains(&"diagnostic.session.status")
+        {
             assert_ne!(record["catalogDigest"], arkdeck_contract::CATALOG_DIGEST);
         }
         // The exact fourteen normal steps in the pre-#1773 Swift producer.

@@ -882,7 +882,13 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(start.isEnabled, "a refusal must release the recording controls")
     XCTAssertTrue(element("device.record.frames", in: app).isEnabled)
     XCTAssertFalse(element("device.record.ready", in: app).exists)
-    element("device.record.shrink", in: app).click()
+    // The keyboard pane can put this link below the inspector viewport.
+    // AX existence does not prove a click will reach it through the Job bar.
+    let shrink = element("device.record.shrink", in: app)
+    scrollIntoView(shrink, in: app)
+    XCTAssertTrue(shrink.isHittable, "the shrink action must be visible before clicking")
+    shrink.click()
+    scrollIntoView(element("device.record.frames", in: app), in: app)
     XCTAssertTrue(app.staticTexts["22 frames"].exists)
     XCTAssertFalse(element("device.record.stage", in: app).exists)
     assertDisplayed(start, equals: "Record")

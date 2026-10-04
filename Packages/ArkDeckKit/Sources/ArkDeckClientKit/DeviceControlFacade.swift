@@ -141,6 +141,9 @@ public protocol DeviceControlProviding: Sendable {
   func send(
     _ request: DeviceGestureRequest, to target: DeviceTargetPresentation
   ) async -> DeviceGestureOutcome
+  func sendKeyboard(
+    _ command: DeviceKeyboardCommand, to target: DeviceTargetPresentation
+  ) async -> DeviceGestureOutcome
   func recordScreen(
     frameCount: Int, target: DeviceTargetPresentation
   ) async -> DeviceScreenRecordingResult
@@ -150,6 +153,11 @@ public protocol DeviceControlProviding: Sendable {
 }
 
 public extension DeviceControlProviding {
+  func sendKeyboard(
+    _ command: DeviceKeyboardCommand, to target: DeviceTargetPresentation
+  ) async -> DeviceGestureOutcome {
+    .failed(reason: "This Device provider does not offer keyboard input")
+  }
   func loadHistoricalScreen(
     jobID _: String,
     targetID _: String
@@ -370,6 +378,75 @@ actor DeviceProductionProvider: DeviceControlProviding {
   }
 
   // MARK: - Runtime plumbing
+
+  func sendKeyboard(
+    _ command: DeviceKeyboardCommand, to target: DeviceTargetPresentation
+  ) async -> DeviceGestureOutcome {
+    guard command.isValid, let revision = target.bindingRevision, revision > 0 else {
+      return .failed(reason: "Keyboard input requires a current target and valid private payload")
+    }
+    let epoch = Date().ISO8601Format(.iso8601(timeZone: .gmt, includingFractionalSeconds: true))
+    let receipt: [String: JSONValue]
+    do {
+      receipt = try await RuntimeAppArtifactUpload.uploadKeyboard(
+        data: command.privatePayload(), targetID: target.id, bindingRevision: revision, send: send)
+    } catch {
+      // No device Job has been submitted. Do not expose an arbitrary service
+      // error that could contain upload bytes.
+      return .failed(reason: "Private keyboard upload was not confirmed; no device input was submitted")
+    }
+    guard case .string(let lease)? = receipt["lease"] else {
+      return .failed(reason: "Private keyboard upload returned no exact Artifact lease")
+    }
+    do {
+      let request = try DeviceControlFacade.keyboardRequest(
+        lease: lease, inputEpochUTC: epoch, target: target, nonce: UUID().uuidString)
+      let encoded = try JSONEncoder().encode(request)
+      guard let text = String(data: encoded, encoding: .utf8) else { throw DeviceFailure(message: "encoding") }
+      let submitted = try await requestObject(method: "job.submit", params: ["requestJson": .string(text)], label: "Keyboard submission")
+      guard submitted["schemaVersion"] as? String == "arkdeck.job-acceptance/1",
+        submitted["deduplicated"] as? Bool == false,
+        submitted["newDispatchCount"] as? Int == 0,
+        let jobID = submitted["jobId"] as? String, !jobID.isEmpty
+      else { throw DeviceFailure(message: "acceptance") }
+      // Reopen the accepted immutable request before granting this Job a run.
+      // A stale or mismatched acceptance must never launch another input.
+      let detail = try await RuntimeAppReadResources.jobDetail(jobID: jobID, send: send)
+      let expected = try JSONDecoder().decode(JSONValue.self, from: encoded)
+      guard case .object(let fields) = detail, case .object(let accepted)? = fields["request"],
+        case .object(let expectedRequest) = expected, case .object(let status)? = fields["job"],
+        status["targetId"] == .string(target.id), status["operation"] == .string("input.keyboard@1"),
+        status["state"] == .string("preflight"), status["outcomeUnknown"] == .bool(false),
+        status["waitingForHuman"] == .bool(false), status["outstandingResidueCount"] == .integer(0),
+        ["requestId", "idempotencyKey", "operation", "target", "inputs"].allSatisfy({
+          accepted[$0] == expectedRequest[$0]
+        })
+      else { throw DeviceFailure(message: "accepted request mismatch") }
+      _ = try await requestObject(method: "job.run", params: ["jobId": .string(jobID)], label: "Keyboard run")
+      let result = try await RuntimeAppReadResources.statusPresentation(jobID: jobID, send: send)
+      guard result["jobId"] as? String == jobID, result["targetId"] as? String == target.id,
+        result["operation"] as? String == "input.keyboard@1",
+        let state = result["state"] as? String,
+        let unknown = result["outcomeUnknown"] as? Bool,
+        let waiting = result["waitingForHuman"] as? Bool,
+        let residues = result["outstandingResidueCount"] as? Int
+      else { throw DeviceFailure(message: "identity") }
+      if unknown || waiting || residues != 0 {
+        return .unknown(reason: "Keyboard outcome is unresolved; input is never resent")
+      }
+      if state == "succeeded",
+        let timeline = result["timeline"] as? [String],
+        timeline.contains(where: { $0.hasPrefix("verified inject-keyboard-input ") }) {
+        return .confirmed(summary: ["keyboardInput": "injectorAccepted"])
+      }
+      if ["failed", "cancelled"].contains(state) {
+        return .failed(reason: "Keyboard input was not confirmed; inspect its Job before sending a new input")
+      }
+      return .unknown(reason: "Keyboard completion was not confirmed; input is never resent")
+    } catch {
+      return .unknown(reason: "Keyboard reply was lost or invalid; input is never resent")
+    }
+  }
 
   private struct DeviceFailure: Error { let message: String }
 

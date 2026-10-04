@@ -11,12 +11,12 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-14T00:00:00Z",
-    "consumptionFingerprintSHA256" : "0d45dd05dd161d2525f6290b0ec9e4011a4c4b703f90726155745abb4fd07a4c",
+    "consumptionFingerprintSHA256" : "a95b132763123596f95fb99abf450192e49f6d726034f9f3dcc585f2a889839d",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-53B70929D828D45D63C291E9B69A099ACC3453D5-G1",
+    "reference" : "CAP-RT-POLICY-8E3E5F70A2AE27D039AD672EDC6D708C6BEAEADB-G1",
     "runtimeCapabilityCorrelation" : {
       "artifactSHA256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
-      "planDigestSHA256" : "137f896aecd1258effb9c6effcb1151285e17e3eb60ae6f3594ae9cb775ed31c",
+      "planDigestSHA256" : "b60595abb20fc9f86c2e570f31bbf16803b3a95dea1996c037abbd4ad6a6aab3",
       "reservationID" : "idem-mutation-published",
       "stepSetDigestSHA256" : "c7d0b358e1bdd6dcae08b927745889a7d165a679c336da1f05961cef75c7f58d",
       "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
@@ -24,13 +24,13 @@
     },
     "validUntilUTC" : "2026-10-14T00:00:00Z"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-a8542c33a62a4286b4976973db7f1579",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "137f896aecd1258effb9c6effcb1151285e17e3eb60ae6f3594ae9cb775ed31c",
+  "materializedPlanDigest" : "b60595abb20fc9f86c2e570f31bbf16803b3a95dea1996c037abbd4ad6a6aab3",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "deploy.native-library.app-owned@1",
   "originalSubmissionRequest" : {
@@ -63,7 +63,7 @@
   "providerID" : "hdc",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-53B70929D828D45D63C291E9B69A099ACC3453D5-G1"
+      "capabilityId" : "CAP-RT-POLICY-8E3E5F70A2AE27D039AD672EDC6D708C6BEAEADB-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-mutation-published",
@@ -91,7 +91,7 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "claims" : [
 
     ],
@@ -159,7 +159,7 @@
     "verified start-target [\"processIds\", \"started\"]",
     "intent verify-loaded-library",
     "verified verify-loaded-library [\"abi\", \"attestation\", \"buildId\", \"fsVerityDigest\", \"loaderVerified\", \"processIds\", \"publishedSha256\"]",
-    "artifact verification-report.json -> ART-e1a36ff0c7c8bcc97cb28741b2f3aced",
+    "artifact verification-report.json -> ART-f1708b02c408a4a70b45ba9c726341af",
     "intent cleanup-staging-and-backup",
     "verified cleanup-staging-and-backup [\"backupRetained\", \"cleaned\"]",
     "host-step finalize-session",

@@ -67,12 +67,14 @@
       "cliEquivalent": [
         "arkdeck input tap ...",
         "arkdeck input long-press ...",
-        "arkdeck input swipe ..."
+        "arkdeck input swipe ...",
+        "arkdeck artifact import keyboard-input ...",
+        "arkdeck input keyboard --inputs-file <path>"
       ],
       "id": "app.device.control",
       "owner": "Device",
       "surface": "device.control",
-      "title": "Typed pointer input"
+      "title": "Typed pointer and private keyboard input"
     },
     {
       "classification": "direct",
@@ -647,7 +649,7 @@
       "id": "app.menu.trace.capture",
       "owner": "TraceViewer",
       "surface": "menu.trace.capture",
-      "title": "Trace › Capture Trace…"
+      "title": "Trace \u203a Capture Trace\u2026"
     },
     {
       "classification": "presentation",
@@ -657,7 +659,7 @@
       "id": "app.menu.trace.open",
       "owner": "TraceViewer",
       "surface": "menu.trace.open",
-      "title": "Trace › Open Trace…"
+      "title": "Trace \u203a Open Trace\u2026"
     },
     {
       "classification": "presentation",
@@ -665,7 +667,7 @@
       "id": "app.menu.trace.reload",
       "owner": "TraceViewer",
       "surface": "menu.trace.reload",
-      "title": "Trace › Reload Trace"
+      "title": "Trace \u203a Reload Trace"
     },
     {
       "classification": "presentation",
@@ -673,7 +675,7 @@
       "id": "app.menu.trace.filterProcesses",
       "owner": "TraceViewer",
       "surface": "menu.trace.filterProcesses",
-      "title": "Trace › Filter Trace Processes"
+      "title": "Trace \u203a Filter Trace Processes"
     },
     {
       "classification": "presentation",
@@ -681,7 +683,7 @@
       "id": "app.menu.trace.searchEvents",
       "owner": "TraceViewer",
       "surface": "menu.trace.searchEvents",
-      "title": "Trace › Search Events"
+      "title": "Trace \u203a Search Events"
     },
     {
       "classification": "presentation",
@@ -689,7 +691,7 @@
       "id": "app.menu.help.traceShortcuts",
       "owner": "TraceViewer",
       "surface": "menu.help.traceShortcuts",
-      "title": "Help › Trace Keyboard Shortcuts"
+      "title": "Help \u203a Trace Keyboard Shortcuts"
     }
   ]
 }

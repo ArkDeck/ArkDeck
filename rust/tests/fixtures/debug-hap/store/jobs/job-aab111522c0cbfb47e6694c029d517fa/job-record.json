@@ -14,12 +14,12 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-14T00:00:00Z",
-    "consumptionFingerprintSHA256" : "088e094fd57034042674ee764995de5d96189aa9f0f350db616a706b8088dc6a",
+    "consumptionFingerprintSHA256" : "5ee177581a93913092f40faea25a8735020f3fb8de5041527b9374d29af8a60e",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-21BDF64EDC338102BC633BF91BB42EDB04C6641F-G1",
+    "reference" : "CAP-RT-POLICY-E2E264C0C51D3EF0E7A086455C78040049FCC157-G1",
     "runtimeCapabilityCorrelation" : {
       "artifactSHA256" : "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575",
-      "planDigestSHA256" : "8a03fd5ae80800cb6b4d85c19c38232ab74a4ea7e98170941a1788b2797fa961",
+      "planDigestSHA256" : "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
       "reservationID" : "idem-hap-cleanupDebt",
       "stepSetDigestSHA256" : "7105dae9799eb931969e6afab81073c48c68fc69382f93a91dce79a6559adfbf",
       "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
@@ -27,7 +27,7 @@
     },
     "validUntilUTC" : "2026-10-14T00:00:00Z"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -92,7 +92,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-aab111522c0cbfb47e6694c029d517fa",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "8a03fd5ae80800cb6b4d85c19c38232ab74a4ea7e98170941a1788b2797fa961",
+  "materializedPlanDigest" : "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationFailure" : {
     "category" : "execution",
@@ -134,7 +134,7 @@
   "providerID" : "hdc",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-21BDF64EDC338102BC633BF91BB42EDB04C6641F-G1"
+      "capabilityId" : "CAP-RT-POLICY-E2E264C0C51D3EF0E7A086455C78040049FCC157-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-hap-cleanupDebt",
@@ -163,11 +163,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "18872",
       "lastSequence" : 28,
-      "sha256" : "cf2b97e554ef394d1f7cbcdf8a0ac0611cc4c48137d15b36bea757c4da224112"
+      "sha256" : "c904616ce9d2758d2192abf233ab1cb961378657c72787cdf27df20c3769884c"
     },
     "claims" : [
       {
@@ -183,20 +183,20 @@
     "journalSeal" : {
       "byteCount" : "19255",
       "lastSequence" : 29,
-      "sha256" : "8c14ef866b7c14015f1b82069cd290b95a4f9208ce8e00e278f59afc3a554c1b"
+      "sha256" : "16943254b930e41db7c8e52d61d3fd12f21a0c0587a3f43947223ed208e027ee"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "10154",
-      "manifestSHA256" : "dd5e71194d9f8d14afa8ad9e0803d5eac568dcf526eed65de5cbb255680ec549",
+      "manifestSHA256" : "ceeac030f762aee5917be398bbbeef7d5d818269ef85023dd9ec8ea4328d0e13",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "failed"
     },
     "receipt" : {
       "catalogGeneration" : "6",
-      "manifestSHA256" : "dd5e71194d9f8d14afa8ad9e0803d5eac568dcf526eed65de5cbb255680ec549",
+      "manifestSHA256" : "ceeac030f762aee5917be398bbbeef7d5d818269ef85023dd9ec8ea4328d0e13",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-aab111522c0cbfb47e6694c029d517fa",
@@ -239,12 +239,12 @@
     "dispatched install-hap; awaiting readback",
     "intent package-readback",
     "verified package-readback [\"bundleName\", \"cpuAbi\", \"deployedArtifactSha256\", \"installed\", \"nativeLibraryFileCount\", \"nativeLibraryPath\"]",
-    "artifact install-readback.json -> ART-fcd0c1bfdc8d90470be28cc4b6679554",
+    "artifact install-readback.json -> ART-b330d04026caa677505576e315ef9413",
     "intent start-ability",
     "dispatched start-ability; awaiting readback",
     "intent process-readback",
     "verified process-readback [\"bundleName\", \"running\"]",
-    "artifact process-readback.json -> ART-b8f358db9bd2bd9a287a81a30aca5f46",
+    "artifact process-readback.json -> ART-f181dbb2158e3298012e075bc4e1e844",
     "intent capture-diagnostics",
     "verified capture-diagnostics [\"byteCount\"]",
     "artifact debug-hilog.txt -> ART-a3acc8f4d8ce0e77eccaaaeedfa276f0",

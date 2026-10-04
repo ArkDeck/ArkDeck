@@ -6,7 +6,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-280e9ef48386c144eb3a2c04a4992916",
           "method" : "job.events"
@@ -58,7 +58,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "757ba5985c65056d5da7fca6f9dde82e574a7acc0264cc13faba2c55045312fa",
+        "materializedPlanDigest" : "fa5552a86686eae7e1156665c51bf63d374e85fd23897da76fef31eb91bdff72",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -154,7 +154,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-5427c6cc294fa4e21ef64bdf677ef1f5",
           "method" : "job.events"
@@ -206,7 +206,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "03f0f4420a16186aadb5a915ff67607487632acfa8be554b51645501987b31f4",
+        "materializedPlanDigest" : "2a3f181ede32872b88cde6d14a34d440540595d92c51fe0bdf9d80f12c32648c",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -300,7 +300,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-950adddf107c46602d07c10b4656a5e3",
           "method" : "job.events"
@@ -345,7 +345,7 @@
           "sessionId" : "session-job-950adddf107c46602d07c10b4656a5e3",
           "sessionPublication" : {
             "catalogGeneration" : "3",
-            "manifestSha256" : "c1077abc342a1f1f5ab79159223ce43f52ff93af352b4a9c2c16d9c257e16173",
+            "manifestSha256" : "4d0c20d7b84e7d690d025a58fa56c353994e27acbcce95d922bf4610cd867c38",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -358,7 +358,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "e128a535fca5f3c770d6e691c83b84418b3475d0118b3d41f119650044ac78d7",
+        "materializedPlanDigest" : "413d7aef9a79798f1380bf10f0ded6978cab9b8bba2a838f0a65952580633239",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -436,7 +436,7 @@
         "sessionId" : "session-job-950adddf107c46602d07c10b4656a5e3",
         "sessionPublication" : {
           "catalogGeneration" : "3",
-          "manifestSha256" : "c1077abc342a1f1f5ab79159223ce43f52ff93af352b4a9c2c16d9c257e16173",
+          "manifestSha256" : "4d0c20d7b84e7d690d025a58fa56c353994e27acbcce95d922bf4610cd867c38",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -457,7 +457,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-a71d0e925d6873760071e314ffd16ff8",
           "method" : "job.events"
@@ -496,7 +496,7 @@
           "sessionId" : "session-job-a71d0e925d6873760071e314ffd16ff8",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "c5363781fc87e21d9ef7c448731a107480274a9e7c74b3cb9eabfcda78c311e7",
+            "manifestSha256" : "709625971f984de98b80ae43a85e1591291570439f11c12a4fb2dfc7047a3d6e",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -509,7 +509,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "e9592bdec653407829fde1d6de185792f68fa7322463c5efc49778eea4d930a5",
+        "materializedPlanDigest" : "e54fe2b54577bf146098826822f62ba97d07a3920362918f6fd2eaaf9a003860",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -584,7 +584,7 @@
         "sessionId" : "session-job-a71d0e925d6873760071e314ffd16ff8",
         "sessionPublication" : {
           "catalogGeneration" : "1",
-          "manifestSha256" : "c5363781fc87e21d9ef7c448731a107480274a9e7c74b3cb9eabfcda78c311e7",
+          "manifestSha256" : "709625971f984de98b80ae43a85e1591291570439f11c12a4fb2dfc7047a3d6e",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -605,7 +605,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3",
           "method" : "job.events"
@@ -663,7 +663,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "c36c2ee4f691eaaaecda7ecf1533d17a35ef9284305bf2ad9eb7e4c702249e49",
+        "materializedPlanDigest" : "3710ff03c08f9ce091125c1782852af3bdda190028bdb38b9c10f25db8166d52",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -762,7 +762,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-eada6b3759d992ce68688b3f88688d1a",
           "method" : "job.events"
@@ -807,7 +807,7 @@
           "sessionId" : "session-job-eada6b3759d992ce68688b3f88688d1a",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "f4775e6bd12c903a3e0ad14793f731e2a98842fe847efc5ca37be661917adc93",
+            "manifestSha256" : "077ef386653fe3021e5c4da4105c5bc10b8e1c00508cfe93e542d7020937e914",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -820,7 +820,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "4e6ee11da614f156703ad4a44014fd5a0e355f2d887957709f2b255a7ce0c287",
+        "materializedPlanDigest" : "072ed789edd8758532a512f64e7dec453e9d960f7f10c23ed83fb9ef7ae23e16",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -900,7 +900,7 @@
         "sessionId" : "session-job-eada6b3759d992ce68688b3f88688d1a",
         "sessionPublication" : {
           "catalogGeneration" : "2",
-          "manifestSha256" : "f4775e6bd12c903a3e0ad14793f731e2a98842fe847efc5ca37be661917adc93",
+          "manifestSha256" : "077ef386653fe3021e5c4da4105c5bc10b8e1c00508cfe93e542d7020937e914",
           "reasonCode" : null,
           "state" : "published"
         },

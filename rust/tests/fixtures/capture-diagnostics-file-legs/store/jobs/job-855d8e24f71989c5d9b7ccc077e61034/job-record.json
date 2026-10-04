@@ -9,11 +9,11 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-14T00:00:00Z",
-    "consumptionFingerprintSHA256" : "da8b1385df1d2d91de9b66b72317077e36b3a30714b5f716a0e756146bab8ad3",
+    "consumptionFingerprintSHA256" : "19b6c83fa160c84dd8603e4c9237b142f43d17a13384782e7db1293f4b404521",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-C0E4A8090F731C033A14B4AC5F0284D8273BD271-G1",
+    "reference" : "CAP-RT-POLICY-558867811AB17D1D460F895BD541AA438B7360CF-G1",
     "runtimeCapabilityCorrelation" : {
-      "planDigestSHA256" : "fa03a6ef754794920fc1530b34170611263c4a7ff823cf74c30af05d7909fd03",
+      "planDigestSHA256" : "287365aaeab2496fb54710d04ab4306459dbff7ad0b9092822c74ed3b226187d",
       "reservationID" : "idem-capture-nothingLanded",
       "stepSetDigestSHA256" : "8e98a64f389c6752985191550a6a1f706a77bbdc7190313d1b8b80f523855080",
       "targetBindingDigestSHA256" : "542a05a6c2c901b26377cb90ec5f608148efd857a2323b7a6b02309d5cfcda52",
@@ -21,7 +21,7 @@
     },
     "validUntilUTC" : "2026-10-14T00:00:00Z"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -86,7 +86,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-855d8e24f71989c5d9b7ccc077e61034",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "fa03a6ef754794920fc1530b34170611263c4a7ff823cf74c30af05d7909fd03",
+  "materializedPlanDigest" : "287365aaeab2496fb54710d04ab4306459dbff7ad0b9092822c74ed3b226187d",
   "materializedStableTargetIdentitySHA256" : "cd93782b7fb95559de14f738b65988af85d41dc1565f7c7d1ed2d035665b519c",
   "operationFailure" : {
     "category" : "unknownOutcome",
@@ -135,7 +135,7 @@
   "recoveryStepID" : "receive-ui-tree",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-C0E4A8090F731C033A14B4AC5F0284D8273BD271-G1"
+      "capabilityId" : "CAP-RT-POLICY-558867811AB17D1D460F895BD541AA438B7360CF-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-capture-nothingLanded",

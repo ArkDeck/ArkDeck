@@ -1,0 +1,11 @@
+{
+  "artifact" : "device-facts.json",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+  "firmware" : "OpenHarmony-4.1-release",
+  "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+  "model" : "OpenHarmony Reference Device",
+  "operation" : "observe.device@1",
+  "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "transport" : "usb",
+  "value" : "OpenHarmony-4.1-release"
+}

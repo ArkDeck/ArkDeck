@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "input",
+        "keyboard"
+      ],
+      "expected": {
+        "command": "input.keyboard",
+        "handlerArguments": [
+          "input",
+          "keyboard"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "input",
+        "keyboard",
+        "--help"
+      ],
+      "expected": {
+        "command": "input.keyboard",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "input",
+        "keyboard",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "input.keyboard",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "input",
+        "keyboard",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "input.keyboard",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "input",
+        "keyboard",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "input.keyboard",
+        "handlerArguments": [
+          "input",
+          "keyboard",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "input.keyboard",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "input",
+    "keyboard"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

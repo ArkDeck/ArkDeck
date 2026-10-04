@@ -6,12 +6,12 @@
     "artifacts/job-ae22d6e48bcd5a65a9bf9cc5ef3d3915/ART-0ca49086bbecc20181d86e1967e3c6a6": "1e736040a1086d1fc7134443979ce1197c50dc29e7529ed13dd696e3d70e197b",
     "artifacts/job-ae22d6e48bcd5a65a9bf9cc5ef3d3915/ART-426cc82c00f57204f33c892706762765": "dca4a8900b77105b88e221f549f02be1429aa21766e4e0d384eac17bc6efb10f",
     "artifacts/job-f0b05aa1bf60059f4585ce436eead7cd/ART-03a90a7825a78d9d76a63c02fe3797d9": "579c25833903207ec924cfa40213c8f011e697ac4f44ab30633e685ed3d9f731",
-    "capabilities/runtime-capabilities.json": "12506a9c347ce6613605e52ff602042ded27b2792eeebd7220886eb8ee7658b2",
-    "capabilities/runtime-capabilities.ledger": "66024ae64d222d9becb128530fd320543f16ad815c0325bcba64ff5be4ff1c3e",
-    "frames.jsonl": "6412f4527120f1b8002b5797e8718d0f9c94454da6bee17d57ab6596fc29e30e",
+    "capabilities/runtime-capabilities.json": "403bf91c150c87070edd13738662d71d9f71dd92e0962fcd3020e65c6634b617",
+    "capabilities/runtime-capabilities.ledger": "1ce4aa96d066264ee609f180a4b55425720e2795e5999e6265558346476af8ed",
+    "frames.jsonl": "3c6e6db45bf5c3e58eff047561b37001a8ad7b01f3ed084ce2eb2a8da9124ff7",
     "hvigorw.js": "564929cdae248c00065d9e7ce4cdef1955408f281e28bb2f4f0f31aa68ca87cd",
     "node.sh": "ee7d66eef234ff50a9dd66b65c2b23219058dbaf4560e6368d5bcd8f6e4be7c8",
-    "parked-record.json": "5d7c815105cb7b02f9088c373f900f8d51ab2bf78299b2a0b833c18064ae7134"
+    "parked-record.json": "084fb4ff8f0f834d9141d54b412bf9e61504d2401250b80d957fe85c84c4c637"
   },
   "frames": "job.submit and job.run of the Runtime-owned copy, then job.plan, job.submit, job.run, job.reconcile and job.result of every workspace.build-openharmony@1 Job, in the order the control plane answered them",
   "recordedBy": "WorkspaceBuildOracleContractTests.testTheControlPlaneBuildsACopyAsRecorded",

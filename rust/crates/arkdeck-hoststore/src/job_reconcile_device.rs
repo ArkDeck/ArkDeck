@@ -46,7 +46,7 @@ use serde_json::{Map, Value};
 /// that its provider confirms not executed, the pointer gesture, which has no
 /// readback, every mutation Swift reads back, and the screen sequence's two,
 /// which Swift's materialization does not know and this Runtime reads back.
-const PORTED: [&str; 38] = [
+const PORTED: [&str; 39] = [
     "hdc.observeTool",
     "hdc.observeServer",
     "hdc.listDeviceCandidates",
@@ -62,6 +62,7 @@ const PORTED: [&str; 38] = [
     "hdc.observeApplicationLiveness",
     "hdc.inspectNativeLibrary",
     "hdc.injectPointerInput",
+    "hdc.injectKeyboardInput",
     "hdc.createPortForward",
     "hdc.removePortForward",
     "hdc.sendArtifactToStaging",
@@ -284,6 +285,20 @@ pub(super) fn materialize(action: &Value) -> Result<DeviceAction, WireError> {
                 )),
                 _ => Ok(DeviceAction::ReadOnly),
             }
+        }
+        "hdc.injectKeyboardInput" => {
+            let id = string("sourceArtifactId")?;
+            let digest = string("sourceSha256")?;
+            if arguments.len() != 2
+                || !arkdeck_contract::import_identifier(id)
+                || !arkdeck_contract::import_digest(digest)
+            {
+                return Err(unsupported(
+                    "persisted keyboard Artifact identity is invalid",
+                ));
+            }
+            // Same no-readback outcome as pointer input: zero new dispatch.
+            Ok(DeviceAction::Pointer)
         }
         "hdc.injectPointerInput" => {
             if arguments.get("gesture").and_then(Value::as_str).is_none() {
