@@ -332,7 +332,29 @@ impl LocalConnection {
     }
 
     pub fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
-        self.0.set_read_timeout(timeout)
+        let result = self.0.set_read_timeout(timeout);
+        #[cfg(target_os = "macos")]
+        if result
+            .as_ref()
+            .is_err_and(|error| error.raw_os_error() == Some(libc::EINVAL))
+        {
+            // Darwin refuses setsockopt after a Unix peer closes, even while
+            // its final frame is buffered. Only a kernel-proved hangup permits
+            // draining: reads cannot wait for new bytes and end at EOF. All
+            // other timeout errors, including a zero budget, remain failures.
+            let mut descriptor = libc::pollfd {
+                fd: self.0.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            // SAFETY: one live descriptor in writable storage; a zero wait.
+            if unsafe { libc::poll(&mut descriptor, 1, 0) } == 1
+                && descriptor.revents & libc::POLLHUP != 0
+            {
+                return Ok(());
+            }
+        }
+        result
     }
 
     pub fn set_write_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {

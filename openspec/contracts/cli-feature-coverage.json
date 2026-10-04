@@ -2154,7 +2154,7 @@
       "feature": "debug.evaluate",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2190,7 +2190,7 @@
       "feature": "debug.probe",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2210,7 +2210,7 @@
       "feature": "debug.start",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2230,7 +2230,7 @@
       "feature": "debug.status",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2906,6 +2906,42 @@
     },
     {
       "classification": "direct",
+      "conformanceFixture": "argv/job.archive.apply.json",
+      "equivalentCommands": [],
+      "feature": "job.archive",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.archive",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job archive apply --job <job-id> --user-confirmation-id <id> --expected-review-sha256 <sha256>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/job.archive.preview.json",
+      "equivalentCommands": [],
+      "feature": "job.archive.preview",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:job.archive.preview",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck job archive preview --job <job-id>"
+    },
+    {
+      "classification": "direct",
       "conformanceFixture": "argv/job.cancel.json",
       "equivalentCommands": [],
       "feature": "job.cancel",
@@ -3335,7 +3371,7 @@
       "feature": "recovery.flash-invocation.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4762,7 +4798,7 @@
   "summary": {
     "blocked": [],
     "byClassification": {
-      "direct": 126,
+      "direct": 128,
       "generic": 2,
       "internal": 4,
       "local": 93,
@@ -4774,9 +4810,9 @@
       "app": 68,
       "catalog": 31,
       "cli": 53,
-      "daemon": 108
+      "daemon": 110
     },
-    "entries": 260,
+    "entries": 262,
     "fullFunction": true
   }
 }

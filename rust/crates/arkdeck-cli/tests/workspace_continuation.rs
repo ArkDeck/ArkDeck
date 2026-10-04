@@ -22,6 +22,17 @@ fn oracle() -> Value {
     // Preserve the recorded refusal mutations; only the baseline Catalog and
     // wire negotiation pins advance for this replay against the current CLI.
     let recorded: Value = serde_json::from_str(ORACLE).unwrap();
+    assert_eq!(
+        recorded["health"]["contractIdentity"],
+        "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633"
+    );
+    assert_eq!(
+        recorded["health"]["publishedMethods"]
+            .as_array()
+            .unwrap()
+            .len(),
+        105
+    );
     let text = ORACLE
         .replace(
             recorded["cliCatalogDigest"].as_str().unwrap(),
