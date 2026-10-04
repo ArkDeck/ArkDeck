@@ -555,7 +555,8 @@ impl StateRoot {
         let published = (|| {
             (&file).write_all(bytes)?;
             file.sync_all()?;
-            rename_replacing(&file, &self.path.join(name))?;
+            // A held document is waited out, as the host store's are.
+            super::host_fs::waiting_out_holders(|| rename_replacing(&file, &self.path.join(name)))?;
             // SAFETY: the directory handle was opened with GENERIC_WRITE.
             bool_result(unsafe { FlushFileBuffers(self.directory.as_raw_handle()) })
         })();
@@ -984,6 +985,54 @@ mod tests {
             Some(&b"second"[..])
         );
         assert!(state.publish_document("../escape", b"x").is_err());
+        let leftovers: Vec<_> = std::fs::read_dir(&root.0)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .filter(|name| name.to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
+    }
+
+    /// A replacement waits out a moment's holder of the document (an
+    /// anti-malware filter holding it without delete sharing, here a handle
+    /// of this test released after 100 ms) and then publishes; a holder that
+    /// stays past the patience refuses it with the document unchanged.
+    #[test]
+    fn a_document_replacement_waits_out_a_brief_holder() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let root = directory();
+        let state = StateRoot::development(&root.0).unwrap();
+        state.publish_document("instance.json", b"first").unwrap();
+        let hold = || {
+            std::fs::OpenOptions::new()
+                .read(true)
+                // FILE_SHARE_READ | FILE_SHARE_WRITE, no FILE_SHARE_DELETE.
+                .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
+                .open(root.0.join("instance.json"))
+                .unwrap()
+        };
+        let held = hold();
+        let holder = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            drop(held);
+        });
+        state.publish_document("instance.json", b"second").unwrap();
+        holder.join().unwrap();
+        assert_eq!(
+            state.read_document("instance.json", 64).unwrap().as_deref(),
+            Some(&b"second"[..])
+        );
+
+        let held = hold();
+        let refused = state
+            .publish_document("instance.json", b"third")
+            .unwrap_err();
+        assert!(super::super::host_fs::held(&refused), "{refused:?}");
+        drop(held);
+        assert_eq!(
+            state.read_document("instance.json", 64).unwrap().as_deref(),
+            Some(&b"second"[..])
+        );
         let leftovers: Vec<_> = std::fs::read_dir(&root.0)
             .unwrap()
             .map(|entry| entry.unwrap().file_name())
