@@ -87,6 +87,47 @@ impl HdcDispatch for ProcessDispatch {
         self.tool_identity_current()
     }
 
+    /// On Windows, the registered tuple's commandless identity family at its
+    /// own endpoint (`CommandlessIdentity`): the kernel's listener proof for
+    /// the pinned executable, no client and no `checkserver`.
+    #[cfg(windows)]
+    fn observe_server(&self) -> Result<crate::ServerObservation, DispatchFailure> {
+        use crate::{
+            CommandlessIdentity, IdentityObservation, IdentityObserver, ServerObservation,
+            StatusExecutable,
+        };
+        let Some(tuple) = self.registered_windows_tuple() else {
+            return Err(DispatchFailure::Refused(
+                "dispatch refused: the executable is no registered Windows HDC tuple".into(),
+            ));
+        };
+        let executable = StatusExecutable {
+            path: self.tool.path().to_string_lossy().into_owned(),
+            sha256: self.tool_sha256().to_owned(),
+        };
+        let endpoint = tuple.endpoint.to_string();
+        Ok(
+            match CommandlessIdentity::default().observe(&executable, &endpoint) {
+                IdentityObservation::Observed {
+                    identity: Some(_), ..
+                } => ServerObservation::Observed,
+                IdentityObservation::Observed { identity: None, .. } => {
+                    ServerObservation::Unknown(format!("no HDC server is observed at {endpoint}"))
+                }
+                IdentityObservation::Unavailable(reason)
+                | IdentityObservation::Unknown(reason)
+                | IdentityObservation::Unsupported(reason) => {
+                    ServerObservation::Unknown(format!("server at {endpoint}: {reason}"))
+                }
+                IdentityObservation::TimedOut | IdentityObservation::Cancelled => {
+                    ServerObservation::Unknown(format!(
+                        "the server observation at {endpoint} did not complete"
+                    ))
+                }
+            },
+        )
+    }
+
     /// Swift `DescriptorBoundProcessDispatcher.execute`: an exited child is a
     /// receipt with its exit status, both streams and whether either went
     /// past the plan's capture; a timeout or a signal leaves the outcome

@@ -5294,4 +5294,44 @@ SHA-256：%4$@</value>
     <value>选择文件夹 / 已挂载 SMB…</value>
     <comment>debug.artifacts.chooseDirectory (DebugLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobInspector_fact_recoveryRelation" xml:space="preserve">
+    <value>恢复关系</value>
+    <comment>jobInspector.fact.recoveryRelation (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_progress" xml:space="preserve">
+    <value>Job 正在进行</value>
+    <comment>jobInspector.progress (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_residue" xml:space="preserve">
+    <value>设备上仍有 %d 个清理项。</value>
+    <comment>jobInspector.residue (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_result_supersededByRecovery" xml:space="preserve">
+    <value>此 Job 的结果仍未知，但后续已确认的完整覆写恢复已建立当前目标状态。</value>
+    <comment>jobInspector.result.supersededByRecovery (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_result_targetAliasResolved" xml:space="preserve">
+    <value>此 Job 的结果仍未知，但后续已确认的完整刷机证明其目标是别名，并建立了当前设备状态。</value>
+    <comment>jobInspector.result.targetAliasResolved (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_state_currentEpochEstablished" xml:space="preserve">
+    <value>当前状态已建立</value>
+    <comment>jobInspector.state.currentEpochEstablished (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_action_readLog" xml:space="preserve">
+    <value>在本机读取日志</value>
+    <comment>jobInspector.action.readLog (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_tail" xml:space="preserve">
+    <value>最多显示末尾 200 行。打开此记录可查看全部产物。</value>
+    <comment>jobInspector.log.tail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_privacy" xml:space="preserve">
+    <value>此处仅预览标准日志。敏感产物需在 History 中显式读取。</value>
+    <comment>jobInspector.log.privacy (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_log_notText" xml:space="preserve">
+    <value>日志不是有效的 UTF-8 文本。</value>
+    <comment>jobInspector.log.notText (JobsLocalizable.xcstrings)</comment>
+  </data>
 </root>

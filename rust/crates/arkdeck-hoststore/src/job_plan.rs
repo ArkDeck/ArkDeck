@@ -744,6 +744,19 @@ impl<'a> JobPlanner<'a> {
             if action.effect() != step.effect {
                 return Err(internal_failure());
             }
+            // On a registered Windows tuple the server probe is the
+            // commandless observation: no process, so no argv to summarize
+            // (CHG-2026-078 `serverIdentityGeneration`).
+            if action.observes_server_commandlessly(hdc.dispatch) {
+                steps.push(json!({
+                    "stepID": step.step_id, "kind": step.kind, "effect": step.effect,
+                    "cancellation": step.cancellation, "binding": step.binding,
+                    "isOptional": step.optional, "journalArguments": arguments,
+                    "processKind": "commandless",
+                    "observationFamily": "serverIdentityGeneration",
+                }));
+                continue;
+            }
             let plan = action
                 .lower(&step.step_id, Some(&facts.connect_key))
                 .map_err(|error| {

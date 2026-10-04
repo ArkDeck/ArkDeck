@@ -84,7 +84,7 @@ pub use observation::{
 };
 pub use operation::{
     Action, DispatchFailure, Expected, HdcDispatch, Outcome, ProcessPlan, Property, Receipt,
-    property_value, stable_identity_sha256,
+    ServerObservation, property_value, stable_identity_sha256,
 };
 pub use operation::{
     DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT, device_arguments,

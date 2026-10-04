@@ -32,7 +32,7 @@
 
 use arkdeck_contract::{ImportIntent, WireError, encode_import_chunk, sha256_hex};
 use arkdeck_hoststore::{ArtifactReadStore, ImportBinding, ImportUploadStore};
-use arkdeck_platform::{InstanceScope, default_user_endpoint, pipe_present};
+use arkdeck_platform::{InstanceScope, StarterLock, default_user_endpoint, pipe_present};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -50,8 +50,43 @@ const DAEMON: &str = env!("CARGO_BIN_EXE_arkdeck-agentd");
 
 /// One test at a time: they share the account's guard and pipe.
 static TURN: Mutex<()> = Mutex::new(());
-fn turn() -> MutexGuard<'static, ()> {
-    TURN.lock().unwrap_or_else(PoisonError::into_inner)
+
+/// This process's turn, then the account's daemon starters' turn, held
+/// until the test ends: no client starts the account's daemon meanwhile (a
+/// CLI whose pipe is briefly absent waits for the turn instead of launching
+/// the daemon it was pointed at, which would outlive the test on the
+/// account's real pipe), and no other process running account tests starts
+/// one over its own fake account. On the way out every daemon this test
+/// started is gone, and no daemon serves the account's pipe.
+struct Turn {
+    _starters: StarterLock,
+    _process: MutexGuard<'static, ()>,
+}
+
+fn turn() -> Turn {
+    let process = TURN.lock().unwrap_or_else(PoisonError::into_inner);
+    let starters = StarterLock::acquire(&InstanceScope::account().unwrap(), DEADLINE * 10)
+        .unwrap()
+        .expect("another process held the account's daemon starters' turn for ten minutes");
+    Turn {
+        _starters: starters,
+        _process: process,
+    }
+}
+
+/// After the test: no daemon serves the account's pipe (the test's own were
+/// stopped or ended by their drop).
+fn assert_account_released() {
+    let endpoint = default_user_endpoint().unwrap();
+    let deadline = Instant::now() + DEADLINE;
+    while pipe_present(&endpoint).unwrap() {
+        assert!(
+            Instant::now() < deadline,
+            "a daemon still serves the account's pipe {}",
+            endpoint.as_path().display()
+        );
+        std::thread::sleep(Duration::from_millis(100));
+    }
 }
 
 fn plain(path: PathBuf) -> PathBuf {
@@ -512,6 +547,7 @@ fn the_account_daemon_patches_checkpoints_and_reverts_a_copy() {
         .join(format!("{attempt}.json"));
     let attempt: Value = serde_json::from_slice(&std::fs::read(durable).unwrap()).unwrap();
     assert!(attempt["revertedAtUTC"].is_string(), "{attempt}");
+    assert_account_released();
 }
 
 /// A fake account's project registered, the daemon stopped: the account and
@@ -730,6 +766,7 @@ fn the_workspace_mutation_leaves_run_through_the_cli_against_a_dev_signed_daemon
     );
     assert_eq!(std::fs::read(&copied).unwrap(), b"old\n");
     running.stop();
+    assert_account_released();
     drop(account);
     let _ = std::fs::remove_dir_all(&signed);
     // What this measured is what the coverage manifest counts.
