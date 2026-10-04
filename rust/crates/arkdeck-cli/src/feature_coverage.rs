@@ -406,7 +406,8 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.reconcile",
     // The agent execution and human-action owners over Swift's
     // physical-assistance records (TASK-XPA-005). Not `agent run`, `agent
-    // resume` or `human-action resume`; see the GJ-1 leaves below.
+    // resume` or `human-action resume`; `agent abandon` is counted. See the
+    // GJ-1 leaves below.
     "agent.list",
     "agent.status",
     "human-action.list",
@@ -481,6 +482,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // operation, and these shared generic leaves are not counted until
     // every operation they reach on Windows answers as Swift does (the
     // lead's ruling of 2026-10-04, as for `flash run` below).
+    // `agent abandon`, over the Swift human-action oracle's `trust` scenario
+    // (`gj1_device_leaves.rs`): an execution paused on the device's trust
+    // prompt, abandoned under its current generation (a stale one refused),
+    // its expired action then refusing either resume. It is counted because
+    // it acts on the existing execution alone: it moves the record to
+    // `abandoned` and expires its waiting action, and refuses once the
+    // execution owns a Job. It never submits or plans, so its answer does
+    // not depend on which operation the execution runs.
+    "agent.abandon",
     // The Debug probe over the Target store and the HDC (TASK-XPA-008;
     // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
     // against the signed test daemon over the Swift oracle's answers). Not
@@ -1330,6 +1340,7 @@ mod tests {
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
+            ("agent.abandon", "implemented"),
             // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),
