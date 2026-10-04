@@ -210,7 +210,10 @@ fn run_case(entry: Entry, outcome: &str) {
         command.env(PIN, pin);
         (scratch, command)
     };
+    let root = crate::flash_execution_control::ChildRoot::new();
+    let (key, path) = root.env();
     let output = command
+        .env(key, path)
         .env(
             "ARKDECK_TEST_FLASH_SOCKET_ENTRY",
             match entry {
