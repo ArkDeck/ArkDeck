@@ -6,6 +6,8 @@ name: SDD Guard
 on:
   push:
     branches: [main, "agent/**"]
+  merge_group:
+    types: [checks_requested]
   pull_request:
     # Routine bot opened/synchronize checks run in the exact-head Agent PR
     # push workflow. reopened/edited re-run guard on the merge ref; the host
@@ -26,14 +28,13 @@ jobs:
       # the checkout exact without granting another permission.
       - name: Checkout exact revision with runner Git
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune --depth=1 origin \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
@@ -66,6 +67,9 @@ jobs:
       - name: Agent PR identity helper contract tests
         run: python3 scripts/test_agent_pr_identity.py
 
+      - name: Agent PR stack helper tests
+        run: python3 scripts/ci/test_agent_pr.py
+
       - name: host-loop contract suite
         working-directory: scripts
         run: python3 -m unittest discover -s host_loop -t .
@@ -85,14 +89,13 @@ jobs:
     steps:
       - name: Checkout exact revision with runner Git
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune --depth=1 origin \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 

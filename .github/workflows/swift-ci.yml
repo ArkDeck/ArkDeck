@@ -15,7 +15,8 @@ name: Swift CI
 # ArkDeckKit keeps its full test suite as the merge gate.  SwiftPM's stable
 # mirrored workspace makes a restored cache genuinely incremental across
 # ephemeral checkout paths. The Xcode lane uses the same stable-mirror model,
-# so a fresh checkout keeps the source identities recorded in DerivedData. The
+# so a fresh checkout keeps the source identities recorded in DerivedData. Agent
+# pushes can restore successful builds from the same branch under separate keys. The
 # App lane compiles the app and UI-test bundle with build-for-testing, but never
 # launches a simulator or device. Cache
 # restores prefer an exact input hash, then fall back to the newest protected-
@@ -26,6 +27,8 @@ name: Swift CI
 on:
   push:
     branches: [main, "agent/**"]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -81,6 +84,9 @@ jobs:
 
       - name: CI planner contract tests
         run: python3 scripts/ci/test_plan.py
+
+      - name: CI cache scope tests
+        run: python3 scripts/ci/test_cache_scope.py
 
       - name: CI workflow contract tests
         run: python3 scripts/test_agent_pr_workflow.py
@@ -192,14 +198,21 @@ jobs:
           fi
           printf 'version=%s\n' "${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
 
-      - name: Restore trusted stable SwiftPM cache
+      # Agent cache prefixes include a hash of this exact branch. Main and
+      # merge groups restore only trusted main keys; every job still builds/tests.
+      - name: Select build cache scope
+        id: cache-scope
+        run: python3 scripts/ci/cache_scope.py --kind swiftpm --github-output "$GITHUB_OUTPUT"
+
+      - name: Restore stable SwiftPM cache
         id: swift-build-cache
         continue-on-error: true
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
+            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
             arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
             arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-
             arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-
@@ -213,16 +226,16 @@ jobs:
           --parallel
           --num-workers 8
 
-      - name: Save trusted stable SwiftPM cache
+      - name: Save successful stable SwiftPM cache
         if: >-
           success() &&
-          github.ref == 'refs/heads/main' &&
+          steps.cache-scope.outputs.can-save == 'true' &&
           steps.swift-build-cache.outputs.cache-hit != 'true'
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
 
   app-build:
     needs: plan
@@ -255,14 +268,21 @@ jobs:
       - name: Xcode stable-workspace contract tests
         run: python3 scripts/ci/test_run_xcodebuild.py
 
-      - name: Restore trusted Xcode build cache
+      # Agent cache prefixes include a hash of this exact branch. Main and
+      # merge groups restore only trusted main keys; every job still builds/tests.
+      - name: Select build cache scope
+        id: cache-scope
+        run: python3 scripts/ci/cache_scope.py --kind xcode --github-output "$GITHUB_OUTPUT"
+
+      - name: Restore Xcode build cache
         id: app-build-cache
         continue-on-error: true
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
           restore-keys: |
+            ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-
             arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-
             arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-
 
@@ -271,16 +291,16 @@ jobs:
           ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode
         run: sh scripts/ci/run-xcodebuild.sh
 
-      - name: Save trusted Xcode build cache
+      - name: Save successful Xcode build cache
         if: >-
           success() &&
-          github.ref == 'refs/heads/main' &&
+          steps.cache-scope.outputs.can-save == 'true' &&
           steps.app-build-cache.outputs.cache-hit != 'true'
         continue-on-error: true
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
+          key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
 
   # The @arkdeck/ds interaction tests execute the docs/design prototype draft
   # and cross-check the audit matrix, implementation-coverage.json and the App

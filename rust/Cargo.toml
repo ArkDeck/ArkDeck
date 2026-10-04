@@ -40,6 +40,20 @@ unicode-segmentation = "=1.13.3"
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
+# Every worktree, contract view and agent task keeps its own Cargo target, so
+# debug artifacts multiply per host. One worktree's debug target reached 15 GB,
+# 9.2 GB of it incremental caches, and these targets together filled the host
+# disk. Tasks rebuild about once per change, so incremental caches cost more
+# disk than the time they save. Line tables keep file:line in panics and
+# backtraces; dependencies carry no debuginfo. Set `debug = true` locally to
+# step through code in a debugger.
+[profile.dev]
+incremental = false
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 # A registered tool is identified by the SHA-256 of its bytes, and a
 # commandless HDC identity observation hashes the 6 MB hdc three times (open
 # and two revalidations). Unoptimized, that alone passes Swift's 1000 ms

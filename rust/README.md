@@ -996,13 +996,20 @@ answer what macOS answers without the owner. On macOS only attributes were
 added.
 
 The Windows daemon composes the planner over its root with the Artifact
-owner and no HDC provider (no Windows HDC tuple is registered; the
-integration change waits for the maintainer's samples), so `job.plan` and
-`job.submit` of `observe.device@1` are refused `provider hdc is not
-registered`, `{"phase": "preAdmission", "newDispatchCount": 0}`, and
-nothing is admitted; a retry of an existing Job is answered with it
-(`deduplicated`), the idempotency lookup coming before materialization. A
-Flash operation is `… is not materialized by the Rust Runtime yet`.
+owner and, where one is composed, its HDC: the HDC composition the planner,
+the admitter (with the capability authority), the runner, the reconciler,
+the cleanup-debt continuation and an agent execution's owned Job all read
+(`Host::hdc`, as on macOS), with the receive root below the account's
+temporary directory (`%TEMP%rkdeck-receive`). That HDC exists only as a
+registered Windows HDC tuple's managed server (`windows_hdc_gate`,
+CHG-2026-078), and `operation.list` then asks after its tool identity as
+macOS does. Without one, `job.plan` and `job.submit` of `observe.device@1`
+are refused `provider hdc is not registered`, `{"phase": "preAdmission",
+"newDispatchCount": 0}`, and nothing is admitted; a retry of an existing Job
+is answered with it (`deduplicated`), the idempotency lookup coming before
+materialization. A Flash operation is `… is not materialized by the Rust
+Runtime yet`. `windows_lifecycle`'s admitted-HDC test checks the composition
+over a stand-in tuple.
 
 Tests on Windows: `arkdeck-hoststore/tests/windows_observe_device_admission.rs`
 replays the Swift `observe.device@1` oracle's `job.plan` and `job.submit`
@@ -1238,11 +1245,12 @@ on Windows as a Job this Runtime does not reconcile: the workspace Jobs
 delegated Flash's lane receipt (`flash_reconcile.rs`, AF-W1).
 
 The Windows daemon composes `job.reconcile` (the Session publication writer
-and the runner its runs use, no HDC composition or Flash lane), the agent
-execution owner in `agent-executions` and the human-action owner in
-`human-action-snapshots` (`agent.*`, `human-action.*`), on the development
-and the account root. An execution admits its Job as `job.submit` does here
-and observes no Target, since no Windows HDC tuple is registered. The census
+and the runner its runs use, the HDC composition where one is composed, and
+the Flash lane where one is installed), the agent execution owner in
+`agent-executions` and the human-action owner in `human-action-snapshots`
+(`agent.*`, `human-action.*`), on the development and the account root. An
+execution admits its Job as `job.submit` does here and observes Targets over
+the composed HDC; without one it observes none. The census
 reads `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
 workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache`.
 
@@ -1515,11 +1523,11 @@ query and scope fingerprints, its receipt and outcome hashes) as Swift's
 through a one-to-one relabelling (`support::debug_hap::HostLabels`); every other
 byte of the answers, the capability store and ledger, the Job records, the
 admission journals and the index rows must be Swift's, and on macOS nothing is
-relabelled. With no HDC composition (the Windows daemon's until the Windows HDC
-tuple is registered) an admitted HAP or deployment is refused before its first
-step with zero dispatch and no use consumed, and the daemon refuses every
-recorded `debug.hap@1` plan and submission before admission
-(`windows_job_admission_process.rs`).
+relabelled. With no HDC composition (the Windows daemon's unless a registered
+Windows HDC tuple's managed server is composed) an admitted HAP or deployment
+is refused before its first step with zero dispatch and no use consumed, and
+the daemon refuses every recorded `debug.hap@1` plan and submission before
+admission (`windows_job_admission_process.rs`).
 
 The runs replay on Windows host code too (TASK-XPA-009): `debug_hap_run.rs` and
 `native_library_run.rs`, both oracles' full replays (every run, result,
@@ -1797,7 +1805,7 @@ what no oracle records.
 
 On Windows (TASK-XPA-012) the same code builds and the daemon answers both
 methods from its Artifact and Job owners, through the runner `job.run` uses
-there (`windows_runner`), with no HDC composition: a continuation of a debt the
+there (`windows_runner`). Without an HDC composition a continuation of a debt the
 ledger owes reads the ledger and loads the Job, then is refused (`rejected`,
 `internalFailure("provider hdc is unavailable")`) before any readback or retry,
 and the ledger is not written. The control-layer corpus replay
@@ -2642,6 +2650,20 @@ well.
   server, so `runtime.hdc.impact-preview` and `runtime.hdc.restart` answer
   `operationUnavailable` without one, as on macOS. Tool selection's restart
   stays macOS-only.
+- Its consumers (TASK-XPA-005): a dispatch names the registered Windows
+  tuple its executable is pinned to (`HdcDispatch::registered_windows_tuple`;
+  `ProcessDispatch` by its digest, on Windows only), and the candidate list,
+  the identity readback and `observe.device`'s confirmation read that tuple's
+  listing with `parse_windows_target_list`, its `-v` with
+  `parse_host_client_version` and the managed start's readiness with
+  `parse_host_server_check` (the CR LF forms the Swift-parity splitter cannot
+  read); every other dispatch keeps the macOS grammars. The managed server is
+  named `TEMP`/`TMP` on Windows (without them `3.2.0g` cannot create its
+  mutex file and exits 0), and a server receipt's `\\?\` image path is
+  compared in the plain spelling. `windows_hdc_live_process.rs` runs the
+  real daemon and CLI over the registered `hdc.exe`
+  (`ARKDECK_LIVE_WINDOWS_HDC`). Jobs still reach no HDC on Windows, so
+  `probeHDCServer`'s commandless lowering waits for Windows Job execution.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
