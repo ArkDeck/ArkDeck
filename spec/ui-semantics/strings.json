@@ -7985,6 +7985,564 @@
       "table": "JobsLocalizable",
       "en": "The log is not valid UTF-8 text.",
       "zh-Hans": "日志不是有效的 UTF-8 文本。"
+    },
+    {
+      "key": "history.action.loadOlder",
+      "table": "HistoryLocalizable",
+      "en": "Load older Jobs",
+      "zh-Hans": "加载更早的 Job"
+    },
+    {
+      "key": "history.activity.all",
+      "table": "HistoryLocalizable",
+      "en": "All records",
+      "zh-Hans": "全部记录"
+    },
+    {
+      "key": "history.activity.debug",
+      "table": "HistoryLocalizable",
+      "en": "Debug runs",
+      "zh-Hans": "调试记录"
+    },
+    {
+      "key": "history.activity.diagnostics",
+      "table": "HistoryLocalizable",
+      "en": "Diagnostics",
+      "zh-Hans": "诊断记录"
+    },
+    {
+      "key": "history.activity.flash",
+      "table": "HistoryLocalizable",
+      "en": "Flashed images",
+      "zh-Hans": "刷机镜像"
+    },
+    {
+      "key": "history.activity.other",
+      "table": "HistoryLocalizable",
+      "en": "Other Runtime activity",
+      "zh-Hans": "其他 Runtime 活动"
+    },
+    {
+      "key": "history.activity.quickFilters",
+      "table": "HistoryLocalizable",
+      "en": "Quick filters",
+      "zh-Hans": "快速筛选"
+    },
+    {
+      "key": "history.activity.recent",
+      "table": "HistoryLocalizable",
+      "en": "Recent activity",
+      "zh-Hans": "最近活动"
+    },
+    {
+      "key": "history.activity.recentDescription",
+      "table": "HistoryLocalizable",
+      "en": "Review saved context or return to the tool that created it.",
+      "zh-Hans": "查看保存的上下文，或返回创建记录的工具继续操作。"
+    },
+    {
+      "key": "history.activity.title",
+      "table": "HistoryLocalizable",
+      "en": "Content",
+      "zh-Hans": "内容"
+    },
+    {
+      "key": "history.activity.trace",
+      "table": "HistoryLocalizable",
+      "en": "Traces",
+      "zh-Hans": "Trace"
+    },
+    {
+      "key": "history.activity.device",
+      "table": "HistoryLocalizable",
+      "en": "Device control",
+      "zh-Hans": "设备控制"
+    },
+    {
+      "key": "history.activity.viewer",
+      "table": "HistoryLocalizable",
+      "en": "Viewer and observe",
+      "zh-Hans": "Viewer 与观测"
+    },
+    {
+      "key": "history.filter.applySaved",
+      "table": "HistoryLocalizable",
+      "en": "Apply saved filter",
+      "zh-Hans": "应用已存筛选"
+    },
+    {
+      "key": "history.filter.deleteSaved",
+      "table": "HistoryLocalizable",
+      "en": "Delete saved filter",
+      "zh-Hans": "删除已存筛选"
+    },
+    {
+      "key": "history.filter.reloadSaved",
+      "table": "HistoryLocalizable",
+      "en": "Reload saved filter",
+      "zh-Hans": "重新加载已存筛选"
+    },
+    {
+      "key": "history.filter.device",
+      "table": "HistoryLocalizable",
+      "en": "Filter by device",
+      "zh-Hans": "按设备筛选"
+    },
+    {
+      "key": "history.filter.device.all",
+      "table": "HistoryLocalizable",
+      "en": "All devices",
+      "zh-Hans": "所有设备"
+    },
+    {
+      "key": "history.filter.empty.description",
+      "table": "HistoryLocalizable",
+      "en": "Change or reset the filters to show recorded Jobs.",
+      "zh-Hans": "更改或重置筛选条件以显示已记录的 Job。"
+    },
+    {
+      "key": "history.filter.empty.title",
+      "table": "HistoryLocalizable",
+      "en": "No Jobs Match",
+      "zh-Hans": "没有匹配的 Job"
+    },
+    {
+      "key": "history.filter.mode",
+      "table": "HistoryLocalizable",
+      "en": "Filter by execution mode",
+      "zh-Hans": "按执行模式筛选"
+    },
+    {
+      "key": "history.filter.mode.all",
+      "table": "HistoryLocalizable",
+      "en": "All modes",
+      "zh-Hans": "所有模式"
+    },
+    {
+      "key": "history.filter.mode.execute",
+      "table": "HistoryLocalizable",
+      "en": "Executed",
+      "zh-Hans": "已执行"
+    },
+    {
+      "key": "history.filter.mode.planned",
+      "table": "HistoryLocalizable",
+      "en": "Plan only",
+      "zh-Hans": "仅计划"
+    },
+    {
+      "key": "history.filter.mode.simulated",
+      "table": "HistoryLocalizable",
+      "en": "Simulated",
+      "zh-Hans": "模拟"
+    },
+    {
+      "key": "history.filter.mode.unknown",
+      "table": "HistoryLocalizable",
+      "en": "Not reported",
+      "zh-Hans": "未报告"
+    },
+    {
+      "key": "history.filter.preset.needsAttention",
+      "table": "HistoryLocalizable",
+      "en": "Needs attention",
+      "zh-Hans": "需要关注"
+    },
+    {
+      "key": "history.filter.preset.recentFailures",
+      "table": "HistoryLocalizable",
+      "en": "Failures in the last week",
+      "zh-Hans": "最近一周失败"
+    },
+    {
+      "key": "history.filter.reset",
+      "table": "HistoryLocalizable",
+      "en": "Reset filters",
+      "zh-Hans": "重置筛选"
+    },
+    {
+      "key": "history.filter.resultCount",
+      "table": "HistoryLocalizable",
+      "en": "%lld of %lld Jobs",
+      "zh-Hans": "显示 %lld / %lld 个 Job"
+    },
+    {
+      "key": "history.filter.save",
+      "table": "HistoryLocalizable",
+      "en": "Save current filter",
+      "zh-Hans": "保存当前筛选"
+    },
+    {
+      "key": "history.filter.saved",
+      "table": "HistoryLocalizable",
+      "en": "Saved filters",
+      "zh-Hans": "已存筛选"
+    },
+    {
+      "key": "history.filter.search",
+      "table": "HistoryLocalizable",
+      "en": "Search Job, operation, or device",
+      "zh-Hans": "搜索 Job、操作或设备"
+    },
+    {
+      "key": "history.filter.session",
+      "table": "HistoryLocalizable",
+      "en": "Filter by Session",
+      "zh-Hans": "按 Session 筛选"
+    },
+    {
+      "key": "history.filter.session.all",
+      "table": "HistoryLocalizable",
+      "en": "All Sessions",
+      "zh-Hans": "所有 Session"
+    },
+    {
+      "key": "history.filter.status",
+      "table": "HistoryLocalizable",
+      "en": "Filter by state",
+      "zh-Hans": "按状态筛选"
+    },
+    {
+      "key": "history.filter.status.active",
+      "table": "HistoryLocalizable",
+      "en": "Active",
+      "zh-Hans": "进行中"
+    },
+    {
+      "key": "history.filter.status.all",
+      "table": "HistoryLocalizable",
+      "en": "All states",
+      "zh-Hans": "所有状态"
+    },
+    {
+      "key": "history.filter.status.cancelled",
+      "table": "HistoryLocalizable",
+      "en": "Cancelled",
+      "zh-Hans": "已取消"
+    },
+    {
+      "key": "history.filter.status.failed",
+      "table": "HistoryLocalizable",
+      "en": "Failed",
+      "zh-Hans": "失败"
+    },
+    {
+      "key": "history.filter.status.interrupted",
+      "table": "HistoryLocalizable",
+      "en": "Interrupted",
+      "zh-Hans": "已中断"
+    },
+    {
+      "key": "history.filter.status.needsAttention",
+      "table": "HistoryLocalizable",
+      "en": "Needs attention",
+      "zh-Hans": "需要关注"
+    },
+    {
+      "key": "history.filter.status.succeeded",
+      "table": "HistoryLocalizable",
+      "en": "Succeeded",
+      "zh-Hans": "成功"
+    },
+    {
+      "key": "history.filter.time",
+      "table": "HistoryLocalizable",
+      "en": "Filter by time",
+      "zh-Hans": "按时间筛选"
+    },
+    {
+      "key": "history.filter.time.anyTime",
+      "table": "HistoryLocalizable",
+      "en": "Any time",
+      "zh-Hans": "不限时间"
+    },
+    {
+      "key": "history.filter.time.lastDay",
+      "table": "HistoryLocalizable",
+      "en": "Last 24 hours",
+      "zh-Hans": "最近 24 小时"
+    },
+    {
+      "key": "history.filter.time.lastHour",
+      "table": "HistoryLocalizable",
+      "en": "Last hour",
+      "zh-Hans": "最近一小时"
+    },
+    {
+      "key": "history.filter.time.lastWeek",
+      "table": "HistoryLocalizable",
+      "en": "Last 7 days",
+      "zh-Hans": "最近 7 天"
+    },
+    {
+      "key": "history.filter.title",
+      "table": "HistoryLocalizable",
+      "en": "Filter history",
+      "zh-Hans": "筛选历史"
+    },
+    {
+      "key": "windows.history.filter.savedNone",
+      "table": null,
+      "en": "No filter is saved.",
+      "zh-Hans": "尚未保存筛选条件。"
+    },
+    {
+      "key": "windows.history.filter.savedSummary",
+      "table": null,
+      "en": "Saved filter: %@",
+      "zh-Hans": "已保存的筛选：%@"
+    },
+    {
+      "key": "windows.history.filter.savedDone",
+      "table": null,
+      "en": "Filter saved.",
+      "zh-Hans": "筛选条件已保存。"
+    },
+    {
+      "key": "windows.history.filter.deletedDone",
+      "table": null,
+      "en": "Saved filter deleted.",
+      "zh-Hans": "已删除保存的筛选条件。"
+    },
+    {
+      "key": "windows.history.filter.savedUnavailable",
+      "table": null,
+      "en": "The saved filter could not be read: %@",
+      "zh-Hans": "无法读取保存的筛选条件：%@"
+    },
+    {
+      "key": "history.detail.correlation",
+      "table": "HistoryLocalizable",
+      "en": "Execution correlation",
+      "zh-Hans": "执行关联"
+    },
+    {
+      "key": "history.correlation.showSession",
+      "table": "HistoryLocalizable",
+      "en": "Show related Jobs",
+      "zh-Hans": "显示关联 Job"
+    },
+    {
+      "key": "history.correlation.noArtifacts",
+      "table": "HistoryLocalizable",
+      "en": "This Job has no Artifact references.",
+      "zh-Hans": "此 Job 没有 Artifact 引用。"
+    },
+    {
+      "key": "history.correlation.artifactCount",
+      "table": "HistoryLocalizable",
+      "en": "Logical diagnostic bundle · %lld Artifact references",
+      "zh-Hans": "逻辑诊断包 · %lld 个 Artifact 引用"
+    },
+    {
+      "key": "history.correlation.readOnly",
+      "table": "HistoryLocalizable",
+      "en": "This view links existing Runtime records only. It does not copy Artifact bytes or grant device, retry, or recovery authority.",
+      "zh-Hans": "此视图仅关联现有 Runtime 记录，不复制 Artifact 字节，也不授予设备、重试或恢复权限。"
+    },
+    {
+      "key": "history.detail.effect",
+      "table": "HistoryLocalizable",
+      "en": "Actual effect",
+      "zh-Hans": "实际影响"
+    },
+    {
+      "key": "history.detail.notLoaded",
+      "table": "HistoryLocalizable",
+      "en": "Detail has not been loaded. Refresh the history and select this Job again.",
+      "zh-Hans": "尚未加载详情。请刷新历史记录并重新选择此 Job。"
+    },
+    {
+      "key": "history.detail.outcomeCertainty",
+      "table": "HistoryLocalizable",
+      "en": "Outcome certainty",
+      "zh-Hans": "结果确定性"
+    },
+    {
+      "key": "history.detail.parameters",
+      "table": "HistoryLocalizable",
+      "en": "Parameters",
+      "zh-Hans": "参数"
+    },
+    {
+      "key": "history.detail.projectionNote",
+      "table": "HistoryLocalizable",
+      "en": "This is the Runtime's read-only manifest projection. Raw manifest and journal files remain inside Runtime-owned storage.",
+      "zh-Hans": "这是 Runtime 的只读 manifest 投影。原始 manifest 与 journal 文件仍保留在 Runtime 管理的存储中。"
+    },
+    {
+      "key": "history.detail.recovery",
+      "table": "HistoryLocalizable",
+      "en": "Recovery",
+      "zh-Hans": "恢复"
+    },
+    {
+      "key": "history.detail.residue",
+      "table": "HistoryLocalizable",
+      "en": "%lld outstanding residue items.",
+      "zh-Hans": "有 %lld 项未清理残留。"
+    },
+    {
+      "key": "history.detail.session",
+      "table": "HistoryLocalizable",
+      "en": "Session",
+      "zh-Hans": "Session"
+    },
+    {
+      "key": "history.detail.started",
+      "table": "HistoryLocalizable",
+      "en": "Started",
+      "zh-Hans": "开始时间"
+    },
+    {
+      "key": "history.detail.summary",
+      "table": "HistoryLocalizable",
+      "en": "Job and manifest summary",
+      "zh-Hans": "Job 与 manifest 摘要"
+    },
+    {
+      "key": "history.detail.timeline",
+      "table": "HistoryLocalizable",
+      "en": "Journal summary",
+      "zh-Hans": "Journal 摘要"
+    },
+    {
+      "key": "history.evidence.firmware",
+      "table": "HistoryLocalizable",
+      "en": "Observed firmware",
+      "zh-Hans": "观测固件"
+    },
+    {
+      "key": "history.evidence.model",
+      "table": "HistoryLocalizable",
+      "en": "Observed model",
+      "zh-Hans": "观测型号"
+    },
+    {
+      "key": "history.evidence.transport",
+      "table": "HistoryLocalizable",
+      "en": "Observed transport",
+      "zh-Hans": "观测传输"
+    },
+    {
+      "key": "history.outcome.confirmed",
+      "table": "HistoryLocalizable",
+      "en": "Confirmed",
+      "zh-Hans": "已确认"
+    },
+    {
+      "key": "history.outcome.unknown",
+      "table": "HistoryLocalizable",
+      "en": "Unknown",
+      "zh-Hans": "未知"
+    },
+    {
+      "key": "history.parameters.column.after",
+      "table": "HistoryLocalizable",
+      "en": "After",
+      "zh-Hans": "执行后"
+    },
+    {
+      "key": "history.parameters.column.before",
+      "table": "HistoryLocalizable",
+      "en": "Before",
+      "zh-Hans": "执行前"
+    },
+    {
+      "key": "history.parameters.column.name",
+      "table": "HistoryLocalizable",
+      "en": "Parameter",
+      "zh-Hans": "参数"
+    },
+    {
+      "key": "history.parameters.column.status",
+      "table": "HistoryLocalizable",
+      "en": "Status",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "history.parameters.comparison.changed",
+      "table": "HistoryLocalizable",
+      "en": "Changed",
+      "zh-Hans": "已变化"
+    },
+    {
+      "key": "history.parameters.comparison.unchanged",
+      "table": "HistoryLocalizable",
+      "en": "Unchanged",
+      "zh-Hans": "未改变"
+    },
+    {
+      "key": "history.parameters.comparison.unverified",
+      "table": "HistoryLocalizable",
+      "en": "Unverified",
+      "zh-Hans": "无法验证"
+    },
+    {
+      "key": "history.parameters.empty",
+      "table": "HistoryLocalizable",
+      "en": "This Job recorded no parameters.",
+      "zh-Hans": "此 Job 未记录参数。"
+    },
+    {
+      "key": "history.parameters.state.missing",
+      "table": "HistoryLocalizable",
+      "en": "Missing",
+      "zh-Hans": "不存在"
+    },
+    {
+      "key": "history.parameters.state.unknown",
+      "table": "HistoryLocalizable",
+      "en": "Unknown",
+      "zh-Hans": "未知"
+    },
+    {
+      "key": "history.parameters.state.unreadable",
+      "table": "HistoryLocalizable",
+      "en": "Unreadable",
+      "zh-Hans": "无法读取"
+    },
+    {
+      "key": "history.parameters.typedInputs",
+      "table": "HistoryLocalizable",
+      "en": "Requested typed inputs",
+      "zh-Hans": "请求的类型化输入"
+    },
+    {
+      "key": "history.parameters.unavailable",
+      "table": "HistoryLocalizable",
+      "en": "This older Job did not report typed parameters.",
+      "zh-Hans": "此旧版 Job 未报告类型化参数。"
+    },
+    {
+      "key": "history.recovery.none",
+      "table": "HistoryLocalizable",
+      "en": "No unresolved recovery condition was reported.",
+      "zh-Hans": "未报告尚未解决的恢复条件。"
+    },
+    {
+      "key": "history.recovery.outcomeUnknown",
+      "table": "HistoryLocalizable",
+      "en": "The device effect is unknown. Do not assume this Job finished safely.",
+      "zh-Hans": "设备影响未知，不能假定此 Job 已安全结束。"
+    },
+    {
+      "key": "history.recovery.readOnly",
+      "table": "HistoryLocalizable",
+      "en": "Recovery actions are intentionally unavailable here. Use the reviewed workflow that owns this Job.",
+      "zh-Hans": "此处有意不提供恢复操作。请使用拥有此 Job 的经审查工作流。"
+    },
+    {
+      "key": "history.recovery.residue",
+      "table": "HistoryLocalizable",
+      "en": "Outstanding residue still requires review.",
+      "zh-Hans": "仍有残留项需要检查。"
+    },
+    {
+      "key": "history.recovery.waitingForHuman",
+      "table": "HistoryLocalizable",
+      "en": "This Job is waiting for a person to continue in its owning workflow.",
+      "zh-Hans": "此 Job 正等待人工在其所属工作流中继续处理。"
     }
   ]
 }

@@ -5334,4 +5334,376 @@ SHA-256：%4$@</value>
     <value>日志不是有效的 UTF-8 文本。</value>
     <comment>jobInspector.log.notText (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="history_action_loadOlder" xml:space="preserve">
+    <value>加载更早的 Job</value>
+    <comment>history.action.loadOlder (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_all" xml:space="preserve">
+    <value>全部记录</value>
+    <comment>history.activity.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_debug" xml:space="preserve">
+    <value>调试记录</value>
+    <comment>history.activity.debug (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_diagnostics" xml:space="preserve">
+    <value>诊断记录</value>
+    <comment>history.activity.diagnostics (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_flash" xml:space="preserve">
+    <value>刷机镜像</value>
+    <comment>history.activity.flash (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_other" xml:space="preserve">
+    <value>其他 Runtime 活动</value>
+    <comment>history.activity.other (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_quickFilters" xml:space="preserve">
+    <value>快速筛选</value>
+    <comment>history.activity.quickFilters (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_recent" xml:space="preserve">
+    <value>最近活动</value>
+    <comment>history.activity.recent (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_recentDescription" xml:space="preserve">
+    <value>查看保存的上下文，或返回创建记录的工具继续操作。</value>
+    <comment>history.activity.recentDescription (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_title" xml:space="preserve">
+    <value>内容</value>
+    <comment>history.activity.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_trace" xml:space="preserve">
+    <value>Trace</value>
+    <comment>history.activity.trace (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_device" xml:space="preserve">
+    <value>设备控制</value>
+    <comment>history.activity.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_viewer" xml:space="preserve">
+    <value>Viewer 与观测</value>
+    <comment>history.activity.viewer (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_applySaved" xml:space="preserve">
+    <value>应用已存筛选</value>
+    <comment>history.filter.applySaved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_deleteSaved" xml:space="preserve">
+    <value>删除已存筛选</value>
+    <comment>history.filter.deleteSaved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_reloadSaved" xml:space="preserve">
+    <value>重新加载已存筛选</value>
+    <comment>history.filter.reloadSaved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_device" xml:space="preserve">
+    <value>按设备筛选</value>
+    <comment>history.filter.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_device_all" xml:space="preserve">
+    <value>所有设备</value>
+    <comment>history.filter.device.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_empty_description" xml:space="preserve">
+    <value>更改或重置筛选条件以显示已记录的 Job。</value>
+    <comment>history.filter.empty.description (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_empty_title" xml:space="preserve">
+    <value>没有匹配的 Job</value>
+    <comment>history.filter.empty.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode" xml:space="preserve">
+    <value>按执行模式筛选</value>
+    <comment>history.filter.mode (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_all" xml:space="preserve">
+    <value>所有模式</value>
+    <comment>history.filter.mode.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_execute" xml:space="preserve">
+    <value>已执行</value>
+    <comment>history.filter.mode.execute (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_planned" xml:space="preserve">
+    <value>仅计划</value>
+    <comment>history.filter.mode.planned (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_simulated" xml:space="preserve">
+    <value>模拟</value>
+    <comment>history.filter.mode.simulated (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_unknown" xml:space="preserve">
+    <value>未报告</value>
+    <comment>history.filter.mode.unknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_preset_needsAttention" xml:space="preserve">
+    <value>需要关注</value>
+    <comment>history.filter.preset.needsAttention (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_preset_recentFailures" xml:space="preserve">
+    <value>最近一周失败</value>
+    <comment>history.filter.preset.recentFailures (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_reset" xml:space="preserve">
+    <value>重置筛选</value>
+    <comment>history.filter.reset (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_resultCount" xml:space="preserve">
+    <value>显示 %lld / %lld 个 Job</value>
+    <comment>history.filter.resultCount (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_save" xml:space="preserve">
+    <value>保存当前筛选</value>
+    <comment>history.filter.save (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_saved" xml:space="preserve">
+    <value>已存筛选</value>
+    <comment>history.filter.saved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_search" xml:space="preserve">
+    <value>搜索 Job、操作或设备</value>
+    <comment>history.filter.search (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_session" xml:space="preserve">
+    <value>按 Session 筛选</value>
+    <comment>history.filter.session (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_session_all" xml:space="preserve">
+    <value>所有 Session</value>
+    <comment>history.filter.session.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status" xml:space="preserve">
+    <value>按状态筛选</value>
+    <comment>history.filter.status (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_active" xml:space="preserve">
+    <value>进行中</value>
+    <comment>history.filter.status.active (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_all" xml:space="preserve">
+    <value>所有状态</value>
+    <comment>history.filter.status.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_cancelled" xml:space="preserve">
+    <value>已取消</value>
+    <comment>history.filter.status.cancelled (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_failed" xml:space="preserve">
+    <value>失败</value>
+    <comment>history.filter.status.failed (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_interrupted" xml:space="preserve">
+    <value>已中断</value>
+    <comment>history.filter.status.interrupted (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_needsAttention" xml:space="preserve">
+    <value>需要关注</value>
+    <comment>history.filter.status.needsAttention (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_succeeded" xml:space="preserve">
+    <value>成功</value>
+    <comment>history.filter.status.succeeded (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time" xml:space="preserve">
+    <value>按时间筛选</value>
+    <comment>history.filter.time (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_anyTime" xml:space="preserve">
+    <value>不限时间</value>
+    <comment>history.filter.time.anyTime (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_lastDay" xml:space="preserve">
+    <value>最近 24 小时</value>
+    <comment>history.filter.time.lastDay (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_lastHour" xml:space="preserve">
+    <value>最近一小时</value>
+    <comment>history.filter.time.lastHour (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_lastWeek" xml:space="preserve">
+    <value>最近 7 天</value>
+    <comment>history.filter.time.lastWeek (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_title" xml:space="preserve">
+    <value>筛选历史</value>
+    <comment>history.filter.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_history_filter_savedNone" xml:space="preserve">
+    <value>尚未保存筛选条件。</value>
+    <comment>windows.history.filter.savedNone (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_savedSummary" xml:space="preserve">
+    <value>已保存的筛选：%@</value>
+    <comment>windows.history.filter.savedSummary (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_savedDone" xml:space="preserve">
+    <value>筛选条件已保存。</value>
+    <comment>windows.history.filter.savedDone (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_deletedDone" xml:space="preserve">
+    <value>已删除保存的筛选条件。</value>
+    <comment>windows.history.filter.deletedDone (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_savedUnavailable" xml:space="preserve">
+    <value>无法读取保存的筛选条件：%@</value>
+    <comment>windows.history.filter.savedUnavailable (Windows only)</comment>
+  </data>
+  <data name="history_detail_correlation" xml:space="preserve">
+    <value>执行关联</value>
+    <comment>history.detail.correlation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_showSession" xml:space="preserve">
+    <value>显示关联 Job</value>
+    <comment>history.correlation.showSession (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_noArtifacts" xml:space="preserve">
+    <value>此 Job 没有 Artifact 引用。</value>
+    <comment>history.correlation.noArtifacts (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_artifactCount" xml:space="preserve">
+    <value>逻辑诊断包 · %lld 个 Artifact 引用</value>
+    <comment>history.correlation.artifactCount (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_readOnly" xml:space="preserve">
+    <value>此视图仅关联现有 Runtime 记录，不复制 Artifact 字节，也不授予设备、重试或恢复权限。</value>
+    <comment>history.correlation.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_effect" xml:space="preserve">
+    <value>实际影响</value>
+    <comment>history.detail.effect (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_notLoaded" xml:space="preserve">
+    <value>尚未加载详情。请刷新历史记录并重新选择此 Job。</value>
+    <comment>history.detail.notLoaded (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_outcomeCertainty" xml:space="preserve">
+    <value>结果确定性</value>
+    <comment>history.detail.outcomeCertainty (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_parameters" xml:space="preserve">
+    <value>参数</value>
+    <comment>history.detail.parameters (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_projectionNote" xml:space="preserve">
+    <value>这是 Runtime 的只读 manifest 投影。原始 manifest 与 journal 文件仍保留在 Runtime 管理的存储中。</value>
+    <comment>history.detail.projectionNote (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_recovery" xml:space="preserve">
+    <value>恢复</value>
+    <comment>history.detail.recovery (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_residue" xml:space="preserve">
+    <value>有 %lld 项未清理残留。</value>
+    <comment>history.detail.residue (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_session" xml:space="preserve">
+    <value>Session</value>
+    <comment>history.detail.session (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_started" xml:space="preserve">
+    <value>开始时间</value>
+    <comment>history.detail.started (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_summary" xml:space="preserve">
+    <value>Job 与 manifest 摘要</value>
+    <comment>history.detail.summary (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_timeline" xml:space="preserve">
+    <value>Journal 摘要</value>
+    <comment>history.detail.timeline (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_firmware" xml:space="preserve">
+    <value>观测固件</value>
+    <comment>history.evidence.firmware (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_model" xml:space="preserve">
+    <value>观测型号</value>
+    <comment>history.evidence.model (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_transport" xml:space="preserve">
+    <value>观测传输</value>
+    <comment>history.evidence.transport (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_outcome_confirmed" xml:space="preserve">
+    <value>已确认</value>
+    <comment>history.outcome.confirmed (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_outcome_unknown" xml:space="preserve">
+    <value>未知</value>
+    <comment>history.outcome.unknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_after" xml:space="preserve">
+    <value>执行后</value>
+    <comment>history.parameters.column.after (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_before" xml:space="preserve">
+    <value>执行前</value>
+    <comment>history.parameters.column.before (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_name" xml:space="preserve">
+    <value>参数</value>
+    <comment>history.parameters.column.name (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_status" xml:space="preserve">
+    <value>状态</value>
+    <comment>history.parameters.column.status (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_comparison_changed" xml:space="preserve">
+    <value>已变化</value>
+    <comment>history.parameters.comparison.changed (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_comparison_unchanged" xml:space="preserve">
+    <value>未改变</value>
+    <comment>history.parameters.comparison.unchanged (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_comparison_unverified" xml:space="preserve">
+    <value>无法验证</value>
+    <comment>history.parameters.comparison.unverified (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_empty" xml:space="preserve">
+    <value>此 Job 未记录参数。</value>
+    <comment>history.parameters.empty (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_state_missing" xml:space="preserve">
+    <value>不存在</value>
+    <comment>history.parameters.state.missing (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_state_unknown" xml:space="preserve">
+    <value>未知</value>
+    <comment>history.parameters.state.unknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_state_unreadable" xml:space="preserve">
+    <value>无法读取</value>
+    <comment>history.parameters.state.unreadable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_typedInputs" xml:space="preserve">
+    <value>请求的类型化输入</value>
+    <comment>history.parameters.typedInputs (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_unavailable" xml:space="preserve">
+    <value>此旧版 Job 未报告类型化参数。</value>
+    <comment>history.parameters.unavailable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_none" xml:space="preserve">
+    <value>未报告尚未解决的恢复条件。</value>
+    <comment>history.recovery.none (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_outcomeUnknown" xml:space="preserve">
+    <value>设备影响未知，不能假定此 Job 已安全结束。</value>
+    <comment>history.recovery.outcomeUnknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_readOnly" xml:space="preserve">
+    <value>此处有意不提供恢复操作。请使用拥有此 Job 的经审查工作流。</value>
+    <comment>history.recovery.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_residue" xml:space="preserve">
+    <value>仍有残留项需要检查。</value>
+    <comment>history.recovery.residue (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_waitingForHuman" xml:space="preserve">
+    <value>此 Job 正等待人工在其所属工作流中继续处理。</value>
+    <comment>history.recovery.waitingForHuman (HistoryLocalizable.xcstrings)</comment>
+  </data>
 </root>

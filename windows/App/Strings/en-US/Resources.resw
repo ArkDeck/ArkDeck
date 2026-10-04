@@ -5334,4 +5334,376 @@ SHA-256: %4$@</value>
     <value>The log is not valid UTF-8 text.</value>
     <comment>jobInspector.log.notText (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="history_action_loadOlder" xml:space="preserve">
+    <value>Load older Jobs</value>
+    <comment>history.action.loadOlder (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_all" xml:space="preserve">
+    <value>All records</value>
+    <comment>history.activity.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_debug" xml:space="preserve">
+    <value>Debug runs</value>
+    <comment>history.activity.debug (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_diagnostics" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>history.activity.diagnostics (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_flash" xml:space="preserve">
+    <value>Flashed images</value>
+    <comment>history.activity.flash (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_other" xml:space="preserve">
+    <value>Other Runtime activity</value>
+    <comment>history.activity.other (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_quickFilters" xml:space="preserve">
+    <value>Quick filters</value>
+    <comment>history.activity.quickFilters (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_recent" xml:space="preserve">
+    <value>Recent activity</value>
+    <comment>history.activity.recent (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_recentDescription" xml:space="preserve">
+    <value>Review saved context or return to the tool that created it.</value>
+    <comment>history.activity.recentDescription (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_title" xml:space="preserve">
+    <value>Content</value>
+    <comment>history.activity.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_trace" xml:space="preserve">
+    <value>Traces</value>
+    <comment>history.activity.trace (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_device" xml:space="preserve">
+    <value>Device control</value>
+    <comment>history.activity.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_viewer" xml:space="preserve">
+    <value>Viewer and observe</value>
+    <comment>history.activity.viewer (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_applySaved" xml:space="preserve">
+    <value>Apply saved filter</value>
+    <comment>history.filter.applySaved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_deleteSaved" xml:space="preserve">
+    <value>Delete saved filter</value>
+    <comment>history.filter.deleteSaved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_reloadSaved" xml:space="preserve">
+    <value>Reload saved filter</value>
+    <comment>history.filter.reloadSaved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_device" xml:space="preserve">
+    <value>Filter by device</value>
+    <comment>history.filter.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_device_all" xml:space="preserve">
+    <value>All devices</value>
+    <comment>history.filter.device.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_empty_description" xml:space="preserve">
+    <value>Change or reset the filters to show recorded Jobs.</value>
+    <comment>history.filter.empty.description (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_empty_title" xml:space="preserve">
+    <value>No Jobs Match</value>
+    <comment>history.filter.empty.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode" xml:space="preserve">
+    <value>Filter by execution mode</value>
+    <comment>history.filter.mode (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_all" xml:space="preserve">
+    <value>All modes</value>
+    <comment>history.filter.mode.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_execute" xml:space="preserve">
+    <value>Executed</value>
+    <comment>history.filter.mode.execute (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_planned" xml:space="preserve">
+    <value>Plan only</value>
+    <comment>history.filter.mode.planned (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_simulated" xml:space="preserve">
+    <value>Simulated</value>
+    <comment>history.filter.mode.simulated (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_mode_unknown" xml:space="preserve">
+    <value>Not reported</value>
+    <comment>history.filter.mode.unknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_preset_needsAttention" xml:space="preserve">
+    <value>Needs attention</value>
+    <comment>history.filter.preset.needsAttention (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_preset_recentFailures" xml:space="preserve">
+    <value>Failures in the last week</value>
+    <comment>history.filter.preset.recentFailures (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_reset" xml:space="preserve">
+    <value>Reset filters</value>
+    <comment>history.filter.reset (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_resultCount" xml:space="preserve">
+    <value>%lld of %lld Jobs</value>
+    <comment>history.filter.resultCount (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_save" xml:space="preserve">
+    <value>Save current filter</value>
+    <comment>history.filter.save (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_saved" xml:space="preserve">
+    <value>Saved filters</value>
+    <comment>history.filter.saved (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_search" xml:space="preserve">
+    <value>Search Job, operation, or device</value>
+    <comment>history.filter.search (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_session" xml:space="preserve">
+    <value>Filter by Session</value>
+    <comment>history.filter.session (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_session_all" xml:space="preserve">
+    <value>All Sessions</value>
+    <comment>history.filter.session.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status" xml:space="preserve">
+    <value>Filter by state</value>
+    <comment>history.filter.status (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_active" xml:space="preserve">
+    <value>Active</value>
+    <comment>history.filter.status.active (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_all" xml:space="preserve">
+    <value>All states</value>
+    <comment>history.filter.status.all (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+    <comment>history.filter.status.cancelled (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_failed" xml:space="preserve">
+    <value>Failed</value>
+    <comment>history.filter.status.failed (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_interrupted" xml:space="preserve">
+    <value>Interrupted</value>
+    <comment>history.filter.status.interrupted (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_needsAttention" xml:space="preserve">
+    <value>Needs attention</value>
+    <comment>history.filter.status.needsAttention (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_status_succeeded" xml:space="preserve">
+    <value>Succeeded</value>
+    <comment>history.filter.status.succeeded (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time" xml:space="preserve">
+    <value>Filter by time</value>
+    <comment>history.filter.time (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_anyTime" xml:space="preserve">
+    <value>Any time</value>
+    <comment>history.filter.time.anyTime (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_lastDay" xml:space="preserve">
+    <value>Last 24 hours</value>
+    <comment>history.filter.time.lastDay (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_lastHour" xml:space="preserve">
+    <value>Last hour</value>
+    <comment>history.filter.time.lastHour (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_time_lastWeek" xml:space="preserve">
+    <value>Last 7 days</value>
+    <comment>history.filter.time.lastWeek (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_filter_title" xml:space="preserve">
+    <value>Filter history</value>
+    <comment>history.filter.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_history_filter_savedNone" xml:space="preserve">
+    <value>No filter is saved.</value>
+    <comment>windows.history.filter.savedNone (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_savedSummary" xml:space="preserve">
+    <value>Saved filter: %@</value>
+    <comment>windows.history.filter.savedSummary (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_savedDone" xml:space="preserve">
+    <value>Filter saved.</value>
+    <comment>windows.history.filter.savedDone (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_deletedDone" xml:space="preserve">
+    <value>Saved filter deleted.</value>
+    <comment>windows.history.filter.deletedDone (Windows only)</comment>
+  </data>
+  <data name="windows_history_filter_savedUnavailable" xml:space="preserve">
+    <value>The saved filter could not be read: %@</value>
+    <comment>windows.history.filter.savedUnavailable (Windows only)</comment>
+  </data>
+  <data name="history_detail_correlation" xml:space="preserve">
+    <value>Execution correlation</value>
+    <comment>history.detail.correlation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_showSession" xml:space="preserve">
+    <value>Show related Jobs</value>
+    <comment>history.correlation.showSession (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_noArtifacts" xml:space="preserve">
+    <value>This Job has no Artifact references.</value>
+    <comment>history.correlation.noArtifacts (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_artifactCount" xml:space="preserve">
+    <value>Logical diagnostic bundle · %lld Artifact references</value>
+    <comment>history.correlation.artifactCount (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_correlation_readOnly" xml:space="preserve">
+    <value>This view links existing Runtime records only. It does not copy Artifact bytes or grant device, retry, or recovery authority.</value>
+    <comment>history.correlation.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_effect" xml:space="preserve">
+    <value>Actual effect</value>
+    <comment>history.detail.effect (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_notLoaded" xml:space="preserve">
+    <value>Detail has not been loaded. Refresh the history and select this Job again.</value>
+    <comment>history.detail.notLoaded (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_outcomeCertainty" xml:space="preserve">
+    <value>Outcome certainty</value>
+    <comment>history.detail.outcomeCertainty (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_parameters" xml:space="preserve">
+    <value>Parameters</value>
+    <comment>history.detail.parameters (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_projectionNote" xml:space="preserve">
+    <value>This is the Runtime's read-only manifest projection. Raw manifest and journal files remain inside Runtime-owned storage.</value>
+    <comment>history.detail.projectionNote (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_recovery" xml:space="preserve">
+    <value>Recovery</value>
+    <comment>history.detail.recovery (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_residue" xml:space="preserve">
+    <value>%lld outstanding residue items.</value>
+    <comment>history.detail.residue (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_session" xml:space="preserve">
+    <value>Session</value>
+    <comment>history.detail.session (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_started" xml:space="preserve">
+    <value>Started</value>
+    <comment>history.detail.started (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_summary" xml:space="preserve">
+    <value>Job and manifest summary</value>
+    <comment>history.detail.summary (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_timeline" xml:space="preserve">
+    <value>Journal summary</value>
+    <comment>history.detail.timeline (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_firmware" xml:space="preserve">
+    <value>Observed firmware</value>
+    <comment>history.evidence.firmware (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_model" xml:space="preserve">
+    <value>Observed model</value>
+    <comment>history.evidence.model (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_transport" xml:space="preserve">
+    <value>Observed transport</value>
+    <comment>history.evidence.transport (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_outcome_confirmed" xml:space="preserve">
+    <value>Confirmed</value>
+    <comment>history.outcome.confirmed (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_outcome_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>history.outcome.unknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_after" xml:space="preserve">
+    <value>After</value>
+    <comment>history.parameters.column.after (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_before" xml:space="preserve">
+    <value>Before</value>
+    <comment>history.parameters.column.before (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_name" xml:space="preserve">
+    <value>Parameter</value>
+    <comment>history.parameters.column.name (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_column_status" xml:space="preserve">
+    <value>Status</value>
+    <comment>history.parameters.column.status (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_comparison_changed" xml:space="preserve">
+    <value>Changed</value>
+    <comment>history.parameters.comparison.changed (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_comparison_unchanged" xml:space="preserve">
+    <value>Unchanged</value>
+    <comment>history.parameters.comparison.unchanged (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_comparison_unverified" xml:space="preserve">
+    <value>Unverified</value>
+    <comment>history.parameters.comparison.unverified (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_empty" xml:space="preserve">
+    <value>This Job recorded no parameters.</value>
+    <comment>history.parameters.empty (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_state_missing" xml:space="preserve">
+    <value>Missing</value>
+    <comment>history.parameters.state.missing (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_state_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>history.parameters.state.unknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_state_unreadable" xml:space="preserve">
+    <value>Unreadable</value>
+    <comment>history.parameters.state.unreadable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_typedInputs" xml:space="preserve">
+    <value>Requested typed inputs</value>
+    <comment>history.parameters.typedInputs (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_parameters_unavailable" xml:space="preserve">
+    <value>This older Job did not report typed parameters.</value>
+    <comment>history.parameters.unavailable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_none" xml:space="preserve">
+    <value>No unresolved recovery condition was reported.</value>
+    <comment>history.recovery.none (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_outcomeUnknown" xml:space="preserve">
+    <value>The device effect is unknown. Do not assume this Job finished safely.</value>
+    <comment>history.recovery.outcomeUnknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_readOnly" xml:space="preserve">
+    <value>Recovery actions are intentionally unavailable here. Use the reviewed workflow that owns this Job.</value>
+    <comment>history.recovery.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_residue" xml:space="preserve">
+    <value>Outstanding residue still requires review.</value>
+    <comment>history.recovery.residue (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_recovery_waitingForHuman" xml:space="preserve">
+    <value>This Job is waiting for a person to continue in its owning workflow.</value>
+    <comment>history.recovery.waitingForHuman (HistoryLocalizable.xcstrings)</comment>
+  </data>
 </root>
