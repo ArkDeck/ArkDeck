@@ -16,9 +16,8 @@ use crate::workspace_patch::{Detail, Invocation, ToolReceipt, failed_detail, out
 use crate::workspace_support as support;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use std::fs::{self, DirBuilder, OpenOptions};
+use std::fs;
 use std::io::Read;
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
 /// The operation this module serves.
@@ -100,10 +99,7 @@ impl Landing {
     pub(crate) fn prepare(&self) -> std::io::Result<()> {
         let destination = Path::new(&self.destination);
         if let Some(parent) = destination.parent() {
-            DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(parent)?;
+            support::create_private_directories(parent)?;
         }
         match fs::symlink_metadata(destination) {
             Ok(metadata) if metadata.is_dir() => fs::remove_dir_all(destination),
@@ -117,16 +113,12 @@ impl Landing {
     /// through a link; an empty or over-budget one is reported unhashed, and
     /// one that cannot be read whole is not reported at all.
     pub(crate) fn inspect(&self) -> Option<Landed> {
-        let mut file = OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
-            .open(&self.destination)
-            .ok()?;
+        let mut file = support::open_no_follow(Path::new(&self.destination), false).ok()?;
         let metadata = file.metadata().ok()?;
         if !metadata.is_file() {
             return None;
         }
-        let byte_count = metadata.size();
+        let byte_count = metadata.len();
         if byte_count == 0 || byte_count > MAXIMUM_PRODUCT_BYTES {
             return Some(Landed {
                 path: self.destination.clone(),
@@ -201,7 +193,8 @@ pub(crate) fn verify(
     BuildVerdict::Verified(summary)
 }
 
-#[cfg(test)]
+// The fixtures are POSIX trees (modes, links).
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
 

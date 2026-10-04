@@ -1,6 +1,6 @@
 //! Frozen Bundle registration under the shared Bootstrap owner lock.
 //! Immutable bytes precede their record; no helper is installed or executed.
-use crate::{BundleRegistryReadStore, bundle_content::inspect_bundle_content, decode_bundles};
+use crate::{BundleRegistryReadStore, bundle_content::inspect_bundle_content_with, decode_bundles};
 use arkdeck_contract::WireError;
 use arkdeck_platform::{
     BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublishError,
@@ -45,6 +45,31 @@ fn publication(error: DocumentPublishError) -> WireError {
         DocumentPublishError::OutcomeUnknown(_) => unknown(error),
     }
 }
+/// A local Bundle as this host spells one: macOS, Swift's `/…/<name>.app`
+/// with no `.` or `..` component; Windows, a standard `X:\…` directory (the
+/// release-candidate package tree), which the tree reader then opens without
+/// following a link.
+#[cfg(not(windows))]
+fn local_source(text: &str, source: &Path) -> bool {
+    text.starts_with('/')
+        && text.len() <= 16_384
+        && !text.contains('\0')
+        && !text.split('/').any(|part| matches!(part, "." | ".."))
+        && source.extension().and_then(|v| v.to_str()) == Some("app")
+}
+#[cfg(windows)]
+fn local_source(text: &str, _source: &Path) -> bool {
+    let bytes = text.as_bytes();
+    bytes.len() > 3
+        && bytes.len() <= 16_384
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && bytes[2] == b'\\'
+        && !text.contains('\0')
+        && text[3..]
+            .split('\\')
+            .all(|part| !part.is_empty() && !matches!(part, "." | ".."))
+}
 fn projection(bytes: &[u8], reference: &str) -> Result<Value, WireError> {
     decode_bundles(bytes)
         .map_err(unreadable)?
@@ -85,7 +110,7 @@ impl BundleRegistryReadStore {
         let mut interrupted = 0;
         for name in names {
             let staging = name.starts_with(".staging-");
-            if !(staging || name.starts_with("bundle-") && name.ends_with(".app")) {
+            if !(staging || crate::bundle_content::is_retained_name(&name)) {
                 continue;
             }
             if staging {
@@ -122,13 +147,7 @@ impl BundleRegistryReadStore {
         let text = source
             .to_str()
             .ok_or_else(|| failure("invalidInput", "a local Bundle is required"))?;
-        if !text.starts_with('/')
-            || text.len() > 16_384
-            || text.contains('\0')
-            || text.split('/').any(|part| matches!(part, "." | ".."))
-            || source.extension().and_then(|v| v.to_str()) != Some("app")
-            || arkdeck_platform::host_legacy_iso8601(now) != Some(true)
-        {
+        if !local_source(text, source) || arkdeck_platform::host_legacy_iso8601(now) != Some(true) {
             return Err(failure(
                 "invalidInput",
                 "the local Bundle or host timestamp is invalid",
@@ -175,19 +194,22 @@ impl BundleRegistryReadStore {
         let mut stage = BootstrapBundleCapture::capture(&self.path, source).map_err(captured)?;
         checkpoint("copied").map_err(unreadable)?;
         stage.revalidate_sources().map_err(captured)?;
-        let content = inspect_bundle_content(stage.path()).map_err(|error| {
-            if error.kind() == io::ErrorKind::PermissionDenied {
-                failure(
-                    "admissionDenied",
-                    "captured Bundle failed its native trust policy",
-                )
-            } else {
-                failure(
-                    "fileIdentityChanged",
-                    "captured Bundle changed during native verification",
-                )
-            }
-        })?;
+        // The store's policy: the production policy unless a caller replaced it
+        // (`with_bundle_validator`), the one its retained Bundles are held to.
+        let content =
+            inspect_bundle_content_with(stage.path(), &*self.validate).map_err(|error| {
+                if error.kind() == io::ErrorKind::PermissionDenied {
+                    failure(
+                        "admissionDenied",
+                        "captured Bundle failed its native trust policy",
+                    )
+                } else {
+                    failure(
+                        "fileIdentityChanged",
+                        "captured Bundle changed during native verification",
+                    )
+                }
+            })?;
         stage.revalidate_sources().map_err(captured)?;
         let reference = format!("bundle:sha256:{}", content.digest);
         if let Some(old) = index["records"]
@@ -208,12 +230,13 @@ impl BundleRegistryReadStore {
         }
         let mut record = json!({"reference":reference,"digest":content.digest,"registeredAtUTC":now,
             "version":content.version,"byteCount":content.byte_count,"entryCount":content.entry_count,
-            "generation":1,"state":"available","references":[]});
+            "generation":1,"state":"available","references":[],
+            "platform":content.signer.as_ref().map(|_| "windows"),"signer":content.signer});
         record
             .as_object_mut()
             .expect("object")
             .retain(|_, v| !v.is_null());
-        let name = format!("bundle-{}.app", content.digest);
+        let name = crate::bundle_content::retained_name(&content.digest);
         let exists = match self.root.child(&name) {
             Ok(_) => {
                 self.verify_record(&record).map_err(unreadable)?;
@@ -278,7 +301,7 @@ impl BundleRegistryReadStore {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{

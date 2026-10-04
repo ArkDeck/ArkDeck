@@ -246,7 +246,9 @@ public sealed class RealDaemonTests
             app.Select("settings.tab.trace");
             TestContext.WriteLine("trace cache: " + app.WaitForName("settings.trace.entries", n => n.Length > 0) + " · " + AppSession.Name(app.Find("settings.trace.scope")));
             app.Select("settings.tab.toolchains");
-            TestContext.WriteLine("hdc: " + app.WaitForName("settings.toolchains.hdc.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal)));
+            // Since #2453 the Windows daemon answers runtime.hdc.status as macOS does without an
+            // HDC host: the unconfigured status, not a refusal.
+            StringAssert.StartsWith(app.WaitForName("settings.toolchains.health", n => n.Length > 0), "unavailable (hdc.notConfigured)");
             app.Select("settings.tab.workspace");
             app.Select("settings.workspace.project." + reference);
             Assert.AreEqual("runtimeRestartRequired", app.WaitForName("settings.workspace.detail.configuration", n => n.Length > 0));
@@ -579,6 +581,131 @@ public sealed class RealDaemonTests
             var refused = Frame(endpoint, "job.submit", $$"""{"requestJson":{{JsonSerializer.Serialize(
                 """{"documentType":"runtime-operation-request","idempotencyKey":"debug-logs-ui-uitest","inputs":{"durationSeconds":5},"operation":{"id":"capture.diagnostics","version":1},"requestId":"debug-logs-ui-uitest","requestedOutputs":["derivedArtifacts"],"schemaVersion":"1.0.0","target":{"expectedBindingRevision":1,"targetId":"TGT-3ba3f5f43b92"}}""")}}}""", expectOk: false);
             Assert.AreEqual("provider hdc is not registered", refused.GetProperty("error").GetProperty("message").GetString());
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            Stop(process, directory);
+        }
+    }
+
+    /// <summary>
+    /// The Trace, Trace viewer and Viewer pages against the real Runtime over a development root
+    /// holding the recorded adopted Target. No Windows HDC tuple is registered, so
+    /// <c>capture.diagnostics@1</c> is unavailable (<c>provider hdc is not registered</c>), the
+    /// Runtime has no Trace probe and no device observation: the Trace page's first blocker says
+    /// so and Start sends nothing; the Viewer's device is not Connected, with the Runtime's reason,
+    /// and Capture sends nothing; a local Trace opens in the viewer, which names the missing
+    /// parser. No Job is admitted.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void TheTraceAndViewerPagesShowTheRuntimesRefusalWithoutHdc()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-trace-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            (process, _) = StartRootDaemon(signed, root);
+            process.Kill();
+            process.WaitForExit();
+            process.Dispose();
+            CopyTree(RepoPaths.At("rust", "tests", "fixtures", "agent-human-action", "targets-state"), Path.Combine(root, "targets-state"));
+            (process, var endpoint) = StartRootDaemon(signed, root);
+            var cache = Directory.CreateDirectory(Path.Combine(directory.FullName, "cache")).FullName;
+            var trace = Path.Combine(cache, "local.htrace");
+            File.WriteAllBytes(trace, [1, 2, 3]);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "trace", "--cache-root", cache], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            Assert.AreEqual(strings["trace.availability.unavailable"], app.WaitForName("trace.availability.status", n => n.Length > 0));
+            var status = app.Find("trace.capture.status");
+            Assert.AreEqual(strings["trace.blocker.operation"], AppSession.Name(status));
+            var details = status.Properties.FullDescription.ValueOrDefault ?? "";
+            TestContext.WriteLine("blockers: " + details.Replace(Environment.NewLine, " | ", StringComparison.Ordinal));
+            StringAssert.Contains(details, "provider hdc is not registered");
+            StringAssert.Contains(details, strings.Format("windows.unavailable.reason", ["internalError", "Trace Runtime probing is not configured"]));
+            Assert.AreEqual("TGT-3ba3f5f43b92", AppSession.Name(app.Find("trace.target.picker").Patterns.Selection.Pattern.Selection.Value.Single()));
+            app.Invoke("trace.start");
+            Assert.AreEqual(strings["trace.blocker.operation"], app.WaitForName("trace.submission.failure", n => n.Length > 0), "nothing is sent");
+
+            app.Navigate("traceViewer");
+            AgentImportFlowTests.ChooseFile(app, "trace.viewer.idle.open", trace);
+            Assert.AreEqual(strings["error.title.bundledParserUnavailable"], app.WaitForName("trace.viewer.error.title", n => n.Length > 0));
+            Assert.AreEqual("039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81", AppSession.Name(app.Find("trace.viewer.inspector.sha256")));
+
+            app.Navigate("viewer");
+            Assert.AreEqual(strings["viewer.empty.selectTarget"], app.WaitForName("viewer.empty.message", n => n.Length > 0));
+            app.Find("viewer.target").Patterns.ExpandCollapse.Pattern.Expand();
+            var target = app.Find("viewer.target.TGT-3ba3f5f43b92");
+            var reason = "Could not read current device state: hdc.notConfigured";
+            Assert.AreEqual($"TGT-3ba3f5f43b92 · {reason}", AppSession.Name(target));
+            target.Patterns.SelectionItem.Pattern.Select();
+            var blocked = strings.Format("viewer.empty.targetBlocked", ["TGT-3ba3f5f43b92", reason]);
+            Assert.AreEqual(blocked, app.WaitForName("viewer.empty.message", n => n == blocked));
+            app.Invoke("viewer.recapture");
+            Assert.AreEqual(blocked, app.WaitForName("viewer.captureFailure", n => n.Length > 0), "nothing is sent");
+
+            Assert.AreEqual(0, Frame(endpoint, "job.list", """{"pageSize":200,"order":"createdAtDescJobIdAsc","includeTimeline":false,"includeCurrent":true}""")
+                .GetProperty("result").GetProperty("items").GetArrayLength(), "nothing was admitted");
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            Stop(process, directory);
+        }
+    }
+
+    /// <summary>
+    /// Diagnostics against the Windows daemon over a development root (TASK-XPA-020): no
+    /// Diagnostic Session capture is connected, so Arm and Mark say so with the macOS reason code;
+    /// with no saved record the page says how to open one, and History has none to open (the
+    /// daemon admits no capture without an HDC). Nothing is admitted.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void TheDiagnosticsPageShowsThatSessionCaptureIsNotConnected()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-diagnostics-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            (process, var endpoint) = StartRootDaemon(signed, root);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "diagnostics"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            Assert.AreEqual(strings["diagnostics.session.none"], app.WaitForName("diagnostics.session.empty", n => n.Length > 0));
+            Assert.AreEqual("diagnostic_session_capture_not_connected", AppSession.Name(app.Find("diagnostics.capture.reasonCode")));
+            app.Invoke("diagnostics.capture.arm");
+            StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["diagnostics.capture.unavailable"]);
+            app.Navigate("history");
+            Assert.AreEqual(strings["history.empty.title"], app.WaitForName("history.empty.title", n => n.Length > 0));
+            Assert.IsNull(app.TryFind("history.openDiagnostics", TimeSpan.FromMilliseconds(300)));
+
+            Assert.AreEqual(0, Frame(endpoint, "job.list", """{"pageSize":200,"order":"createdAtDescJobIdAsc","includeTimeline":false,"includeCurrent":true}""")
+                .GetProperty("result").GetProperty("items").GetArrayLength(), "nothing was admitted");
             foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
         }
         finally

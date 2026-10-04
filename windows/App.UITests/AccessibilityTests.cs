@@ -47,6 +47,12 @@ public sealed class AccessibilityTests
         ["debug", "jobs", new[] { "debug.tab.network" }],
         ["debug", "jobs", new[] { "debug.tab.commands" }],
         ["flash", "flash", Array.Empty<string>()],
+        ["trace", "viewer", Array.Empty<string>()],
+        ["traceViewer", "viewer", Array.Empty<string>()],
+        ["viewer", "viewer", new[] { "viewer.recapture" }],
+        ["diagnostics", "jobs", Array.Empty<string>()],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics" }],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openDiagnostics" }],
         ["overview", "jobs", new[] { "jobInspector.row.job-0000000000000000000000000000a004" }],
     ];
 
@@ -59,9 +65,15 @@ public sealed class AccessibilityTests
         var file = Path.Combine(Path.GetTempPath(), $"arkdeck-focus-{Guid.NewGuid():N}.json");
         try
         {
-            using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", page, "--focus-walk", file]);
-            app.Find(Refresh(page));
-            foreach (var id in selections) app.Select(id);
+            var start = StartPage(page, selections);
+            using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", start, "--focus-walk", file]);
+            app.Find(Refresh(start));
+            foreach (var id in selections.Where(s => !s.StartsWith('@')))
+            {
+                var element = app.Find(id);
+                if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
+                else element.Patterns.Invoke.Pattern.Invoke();
+            }
             Thread.Sleep(800);
 
             // The actions a keyboard user must reach: every button of the page.
@@ -115,6 +127,10 @@ public sealed class AccessibilityTests
             ["imports"] = ("I", 0),
             ["debug"] = ("B", 0),
             ["flash"] = ("F", 0),
+            ["trace"] = ("T", 0),
+            ["traceViewer"] = ("R", 0),
+            ["viewer"] = ("V", 0),
+            ["diagnostics"] = ("G", 0),
             ["history"] = ("H", 0),
             ["device"] = ("D", 0),
             ["settings"] = ("S", 0),
@@ -263,6 +279,14 @@ public sealed class AccessibilityTests
         ["debug", "foundation", Array.Empty<string>()],
         ["flash", "flash", new[] { "flash.workspace.details" }],
         ["flash", "foundation", new[] { "flash.workspace.details" }],
+        ["trace", "viewer", Array.Empty<string>()],
+        ["trace", "targets", Array.Empty<string>()],
+        ["traceViewer", "viewer", Array.Empty<string>()],
+        ["viewer", "viewer", new[] { "viewer.recapture" }],
+        ["viewer", "targets", Array.Empty<string>()],
+        ["diagnostics", "jobs", Array.Empty<string>()],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics", "diagnostics.artifact.read.hilog.txt" }],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openDiagnostics" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a002" }],
     ];
 
@@ -272,9 +296,10 @@ public sealed class AccessibilityTests
     public void NothingIsClippedAtTheLargestTextSize(string page, string scenario, string[] steps)
     {
         var exe = AppSession.RequireApp();
-        using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", page, "--text-scale", "2.25"]);
-        app.Find(Refresh(page));
-        foreach (var id in steps)
+        var start = StartPage(page, steps);
+        using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", start, "--text-scale", "2.25"]);
+        app.Find(Refresh(start));
+        foreach (var id in steps.Where(s => !s.StartsWith('@')))
         {
             var element = app.Find(id);
             if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
@@ -346,13 +371,25 @@ public sealed class AccessibilityTests
         SemanticSnapshotTests.WaitUntil(() => app.TryFind(dialog, TimeSpan.FromMilliseconds(200)) is null, what);
     }
 
-    private static string Refresh(string page) => page == "device" ? "hdc.devices.refresh" : page + ".refresh";
+    private static string Refresh(string page) => page switch
+    {
+        "device" => "hdc.devices.refresh",
+        "diagnostics" => "diagnostics.session.reload",
+        _ => page + ".refresh",
+    };
+
+    /// <summary>The page the App starts on: the page itself, or the one an <c>@page</c> step names
+    /// (Diagnostics opens a record from History).</summary>
+    private static string StartPage(string page, string[] steps) => steps.FirstOrDefault(s => s.StartsWith('@'))?[1..] ?? page;
 
     private static HashSet<string> Buttons(AutomationElement pageRoot) =>
         pageRoot.FindAllDescendants(cf => cf.ByControlType(ControlType.Button))
             .Select(b => b.Properties.AutomationId.ValueOrDefault ?? "")
             // The App's own actions (dotted identifiers), not template parts such as scroll bar buttons.
             .Where(id => id.Contains('.', StringComparison.Ordinal))
+            // The Viewer's per-component outlines and tree disclosures are for screen readers: the
+            // keyboard reaches the same components through the tree (arrows, Left and Right), as on macOS.
+            .Where(id => !id.StartsWith("viewer.screenshot.node.", StringComparison.Ordinal) && !id.StartsWith("viewer.tree.disclosure.", StringComparison.Ordinal))
             .ToHashSet();
 
     private sealed record Stop(string Id, string Type, string State, double X, double Y, double Width, double Height);

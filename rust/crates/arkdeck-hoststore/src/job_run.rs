@@ -40,12 +40,12 @@
 //! runs on Windows too (TASK-XPA-010), over whatever `FlashLane` and
 //! `RockchipHost` its composition hands it. No Windows daemon composes an HDC provider until the
 //! Windows HDC tuple is registered, so no device Job runs there yet.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use crate::analyzer_composition;
 use crate::analyzer_composition::AnalyzerComposition;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use crate::analyzer_output::{self, Invocation, Receipt, Source};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
 use crate::device_facts::HdcComposition;
@@ -58,19 +58,22 @@ use crate::job_owner::JobStore;
 use crate::job_record::{JobRecord, terminal};
 use crate::session_publication::SessionPublisher;
 use arkdeck_contract::CATALOG_DIGEST;
+#[cfg(any(target_os = "macos", windows))]
+use arkdeck_platform::{
+    AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource, VerifiedTool,
+};
 #[cfg(target_os = "macos")]
 use arkdeck_platform::{
-    AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ToolLimits, ToolRequest, ToolRunError,
-    ToolTermination, VerifiedNamespace, VerifiedResource, VerifiedSource, VerifiedTool,
+    ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedNamespace, VerifiedResource,
 };
 use serde_json::{Map, Value, json};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use std::ffi::OsString;
 use std::path::Path;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use std::time::Duration;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "workspace_run.rs"]
 mod workspace_run;
 
@@ -80,13 +83,13 @@ mod flash_run;
 #[cfg(any(target_os = "macos", windows))]
 pub use flash_run::{FlashExecution, FlashRunner};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 const STEP_KIND: &str = "runDeterministicAnalyzer";
 /// Swift `DescriptorBoundProcessDispatcher`'s per-stream capture, whatever
 /// budget the analyzer profile gives its answer.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 const CAPTURE_BYTES: usize = 8 * 1024 * 1024;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 const MAXIMUM_SOURCE_BYTES: u64 = 512 * 1024 * 1024;
 /// The states Swift `runOwned` drives (a finalizing `debug.hap@1` aside).
 const RUNNABLE: [&str; 4] = [
@@ -101,17 +104,10 @@ const RUNNABLE: [&str; 4] = [
 /// composition, a Runtime-owned workspace copy, the patches applied to and
 /// reverted from a workspace and a workspace build through its workspace
 /// composition. Every other Job is refused before its run starts.
-#[cfg(target_os = "macos")]
 pub(crate) fn executes(operation: &str) -> bool {
     analyzer_composition::EXECUTED.contains(&operation)
         || crate::device_run::runs(operation)
         || workspace_run::runs(operation)
-}
-
-/// On Windows only the device lane is built.
-#[cfg(windows)]
-pub(crate) fn executes(operation: &str) -> bool {
-    crate::device_run::runs(operation)
 }
 
 /// A `job.run` refusal: its control-plane code, message and details.
@@ -166,7 +162,7 @@ fn valid_identifier(id: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 /// `RockchipHostProcessDiagnostics.signalDeath`.
 fn signal_death(signal: i32) -> String {
     format!(
@@ -183,7 +179,7 @@ pub(crate) fn failure(code: &str, category: &str, retryability: &str, recovery: 
 
 /// Swift `RuntimeDispatchFailure` before a verified receipt, and the
 /// process-group resolution of a cancelled child.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 enum Dispatch {
     Failed(String),
     OutcomeUnknown(String),
@@ -191,7 +187,7 @@ enum Dispatch {
 }
 
 /// A child that exited: its status, its output and whether any was dropped.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 struct Exited {
     status: i32,
     stdout: Vec<u8>,
@@ -412,15 +408,10 @@ impl JobRunner<'_> {
             ));
         }
         let device = crate::device_run::runs(record.operation()) && self.hdc.is_some();
-        #[cfg(target_os = "macos")]
         let workspace = self
             .workspace
             .filter(|_| workspace_run::runs(record.operation()));
-        #[cfg(target_os = "macos")]
         let analyzer = analyzer_composition::EXECUTED.contains(&record.operation());
-        // Neither lane is built on Windows.
-        #[cfg(windows)]
-        let (workspace, analyzer) = (None::<&crate::WorkspaceComposition>, false);
         if !analyzer && !device && workspace.is_none() {
             return Err(proven(
                 "rejected",
@@ -435,11 +426,8 @@ impl JobRunner<'_> {
         // Job a reconcile confirmed at its safe boundary, whose products it
         // republished — and a complete-overwrite recovery belongs to the
         // flash lane this Runtime does not hold.
-        #[cfg(target_os = "macos")]
         let resumed_signing = record.operation() == crate::workspace_composition::SIGN
             && state == "resumeAtConfirmedSafeBoundary";
-        #[cfg(windows)]
-        let resumed_signing = false;
         if state != "preflight"
             && !resumed_signing
             && (!device || state == "recoveringByCompleteOverwrite")
@@ -498,7 +486,6 @@ impl JobRunner<'_> {
             self.take_over_held_use(&mut run)
                 .map_err(|message| proven("rejected", message, Some(id)))?;
         }
-        #[cfg(target_os = "macos")]
         match (self.hdc.filter(|_| device), workspace) {
             (Some(hdc), _) => self.execute_device(&mut run, hdc)?,
             (None, Some(workspace))
@@ -540,18 +527,12 @@ impl JobRunner<'_> {
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
         }
-        // Only a device Job reaches here on Windows.
-        #[cfg(windows)]
-        match self.hdc.filter(|_| device) {
-            Some(hdc) => self.execute_device(&mut run, hdc)?,
-            None => return Err(uncertain()),
-        }
         run.release(self.jobs, self.sessions, &directory)?;
         Ok(run.record.status())
     }
 
     /// Swift `runOwned` through `dispatchWithWAL` for the one analyzer step.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn execute(&self, run: &mut Run) -> Result<(), RunRefusal> {
         let operation = run.record.operation().to_owned();
         let step = analyzer_composition::step(&operation).ok_or_else(uncertain)?;
@@ -967,6 +948,60 @@ impl JobRunner<'_> {
         let profile = invocation.profile;
         if profile.arktrace_summary.is_some() || profile.arktrace_analysis.is_some() {
             return dispatch_arktrace(invocation, source, cancelled);
+        }
+        let verified = VerifiedSource::open(path, source.sha256, source.byte_count)
+            .map_err(|_| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;
+        let tool = VerifiedTool::open(&profile.executable_path, &profile.executable_sha256)
+            .map_err(|error| Dispatch::Failed(format!("dispatch refused: {error}")))?;
+        let mut arguments: Vec<OsString> =
+            profile.fixed_arguments.iter().map(OsString::from).collect();
+        arguments.push(verified.inode_path().into());
+        let limits = AnalyzerLimits {
+            timeout: Duration::from_secs(profile.timeout_seconds.max(1) as u64),
+            capture_bytes: CAPTURE_BYTES,
+        };
+        match tool.run_analyzer(&arguments, &verified, limits, cancelled) {
+            Err(AnalyzerRunError::Refused(error)) => {
+                Err(Dispatch::Failed(format!("dispatch refused: {error}")))
+            }
+            Err(AnalyzerRunError::Unobservable(error)) => Err(Dispatch::OutcomeUnknown(format!(
+                "dispatch outcome unobservable: {error}"
+            ))),
+            Ok(execution) => match execution.termination {
+                AnalyzerTermination::Exited(status) => Ok(Exited {
+                    status,
+                    stdout: execution.stdout,
+                    stderr: execution.stderr,
+                    truncated: execution.truncated,
+                }),
+                AnalyzerTermination::TimedOut => Err(Dispatch::OutcomeUnknown(
+                    "process timed out before completion".into(),
+                )),
+                AnalyzerTermination::Signalled(signal) => {
+                    Err(Dispatch::OutcomeUnknown(signal_death(signal)))
+                }
+                // Whether a request stopped it is the run's to judge.
+                AnalyzerTermination::Cancelled { drained } => Err(Dispatch::Cancelled { drained }),
+            },
+        }
+    }
+
+    /// On Windows: the same dispatch of a crash-ledger or HiLog summary
+    /// analyzer. The source is held by the Windows `VerifiedSource`, which
+    /// hands the child its canonical path, and the pinned executable is
+    /// spawned by `VerifiedTool`. No ArkTrace profile loads on Windows
+    /// (TASK-XPA-021), so one is refused before anything is spawned.
+    #[cfg(windows)]
+    fn dispatch(
+        &self,
+        invocation: &Invocation<'_>,
+        path: &Path,
+        source: &Source<'_>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<Exited, Dispatch> {
+        let profile = invocation.profile;
+        if profile.arktrace_summary.is_some() || profile.arktrace_analysis.is_some() {
+            return Err(Dispatch::Failed("analyzer process identity refused".into()));
         }
         let verified = VerifiedSource::open(path, source.sha256, source.byte_count)
             .map_err(|_| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;

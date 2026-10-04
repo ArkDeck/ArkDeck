@@ -643,6 +643,160 @@ public static class UiStrings
     public const string FlashWorkspaceStageWrite = "flash.workspace.stage.write";
     public const string FlashWorkspaceSubtitle = "flash.workspace.subtitle";
     public const string FlashWorkspaceTitle = "flash.workspace.title";
+    public const string TraceActionCancel = "trace.action.cancel";
+    public const string TraceActionOpenViewer = "trace.action.openViewer";
+    public const string TraceActionRefresh = "trace.action.refresh";
+    public const string TraceActionRunning = "trace.action.running";
+    public const string TraceActionStart = "trace.action.start";
+    public const string TraceAvailabilityAvailable = "trace.availability.available";
+    public const string TraceAvailabilityChecking = "trace.availability.checking";
+    public const string TraceAvailabilityUnavailable = "trace.availability.unavailable";
+    public const string TraceBlockerAdapterUnsupported = "trace.blocker.adapterUnsupported";
+    public const string TraceBlockerBuffer = "trace.blocker.buffer";
+    public const string TraceBlockerCapability = "trace.blocker.capability";
+    public const string TraceBlockerChecking = "trace.blocker.checking";
+    public const string TraceBlockerDuration = "trace.blocker.duration";
+    public const string TraceBlockerNoTags = "trace.blocker.noTags";
+    public const string TraceBlockerOperation = "trace.blocker.operation";
+    public const string TraceBlockerTags = "trace.blocker.tags";
+    public const string TraceBlockerTarget = "trace.blocker.target";
+    public const string TraceBoundsDuration = "trace.bounds.duration";
+    public const string TraceCancelFailed = "trace.cancel.failed";
+    public const string TraceCaptureDevice = "trace.capture.device";
+    public const string TraceCaptureFinished = "trace.capture.finished";
+    public const string TraceCaptureLocalOnly = "trace.capture.localOnly";
+    public const string TraceCaptureNotCompleted = "trace.capture.notCompleted";
+    public const string TraceCaptureOutcomeUnknown = "trace.capture.outcomeUnknown";
+    public const string TraceCaptureProfile = "trace.capture.profile";
+    public const string TraceCaptureTitle = "trace.capture.title";
+    public const string TraceDurationMinutes = "trace.duration.minutes";
+    public const string TraceDurationQuick = "trace.duration.quick";
+    public const string TraceDurationSeconds = "trace.duration.seconds";
+    public const string TraceDurationSet10Seconds = "trace.duration.set10Seconds";
+    public const string TraceDurationSet15Seconds = "trace.duration.set15Seconds";
+    public const string TraceDurationSet1Minute = "trace.duration.set1Minute";
+    public const string TraceDurationSet2Minutes = "trace.duration.set2Minutes";
+    public const string TraceDurationSet30Seconds = "trace.duration.set30Seconds";
+    public const string TraceDurationSet3Minutes = "trace.duration.set3Minutes";
+    public const string TraceDurationSet5Seconds = "trace.duration.set5Seconds";
+    public const string TraceDurationSetCustom = "trace.duration.setCustom";
+    public const string TraceDurationUnit = "trace.duration.unit";
+    public const string TracePresetArkuiDeep = "trace.preset.arkuiDeep";
+    public const string TracePresetArkuiDeepDetail = "trace.preset.arkuiDeep.detail";
+    public const string TracePresetAttachmentPanorama = "trace.preset.attachmentPanorama";
+    public const string TracePresetAttachmentPanoramaDetail = "trace.preset.attachmentPanorama.detail";
+    public const string TracePresetIo = "trace.preset.io";
+    public const string TracePresetIoDetail = "trace.preset.io.detail";
+    public const string TracePresetRenderAnimation = "trace.preset.renderAnimation";
+    public const string TracePresetRenderAnimationDetail = "trace.preset.renderAnimation.detail";
+    public const string TracePresetSchedulingIpc = "trace.preset.schedulingIpc";
+    public const string TracePresetSchedulingIpcDetail = "trace.preset.schedulingIpc.detail";
+    public const string TraceTargetEmpty = "trace.target.empty";
+    public const string TraceValidationDecimal = "trace.validation.decimal";
+    public const string TraceValidationMissing = "trace.validation.missing";
+    public const string TraceValidationRange = "trace.validation.range";
+    public const string TraceViewerArtifactInvalid = "trace.viewer.artifactInvalid";
+    public const string TraceViewerArtifactListUnavailable = "trace.viewer.artifactListUnavailable";
+    public const string TraceViewerDescription = "trace.viewer.description";
+    public const string TraceViewerLatest = "trace.viewer.latest";
+    public const string TraceViewerPreparing = "trace.viewer.preparing";
+    public const string TraceViewerReadFailed = "trace.viewer.readFailed";
+    public const string TraceViewerStagingUnavailable = "trace.viewer.stagingUnavailable";
+    public const string TraceViewerTitle = "trace.viewer.title";
+    public const string TraceViewerTryAgain = "trace.viewer.tryAgain";
+    public const string TraceWorkspaceSummary = "trace.workspace.summary";
+    public const string ViewerActionShow = "viewer.action.show";
+    public const string ViewerAdvancedDumpSearch = "viewer.advancedDump.search";
+    public const string ViewerAdvancedDumpSearchClear = "viewer.advancedDump.search.clear";
+    public const string ViewerAdvancedDumpSearchNoResults = "viewer.advancedDump.search.noResults";
+    public const string ViewerAdvancedDumpSearchPlaceholder = "viewer.advancedDump.search.placeholder";
+    public const string ViewerAdvancedDumpSearchResults = "viewer.advancedDump.search.results";
+    public const string ViewerAdvancedDumpSearchShortcut = "viewer.advancedDump.search.shortcut";
+    public const string ViewerAdvancedDumpUnavailable = "viewer.advancedDump.unavailable";
+    public const string ViewerChipInteractive = "viewer.chip.interactive";
+    public const string ViewerChipVisible = "viewer.chip.visible";
+    public const string ViewerEmptyExplain = "viewer.empty.explain";
+    public const string ViewerEmptySelectTarget = "viewer.empty.selectTarget";
+    public const string ViewerEmptyTargetBlocked = "viewer.empty.targetBlocked";
+    public const string ViewerEmptyTitle = "viewer.empty.title";
+    public const string ViewerFieldAccessibleLabel = "viewer.field.accessibleLabel";
+    public const string ViewerFieldDescription = "viewer.field.description";
+    public const string ViewerFieldHitTest = "viewer.field.hitTest";
+    public const string ViewerFieldScreenshotMapping = "viewer.field.screenshotMapping";
+    public const string ViewerFooterNodes = "viewer.footer.nodes";
+    public const string ViewerFooterNotMeasured = "viewer.footer.notMeasured";
+    public const string ViewerGroupFocus = "viewer.group.focus";
+    public const string ViewerGroupGeometry = "viewer.group.geometry";
+    public const string ViewerGroupIdentity = "viewer.group.identity";
+    public const string ViewerGroupPaint = "viewer.group.paint";
+    public const string ViewerGroupSemantics = "viewer.group.semantics";
+    public const string ViewerGroupState = "viewer.group.state";
+    public const string ViewerPaneCoordinatesUnverified = "viewer.pane.coordinatesUnverified";
+    public const string ViewerPaneScreenshot = "viewer.pane.screenshot";
+    public const string ViewerPaneShowBounds = "viewer.pane.showBounds";
+    public const string ViewerPaneTree = "viewer.pane.tree";
+    public const string ViewerPropertiesRawUnavailable = "viewer.properties.rawUnavailable";
+    public const string ViewerPropertiesSelectPrompt = "viewer.properties.selectPrompt";
+    public const string ViewerScreenshotSelectHint = "viewer.screenshot.selectHint";
+    public const string ViewerScreenshotSelectLabel = "viewer.screenshot.selectLabel";
+    public const string ViewerScreenshotUnavailable = "viewer.screenshot.unavailable";
+    public const string ViewerScreenshotUnverifiedDetail = "viewer.screenshot.unverifiedDetail";
+    public const string ViewerSearchMatchCount = "viewer.search.matchCount";
+    public const string ViewerSearchNext = "viewer.search.next";
+    public const string ViewerSearchPrevious = "viewer.search.previous";
+    public const string ViewerSeparatorLabel = "viewer.separator.label";
+    public const string ViewerSeparatorValue = "viewer.separator.value";
+    public const string ViewerTabAccessibility = "viewer.tab.accessibility";
+    public const string ViewerTabLayout = "viewer.tab.layout";
+    public const string ViewerTabProperties = "viewer.tab.properties";
+    public const string ViewerTabRawDump = "viewer.tab.rawDump";
+    public const string ViewerToolbarCapture = "viewer.toolbar.capture";
+    public const string ViewerToolbarCapturing = "viewer.toolbar.capturing";
+    public const string ViewerToolbarCurrentScreen = "viewer.toolbar.currentScreen";
+    public const string ViewerToolbarDevice = "viewer.toolbar.device";
+    public const string ViewerToolbarNoDevice = "viewer.toolbar.noDevice";
+    public const string ViewerToolbarRecapture = "viewer.toolbar.recapture";
+    public const string ViewerToolbarRefresh = "viewer.toolbar.refresh";
+    public const string ViewerToolbarSearch = "viewer.toolbar.search";
+    public const string ViewerTreeCollapse = "viewer.tree.collapse";
+    public const string ViewerTreeExpand = "viewer.tree.expand";
+    public const string ViewerTreeLabel = "viewer.tree.label";
+    public const string ViewerTreeMatchCount = "viewer.tree.matchCount";
+    public const string ViewerTreeNoMatches = "viewer.tree.noMatches";
+    public const string ViewerTreeNotSelected = "viewer.tree.notSelected";
+    public const string ViewerTreeSelected = "viewer.tree.selected";
+    public const string ViewerValueAvailable = "viewer.value.available";
+    public const string ViewerValueNo = "viewer.value.no";
+    public const string ViewerValueUnavailable = "viewer.value.unavailable";
+    public const string ViewerValueVerified = "viewer.value.verified";
+    public const string ViewerValueYes = "viewer.value.yes";
+    public const string A11yAnnounceOpeningCancelled = "a11y.announce.openingCancelled";
+    public const string A11yAnnounceOpeningTrace = "a11y.announce.openingTrace";
+    public const string A11yAnnounceOperationFailed = "a11y.announce.operationFailed";
+    public const string A11yAnnounceRangeAnalysisComplete = "a11y.announce.rangeAnalysisComplete";
+    public const string A11yAnnounceSearchFoundAtLeastResults = "a11y.announce.searchFoundAtLeastResults";
+    public const string A11yAnnounceSearchFoundResults = "a11y.announce.searchFoundResults";
+    public const string A11yAnnounceTraceCloseFailed = "a11y.announce.traceCloseFailed";
+    public const string A11yAnnounceTraceClosed = "a11y.announce.traceClosed";
+    public const string A11yAnnounceTraceLoadedWithVisibleTracks = "a11y.announce.traceLoadedWithVisibleTracks";
+    public const string A11yAnnounceTraceLoadedWithoutTimedEvents = "a11y.announce.traceLoadedWithoutTimedEvents";
+    public const string A11yAnnounceTraceOpenFailed = "a11y.announce.traceOpenFailed";
+    public const string A11yTimelineLabel = "a11y.timeline.label";
+    public const string ErrorReasonCache = "error.reason.cache";
+    public const string ErrorReasonCancelled = "error.reason.cancelled";
+    public const string ErrorReasonChooseFile = "error.reason.chooseFile";
+    public const string ErrorReasonOperation = "error.reason.operation";
+    public const string ErrorReasonParser = "error.reason.parser";
+    public const string ErrorTitleBundledParserUnavailable = "error.title.bundledParserUnavailable";
+    public const string ErrorTitleCacheNeedsAttention = "error.title.cacheNeedsAttention";
+    public const string ErrorTitleCouldNotFinish = "error.title.couldNotFinish";
+    public const string ErrorTitleOpeningCancelled = "error.title.openingCancelled";
+    public const string ErrorTitleTraceCouldNotBeOpened = "error.title.traceCouldNotBeOpened";
+    public const string ViewerEventType = "viewer.eventType";
+    public const string ViewerOpenPanelTitle = "viewer.openPanel.title";
+    public const string ViewerSearchEventsMenu = "viewer.searchEvents.menu";
+    public const string AppNavigationTrace = "app.navigation.trace";
+    public const string AppNavigationUiDump = "app.navigation.uiDump";
     public const string WindowsRecoveryTitle = "windows.recovery.title";
     public const string WindowsRecoveryMessageNotRunning = "windows.recovery.message.notRunning";
     public const string WindowsRecoveryMessageImpostor = "windows.recovery.message.impostor";
@@ -893,6 +1047,122 @@ public static class UiStrings
     public const string WindowsFlashRuntimeCriticalWrite = "windows.flash.runtime.criticalWrite";
     public const string WindowsFlashChooseImageInvalid = "windows.flash.chooseImage.invalid";
     public const string WindowsFlashTargetChanged = "windows.flash.targetChanged";
+    public const string WindowsTraceViewerCapture = "windows.traceViewer.capture";
+    public const string WindowsTraceViewerCaptureHelp = "windows.traceViewer.captureHelp";
+    public const string WindowsTraceViewerOpen = "windows.traceViewer.open";
+    public const string WindowsTraceViewerOpenTrace = "windows.traceViewer.openTrace";
+    public const string WindowsTraceViewerCaptureTrace = "windows.traceViewer.captureTrace";
+    public const string WindowsTraceViewerReload = "windows.traceViewer.reload";
+    public const string WindowsTraceViewerRecent = "windows.traceViewer.recent";
+    public const string WindowsTraceViewerRemoveRecent = "windows.traceViewer.removeRecent";
+    public const string WindowsTraceViewerMissingName = "windows.traceViewer.missingName";
+    public const string WindowsTraceViewerMissingPath = "windows.traceViewer.missingPath";
+    public const string WindowsTraceViewerIdleTitle = "windows.traceViewer.idleTitle";
+    public const string WindowsTraceViewerIdleDetail = "windows.traceViewer.idleDetail";
+    public const string WindowsTraceViewerUnavailable = "windows.traceViewer.unavailable";
+    public const string WindowsTraceViewerDiagnostics = "windows.traceViewer.diagnostics";
+    public const string WindowsTraceViewerRetry = "windows.traceViewer.retry";
+    public const string WindowsTraceViewerChooseAnother = "windows.traceViewer.chooseAnother";
+    public const string WindowsTraceViewerInspector = "windows.traceViewer.inspector";
+    public const string WindowsTraceViewerDuration = "windows.traceViewer.duration";
+    public const string WindowsTraceViewerSourceBytes = "windows.traceViewer.sourceBytes";
+    public const string WindowsTraceViewerSchema = "windows.traceViewer.schema";
+    public const string WindowsTraceViewerCache = "windows.traceViewer.cache";
+    public const string WindowsTraceViewerHit = "windows.traceViewer.hit";
+    public const string WindowsTraceViewerMiss = "windows.traceViewer.miss";
+    public const string WindowsTraceViewerNothingSelected = "windows.traceViewer.nothingSelected";
+    public const string WindowsTraceViewerTitle = "windows.traceViewer.title";
+    public const string WindowsTraceViewerBack = "windows.traceViewer.back";
+    public const string WindowsTraceViewerNoParser = "windows.traceViewer.noParser";
+    public const string WindowsTraceViewerSha256 = "windows.traceViewer.sha256";
+    public const string WindowsTraceViewerRuntimeInspection = "windows.traceViewer.runtimeInspection";
+    public const string WindowsTraceViewerEngine = "windows.traceViewer.engine";
+    public const string WindowsTraceViewerDataQuality = "windows.traceViewer.dataQuality";
+    public const string WindowsTraceViewerChooseInvalid = "windows.traceViewer.chooseInvalid";
+    public const string WindowsTraceCaptureLocalOnly = "windows.trace.capture.localOnly";
+    public const string WindowsViewerAdvancedDumpSearchShortcut = "windows.viewer.advancedDump.search.shortcut";
+    public const string WindowsViewerTabAdvancedDump = "windows.viewer.tab.advancedDump";
+    public const string WindowsViewerAdvancedDumpLoading = "windows.viewer.advancedDump.loading";
+    public const string WindowsViewerAdvancedDumpNoIds = "windows.viewer.advancedDump.noIds";
+    public const string AppNavigationDiagnostics = "app.navigation.diagnostics";
+    public const string HistoryActivityOpenDiagnostics = "history.activity.open.diagnostics";
+    public const string HistoryContextReadOnly = "history.context.readOnly";
+    public const string DiagnosticsCaptureUnavailable = "diagnostics.capture.unavailable";
+    public const string DiagnosticsCaptureUnavailableDetail = "diagnostics.capture.unavailable.detail";
+    public const string DiagnosticsAlignmentCalibrated = "diagnostics.alignment.calibrated";
+    public const string DiagnosticsAlignmentCannotAlign = "diagnostics.alignment.cannotAlign";
+    public const string DiagnosticsAlignmentExplain = "diagnostics.alignment.explain";
+    public const string DiagnosticsAlignmentSameClock = "diagnostics.alignment.sameClock";
+    public const string DiagnosticsCaptureArm = "diagnostics.capture.arm";
+    public const string DiagnosticsCaptureMark = "diagnostics.capture.mark";
+    public const string DiagnosticsMarkAuto = "diagnostics.mark.auto";
+    public const string DiagnosticsMarkManual = "diagnostics.mark.manual";
+    public const string DiagnosticsMarksEmpty = "diagnostics.marks.empty";
+    public const string DiagnosticsMarksTitle = "diagnostics.marks.title";
+    public const string DiagnosticsMissingTitle = "diagnostics.missing.title";
+    public const string DiagnosticsNotDerivedDetail = "diagnostics.notDerived.detail";
+    public const string DiagnosticsNotDerivedTitle = "diagnostics.notDerived.title";
+    public const string DiagnosticsPartial = "diagnostics.partial";
+    public const string DiagnosticsPartialDetail = "diagnostics.partial.detail";
+    public const string DiagnosticsSelectionDriftedAway = "diagnostics.selection.driftedAway";
+    public const string DiagnosticsSelectionTimeOnly = "diagnostics.selection.timeOnly";
+    public const string DiagnosticsSessionNone = "diagnostics.session.none";
+    public const string DiagnosticsSessionNoneDetail = "diagnostics.session.none.detail";
+    public const string DiagnosticsShotFailed = "diagnostics.shot.failed";
+    public const string DiagnosticsShotNone = "diagnostics.shot.none";
+    public const string DiagnosticsShotStandsFor = "diagnostics.shot.standsFor";
+    public const string DiagnosticsShotTakenAfter = "diagnostics.shot.takenAfter";
+    public const string DiagnosticsShotTooFar = "diagnostics.shot.tooFar";
+    public const string DiagnosticsShotTooFarDetail = "diagnostics.shot.tooFar.detail";
+    public const string DiagnosticsShotUndecidable = "diagnostics.shot.undecidable";
+    public const string DiagnosticsShotUndecidableDetail = "diagnostics.shot.undecidable.detail";
+    public const string DiagnosticsSessionLoading = "diagnostics.session.loading";
+    public const string DiagnosticsSessionFailed = "diagnostics.session.failed";
+    public const string DiagnosticsSessionRetry = "diagnostics.session.retry";
+    public const string DiagnosticsSessionReload = "diagnostics.session.reload";
+    public const string DiagnosticsSessionReadOnly = "diagnostics.session.readOnly";
+    public const string DiagnosticsSessionTimeline = "diagnostics.session.timeline";
+    public const string DiagnosticsRingCovered = "diagnostics.ring.covered";
+    public const string DiagnosticsRingLost = "diagnostics.ring.lost";
+    public const string DiagnosticsArtifactsTitle = "diagnostics.artifacts.title";
+    public const string DiagnosticsArtifactsPrivacy = "diagnostics.artifacts.privacy";
+    public const string DiagnosticsArtifactsRead = "diagnostics.artifacts.read";
+    public const string DiagnosticsArtifactsReadSensitive = "diagnostics.artifacts.readSensitive";
+    public const string DiagnosticsArtifactsOpenElsewhere = "diagnostics.artifacts.openElsewhere";
+    public const string DiagnosticsPreviewClipped = "diagnostics.preview.clipped";
+    public const string DiagnosticsMarkTimeMissing = "diagnostics.mark.timeMissing";
+    public const string DiagnosticsArtifactsOpenTrace = "diagnostics.artifacts.openTrace";
+    public const string DiagnosticsArtifactsOpenTracePrivacy = "diagnostics.artifacts.openTrace.privacy";
+    public const string DiagnosticsPreviewReplacedInvalidUTF8 = "diagnostics.preview.replacedInvalidUTF8";
+    public const string DiagnosticsPreviewInvalidStructuredText = "diagnostics.preview.invalidStructuredText";
+    public const string DiagnosticsHilogTitle = "diagnostics.hilog.title";
+    public const string DiagnosticsHilogFailed = "diagnostics.hilog.failed";
+    public const string DiagnosticsHilogFailedDetail = "diagnostics.hilog.failed.detail";
+    public const string DiagnosticsHilogReadOnly = "diagnostics.hilog.readOnly";
+    public const string DiagnosticsHilogCoverageComplete = "diagnostics.hilog.coverage.complete";
+    public const string DiagnosticsHilogCoveragePartial = "diagnostics.hilog.coverage.partial";
+    public const string DiagnosticsHilogCoverageUnrecognized = "diagnostics.hilog.coverage.unrecognized";
+    public const string DiagnosticsHilogCoverageEmpty = "diagnostics.hilog.coverage.empty";
+    public const string DiagnosticsHilogCoverageDetail = "diagnostics.hilog.coverage.detail";
+    public const string DiagnosticsHilogLines = "diagnostics.hilog.lines";
+    public const string DiagnosticsHilogLevelD = "diagnostics.hilog.level.D";
+    public const string DiagnosticsHilogLevelI = "diagnostics.hilog.level.I";
+    public const string DiagnosticsHilogLevelW = "diagnostics.hilog.level.W";
+    public const string DiagnosticsHilogLevelE = "diagnostics.hilog.level.E";
+    public const string DiagnosticsHilogLevelF = "diagnostics.hilog.level.F";
+    public const string DiagnosticsHilogUnrecognized = "diagnostics.hilog.unrecognized";
+    public const string DiagnosticsHilogBlank = "diagnostics.hilog.blank";
+    public const string DiagnosticsHilogSource = "diagnostics.hilog.source";
+    public const string DiagnosticsHilogSourceDetail = "diagnostics.hilog.source.detail";
+    public const string DiagnosticsHilogSourceJob = "diagnostics.hilog.sourceJob";
+    public const string DiagnosticsHilogSourceArtifact = "diagnostics.hilog.sourceArtifact";
+    public const string DiagnosticsHilogSourceBytes = "diagnostics.hilog.sourceBytes";
+    public const string DiagnosticsHilogDigests = "diagnostics.hilog.digests";
+    public const string DiagnosticsHilogSourceDigest = "diagnostics.hilog.sourceDigest";
+    public const string DiagnosticsHilogToolDigest = "diagnostics.hilog.toolDigest";
+    public const string DiagnosticsHilogOutputDigest = "diagnostics.hilog.outputDigest";
+    public const string DiagnosticsHilogArtifactDigest = "diagnostics.hilog.artifactDigest";
+    public const string WindowsDiagnosticsCaptureMark = "windows.diagnostics.capture.mark";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -1532,6 +1802,160 @@ public static class UiStrings
         FlashWorkspaceStageWrite,
         FlashWorkspaceSubtitle,
         FlashWorkspaceTitle,
+        TraceActionCancel,
+        TraceActionOpenViewer,
+        TraceActionRefresh,
+        TraceActionRunning,
+        TraceActionStart,
+        TraceAvailabilityAvailable,
+        TraceAvailabilityChecking,
+        TraceAvailabilityUnavailable,
+        TraceBlockerAdapterUnsupported,
+        TraceBlockerBuffer,
+        TraceBlockerCapability,
+        TraceBlockerChecking,
+        TraceBlockerDuration,
+        TraceBlockerNoTags,
+        TraceBlockerOperation,
+        TraceBlockerTags,
+        TraceBlockerTarget,
+        TraceBoundsDuration,
+        TraceCancelFailed,
+        TraceCaptureDevice,
+        TraceCaptureFinished,
+        TraceCaptureLocalOnly,
+        TraceCaptureNotCompleted,
+        TraceCaptureOutcomeUnknown,
+        TraceCaptureProfile,
+        TraceCaptureTitle,
+        TraceDurationMinutes,
+        TraceDurationQuick,
+        TraceDurationSeconds,
+        TraceDurationSet10Seconds,
+        TraceDurationSet15Seconds,
+        TraceDurationSet1Minute,
+        TraceDurationSet2Minutes,
+        TraceDurationSet30Seconds,
+        TraceDurationSet3Minutes,
+        TraceDurationSet5Seconds,
+        TraceDurationSetCustom,
+        TraceDurationUnit,
+        TracePresetArkuiDeep,
+        TracePresetArkuiDeepDetail,
+        TracePresetAttachmentPanorama,
+        TracePresetAttachmentPanoramaDetail,
+        TracePresetIo,
+        TracePresetIoDetail,
+        TracePresetRenderAnimation,
+        TracePresetRenderAnimationDetail,
+        TracePresetSchedulingIpc,
+        TracePresetSchedulingIpcDetail,
+        TraceTargetEmpty,
+        TraceValidationDecimal,
+        TraceValidationMissing,
+        TraceValidationRange,
+        TraceViewerArtifactInvalid,
+        TraceViewerArtifactListUnavailable,
+        TraceViewerDescription,
+        TraceViewerLatest,
+        TraceViewerPreparing,
+        TraceViewerReadFailed,
+        TraceViewerStagingUnavailable,
+        TraceViewerTitle,
+        TraceViewerTryAgain,
+        TraceWorkspaceSummary,
+        ViewerActionShow,
+        ViewerAdvancedDumpSearch,
+        ViewerAdvancedDumpSearchClear,
+        ViewerAdvancedDumpSearchNoResults,
+        ViewerAdvancedDumpSearchPlaceholder,
+        ViewerAdvancedDumpSearchResults,
+        ViewerAdvancedDumpSearchShortcut,
+        ViewerAdvancedDumpUnavailable,
+        ViewerChipInteractive,
+        ViewerChipVisible,
+        ViewerEmptyExplain,
+        ViewerEmptySelectTarget,
+        ViewerEmptyTargetBlocked,
+        ViewerEmptyTitle,
+        ViewerFieldAccessibleLabel,
+        ViewerFieldDescription,
+        ViewerFieldHitTest,
+        ViewerFieldScreenshotMapping,
+        ViewerFooterNodes,
+        ViewerFooterNotMeasured,
+        ViewerGroupFocus,
+        ViewerGroupGeometry,
+        ViewerGroupIdentity,
+        ViewerGroupPaint,
+        ViewerGroupSemantics,
+        ViewerGroupState,
+        ViewerPaneCoordinatesUnverified,
+        ViewerPaneScreenshot,
+        ViewerPaneShowBounds,
+        ViewerPaneTree,
+        ViewerPropertiesRawUnavailable,
+        ViewerPropertiesSelectPrompt,
+        ViewerScreenshotSelectHint,
+        ViewerScreenshotSelectLabel,
+        ViewerScreenshotUnavailable,
+        ViewerScreenshotUnverifiedDetail,
+        ViewerSearchMatchCount,
+        ViewerSearchNext,
+        ViewerSearchPrevious,
+        ViewerSeparatorLabel,
+        ViewerSeparatorValue,
+        ViewerTabAccessibility,
+        ViewerTabLayout,
+        ViewerTabProperties,
+        ViewerTabRawDump,
+        ViewerToolbarCapture,
+        ViewerToolbarCapturing,
+        ViewerToolbarCurrentScreen,
+        ViewerToolbarDevice,
+        ViewerToolbarNoDevice,
+        ViewerToolbarRecapture,
+        ViewerToolbarRefresh,
+        ViewerToolbarSearch,
+        ViewerTreeCollapse,
+        ViewerTreeExpand,
+        ViewerTreeLabel,
+        ViewerTreeMatchCount,
+        ViewerTreeNoMatches,
+        ViewerTreeNotSelected,
+        ViewerTreeSelected,
+        ViewerValueAvailable,
+        ViewerValueNo,
+        ViewerValueUnavailable,
+        ViewerValueVerified,
+        ViewerValueYes,
+        A11yAnnounceOpeningCancelled,
+        A11yAnnounceOpeningTrace,
+        A11yAnnounceOperationFailed,
+        A11yAnnounceRangeAnalysisComplete,
+        A11yAnnounceSearchFoundAtLeastResults,
+        A11yAnnounceSearchFoundResults,
+        A11yAnnounceTraceCloseFailed,
+        A11yAnnounceTraceClosed,
+        A11yAnnounceTraceLoadedWithVisibleTracks,
+        A11yAnnounceTraceLoadedWithoutTimedEvents,
+        A11yAnnounceTraceOpenFailed,
+        A11yTimelineLabel,
+        ErrorReasonCache,
+        ErrorReasonCancelled,
+        ErrorReasonChooseFile,
+        ErrorReasonOperation,
+        ErrorReasonParser,
+        ErrorTitleBundledParserUnavailable,
+        ErrorTitleCacheNeedsAttention,
+        ErrorTitleCouldNotFinish,
+        ErrorTitleOpeningCancelled,
+        ErrorTitleTraceCouldNotBeOpened,
+        ViewerEventType,
+        ViewerOpenPanelTitle,
+        ViewerSearchEventsMenu,
+        AppNavigationTrace,
+        AppNavigationUiDump,
         WindowsRecoveryTitle,
         WindowsRecoveryMessageNotRunning,
         WindowsRecoveryMessageImpostor,
@@ -1782,5 +2206,121 @@ public static class UiStrings
         WindowsFlashRuntimeCriticalWrite,
         WindowsFlashChooseImageInvalid,
         WindowsFlashTargetChanged,
+        WindowsTraceViewerCapture,
+        WindowsTraceViewerCaptureHelp,
+        WindowsTraceViewerOpen,
+        WindowsTraceViewerOpenTrace,
+        WindowsTraceViewerCaptureTrace,
+        WindowsTraceViewerReload,
+        WindowsTraceViewerRecent,
+        WindowsTraceViewerRemoveRecent,
+        WindowsTraceViewerMissingName,
+        WindowsTraceViewerMissingPath,
+        WindowsTraceViewerIdleTitle,
+        WindowsTraceViewerIdleDetail,
+        WindowsTraceViewerUnavailable,
+        WindowsTraceViewerDiagnostics,
+        WindowsTraceViewerRetry,
+        WindowsTraceViewerChooseAnother,
+        WindowsTraceViewerInspector,
+        WindowsTraceViewerDuration,
+        WindowsTraceViewerSourceBytes,
+        WindowsTraceViewerSchema,
+        WindowsTraceViewerCache,
+        WindowsTraceViewerHit,
+        WindowsTraceViewerMiss,
+        WindowsTraceViewerNothingSelected,
+        WindowsTraceViewerTitle,
+        WindowsTraceViewerBack,
+        WindowsTraceViewerNoParser,
+        WindowsTraceViewerSha256,
+        WindowsTraceViewerRuntimeInspection,
+        WindowsTraceViewerEngine,
+        WindowsTraceViewerDataQuality,
+        WindowsTraceViewerChooseInvalid,
+        WindowsTraceCaptureLocalOnly,
+        WindowsViewerAdvancedDumpSearchShortcut,
+        WindowsViewerTabAdvancedDump,
+        WindowsViewerAdvancedDumpLoading,
+        WindowsViewerAdvancedDumpNoIds,
+        AppNavigationDiagnostics,
+        HistoryActivityOpenDiagnostics,
+        HistoryContextReadOnly,
+        DiagnosticsCaptureUnavailable,
+        DiagnosticsCaptureUnavailableDetail,
+        DiagnosticsAlignmentCalibrated,
+        DiagnosticsAlignmentCannotAlign,
+        DiagnosticsAlignmentExplain,
+        DiagnosticsAlignmentSameClock,
+        DiagnosticsCaptureArm,
+        DiagnosticsCaptureMark,
+        DiagnosticsMarkAuto,
+        DiagnosticsMarkManual,
+        DiagnosticsMarksEmpty,
+        DiagnosticsMarksTitle,
+        DiagnosticsMissingTitle,
+        DiagnosticsNotDerivedDetail,
+        DiagnosticsNotDerivedTitle,
+        DiagnosticsPartial,
+        DiagnosticsPartialDetail,
+        DiagnosticsSelectionDriftedAway,
+        DiagnosticsSelectionTimeOnly,
+        DiagnosticsSessionNone,
+        DiagnosticsSessionNoneDetail,
+        DiagnosticsShotFailed,
+        DiagnosticsShotNone,
+        DiagnosticsShotStandsFor,
+        DiagnosticsShotTakenAfter,
+        DiagnosticsShotTooFar,
+        DiagnosticsShotTooFarDetail,
+        DiagnosticsShotUndecidable,
+        DiagnosticsShotUndecidableDetail,
+        DiagnosticsSessionLoading,
+        DiagnosticsSessionFailed,
+        DiagnosticsSessionRetry,
+        DiagnosticsSessionReload,
+        DiagnosticsSessionReadOnly,
+        DiagnosticsSessionTimeline,
+        DiagnosticsRingCovered,
+        DiagnosticsRingLost,
+        DiagnosticsArtifactsTitle,
+        DiagnosticsArtifactsPrivacy,
+        DiagnosticsArtifactsRead,
+        DiagnosticsArtifactsReadSensitive,
+        DiagnosticsArtifactsOpenElsewhere,
+        DiagnosticsPreviewClipped,
+        DiagnosticsMarkTimeMissing,
+        DiagnosticsArtifactsOpenTrace,
+        DiagnosticsArtifactsOpenTracePrivacy,
+        DiagnosticsPreviewReplacedInvalidUTF8,
+        DiagnosticsPreviewInvalidStructuredText,
+        DiagnosticsHilogTitle,
+        DiagnosticsHilogFailed,
+        DiagnosticsHilogFailedDetail,
+        DiagnosticsHilogReadOnly,
+        DiagnosticsHilogCoverageComplete,
+        DiagnosticsHilogCoveragePartial,
+        DiagnosticsHilogCoverageUnrecognized,
+        DiagnosticsHilogCoverageEmpty,
+        DiagnosticsHilogCoverageDetail,
+        DiagnosticsHilogLines,
+        DiagnosticsHilogLevelD,
+        DiagnosticsHilogLevelI,
+        DiagnosticsHilogLevelW,
+        DiagnosticsHilogLevelE,
+        DiagnosticsHilogLevelF,
+        DiagnosticsHilogUnrecognized,
+        DiagnosticsHilogBlank,
+        DiagnosticsHilogSource,
+        DiagnosticsHilogSourceDetail,
+        DiagnosticsHilogSourceJob,
+        DiagnosticsHilogSourceArtifact,
+        DiagnosticsHilogSourceBytes,
+        DiagnosticsHilogDigests,
+        DiagnosticsHilogSourceDigest,
+        DiagnosticsHilogToolDigest,
+        DiagnosticsHilogOutputDigest,
+        DiagnosticsHilogArtifactDigest,
+        WindowsDiagnosticsCaptureMark,
     ];
 }

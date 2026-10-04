@@ -40,6 +40,12 @@ released port or dropped listener stays held. A test whose path starts a child
 belongs in `tests/spawning`, which compiles the daemon's modules from their
 sources and runs one test at a time (`turn()`), as do the integration tests
 that listen or take a lock in their own process while spawning.
+On Windows only `flash_host_facts_control.rs` runs there (TASK-XPA-010): the
+Swift Flash host facts oracle through `Control` and the daemon's own host, over
+the shared fake's answers ported in process
+(`arkdeck-provider-hdc/tests/common/oracle_fake.rs`), which the host probes
+through a seam compiled into test builds only. The Windows daemon itself still
+composes no HDC.
 
 Clippy and the workspace tests are the only checks that compile this checkout.
 `generate-contract.py --check` regenerates the manifest and bindings from the
@@ -967,14 +973,14 @@ capture), the capability store and policy (`capability_store`,
 `capability_policy`; the store directory is the host store's owner-only
 directory on Windows) and `catalog_review`; the Artifact read owner comes
 from #2356. Members whose owner is not built on Windows yet are types with
-no value there, so they are always `None`: `WorkspaceComposition` (the workspace provider crate and the DevEco owners),
-`AnalyzerComposition` (a trait nothing implements: the ArkTrace profiles pin
-a trace_streamer Windows does not have) and `MutationAuthority` (the Session
-root owner and the Job owner's continuity census). Still `cfg(target_os =
-"macos")`: the Flash planner and admitter (the ArkForge lane, AF-W1), the
-analyzer profile and the analyzer paths of the planner (`AnalyzerProfile`,
-`materialize`, `unmaterialized_analyzer`, the ArkTrace cross-field check),
-`workspace_plan`, and the authority's uses (`preauthorize*`, the
+no value there, so they are always `None`: `MutationAuthority` (the Session
+root owner and the Job owner's continuity census). The analyzer profile and
+the planner's analyzer paths (`AnalyzerProfile`, `materialize`,
+`unmaterialized_analyzer`) and the workspace provider (`WorkspaceComposition`,
+`workspace_plan`, `preauthorize_workspace`) build on Windows too (see
+"Windows analyzer provider" and "Windows workspace provider"). Still
+`cfg(target_os = "macos")`: the Flash planner and admitter (the ArkForge
+lane, AF-W1), the ArkTrace cross-field check, and the authority's uses (the
 capability-gap repair, `submit_for_agent`); on Windows their stand-ins
 answer what macOS answers without the owner. On macOS only attributes were
 added.
@@ -1107,20 +1113,21 @@ and `operation_availability` build on Windows. Ported for it: a file a step
 left on the host is read for publication by `landed_file_bytes` (on Windows
 measured before and after through `measure_host_file`, no reparse point
 followed); the analyzer operations' fixed facts moved to
-`analyzer_operations.rs`, which `analyzer_composition` re-exports on macOS;
+`analyzer_operations.rs`, which `analyzer_composition` re-exports;
 `MutationAuthority` is the same type on Windows (its proof, the continuity
-census, is built there too: see below). Still macOS-only, each refused on Windows as a Job this Runtime
-does not execute: the analyzer lane (ArkTrace's trace_streamer), the
-workspace lane (`workspace_run.rs`) and the Flash lane (`flash_run.rs`,
-AF-W1); a Flash Job's recovery epoch is not read on Windows, and such a Job
+census, is built there too: see below). The analyzer lane runs on Windows
+(see "Windows analyzer provider"), and so does the workspace lane
+(`workspace_run.rs`, see "Windows workspace provider"). Still macOS-only,
+each refused on Windows as a Job this Runtime does not execute: the ArkTrace
+analyses (their trace_streamer) and the Flash lane (`flash_run.rs`, AF-W1); a Flash Job's recovery epoch is not read on Windows, and such a Job
 is left as it is.
 
 The Windows daemon composes the runner, `job.cancel`, `job.result` and
 `job.evidence`, the capability store (`jobs-state\capabilities`), the Session
 owner (`session-state`, and `sessions` in a development root or
 `%LOCALAPPDATA%\ArkDeck\Sessions` for the account; see the Session owner
-section) and `operation.list` (the HDC and analyzer operations
-`provider_not_registered`), and recovers the active Jobs at its start
+section) and `operation.list` (the HDC operations `provider_not_registered`,
+the analyzer operations as the composed analyzers leave them), and recovers the active Jobs at its start
 (`recover_active_jobs`, then the staged Sessions) as the macOS daemon does.
 No HDC provider is composed until the Windows HDC tuple is registered, so a
 device Job is refused before its run with zero dispatch; a queued Job is
@@ -2557,8 +2564,8 @@ that server's own child (launch record, creation time, image file, Job
 membership, declared endpoint, listener) where macOS reads argv
 (`verifies_managed_process`). `arkdeck_provider_hdc::ProcessDispatch` and
 `ManagedHdcServer` now build on Windows; `mutation_identity_current()` stays
-`false` there (no Windows launch identity is published), and nothing composes
-them on Windows, since no Windows HDC tuple is registered.
+`false` there (no Windows launch identity is published), and only a registered
+Windows HDC tuple composes them (below), of which there is none yet.
 `tests/windows_tool_dispatch.rs` (platform) and `tests/windows_managed_hdc.rs`
 (provider) are `harness = false` targets whose fake tool and fake `hdc` are the
 test binary itself; no real HDC is launched. The run record is
@@ -2579,9 +2586,21 @@ well.
   replacement blocks the start, and once the proved replacement is ended,
   the next start owns the endpoint.
 - The daemon's own managed-HDC owner (`managed_hdc.rs`, with its restart
-  lifecycle) stays macOS-only. It needs a registered HDC, and a Windows
-  development root refuses `ARKDECK_DEVELOPMENT_HDC_PATH` and
-  `ARKDECK_DEVELOPMENT_HDC_SERVER` before starting anything.
+  lifecycle) builds on Windows and is composed behind the HDC tuple gate
+  (`windows_hdc_gate.rs`, CHG-2026-078). A development root whose
+  `ARKDECK_DEVELOPMENT_HDC_PATH` (with `ARKDECK_DEVELOPMENT_HDC_SERVER=managed`)
+  hashes to a registered tuple starts it as its managed server on the
+  tuple's endpoint, after its stores and before the ArkForge lane; its
+  dispatch registers the HDC, `runtime.hdc.status` and `target.availability`
+  answer from it, and the daemon stops it after the drain and before
+  releasing the root (exit 70 when the owner must be recomposed). The
+  status verifies the process by provenance (`ManagedHdcServer::verifies`).
+  `WINDOWS_HDC_TUPLES` is empty, so today every such input is refused before
+  the root is opened and a root without one answers `runtime.hdc.status` as
+  unconfigured (`windows_lifecycle_process.rs`); the composed path is
+  exercised with an injected tuple and a stand-in compiled at test time
+  (`windows_lifecycle::tests`). Tool selection's restart and the HDC
+  control-action owner stay macOS-only.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
@@ -2793,8 +2812,8 @@ composes, as the macOS compositions do:
 
 - the lane from `ARKDECK_ARKFORGE_BUNDLE_PATH`, with Swift's absences;
 - the Flash planning over it;
-- the Flash facts over the Windows USB census, which fails closed until the
-  DAYU200 sample confirms its mapping;
+- the Flash facts over the Windows USB census (open since the DAYU200 sample
+  confirmed its mapping);
 - the device access observer.
 
 The lane's authority binds the managed-control HDC's digest, and no HDC is
@@ -2903,17 +2922,25 @@ do, over the registry of a development root's private `bootstrap`, or the accoun
 `%LOCALAPPDATA%\ArkDeck\Bootstrap\v1` (the macOS `ArkDeck/Bootstrap/v1` below the product
 directory), created owner-only at the start. The census names `bootstrap` after
 `workspaceProjects`, the macOS order.
-- **Served.** `runtime.bundle.list|inspect|remove` and `runtime.tool.list|inspect|remove` over
+- **Served.** `runtime.bundle.register|list|inspect|remove` and `runtime.tool.list|inspect|remove` over
   `arkdeck-bootstrap`'s store, index, retirement, reference and selection-ledger owners, which
   build on Windows on the NTFS host store; `runtime.tool.register --kind deveco` and a DevEco
   toolchain's inspection, listing and retirement over the DevEco registry. The control layer and
   the CLI take a registration path as the host spells an absolute one (`X:\…` on Windows), and the
   CLI expects the host's `platform` in a returned record.
-- **Refused on Windows**, before the store is locked: registering a daemon Bundle (no Windows
-  daemon-bundle form; the daemon is installed as the signed package) or an HDC (no Windows HDC
-  tuple is registered, CHG-2026-078); a retained record of either is refused as failing its
-  native trust policy. With no HDC to select, `runtime.tool.select` answers Swift's no-owner
-  refusal.
+- **The Windows daemon Bundle** is a release-candidate package tree (`package-rc.ps1`'s xcopy
+  form): it holds exactly the files its `rc-manifest.json` names with their sizes and SHA-256s,
+  and its `arkdeck-agentd.exe` is signed as the running Runtime is (the same development leaf,
+  or the same production publisher, ruling 17). `arkdeck-platform`'s `windows::bootstrap_tree`
+  reads the tree handle-relative on NTFS (no reparse point; nothing another principal may
+  change) and captures it through a private staging directory as `bundle-<digest>.rc`. The
+  record adds `"platform":"windows"` and the signer, and the projection names
+  `arkdeck.windows-daemon-package/1` with the signer as `teamIdentifier`; the content digest is
+  host-tagged. `runtime service update` stays macOS-only (the open question is in
+  `evidence/runs/TASK-XPA-012/windows-daemon-bundle-run.md`).
+- **Refused on Windows**, before the store is locked: registering an HDC (no Windows HDC tuple
+  is registered, CHG-2026-078); a retained HDC record is refused as failing its native trust
+  policy. With no HDC to select, `runtime.tool.select` answers Swift's no-owner refusal.
 - **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
   team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
   `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.
@@ -3245,25 +3272,36 @@ DeviceSet` / `Enumeration`), never a shorter list.
 
 `UsbHostDevice::from_device_node` is the per-node rule, failing closed as the
 macOS per-entry rule does. The property choice lives there and in
-`NodeProperty` only, and is **provisional** until the maintainer's DAYU200
-sample (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`)
-confirms it:
+`NodeProperty` only. It is CHG-2026-078 design §4 (the Windows profile's USB
+census row, TASK-WHR-003), confirmed by the maintainer's DAYU200 sample of
+2026-10-04 (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`)
+and maintainer ruling 2026-10-04, items 4 and 5; every `CENSUS_MAPPING` row is
+`Confirmed`, so `usb_host_devices()` is open (a row set back to `Tbd` closes it
+with `RegistryUnavailable::MappingUnconfirmed`):
 
-- entry: a device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`; interface nodes
-  (`&MI_xx`), hubs without numbers and other enumerators are passed over;
+- entry: a present device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`
+  (`DEVPKEY_Device_IsPresent` true, besides `DIGCF_PRESENT`); phantom nodes,
+  which keep their last attachment's properties, interface nodes (`&MI_xx`),
+  hubs without numbers and other enumerators are passed over;
 - vendor and product: the first `USB\VID_…&PID_…` entry of
   `DEVPKEY_Device_HardwareIds`, which must name the instance ID's numbers;
-- serial: the instance ID's suffix, taken as it is; a suffix holding `&` is a
-  Windows-generated, port-derived ID, so the node has no serial and is passed
-  over;
+- serial: the instance ID's suffix, ASCII-lowercase folded (the instance ID
+  spells the board's serial in upper case, the HDC connect key is lower case);
+  a suffix holding `&` is a Windows-generated, port-derived ID, so the node has
+  no serial and no identity and is passed over. The long-term device identity
+  is the folded serial;
 - topology: the first `DEVPKEY_Device_LocationPaths` entry, spelled as the
   decimal of the first eight bytes (big-endian) of its SHA-256 (the relation
-  rule accepts only a canonical decimal location; it is stable per port and
-  never equal to a macOS `locationID`);
+  rule accepts only a canonical decimal location; never equal to a macOS
+  `locationID`). It is valid only within one attachment: the sample's board
+  moved from `USB(10)` (USB 2) to `USB(26)` (USB 3) on a replug into the same
+  connector, which is the same identity in a new attachment;
 - product name: `DEVPKEY_Device_BusReportedDeviceDesc` (optional; without it
   the board is not the registered HDC-normal DAYU200 and proves nothing);
 - attachment: `DEVPKEY_Device_LastArrivalDate` (a `FILETIME`; none when absent
-  or zero, and then no relation is formed).
+  or zero, and then no relation is formed). One attachment is the pair
+  (instance ID, arrival), which a relation carries as its numbers and serial
+  with its attachment ID.
 
 `UsbRegistryRelations::system()` reads this census on Windows. The Windows
 daemon composes the Target observation owner it feeds (see
@@ -3272,11 +3310,15 @@ macOS rule: only beside a registered HDC the composition started as its managed
 server. No Windows HDC tuple is registered yet, so it reads no relation.
 
 Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
-sets, and this host's census answering with well-formed entries, shape only);
-the provider's `tests/windows_usb_census.rs` (a synthetic node through the
-Windows rule proving a scripted HDC's candidate and holding the adoption's final
-check, a replug or a missing name, arrival or serial proving nothing, and on
-Windows this host's tree through `system()`). None of it is device evidence.
+sets: the upper-case suffix folded, a phantom passed over, a new arrival a new
+attachment of the same identity; and this host's census answering with
+well-formed entries, shape only); the provider's `tests/windows_usb_census.rs`
+(a synthetic node with an upper-case suffix proving a scripted HDC's
+lower-case candidate and holding the adoption's final check; a phantom board, a
+port-derived suffix, a topology moving within one attachment, a replug between
+the brackets or a missing name, arrival or serial proving nothing; a USB 2 to
+USB 3 replug proving the same identity in a new attachment; and on Windows this
+host's tree through `system()`). None of it is device evidence.
 
 ## Windows Target owners (TASK-XPA-004)
 
@@ -3742,6 +3784,105 @@ an isolated Runtime, by `job.run` and by `agent.run`;
 `cargo test -p arkdeck-hoststore --test job_run_hilog` replays the Jobs byte
 for byte
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
+
+## Windows workspace provider (TASK-XPA-011)
+
+The Windows daemon composes the workspace provider over the registered
+projects at its start, as the macOS compositions do
+(`Host::with_workspace_operations`). It uses the root's `evolution-workspaces`
+for the Runtime-owned copies. The source inspection uses the inspector named
+by `ARKDECK_WORKSPACE_INSPECTOR`, pinned at the start; an inspector that is not
+an executable ends the start. The symbolizer is the one `ARKDECK_ANALYZER_PATH`
+names. Signing is composed for the installed daemon only: it uses the
+account's preset store, Credential Manager bound to the daemon's own image,
+and the root's `workspace-signing-attempts`. A development root composes no
+signing, as the macOS isolated owner composes none. A preset's DevEco
+toolchain is pinned in the Bootstrap registry, as both macOS compositions pin
+it.
+
+The hoststore workspace modules (composition, profile, reads, patch attempts,
+isolation, build, checkpoint, sweep, tests and symbolization), the planner's
+`workspace_plan`, the runner's `workspace_run`, the admitter's
+`preauthorize_workspace` and the reconciler's workspace arms all build on
+Windows. Two things change there:
+
+- **Paths.** An absolute path is spelled as the host spells a standard local
+  one (`X:\a\b`), which is what the project registration pins and what the
+  platform's verified handles require. A path relative to a project root keeps
+  Swift's `/` (`workspace_support::{join, relative_to, is_within}`). A colon
+  is never part of a relative path.
+- **Files.** Files are opened without following a reparse point and created
+  with the private descriptor. An executable is a PE image the caller may
+  execute, measured through `measure_host_file`. A copy refuses a link or
+  junction inside the tree instead of recreating it.
+
+A registered project resolves to no profile on Windows. Swift's profiles pin
+code-owned system tools (`/usr/bin/grep`, `sed`, `patch`, `bsdtar`, `git`, and
+SwiftPM), Windows ships none of them, and no rule yet decides which ones a
+Windows Runtime may trust. No PATH lookup stands in for that decision. So every
+profile-served workspace operation is unavailable with
+`workspace.toolchainUnavailable: no code-owned source tool … is trusted on
+Windows`, and a plan of one is refused before admission with zero dispatch.
+`workspace.inspect-source@1` needs no profile, so it runs.
+
+`cargo test -p arkdeck-agentd --test windows_workspace_provider_process`
+(`harness = false`) registers a project and restarts the daemon with this
+test binary as the inspector; the binary answers as `grep -r -n` does. The
+inspection is planned under the default read-only policy and runs. It
+publishes exactly what the inspector prints when run directly, and it reads
+back and deduplicates after a restart. The test also checks that the
+profile-served operations carry the code-owned tools reason, that a plan of
+one is refused with zero dispatch, and that an inspector that is not an
+executable refuses the start.
+
+With `ARKDECK_DEV_SIGNER_THUMBPRINT`, `arkdeck-cli/tests/windows_signed_runtime.rs`
+runs `arkdeck workspace inspect` against a dev-signed daemon, before and after
+a restart. `workspace.inspect` is in `WINDOWS_MEASURED_LEAVES`, so
+`workspace.inspect-source@1` is Windows `implemented` in
+`cli-feature-coverage.json`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-provider-run.md)).
+
+## Windows analyzer provider (TASK-XPA-011)
+
+The Windows daemon composes the analyzers `ARKDECK_ANALYZER_PATH` names, as
+the macOS composition does (`hilog_summary_analyzer::composed`): the
+crash-ledger analyzer, and the HiLog summary when that path is the daemon's
+own bytes. A named path that is not an executable ends the start. The two
+ArkTrace analyzers are unavailable as `analyzer.arktraceNotFound`, because no
+ArkTrace distribution is reviewed for Windows (TASK-XPA-021), and
+`ARKDECK_ARKTRACE_DESCRIPTOR` still refuses the start. The Windows parts:
+
+- An analyzer profile's executable is an explicit local absolute path, resolved
+  to its on-disk spelling. It is measured through one handle that follows no
+  reparse point, must be a PE image the caller may execute, and is measured
+  again at every plan (`measure_host_file`).
+- The planner materializes the analyzer plan as on macOS, so the plan digest
+  and the Job identity are Swift's.
+- The runner spawns the child through `VerifiedTool::run_analyzer`, with no
+  environment and the source Artifact's canonical path, where macOS passes its
+  `/.vol` alias.
+- The daemon's `--analyze-crash-ledger` and `--summarize-hilog` modes run on
+  Windows too. They read the one file through `read_host_file`: a local
+  absolute path, no reparse point, unchanged while it is read, and at most
+  512 MiB.
+
+`cargo test -p arkdeck-agentd --test windows_analyzer_process` replays
+recorded Swift oracle cases through the built daemon, byte for byte: 67 of the
+crash-ledger oracle's 78 cases and 40 of the HiLog oracle's 62. These are
+every case whose one argument is the input file, plus the usage refusals.
+The cases left out need a `/.vol` alias, a POSIX spelling, a link, a FIFO or a
+mode, and stay with the macOS replay. The same test runs the real daemon as
+its own analyzer over a recorded Swift source Job, and each derived Artifact
+is Swift's analysis beside its identity. The crash-signature Job reads back
+after a restart and deduplicates on resubmission. A path that is not an
+executable refuses the start.
+
+With `ARKDECK_DEV_SIGNER_THUMBPRINT`, `arkdeck-cli/tests/windows_signed_runtime.rs`
+runs `arkdeck analyze crash-signature` and `arkdeck analyze hilog-summary`
+against a dev-signed daemon, both before and after a restart. They are
+`WINDOWS_MEASURED_LEAVES`, so both catalog entries are Windows `implemented` in
+`cli-feature-coverage.json`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-analyzer-provider-run.md)).
 
 ## ArkTrace analyzers and distribution loader (TASK-XPA-015)
 

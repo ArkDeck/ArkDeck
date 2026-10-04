@@ -47,6 +47,10 @@ public sealed partial class MainWindow : Window
                      (NavImports, UiStrings.WindowsNavigationImports),
                      (NavDebug, UiStrings.WindowsNavigationDebug),
                      (NavFlash, UiStrings.WindowsNavigationFlash),
+                     (NavTrace, UiStrings.AppNavigationTrace),
+                     (NavTraceViewer, UiStrings.WindowsTraceViewerTitle),
+                     (NavViewer, UiStrings.AppNavigationUiDump),
+                     (NavDiagnostics, UiStrings.AppNavigationDiagnostics),
                      (NavSettings, UiStrings.WindowsNavigationSettings),
                  })
         {
@@ -96,6 +100,35 @@ public sealed partial class MainWindow : Window
     {
         Select("history");
         if (_pages.TryGetValue("history", out var page) && page is HistoryPage history) await history.OpenAsync(jobId);
+    }
+
+    /// <summary>The Trace viewer, showing a captured Trace (or what it had open).</summary>
+    public async void OpenTraceViewer(TraceDocument? document)
+    {
+        if (!_pages.TryGetValue("traceViewer", out var page)) _pages["traceViewer"] = page = new TraceViewerPage();
+        if (ReferenceEquals(NavView.SelectedItem, NavTraceViewer))
+        {
+            await ((TraceViewerPage)page).ShowAsync(document);
+            return;
+        }
+        _pendingTrace = document;
+        Select("traceViewer");
+    }
+
+    private TraceDocument? _pendingTrace;
+
+    /// <summary>Diagnostics, reading one History record (macOS <c>openHistoryContext</c>).</summary>
+    public async void OpenDiagnostics(DiagnosticJobContext context)
+    {
+        if (!_pages.TryGetValue("diagnostics", out var page)) _pages["diagnostics"] = page = new DiagnosticsPage();
+        var diagnostics = (DiagnosticsPage)page;
+        diagnostics.Open(context);
+        if (ReferenceEquals(NavView.SelectedItem, NavDiagnostics))
+        {
+            await diagnostics.RefreshAsync();
+            return;
+        }
+        Select("diagnostics");
     }
 
     public void Select(string tag)
@@ -160,11 +193,21 @@ public sealed partial class MainWindow : Window
                 "imports" => new ImportsPage(),
                 "debug" => new DebugPage(),
                 "flash" => new FlashPage(),
+                "trace" => new TracePage(),
+                "traceViewer" => new TraceViewerPage(),
+                "viewer" => new ViewerPage(),
+                "diagnostics" => new DiagnosticsPage(),
                 _ => new OverviewPage(),
             };
             _pages[tag] = page;
         }
         PageHost.Content = page;
+        if (page is TraceViewerPage viewer && _pendingTrace is { } pending)
+        {
+            _pendingTrace = null;
+            await viewer.ShowAsync(pending);
+            return;
+        }
         await ((IRefreshable)page).RefreshAsync();
     }
 }

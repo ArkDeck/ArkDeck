@@ -27,6 +27,17 @@
 //!   status`), and what they wrote is read back after a restart. Each of
 //!   their coverage entries must be Windows `implemented` in
 //!   `openspec/contracts/cli-feature-coverage.json`.
+//! - The same daemon as its own analyzer (`ARKDECK_ANALYZER_PATH`, TASK-
+//!   XPA-011) over a development root holding a recorded Swift source Job's
+//!   Artifacts: `analyze crash-signature` and `analyze hilog-summary` run to
+//!   a verified derived Artifact, and again after a restart to the same
+//!   bytes.
+//! - The same daemon's workspace provider (TASK-XPA-011) over a registered
+//!   OpenHarmony project, with this binary as the inspector the host
+//!   configured (`ARKDECK_WORKSPACE_INSPECTOR`; run with `-r` first it
+//!   answers as `grep -r -n --include <glob> -- <symbol> <root>` does):
+//!   `workspace inspect` runs to a verified `source-inspection.txt`, and
+//!   again after a restart to the same bytes.
 //! - A fake Runtime, which is this binary itself run as
 //!   `<exe> --fake-runtime <pipe>` (a `harness = false` target, so nothing but
 //!   its own lines reach its streams), serving `job watch` the same recorded
@@ -50,6 +61,9 @@ fn main() {
         .is_some_and(|flag| flag == "--fake-runtime")
     {
         windows::fake_runtime(&arguments[2]);
+    }
+    if arguments.get(1).is_some_and(|flag| flag == "-r") {
+        windows::fake_inspector(&arguments[1..]);
     }
     windows::run_tests();
 }
@@ -164,6 +178,14 @@ mod windows {
             (
                 "measured_owner_leaves_answer_their_contract_through_the_pipe",
                 measured_owner_leaves_answer_their_contract_through_the_pipe,
+            ),
+            (
+                "analyzer_leaves_run_end_to_end_through_the_pipe",
+                analyzer_leaves_run_end_to_end_through_the_pipe,
+            ),
+            (
+                "workspace_inspect_leaf_runs_end_to_end_through_the_pipe",
+                workspace_inspect_leaf_runs_end_to_end_through_the_pipe,
             ),
             (
                 "ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope",
@@ -639,9 +661,17 @@ mod windows {
             "2",
         ]);
         assert_eq!(cleared["generation"], "3", "{cleared}");
+        // The restart composed the registered project, as macOS composes it:
+        // it is active, and its empty root resolves to no profile.
+        let mut composed = registered.clone();
+        composed["configurationStatus"] = json!("active");
+        composed["reasonCode"] = json!("workspace_project_profile_unavailable");
+        composed["reason"] = json!(
+            "workspace.projectProfileUnavailable:workspace.projectProfileUnavailable: WaterFlow project or Hvigor is absent"
+        );
         assert_eq!(
             run(&["workspace", "project", "show", "--project", &reference]),
-            registered
+            composed
         );
         assert_eq!(
             run(&[
@@ -680,6 +710,316 @@ mod windows {
                 "{leaf}: {statuses:?}"
             );
         }
+    }
+
+    /// A development root below `directory` holding a recorded Swift source
+    /// Job's Artifacts as the Swift engine published them (the index
+    /// owner-only, each payload sealed; the passed retention deadlines moved
+    /// to a year no run reaches).
+    fn root_with_source(directory: &Directory, name: &str, recorded: &str) -> PathBuf {
+        let root = directory.0.join(name);
+        std::fs::create_dir(&root).unwrap();
+        let artifacts =
+            arkdeck_platform::HostDirectory::open_or_create_private(&root.join("artifacts"))
+                .unwrap();
+        let job = artifacts.create_private_child("job-oracle-source").unwrap();
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures");
+        for entry in std::fs::read_dir(fixtures.join(recorded)).unwrap() {
+            let path = entry.unwrap().path();
+            let file = path.file_name().unwrap().to_str().unwrap().to_owned();
+            let mut bytes = std::fs::read(&path).unwrap();
+            if file == "index.json" {
+                let text = String::from_utf8(bytes).unwrap();
+                let moved = text.replace("\"deadlineUTC\" : \"2026-", "\"deadlineUTC\" : \"2099-");
+                assert_ne!(moved, text);
+                bytes = moved.into_bytes();
+            }
+            job.create_document(&file, &bytes).unwrap();
+            if file != "index.json" {
+                job.seal_document(&file).unwrap();
+            }
+        }
+        root
+    }
+
+    /// `analyze crash-signature` and `analyze hilog-summary` (TASK-XPA-011)
+    /// through the CLI against the signed daemon, whose own image is the
+    /// analyzer `ARKDECK_ANALYZER_PATH` names, over a recorded Swift source
+    /// Artifact: each run completes with its one derived Artifact, verified,
+    /// and after a restart a new execution derives the same bytes.
+    fn analyzer_leaves_run_end_to_end_through_the_pipe(thumbprint: &str) {
+        let directory = Directory::new();
+        let (daemon, pin) = signed_copy(
+            &Path::new(CLI).with_file_name("arkdeck-agentd.exe"),
+            &directory,
+            thumbprint,
+        );
+        for (leaf, recorded, source) in [
+            (
+                "crash-signature",
+                "job-reconcile-analyzer/artifacts/job-oracle-source",
+                "ART-73deeb970a032e1b7fdecf34c4fc5511",
+            ),
+            (
+                "hilog-summary",
+                "job-run-hilog/artifacts/job-oracle-source",
+                "ART-bfdf1c6973a8e0f2917400119782e8c5",
+            ),
+        ] {
+            let root = root_with_source(&directory, leaf, recorded);
+            let inputs = directory.0.join(format!("{leaf}.json"));
+            std::fs::write(
+                &inputs,
+                json!({"sourceArtifactRef": format!("lease-v1:job-oracle-source:{source}")})
+                    .to_string(),
+            )
+            .unwrap();
+            let inputs = inputs.to_str().unwrap().to_owned();
+            let run = |pipe: &str, execution: &str| {
+                answered(
+                    pipe,
+                    &daemon,
+                    &pin,
+                    &[
+                        "analyze",
+                        leaf,
+                        "--target",
+                        "TGT-ORACLE",
+                        "--inputs-file",
+                        &inputs,
+                        "--execution-id",
+                        execution,
+                    ],
+                )
+            };
+            let serve_analyzing = || {
+                let mut command = Command::new(&daemon);
+                command
+                    .env("ARKDECK_DEVELOPMENT_STATE_ROOT", &root)
+                    .env("ARKDECK_ANALYZER_PATH", &daemon);
+                let server = Server::start(command);
+                let pipe = server
+                    .line_starting("arkdeck-agentd listening on ")
+                    .pop()
+                    .unwrap()
+                    .trim_start_matches("arkdeck-agentd listening on ")
+                    .to_owned();
+                (server, pipe)
+            };
+            let (server, pipe) = serve_analyzing();
+            let first = run(&pipe, &format!("exec-windows-{leaf}-1"));
+            assert_eq!(first["terminalState"], "succeeded", "{first}");
+            assert_eq!(first["providerID"], "analyzer", "{first}");
+            assert_eq!(first["actualEffect"], "hostOnly", "{first}");
+            assert_eq!(
+                first["stepKinds"],
+                json!(["runDeterministicAnalyzer"]),
+                "{first}"
+            );
+            assert_eq!(first["evidenceBlockers"], json!([]), "{first}");
+            let produced = first["artifacts"].as_array().unwrap();
+            assert_eq!(produced.len(), 1, "{first}");
+            assert_eq!(produced[0]["bytesVerified"], true, "{first}");
+            assert_eq!(produced[0]["jobId"], first["jobID"], "{first}");
+            stop(server, &root);
+
+            // After a restart the analyzer is composed again: a new execution
+            // is a new Job whose analysis is the same bytes.
+            let (server, pipe) = serve_analyzing();
+            let second = run(&pipe, &format!("exec-windows-{leaf}-2"));
+            assert_eq!(second["terminalState"], "succeeded", "{second}");
+            assert_ne!(second["jobID"], first["jobID"], "{second}");
+            let again = &second["artifacts"][0];
+            assert_eq!(again["sha256"], produced[0]["sha256"], "{second}");
+            assert_eq!(again["byteCount"], produced[0]["byteCount"], "{second}");
+            stop(server, &root);
+            // The source was read, never rewritten.
+            let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures")
+                .join(recorded)
+                .join(source);
+            assert_eq!(
+                std::fs::read(root.join("artifacts/job-oracle-source").join(source)).unwrap(),
+                std::fs::read(fixture).unwrap()
+            );
+        }
+        // What this measured is what the coverage manifest counts.
+        for feature in [
+            "analyzer.extract-crash-signature@1",
+            "analyzer.summarize-hilog@1",
+        ] {
+            assert_eq!(windows_statuses(feature), ["implemented"], "{feature}");
+        }
+    }
+
+    /// `grep -r -n --include <glob> -- <symbol> <root>` over a tree of
+    /// plain files: every line holding `symbol` in a file whose name `glob`
+    /// (`*.<extension>` or a whole name) matches, as `<path>:<line>:<text>`,
+    /// files in path order; exit 0 with a match, 1 without, 2 on misuse.
+    pub fn fake_inspector(arguments: &[String]) -> ! {
+        let valid = arguments.len() == 7
+            && arguments[..3] == ["-r", "-n", "--include"]
+            && arguments[4] == "--";
+        if !valid {
+            std::process::exit(2);
+        }
+        let (glob, symbol, root) = (&arguments[3], &arguments[5], &arguments[6]);
+        let named = |name: &str| match glob.strip_prefix('*') {
+            Some(suffix) => name.ends_with(suffix),
+            None => name == glob,
+        };
+        let (mut stack, mut files) = (vec![PathBuf::from(root)], Vec::new());
+        while let Some(directory) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(&directory) else {
+                std::process::exit(2);
+            };
+            for entry in entries {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if named(path.file_name().unwrap().to_str().unwrap()) {
+                    files.push(path);
+                }
+            }
+        }
+        files.sort();
+        let mut output = String::new();
+        for file in files {
+            let text = std::fs::read_to_string(&file).unwrap_or_default();
+            for (index, line) in text.lines().enumerate() {
+                if line.contains(symbol.as_str()) {
+                    output.push_str(&format!("{}:{}:{line}\n", file.display(), index + 1));
+                }
+            }
+        }
+        std::io::stdout().write_all(output.as_bytes()).unwrap();
+        std::process::exit(if output.is_empty() { 1 } else { 0 });
+    }
+
+    /// `workspace inspect` (TASK-XPA-011) through the CLI against the signed
+    /// daemon, over an OpenHarmony project registered through the CLI and
+    /// composed by the next start with this binary as the host's inspector:
+    /// the inspection runs to its one verified derived Artifact, and after a
+    /// restart a new execution derives the same bytes.
+    fn workspace_inspect_leaf_runs_end_to_end_through_the_pipe(thumbprint: &str) {
+        let directory = Directory::new();
+        let (daemon, pin) = signed_copy(
+            &Path::new(CLI).with_file_name("arkdeck-agentd.exe"),
+            &directory,
+            thumbprint,
+        );
+        // A development root and a project named as the disk names them (a
+        // workspace root must be that spelling).
+        let canonical = std::fs::canonicalize(&directory.0).unwrap();
+        let canonical = canonical.to_str().unwrap();
+        let base = PathBuf::from(canonical.strip_prefix(r"\\?\").unwrap_or(canonical));
+        let root = base.join("root");
+        std::fs::create_dir(&root).unwrap();
+        let project = base.join("project");
+        for (relative, text) in [
+            ("build-profile.json5", "{}\n"),
+            ("entry/src/main/module.json5", "{}\n"),
+            (
+                "entry/src/main/ets/pages/Index.ets",
+                "@Entry\n@Component\nstruct Index {\n  build() {}\n}\n",
+            ),
+        ] {
+            let file = project.join(relative);
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, text).unwrap();
+        }
+        let project = project.to_str().unwrap().to_owned();
+        let inspector = base.join("inspector.exe");
+        std::fs::copy(std::env::current_exe().unwrap(), &inspector).unwrap();
+
+        let (server, pipe) = serve(&daemon, &root);
+        let registered = answered(
+            &pipe,
+            &daemon,
+            &pin,
+            &[
+                "workspace",
+                "project",
+                "register",
+                "--registration-request-id",
+                "request-inspect",
+                "--kind",
+                "openharmony",
+                "--root",
+                &project,
+            ],
+        );
+        let reference = registered["projectRef"].as_str().unwrap().to_owned();
+        stop(server, &root);
+
+        let inputs = directory.0.join("inspect.json");
+        std::fs::write(
+            &inputs,
+            json!({"projectRef": reference, "symbol": "build", "fileScope": "*.ets"}).to_string(),
+        )
+        .unwrap();
+        let inputs = inputs.to_str().unwrap().to_owned();
+        let serve_inspecting = || {
+            let mut command = Command::new(&daemon);
+            command
+                .env("ARKDECK_DEVELOPMENT_STATE_ROOT", &root)
+                .env("ARKDECK_WORKSPACE_INSPECTOR", &inspector);
+            let server = Server::start(command);
+            let pipe = server
+                .line_starting("arkdeck-agentd listening on ")
+                .pop()
+                .unwrap()
+                .trim_start_matches("arkdeck-agentd listening on ")
+                .to_owned();
+            (server, pipe)
+        };
+        let run = |pipe: &str, execution: &str| {
+            answered(
+                pipe,
+                &daemon,
+                &pin,
+                &[
+                    "workspace",
+                    "inspect",
+                    "--inputs-file",
+                    &inputs,
+                    "--execution-id",
+                    execution,
+                ],
+            )
+        };
+        let (server, pipe) = serve_inspecting();
+        let first = run(&pipe, "exec-windows-workspace-inspect-1");
+        assert_eq!(first["terminalState"], "succeeded", "{first}");
+        assert_eq!(first["providerID"], "workspace", "{first}");
+        assert_eq!(first["actualEffect"], "hostOnly", "{first}");
+        assert_eq!(
+            first["stepKinds"],
+            json!(["inspectWorkspaceSource"]),
+            "{first}"
+        );
+        assert_eq!(first["evidenceBlockers"], json!([]), "{first}");
+        let produced = first["artifacts"].as_array().unwrap();
+        assert_eq!(produced.len(), 1, "{first}");
+        assert_eq!(produced[0]["bytesVerified"], true, "{first}");
+        assert_eq!(produced[0]["jobId"], first["jobID"], "{first}");
+        stop(server, &root);
+
+        // After a restart the provider is composed again: a new execution is
+        // a new Job whose inspection is the same bytes.
+        let (server, pipe) = serve_inspecting();
+        let second = run(&pipe, "exec-windows-workspace-inspect-2");
+        assert_eq!(second["terminalState"], "succeeded", "{second}");
+        assert_ne!(second["jobID"], first["jobID"], "{second}");
+        let again = &second["artifacts"][0];
+        assert_eq!(again["sha256"], produced[0]["sha256"], "{second}");
+        assert_eq!(again["byteCount"], produced[0]["byteCount"], "{second}");
+        stop(server, &root);
+        // What this measured is what the coverage manifest counts.
+        assert_eq!(
+            windows_statuses("workspace.inspect-source@1"),
+            ["implemented"]
+        );
     }
 
     fn ctrl_break_ends_a_waiting_watch_with_the_interrupted_envelope(thumbprint: &str) {

@@ -1040,7 +1040,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.preview (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_productionBoundary" xml:space="preserve">
-    <value>Production supports one signed app-owned .so per request from either a local file or a verified read-only SSH build source. Every request still passes ELF/ABI/Build ID/hash validation, backup, atomic publish, Ability restart, loaded-library readback, and rollback on failure. SMB, WSL, batches, .abc replacement, and standalone device restart remain unavailable until published as typed behavior.</value>
+    <value>Each Job deploys one signed app-owned .so through the published operation. Queues run these Jobs serially, stopping on failure or uncertainty. ELF, ABI, Build ID, hash, backup and readback checks still apply. .abc replacement and standalone device restart remain unavailable.</value>
     <comment>debug.artifacts.productionBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_remoteBindingFailed" xml:space="preserve">
@@ -1184,7 +1184,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.sheet.warning (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_detail" xml:space="preserve">
-    <value>Choose one signed app-owned native library from a local output or a verified remote build source. Only the selected bytes enter the controlled Artifact import channel.</value>
+    <value>Choose signed app-owned libraries from local files, folders, mounted SMB shares or a verified SSH build source. Only selected bytes enter Artifact import.</value>
     <comment>debug.artifacts.source.detail (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_kind" xml:space="preserve">
@@ -1204,7 +1204,7 @@ SHA-256: %4$@</value>
     <comment>debug.artifacts.source.title (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_sourceBoundary" xml:space="preserve">
-    <value>SSH sources are read-only, host-key pinned, and confined to the saved canonical build root. SMB, WSL, batch selection, and .abc search remain unavailable.</value>
+    <value>Folder access uses the file-picker grant. SMB shares must already be mounted in Finder. SSH, including WSL, stays read-only within the saved root and pins the host key.</value>
     <comment>debug.artifacts.sourceBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_target" xml:space="preserve">
@@ -2554,6 +2554,622 @@ SHA-256: %4$@</value>
     <value>Flash</value>
     <comment>flash.workspace.title (FlashLocalizable.xcstrings)</comment>
   </data>
+  <data name="trace_action_cancel" xml:space="preserve">
+    <value>Cancel capture</value>
+    <comment>trace.action.cancel (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_openViewer" xml:space="preserve">
+    <value>Open trace viewer</value>
+    <comment>trace.action.openViewer (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_refresh" xml:space="preserve">
+    <value>Refresh devices</value>
+    <comment>trace.action.refresh (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_running" xml:space="preserve">
+    <value>Capturing…</value>
+    <comment>trace.action.running (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_start" xml:space="preserve">
+    <value>Start capture</value>
+    <comment>trace.action.start (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_availability_available" xml:space="preserve">
+    <value>Ready</value>
+    <comment>trace.availability.available (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_availability_checking" xml:space="preserve">
+    <value>Checking…</value>
+    <comment>trace.availability.checking (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_availability_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>trace.availability.unavailable (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_adapterUnsupported" xml:space="preserve">
+    <value>This device's hitrace category list is not supported by this ArkDeck version. Update ArkDeck or use a supported device.</value>
+    <comment>trace.blocker.adapterUnsupported (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_buffer" xml:space="preserve">
+    <value>The default trace buffer is unavailable for this device.</value>
+    <comment>trace.blocker.buffer (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_capability" xml:space="preserve">
+    <value>Trace capability check is incomplete for this device. Refresh and try again.</value>
+    <comment>trace.blocker.capability (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_checking" xml:space="preserve">
+    <value>Wait for the device check to finish.</value>
+    <comment>trace.blocker.checking (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_duration" xml:space="preserve">
+    <value>Enter a duration inside the allowed range.</value>
+    <comment>trace.blocker.duration (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_noTags" xml:space="preserve">
+    <value>Choose a capture profile.</value>
+    <comment>trace.blocker.noTags (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_operation" xml:space="preserve">
+    <value>Trace capture is unavailable. Refresh and try again.</value>
+    <comment>trace.blocker.operation (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_tags" xml:space="preserve">
+    <value>This profile is not supported by the selected device. Choose another profile.</value>
+    <comment>trace.blocker.tags (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_target" xml:space="preserve">
+    <value>Select an adopted device.</value>
+    <comment>trace.blocker.target (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_bounds_duration" xml:space="preserve">
+    <value>Duration</value>
+    <comment>trace.bounds.duration (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_cancel_failed" xml:space="preserve">
+    <value>Unable to cancel this capture. Wait for the current safe step to finish and try again.</value>
+    <comment>trace.cancel.failed (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_device" xml:space="preserve">
+    <value>Device</value>
+    <comment>trace.capture.device (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_finished" xml:space="preserve">
+    <value>Capture complete.</value>
+    <comment>trace.capture.finished (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_localOnly" xml:space="preserve">
+    <value>The trace stays on this Mac and opens automatically.</value>
+    <comment>trace.capture.localOnly (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_notCompleted" xml:space="preserve">
+    <value>Capture ended without a viewable trace. Open History for details.</value>
+    <comment>trace.capture.notCompleted (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_outcomeUnknown" xml:space="preserve">
+    <value>Capture outcome is unknown. Check History before starting another capture.</value>
+    <comment>trace.capture.outcomeUnknown (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_profile" xml:space="preserve">
+    <value>Profile</value>
+    <comment>trace.capture.profile (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_title" xml:space="preserve">
+    <value>Capture trace</value>
+    <comment>trace.capture.title (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_minutes" xml:space="preserve">
+    <value>Minutes</value>
+    <comment>trace.duration.minutes (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_quick" xml:space="preserve">
+    <value>Quick duration</value>
+    <comment>trace.duration.quick (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_seconds" xml:space="preserve">
+    <value>Seconds</value>
+    <comment>trace.duration.seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set10Seconds" xml:space="preserve">
+    <value>Set duration to 10 seconds</value>
+    <comment>trace.duration.set10Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set15Seconds" xml:space="preserve">
+    <value>Set duration to 15 seconds</value>
+    <comment>trace.duration.set15Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set1Minute" xml:space="preserve">
+    <value>Set duration to 1 minute</value>
+    <comment>trace.duration.set1Minute (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set2Minutes" xml:space="preserve">
+    <value>Set duration to 2 minutes</value>
+    <comment>trace.duration.set2Minutes (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set30Seconds" xml:space="preserve">
+    <value>Set duration to 30 seconds</value>
+    <comment>trace.duration.set30Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set3Minutes" xml:space="preserve">
+    <value>Set duration to 3 minutes</value>
+    <comment>trace.duration.set3Minutes (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set5Seconds" xml:space="preserve">
+    <value>Set duration to 5 seconds</value>
+    <comment>trace.duration.set5Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_setCustom" xml:space="preserve">
+    <value>Set a custom duration</value>
+    <comment>trace.duration.setCustom (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_unit" xml:space="preserve">
+    <value>Duration unit</value>
+    <comment>trace.duration.unit (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_arkuiDeep" xml:space="preserve">
+    <value>App responsiveness</value>
+    <comment>trace.preset.arkuiDeep (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_arkuiDeep_detail" xml:space="preserve">
+    <value>Best for slow interactions, layout work and ArkUI jank.</value>
+    <comment>trace.preset.arkuiDeep.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_attachmentPanorama" xml:space="preserve">
+    <value>System overview</value>
+    <comment>trace.preset.attachmentPanorama (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_attachmentPanorama_detail" xml:space="preserve">
+    <value>Captures the broadest system activity and produces the largest trace.</value>
+    <comment>trace.preset.attachmentPanorama.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_io" xml:space="preserve">
+    <value>I/O</value>
+    <comment>trace.preset.io (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_io_detail" xml:space="preserve">
+    <value>Best for file, storage and work-queue investigations.</value>
+    <comment>trace.preset.io.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_renderAnimation" xml:space="preserve">
+    <value>Rendering and animation</value>
+    <comment>trace.preset.renderAnimation (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_renderAnimation_detail" xml:space="preserve">
+    <value>Best for frame production, graphics and animation issues.</value>
+    <comment>trace.preset.renderAnimation.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_schedulingIpc" xml:space="preserve">
+    <value>CPU scheduling</value>
+    <comment>trace.preset.schedulingIpc (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_schedulingIpc_detail" xml:space="preserve">
+    <value>Best for thread scheduling, contention and IPC investigations.</value>
+    <comment>trace.preset.schedulingIpc.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_target_empty" xml:space="preserve">
+    <value>No adopted devices. Connect and adopt a device, then refresh.</value>
+    <comment>trace.target.empty (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_validation_decimal" xml:space="preserve">
+    <value>Use whole numbers only.</value>
+    <comment>trace.validation.decimal (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_validation_missing" xml:space="preserve">
+    <value>Enter a duration.</value>
+    <comment>trace.validation.missing (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_validation_range" xml:space="preserve">
+    <value>Enter a value from %1$d through %2$d.</value>
+    <comment>trace.validation.range (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_artifactInvalid" xml:space="preserve">
+    <value>Capture completed, but no valid raw trace was published. Open History to inspect the job.</value>
+    <comment>trace.viewer.artifactInvalid (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_artifactListUnavailable" xml:space="preserve">
+    <value>Capture completed, but its trace is unavailable. Refresh and try opening it again.</value>
+    <comment>trace.viewer.artifactListUnavailable (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_description" xml:space="preserve">
+    <value>Open a local trace or choose a recent trace in the viewer.</value>
+    <comment>trace.viewer.description (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_latest" xml:space="preserve">
+    <value>Latest captured trace is ready</value>
+    <comment>trace.viewer.latest (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_preparing" xml:space="preserve">
+    <value>Verifying and opening the captured trace…</value>
+    <comment>trace.viewer.preparing (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_readFailed" xml:space="preserve">
+    <value>Capture completed, but the trace could not be read. Refresh and try again.</value>
+    <comment>trace.viewer.readFailed (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_stagingUnavailable" xml:space="preserve">
+    <value>Unable to prepare the trace for viewing. Check available storage and try again.</value>
+    <comment>trace.viewer.stagingUnavailable (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_title" xml:space="preserve">
+    <value>View traces</value>
+    <comment>trace.viewer.title (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_tryAgain" xml:space="preserve">
+    <value>Try opening trace again</value>
+    <comment>trace.viewer.tryAgain (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_workspace_summary" xml:space="preserve">
+    <value>Capture a trace from an adopted OpenHarmony device, then inspect it in the built-in viewer.</value>
+    <comment>trace.workspace.summary (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_action_show" xml:space="preserve">
+    <value>Show %1$@</value>
+    <comment>viewer.action.show (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search" xml:space="preserve">
+    <value>Search Advanced Dump</value>
+    <comment>viewer.advancedDump.search (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_clear" xml:space="preserve">
+    <value>Clear search</value>
+    <comment>viewer.advancedDump.search.clear (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_noResults" xml:space="preserve">
+    <value>No matching fields or values</value>
+    <comment>viewer.advancedDump.search.noResults (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_placeholder" xml:space="preserve">
+    <value>Search fields or values</value>
+    <comment>viewer.advancedDump.search.placeholder (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_results" xml:space="preserve">
+    <value>Advanced Dump search results</value>
+    <comment>viewer.advancedDump.search.results (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_shortcut" xml:space="preserve">
+    <value>Search Advanced Dump (⌘F)</value>
+    <comment>viewer.advancedDump.search.shortcut (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_unavailable" xml:space="preserve">
+    <value>Select this tab to capture componentDetail fields</value>
+    <comment>viewer.advancedDump.unavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_chip_interactive" xml:space="preserve">
+    <value>Interactive</value>
+    <comment>viewer.chip.interactive (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_chip_visible" xml:space="preserve">
+    <value>Visible</value>
+    <comment>viewer.chip.visible (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_explain" xml:space="preserve">
+    <value>Capture View creates a typed Runtime Job and shows only verified, same-Job Artifacts.</value>
+    <comment>viewer.empty.explain (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_selectTarget" xml:space="preserve">
+    <value>Select an adopted target with a complete binding, then capture the view.</value>
+    <comment>viewer.empty.selectTarget (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_targetBlocked" xml:space="preserve">
+    <value>%1$@ cannot capture a view: %2$@. Select a Connected target.</value>
+    <comment>viewer.empty.targetBlocked (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_title" xml:space="preserve">
+    <value>No verified capture</value>
+    <comment>viewer.empty.title (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_accessibleLabel" xml:space="preserve">
+    <value>accessible label</value>
+    <comment>viewer.field.accessibleLabel (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_description" xml:space="preserve">
+    <value>description</value>
+    <comment>viewer.field.description (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_hitTest" xml:space="preserve">
+    <value>hit test</value>
+    <comment>viewer.field.hitTest (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_screenshotMapping" xml:space="preserve">
+    <value>screenshot mapping</value>
+    <comment>viewer.field.screenshotMapping (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_footer_nodes" xml:space="preserve">
+    <value>%1$d nodes</value>
+    <comment>viewer.footer.nodes (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_footer_notMeasured" xml:space="preserve">
+    <value>not measured</value>
+    <comment>viewer.footer.notMeasured (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_focus" xml:space="preserve">
+    <value>Focus</value>
+    <comment>viewer.group.focus (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_geometry" xml:space="preserve">
+    <value>Geometry</value>
+    <comment>viewer.group.geometry (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_identity" xml:space="preserve">
+    <value>Identity</value>
+    <comment>viewer.group.identity (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_paint" xml:space="preserve">
+    <value>Paint</value>
+    <comment>viewer.group.paint (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_semantics" xml:space="preserve">
+    <value>Semantics</value>
+    <comment>viewer.group.semantics (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_state" xml:space="preserve">
+    <value>State</value>
+    <comment>viewer.group.state (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_coordinatesUnverified" xml:space="preserve">
+    <value>Coordinates cannot be verified</value>
+    <comment>viewer.pane.coordinatesUnverified (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_screenshot" xml:space="preserve">
+    <value>Device screenshot</value>
+    <comment>viewer.pane.screenshot (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_showBounds" xml:space="preserve">
+    <value>Show component bounds</value>
+    <comment>viewer.pane.showBounds (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_tree" xml:space="preserve">
+    <value>UI tree</value>
+    <comment>viewer.pane.tree (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_properties_rawUnavailable" xml:space="preserve">
+    <value>Raw fields are unavailable</value>
+    <comment>viewer.properties.rawUnavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_properties_selectPrompt" xml:space="preserve">
+    <value>Select a component</value>
+    <comment>viewer.properties.selectPrompt (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_selectHint" xml:space="preserve">
+    <value>Use the UI tree to select a component with the keyboard.</value>
+    <comment>viewer.screenshot.selectHint (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_selectLabel" xml:space="preserve">
+    <value>Select component in screenshot</value>
+    <comment>viewer.screenshot.selectLabel (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_unavailable" xml:space="preserve">
+    <value>Screenshot is unavailable</value>
+    <comment>viewer.screenshot.unavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_unverifiedDetail" xml:space="preserve">
+    <value>The tree bounds do not prove this screenshot's coordinate space. Tree and Raw dump remain available, but screenshot selection is disabled.</value>
+    <comment>viewer.screenshot.unverifiedDetail (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_search_matchCount" xml:space="preserve">
+    <value>Search results</value>
+    <comment>viewer.search.matchCount (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_search_next" xml:space="preserve">
+    <value>Next search result</value>
+    <comment>viewer.search.next (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_search_previous" xml:space="preserve">
+    <value>Previous search result</value>
+    <comment>viewer.search.previous (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_separator_label" xml:space="preserve">
+    <value>Resize UI tree and node properties</value>
+    <comment>viewer.separator.label (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_separator_value" xml:space="preserve">
+    <value>UI tree uses %1$d percent of the inspector</value>
+    <comment>viewer.separator.value (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_accessibility" xml:space="preserve">
+    <value>Accessibility</value>
+    <comment>viewer.tab.accessibility (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_layout" xml:space="preserve">
+    <value>Layout</value>
+    <comment>viewer.tab.layout (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_properties" xml:space="preserve">
+    <value>Properties</value>
+    <comment>viewer.tab.properties (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_rawDump" xml:space="preserve">
+    <value>Raw dump</value>
+    <comment>viewer.tab.rawDump (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_capture" xml:space="preserve">
+    <value>Capture View</value>
+    <comment>viewer.toolbar.capture (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_capturing" xml:space="preserve">
+    <value>Capturing…</value>
+    <comment>viewer.toolbar.capturing (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_currentScreen" xml:space="preserve">
+    <value>Current screen</value>
+    <comment>viewer.toolbar.currentScreen (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_device" xml:space="preserve">
+    <value>Device</value>
+    <comment>viewer.toolbar.device (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_noDevice" xml:space="preserve">
+    <value>No device</value>
+    <comment>viewer.toolbar.noDevice (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_recapture" xml:space="preserve">
+    <value>Recapture</value>
+    <comment>viewer.toolbar.recapture (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_refresh" xml:space="preserve">
+    <value>Refresh Viewer</value>
+    <comment>viewer.toolbar.refresh (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_search" xml:space="preserve">
+    <value>Search component, ID, or text</value>
+    <comment>viewer.toolbar.search (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_collapse" xml:space="preserve">
+    <value>Collapse</value>
+    <comment>viewer.tree.collapse (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_expand" xml:space="preserve">
+    <value>Expand</value>
+    <comment>viewer.tree.expand (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_label" xml:space="preserve">
+    <value>Complete UI tree</value>
+    <comment>viewer.tree.label (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_matchCount" xml:space="preserve">
+    <value>%1$@ / %2$@</value>
+    <comment>viewer.tree.matchCount (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_noMatches" xml:space="preserve">
+    <value>No matching components. The current selection is unchanged.</value>
+    <comment>viewer.tree.noMatches (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_notSelected" xml:space="preserve">
+    <value>Not selected</value>
+    <comment>viewer.tree.notSelected (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_selected" xml:space="preserve">
+    <value>Selected</value>
+    <comment>viewer.tree.selected (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_available" xml:space="preserve">
+    <value>Available</value>
+    <comment>viewer.value.available (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_no" xml:space="preserve">
+    <value>No</value>
+    <comment>viewer.value.no (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_unavailable" xml:space="preserve">
+    <value>Unavailable</value>
+    <comment>viewer.value.unavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_verified" xml:space="preserve">
+    <value>Verified</value>
+    <comment>viewer.value.verified (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_yes" xml:space="preserve">
+    <value>Yes</value>
+    <comment>viewer.value.yes (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_openingCancelled" xml:space="preserve">
+    <value>Opening cancelled</value>
+    <comment>a11y.announce.openingCancelled (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_openingTrace" xml:space="preserve">
+    <value>Opening trace</value>
+    <comment>a11y.announce.openingTrace (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_operationFailed" xml:space="preserve">
+    <value>Operation failed</value>
+    <comment>a11y.announce.operationFailed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_rangeAnalysisComplete" xml:space="preserve">
+    <value>Range analysis complete</value>
+    <comment>a11y.announce.rangeAnalysisComplete (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_searchFoundAtLeastResults" xml:space="preserve">
+    <value>Search found at least %lld results</value>
+    <comment>a11y.announce.searchFoundAtLeastResults (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_searchFoundResults" xml:space="preserve">
+    <value>Search found %lld results</value>
+    <comment>a11y.announce.searchFoundResults (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceCloseFailed" xml:space="preserve">
+    <value>Trace close failed</value>
+    <comment>a11y.announce.traceCloseFailed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceClosed" xml:space="preserve">
+    <value>Trace closed</value>
+    <comment>a11y.announce.traceClosed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceLoadedWithVisibleTracks" xml:space="preserve">
+    <value>Trace loaded, %lld visible tracks</value>
+    <comment>a11y.announce.traceLoadedWithVisibleTracks (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceLoadedWithoutTimedEvents" xml:space="preserve">
+    <value>Trace loaded, no timed events</value>
+    <comment>a11y.announce.traceLoadedWithoutTimedEvents (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceOpenFailed" xml:space="preserve">
+    <value>Trace failed</value>
+    <comment>a11y.announce.traceOpenFailed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_timeline_label" xml:space="preserve">
+    <value>Trace Timeline</value>
+    <comment>a11y.timeline.label (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_cache" xml:space="preserve">
+    <value>The derived trace cache needs attention. Inspect it in Trace settings; the original trace is not a cache target.</value>
+    <comment>error.reason.cache (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_cancelled" xml:space="preserve">
+    <value>Opening was cancelled. No new trace was opened.</value>
+    <comment>error.reason.cancelled (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_chooseFile" xml:space="preserve">
+    <value>The source could not be read or validated. Choose an accessible trace file.</value>
+    <comment>error.reason.chooseFile (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_operation" xml:space="preserve">
+    <value>The trace operation did not finish. Review the diagnostic details and the available recovery action.</value>
+    <comment>error.reason.operation (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_parser" xml:space="preserve">
+    <value>The bundled parser could not be verified or started. Check the diagnostic details before retrying.</value>
+    <comment>error.reason.parser (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_bundledParserUnavailable" xml:space="preserve">
+    <value>Bundled parser is unavailable</value>
+    <comment>error.title.bundledParserUnavailable (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_cacheNeedsAttention" xml:space="preserve">
+    <value>Trace cache needs attention</value>
+    <comment>error.title.cacheNeedsAttention (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_couldNotFinish" xml:space="preserve">
+    <value>ArkTrace could not finish</value>
+    <comment>error.title.couldNotFinish (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_openingCancelled" xml:space="preserve">
+    <value>Opening was cancelled</value>
+    <comment>error.title.openingCancelled (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_traceCouldNotBeOpened" xml:space="preserve">
+    <value>Trace could not be opened</value>
+    <comment>error.title.traceCouldNotBeOpened (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_eventType" xml:space="preserve">
+    <value>Type</value>
+    <comment>viewer.eventType (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_openPanel_title" xml:space="preserve">
+    <value>Open Trace</value>
+    <comment>viewer.openPanel.title (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_searchEvents_menu" xml:space="preserve">
+    <value>Search Trace Events</value>
+    <comment>viewer.searchEvents.menu (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="app_navigation_trace" xml:space="preserve">
+    <value>Trace</value>
+    <comment>app.navigation.trace (Localizable.xcstrings)</comment>
+  </data>
+  <data name="app_navigation_uiDump" xml:space="preserve">
+    <value>Viewer</value>
+    <comment>app.navigation.uiDump (Localizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime unavailable</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -3553,5 +4169,469 @@ SHA-256: %4$@</value>
   <data name="windows_flash_targetChanged" xml:space="preserve">
     <value>The selected target changed; the exact plan is prepared again.</value>
     <comment>windows.flash.targetChanged (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_capture" xml:space="preserve">
+    <value>Capture</value>
+    <comment>windows.traceViewer.capture (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_captureHelp" xml:space="preserve">
+    <value>Capture a trace from a connected OpenHarmony device</value>
+    <comment>windows.traceViewer.captureHelp (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_open" xml:space="preserve">
+    <value>Open</value>
+    <comment>windows.traceViewer.open (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_openTrace" xml:space="preserve">
+    <value>Open Trace…</value>
+    <comment>windows.traceViewer.openTrace (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_captureTrace" xml:space="preserve">
+    <value>Capture Trace…</value>
+    <comment>windows.traceViewer.captureTrace (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_reload" xml:space="preserve">
+    <value>Reload</value>
+    <comment>windows.traceViewer.reload (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_recent" xml:space="preserve">
+    <value>Recent</value>
+    <comment>windows.traceViewer.recent (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_removeRecent" xml:space="preserve">
+    <value>Remove from Recent</value>
+    <comment>windows.traceViewer.removeRecent (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_missingName" xml:space="preserve">
+    <value>%1$@, missing</value>
+    <comment>windows.traceViewer.missingName (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_missingPath" xml:space="preserve">
+    <value>Missing — %1$@</value>
+    <comment>windows.traceViewer.missingPath (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_idleTitle" xml:space="preserve">
+    <value>Open a trace</value>
+    <comment>windows.traceViewer.idleTitle (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_idleDetail" xml:space="preserve">
+    <value>Open, drop, or choose a recent .htrace/.ftrace/.systrace file.</value>
+    <comment>windows.traceViewer.idleDetail (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_unavailable" xml:space="preserve">
+    <value>Trace unavailable</value>
+    <comment>windows.traceViewer.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_diagnostics" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>windows.traceViewer.diagnostics (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_retry" xml:space="preserve">
+    <value>Retry</value>
+    <comment>windows.traceViewer.retry (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_chooseAnother" xml:space="preserve">
+    <value>Choose Another File…</value>
+    <comment>windows.traceViewer.chooseAnother (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_inspector" xml:space="preserve">
+    <value>Inspector</value>
+    <comment>windows.traceViewer.inspector (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_duration" xml:space="preserve">
+    <value>Duration</value>
+    <comment>windows.traceViewer.duration (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_sourceBytes" xml:space="preserve">
+    <value>Source bytes</value>
+    <comment>windows.traceViewer.sourceBytes (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_schema" xml:space="preserve">
+    <value>Schema</value>
+    <comment>windows.traceViewer.schema (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_cache" xml:space="preserve">
+    <value>Cache</value>
+    <comment>windows.traceViewer.cache (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_hit" xml:space="preserve">
+    <value>Hit</value>
+    <comment>windows.traceViewer.hit (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_miss" xml:space="preserve">
+    <value>Miss</value>
+    <comment>windows.traceViewer.miss (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_nothingSelected" xml:space="preserve">
+    <value>Select an event or drag a time range.</value>
+    <comment>windows.traceViewer.nothingSelected (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_title" xml:space="preserve">
+    <value>Trace Viewer</value>
+    <comment>windows.traceViewer.title (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_back" xml:space="preserve">
+    <value>Back to Trace</value>
+    <comment>windows.traceViewer.back (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_noParser" xml:space="preserve">
+    <value>No ArkTrace parser is distributed for Windows, so this PC cannot draw the timeline. The file's size and SHA-256 are shown; for a captured Trace, the Runtime's Trace inspector is asked.</value>
+    <comment>windows.traceViewer.noParser (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_sha256" xml:space="preserve">
+    <value>SHA-256</value>
+    <comment>windows.traceViewer.sha256 (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_runtimeInspection" xml:space="preserve">
+    <value>Runtime inspection</value>
+    <comment>windows.traceViewer.runtimeInspection (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_engine" xml:space="preserve">
+    <value>Engine</value>
+    <comment>windows.traceViewer.engine (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_dataQuality" xml:space="preserve">
+    <value>Data quality</value>
+    <comment>windows.traceViewer.dataQuality (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_chooseInvalid" xml:space="preserve">
+    <value>Choose a .htrace, .ftrace, .systrace or .trace file.</value>
+    <comment>windows.traceViewer.chooseInvalid (Windows only)</comment>
+  </data>
+  <data name="windows_trace_capture_localOnly" xml:space="preserve">
+    <value>The trace stays on this PC and opens automatically.</value>
+    <comment>windows.trace.capture.localOnly (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_advancedDump_search_shortcut" xml:space="preserve">
+    <value>Search Advanced Dump (Ctrl+F)</value>
+    <comment>windows.viewer.advancedDump.search.shortcut (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_tab_advancedDump" xml:space="preserve">
+    <value>Advanced Dump</value>
+    <comment>windows.viewer.tab.advancedDump (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_advancedDump_loading" xml:space="preserve">
+    <value>Capturing componentDetail…</value>
+    <comment>windows.viewer.advancedDump.loading (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_advancedDump_noIds" xml:space="preserve">
+    <value>This component has no numeric hostWindowId/componentId pair in the current capture</value>
+    <comment>windows.viewer.advancedDump.noIds (Windows only)</comment>
+  </data>
+  <data name="app_navigation_diagnostics" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>app.navigation.diagnostics (Localizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_diagnostics" xml:space="preserve">
+    <value>Open Diagnostics</value>
+    <comment>history.activity.open.diagnostics (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_readOnly" xml:space="preserve">
+    <value>This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.</value>
+    <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_unavailable" xml:space="preserve">
+    <value>Session capture is not available</value>
+    <comment>diagnostics.capture.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_unavailable_detail" xml:space="preserve">
+    <value>Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.</value>
+    <comment>diagnostics.capture.unavailable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_calibrated" xml:space="preserve">
+    <value>Calibrated</value>
+    <comment>diagnostics.alignment.calibrated (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_cannotAlign" xml:space="preserve">
+    <value>Cannot align</value>
+    <comment>diagnostics.alignment.cannotAlign (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_explain" xml:space="preserve">
+    <value>Marks are host time. Without a calibration nothing here can be lined up against what the device recorded.</value>
+    <comment>diagnostics.alignment.explain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_sameClock" xml:space="preserve">
+    <value>One clock</value>
+    <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_arm" xml:space="preserve">
+    <value>Arm a session</value>
+    <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_mark" xml:space="preserve">
+    <value>Mark (⌘M)</value>
+    <comment>diagnostics.capture.mark (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_auto" xml:space="preserve">
+    <value>Found</value>
+    <comment>diagnostics.mark.auto (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_manual" xml:space="preserve">
+    <value>Marked</value>
+    <comment>diagnostics.mark.manual (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_empty" xml:space="preserve">
+    <value>Nothing was marked in this session.</value>
+    <comment>diagnostics.marks.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_title" xml:space="preserve">
+    <value>Marks</value>
+    <comment>diagnostics.marks.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_missing_title" xml:space="preserve">
+    <value>Missing products</value>
+    <comment>diagnostics.missing.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_detail" xml:space="preserve">
+    <value>These marker kinds were never derived, so their absence says nothing about the run.</value>
+    <comment>diagnostics.notDerived.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_title" xml:space="preserve">
+    <value>Not looked for</value>
+    <comment>diagnostics.notDerived.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial" xml:space="preserve">
+    <value>Partial</value>
+    <comment>diagnostics.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial_detail" xml:space="preserve">
+    <value>This session is missing a product it declared.</value>
+    <comment>diagnostics.partial.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_driftedAway" xml:space="preserve">
+    <value>the cursor has left this event</value>
+    <comment>diagnostics.selection.driftedAway (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_timeOnly" xml:space="preserve">
+    <value>Only a time point is selected</value>
+    <comment>diagnostics.selection.timeOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none" xml:space="preserve">
+    <value>No session open</value>
+    <comment>diagnostics.session.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none_detail" xml:space="preserve">
+    <value>Open a capture.diagnostics Job from History to read its verified artifacts. No connected device is needed to read a saved capture.</value>
+    <comment>diagnostics.session.none.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_failed" xml:space="preserve">
+    <value>The capture failed</value>
+    <comment>diagnostics.shot.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_none" xml:space="preserve">
+    <value>No screenshot was taken here</value>
+    <comment>diagnostics.shot.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_standsFor" xml:space="preserve">
+    <value>A screenshot stands for the moment it was taken, not the moment it was asked for.</value>
+    <comment>diagnostics.shot.standsFor (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_takenAfter" xml:space="preserve">
+    <value>taken after the mark</value>
+    <comment>diagnostics.shot.takenAfter (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar" xml:space="preserve">
+    <value>No picture proves this moment</value>
+    <comment>diagnostics.shot.tooFar (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar_detail" xml:space="preserve">
+    <value>The nearest screenshot is too far from this mark to stand for it.</value>
+    <comment>diagnostics.shot.tooFar.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable" xml:space="preserve">
+    <value>Nothing here can tell</value>
+    <comment>diagnostics.shot.undecidable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable_detail" xml:space="preserve">
+    <value>A screenshot was taken around this mark, but the interval it could have been taken in is wider than the tolerance, so it cannot be said to be this moment.</value>
+    <comment>diagnostics.shot.undecidable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_loading" xml:space="preserve">
+    <value>Reading session artifacts…</value>
+    <comment>diagnostics.session.loading (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_failed" xml:space="preserve">
+    <value>Cannot read this session</value>
+    <comment>diagnostics.session.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_retry" xml:space="preserve">
+    <value>Retry reading</value>
+    <comment>diagnostics.session.retry (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_reload" xml:space="preserve">
+    <value>Reload session</value>
+    <comment>diagnostics.session.reload (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_readOnly" xml:space="preserve">
+    <value>Saved capture · read only. Viewing does not start a new Job.</value>
+    <comment>diagnostics.session.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_timeline" xml:space="preserve">
+    <value>Runtime timeline</value>
+    <comment>diagnostics.session.timeline (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_covered" xml:space="preserve">
+    <value>Runtime found the coverage anchor in the ring snapshot.</value>
+    <comment>diagnostics.ring.covered (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_lost" xml:space="preserve">
+    <value>The ring snapshot lost its coverage anchor. Earlier events may be missing.</value>
+    <comment>diagnostics.ring.lost (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_title" xml:space="preserve">
+    <value>Session artifacts</value>
+    <comment>diagnostics.artifacts.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_privacy" xml:space="preserve">
+    <value>Text previews stay in this App. Sensitive content is read only when you select it; nothing is exported or uploaded.</value>
+    <comment>diagnostics.artifacts.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_read" xml:space="preserve">
+    <value>Read locally</value>
+    <comment>diagnostics.artifacts.read (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_readSensitive" xml:space="preserve">
+    <value>Read sensitive content locally</value>
+    <comment>diagnostics.artifacts.readSensitive (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openElsewhere" xml:space="preserve">
+    <value>A published Trace can open in Trace Viewer. Other files can be exported explicitly from History. Job times are never used as screenshot timestamps.</value>
+    <comment>diagnostics.artifacts.openElsewhere (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_clipped" xml:space="preserve">
+    <value>Preview shows the first 120,000 characters. Export the artifact from History to read the complete file.</value>
+    <comment>diagnostics.preview.clipped (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_timeMissing" xml:space="preserve">
+    <value>Time not reported</value>
+    <comment>diagnostics.mark.timeMissing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace" xml:space="preserve">
+    <value>Open sensitive Trace in Viewer</value>
+    <comment>diagnostics.artifacts.openTrace (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace_privacy" xml:space="preserve">
+    <value>Reads the selected Job’s immutable Trace into the local viewer cache. No upload.</value>
+    <comment>diagnostics.artifacts.openTrace.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_replacedInvalidUTF8" xml:space="preserve">
+    <value>Some bytes are not valid UTF-8 and appear as � in this preview. The original Artifact and its SHA-256 are unchanged.</value>
+    <comment>diagnostics.preview.replacedInvalidUTF8 (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_invalidStructuredText" xml:space="preserve">
+    <value>This structured text is not valid UTF-8. Inspect or export the original Artifact from History.</value>
+    <comment>diagnostics.preview.invalidStructuredText (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_title" xml:space="preserve">
+    <value>HiLog summary</value>
+    <comment>diagnostics.hilog.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed" xml:space="preserve">
+    <value>Unable to verify the HiLog summary</value>
+    <comment>diagnostics.hilog.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed_detail" xml:space="preserve">
+    <value>Return to History to inspect this Job and its Artifacts. Reload to try reading the same record again.</value>
+    <comment>diagnostics.hilog.failed.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_readOnly" xml:space="preserve">
+    <value>Read-only view of the saved summary. Opening or reloading it does not run another analysis.</value>
+    <comment>diagnostics.hilog.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_complete" xml:space="preserve">
+    <value>All nonblank line headers recognized</value>
+    <comment>diagnostics.hilog.coverage.complete (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_partial" xml:space="preserve">
+    <value>Some line headers unrecognized</value>
+    <comment>diagnostics.hilog.coverage.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_unrecognized" xml:space="preserve">
+    <value>No line headers recognized</value>
+    <comment>diagnostics.hilog.coverage.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_empty" xml:space="preserve">
+    <value>No nonblank lines</value>
+    <comment>diagnostics.hilog.coverage.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_detail" xml:space="preserve">
+    <value>These counts describe default HiLog line headers only. They do not prove capture completeness, valid body encoding, absence of faults or device health.</value>
+    <comment>diagnostics.hilog.coverage.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_lines" xml:space="preserve">
+    <value>Physical lines</value>
+    <comment>diagnostics.hilog.lines (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_D" xml:space="preserve">
+    <value>D · Debug</value>
+    <comment>diagnostics.hilog.level.D (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_I" xml:space="preserve">
+    <value>I · Info</value>
+    <comment>diagnostics.hilog.level.I (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_W" xml:space="preserve">
+    <value>W · Warning</value>
+    <comment>diagnostics.hilog.level.W (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_E" xml:space="preserve">
+    <value>E · Error</value>
+    <comment>diagnostics.hilog.level.E (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_F" xml:space="preserve">
+    <value>F · Fatal</value>
+    <comment>diagnostics.hilog.level.F (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_unrecognized" xml:space="preserve">
+    <value>Unrecognized lines</value>
+    <comment>diagnostics.hilog.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_blank" xml:space="preserve">
+    <value>Blank lines</value>
+    <comment>diagnostics.hilog.blank (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source" xml:space="preserve">
+    <value>Recorded source</value>
+    <comment>diagnostics.hilog.source (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source_detail" xml:space="preserve">
+    <value>The source Artifact ID matches the Job input. The source hash and size are recorded by the analyzer; this view does not read the raw log or verify it again. Export the summary from History.</value>
+    <comment>diagnostics.hilog.source.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceJob" xml:space="preserve">
+    <value>Source Job</value>
+    <comment>diagnostics.hilog.sourceJob (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceArtifact" xml:space="preserve">
+    <value>Source Artifact</value>
+    <comment>diagnostics.hilog.sourceArtifact (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceBytes" xml:space="preserve">
+    <value>Recorded source bytes</value>
+    <comment>diagnostics.hilog.sourceBytes (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_digests" xml:space="preserve">
+    <value>Inspect recorded hashes</value>
+    <comment>diagnostics.hilog.digests (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceDigest" xml:space="preserve">
+    <value>Recorded source SHA-256</value>
+    <comment>diagnostics.hilog.sourceDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_toolDigest" xml:space="preserve">
+    <value>Recorded analyzer SHA-256</value>
+    <comment>diagnostics.hilog.toolDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_outputDigest" xml:space="preserve">
+    <value>Analyzer output SHA-256</value>
+    <comment>diagnostics.hilog.outputDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_artifactDigest" xml:space="preserve">
+    <value>Verified summary Artifact SHA-256</value>
+    <comment>diagnostics.hilog.artifactDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_diagnostics_capture_mark" xml:space="preserve">
+    <value>Mark (Ctrl+M)</value>
+    <comment>windows.diagnostics.capture.mark (Windows only)</comment>
   </data>
 </root>

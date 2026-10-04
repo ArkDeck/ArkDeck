@@ -57,7 +57,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -82,6 +82,9 @@ public static partial class ScriptedDaemon
 
     /// <summary>The committed Import of <see cref="Jobs"/>.</summary>
     public const string CommittedImportId = "imp-dcb7943f-d934-43da-b290-65d0066cae35";
+
+    /// <summary>The Windows daemon's <c>trace.probe</c> without an HDC (measured).</summary>
+    public const string TraceProbeRefusal = "Trace Runtime probing is not configured";
 
     /// <summary>The Windows daemon's flash-bundle validator refusing content that is not a DAYU200
     /// images archive (measured).</summary>
@@ -176,6 +179,7 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("artifact.import.", StringComparison.Ordinal) => Failure(request, "operationUnavailable", "Import owner services are unavailable", Details("importOwner")),
                     _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
                     "trace.inspect" => NoTraceInspector(request),
+                    "trace.probe" => Failure(request, "internalError", TraceProbeRefusal),
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Failure(request, "operationUnavailable", "workspace project owner is unavailable",
                         Details(method.StartsWith("workspace.preset", StringComparison.Ordinal) ? "workspacePresetOwner" : "workspaceProjectOwner")),
                     // No state root, so no agent execution owner (measured on #2391's daemon).
@@ -201,10 +205,11 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("artifact.import.", StringComparison.Ordinal) => Import(request, method, OracleTargetId, 1),
                     _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
                     "trace.inspect" => NoTraceInspector(request),
+                    "trace.probe" => Failure(request, "internalError", TraceProbeRefusal),
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? Debug(request, method) ?? method switch
+                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(Observations)),
@@ -215,6 +220,7 @@ public static partial class ScriptedDaemon
                     "artifact.list" => ArtifactList(request),
                     "artifact.read" => ArtifactRead(request),
                     "trace.inspect" => mode == Inspector ? TraceInspect(request) : NoTraceInspector(request),
+                    "trace.probe" => Failure(request, "internalError", TraceProbeRefusal),
                     "job.cancel" => JobCancel(request),
                     "job.result" => JobResult(request),
                     "job.evidence" => JobEvidence(request),

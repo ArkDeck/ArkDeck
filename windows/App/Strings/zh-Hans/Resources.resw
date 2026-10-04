@@ -1040,7 +1040,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.preview (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_productionBoundary" xml:space="preserve">
-    <value>当前生产能力每次支持一个本地文件或已验证只读 SSH 构建源中的已签名 app-owned .so；两种来源都执行 ELF / ABI / Build ID / hash 校验、备份、原子发布、Ability 重启、加载 readback 与失败回滚。SMB、WSL、批量、.abc 替换和独立设备重启在对应 typed behavior 发布前保持不可用。</value>
+    <value>每个 Job 通过已发布 operation 部署一个已签名 app-owned .so；队列串行运行，失败或结果不确定时停止。仍执行 ELF、ABI、Build ID、hash、备份与读取验证。.abc 替换和独立设备重启仍不可用。</value>
     <comment>debug.artifacts.productionBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_remoteBindingFailed" xml:space="preserve">
@@ -1184,7 +1184,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.sheet.warning (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_detail" xml:space="preserve">
-    <value>从本地输出或已验证的远端构建源中选择一个已签名的 app-owned 动态库；只有所选文件字节会进入受控 Artifact 导入通道。</value>
+    <value>从本地文件、文件夹、已挂载 SMB 共享或已验证 SSH 构建源选择已签名的 app-owned 动态库；只有所选字节进入 Artifact 导入。</value>
     <comment>debug.artifacts.source.detail (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_source_kind" xml:space="preserve">
@@ -1204,7 +1204,7 @@ SHA-256：%4$@</value>
     <comment>debug.artifacts.source.title (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_sourceBoundary" xml:space="preserve">
-    <value>SSH 构建源为只读能力，固定主机密钥并限制在已保存的真实编译根目录内。SMB、WSL、批量选择与 .abc 搜索仍未开放。</value>
+    <value>文件夹访问使用文件选择器授权；SMB 共享需先在 Finder 挂载。SSH（包括 WSL）在已保存根目录内只读访问，并固定主机密钥。</value>
     <comment>debug.artifacts.sourceBoundary (DebugLocalizable.xcstrings)</comment>
   </data>
   <data name="debug_artifacts_target" xml:space="preserve">
@@ -2554,6 +2554,622 @@ SHA-256：%4$@</value>
     <value>刷机</value>
     <comment>flash.workspace.title (FlashLocalizable.xcstrings)</comment>
   </data>
+  <data name="trace_action_cancel" xml:space="preserve">
+    <value>取消抓取</value>
+    <comment>trace.action.cancel (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_openViewer" xml:space="preserve">
+    <value>打开 Trace 查看器</value>
+    <comment>trace.action.openViewer (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_refresh" xml:space="preserve">
+    <value>刷新设备</value>
+    <comment>trace.action.refresh (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_running" xml:space="preserve">
+    <value>正在抓取…</value>
+    <comment>trace.action.running (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_action_start" xml:space="preserve">
+    <value>开始抓取</value>
+    <comment>trace.action.start (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_availability_available" xml:space="preserve">
+    <value>可以抓取</value>
+    <comment>trace.availability.available (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_availability_checking" xml:space="preserve">
+    <value>正在检查…</value>
+    <comment>trace.availability.checking (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_availability_unavailable" xml:space="preserve">
+    <value>暂时无法抓取</value>
+    <comment>trace.availability.unavailable (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_adapterUnsupported" xml:space="preserve">
+    <value>当前 ArkDeck 版本尚未支持此设备的 hitrace 分类列表。请更新 ArkDeck 或使用已支持的设备。</value>
+    <comment>trace.blocker.adapterUnsupported (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_buffer" xml:space="preserve">
+    <value>当前设备不支持默认 Trace 缓冲区。</value>
+    <comment>trace.blocker.buffer (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_capability" xml:space="preserve">
+    <value>当前设备的 Trace 能力检查尚未完成，请刷新后重试。</value>
+    <comment>trace.blocker.capability (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_checking" xml:space="preserve">
+    <value>请等待设备检查完成。</value>
+    <comment>trace.blocker.checking (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_duration" xml:space="preserve">
+    <value>请输入允许范围内的时长。</value>
+    <comment>trace.blocker.duration (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_noTags" xml:space="preserve">
+    <value>请选择抓取场景。</value>
+    <comment>trace.blocker.noTags (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_operation" xml:space="preserve">
+    <value>Trace 抓取暂不可用，请刷新后重试。</value>
+    <comment>trace.blocker.operation (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_tags" xml:space="preserve">
+    <value>所选设备不支持这个抓取场景，请选择其他场景。</value>
+    <comment>trace.blocker.tags (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_blocker_target" xml:space="preserve">
+    <value>请选择已接管的设备。</value>
+    <comment>trace.blocker.target (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_bounds_duration" xml:space="preserve">
+    <value>时长</value>
+    <comment>trace.bounds.duration (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_cancel_failed" xml:space="preserve">
+    <value>无法取消此次抓取。请等待当前安全步骤结束后重试。</value>
+    <comment>trace.cancel.failed (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_device" xml:space="preserve">
+    <value>设备</value>
+    <comment>trace.capture.device (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_finished" xml:space="preserve">
+    <value>抓取完成。</value>
+    <comment>trace.capture.finished (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_localOnly" xml:space="preserve">
+    <value>Trace 只保存在这台 Mac，并会在完成后自动打开。</value>
+    <comment>trace.capture.localOnly (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_notCompleted" xml:space="preserve">
+    <value>抓取已结束，但没有可查看的 Trace。请打开历史记录了解详情。</value>
+    <comment>trace.capture.notCompleted (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_outcomeUnknown" xml:space="preserve">
+    <value>抓取结果未知。再次抓取前请先查看历史记录。</value>
+    <comment>trace.capture.outcomeUnknown (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_profile" xml:space="preserve">
+    <value>抓取场景</value>
+    <comment>trace.capture.profile (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_capture_title" xml:space="preserve">
+    <value>抓取 Trace</value>
+    <comment>trace.capture.title (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_minutes" xml:space="preserve">
+    <value>分钟</value>
+    <comment>trace.duration.minutes (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_quick" xml:space="preserve">
+    <value>快捷时长</value>
+    <comment>trace.duration.quick (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_seconds" xml:space="preserve">
+    <value>秒</value>
+    <comment>trace.duration.seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set10Seconds" xml:space="preserve">
+    <value>将时长设为 10 秒</value>
+    <comment>trace.duration.set10Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set15Seconds" xml:space="preserve">
+    <value>将时长设为 15 秒</value>
+    <comment>trace.duration.set15Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set1Minute" xml:space="preserve">
+    <value>将时长设为 1 分钟</value>
+    <comment>trace.duration.set1Minute (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set2Minutes" xml:space="preserve">
+    <value>将时长设为 2 分钟</value>
+    <comment>trace.duration.set2Minutes (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set30Seconds" xml:space="preserve">
+    <value>将时长设为 30 秒</value>
+    <comment>trace.duration.set30Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set3Minutes" xml:space="preserve">
+    <value>将时长设为 3 分钟</value>
+    <comment>trace.duration.set3Minutes (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_set5Seconds" xml:space="preserve">
+    <value>将时长设为 5 秒</value>
+    <comment>trace.duration.set5Seconds (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_setCustom" xml:space="preserve">
+    <value>设置自定义时长</value>
+    <comment>trace.duration.setCustom (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_duration_unit" xml:space="preserve">
+    <value>时长单位</value>
+    <comment>trace.duration.unit (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_arkuiDeep" xml:space="preserve">
+    <value>应用响应</value>
+    <comment>trace.preset.arkuiDeep (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_arkuiDeep_detail" xml:space="preserve">
+    <value>适合分析交互迟缓、布局耗时和 ArkUI 卡顿。</value>
+    <comment>trace.preset.arkuiDeep.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_attachmentPanorama" xml:space="preserve">
+    <value>系统概览</value>
+    <comment>trace.preset.attachmentPanorama (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_attachmentPanorama_detail" xml:space="preserve">
+    <value>覆盖最广的系统活动，生成的 Trace 也最大。</value>
+    <comment>trace.preset.attachmentPanorama.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_io" xml:space="preserve">
+    <value>I/O</value>
+    <comment>trace.preset.io (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_io_detail" xml:space="preserve">
+    <value>适合分析文件、存储和工作队列问题。</value>
+    <comment>trace.preset.io.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_renderAnimation" xml:space="preserve">
+    <value>渲染与动画</value>
+    <comment>trace.preset.renderAnimation (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_renderAnimation_detail" xml:space="preserve">
+    <value>适合分析出帧、图形和动画问题。</value>
+    <comment>trace.preset.renderAnimation.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_schedulingIpc" xml:space="preserve">
+    <value>CPU 调度</value>
+    <comment>trace.preset.schedulingIpc (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_preset_schedulingIpc_detail" xml:space="preserve">
+    <value>适合分析线程调度、资源争用和 IPC 问题。</value>
+    <comment>trace.preset.schedulingIpc.detail (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_target_empty" xml:space="preserve">
+    <value>没有已接管的设备。请连接并接管设备，然后刷新。</value>
+    <comment>trace.target.empty (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_validation_decimal" xml:space="preserve">
+    <value>只能输入整数。</value>
+    <comment>trace.validation.decimal (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_validation_missing" xml:space="preserve">
+    <value>请输入抓取时长。</value>
+    <comment>trace.validation.missing (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_validation_range" xml:space="preserve">
+    <value>请输入 %1$d 到 %2$d 之间的值。</value>
+    <comment>trace.validation.range (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_artifactInvalid" xml:space="preserve">
+    <value>抓取已完成，但没有发布有效的原始 Trace。请打开历史记录检查任务。</value>
+    <comment>trace.viewer.artifactInvalid (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_artifactListUnavailable" xml:space="preserve">
+    <value>抓取已完成，但 Trace 暂不可用。请刷新后重试。</value>
+    <comment>trace.viewer.artifactListUnavailable (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_description" xml:space="preserve">
+    <value>在查看器中打开本地 Trace，或继续查看最近的 Trace。</value>
+    <comment>trace.viewer.description (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_latest" xml:space="preserve">
+    <value>最新抓取的 Trace 已就绪</value>
+    <comment>trace.viewer.latest (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_preparing" xml:space="preserve">
+    <value>正在校验并打开抓取的 Trace…</value>
+    <comment>trace.viewer.preparing (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_readFailed" xml:space="preserve">
+    <value>抓取已完成，但无法读取 Trace。请刷新后重试。</value>
+    <comment>trace.viewer.readFailed (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_stagingUnavailable" xml:space="preserve">
+    <value>无法准备要查看的 Trace。请检查可用存储空间后重试。</value>
+    <comment>trace.viewer.stagingUnavailable (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_title" xml:space="preserve">
+    <value>查看 Trace</value>
+    <comment>trace.viewer.title (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_viewer_tryAgain" xml:space="preserve">
+    <value>重试打开 Trace</value>
+    <comment>trace.viewer.tryAgain (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="trace_workspace_summary" xml:space="preserve">
+    <value>从已接管的 OpenHarmony 设备抓取 Trace，然后在内置查看器中分析。</value>
+    <comment>trace.workspace.summary (TraceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_action_show" xml:space="preserve">
+    <value>显示%1$@</value>
+    <comment>viewer.action.show (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search" xml:space="preserve">
+    <value>搜索 Advanced Dump</value>
+    <comment>viewer.advancedDump.search (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_clear" xml:space="preserve">
+    <value>清除搜索</value>
+    <comment>viewer.advancedDump.search.clear (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_noResults" xml:space="preserve">
+    <value>没有匹配的字段或值</value>
+    <comment>viewer.advancedDump.search.noResults (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_placeholder" xml:space="preserve">
+    <value>搜索字段或值</value>
+    <comment>viewer.advancedDump.search.placeholder (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_results" xml:space="preserve">
+    <value>Advanced Dump 搜索结果</value>
+    <comment>viewer.advancedDump.search.results (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_search_shortcut" xml:space="preserve">
+    <value>搜索 Advanced Dump（⌘F）</value>
+    <comment>viewer.advancedDump.search.shortcut (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_advancedDump_unavailable" xml:space="preserve">
+    <value>选择此标签以采集 componentDetail 字段</value>
+    <comment>viewer.advancedDump.unavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_chip_interactive" xml:space="preserve">
+    <value>可交互</value>
+    <comment>viewer.chip.interactive (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_chip_visible" xml:space="preserve">
+    <value>可见</value>
+    <comment>viewer.chip.visible (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_explain" xml:space="preserve">
+    <value>「抓取视图」会创建一个 typed Runtime Job，并且只展示同一个 Job 里通过校验的 Artifact。</value>
+    <comment>viewer.empty.explain (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_selectTarget" xml:space="preserve">
+    <value>先选择一个绑定完整的已纳管目标，再抓取视图。</value>
+    <comment>viewer.empty.selectTarget (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_targetBlocked" xml:space="preserve">
+    <value>%1$@ 无法抓取视图：%2$@。请选择一个「已连接」的目标。</value>
+    <comment>viewer.empty.targetBlocked (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_empty_title" xml:space="preserve">
+    <value>没有已验证的 capture</value>
+    <comment>viewer.empty.title (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_accessibleLabel" xml:space="preserve">
+    <value>无障碍名称</value>
+    <comment>viewer.field.accessibleLabel (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_description" xml:space="preserve">
+    <value>描述</value>
+    <comment>viewer.field.description (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_hitTest" xml:space="preserve">
+    <value>命中测试</value>
+    <comment>viewer.field.hitTest (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_field_screenshotMapping" xml:space="preserve">
+    <value>截图映射</value>
+    <comment>viewer.field.screenshotMapping (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_footer_nodes" xml:space="preserve">
+    <value>%1$d 个节点</value>
+    <comment>viewer.footer.nodes (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_footer_notMeasured" xml:space="preserve">
+    <value>未测量</value>
+    <comment>viewer.footer.notMeasured (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_focus" xml:space="preserve">
+    <value>焦点</value>
+    <comment>viewer.group.focus (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_geometry" xml:space="preserve">
+    <value>几何</value>
+    <comment>viewer.group.geometry (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_identity" xml:space="preserve">
+    <value>身份</value>
+    <comment>viewer.group.identity (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_paint" xml:space="preserve">
+    <value>绘制</value>
+    <comment>viewer.group.paint (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_semantics" xml:space="preserve">
+    <value>语义</value>
+    <comment>viewer.group.semantics (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_group_state" xml:space="preserve">
+    <value>状态</value>
+    <comment>viewer.group.state (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_coordinatesUnverified" xml:space="preserve">
+    <value>坐标系无法证明</value>
+    <comment>viewer.pane.coordinatesUnverified (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_screenshot" xml:space="preserve">
+    <value>设备截图</value>
+    <comment>viewer.pane.screenshot (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_showBounds" xml:space="preserve">
+    <value>显示组件边界</value>
+    <comment>viewer.pane.showBounds (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_pane_tree" xml:space="preserve">
+    <value>UI 树</value>
+    <comment>viewer.pane.tree (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_properties_rawUnavailable" xml:space="preserve">
+    <value>原始字段不可用</value>
+    <comment>viewer.properties.rawUnavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_properties_selectPrompt" xml:space="preserve">
+    <value>选择一个组件</value>
+    <comment>viewer.properties.selectPrompt (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_selectHint" xml:space="preserve">
+    <value>用 UI 树可以通过键盘选择组件。</value>
+    <comment>viewer.screenshot.selectHint (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_selectLabel" xml:space="preserve">
+    <value>在截图中选择组件</value>
+    <comment>viewer.screenshot.selectLabel (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_unavailable" xml:space="preserve">
+    <value>截图不可用</value>
+    <comment>viewer.screenshot.unavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_screenshot_unverifiedDetail" xml:space="preserve">
+    <value>树的 bounds 无法证明这张截图的坐标系。树和 Raw dump 仍然可读，但截图选择已禁用。</value>
+    <comment>viewer.screenshot.unverifiedDetail (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_search_matchCount" xml:space="preserve">
+    <value>搜索结果</value>
+    <comment>viewer.search.matchCount (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_search_next" xml:space="preserve">
+    <value>下一个搜索结果</value>
+    <comment>viewer.search.next (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_search_previous" xml:space="preserve">
+    <value>上一个搜索结果</value>
+    <comment>viewer.search.previous (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_separator_label" xml:space="preserve">
+    <value>调整 UI 树和节点属性的高度</value>
+    <comment>viewer.separator.label (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_separator_value" xml:space="preserve">
+    <value>UI 树占检查器高度 %1$d%%</value>
+    <comment>viewer.separator.value (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_accessibility" xml:space="preserve">
+    <value>无障碍</value>
+    <comment>viewer.tab.accessibility (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_layout" xml:space="preserve">
+    <value>布局</value>
+    <comment>viewer.tab.layout (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_properties" xml:space="preserve">
+    <value>属性</value>
+    <comment>viewer.tab.properties (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tab_rawDump" xml:space="preserve">
+    <value>Raw dump</value>
+    <comment>viewer.tab.rawDump (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_capture" xml:space="preserve">
+    <value>抓取视图</value>
+    <comment>viewer.toolbar.capture (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_capturing" xml:space="preserve">
+    <value>抓取中…</value>
+    <comment>viewer.toolbar.capturing (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_currentScreen" xml:space="preserve">
+    <value>当前屏幕</value>
+    <comment>viewer.toolbar.currentScreen (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_device" xml:space="preserve">
+    <value>设备</value>
+    <comment>viewer.toolbar.device (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_noDevice" xml:space="preserve">
+    <value>无设备</value>
+    <comment>viewer.toolbar.noDevice (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_recapture" xml:space="preserve">
+    <value>重新抓取</value>
+    <comment>viewer.toolbar.recapture (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_refresh" xml:space="preserve">
+    <value>刷新 Viewer</value>
+    <comment>viewer.toolbar.refresh (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_toolbar_search" xml:space="preserve">
+    <value>搜索组件 / ID / 文本</value>
+    <comment>viewer.toolbar.search (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_collapse" xml:space="preserve">
+    <value>折叠</value>
+    <comment>viewer.tree.collapse (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_expand" xml:space="preserve">
+    <value>展开</value>
+    <comment>viewer.tree.expand (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_label" xml:space="preserve">
+    <value>完整 UI 树</value>
+    <comment>viewer.tree.label (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_matchCount" xml:space="preserve">
+    <value>%1$@ / %2$@</value>
+    <comment>viewer.tree.matchCount (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_noMatches" xml:space="preserve">
+    <value>没有匹配的组件。当前选中项未改变。</value>
+    <comment>viewer.tree.noMatches (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_notSelected" xml:space="preserve">
+    <value>未选中</value>
+    <comment>viewer.tree.notSelected (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_tree_selected" xml:space="preserve">
+    <value>已选中</value>
+    <comment>viewer.tree.selected (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_available" xml:space="preserve">
+    <value>可用</value>
+    <comment>viewer.value.available (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_no" xml:space="preserve">
+    <value>否</value>
+    <comment>viewer.value.no (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_unavailable" xml:space="preserve">
+    <value>不可用</value>
+    <comment>viewer.value.unavailable (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_verified" xml:space="preserve">
+    <value>已验证</value>
+    <comment>viewer.value.verified (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_value_yes" xml:space="preserve">
+    <value>是</value>
+    <comment>viewer.value.yes (UIDumpLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_openingCancelled" xml:space="preserve">
+    <value>已取消打开</value>
+    <comment>a11y.announce.openingCancelled (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_openingTrace" xml:space="preserve">
+    <value>正在打开 Trace</value>
+    <comment>a11y.announce.openingTrace (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_operationFailed" xml:space="preserve">
+    <value>操作失败</value>
+    <comment>a11y.announce.operationFailed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_rangeAnalysisComplete" xml:space="preserve">
+    <value>范围分析完成</value>
+    <comment>a11y.announce.rangeAnalysisComplete (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_searchFoundAtLeastResults" xml:space="preserve">
+    <value>搜索找到至少 %lld 个结果</value>
+    <comment>a11y.announce.searchFoundAtLeastResults (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_searchFoundResults" xml:space="preserve">
+    <value>搜索找到 %lld 个结果</value>
+    <comment>a11y.announce.searchFoundResults (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceCloseFailed" xml:space="preserve">
+    <value>关闭 Trace 失败</value>
+    <comment>a11y.announce.traceCloseFailed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceClosed" xml:space="preserve">
+    <value>已关闭 Trace</value>
+    <comment>a11y.announce.traceClosed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceLoadedWithVisibleTracks" xml:space="preserve">
+    <value>Trace 已加载，有 %lld 个可见轨道</value>
+    <comment>a11y.announce.traceLoadedWithVisibleTracks (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceLoadedWithoutTimedEvents" xml:space="preserve">
+    <value>Trace 已加载，没有带时刻的事件</value>
+    <comment>a11y.announce.traceLoadedWithoutTimedEvents (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_announce_traceOpenFailed" xml:space="preserve">
+    <value>Trace 加载失败</value>
+    <comment>a11y.announce.traceOpenFailed (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="a11y_timeline_label" xml:space="preserve">
+    <value>Trace 时间轴</value>
+    <comment>a11y.timeline.label (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_cache" xml:space="preserve">
+    <value>Trace 派生缓存需要处理。请在 Trace 设置中检查；原始 Trace 不属于缓存清理范围。</value>
+    <comment>error.reason.cache (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_cancelled" xml:space="preserve">
+    <value>打开操作已取消，没有打开新的 Trace。</value>
+    <comment>error.reason.cancelled (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_chooseFile" xml:space="preserve">
+    <value>源文件无法读取或校验。请选择一个可访问的 Trace 文件。</value>
+    <comment>error.reason.chooseFile (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_operation" xml:space="preserve">
+    <value>Trace 操作未完成。请查看诊断详情和当前可用的处理方式。</value>
+    <comment>error.reason.operation (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_reason_parser" xml:space="preserve">
+    <value>内置解析器未通过校验或无法启动。请查看诊断详情后重试。</value>
+    <comment>error.reason.parser (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_bundledParserUnavailable" xml:space="preserve">
+    <value>内置解析器不可用</value>
+    <comment>error.title.bundledParserUnavailable (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_cacheNeedsAttention" xml:space="preserve">
+    <value>Trace 缓存需要处理</value>
+    <comment>error.title.cacheNeedsAttention (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_couldNotFinish" xml:space="preserve">
+    <value>ArkTrace 未能完成操作</value>
+    <comment>error.title.couldNotFinish (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_openingCancelled" xml:space="preserve">
+    <value>已取消打开</value>
+    <comment>error.title.openingCancelled (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="error_title_traceCouldNotBeOpened" xml:space="preserve">
+    <value>无法打开 Trace</value>
+    <comment>error.title.traceCouldNotBeOpened (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_eventType" xml:space="preserve">
+    <value>类型</value>
+    <comment>viewer.eventType (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_openPanel_title" xml:space="preserve">
+    <value>打开 Trace</value>
+    <comment>viewer.openPanel.title (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="viewer_searchEvents_menu" xml:space="preserve">
+    <value>搜索 Trace 事件</value>
+    <comment>viewer.searchEvents.menu (TraceViewerLocalizable.xcstrings)</comment>
+  </data>
+  <data name="app_navigation_trace" xml:space="preserve">
+    <value>Trace</value>
+    <comment>app.navigation.trace (Localizable.xcstrings)</comment>
+  </data>
+  <data name="app_navigation_uiDump" xml:space="preserve">
+    <value>Viewer</value>
+    <comment>app.navigation.uiDump (Localizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime 不可用</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -3553,5 +4169,469 @@ SHA-256：%4$@</value>
   <data name="windows_flash_targetChanged" xml:space="preserve">
     <value>所选 Target 已变更，将重新准备精确计划。</value>
     <comment>windows.flash.targetChanged (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_capture" xml:space="preserve">
+    <value>采集</value>
+    <comment>windows.traceViewer.capture (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_captureHelp" xml:space="preserve">
+    <value>从已连接的 OpenHarmony 设备采集 Trace</value>
+    <comment>windows.traceViewer.captureHelp (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_open" xml:space="preserve">
+    <value>打开</value>
+    <comment>windows.traceViewer.open (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_openTrace" xml:space="preserve">
+    <value>打开 Trace…</value>
+    <comment>windows.traceViewer.openTrace (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_captureTrace" xml:space="preserve">
+    <value>采集 Trace…</value>
+    <comment>windows.traceViewer.captureTrace (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_reload" xml:space="preserve">
+    <value>重新加载</value>
+    <comment>windows.traceViewer.reload (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_recent" xml:space="preserve">
+    <value>最近打开</value>
+    <comment>windows.traceViewer.recent (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_removeRecent" xml:space="preserve">
+    <value>从最近记录移除</value>
+    <comment>windows.traceViewer.removeRecent (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_missingName" xml:space="preserve">
+    <value>%1$@，文件缺失</value>
+    <comment>windows.traceViewer.missingName (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_missingPath" xml:space="preserve">
+    <value>文件缺失 — %1$@</value>
+    <comment>windows.traceViewer.missingPath (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_idleTitle" xml:space="preserve">
+    <value>打开 Trace</value>
+    <comment>windows.traceViewer.idleTitle (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_idleDetail" xml:space="preserve">
+    <value>打开或拖入 .htrace/.ftrace/.systrace 文件，也可选择最近打开的文件。</value>
+    <comment>windows.traceViewer.idleDetail (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_unavailable" xml:space="preserve">
+    <value>Trace 不可用</value>
+    <comment>windows.traceViewer.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_diagnostics" xml:space="preserve">
+    <value>诊断详情</value>
+    <comment>windows.traceViewer.diagnostics (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_retry" xml:space="preserve">
+    <value>重试</value>
+    <comment>windows.traceViewer.retry (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_chooseAnother" xml:space="preserve">
+    <value>选择其他文件…</value>
+    <comment>windows.traceViewer.chooseAnother (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_inspector" xml:space="preserve">
+    <value>检查器</value>
+    <comment>windows.traceViewer.inspector (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_duration" xml:space="preserve">
+    <value>时长</value>
+    <comment>windows.traceViewer.duration (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_sourceBytes" xml:space="preserve">
+    <value>源文件大小</value>
+    <comment>windows.traceViewer.sourceBytes (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_schema" xml:space="preserve">
+    <value>Schema 指纹</value>
+    <comment>windows.traceViewer.schema (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_cache" xml:space="preserve">
+    <value>缓存</value>
+    <comment>windows.traceViewer.cache (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_hit" xml:space="preserve">
+    <value>命中</value>
+    <comment>windows.traceViewer.hit (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_miss" xml:space="preserve">
+    <value>未命中</value>
+    <comment>windows.traceViewer.miss (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_nothingSelected" xml:space="preserve">
+    <value>选择事件或拖动选取时间范围。</value>
+    <comment>windows.traceViewer.nothingSelected (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_title" xml:space="preserve">
+    <value>Trace 查看器</value>
+    <comment>windows.traceViewer.title (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_back" xml:space="preserve">
+    <value>返回 Trace</value>
+    <comment>windows.traceViewer.back (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_noParser" xml:space="preserve">
+    <value>Windows 版未分发 ArkTrace 解析器，本机无法绘制时间线。此处显示文件大小和 SHA-256；对于采集得到的 Trace，会询问 Runtime 的 Trace 检查器。</value>
+    <comment>windows.traceViewer.noParser (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_sha256" xml:space="preserve">
+    <value>SHA-256</value>
+    <comment>windows.traceViewer.sha256 (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_runtimeInspection" xml:space="preserve">
+    <value>Runtime 检查</value>
+    <comment>windows.traceViewer.runtimeInspection (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_engine" xml:space="preserve">
+    <value>引擎</value>
+    <comment>windows.traceViewer.engine (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_dataQuality" xml:space="preserve">
+    <value>数据质量</value>
+    <comment>windows.traceViewer.dataQuality (Windows only)</comment>
+  </data>
+  <data name="windows_traceViewer_chooseInvalid" xml:space="preserve">
+    <value>请选择 .htrace、.ftrace、.systrace 或 .trace 文件。</value>
+    <comment>windows.traceViewer.chooseInvalid (Windows only)</comment>
+  </data>
+  <data name="windows_trace_capture_localOnly" xml:space="preserve">
+    <value>Trace 只保存在这台 电脑，并会在完成后自动打开。</value>
+    <comment>windows.trace.capture.localOnly (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_advancedDump_search_shortcut" xml:space="preserve">
+    <value>搜索 Advanced Dump（Ctrl+F）</value>
+    <comment>windows.viewer.advancedDump.search.shortcut (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_tab_advancedDump" xml:space="preserve">
+    <value>高级转储</value>
+    <comment>windows.viewer.tab.advancedDump (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_advancedDump_loading" xml:space="preserve">
+    <value>正在采集 componentDetail…</value>
+    <comment>windows.viewer.advancedDump.loading (Windows only)</comment>
+  </data>
+  <data name="windows_viewer_advancedDump_noIds" xml:space="preserve">
+    <value>当前采集中，此组件没有数字形式的 hostWindowId/componentId 组合</value>
+    <comment>windows.viewer.advancedDump.noIds (Windows only)</comment>
+  </data>
+  <data name="app_navigation_diagnostics" xml:space="preserve">
+    <value>Diagnostics</value>
+    <comment>app.navigation.diagnostics (Localizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_diagnostics" xml:space="preserve">
+    <value>打开诊断工具</value>
+    <comment>history.activity.open.diagnostics (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_readOnly" xml:space="preserve">
+    <value>这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。</value>
+    <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_unavailable" xml:space="preserve">
+    <value>诊断会话采集尚不可用</value>
+    <comment>diagnostics.capture.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_unavailable_detail" xml:space="preserve">
+    <value>交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。</value>
+    <comment>diagnostics.capture.unavailable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_calibrated" xml:space="preserve">
+    <value>已校准</value>
+    <comment>diagnostics.alignment.calibrated (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_cannotAlign" xml:space="preserve">
+    <value>无法对齐</value>
+    <comment>diagnostics.alignment.cannotAlign (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_explain" xml:space="preserve">
+    <value>标记走的是主机时间。没有校准，这里的任何东西都无法与设备记录的内容对齐。</value>
+    <comment>diagnostics.alignment.explain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_sameClock" xml:space="preserve">
+    <value>同一时钟</value>
+    <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_arm" xml:space="preserve">
+    <value>布防会话</value>
+    <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_mark" xml:space="preserve">
+    <value>打标记（⌘M）</value>
+    <comment>diagnostics.capture.mark (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_auto" xml:space="preserve">
+    <value>自动标记</value>
+    <comment>diagnostics.mark.auto (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_manual" xml:space="preserve">
+    <value>手动标记</value>
+    <comment>diagnostics.mark.manual (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_empty" xml:space="preserve">
+    <value>这次会话没有任何标记。</value>
+    <comment>diagnostics.marks.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_marks_title" xml:space="preserve">
+    <value>标记</value>
+    <comment>diagnostics.marks.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_missing_title" xml:space="preserve">
+    <value>缺失的产物</value>
+    <comment>diagnostics.missing.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_detail" xml:space="preserve">
+    <value>这些标记种类从未被反推，所以它们的缺席不说明这次运行发生了什么。</value>
+    <comment>diagnostics.notDerived.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_notDerived_title" xml:space="preserve">
+    <value>未检查的种类</value>
+    <comment>diagnostics.notDerived.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial" xml:space="preserve">
+    <value>不完整</value>
+    <comment>diagnostics.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_partial_detail" xml:space="preserve">
+    <value>这次会话缺少它自己声明过的产物。</value>
+    <comment>diagnostics.partial.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_driftedAway" xml:space="preserve">
+    <value>光标已离开该事件</value>
+    <comment>diagnostics.selection.driftedAway (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_selection_timeOnly" xml:space="preserve">
+    <value>当前仅选择了时间点</value>
+    <comment>diagnostics.selection.timeOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none" xml:space="preserve">
+    <value>尚无诊断会话</value>
+    <comment>diagnostics.session.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_none_detail" xml:space="preserve">
+    <value>从 History 打开 capture.diagnostics 记录，读取校验后的产物。读取已保存的采集无需连接设备。</value>
+    <comment>diagnostics.session.none.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_failed" xml:space="preserve">
+    <value>截图失败</value>
+    <comment>diagnostics.shot.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_none" xml:space="preserve">
+    <value>此处未拍摄截图</value>
+    <comment>diagnostics.shot.none (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_standsFor" xml:space="preserve">
+    <value>截图只代表拍摄时刻，不代表标记时刻的画面。</value>
+    <comment>diagnostics.shot.standsFor (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_takenAfter" xml:space="preserve">
+    <value>拍摄于标记之后</value>
+    <comment>diagnostics.shot.takenAfter (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar" xml:space="preserve">
+    <value>这一时刻没有可证明对应的画面</value>
+    <comment>diagnostics.shot.tooFar (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_tooFar_detail" xml:space="preserve">
+    <value>最近的一张截图距这个标记太远，不能代表它。</value>
+    <comment>diagnostics.shot.tooFar.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable" xml:space="preserve">
+    <value>此处无法判定</value>
+    <comment>diagnostics.shot.undecidable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_shot_undecidable_detail" xml:space="preserve">
+    <value>这个标记附近确有一张截图，但它可能被拍摄的时间区间宽于容差，因此无法断定它就是这一时刻。</value>
+    <comment>diagnostics.shot.undecidable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_loading" xml:space="preserve">
+    <value>正在读取会话产物…</value>
+    <comment>diagnostics.session.loading (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_failed" xml:space="preserve">
+    <value>无法读取此会话</value>
+    <comment>diagnostics.session.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_retry" xml:space="preserve">
+    <value>重新读取</value>
+    <comment>diagnostics.session.retry (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_reload" xml:space="preserve">
+    <value>重新加载会话</value>
+    <comment>diagnostics.session.reload (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_readOnly" xml:space="preserve">
+    <value>已保存的采集 · 只读。查看不会启动新 Job。</value>
+    <comment>diagnostics.session.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_session_timeline" xml:space="preserve">
+    <value>Runtime 时间线</value>
+    <comment>diagnostics.session.timeline (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_covered" xml:space="preserve">
+    <value>Runtime 已在环形快照中找到覆盖锚点。</value>
+    <comment>diagnostics.ring.covered (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_ring_lost" xml:space="preserve">
+    <value>环形快照未保留覆盖锚点，较早事件可能缺失。</value>
+    <comment>diagnostics.ring.lost (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_title" xml:space="preserve">
+    <value>会话产物</value>
+    <comment>diagnostics.artifacts.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_privacy" xml:space="preserve">
+    <value>文本预览仅留在此 App。敏感内容仅在选择后读取，不会导出或上传。</value>
+    <comment>diagnostics.artifacts.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_read" xml:space="preserve">
+    <value>在本机读取</value>
+    <comment>diagnostics.artifacts.read (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_readSensitive" xml:space="preserve">
+    <value>在本机读取敏感内容</value>
+    <comment>diagnostics.artifacts.readSensitive (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openElsewhere" xml:space="preserve">
+    <value>已发布的 Trace 可在 Trace Viewer 打开；其他文件可从 History 显式导出。不会使用 Job 时间推算截图时刻。</value>
+    <comment>diagnostics.artifacts.openElsewhere (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_clipped" xml:space="preserve">
+    <value>预览显示前 120,000 个字符。可从 History 导出产物以读取完整文件。</value>
+    <comment>diagnostics.preview.clipped (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_mark_timeMissing" xml:space="preserve">
+    <value>未记录时刻</value>
+    <comment>diagnostics.mark.timeMissing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace" xml:space="preserve">
+    <value>在 Viewer 中打开敏感 Trace</value>
+    <comment>diagnostics.artifacts.openTrace (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_artifacts_openTrace_privacy" xml:space="preserve">
+    <value>将所选 Job 的不可变 Trace 读取到本机查看器缓存，不上传。</value>
+    <comment>diagnostics.artifacts.openTrace.privacy (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_replacedInvalidUTF8" xml:space="preserve">
+    <value>部分字节不是有效 UTF-8，在此预览中显示为 �。原始 Artifact 及其 SHA-256 未改变。</value>
+    <comment>diagnostics.preview.replacedInvalidUTF8 (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_preview_invalidStructuredText" xml:space="preserve">
+    <value>这份结构化文本不是有效 UTF-8。请在 History 中检查或导出原始 Artifact。</value>
+    <comment>diagnostics.preview.invalidStructuredText (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_title" xml:space="preserve">
+    <value>HiLog 摘要</value>
+    <comment>diagnostics.hilog.title (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed" xml:space="preserve">
+    <value>无法核验 HiLog 摘要</value>
+    <comment>diagnostics.hilog.failed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_failed_detail" xml:space="preserve">
+    <value>请返回 History 检查此 Job 与 Artifact；重新加载只会重读同一记录。</value>
+    <comment>diagnostics.hilog.failed.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_readOnly" xml:space="preserve">
+    <value>只读查看已保存的摘要。打开或重新加载不会再次执行分析。</value>
+    <comment>diagnostics.hilog.readOnly (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_complete" xml:space="preserve">
+    <value>全部非空行的行首已识别</value>
+    <comment>diagnostics.hilog.coverage.complete (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_partial" xml:space="preserve">
+    <value>部分行首未识别</value>
+    <comment>diagnostics.hilog.coverage.partial (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_unrecognized" xml:space="preserve">
+    <value>没有识别到行首</value>
+    <comment>diagnostics.hilog.coverage.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_empty" xml:space="preserve">
+    <value>没有非空行</value>
+    <comment>diagnostics.hilog.coverage.empty (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_coverage_detail" xml:space="preserve">
+    <value>这些统计仅描述默认 HiLog 行首；不证明采集完整、正文编码有效、没有故障或设备健康。</value>
+    <comment>diagnostics.hilog.coverage.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_lines" xml:space="preserve">
+    <value>物理行数</value>
+    <comment>diagnostics.hilog.lines (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_D" xml:space="preserve">
+    <value>D · 调试</value>
+    <comment>diagnostics.hilog.level.D (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_I" xml:space="preserve">
+    <value>I · 信息</value>
+    <comment>diagnostics.hilog.level.I (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_W" xml:space="preserve">
+    <value>W · 警告</value>
+    <comment>diagnostics.hilog.level.W (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_E" xml:space="preserve">
+    <value>E · 错误</value>
+    <comment>diagnostics.hilog.level.E (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_level_F" xml:space="preserve">
+    <value>F · 致命</value>
+    <comment>diagnostics.hilog.level.F (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_unrecognized" xml:space="preserve">
+    <value>未识别行数</value>
+    <comment>diagnostics.hilog.unrecognized (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_blank" xml:space="preserve">
+    <value>空行数</value>
+    <comment>diagnostics.hilog.blank (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source" xml:space="preserve">
+    <value>已记录来源</value>
+    <comment>diagnostics.hilog.source (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_source_detail" xml:space="preserve">
+    <value>来源 Artifact 标识与 Job 输入一致。来源哈希与大小来自分析器记录；此页面不会读取或重新核验原始日志。可从 History 导出摘要。</value>
+    <comment>diagnostics.hilog.source.detail (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceJob" xml:space="preserve">
+    <value>来源 Job</value>
+    <comment>diagnostics.hilog.sourceJob (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceArtifact" xml:space="preserve">
+    <value>来源 Artifact</value>
+    <comment>diagnostics.hilog.sourceArtifact (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceBytes" xml:space="preserve">
+    <value>已记录来源字节数</value>
+    <comment>diagnostics.hilog.sourceBytes (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_digests" xml:space="preserve">
+    <value>查看已记录哈希</value>
+    <comment>diagnostics.hilog.digests (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_sourceDigest" xml:space="preserve">
+    <value>已记录来源 SHA-256</value>
+    <comment>diagnostics.hilog.sourceDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_toolDigest" xml:space="preserve">
+    <value>已记录分析器 SHA-256</value>
+    <comment>diagnostics.hilog.toolDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_outputDigest" xml:space="preserve">
+    <value>分析器输出 SHA-256</value>
+    <comment>diagnostics.hilog.outputDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_hilog_artifactDigest" xml:space="preserve">
+    <value>已核验摘要 Artifact SHA-256</value>
+    <comment>diagnostics.hilog.artifactDigest (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_diagnostics_capture_mark" xml:space="preserve">
+    <value>打标记（Ctrl+M）</value>
+    <comment>windows.diagnostics.capture.mark (Windows only)</comment>
   </data>
 </root>

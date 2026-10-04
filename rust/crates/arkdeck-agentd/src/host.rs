@@ -119,12 +119,11 @@ pub struct Host {
     agents: Option<std::sync::Arc<arkdeck_hoststore::AgentExecutionStore>>,
     #[cfg(any(target_os = "macos", windows))]
     capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
-    #[cfg(target_os = "macos")]
+    /// The state root `job.plan` and `job.submit` plan against, and the
+    /// analyzers the host composed (on Windows the crash-ledger and HiLog
+    /// summary ones; no ArkTrace analyzer loads there, TASK-XPA-021).
+    #[cfg(any(target_os = "macos", windows))]
     planning: Option<(std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles)>,
-    /// The state root `job.plan` and `job.submit` plan against on Windows,
-    /// where no analyzer is composed (G20).
-    #[cfg(windows)]
-    planning: Option<std::path::PathBuf>,
     #[cfg(any(target_os = "macos", windows))]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     pub(crate) provider: Option<HdcReadOnlyProvider>,
@@ -134,7 +133,7 @@ pub struct Host {
     workspace_projects: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceProjectStore>>,
     /// The workspace provider composed over the registered projects, which a
     /// workspace Job plans, admits and runs through.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     workspace: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceComposition>>,
     #[cfg(any(target_os = "macos", windows))]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
@@ -171,8 +170,10 @@ pub struct Host {
     claims: std::sync::Arc<arkdeck_hoststore::StorageClaims>,
     /// The isolated owner's development HDC: the executable its
     /// device-bound Jobs dispatch to, through the process dispatch every HDC
-    /// plan takes, and the managed server it started, if it started one.
-    #[cfg(target_os = "macos")]
+    /// plan takes, and the managed server it started, if it started one. On
+    /// Windows only a registered HDC tuple's managed server is composed
+    /// (`windows_hdc_gate`), and none is registered yet.
+    #[cfg(any(target_os = "macos", windows))]
     hdc: Option<std::sync::Arc<crate::managed_hdc::DevelopmentHdc>>,
     /// The device sessions this daemon's control sessions hold (Swift
     /// `deviceSessionHolds`).
@@ -221,6 +222,11 @@ pub struct Host {
     /// the native RockUSB identity and the live probe over this host's HDC.
     #[cfg(any(target_os = "macos", windows))]
     flash_facts: Option<std::sync::Arc<arkdeck_hoststore::FlashHostFacts>>,
+    /// Test builds on Windows only: the in-process fake HDC the Flash host
+    /// facts oracle replay probes over (`tests/spawning`). No Windows daemon
+    /// composes an HDC until its tuple is registered.
+    #[cfg(all(windows, test))]
+    flash_test_hdc: Option<std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>>,
     /// What a Flash `job.plan` reads beyond the Artifact and Import owners
     /// and those facts: the ArkForge provider's availability, the Rockchip
     /// dispatcher's reason and the lane's toolchain, as Swift's daemon
@@ -341,7 +347,7 @@ impl Host {
     }
     /// `job.plan` reads the Artifact owner, the configured analyzer and the
     /// state root's Runtime debug attempt permits.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_planning(
         mut self,
         state_root: &std::path::Path,
@@ -350,28 +356,22 @@ impl Host {
         self.planning = Some((state_root.to_owned(), analyzer.unwrap_or_default()));
         self
     }
-    /// `job.plan` and `job.submit` on Windows: the same planner and
-    /// admitter over the Job store, with no provider, Artifact, Import or
-    /// capability owner composed beside them, so every operation is refused
-    /// before admission as macOS refuses it without that owner.
-    #[cfg(windows)]
-    pub fn with_planning(mut self, state_root: &std::path::Path) -> Self {
-        self.planning = Some(state_root.to_owned());
-        self
-    }
     /// The Job planner over this Windows composition's owners, as macOS
-    /// builds it: the Artifact and Import owners, and no workspace or HDC
-    /// provider (none is composed on Windows yet; the HDC waits for the
-    /// Windows HDC tuple's registration) and no analyzer.
+    /// builds it: the Artifact and Import owners, the analyzers and the
+    /// workspace provider, and no HDC provider (it waits for the Windows HDC
+    /// tuple's registration).
     #[cfg(windows)]
     fn planner<'a>(&'a self, state_root: &'a std::path::Path) -> arkdeck_hoststore::JobPlanner<'a> {
         arkdeck_hoststore::JobPlanner {
             imports: self.imports.as_deref(),
             artifacts: self.artifacts.as_deref(),
-            analyzer: None,
+            analyzer: self
+                .planning
+                .as_ref()
+                .map(|(_, analyzers)| analyzers as &dyn arkdeck_hoststore::AnalyzerComposition),
             state_root,
             hdc: None,
-            workspace: None,
+            workspace: self.workspace.as_deref(),
         }
     }
     #[cfg(any(target_os = "macos", windows))]
@@ -406,7 +406,7 @@ impl Host {
     /// answers `runtime.hdc.status`, its startup facts the tool leg of
     /// `target.availability`, and no plan is dispatched once it is not the
     /// server launched.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_managed_development_hdc(
         mut self,
         dispatch: arkdeck_provider_hdc::ProcessDispatch,
@@ -418,7 +418,7 @@ impl Host {
         self
     }
     /// The managed server this composition started, if it started one.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn managed_hdc(&self) -> Option<&crate::managed_hdc::ManagedHdc> {
         self.hdc.as_ref().and_then(|hdc| hdc.managed())
     }
@@ -463,21 +463,17 @@ impl Host {
         &*self.usb
     }
     /// The HDC the Target observation owner dispatches through: the
-    /// development or managed HDC this composition registered.
-    #[cfg(target_os = "macos")]
+    /// development or managed HDC this composition registered. On Windows
+    /// that is only a registered HDC tuple's managed server, and no Windows
+    /// HDC tuple is registered yet (its integration change waits for the
+    /// maintainer's samples; the gate inventory's G06, G07 and G17a), so the
+    /// Target observation owner observes nothing, dispatches nothing and
+    /// refuses every adoption before admission (`target_adopt`).
+    #[cfg(any(target_os = "macos", windows))]
     fn hdc_dispatch(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
         self.hdc
             .as_deref()
             .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
-    }
-    /// On Windows there is none: no Windows HDC tuple is registered yet (its
-    /// integration change waits for the maintainer's samples; the gate
-    /// inventory's G06, G07 and G17a), so the Target observation owner
-    /// observes nothing, dispatches nothing and refuses every adoption before
-    /// admission (`target_adopt`).
-    #[cfg(windows)]
-    fn hdc_dispatch(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
-        None
     }
     /// Runs `run` over the Target observation owner's sources — the
     /// development HDC, the USB relations, the Target store and the clock —
@@ -610,11 +606,7 @@ impl Host {
     /// On Windows no descriptor-bound HDC is composed until the Windows HDC
     /// tuple is registered, so there is no resolver and no executable lane is
     /// installed (`arkforge_execution::install`).
-    #[cfg(windows)]
-    pub(crate) fn rockchip_hdc_resolver(&self) -> Option<Box<arkdeck_hoststore::HdcResolver>> {
-        None
-    }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn rockchip_hdc_resolver(&self) -> Option<Box<arkdeck_hoststore::HdcResolver>> {
         let dispatch = self.hdc.clone()?;
         Some(Box::new(move || {
@@ -839,11 +831,11 @@ impl Host {
     }
     /// Swift `startJob` on Windows: the owned Job runs in the background in
     /// the slot every `job.run` and `job.cancel` of it meets, through the
-    /// runner `job.run` composes here (no HDC, analyzer, workspace provider
-    /// or Flash lane), and its end is reported to the execution.
+    /// runner `job.run` composes here (the composed analyzers and workspace
+    /// provider, and no HDC), and its end is reported to the execution.
     #[cfg(windows)]
     fn start_agent_run(&self, start: arkdeck_hoststore::AgentStart) {
-        let (Some(agents), Some(jobs), Some(artifacts), Some(state_root)) = (
+        let (Some(agents), Some(jobs), Some(artifacts), Some(planning)) = (
             self.agents.clone(),
             self.jobs.clone(),
             self.artifacts.clone(),
@@ -865,6 +857,7 @@ impl Host {
         let flash_runtime = self.flash_runtime.clone();
         let flash_planning = self.flash_planning.clone();
         let flash_facts = self.flash_facts.clone();
+        let workspace = self.workspace.clone();
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
             Ok(mut runs) if !runs.contains_key(&start.job) => {
@@ -925,7 +918,7 @@ impl Host {
                     );
                 arkdeck_hoststore::FlashRunner {
                     runner: windows_runner(
-                        &state_root,
+                        &planning,
                         &jobs,
                         &artifacts,
                         imports.as_deref(),
@@ -933,6 +926,7 @@ impl Host {
                         &home,
                         publisher.as_ref(),
                         Some(&slot.cancellation),
+                        workspace.as_deref(),
                     ),
                     flash,
                 }
@@ -1007,7 +1001,7 @@ impl Host {
     /// pinned now; one that is not a regular executable fails the start, as
     /// Swift's composition fails it. Without the project owner nothing is
     /// composed.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_workspace_operations(
         mut self,
         state_root: &std::path::Path,
@@ -1302,7 +1296,7 @@ impl Host {
         &self,
         run: impl FnOnce(&arkdeck_hoststore::FlashPlanner<'_>) -> T,
     ) -> Option<T> {
-        let state_root = self.planning.as_ref()?;
+        let (state_root, _) = self.planning.as_ref()?;
         let facts = self.flash_facts_port();
         Some(run(&arkdeck_hoststore::FlashPlanner {
             planner: self.planner(state_root),
@@ -1342,18 +1336,38 @@ impl Host {
         })
     }
 
-    /// The HDC the Flash facts probe over: this host's, on macOS; none on
-    /// Windows until its HDC tuple is registered.
-    #[cfg(target_os = "macos")]
+    /// The HDC the Flash facts probe over: this host's (on Windows none
+    /// until its HDC tuple is registered).
+    #[cfg(any(target_os = "macos", all(windows, not(test))))]
     fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
         self.hdc
             .as_deref()
             .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
     }
 
-    #[cfg(windows)]
+    /// In a Windows test build, the fake HDC the Flash host facts replay
+    /// composed (`tests/spawning`), else this host's.
+    #[cfg(all(windows, test))]
     fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
-        None
+        match &self.flash_test_hdc {
+            Some(fake) => Some(fake.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch),
+            None => self
+                .hdc
+                .as_deref()
+                .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
+        }
+    }
+
+    /// Test builds on Windows only: the Flash facts probe over `hdc`, a fake
+    /// (TASK-XPA-010). The production Windows daemon has no such seam.
+    #[cfg(all(windows, test))]
+    #[allow(dead_code)]
+    pub fn with_flash_test_hdc(
+        mut self,
+        hdc: std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+    ) -> Self {
+        self.flash_test_hdc = Some(hdc);
+        self
     }
 
     /// `flash.bind-current-loader` binds through this owner, against this
@@ -1447,11 +1461,20 @@ impl Host {
             ("storage", self.storage.is_some()),
             ("history", self.history.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
+            ("workspaceOperations", self.workspace.is_some()),
             ("bootstrap", self.bootstrap.is_some()),
             ("planning", self.planning.is_some()),
+            (
+                "analyzer",
+                self.planning
+                    .as_ref()
+                    .is_some_and(|(_, analyzer)| !analyzer.profiles().is_empty()),
+            ),
             ("agentExecutions", self.agents.is_some()),
             ("humanActions", self.human_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
+            ("hdc", self.hdc.is_some()),
+            ("managedHdc", self.managed_hdc().is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("codeSignHelper", self.code_sign_helper.is_some()),
             ("flashHostFacts", self.flash_facts.is_some()),
@@ -1503,7 +1526,7 @@ impl Host {
             history: None,
             #[cfg(any(target_os = "macos", windows))]
             workspace_projects: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             workspace: None,
             #[cfg(any(target_os = "macos", windows))]
             trace_cache: None,
@@ -1531,7 +1554,7 @@ impl Host {
             default_mutation_root: None,
             #[cfg(any(target_os = "macos", windows))]
             claims: Default::default(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             hdc: None,
             #[cfg(any(target_os = "macos", windows))]
             agents: None,
@@ -1555,6 +1578,8 @@ impl Host {
             flash_invocations: None,
             #[cfg(any(target_os = "macos", windows))]
             flash_facts: None,
+            #[cfg(all(windows, test))]
+            flash_test_hdc: None,
             #[cfg(any(target_os = "macos", windows))]
             flash_planning: None,
             #[cfg(any(target_os = "macos", windows))]
@@ -1622,14 +1647,15 @@ impl Host {
 
 /// The Job runner a Windows composition runs a Job with (`job.run`, an
 /// agent execution's owned Job and `job.reconcile`'s finalization): the Job,
-/// Artifact and Import owners, the Session publication writer and the
-/// mutation authority, with no HDC composition (no Windows HDC tuple is
-/// registered), analyzer or workspace provider. One argument per owner, as
-/// the runner's own fields are: the background run passes its own clones.
+/// Artifact and Import owners, the analyzers the planning composed, the
+/// Session publication writer, the mutation authority and the workspace
+/// provider, with no HDC composition (no Windows HDC tuple is registered).
+/// One argument per owner, as the runner's own fields are: the background
+/// run passes its own clones.
 #[cfg(windows)]
 #[allow(clippy::too_many_arguments)]
 fn windows_runner<'a>(
-    state_root: &'a std::path::Path,
+    (state_root, analyzers): &'a (std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles),
     jobs: &'a arkdeck_hoststore::JobStore,
     artifacts: &'a arkdeck_hoststore::ArtifactReadStore,
     imports: Option<&'a arkdeck_hoststore::ImportUploadStore>,
@@ -1637,6 +1663,7 @@ fn windows_runner<'a>(
     home: &'a str,
     sessions: Option<&'a arkdeck_hoststore::SessionPublisher<'a>>,
     cancellation: Option<&'a arkdeck_hoststore::RunCancellation>,
+    workspace: Option<&'a arkdeck_hoststore::WorkspaceComposition>,
 ) -> arkdeck_hoststore::JobRunner<'a> {
     arkdeck_hoststore::JobRunner {
         imports,
@@ -1646,7 +1673,7 @@ fn windows_runner<'a>(
         }),
         jobs,
         artifacts,
-        analyzer: None,
+        analyzer: Some(analyzers),
         quota: ARTIFACT_QUOTA,
         home,
         now: arkdeck_hoststore::runtime_now,
@@ -1655,27 +1682,20 @@ fn windows_runner<'a>(
         cancellation,
         after_commit: None,
         hdc: None,
-        workspace: None,
+        workspace,
     }
 }
 
 impl HostServices for Host {
     /// `operation.list` on Windows: the macOS report with this composition's
-    /// owners — the planner, the Job and Artifact owners, and no HDC,
-    /// analyzer, workspace provider or mutation authority.
+    /// owners — the planner, the Job and Artifact owners, the composed
+    /// analyzers and workspace provider, and no HDC.
     #[cfg(windows)]
     fn operation_availability(
         &self,
         reference: &str,
         provider: &str,
     ) -> Option<Vec<(&'static str, String)>> {
-        // No analyzer provider is built on Windows (its profiles pin
-        // ArkTrace's trace_streamer): it is not registered, as the offline
-        // Trace surface reports it (`provider_not_registered`), rather than a
-        // provider a host left unconfigured.
-        if provider == "analyzer" {
-            return None;
-        }
         arkdeck_hoststore::operation_unavailability(
             reference,
             provider,
@@ -1683,7 +1703,10 @@ impl HostServices for Host {
                 planning_owner: self.planning.is_some(),
                 job_owner: self.jobs.is_some(),
                 artifacts: self.artifacts.is_some(),
-                analyzer: None,
+                analyzer: self
+                    .planning
+                    .as_ref()
+                    .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
                 // No Windows HDC tuple is registered.
                 hdc_registered: false,
                 mutation_owner: self
@@ -1692,7 +1715,7 @@ impl HostServices for Host {
                     .is_some_and(|(authority, jobs)| authority.state_proven_now(jobs)),
                 code_sign_helper: false,
                 hdc_tool_current: false,
-                workspace: None,
+                workspace: self.workspace.as_deref(),
             },
         )
     }
@@ -2056,7 +2079,7 @@ impl HostServices for Host {
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let (Some(agents), Some(state_root), Some(jobs), Some(artifacts), Some(targets)) = (
+        let (Some(agents), Some((state_root, _)), Some(jobs), Some(artifacts), Some(targets)) = (
             &self.agents,
             &self.planning,
             &self.jobs,
@@ -2339,7 +2362,7 @@ impl HostServices for Host {
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let (Some(state_root), Some(jobs)) = (&self.planning, &self.jobs) else {
+        let (Some((state_root, _)), Some(jobs)) = (&self.planning, &self.jobs) else {
             return Err(WireError {
                 code: "rejected".into(),
                 message: "this method is unavailable in the read-only Rust foundation".into(),
@@ -2440,7 +2463,7 @@ impl HostServices for Host {
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let (Some(state_root), Some(jobs), Some(artifacts)) =
+        let (Some(planning), Some(jobs), Some(artifacts)) =
             (&self.planning, &self.jobs, &self.artifacts)
         else {
             return Err(WireError {
@@ -2465,7 +2488,7 @@ impl HostServices for Host {
             let flash = facts.as_ref().and_then(|facts| self.flash_execution(facts));
             arkdeck_hoststore::FlashRunner {
                 runner: windows_runner(
-                    state_root,
+                    planning,
                     jobs,
                     artifacts,
                     self.imports.as_deref(),
@@ -2473,6 +2496,7 @@ impl HostServices for Host {
                     &self.home,
                     publisher.as_ref(),
                     cancellation,
+                    self.workspace.as_deref(),
                 ),
                 flash,
             }
@@ -2762,6 +2786,7 @@ impl HostServices for Host {
             &self.home,
             None,
             None,
+            self.workspace.as_deref(),
         )
         .continue_cleanup_debt(params)
     }
@@ -2945,9 +2970,9 @@ impl HostServices for Host {
                     claims: &self.claims,
                     probe: &probe,
                 });
-        let runner = self.planning.as_deref().map(|state_root| {
+        let runner = self.planning.as_ref().map(|planning| {
             windows_runner(
-                state_root,
+                planning,
                 jobs,
                 artifacts,
                 self.imports.as_deref(),
@@ -2955,6 +2980,7 @@ impl HostServices for Host {
                 &self.home,
                 publisher.as_ref(),
                 None,
+                self.workspace.as_deref(),
             )
         });
         let reconciler = arkdeck_hoststore::JobReconciler {
@@ -3323,18 +3349,12 @@ impl HostServices for Host {
                 ])),
             };
             // A Runtime-owned copy's reference maps to the project it was
-            // copied from through the workspace provider. Windows composes no
-            // workspace provider, so it has made no copy, and every reference
-            // is compared as written (Swift `resolveRegistrationProjectRef`
-            // for a reference nothing maps).
-            #[cfg(target_os = "macos")]
+            // copied from through the workspace provider.
             let registration = |reference: &str| {
                 self.workspace
                     .as_ref()
                     .and_then(|workspace| workspace.census_registration(reference))
             };
-            #[cfg(windows)]
-            let registration = |_: &str| None;
             let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
                 (Some(jobs), WorkspaceReference::Project(project)) => {
                     jobs.require_no_active_workspace_project_reference(project, &registration)
@@ -3585,15 +3605,16 @@ impl HostServices for Host {
 
     /// Swift's daemon answers from the observer its HDC host gives it, and
     /// `unconfigured()` without one: this composition has a host only when
-    /// the isolated owner started a managed server.
-    #[cfg(target_os = "macos")]
+    /// the isolated owner started a managed server (on Windows, only behind
+    /// a registered HDC tuple).
+    #[cfg(any(target_os = "macos", windows))]
     fn runtime_hdc_status(&self) -> Result<serde_json::Value, WireError> {
         Ok(match self.managed_hdc() {
             Some(managed) => managed.status(&utc_now),
             None => arkdeck_provider_hdc::unconfigured_status(None),
         })
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn managed_hdc_tool(&self) -> Option<arkdeck_control::ManagedToolFacts> {
         self.managed_hdc()
             .map(crate::managed_hdc::ManagedHdc::tool_facts)
@@ -3669,7 +3690,7 @@ impl HostServices for Host {
     fn hdc_status(&self, deep: bool) -> HdcStatus {
         // Swift's status observer exists exactly when its HDC host started:
         // here, when the isolated owner started its managed server.
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         if let Some(managed) = self.managed_hdc() {
             if !deep {
                 return HdcStatus {

@@ -18,10 +18,10 @@ mod windows;
 #[cfg(any(target_os = "macos", windows))]
 pub use process::ToolLaunchIdentity;
 #[cfg(target_os = "macos")]
-pub use process::{
-    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ManagedServer,
-    VerifiedNamespace, VerifiedResource, VerifiedSource,
-};
+pub use process::{ManagedServer, VerifiedNamespace, VerifiedResource, VerifiedSource};
+// The analyzer runner on macOS and Windows (TASK-XPA-011).
+#[cfg(any(target_os = "macos", windows))]
+pub use process::{AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination};
 #[cfg(any(target_os = "macos", windows))]
 pub use process::{
     DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError, PtyError, PtyExecution,
@@ -64,7 +64,9 @@ pub use windows::{
 // The Windows counterpart of the `/.vol`-bound source (a held file and
 // namespace) and the signing layer's private entries (TASK-XPA-011).
 #[cfg(windows)]
-pub use windows::{VerifiedSource, create_private_directory, create_private_file};
+pub use windows::{
+    VerifiedSource, create_private_directories, create_private_directory, create_private_file,
+};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;
@@ -376,6 +378,14 @@ pub use distribution_tree::{
     tree_snapshot_at,
 };
 
+// The Windows content tree and Bundle capture on NTFS (TASK-XPA-012): the
+// same API over held directory handles.
+#[cfg(windows)]
+pub use windows::{
+    BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublication,
+    BootstrapBundlePublishError, BootstrapEntry, BootstrapTree, inspect_bootstrap_tree,
+};
+
 #[cfg(target_os = "macos")]
 mod bootstrap_bundle_capture;
 #[cfg(target_os = "macos")]
@@ -404,13 +414,15 @@ pub use windows::{
 // A pinned file measured through one no-follow handle (`FileIdInfo`, owner
 // and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
 #[cfg(windows)]
-pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
+pub use windows::{
+    HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
+};
 // The Authenticode signature of a registered DevEco tool and the DevEco
 // launcher's publisher, with the macOS answer type (TASK-XPA-011, G12).
 #[cfg(windows)]
 pub use windows::{
     DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,
-    inspect_native_code_signature, inspect_publisher,
+    inspect_native_code_signature, inspect_publisher, same_signer,
 };
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;

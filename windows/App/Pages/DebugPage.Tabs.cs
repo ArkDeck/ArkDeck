@@ -941,7 +941,10 @@ public sealed partial class DebugPage
         var box = new TextBox { Header = header, Text = value, PlaceholderText = prompt, MinWidth = 220 };
         AutomationProperties.SetAutomationId(box, id);
         AutomationProperties.SetName(box, header);
-        box.TextChanged += (_, _) => changed(box.Text);
+        // TextChanging, not TextChanged: TextChanged is raised asynchronously, so an action
+        // invoked right after the text was set (UI Automation's SetValue, then Invoke) could
+        // read the previous value.
+        box.TextChanging += (_, _) => changed(box.Text);
         return box;
     }
 

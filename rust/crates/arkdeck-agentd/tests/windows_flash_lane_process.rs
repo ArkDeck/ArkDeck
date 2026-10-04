@@ -18,8 +18,9 @@
 //!   that reason and zero dispatch, and nothing is admitted;
 //! * the Flash facts and the device access observer are composed either
 //!   way (the census names them); the facts read the Windows USB census,
-//!   which fails closed until the DAYU200 sample confirms its mapping, so
-//!   `flash.bootloader-status` observes no board.
+//!   open since the DAYU200 sample confirmed its mapping, so
+//!   `flash.bootloader-status` answers, observing no board on a host without
+//!   one.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root and, where a case names one, its bundle: nothing
@@ -390,25 +391,19 @@ fn without_a_bundle_the_start_and_a_flash_report_swifts_absence() {
     assert!(daemon.errors().contains(absence), "{}", daemon.errors());
     assert_flash_refused(&pipe, &root, absence);
     assert_no_lane_daemon(&pipe, &root.0.join("jobs-state").join("arkforge"));
-    // The facts read the Windows USB census, which fails closed until the
-    // DAYU200 sample confirms its mapping: no board is observed.
+    // The facts read the Windows USB census, open since the DAYU200 sample
+    // confirmed its mapping: the status answers, and with no Rockchip board
+    // on this host it observes none.
     let status = request(&pipe, "flash.bootloader-status", json!({}));
-    assert_eq!(status["ok"], false, "{status}");
-    assert_eq!(status["error"]["code"], "rejected", "{status}");
-    assert!(
-        status["error"]["message"]
-            .as_str()
-            .unwrap()
-            .starts_with("Rockchip bootloader status could not be observed: "),
-        "{status}"
-    );
-    assert!(
-        status["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("USB registry unavailable"),
-        "{status}"
-    );
+    assert_eq!(status["ok"], true, "{status}");
+    let rockchip = arkdeck_platform::usb_host_devices()
+        .expect("the host's USB census answers")
+        .iter()
+        .any(|device| device.vendor_id == 0x2207);
+    if !rockchip {
+        assert_eq!(status["result"]["disposition"], "absent", "{status}");
+        assert_eq!(status["result"]["observationCount"], 0, "{status}");
+    }
     daemon.stop(&root.0);
 }
 
