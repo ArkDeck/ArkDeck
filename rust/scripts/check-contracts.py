@@ -170,7 +170,8 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
 
 
 def commands(view: Path, output: Path, *, owners: bool = False,
-             checkout_tested: bool = False) -> list[tuple[list[str], Path]]:
+             checkout_tested: bool = False,
+             candidate_inputs: bool = False) -> list[tuple[list[str], Path]]:
     rust = view / "rust"
     if checkout_tested:
         # The lane lints and tests the checkout (locally before this script
@@ -185,6 +186,19 @@ def commands(view: Path, output: Path, *, owners: bool = False,
         # which here is main's. Linting and testing the rest again repeated the
         # lane's own two steps, and their flakes, at about two minutes on macOS.
         native = [(["cargo", "test", "--package", "arkdeck-contract", "--locked"], rust)]
+        if candidate_inputs:
+            # A candidate of drifted inputs is still the checkout's own Rust:
+            # the views copy it, and only the two embedded documents differ
+            # (CONTRACT_INPUTS of kind `candidate`, SWIFT_BASELINE the merge
+            # base). Every other test reads them only to relax an assertion in
+            # the published view (`development` with a commit), so it runs as
+            # in the lane. arkdeck-cli's resource tests also assert that a
+            # candidate exposes what its registry lacks, which only this view
+            # can check. Repeating the lane's lint and workspace tests here
+            # cost about 15 minutes on Windows (#2545, run 37224202133: the
+            # candidate's workspace tests ran out the job's 40 minutes).
+            native = [(["cargo", "test", "--package", "arkdeck-contract",
+                        "--package", "arkdeck-cli", "--locked"], rust)]
     else:
         native = [
             (["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"], rust),
@@ -249,13 +263,17 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
     environment = os.environ.copy()
     environment["CARGO_TARGET_DIR"] = str(view / "rust/target")
     environment["ARKDECK_RUST_TEST_VIEW"] = "candidate" if info["kind"] == "candidate" else "published"
-    # A candidate of the published inputs is the checkout the lane already
-    # linted and tested; see commands().
-    checkout_tested = (info["kind"] == "candidate"
-                       and info["inputDigest"] == published_info["inputDigest"])
+    # A candidate view is the checkout the lane already linted and tested,
+    # whatever its inputs; see commands(). The published view of drifted
+    # inputs is the one that compiles the checkout against another contract,
+    # and keeps its complete lint and workspace tests.
+    checkout_tested = info["kind"] == "candidate"
+    candidate_inputs = (checkout_tested
+                        and info["inputDigest"] != published_info["inputDigest"])
     try:
         for argv, cwd in commands(view, output, owners=info["kind"] == "candidate",
-                                  checkout_tested=checkout_tested):
+                                  checkout_tested=checkout_tested,
+                                  candidate_inputs=candidate_inputs):
             print(f'+ [{info["kind"]}] ' + " ".join(argv), flush=True)
             record = {"argv": argv, "completed": False}
             provenance["commands"].append(record)
