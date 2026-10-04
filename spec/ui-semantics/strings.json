@@ -6475,14 +6475,14 @@
       "zh-Hans": "这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。"
     },
     {
-      "key": "diagnostics.capture.unavailable",
-      "table": "DiagnosticsLocalizable",
+      "key": "windows.diagnostics.capture.unavailable",
+      "table": null,
       "en": "Session capture is not available",
       "zh-Hans": "诊断会话采集尚不可用"
     },
     {
-      "key": "diagnostics.capture.unavailable.detail",
-      "table": "DiagnosticsLocalizable",
+      "key": "windows.diagnostics.capture.unavailable.detail",
+      "table": null,
       "en": "Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.",
       "zh-Hans": "交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。"
     },
@@ -6513,8 +6513,8 @@
     {
       "key": "diagnostics.capture.arm",
       "table": "DiagnosticsLocalizable",
-      "en": "Arm a session",
-      "zh-Hans": "布防会话"
+      "en": "Start session",
+      "zh-Hans": "开始采集"
     },
     {
       "key": "diagnostics.capture.mark",
@@ -7501,16 +7501,88 @@
       "zh-Hans": "无法安全保存远端构建源。"
     },
     {
-      "key": "jobRecovery.action.rebound",
-      "table": "JobsLocalizable",
-      "en": "Loader binding verified; review the Job’s current recovery state",
-      "zh-Hans": "Loader 绑定已核验；请查看此 Job 的当前恢复状态"
+      "key": "history.activity.open.flash",
+      "table": "HistoryLocalizable",
+      "en": "Open Flash",
+      "zh-Hans": "打开 Flash"
     },
     {
-      "key": "jobRecovery.action.unconfirmed",
-      "table": "JobsLocalizable",
-      "en": "The response was not confirmed. Refresh this Job before taking another action.",
-      "zh-Hans": "未能确认请求结果。请先刷新此 Job，再决定后续操作。"
+      "key": "history.activity.open.viewer",
+      "table": "HistoryLocalizable",
+      "en": "Open Viewer",
+      "zh-Hans": "打开 Viewer"
+    },
+    {
+      "key": "history.activity.open.trace",
+      "table": "HistoryLocalizable",
+      "en": "Open Trace",
+      "zh-Hans": "打开 Trace"
+    },
+    {
+      "key": "history.activity.open.debug",
+      "table": "HistoryLocalizable",
+      "en": "Open Debug",
+      "zh-Hans": "打开 Debug"
+    },
+    {
+      "key": "history.activity.open.device",
+      "table": "HistoryLocalizable",
+      "en": "Open Device",
+      "zh-Hans": "打开 Device"
+    },
+    {
+      "key": "history.activity.open.detailUnavailable",
+      "table": "HistoryLocalizable",
+      "en": "Job details are unavailable, so ArkDeck cannot reopen this context.",
+      "zh-Hans": "Job 详情不可用，ArkDeck 无法重新打开此上下文。"
+    },
+    {
+      "key": "history.activity.open.unsupported",
+      "table": "HistoryLocalizable",
+      "en": "This record has no workspace that can be reopened.",
+      "zh-Hans": "此记录没有可重新打开的工作区。"
+    },
+    {
+      "key": "history.context.title",
+      "table": "HistoryLocalizable",
+      "en": "Opened from History",
+      "zh-Hans": "从 History 打开"
+    },
+    {
+      "key": "history.context.dismiss",
+      "table": "HistoryLocalizable",
+      "en": "Close history context",
+      "zh-Hans": "关闭历史上下文"
+    },
+    {
+      "key": "history.context.job",
+      "table": "HistoryLocalizable",
+      "en": "Job",
+      "zh-Hans": "Job"
+    },
+    {
+      "key": "history.context.target",
+      "table": "HistoryLocalizable",
+      "en": "Target",
+      "zh-Hans": "目标"
+    },
+    {
+      "key": "history.context.operation",
+      "table": "HistoryLocalizable",
+      "en": "Operation",
+      "zh-Hans": "操作"
+    },
+    {
+      "key": "history.context.state",
+      "table": "HistoryLocalizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "history.context.artifacts",
+      "table": "HistoryLocalizable",
+      "en": "Artifacts",
+      "zh-Hans": "Artifacts"
     },
     {
       "key": "jobRecovery.action.stillUnknown",
@@ -7519,40 +7591,10 @@
       "zh-Hans": "原操作结果仍然未知"
     },
     {
-      "key": "jobRecovery.action.refused",
+      "key": "jobRecovery.action.rebound",
       "table": "JobsLocalizable",
-      "en": "Recovery action unavailable",
-      "zh-Hans": "恢复操作不可用"
-    },
-    {
-      "key": "jobRecovery.action.rebind.detail",
-      "table": "JobsLocalizable",
-      "en": "Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.",
-      "zh-Hans": "核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。"
-    },
-    {
-      "key": "jobRecovery.action.resume.detail",
-      "table": "JobsLocalizable",
-      "en": "Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.",
-      "zh-Hans": "仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。"
-    },
-    {
-      "key": "jobRecovery.action.reconcile",
-      "table": "JobsLocalizable",
-      "en": "Check recovery state",
-      "zh-Hans": "重新核对恢复状态"
-    },
-    {
-      "key": "jobRecovery.action.resume",
-      "table": "JobsLocalizable",
-      "en": "Continue from confirmed safe boundary",
-      "zh-Hans": "从已确认的安全边界继续"
-    },
-    {
-      "key": "jobRecovery.action.rebind",
-      "table": "JobsLocalizable",
-      "en": "Verify and rebind Loader",
-      "zh-Hans": "核验并重新绑定 Loader"
+      "en": "Loader binding verified; review the Job’s current recovery state",
+      "zh-Hans": "Loader 绑定已核验；请查看此 Job 的当前恢复状态"
     },
     {
       "key": "jobRecovery.action.reconcile.detail",
@@ -7561,10 +7603,46 @@
       "zh-Hans": "Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。"
     },
     {
+      "key": "jobRecovery.action.resume.detail",
+      "table": "JobsLocalizable",
+      "en": "Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.",
+      "zh-Hans": "仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。"
+    },
+    {
       "key": "jobRecovery.action.working",
       "table": "JobsLocalizable",
       "en": "Checking this Job…",
       "zh-Hans": "正在核对这个 Job…"
+    },
+    {
+      "key": "jobRecovery.action.unconfirmed",
+      "table": "JobsLocalizable",
+      "en": "The response was not confirmed. Refresh this Job before taking another action.",
+      "zh-Hans": "未能确认请求结果。请先刷新此 Job，再决定后续操作。"
+    },
+    {
+      "key": "jobRecovery.action.reconcile",
+      "table": "JobsLocalizable",
+      "en": "Check recovery state",
+      "zh-Hans": "重新核对恢复状态"
+    },
+    {
+      "key": "jobRecovery.action.rebind.detail",
+      "table": "JobsLocalizable",
+      "en": "Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.",
+      "zh-Hans": "核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。"
+    },
+    {
+      "key": "jobRecovery.action.refused",
+      "table": "JobsLocalizable",
+      "en": "Recovery action unavailable",
+      "zh-Hans": "恢复操作不可用"
+    },
+    {
+      "key": "jobRecovery.action.resume",
+      "table": "JobsLocalizable",
+      "en": "Continue from confirmed safe boundary",
+      "zh-Hans": "从已确认的安全边界继续"
     },
     {
       "key": "jobRecovery.action.observed",
@@ -7573,28 +7651,28 @@
       "zh-Hans": "Runtime 已返回更新后的状态"
     },
     {
-      "key": "jobRecovery.archive.confirm",
+      "key": "jobRecovery.action.rebind",
       "table": "JobsLocalizable",
-      "en": "Archive as interrupted",
-      "zh-Hans": "按中断状态归档"
+      "en": "Verify and rebind Loader",
+      "zh-Hans": "核验并重新绑定 Loader"
     },
     {
-      "key": "jobRecovery.archive.blocker.active",
+      "key": "jobRecovery.archive.blocker.mutation",
       "table": "JobsLocalizable",
-      "en": "Runtime is still handling this Job. Wait for it to reach a safe boundary.",
-      "zh-Hans": "Runtime 仍在处理此 Job，请等待其到达安全边界。"
+      "en": "This Runtime cannot yet prove that a device-changing Job can release all its holds.",
+      "zh-Hans": "当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。"
     },
     {
-      "key": "jobRecovery.archive.blocker.storage",
+      "key": "jobRecovery.archive.unavailable",
       "table": "JobsLocalizable",
-      "en": "Session storage is unavailable. Restore storage before archiving.",
-      "zh-Hans": "Session 存储不可用，请恢复存储后再归档。"
+      "en": "Archive is unavailable. Refresh this Job and inspect its recovery state.",
+      "zh-Hans": "暂时无法归档。请刷新此 Job 并检查恢复状态。"
     },
     {
-      "key": "jobRecovery.archive.blocker.hazards",
+      "key": "jobRecovery.archive.title",
       "table": "JobsLocalizable",
-      "en": "Unresolved hazards or device residues must remain associated with this Job.",
-      "zh-Hans": "未解决的风险或设备残留仍需与此 Job 关联。"
+      "en": "Archive interrupted Job",
+      "zh-Hans": "归档中断的 Job"
     },
     {
       "key": "jobRecovery.archive.finish",
@@ -7603,28 +7681,40 @@
       "zh-Hans": "完成已记录的归档"
     },
     {
-      "key": "jobRecovery.archive.review",
+      "key": "jobRecovery.archive.confirm",
       "table": "JobsLocalizable",
-      "en": "Review archive…",
-      "zh-Hans": "检查归档条件…"
+      "en": "Archive as interrupted",
+      "zh-Hans": "按中断状态归档"
     },
     {
-      "key": "jobRecovery.archive.dismiss",
+      "key": "jobRecovery.archive.blocker.hazards",
       "table": "JobsLocalizable",
-      "en": "Back",
-      "zh-Hans": "返回"
+      "en": "Unresolved hazards or device residues must remain associated with this Job.",
+      "zh-Hans": "未解决的风险或设备残留仍需与此 Job 关联。"
     },
     {
-      "key": "jobRecovery.archive.working",
+      "key": "jobRecovery.archive.detail",
       "table": "JobsLocalizable",
-      "en": "Checking archive state…",
-      "zh-Hans": "正在核对归档状态…"
+      "en": "Archive ends this Job and keeps its evidence. It does not recover the device or clean up device state. Runtime must prove that no managed process, unknown outcome, or unresolved hazard remains.",
+      "zh-Hans": "归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。"
     },
     {
       "key": "jobRecovery.archive.lastStep",
       "table": "JobsLocalizable",
       "en": "Last confirmed step",
       "zh-Hans": "最后确认的步骤"
+    },
+    {
+      "key": "jobRecovery.archive.blocker.process",
+      "table": "JobsLocalizable",
+      "en": "The managed process or compensation state is not proven safe to close.",
+      "zh-Hans": "尚不能证明托管进程或补偿状态可安全结束。"
+    },
+    {
+      "key": "jobRecovery.archive.blocker.storage",
+      "table": "JobsLocalizable",
+      "en": "Session storage is unavailable. Restore storage before archiving.",
+      "zh-Hans": "Session 存储不可用，请恢复存储后再归档。"
     },
     {
       "key": "jobRecovery.archive.existingDecision",
@@ -7639,22 +7729,10 @@
       "zh-Hans": "仍有操作结果未知，需保留此 Job 进行恢复。"
     },
     {
-      "key": "jobRecovery.archive.blocker.refresh",
+      "key": "jobRecovery.archive.working",
       "table": "JobsLocalizable",
-      "en": "The Job record or journal needs a fresh recovery check before archive.",
-      "zh-Hans": "归档前需要重新核对 Job 记录与日志的恢复状态。"
-    },
-    {
-      "key": "jobRecovery.archive.unavailable",
-      "table": "JobsLocalizable",
-      "en": "Archive is unavailable. Refresh this Job and inspect its recovery state.",
-      "zh-Hans": "暂时无法归档。请刷新此 Job 并检查恢复状态。"
-    },
-    {
-      "key": "jobRecovery.archive.publicationPending",
-      "table": "JobsLocalizable",
-      "en": "The interruption is recorded; Session publication is pending. Review archive again to finish publishing.",
-      "zh-Hans": "中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。"
+      "en": "Checking archive state…",
+      "zh-Hans": "正在核对归档状态…"
     },
     {
       "key": "jobRecovery.archive.complete",
@@ -7663,28 +7741,34 @@
       "zh-Hans": "已按中断状态归档，Session 保留原始证据。"
     },
     {
-      "key": "jobRecovery.archive.title",
+      "key": "jobRecovery.archive.blocker.active",
       "table": "JobsLocalizable",
-      "en": "Archive interrupted Job",
-      "zh-Hans": "归档中断的 Job"
+      "en": "Runtime is still handling this Job. Wait for it to reach a safe boundary.",
+      "zh-Hans": "Runtime 仍在处理此 Job，请等待其到达安全边界。"
     },
     {
-      "key": "jobRecovery.archive.blocker.process",
+      "key": "jobRecovery.archive.dismiss",
       "table": "JobsLocalizable",
-      "en": "The managed process or compensation state is not proven safe to close.",
-      "zh-Hans": "尚不能证明托管进程或补偿状态可安全结束。"
+      "en": "Back",
+      "zh-Hans": "返回"
     },
     {
-      "key": "jobRecovery.archive.detail",
+      "key": "jobRecovery.archive.blocker.refresh",
       "table": "JobsLocalizable",
-      "en": "Archive ends this Job and keeps its evidence. It does not recover the device or clean up device state. Runtime must prove that no managed process, unknown outcome, or unresolved hazard remains.",
-      "zh-Hans": "归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。"
+      "en": "The Job record or journal needs a fresh recovery check before archive.",
+      "zh-Hans": "归档前需要重新核对 Job 记录与日志的恢复状态。"
     },
     {
-      "key": "jobRecovery.archive.blocker.mutation",
+      "key": "jobRecovery.archive.review",
       "table": "JobsLocalizable",
-      "en": "This Runtime cannot yet prove that a device-changing Job can release all its holds.",
-      "zh-Hans": "当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。"
+      "en": "Review archive…",
+      "zh-Hans": "检查归档条件…"
+    },
+    {
+      "key": "jobRecovery.archive.publicationPending",
+      "table": "JobsLocalizable",
+      "en": "The interruption is recorded; Session publication is pending. Review archive again to finish publishing.",
+      "zh-Hans": "中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。"
     }
   ]
 }

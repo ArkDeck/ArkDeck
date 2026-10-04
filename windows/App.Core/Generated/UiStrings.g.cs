@@ -1086,8 +1086,8 @@ public static class UiStrings
     public const string AppNavigationDiagnostics = "app.navigation.diagnostics";
     public const string HistoryActivityOpenDiagnostics = "history.activity.open.diagnostics";
     public const string HistoryContextReadOnly = "history.context.readOnly";
-    public const string DiagnosticsCaptureUnavailable = "diagnostics.capture.unavailable";
-    public const string DiagnosticsCaptureUnavailableDetail = "diagnostics.capture.unavailable.detail";
+    public const string WindowsDiagnosticsCaptureUnavailable = "windows.diagnostics.capture.unavailable";
+    public const string WindowsDiagnosticsCaptureUnavailableDetail = "windows.diagnostics.capture.unavailable.detail";
     public const string DiagnosticsAlignmentCalibrated = "diagnostics.alignment.calibrated";
     public const string DiagnosticsAlignmentCannotAlign = "diagnostics.alignment.cannotAlign";
     public const string DiagnosticsAlignmentExplain = "diagnostics.alignment.explain";
@@ -1257,37 +1257,51 @@ public static class UiStrings
     public const string WindowsRemoteSourcesErrorConnectionFailed = "windows.remoteSources.error.connectionFailed";
     public const string WindowsRemoteSourcesErrorCredentialStoreFailed = "windows.remoteSources.error.credentialStoreFailed";
     public const string WindowsRemoteSourcesErrorStorageFailed = "windows.remoteSources.error.storageFailed";
-    public const string JobRecoveryActionRebound = "jobRecovery.action.rebound";
-    public const string JobRecoveryActionUnconfirmed = "jobRecovery.action.unconfirmed";
+    public const string HistoryActivityOpenFlash = "history.activity.open.flash";
+    public const string HistoryActivityOpenViewer = "history.activity.open.viewer";
+    public const string HistoryActivityOpenTrace = "history.activity.open.trace";
+    public const string HistoryActivityOpenDebug = "history.activity.open.debug";
+    public const string HistoryActivityOpenDevice = "history.activity.open.device";
+    public const string HistoryActivityOpenDetailUnavailable = "history.activity.open.detailUnavailable";
+    public const string HistoryActivityOpenUnsupported = "history.activity.open.unsupported";
+    public const string HistoryContextTitle = "history.context.title";
+    public const string HistoryContextDismiss = "history.context.dismiss";
+    public const string HistoryContextJob = "history.context.job";
+    public const string HistoryContextTarget = "history.context.target";
+    public const string HistoryContextOperation = "history.context.operation";
+    public const string HistoryContextState = "history.context.state";
+    public const string HistoryContextArtifacts = "history.context.artifacts";
     public const string JobRecoveryActionStillUnknown = "jobRecovery.action.stillUnknown";
-    public const string JobRecoveryActionRefused = "jobRecovery.action.refused";
-    public const string JobRecoveryActionRebindDetail = "jobRecovery.action.rebind.detail";
-    public const string JobRecoveryActionResumeDetail = "jobRecovery.action.resume.detail";
-    public const string JobRecoveryActionReconcile = "jobRecovery.action.reconcile";
-    public const string JobRecoveryActionResume = "jobRecovery.action.resume";
-    public const string JobRecoveryActionRebind = "jobRecovery.action.rebind";
+    public const string JobRecoveryActionRebound = "jobRecovery.action.rebound";
     public const string JobRecoveryActionReconcileDetail = "jobRecovery.action.reconcile.detail";
+    public const string JobRecoveryActionResumeDetail = "jobRecovery.action.resume.detail";
     public const string JobRecoveryActionWorking = "jobRecovery.action.working";
+    public const string JobRecoveryActionUnconfirmed = "jobRecovery.action.unconfirmed";
+    public const string JobRecoveryActionReconcile = "jobRecovery.action.reconcile";
+    public const string JobRecoveryActionRebindDetail = "jobRecovery.action.rebind.detail";
+    public const string JobRecoveryActionRefused = "jobRecovery.action.refused";
+    public const string JobRecoveryActionResume = "jobRecovery.action.resume";
     public const string JobRecoveryActionObserved = "jobRecovery.action.observed";
-    public const string JobRecoveryArchiveConfirm = "jobRecovery.archive.confirm";
-    public const string JobRecoveryArchiveBlockerActive = "jobRecovery.archive.blocker.active";
-    public const string JobRecoveryArchiveBlockerStorage = "jobRecovery.archive.blocker.storage";
-    public const string JobRecoveryArchiveBlockerHazards = "jobRecovery.archive.blocker.hazards";
+    public const string JobRecoveryActionRebind = "jobRecovery.action.rebind";
+    public const string JobRecoveryArchiveBlockerMutation = "jobRecovery.archive.blocker.mutation";
+    public const string JobRecoveryArchiveUnavailable = "jobRecovery.archive.unavailable";
+    public const string JobRecoveryArchiveTitle = "jobRecovery.archive.title";
     public const string JobRecoveryArchiveFinish = "jobRecovery.archive.finish";
-    public const string JobRecoveryArchiveReview = "jobRecovery.archive.review";
-    public const string JobRecoveryArchiveDismiss = "jobRecovery.archive.dismiss";
-    public const string JobRecoveryArchiveWorking = "jobRecovery.archive.working";
+    public const string JobRecoveryArchiveConfirm = "jobRecovery.archive.confirm";
+    public const string JobRecoveryArchiveBlockerHazards = "jobRecovery.archive.blocker.hazards";
+    public const string JobRecoveryArchiveDetail = "jobRecovery.archive.detail";
     public const string JobRecoveryArchiveLastStep = "jobRecovery.archive.lastStep";
+    public const string JobRecoveryArchiveBlockerProcess = "jobRecovery.archive.blocker.process";
+    public const string JobRecoveryArchiveBlockerStorage = "jobRecovery.archive.blocker.storage";
     public const string JobRecoveryArchiveExistingDecision = "jobRecovery.archive.existingDecision";
     public const string JobRecoveryArchiveBlockerUnknown = "jobRecovery.archive.blocker.unknown";
-    public const string JobRecoveryArchiveBlockerRefresh = "jobRecovery.archive.blocker.refresh";
-    public const string JobRecoveryArchiveUnavailable = "jobRecovery.archive.unavailable";
-    public const string JobRecoveryArchivePublicationPending = "jobRecovery.archive.publicationPending";
+    public const string JobRecoveryArchiveWorking = "jobRecovery.archive.working";
     public const string JobRecoveryArchiveComplete = "jobRecovery.archive.complete";
-    public const string JobRecoveryArchiveTitle = "jobRecovery.archive.title";
-    public const string JobRecoveryArchiveBlockerProcess = "jobRecovery.archive.blocker.process";
-    public const string JobRecoveryArchiveDetail = "jobRecovery.archive.detail";
-    public const string JobRecoveryArchiveBlockerMutation = "jobRecovery.archive.blocker.mutation";
+    public const string JobRecoveryArchiveBlockerActive = "jobRecovery.archive.blocker.active";
+    public const string JobRecoveryArchiveDismiss = "jobRecovery.archive.dismiss";
+    public const string JobRecoveryArchiveBlockerRefresh = "jobRecovery.archive.blocker.refresh";
+    public const string JobRecoveryArchiveReview = "jobRecovery.archive.review";
+    public const string JobRecoveryArchivePublicationPending = "jobRecovery.archive.publicationPending";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2370,8 +2384,8 @@ public static class UiStrings
         AppNavigationDiagnostics,
         HistoryActivityOpenDiagnostics,
         HistoryContextReadOnly,
-        DiagnosticsCaptureUnavailable,
-        DiagnosticsCaptureUnavailableDetail,
+        WindowsDiagnosticsCaptureUnavailable,
+        WindowsDiagnosticsCaptureUnavailableDetail,
         DiagnosticsAlignmentCalibrated,
         DiagnosticsAlignmentCannotAlign,
         DiagnosticsAlignmentExplain,
@@ -2541,36 +2555,50 @@ public static class UiStrings
         WindowsRemoteSourcesErrorConnectionFailed,
         WindowsRemoteSourcesErrorCredentialStoreFailed,
         WindowsRemoteSourcesErrorStorageFailed,
-        JobRecoveryActionRebound,
-        JobRecoveryActionUnconfirmed,
+        HistoryActivityOpenFlash,
+        HistoryActivityOpenViewer,
+        HistoryActivityOpenTrace,
+        HistoryActivityOpenDebug,
+        HistoryActivityOpenDevice,
+        HistoryActivityOpenDetailUnavailable,
+        HistoryActivityOpenUnsupported,
+        HistoryContextTitle,
+        HistoryContextDismiss,
+        HistoryContextJob,
+        HistoryContextTarget,
+        HistoryContextOperation,
+        HistoryContextState,
+        HistoryContextArtifacts,
         JobRecoveryActionStillUnknown,
-        JobRecoveryActionRefused,
-        JobRecoveryActionRebindDetail,
-        JobRecoveryActionResumeDetail,
-        JobRecoveryActionReconcile,
-        JobRecoveryActionResume,
-        JobRecoveryActionRebind,
+        JobRecoveryActionRebound,
         JobRecoveryActionReconcileDetail,
+        JobRecoveryActionResumeDetail,
         JobRecoveryActionWorking,
+        JobRecoveryActionUnconfirmed,
+        JobRecoveryActionReconcile,
+        JobRecoveryActionRebindDetail,
+        JobRecoveryActionRefused,
+        JobRecoveryActionResume,
         JobRecoveryActionObserved,
-        JobRecoveryArchiveConfirm,
-        JobRecoveryArchiveBlockerActive,
-        JobRecoveryArchiveBlockerStorage,
-        JobRecoveryArchiveBlockerHazards,
+        JobRecoveryActionRebind,
+        JobRecoveryArchiveBlockerMutation,
+        JobRecoveryArchiveUnavailable,
+        JobRecoveryArchiveTitle,
         JobRecoveryArchiveFinish,
-        JobRecoveryArchiveReview,
-        JobRecoveryArchiveDismiss,
-        JobRecoveryArchiveWorking,
+        JobRecoveryArchiveConfirm,
+        JobRecoveryArchiveBlockerHazards,
+        JobRecoveryArchiveDetail,
         JobRecoveryArchiveLastStep,
+        JobRecoveryArchiveBlockerProcess,
+        JobRecoveryArchiveBlockerStorage,
         JobRecoveryArchiveExistingDecision,
         JobRecoveryArchiveBlockerUnknown,
-        JobRecoveryArchiveBlockerRefresh,
-        JobRecoveryArchiveUnavailable,
-        JobRecoveryArchivePublicationPending,
+        JobRecoveryArchiveWorking,
         JobRecoveryArchiveComplete,
-        JobRecoveryArchiveTitle,
-        JobRecoveryArchiveBlockerProcess,
-        JobRecoveryArchiveDetail,
-        JobRecoveryArchiveBlockerMutation,
+        JobRecoveryArchiveBlockerActive,
+        JobRecoveryArchiveDismiss,
+        JobRecoveryArchiveBlockerRefresh,
+        JobRecoveryArchiveReview,
+        JobRecoveryArchivePublicationPending,
     ];
 }

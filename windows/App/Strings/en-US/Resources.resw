@@ -4326,13 +4326,13 @@ SHA-256: %4$@</value>
     <value>This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.</value>
     <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable" xml:space="preserve">
     <value>Session capture is not available</value>
-    <comment>diagnostics.capture.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable (Windows only)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable_detail" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable_detail" xml:space="preserve">
     <value>Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.</value>
-    <comment>diagnostics.capture.unavailable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable.detail (Windows only)</comment>
   </data>
   <data name="diagnostics_alignment_calibrated" xml:space="preserve">
     <value>Calibrated</value>
@@ -4351,7 +4351,7 @@ SHA-256: %4$@</value>
     <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_arm" xml:space="preserve">
-    <value>Arm a session</value>
+    <value>Start session</value>
     <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_mark" xml:space="preserve">
@@ -5010,89 +5010,149 @@ SHA-256: %4$@</value>
     <value>The remote build source could not be saved safely.</value>
     <comment>windows.remoteSources.error.storageFailed (Windows only)</comment>
   </data>
-  <data name="jobRecovery_action_rebound" xml:space="preserve">
-    <value>Loader binding verified; review the Job’s current recovery state</value>
-    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
+  <data name="history_activity_open_flash" xml:space="preserve">
+    <value>Open Flash</value>
+    <comment>history.activity.open.flash (HistoryLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
-    <value>The response was not confirmed. Refresh this Job before taking another action.</value>
-    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
+  <data name="history_activity_open_viewer" xml:space="preserve">
+    <value>Open Viewer</value>
+    <comment>history.activity.open.viewer (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_trace" xml:space="preserve">
+    <value>Open Trace</value>
+    <comment>history.activity.open.trace (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_debug" xml:space="preserve">
+    <value>Open Debug</value>
+    <comment>history.activity.open.debug (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_device" xml:space="preserve">
+    <value>Open Device</value>
+    <comment>history.activity.open.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_detailUnavailable" xml:space="preserve">
+    <value>Job details are unavailable, so ArkDeck cannot reopen this context.</value>
+    <comment>history.activity.open.detailUnavailable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_unsupported" xml:space="preserve">
+    <value>This record has no workspace that can be reopened.</value>
+    <comment>history.activity.open.unsupported (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_title" xml:space="preserve">
+    <value>Opened from History</value>
+    <comment>history.context.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_dismiss" xml:space="preserve">
+    <value>Close history context</value>
+    <comment>history.context.dismiss (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>history.context.job (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>history.context.target (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_operation" xml:space="preserve">
+    <value>Operation</value>
+    <comment>history.context.operation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_state" xml:space="preserve">
+    <value>State</value>
+    <comment>history.context.state (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_artifacts" xml:space="preserve">
+    <value>Artifacts</value>
+    <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_stillUnknown" xml:space="preserve">
     <value>The original outcome is still unknown</value>
     <comment>jobRecovery.action.stillUnknown (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_refused" xml:space="preserve">
-    <value>Recovery action unavailable</value>
-    <comment>jobRecovery.action.refused (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_rebind_detail" xml:space="preserve">
-    <value>Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.</value>
-    <comment>jobRecovery.action.rebind.detail (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
-    <value>Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.</value>
-    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_reconcile" xml:space="preserve">
-    <value>Check recovery state</value>
-    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_resume" xml:space="preserve">
-    <value>Continue from confirmed safe boundary</value>
-    <comment>jobRecovery.action.resume (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_rebind" xml:space="preserve">
-    <value>Verify and rebind Loader</value>
-    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_action_rebound" xml:space="preserve">
+    <value>Loader binding verified; review the Job’s current recovery state</value>
+    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_reconcile_detail" xml:space="preserve">
     <value>Runtime checks durable evidence and current identity. An unknown original action is never replayed.</value>
     <comment>jobRecovery.action.reconcile.detail (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
+    <value>Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.</value>
+    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="jobRecovery_action_working" xml:space="preserve">
     <value>Checking this Job…</value>
     <comment>jobRecovery.action.working (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
+    <value>The response was not confirmed. Refresh this Job before taking another action.</value>
+    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile" xml:space="preserve">
+    <value>Check recovery state</value>
+    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebind_detail" xml:space="preserve">
+    <value>Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.</value>
+    <comment>jobRecovery.action.rebind.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_refused" xml:space="preserve">
+    <value>Recovery action unavailable</value>
+    <comment>jobRecovery.action.refused (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_resume" xml:space="preserve">
+    <value>Continue from confirmed safe boundary</value>
+    <comment>jobRecovery.action.resume (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_observed" xml:space="preserve">
     <value>Runtime reported the updated state</value>
     <comment>jobRecovery.action.observed (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_confirm" xml:space="preserve">
-    <value>Archive as interrupted</value>
-    <comment>jobRecovery.archive.confirm (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_action_rebind" xml:space="preserve">
+    <value>Verify and rebind Loader</value>
+    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_active" xml:space="preserve">
-    <value>Runtime is still handling this Job. Wait for it to reach a safe boundary.</value>
-    <comment>jobRecovery.archive.blocker.active (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
+    <value>This Runtime cannot yet prove that a device-changing Job can release all its holds.</value>
+    <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_storage" xml:space="preserve">
-    <value>Session storage is unavailable. Restore storage before archiving.</value>
-    <comment>jobRecovery.archive.blocker.storage (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_unavailable" xml:space="preserve">
+    <value>Archive is unavailable. Refresh this Job and inspect its recovery state.</value>
+    <comment>jobRecovery.archive.unavailable (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_hazards" xml:space="preserve">
-    <value>Unresolved hazards or device residues must remain associated with this Job.</value>
-    <comment>jobRecovery.archive.blocker.hazards (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_title" xml:space="preserve">
+    <value>Archive interrupted Job</value>
+    <comment>jobRecovery.archive.title (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_finish" xml:space="preserve">
     <value>Finish recorded archive</value>
     <comment>jobRecovery.archive.finish (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_review" xml:space="preserve">
-    <value>Review archive…</value>
-    <comment>jobRecovery.archive.review (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_confirm" xml:space="preserve">
+    <value>Archive as interrupted</value>
+    <comment>jobRecovery.archive.confirm (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_dismiss" xml:space="preserve">
-    <value>Back</value>
-    <comment>jobRecovery.archive.dismiss (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_hazards" xml:space="preserve">
+    <value>Unresolved hazards or device residues must remain associated with this Job.</value>
+    <comment>jobRecovery.archive.blocker.hazards (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_working" xml:space="preserve">
-    <value>Checking archive state…</value>
-    <comment>jobRecovery.archive.working (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_detail" xml:space="preserve">
+    <value>Archive ends this Job and keeps its evidence. It does not recover the device or clean up device state. Runtime must prove that no managed process, unknown outcome, or unresolved hazard remains.</value>
+    <comment>jobRecovery.archive.detail (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_lastStep" xml:space="preserve">
     <value>Last confirmed step</value>
     <comment>jobRecovery.archive.lastStep (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_process" xml:space="preserve">
+    <value>The managed process or compensation state is not proven safe to close.</value>
+    <comment>jobRecovery.archive.blocker.process (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_storage" xml:space="preserve">
+    <value>Session storage is unavailable. Restore storage before archiving.</value>
+    <comment>jobRecovery.archive.blocker.storage (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_existingDecision" xml:space="preserve">
     <value>A previous archive decision is already recorded. This action only finishes its audit or Session publication.</value>
@@ -5102,36 +5162,32 @@ SHA-256: %4$@</value>
     <value>An action still has an unknown outcome. Keep this Job available for recovery.</value>
     <comment>jobRecovery.archive.blocker.unknown (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_refresh" xml:space="preserve">
-    <value>The Job record or journal needs a fresh recovery check before archive.</value>
-    <comment>jobRecovery.archive.blocker.refresh (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_unavailable" xml:space="preserve">
-    <value>Archive is unavailable. Refresh this Job and inspect its recovery state.</value>
-    <comment>jobRecovery.archive.unavailable (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_publicationPending" xml:space="preserve">
-    <value>The interruption is recorded; Session publication is pending. Review archive again to finish publishing.</value>
-    <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_working" xml:space="preserve">
+    <value>Checking archive state…</value>
+    <comment>jobRecovery.archive.working (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_complete" xml:space="preserve">
     <value>Archived as interrupted. The Session retains the original evidence.</value>
     <comment>jobRecovery.archive.complete (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_title" xml:space="preserve">
-    <value>Archive interrupted Job</value>
-    <comment>jobRecovery.archive.title (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_active" xml:space="preserve">
+    <value>Runtime is still handling this Job. Wait for it to reach a safe boundary.</value>
+    <comment>jobRecovery.archive.blocker.active (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_process" xml:space="preserve">
-    <value>The managed process or compensation state is not proven safe to close.</value>
-    <comment>jobRecovery.archive.blocker.process (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_dismiss" xml:space="preserve">
+    <value>Back</value>
+    <comment>jobRecovery.archive.dismiss (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_detail" xml:space="preserve">
-    <value>Archive ends this Job and keeps its evidence. It does not recover the device or clean up device state. Runtime must prove that no managed process, unknown outcome, or unresolved hazard remains.</value>
-    <comment>jobRecovery.archive.detail (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_refresh" xml:space="preserve">
+    <value>The Job record or journal needs a fresh recovery check before archive.</value>
+    <comment>jobRecovery.archive.blocker.refresh (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
-    <value>This Runtime cannot yet prove that a device-changing Job can release all its holds.</value>
-    <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_review" xml:space="preserve">
+    <value>Review archive…</value>
+    <comment>jobRecovery.archive.review (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_publicationPending" xml:space="preserve">
+    <value>The interruption is recorded; Session publication is pending. Review archive again to finish publishing.</value>
+    <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
   </data>
 </root>

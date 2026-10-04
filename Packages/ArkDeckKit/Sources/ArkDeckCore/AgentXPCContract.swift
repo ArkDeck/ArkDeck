@@ -38,6 +38,7 @@ package enum ArkDeckEnvironmentKey {
 
 package enum ArkDeckAgentClientName {
   public static let flashWorkspace = "ArkDeckApp.FlashWorkspace"
+  package static let diagnosticsWorkspace = "ArkDeckApp.DiagnosticsWorkspace"
   public static let traceWorkspace = "ArkDeckApp.TraceWorkspace"
   package static let debugLogsWorkspace = "ArkDeckApp.DebugWorkspace.Logs"
   package static let debugArtifactsWorkspace = "ArkDeckApp.DebugWorkspace.Artifacts"
@@ -107,6 +108,7 @@ package enum ArkDeckAgentXPC {
     "device.observations",
     "health",
     "debug.probe",
+    "diagnostic.session.status",
     "flash.bootloader-status",
     "flash.device-access",
     "flash.lanePlanPreview",
@@ -189,6 +191,11 @@ package enum ArkDeckAgentXPC {
     "job.submit",
   ]
 
+  /// Host annotations and stop signalling remain bound to one App-owned Job.
+  package static let forwardableDiagnosticSessionMethods: Set<String> = [
+    "diagnostic.session.mark", "diagnostic.session.stop",
+  ]
+
   package static let forwardableMethods =
     forwardableReadOnlyMethods
     .union(forwardableImportMethods)
@@ -198,6 +205,7 @@ package enum ArkDeckAgentXPC {
     .union(forwardableRuntimeStorageMethods)
     .union(forwardableSessionMethods)
     .union(gatedAppJobMethods)
+    .union(forwardableDiagnosticSessionMethods)
 
   /// Reason codes returned to the client instead of a forwarded response.
   /// They are stable strings so the App can present an accurate cause rather

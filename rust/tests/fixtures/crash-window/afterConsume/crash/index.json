@@ -7,7 +7,7 @@
       "createdAtUTC" : "2026-09-14T00:00:00Z",
       "idempotencyKey" : "idem-crash-tap",
       "jobId" : "job-170e24af76bacc6d8185503ed380ebea",
-      "recordSHA256" : "5ca908f8b5a25a22bc2003e2c1502b314e3e399c7def42ba0509e4c696024ee4",
+      "recordSHA256" : "41aa8a90933dd0fe7a36dffd25d8cff7a2b30b1536fa2de9fee1a241951401e7",
       "requestHash" : "9aa7ffe63744a84ef3bb133aa4dd313552fefc6727bdfd5f114401bcb995592c",
       "state" : "running",
       "updatedAtUTC" : "2026-09-14T00:00:00Z",

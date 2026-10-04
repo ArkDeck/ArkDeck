@@ -37,12 +37,18 @@ pub(crate) const SCREEN_SEQUENCE: &str = "capture.screen-sequence@1";
 /// The diagnostic capture, whose legs beyond its default are file legs or
 /// reads [`FileAction`] names.
 pub(crate) const CAPTURE: &str = "capture.diagnostics@1";
+pub(crate) const DIAGNOSTIC_SESSION: &str = "capture.diagnostic-session@1";
+
+pub(crate) fn diagnostic_capture(reference: &str) -> bool {
+    matches!(reference, CAPTURE | DIAGNOSTIC_SESSION)
+}
 
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 11] = [
+pub(crate) const DEVICE_OPERATIONS: [&str; 12] = [
     "observe.device@1",
     "debug.template@1",
     "capture.diagnostics@1",
+    DIAGNOSTIC_SESSION,
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
@@ -55,9 +61,10 @@ pub(crate) const DEVICE_OPERATIONS: [&str; 11] = [
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
 /// for a complete evidence preflight.
-const EVIDENCE_OPERATIONS: [&str; 8] = [
+const EVIDENCE_OPERATIONS: [&str; 9] = [
     "observe.device@1",
     "capture.diagnostics@1",
+    DIAGNOSTIC_SESSION,
     "debug.hap@1",
     "port-forward.create@1",
     "port-forward.remove@1",
@@ -450,7 +457,7 @@ pub(crate) fn action_in(
     }
     // A screen sequence's capture, receive and cleanup are its file legs,
     // each naming the Job's own frame directory and archive.
-    if matches!(reference, SCREEN_SEQUENCE | CAPTURE) {
+    if matches!(reference, SCREEN_SEQUENCE | CAPTURE | DIAGNOSTIC_SESSION) {
         let named = FileAction::for_step(
             &step.step_id,
             &step.kind,
@@ -1002,10 +1009,10 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
             &["device-facts.json", "binding-snapshot.json"]
         }
         ("capture.diagnostics@1", "observe-application-liveness") => &["application-liveness.json"],
-        ("capture.diagnostics@1", "capture-hilog") => &["hilog.txt"],
+        (CAPTURE | DIAGNOSTIC_SESSION, "capture-hilog") => &["hilog.txt"],
         ("capture.diagnostics@1", "capture-ui-dump") => &["ui-dump.json"],
         ("capture.diagnostics@1", "capture-advanced-ui-dump") => &["advanced-dump.txt"],
-        ("capture.diagnostics@1", "receive-trace-artifact") => &["trace.htrace"],
+        (CAPTURE | DIAGNOSTIC_SESSION, "receive-trace-artifact") => &["trace.htrace"],
         ("capture.diagnostics@1", "receive-ui-tree") => &["ui-tree.json"],
         ("capture.diagnostics@1", "receive-screenshot") => &["screenshot.png", "screenshot.jpeg"],
         ("capture.diagnostics@1", "capture-crash-index") => &["crash-index.txt"],
@@ -1037,6 +1044,13 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
 /// at finalization rather than by one step.
 pub(crate) fn finalize_products(operation: &str) -> &'static [&'static str] {
     match operation {
+        DIAGNOSTIC_SESSION => &[
+            "capture.log",
+            "markers.json",
+            "diagnostic-session.json",
+            "artifact-index.json",
+            "capture-summary.json",
+        ],
         "capture.diagnostics@1" => &[
             "capture.log",
             "markers.json",
@@ -1172,7 +1186,8 @@ pub(crate) fn file_journal_arguments(
             json!({"catalogId": "trace-presets", "actionId": "custom", "parameters": {},
                 "artifactId": artifact_id, "ownedRemotePath": path.remote_path})
         }
-        FileAction::CaptureTrace { request, path } => json!({
+        FileAction::CaptureTrace { request, path }
+        | FileAction::CaptureDiagnosticTrace { request, path } => json!({
             "catalogId": "trace-presets", "actionId": "custom",
             "parameters": {"durationSeconds": request.duration_seconds,
                 "categories": request.categories, "bufferKB": request.buffer_kb},

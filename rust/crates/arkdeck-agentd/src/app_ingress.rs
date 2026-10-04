@@ -206,6 +206,9 @@ impl<H: HostServices> AppIngress<H> {
                     | "trace.cache.purge"
                     | "debug.probe"
                     | "trace.probe"
+                    | "diagnostic.session.status"
+                    | "diagnostic.session.mark"
+                    | "diagnostic.session.stop"
                     | "flash.bootloader-status"
                     | "flash.prerequisites"
                     | "flash.device-access"
@@ -230,6 +233,21 @@ impl<H: HostServices> AppIngress<H> {
                 "invalidParams",
                 "App request requires its complete closed parameters",
             );
+        }
+        // A live session belongs to a Job submitted through this App door.
+        // Read-only inspection may name History; marking/stopping cannot
+        // reach a CLI/Agent Job or manufacture an owner after restart.
+        if matches!(
+            request.method.as_str(),
+            "diagnostic.session.mark" | "diagnostic.session.stop"
+        ) && !request
+            .params
+            .as_ref()
+            .and_then(|params| params.get("jobId"))
+            .and_then(Value::as_str)
+            .is_some_and(|id| self.jobs.owns(id))
+        {
+            return not_allowlisted(&request.id);
         }
         // Retain the one-shot claim across the synchronous owner call, but
         // never hold the gate mutex while executing; a parallel cancel must enter.
@@ -357,6 +375,9 @@ fn closed_parameters(request: &Request) -> bool {
     if matches!(
         request.method.as_str(),
         "job.list"
+            | "diagnostic.session.status"
+            | "diagnostic.session.mark"
+            | "diagnostic.session.stop"
             | "job.show"
             | "job.timeline"
             | "job.evidence"

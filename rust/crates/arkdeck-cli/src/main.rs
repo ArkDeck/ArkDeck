@@ -285,7 +285,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         });
     }
     if let Some(verb) = invocation.command.strip_prefix("diagnostics.")
-        && verb != "export"
+        && matches!(verb, "inspect" | "preview")
     {
         // Swift's session bounds every request by one deadline.
         let deadline =

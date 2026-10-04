@@ -18,7 +18,7 @@ namespace ArkDeck.App.Pages;
 /// </summary>
 public sealed partial class TracePage() : SurfacePage<TraceState>(
     "trace", "trace.title", UiStrings.AppNavigationTrace,
-    "trace.refresh", UiStrings.TraceActionRefresh, "trace.loading", UiStrings.SettingsCommonLoading)
+    "trace.refresh", UiStrings.TraceActionRefresh, "trace.loading", UiStrings.SettingsCommonLoading), IHistoryContextPage
 {
     // Rebuilt by each render (an element is never moved between renders).
     private StackPanel _footer = new() { Spacing = 8 };
@@ -40,6 +40,18 @@ public sealed partial class TracePage() : SurfacePage<TraceState>(
     private string? _viewerFailureKey;
     private Unavailable? _viewerFailure;
     private TraceDocument? _latest;
+    private HistoryWorkspaceContext? _history;
+    private string? _historyTraceJob;
+
+    /// <summary>macOS <c>openHistoryContext</c>: the record's Target is pinned and, for a capture,
+    /// its raw Trace is read (verified) into the inbox and opened in the Trace viewer.</summary>
+    public void OpenHistoryContext(HistoryWorkspaceContext context)
+    {
+        _history = context;
+        _pinnedTargetId = context.TargetId;
+        _targetId = context.TargetId;
+        _historyTraceJob = context.OperationReference == HistoryWorkspaceContext.CaptureDiagnostics ? context.JobId : null;
+    }
 
     protected override async Task<TraceState> LoadAsync()
     {
@@ -67,12 +79,27 @@ public sealed partial class TracePage() : SurfacePage<TraceState>(
         var said = _status.Text;
         _status = Ui.Status("trace.status");
         Ui.SetText(_status, said);
+        if (_history is { } history)
+        {
+            body.Children.Add(HistoryContextBanner.Create(history, async () =>
+            {
+                _history = null;
+                _historyTraceJob = null;
+                _pinnedTargetId = null;
+                await RefreshAsync();
+            }));
+        }
         body.Children.Add(Ui.Text("trace.workspace.summary", S.Text(UiStrings.TraceWorkspaceSummary), "ArkDeckCaptionStyle"));
         body.Children.Add(Ui.Card(Capture(state), "trace.capture.section"));
         _viewer = new StackPanel { Spacing = 8 };
         body.Children.Add(Ui.Card(_viewer, "trace.viewer.section"));
         body.Children.Add(_status);
         RenderViewer();
+        if (_historyTraceJob is { } job)
+        {
+            _historyTraceJob = null;
+            DispatcherQueue.TryEnqueue(async () => await OpenCapturedAsync(job, open: true));
+        }
     }
 
     // ---- capture ----

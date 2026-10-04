@@ -1361,6 +1361,9 @@ mod tests {
 
     fn arguments(plan: &FilePlan) -> Vec<Vec<String>> {
         match plan {
+            FilePlan::DiagnosticTrace { .. } => {
+                panic!("debug HAP must not use interactive session lowering")
+            }
             FilePlan::Process(process) | FilePlan::Receive { process, .. } => {
                 vec![process.arguments.clone()]
             }

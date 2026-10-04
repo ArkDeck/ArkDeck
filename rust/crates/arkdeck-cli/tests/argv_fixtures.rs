@@ -11,6 +11,103 @@ use arkdeck_cli::{
 use serde_json::{Value, json};
 use std::process::Command;
 
+#[test]
+fn diagnostic_session_controls_pin_one_job_and_reject_untyped_fields() {
+    let argv = |words: &[&str]| {
+        words
+            .iter()
+            .map(|word| (*word).to_owned())
+            .collect::<Vec<_>>()
+    };
+    for verb in ["status", "stop"] {
+        let invocation = parse(&argv(&[
+            "diagnostics",
+            "session",
+            verb,
+            "--job",
+            "job-session-1",
+        ]))
+        .unwrap();
+        assert_eq!(invocation.method, format!("diagnostic.session.{verb}"));
+        assert_eq!(
+            invocation.params,
+            Some(
+                json!({"jobId": "job-session-1"})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            )
+        );
+    }
+    let invocation = parse(&argv(&[
+        "diagnostics",
+        "session",
+        "mark",
+        "--job",
+        "job-session-1",
+        "--marker-id",
+        "marker-1",
+        "--label",
+        "slow frame",
+        "--timeout",
+        "5s",
+    ]))
+    .unwrap();
+    assert_eq!(invocation.method, "diagnostic.session.mark");
+    assert_eq!(
+        invocation.params,
+        Some(
+            json!({"jobId": "job-session-1", "markerId": "marker-1", "label": "slow frame"})
+                .as_object()
+                .unwrap()
+                .clone()
+        )
+    );
+    for words in [
+        vec!["diagnostics", "session", "mark", "--job", "job-session-1"],
+        vec![
+            "diagnostics",
+            "session",
+            "mark",
+            "--job",
+            "job-session-1",
+            "--marker-id",
+            "marker-1",
+            "--label",
+            "bad\nlabel",
+        ],
+        vec![
+            "diagnostics",
+            "session",
+            "stop",
+            "--job",
+            "../job-session-1",
+        ],
+        vec![
+            "diagnostics",
+            "session",
+            "stop",
+            "--job",
+            "job-session-1",
+            "--target",
+            "another-target",
+        ],
+        vec![
+            "diagnostics",
+            "session",
+            "mark",
+            "--job",
+            "job-session-1",
+            "--marker-id",
+            "marker-1",
+            "--timestamp",
+            "1",
+        ],
+    ] {
+        assert!(parse(&argv(&words)).is_err(), "{words:?}");
+    }
+}
+
 /// Each served leaf's argv fixture, in the registry's order.
 fn fixtures() -> Vec<(String, Value)> {
     command_registry()["commands"]

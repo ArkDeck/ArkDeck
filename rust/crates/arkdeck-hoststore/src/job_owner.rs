@@ -39,6 +39,9 @@ pub(crate) use mutation_state_continuity::require_retained_sessions_without_owne
 #[path = "job_flash_state.rs"]
 mod flash_state;
 
+#[path = "diagnostic_session.rs"]
+pub(crate) mod diagnostic_session;
+
 #[cfg(any(target_os = "macos", windows))]
 #[path = "arkforge_job_state.rs"]
 pub(crate) mod arkforge_job_state;
@@ -70,6 +73,9 @@ pub struct JobStore {
     /// sees it, as Swift's `recordForRead` does, until the Job is persisted
     /// again or the process ends.
     resident: std::sync::Mutex<std::collections::BTreeMap<String, JobRecord>>,
+    diagnostic_sessions: std::sync::Mutex<
+        std::collections::BTreeMap<String, std::sync::Arc<diagnostic_session::LiveSession>>,
+    >,
     /// The retained Sessions the last complete continuity scan let pass, in
     /// memory only (`mutation_state_continuity.rs`). Taken only under
     /// `activity`.
@@ -241,6 +247,7 @@ impl JobStore {
             hdc_lifecycle: std::sync::RwLock::new(()),
             hdc_recomposition: std::sync::atomic::AtomicBool::new(false),
             resident: Default::default(),
+            diagnostic_sessions: Default::default(),
             #[cfg(any(target_os = "macos", windows))]
             session_verdicts: Default::default(),
         })

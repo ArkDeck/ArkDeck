@@ -19,7 +19,6 @@ use crate::operation_catalog::CatalogOperation;
 use arkdeck_provider_hdc::{TRACE_PARAMETERS, TraceProbe};
 use serde_json::{Map, Value, json};
 
-const CAPTURE: &str = "capture.diagnostics@1";
 /// Swift `validateTraceRuntimeProbe`'s refusal.
 const MISMATCH: &str =
     "Trace probe facts do not match target, binding, adapter, tags, or parameter catalog";
@@ -47,7 +46,7 @@ impl Unkept {
 /// Swift's refusal when one of them is not a string; none for any other
 /// request.
 fn requested_tags(run: &Run) -> Option<Result<Vec<String>, Stop>> {
-    if run.record.operation() != CAPTURE {
+    if !crate::device_steps::diagnostic_capture(run.record.operation()) {
         return None;
     }
     let values = run.record.request["inputs"]["traceCategories"]
@@ -196,6 +195,11 @@ impl JobRunner<'_> {
         // Swift's does without an error: the second snapshot is taken then
         // too, and one that cannot be is noted rather than failing the drain.
         let executed = self.steps(run, hdc, descriptor);
+        // The interactive operation closes the entire dispatch chain on an
+        // interrupted lifecycle, including the old capture's trailing probe.
+        if run.record.operation() == crate::device_steps::DIAGNOSTIC_SESSION && executed.is_err() {
+            return executed;
+        }
         let after = snapshot(hdc, &target_id, revision, &tags);
         match executed {
             Ok(()) | Err(Stop::Cancelled) => {

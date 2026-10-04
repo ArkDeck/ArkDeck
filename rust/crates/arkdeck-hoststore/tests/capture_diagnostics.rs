@@ -558,3 +558,286 @@ fn rust_captures_the_file_legs_of_the_swift_fake_device() {
 fn rust_captures_the_trace_legs_of_the_swift_fake_device() {
     replay_under_mutation_authority("capture-diagnostics-trace");
 }
+
+/// A new operation runs through the real planner/admitter/runner/result path,
+/// over the historical fake only. Its stdout is adapted to the observed ring
+/// lifecycle vocabulary; none of these bytes are hardware evidence.
+#[test]
+fn diagnostic_session_publishes_host_marks_and_stops_after_an_unknown_anchor() {
+    if !arkdeck_contract::METHODS.contains(&"diagnostic.session.status") {
+        let operations: Value =
+            serde_json::from_str(arkdeck_contract::CATALOG_CANONICAL_JSON).unwrap();
+        assert!(
+            !operations
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|op| op["id"] == "capture.diagnostic-session")
+        );
+        return; // The previous published view has no interactive operation to execute.
+    }
+    use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt};
+    use std::sync::Mutex;
+    use std::time::{Duration, Instant};
+    struct Interactive<'a> {
+        inner: &'a ProcessDispatch,
+        calls: Mutex<Vec<Vec<String>>>,
+        unknown_anchor: bool,
+    }
+    impl HdcDispatch for Interactive<'_> {
+        fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
+            self.calls.lock().unwrap().push(plan.arguments.clone());
+            let mut receipt = self.inner.dispatch(plan)?;
+            if plan.arguments.iter().any(|arg| arg == "--trace_begin") {
+                receipt.stdout = b"OpenRecording done\n".to_vec();
+            } else if plan
+                .arguments
+                .iter()
+                .any(|arg| arg == "--trace_finish_nodump")
+            {
+                receipt.stdout = b"end capture trace.\n".to_vec();
+            } else if self.unknown_anchor
+                && plan
+                    .arguments
+                    .iter()
+                    .any(|arg| arg.starts_with("grep -c ARKDECKANCHOR"))
+            {
+                receipt.stdout = b"0\n".to_vec();
+            }
+            Ok(receipt)
+        }
+        fn mutation_identity_current(&self) -> bool {
+            self.inner.mutation_identity_current()
+        }
+    }
+    let _lock = exclusive();
+    for unknown_anchor in [false, true] {
+        let fixture = support::fixture("capture-diagnostics-trace");
+        let provenance = support::document(&fixture, "provenance.json");
+        let root = rebuild(&fixture);
+        let default_root = root.join("store");
+        fs::create_dir(&default_root).unwrap();
+        chmod(&default_root, 0o700);
+        fs::create_dir(root.join("resources")).unwrap();
+        chmod(&root.join("resources"), 0o700);
+        for resource in fs::read_dir(fixture.join("resources")).unwrap() {
+            let resource = resource.unwrap().path();
+            fs::copy(
+                &resource,
+                root.join("resources").join(resource.file_name().unwrap()),
+            )
+            .unwrap();
+        }
+        let receive_root = PathBuf::from(provenance["receiveRoot"].as_str().unwrap());
+        let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
+        let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+        let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+        let jobs = JobStore::open_owner(&default_root).unwrap();
+        let capabilities = CapabilityStore::open(&default_root.join("capabilities")).unwrap();
+        let sessions =
+            SessionStore::open(&root.join("session-owner"), &root.join("Sessions")).unwrap();
+        let inner =
+            ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
+        let dispatch = Interactive {
+            inner: &inner,
+            calls: Mutex::default(),
+            unknown_anchor,
+        };
+        let hdc = HdcComposition {
+            targets: &targets,
+            dispatch: &dispatch,
+            receive_root: Some(&receive_root),
+            tool_sha256: &digest,
+            now: fixed_now,
+            code_sign_helper: None,
+        };
+        let holds = DeviceHolds::default();
+        let authority = || MutationAuthority {
+            default_root: &default_root,
+            sessions: Some(&sessions),
+            capabilities: &capabilities,
+            holds: &holds,
+        };
+        let probe = OracleProbe::new(&provenance);
+        let claims = StorageClaims::default();
+        let publisher = SessionPublisher {
+            sessions: &sessions,
+            claims: &claims,
+            probe: &probe,
+        };
+        let planner = || JobPlanner {
+            imports: None,
+            artifacts: Some(&artifacts),
+            analyzer: None,
+            state_root: &root,
+            hdc: Some(&hdc),
+            workspace: None,
+        };
+        let request = json!({
+            "documentType":"runtime-operation-request", "schemaVersion":"1.0.0",
+            "requestId":"interactive-fixture", "idempotencyKey":"interactive-fixture",
+            "operation":{"id":"capture.diagnostic-session", "version":1},
+            "target":{"targetId":"TGT-3ba3f5f43b92", "expectedBindingRevision":1},
+            "inputs":{"durationSeconds":3, "maximumMarkers":2, "traceCategories":["ohos"]},
+            "requestedOutputs":["hardwareEvidence"]
+        });
+        let params = Map::from_iter([("requestJson".into(), json!(request.to_string()))]);
+        let plan = planner().handle(&params).unwrap();
+        let plan_text = plan.to_string();
+        assert!(plan_text.contains("capture-session-trace"));
+        let submitted = JobAdmitter {
+            planner: planner(),
+            jobs: &jobs,
+            now: fixed_now,
+            authority: Some(authority()),
+        }
+        .handle(&params)
+        .unwrap();
+        let id = submitted["jobId"].as_str().unwrap();
+        let run_params = Map::from_iter([("jobId".into(), json!(id))]);
+        let runner = JobRunner {
+            imports: None,
+            mutation: Some(MutationExecution {
+                authority: authority(),
+                state_root: &root,
+            }),
+            jobs: &jobs,
+            artifacts: &artifacts,
+            analyzer: None,
+            quota: provenance["quotaBytes"].as_u64().unwrap(),
+            home: provenance["home"].as_str().unwrap(),
+            now: fixed_now,
+            precise_now: fixed_precise_now,
+            sessions: Some(&publisher),
+            cancellation: None,
+            after_commit: None,
+            hdc: Some(&hdc),
+            workspace: None,
+        };
+        std::thread::scope(|scope| {
+            let running = scope.spawn(|| runner.handle(&run_params));
+            if !unknown_anchor {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                loop {
+                    let status = jobs
+                        .diagnostic_session_control("diagnostic.session.status", &run_params)
+                        .unwrap();
+                    if status["state"] == "recording" {
+                        break;
+                    }
+                    assert!(Instant::now() < deadline, "session never armed: {status}");
+                    std::thread::yield_now();
+                }
+                let mut mark = run_params.clone();
+                mark.insert("markerId".into(), json!("problem-observed"));
+                let marked = jobs
+                    .diagnostic_session_control("diagnostic.session.mark", &mark)
+                    .unwrap();
+                assert_eq!(marked["markers"].as_array().unwrap().len(), 1);
+                jobs.diagnostic_session_control("diagnostic.session.stop", &run_params)
+                    .unwrap();
+            }
+            let result = running.join().unwrap();
+            assert!(result.is_ok(), "{result:?}");
+        });
+        let status = jobs
+            .diagnostic_session_control("diagnostic.session.status", &run_params)
+            .unwrap();
+        assert!(
+            status.get("clockObservation").is_none(),
+            "closed live control contract is unchanged"
+        );
+        let calls = dispatch.calls.lock().unwrap();
+        let anchor = calls
+            .iter()
+            .position(|args| {
+                args.iter()
+                    .any(|arg| arg.starts_with("grep -c ARKDECKANCHOR"))
+            })
+            .unwrap();
+        if unknown_anchor {
+            assert_eq!(status["state"], "interrupted");
+            assert_eq!(
+                calls.len(),
+                anchor + 1,
+                "unknown anchor must prevent dump, cleanup and trailing device probes"
+            );
+            assert_eq!(status["markers"].as_array().unwrap().len(), 0);
+        } else {
+            assert_eq!(status["jobState"], "succeeded", "{status}");
+            let reader = JobResultReader {
+                jobs: &jobs,
+                artifacts: &artifacts,
+            };
+            assert!(reader.handle("job.evidence", &run_params).is_ok());
+            let index: Value = serde_json::from_slice(
+                &fs::read(root.join("artifacts").join(id).join("index.json")).unwrap(),
+            )
+            .unwrap();
+            let rows = index["artifacts"].as_array().unwrap();
+            let marks = rows
+                .iter()
+                .find(|row| row["name"] == "markers.json")
+                .unwrap();
+            let bytes = fs::read(
+                root.join("artifacts")
+                    .join(id)
+                    .join(marks["artifactID"].as_str().unwrap()),
+            )
+            .unwrap();
+            let document: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(document["markers"][0]["markerId"], "problem-observed");
+            assert_eq!(document["clockObservation"]["jobId"], id);
+            assert_eq!(
+                document["clockObservation"]["anchor"],
+                document["coverage"]["anchor"]
+            );
+            assert_eq!(document["clockObservation"]["status"], "unvalidated");
+            assert!(
+                document["clockObservation"]["elapsedNanoseconds"]
+                    .as_u64()
+                    .is_some()
+            );
+            if let Some(destination) = std::env::var_os("ARKDECK_DIAGNOSTIC_ARTIFACT_RECORD") {
+                let inventory = artifacts
+                    .handle_list(
+                        &Map::from_iter([
+                            ("owner".into(), json!({"kind":"job", "id":id})),
+                            ("pageSize".into(), json!(1000)),
+                        ]),
+                        |_| Ok(()),
+                    )
+                    .unwrap();
+                let mut documents = Map::new();
+                for name in [
+                    "artifact-index.json",
+                    "capture-summary.json",
+                    "markers.json",
+                    "diagnostic-session.json",
+                ] {
+                    let row = rows.iter().find(|row| row["name"] == name).unwrap();
+                    let bytes = fs::read(
+                        root.join("artifacts")
+                            .join(id)
+                            .join(row["artifactID"].as_str().unwrap()),
+                    )
+                    .unwrap();
+                    documents.insert(name.into(), json!(String::from_utf8(bytes).unwrap()));
+                }
+                let snapshot = json!({"fixtureOnly":true,
+                    "producer":"capture_diagnostics::diagnostic_session_publishes_host_marks_and_stops_after_an_unknown_anchor",
+                    "jobId":id, "operationReference":"capture.diagnostic-session@1",
+                    "typedParameters":request["inputs"], "inventory":inventory["items"], "documents":documents});
+                fs::write(destination, serde_json::to_vec_pretty(&snapshot).unwrap()).unwrap();
+            }
+
+            assert!(
+                rows.iter()
+                    .any(|row| row["name"] == "diagnostic-session.json")
+            );
+            assert!(rows.iter().any(
+                |row| row["name"] == "trace.htrace" && row["status"].get("published").is_some()
+            ));
+        }
+    }
+}

@@ -40,7 +40,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-const DIGEST: &str = "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684";
+const DIGEST: &str = arkdeck_contract::CATALOG_DIGEST;
 const OTHER_DIGEST: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const JOB: &str = "job-73b1cb9a96d12a0ea736a065afdf5abd";
 const REVISION: &str = "e17de5f6-fc4c-4bbf-9486-81b47431095a";
@@ -1061,19 +1061,27 @@ fn verify_reopens_the_recorded_observe_job_through_durable_reads_only() {
         .iter()
         .map(|a| a["artifactId"].as_str().unwrap())
         .collect();
+    let recorded = oracle_exchange("observed.artifacts");
+    let rows = recorded["result"]["items"].as_array().unwrap();
+    let mut expected_ids: Vec<_> = rows
+        .iter()
+        .map(|row| row["artifactId"].as_str().unwrap())
+        .collect();
+    expected_ids.sort_unstable();
+    assert_eq!(ids, expected_ids);
+    let tool = inventory
+        .iter()
+        .find(|row| row["name"] == "tool-facts.json")
+        .unwrap();
+    let source = rows
+        .iter()
+        .find(|row| row["name"] == "tool-facts.json")
+        .unwrap();
     assert_eq!(
-        ids,
-        [
-            "ART-5ab8ddce1b835cb95173c1a4b08a7e5d",
-            "ART-e04cd422be1334393565566a35c7ff20",
-            "ART-e52440fb7438dd09bd82755af4c243a9"
-        ]
-    );
-    assert_eq!(
-        inventory[0],
-        json!({"artifactId": "ART-5ab8ddce1b835cb95173c1a4b08a7e5d", "jobId": JOB,
+        tool,
+        &json!({"artifactId": source["artifactId"], "jobId": JOB,
             "name": "tool-facts.json", "byteCount": 240,
-            "sha256": "75eaaaac8879fd393e7ae2d38a22ee422c5aaec4b1c4384320b12d94d2ae022e",
+            "sha256": source["artifactDigest"],
             "status": "published", "sourceOperation": "observe.device@1",
             "targetId": "TGT-3ba3f5f43b92", "bindingRevision": 1,
             "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"})

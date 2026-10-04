@@ -4326,13 +4326,13 @@ SHA-256：%4$@</value>
     <value>这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。</value>
     <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable" xml:space="preserve">
     <value>诊断会话采集尚不可用</value>
-    <comment>diagnostics.capture.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable (Windows only)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable_detail" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable_detail" xml:space="preserve">
     <value>交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。</value>
-    <comment>diagnostics.capture.unavailable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable.detail (Windows only)</comment>
   </data>
   <data name="diagnostics_alignment_calibrated" xml:space="preserve">
     <value>已校准</value>
@@ -4351,7 +4351,7 @@ SHA-256：%4$@</value>
     <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_arm" xml:space="preserve">
-    <value>布防会话</value>
+    <value>开始采集</value>
     <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_mark" xml:space="preserve">
@@ -5010,89 +5010,149 @@ SHA-256：%4$@</value>
     <value>无法安全保存远端构建源。</value>
     <comment>windows.remoteSources.error.storageFailed (Windows only)</comment>
   </data>
-  <data name="jobRecovery_action_rebound" xml:space="preserve">
-    <value>Loader 绑定已核验；请查看此 Job 的当前恢复状态</value>
-    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
+  <data name="history_activity_open_flash" xml:space="preserve">
+    <value>打开 Flash</value>
+    <comment>history.activity.open.flash (HistoryLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
-    <value>未能确认请求结果。请先刷新此 Job，再决定后续操作。</value>
-    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
+  <data name="history_activity_open_viewer" xml:space="preserve">
+    <value>打开 Viewer</value>
+    <comment>history.activity.open.viewer (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_trace" xml:space="preserve">
+    <value>打开 Trace</value>
+    <comment>history.activity.open.trace (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_debug" xml:space="preserve">
+    <value>打开 Debug</value>
+    <comment>history.activity.open.debug (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_device" xml:space="preserve">
+    <value>打开 Device</value>
+    <comment>history.activity.open.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_detailUnavailable" xml:space="preserve">
+    <value>Job 详情不可用，ArkDeck 无法重新打开此上下文。</value>
+    <comment>history.activity.open.detailUnavailable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_unsupported" xml:space="preserve">
+    <value>此记录没有可重新打开的工作区。</value>
+    <comment>history.activity.open.unsupported (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_title" xml:space="preserve">
+    <value>从 History 打开</value>
+    <comment>history.context.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_dismiss" xml:space="preserve">
+    <value>关闭历史上下文</value>
+    <comment>history.context.dismiss (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>history.context.job (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_target" xml:space="preserve">
+    <value>目标</value>
+    <comment>history.context.target (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_operation" xml:space="preserve">
+    <value>操作</value>
+    <comment>history.context.operation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_state" xml:space="preserve">
+    <value>状态</value>
+    <comment>history.context.state (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_artifacts" xml:space="preserve">
+    <value>Artifacts</value>
+    <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_stillUnknown" xml:space="preserve">
     <value>原操作结果仍然未知</value>
     <comment>jobRecovery.action.stillUnknown (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_refused" xml:space="preserve">
-    <value>恢复操作不可用</value>
-    <comment>jobRecovery.action.refused (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_rebind_detail" xml:space="preserve">
-    <value>核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。</value>
-    <comment>jobRecovery.action.rebind.detail (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
-    <value>仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。</value>
-    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_reconcile" xml:space="preserve">
-    <value>重新核对恢复状态</value>
-    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_resume" xml:space="preserve">
-    <value>从已确认的安全边界继续</value>
-    <comment>jobRecovery.action.resume (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_rebind" xml:space="preserve">
-    <value>核验并重新绑定 Loader</value>
-    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_action_rebound" xml:space="preserve">
+    <value>Loader 绑定已核验；请查看此 Job 的当前恢复状态</value>
+    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_reconcile_detail" xml:space="preserve">
     <value>Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。</value>
     <comment>jobRecovery.action.reconcile.detail (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
+    <value>仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。</value>
+    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="jobRecovery_action_working" xml:space="preserve">
     <value>正在核对这个 Job…</value>
     <comment>jobRecovery.action.working (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
+    <value>未能确认请求结果。请先刷新此 Job，再决定后续操作。</value>
+    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile" xml:space="preserve">
+    <value>重新核对恢复状态</value>
+    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebind_detail" xml:space="preserve">
+    <value>核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。</value>
+    <comment>jobRecovery.action.rebind.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_refused" xml:space="preserve">
+    <value>恢复操作不可用</value>
+    <comment>jobRecovery.action.refused (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_resume" xml:space="preserve">
+    <value>从已确认的安全边界继续</value>
+    <comment>jobRecovery.action.resume (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_observed" xml:space="preserve">
     <value>Runtime 已返回更新后的状态</value>
     <comment>jobRecovery.action.observed (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_confirm" xml:space="preserve">
-    <value>按中断状态归档</value>
-    <comment>jobRecovery.archive.confirm (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_action_rebind" xml:space="preserve">
+    <value>核验并重新绑定 Loader</value>
+    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_active" xml:space="preserve">
-    <value>Runtime 仍在处理此 Job，请等待其到达安全边界。</value>
-    <comment>jobRecovery.archive.blocker.active (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
+    <value>当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。</value>
+    <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_storage" xml:space="preserve">
-    <value>Session 存储不可用，请恢复存储后再归档。</value>
-    <comment>jobRecovery.archive.blocker.storage (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_unavailable" xml:space="preserve">
+    <value>暂时无法归档。请刷新此 Job 并检查恢复状态。</value>
+    <comment>jobRecovery.archive.unavailable (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_hazards" xml:space="preserve">
-    <value>未解决的风险或设备残留仍需与此 Job 关联。</value>
-    <comment>jobRecovery.archive.blocker.hazards (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_title" xml:space="preserve">
+    <value>归档中断的 Job</value>
+    <comment>jobRecovery.archive.title (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_finish" xml:space="preserve">
     <value>完成已记录的归档</value>
     <comment>jobRecovery.archive.finish (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_review" xml:space="preserve">
-    <value>检查归档条件…</value>
-    <comment>jobRecovery.archive.review (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_confirm" xml:space="preserve">
+    <value>按中断状态归档</value>
+    <comment>jobRecovery.archive.confirm (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_dismiss" xml:space="preserve">
-    <value>返回</value>
-    <comment>jobRecovery.archive.dismiss (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_hazards" xml:space="preserve">
+    <value>未解决的风险或设备残留仍需与此 Job 关联。</value>
+    <comment>jobRecovery.archive.blocker.hazards (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_working" xml:space="preserve">
-    <value>正在核对归档状态…</value>
-    <comment>jobRecovery.archive.working (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_detail" xml:space="preserve">
+    <value>归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。</value>
+    <comment>jobRecovery.archive.detail (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_lastStep" xml:space="preserve">
     <value>最后确认的步骤</value>
     <comment>jobRecovery.archive.lastStep (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_process" xml:space="preserve">
+    <value>尚不能证明托管进程或补偿状态可安全结束。</value>
+    <comment>jobRecovery.archive.blocker.process (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_storage" xml:space="preserve">
+    <value>Session 存储不可用，请恢复存储后再归档。</value>
+    <comment>jobRecovery.archive.blocker.storage (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_existingDecision" xml:space="preserve">
     <value>已有归档决策记录。此操作仅补齐原决策的审计或 Session 发布。</value>
@@ -5102,36 +5162,32 @@ SHA-256：%4$@</value>
     <value>仍有操作结果未知，需保留此 Job 进行恢复。</value>
     <comment>jobRecovery.archive.blocker.unknown (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_refresh" xml:space="preserve">
-    <value>归档前需要重新核对 Job 记录与日志的恢复状态。</value>
-    <comment>jobRecovery.archive.blocker.refresh (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_unavailable" xml:space="preserve">
-    <value>暂时无法归档。请刷新此 Job 并检查恢复状态。</value>
-    <comment>jobRecovery.archive.unavailable (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_publicationPending" xml:space="preserve">
-    <value>中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。</value>
-    <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_working" xml:space="preserve">
+    <value>正在核对归档状态…</value>
+    <comment>jobRecovery.archive.working (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_complete" xml:space="preserve">
     <value>已按中断状态归档，Session 保留原始证据。</value>
     <comment>jobRecovery.archive.complete (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_title" xml:space="preserve">
-    <value>归档中断的 Job</value>
-    <comment>jobRecovery.archive.title (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_active" xml:space="preserve">
+    <value>Runtime 仍在处理此 Job，请等待其到达安全边界。</value>
+    <comment>jobRecovery.archive.blocker.active (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_process" xml:space="preserve">
-    <value>尚不能证明托管进程或补偿状态可安全结束。</value>
-    <comment>jobRecovery.archive.blocker.process (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_dismiss" xml:space="preserve">
+    <value>返回</value>
+    <comment>jobRecovery.archive.dismiss (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_detail" xml:space="preserve">
-    <value>归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。</value>
-    <comment>jobRecovery.archive.detail (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_refresh" xml:space="preserve">
+    <value>归档前需要重新核对 Job 记录与日志的恢复状态。</value>
+    <comment>jobRecovery.archive.blocker.refresh (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
-    <value>当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。</value>
-    <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_review" xml:space="preserve">
+    <value>检查归档条件…</value>
+    <comment>jobRecovery.archive.review (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_publicationPending" xml:space="preserve">
+    <value>中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。</value>
+    <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
   </data>
 </root>

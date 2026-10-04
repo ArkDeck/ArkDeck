@@ -686,11 +686,27 @@ fn grammar(
             error.details.insert("value".into(), json!(value));
             Err(error)
         }
-        // Swift projects its control-request identity grammar as this pattern.
-        "pattern" if !valid_correlation(value) => Err(named(format!(
-            "must match {}",
-            grammar["pattern"].as_str().unwrap_or_default()
-        ))),
+        "pattern" => {
+            let pattern = grammar["pattern"].as_str().unwrap_or_default();
+            let valid = match pattern {
+                "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" => valid_correlation(value),
+                "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" => {
+                    valid_correlation(value) && !value.contains(':')
+                }
+                "^[A-Za-z0-9 ._-]{1,64}$" => {
+                    (1..=64).contains(&value.len())
+                        && value
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b" ._-".contains(&byte))
+                }
+                _ => false,
+            };
+            if valid {
+                Ok(())
+            } else {
+                Err(named(format!("must match {pattern}")))
+            }
+        }
         "hexDigest" => {
             let length = grammar["length"].as_u64().unwrap_or(64);
             // Swift `Character.isHexDigit && !isUppercase`: ASCII or fullwidth,

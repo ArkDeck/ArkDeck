@@ -188,3 +188,35 @@ from the previously verified archive head.
 Fresh PR #2468 CI is pending for this merge. Previous-head results above do not
 validate the new commit. No device execution, runtime-authority write, maintainer
 approval or real-device acceptance is claimed.
+
+
+## Stack synchronization after diagnostic publication
+
+The archive layer now inherits recovery-controls head `53886bcfc` and published
+main `535f0de85`. The three diagnostic control leaves and two archive leaves are
+preserved together in the registry, CLI projection, bundle and wire consumers.
+Conflicts in historical fixtures are limited to generated contract identities;
+existing refusal, health mismatch and continuation assertions remain intact.
+All 19 archive string keys survive alongside the newly published diagnostics and
+Windows history resources. No archive admission or dispatch policy is changed.
+
+### Local targeted checks
+
+All log paths below are under `/tmp/arkdeck-macos-closeout-20261004/`.
+
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-contract -p arkdeck-control`: exit 0, 100 tests passed (`archive-main3-contract-tests.log`).
+- Focused CLI coverage and archive/registry/bundle integration tests: exit 0, 38 tests passed (`archive-main3-cli-tests-final.log`). Archive owner and daemon App-ingress tests: exit 0, 48 tests passed (`archive-main3-owner-tests.log`).
+- `CARGO_BUILD_JOBS=2 cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-contract -p arkdeck-control -p arkdeck-bootstrap -p arkdeck-client -p arkdeck-provider-arkforge -p arkdeck-provider-hdc -p arkdeck-rockchip-binding -p arkdeck-hoststore -p arkdeck-cli -p arkdeck-agentd -p arkdeck-soak --all-targets -- -D warnings`: exit 0 (`archive-main3-clippy.log`).
+- `run-swiftpm.sh test --filter 'RuntimeJobArchiveApplicationFacadeTests|RuntimeJobRecoveryApplicationFacadeTests'`: exit 0, 11 tests passed (`archive-main3-facades.log`). Jobs localization: 6 tests passed (`archive-main3-swift.log`); the initially misspelled facade selectors matched zero and are not counted.
+- `ARKDECK_XCODE_JOBS=2 sh scripts/ci/run-xcodebuild.sh`: exit 0, TEST BUILD SUCCEEDED (`archive-main3-app.log`). `npm test --prefix docs/design/arkdeck-ds`: exit 0, 85 tests passed (`archive-main3-ds.log`).
+- Actual isolated read-only CLI/daemon recordings: exit 0, 141 control and 13 CLI responses across 132 requests (`archive-main3-readonly-final.log`). The first interpreter lacked `jsonschema`; the successful recording uses the pinned contract-check environment and does not access a device or production state.
+- Contract/ClientKit/string generator checks, owned bundle digests, Rust formatting and diff checks: exit 0. Vocabulary is 110 methods and 1,073 recorded shapes; all 1,294 string entries, 46 snapshots and 286 resource references validate. SDD: exit 0, zero errors and warnings (`archive-main3-sdd.log`).
+
+### CI
+
+PR #2468 retains #2467 as its direct base. New-head CI is pending after this push;
+prior-head results above are not presented as validation of this merge. The
+existing Agent PR workflow still assumes base `main`; its metadata failure on
+this stacked branch does not change the base or count as a passing check.
+Native Windows validation remains in PR CI. No full local unified gate or
+real-device acceptance is claimed.

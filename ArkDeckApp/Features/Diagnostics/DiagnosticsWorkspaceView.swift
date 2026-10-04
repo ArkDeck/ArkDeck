@@ -11,6 +11,7 @@ import SwiftUI
 /// looked for is listed, so an empty track is not read as a quiet all-clear.
 struct DiagnosticsWorkspaceView: View {
   var model: DiagnosticsWorkspaceViewModel
+  @State private var captureDuration = 60
   let onOpenTrace: (RuntimeHistoryWorkspaceContext) -> Void
 
   var body: some View {
@@ -68,49 +69,100 @@ struct DiagnosticsWorkspaceView: View {
         footer
       }
     }
+    .onChange(of: model.capture.completedContext) { _, context in
+      if let context { model.openHistoryContext(context) }
+    }
   }
 
   // MARK: - Capture
 
-  /// Keep the missing visible without pretending a local state change starts
-  /// a Runtime recording. Interactive session controls are not connected.
   private var capturePane: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 12) {
-        Button {} label: {
+        Button {
+          guard let target = model.target else { return }
+          Task { await model.capture.start(target: target, durationSeconds: captureDuration) }
+        } label: {
           Label(diagnosticsText("diagnostics.capture.arm"), systemImage: "record.circle")
         }
-        .disabled(true)
-        .help(diagnosticsText("diagnostics.capture.unavailable.detail"))
+        .disabled(model.target == nil || !model.capture.canStart)
         .accessibilityIdentifier("diagnostics.capture.arm")
-
-        Button {} label: {
-          Label(diagnosticsText("diagnostics.capture.mark"), systemImage: "bookmark")
+        Picker(diagnosticsText("diagnostics.capture.duration"), selection: $captureDuration) {
+          ForEach([30, 60, 120], id: \.self) { seconds in
+            Text("\(seconds) s").tag(seconds)
+          }
         }
-        .keyboardShortcut("m", modifiers: .command)
-        .disabled(true)
-        .accessibilityIdentifier("diagnostics.capture.mark")
-
+        .frame(width: 180)
+        .disabled(!model.capture.canStart)
+        .accessibilityIdentifier("diagnostics.capture.duration")
         Spacer()
       }
-      VStack(alignment: .leading, spacing: 4) {
-        Label(
-          diagnosticsText("diagnostics.capture.unavailable"),
-          systemImage: "exclamationmark.triangle")
-          .font(WorkspaceFont.secondary)
-          .foregroundStyle(.orange)
-        Text(diagnosticsText("diagnostics.capture.unavailable.detail"))
-          .font(WorkspaceFont.caption)
-          .foregroundStyle(.secondary)
-          .fixedSize(horizontal: false, vertical: true)
-        Text(model.captureUnavailableReasonCode)
-          .font(.system(size: 10, design: .monospaced))
-          .foregroundStyle(.secondary)
-          .modifier(WorkspaceTextSelection())
+      HStack(spacing: 12) {
+        Button { Task { await model.capture.mark() } } label: {
+          Label(diagnosticsText("diagnostics.capture.mark"), systemImage: "bookmark")
+        }
+        .keyboardShortcut("m", modifiers: [.command, .shift])
+        .disabled(!model.capture.canMark)
+        .accessibilityIdentifier("diagnostics.capture.mark")
+        Button { Task { await model.capture.stop() } } label: {
+          Label(diagnosticsText("diagnostics.capture.stop"), systemImage: "stop.circle")
+        }
+        .disabled(!model.capture.canStop)
+        .accessibilityIdentifier("diagnostics.capture.stop")
+        if model.capture.canCancelPreparation {
+          Button(diagnosticsText("diagnostics.capture.cancelPreparation")) {
+            Task { await model.capture.cancelPreparation() }
+          }
+          .accessibilityIdentifier("diagnostics.capture.cancelPreparation")
+        }
+        if model.capture.jobID != nil {
+          Button(diagnosticsText("diagnostics.capture.refresh")) { Task { await model.capture.refresh() } }
+            .disabled(model.capture.isControlling)
+            .accessibilityIdentifier("diagnostics.capture.refresh")
+        }
+        Spacer()
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .accessibilityElement(children: .contain)
-      .accessibilityIdentifier("diagnostics.capture.unavailable")
+      if let snapshot = model.capture.snapshot {
+        HStack(spacing: 12) {
+          Text(diagnosticsText("diagnostics.capture.state.\(snapshot.state)"))
+            .accessibilityIdentifier("diagnostics.capture.state")
+          Text("\(snapshot.elapsedMs / 1000) / \(snapshot.maximumSeconds) s")
+            .monospacedDigit()
+          Text("\(diagnosticsText("diagnostics.capture.marks")): \(snapshot.markers.count) / \(snapshot.maximumMarkers)")
+            .accessibilityIdentifier("diagnostics.capture.markCount")
+        }
+        .font(WorkspaceFont.secondary)
+      } else if model.capture.phase != .idle {
+        Text(diagnosticsText("diagnostics.capture.phase.\(model.capture.phase.rawValue)"))
+          .font(WorkspaceFont.secondary)
+          .accessibilityIdentifier("diagnostics.capture.state")
+      }
+      if let target = model.capture.canStart ? model.target : model.capture.target {
+        Text(target.displayName).font(WorkspaceFont.caption)
+          .accessibilityIdentifier("diagnostics.capture.target")
+      } else {
+        Text(diagnosticsText("diagnostics.capture.chooseTarget"))
+          .font(WorkspaceFont.caption).foregroundStyle(.secondary)
+      }
+      if let jobID = model.capture.jobID {
+        Text(jobID).font(WorkspaceFont.monospacedValue).modifier(WorkspaceTextSelection())
+          .accessibilityIdentifier("diagnostics.capture.job")
+      }
+      if model.capture.phase == .uncertain {
+        Text(diagnosticsText("diagnostics.capture.uncertain"))
+          .font(WorkspaceFont.caption).foregroundStyle(.orange)
+          .accessibilityIdentifier("diagnostics.capture.uncertain")
+      }
+      if let failure = model.capture.failure {
+        Text(failure).font(WorkspaceFont.caption).foregroundStyle(.orange)
+          .fixedSize(horizontal: false, vertical: true)
+          .modifier(WorkspaceTextSelection())
+          .accessibilityIdentifier("diagnostics.capture.failure")
+      }
+      Text(diagnosticsText("diagnostics.capture.boundary"))
+        .font(WorkspaceFont.caption).foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityIdentifier("diagnostics.capture.boundary")
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(.horizontal, 20)

@@ -1,0 +1,36 @@
+schema_version: 1.0.0
+change_id: CHG-2026-079-diagnostic-session-control
+change_revision: 1
+platform: macos
+evidence_classes: [contract]
+cases:
+- acceptance_id: DSC-AC-1
+  test_id: TEST-DSC-AC-1
+  method: Provider and end-to-end fake Runtime tests
+  expected_source: openspec/changes/chg-2026-079-diagnostic-session-control/verification.md
+  minimum_evidence: contract
+  expected_result: Readiness follows a unique anchor readback; an absent live owner dispatches nothing; the plan names exact target and owned path.
+- acceptance_id: DSC-AC-2
+  test_id: TEST-DSC-AC-2
+  method: Host state race and deadline tests
+  expected_source: openspec/changes/chg-2026-079-diagnostic-session-control/verification.md
+  minimum_evidence: contract
+  expected_result: Runtime timestamps marks, enforces the admitted count, preserves same-ID idempotency, and freezes marks at stop or deadline.
+- acceptance_id: DSC-AC-3
+  test_id: TEST-DSC-AC-3
+  method: Fault, restart and unknown-anchor fixtures
+  expected_source: openspec/changes/chg-2026-079-diagnostic-session-control/verification.md
+  minimum_evidence: contract
+  expected_result: Uncertain state or provider outcomes never replay or start trailing probes; raw artifacts remain immutable.
+- acceptance_id: DSC-AC-4
+  test_id: TEST-DSC-AC-4
+  method: Swift controller and App UI fixtures
+  expected_source: openspec/changes/chg-2026-079-diagnostic-session-control/verification.md
+  minimum_evidence: contract
+  expected_result: Start, mark and stop follow exact Runtime state; reply loss does not resubmit; completed artifacts retain Job correlation.
+- acceptance_id: DSC-AC-5
+  test_id: TEST-DSC-AC-5
+  method: Catalog, protocol, offline reader and old capture regression tests
+  expected_source: openspec/changes/chg-2026-079-diagnostic-session-control/verification.md
+  minimum_evidence: contract
+  expected_result: New operation and control resources agree with generated schemas, validators and consumers without changing old capture semantics.

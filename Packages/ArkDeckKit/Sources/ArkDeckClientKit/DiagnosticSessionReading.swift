@@ -116,6 +116,7 @@ public struct DiagnosticSessionReading: Sendable, Equatable {
 
   public let jobID: String
   public let alignment: Alignment
+  public let clockObservation: DiagnosticClockObservation?
   public let marks: [Mark]
   public let missingProducts: [MissingProduct]
   /// Marker kinds this session never looked for, carried through from the
@@ -127,10 +128,12 @@ public struct DiagnosticSessionReading: Sendable, Equatable {
 
   public init(
     jobID: String, alignment: Alignment, marks: [Mark],
-    missingProducts: [MissingProduct], notDerived: [String]
+    missingProducts: [MissingProduct], notDerived: [String],
+    clockObservation: DiagnosticClockObservation? = nil
   ) {
     self.jobID = jobID
     self.alignment = alignment
+    self.clockObservation = clockObservation
     self.marks = marks
     self.missingProducts = missingProducts
     self.notDerived = notDerived

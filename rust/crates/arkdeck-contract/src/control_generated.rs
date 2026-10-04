@@ -4,7 +4,7 @@ pub const PROTOCOL_VERSION: &str = "1.0.0";
 pub const MAX_REQUEST_BYTES: usize = 4194304;
 pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
-    "a385fef3a995b3b67404eef9d081d14f42fdedc6eaee6a809593fee27768116b";
+    "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2";
 pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
 pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
@@ -41,6 +41,9 @@ pub const METHODS: &[&str] = &[
     "device.display-name.clear",
     "device.display-name.set",
     "device.observations",
+    "diagnostic.session.mark",
+    "diagnostic.session.status",
+    "diagnostic.session.stop",
     "doctor",
     "flash.bind-current-loader",
     "flash.bootloader-status",
@@ -249,6 +252,18 @@ pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
     (
         "device.observations",
         include_str!("../../../../spec/control/methods/device.observations.json"),
+    ),
+    (
+        "diagnostic.session.mark",
+        include_str!("../../../../spec/control/methods/diagnostic.session.mark.json"),
+    ),
+    (
+        "diagnostic.session.status",
+        include_str!("../../../../spec/control/methods/diagnostic.session.status.json"),
+    ),
+    (
+        "diagnostic.session.stop",
+        include_str!("../../../../spec/control/methods/diagnostic.session.stop.json"),
     ),
     (
         "doctor",

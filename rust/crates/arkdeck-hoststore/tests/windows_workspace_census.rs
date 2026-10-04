@@ -49,9 +49,11 @@ fn workspace_job(
     older: bool,
 ) -> (JobRecord, String) {
     let mut record = recorded();
-    if older {
-        record["catalogDigest"] = json!(OLDER_CATALOG);
-    }
+    record["catalogDigest"] = json!(if older {
+        OLDER_CATALOG
+    } else {
+        arkdeck_contract::CATALOG_DIGEST
+    });
     for request in ["request", "originalSubmissionRequest"] {
         let inputs = &mut record[request]["inputs"];
         inputs["projectRef"] = json!(project);

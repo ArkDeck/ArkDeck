@@ -13,7 +13,7 @@
 //! Swift's code, words and details, or the plain diagnostic and exit status.
 #![cfg(target_os = "macos")]
 
-use arkdeck_contract::{CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
+use arkdeck_contract::{CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
 use serde_json::{Map, Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
@@ -147,9 +147,15 @@ fn clocked(actual: &Value, expected: &Value) -> Value {
 }
 
 fn health() -> Value {
+    // The fake peer belongs to this historical recording, including its
+    // Catalog identity. Only the wire handshake uses the compiled contract.
+    let provenance: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/domain-executor/provenance.json"
+    ))
+    .unwrap();
     json!({"status": "ok", "protocolVersion": PROTOCOL_VERSION,
         "contractIdentity": CONTRACT_IDENTITY, "publishedMethods": METHODS,
-        "catalogDigest": CATALOG_DIGEST, "providers": []})
+        "catalogDigest": provenance["catalogDigest"], "providers": []})
 }
 
 /// What the fake Runtime saw: every frame, labelled, and its connections.

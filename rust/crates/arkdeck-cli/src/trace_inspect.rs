@@ -219,7 +219,9 @@ pub fn inspection_projection(value: &Value) -> Option<(Value, String)> {
     if !crate::read_only_resources::identifier(artifact)
         || !sha256(&source["artifactDigest"])
         || !canonical_integer(&source["byteCount"]).is_some_and(|count| count > 0)
-        || source["sourceOperation"] != "capture.diagnostics@1"
+        || !source["sourceOperation"]
+            .as_str()
+            .is_some_and(crate::diagnostics_resources::supported_operation)
         || source["name"] != "trace.htrace"
         || source["mediaType"] != "application/octet-stream"
         || source["privacy"] != "sensitive"

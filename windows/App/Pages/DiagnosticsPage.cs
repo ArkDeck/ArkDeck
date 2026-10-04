@@ -22,7 +22,7 @@ namespace ArkDeck.App.Pages;
 /// </summary>
 public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
     "diagnostics", "diagnostics.title", UiStrings.AppNavigationDiagnostics,
-    "diagnostics.session.reload", UiStrings.DiagnosticsSessionReload, "diagnostics.session.loading", UiStrings.DiagnosticsSessionLoading)
+    "diagnostics.session.reload", UiStrings.DiagnosticsSessionReload, "diagnostics.session.loading", UiStrings.DiagnosticsSessionLoading), IHistoryContextPage
 {
     private DiagnosticJobContext? _context;
     private DiagnosticsState? _state;
@@ -31,10 +31,14 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
     private DiagnosticReaderSelection? _selection;
     private bool _previewLoading;
 
+    private HistoryWorkspaceContext? _history;
+
     /// <summary>Opens a History record (macOS <c>openHistoryContext</c>); the next refresh reads it.</summary>
-    public void Open(DiagnosticJobContext context)
+    public void OpenHistoryContext(HistoryWorkspaceContext context)
     {
-        _context = context;
+        _history = context;
+        _context = context.Diagnostics;
+        _selection = null;
         _preview.Children.Clear();
     }
 
@@ -50,6 +54,17 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
         if (reading is not null && _selection is null) _selection = new DiagnosticReaderSelection(reading.Marks.FirstOrDefault()?.AtHostUtc ?? "");
         if (reading is null) _selection = null;
 
+        if (_history is { } history)
+        {
+            body.Children.Add(HistoryContextBanner.Create(history, async () =>
+            {
+                _history = null;
+                _context = null;
+                _selection = null;
+                _preview.Children.Clear();
+                await RefreshAsync();
+            }));
+        }
         body.Children.Add(Toolbar(state, reading));
         if (!state.IsHilogSummaryContext) body.Children.Add(Ui.Card(CapturePane(), "diagnostics.capture"));
 
@@ -125,18 +140,18 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
 
     private StackPanel CapturePane()
     {
-        void Unavailable() => Ui.Say(_status, S.Text(UiStrings.DiagnosticsCaptureUnavailable) + ". " + S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
+        void Unavailable() => Ui.Say(_status, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailable) + ". " + S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
         var arm = Ui.Button("diagnostics.capture.arm", S.Text(UiStrings.DiagnosticsCaptureArm), (_, _) => Unavailable());
-        ToolTipService.SetToolTip(arm, S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
-        AutomationProperties.SetHelpText(arm, S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
+        ToolTipService.SetToolTip(arm, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
+        AutomationProperties.SetHelpText(arm, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
         var mark = Ui.Button("diagnostics.capture.mark", S.Text(UiStrings.WindowsDiagnosticsCaptureMark), (_, _) => Unavailable());
         mark.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = VirtualKey.M, Modifiers = VirtualKeyModifiers.Control });
-        AutomationProperties.SetHelpText(mark, S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
+        AutomationProperties.SetHelpText(mark, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
         var code = Ui.Text("diagnostics.capture.reasonCode", DiagnosticsState.CaptureUnavailableReasonCode, "ArkDeckMonoStyle");
         code.IsTextSelectionEnabled = true;
         var notice = Ui.Stack(4,
-            Ui.Text("diagnostics.capture.unavailable", S.Text(UiStrings.DiagnosticsCaptureUnavailable), "ArkDeckSectionTitleStyle"),
-            Ui.Text("diagnostics.capture.unavailable.detail", S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail), "ArkDeckCaptionStyle"),
+            Ui.Text("diagnostics.capture.unavailable", S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailable), "ArkDeckSectionTitleStyle"),
+            Ui.Text("diagnostics.capture.unavailable.detail", S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail), "ArkDeckCaptionStyle"),
             code);
         return Ui.Stack(8, Ui.Row(arm, mark), notice);
     }

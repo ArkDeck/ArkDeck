@@ -43,7 +43,29 @@ const TRACE: &str = "ART-148c3168fc02b640a96d452463b2a8d7";
 const SUMMARY: &str = "ART-254a229f7471f2bbe3d18b818b1fb8d1";
 /// A recorded Job that is not a diagnostics capture, and its Artifact.
 const OTHER: &str = "job-73b1cb9a96d12a0ea736a065afdf5abd";
-const OTHER_ARTIFACT: &str = "ART-5ab8ddce1b835cb95173c1a4b08a7e5d";
+fn other_artifact() -> &'static str {
+    static INDEX: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    let index = INDEX.get_or_init(|| {
+        serde_json::from_slice(
+            &std::fs::read(
+                fixture("agent-execution")
+                    .join("artifacts")
+                    .join(OTHER)
+                    .join("index.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+    });
+    let rows: Vec<_> = index["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["name"] == "tool-facts.json")
+        .collect();
+    assert_eq!(rows.len(), 1);
+    rows[0]["artifactID"].as_str().unwrap()
+}
 
 fn fixture(path: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -412,7 +434,7 @@ fn diagnostics_export_runs_through_the_cli_against_a_dev_signed_daemon() {
             "--job",
             OTHER,
             "--artifact",
-            OTHER_ARTIFACT,
+            other_artifact(),
             "--destination",
             &exports_text,
         ],

@@ -212,6 +212,12 @@ const RULINGS: &[(&str, Ruling)] = &[
     ("job.run", leaf("job.run")),
     ("job.show", leaf("job.show")),
     ("job.status", leaf("job.status")),
+    (
+        "diagnostic.session.status",
+        leaf("diagnostics.session.status"),
+    ),
+    ("diagnostic.session.mark", leaf("diagnostics.session.mark")),
+    ("diagnostic.session.stop", leaf("diagnostics.session.stop")),
     ("job.submit", leaf("job.submit")),
     ("job.timeline", leaf("job.timeline")),
     ("operation.describe", leaf("operation.describe")),
@@ -327,6 +333,9 @@ const LOCAL_COMMANDS: &[&str] = &[
     "ui-dump.inspect",
     "ui-dump.hit-test",
     "diagnostics.inspect",
+    "diagnostics.session.status",
+    "diagnostics.session.mark",
+    "diagnostics.session.stop",
     "diagnostics.preview",
     "diagnostics.export",
     "artifact.quota",
@@ -1251,8 +1260,8 @@ mod tests {
     }
 
     /// A contract view may compile another method set than the rulings: the
-    /// manifest then covers the methods it has a ruling for, and the two
-    /// differences are problems rather than a panic.
+    /// manifest covers methods it has a ruling for. Missing published methods
+    /// and the deliberately altered pair are reported exactly, never hidden.
     #[test]
     fn another_method_set_is_covered_where_ruled_and_reported() {
         let mut methods: Vec<&str> = METHODS
@@ -1274,7 +1283,14 @@ mod tests {
             serde_json::json!(METHODS.len() - 1)
         );
         let mut expected = vec!["daemon method job.unruled has no coverage ruling".to_owned()];
-        for method in ["job.archive", "job.archive.preview", "job.status"] {
+        for method in [
+            "job.archive",
+            "job.archive.preview",
+            "job.status",
+            "diagnostic.session.status",
+            "diagnostic.session.mark",
+            "diagnostic.session.stop",
+        ] {
             if !methods.contains(&method) {
                 expected.push(format!(
                     "coverage names a daemon method the registry does not classify: {method}"

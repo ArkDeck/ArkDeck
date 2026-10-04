@@ -10,10 +10,10 @@
     "artifacts/job-input-patch/index.json": "862886365c64bb7602c1a7a2395faca30548b10a8aef277dace9890da29825dd",
     "attempts/patch-d801b71ae8890b11ac540b67f0b4c30a.json": "49de58a88c1d1ec58913e69c643383a9a8adb7d9bef16f699460d92b8954ac31",
     "attempts/patch-d801b71ae8890b11ac540b67f0b4c30a.patch": "f0a60ff8aa51ca5b39e950bf7c57dc8707ccea707c5d7c1eb6ac72797438ed4a",
-    "capabilities/runtime-capabilities.json": "cc92c862cf7b16d4344baaee40820f570e26e0672b7439e6959f3cafde6ede97",
-    "capabilities/runtime-capabilities.ledger": "9a198e7bc0f75a3915bac5b64f90e2995ad400f7a6a7211f1a5ee37efc03e7cd",
-    "frames.jsonl": "50f47559cd122fdd07bd5d4ddb7b569d4d7da974d8b1d120677e1082937c8cbe",
-    "parked-record.json": "67bad93f3a6608b618508d6f922c1786710dfc72cef3080c09d158697a3e4567",
+    "capabilities/runtime-capabilities.json": "5d5f64ac0cf5e917dbbd32a41d57cc7b971be735632a76dbfd4d71fde009ce73",
+    "capabilities/runtime-capabilities.ledger": "61fdb8c47e5c60e8d6a84eab86dc5c685232f19d0e848daf292df8d9f95399c5",
+    "frames.jsonl": "9b6ef69362321ca9f531c60346c6733fb625fe6bc632e0759005e34006ba06a9",
+    "parked-record.json": "07652947f2ccd63d521dea0b6203e49c12cb706ce4670b06199bb9e1f6b2a1b4",
     "patch.sh": "effe702f89bec06304df5d674f28d819c0832d78b42689989935a04c581206ce",
     "tree.json": "9e4ec1bcbd20bdedb2626f7040da3d529e624c9725437ce1e7cb5e0fc8696993"
   },
@@ -22,5 +22,6 @@
   "recordedBy": "WorkspacePatchOracleContractTests.testTheControlPlaneAppliesAndRevertsPatchesAsRecorded",
   "replayedBy": "the Rust port of workspace.apply-patch@1 and workspace.revert-patch@1 (TASK-XPA-015, M3)",
   "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceOperationsProvider, with EvolutionWorkspaceManager as its isolation manager and WorkspacePatchAttemptStore as its patch lineage, over a fabricated source tree under /private/tmp/arkdeck-workspace-patch-oracle; the patch dispatch loses its receipt only where the sequence says so",
-  "why": "the job.* corpora carry no frame of these operations and are deduplicated by shape, so they cannot be replayed as one sequence"
+  "why": "the job.* corpora carry no frame of these operations and are deduplicated by shape, so they cannot be replayed as one sequence",
+  "catalogRegeneration": "../catalog-extension-recording.json"
 }
