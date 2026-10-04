@@ -24,7 +24,7 @@
 //! is the Target owner's.
 use crate::{
     Action, DeviceCandidate, DispatchFailure, Expected, HdcDispatch, Outcome, ParseError,
-    ProcessPlan, parse_target_list,
+    ProcessPlan, parse_host_target_list,
 };
 use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
 use serde_json::{Value, json};
@@ -261,9 +261,11 @@ pub fn list_candidates(
         timeout: OBSERVE_TIMEOUT,
         capture_bytes: CAPTURE_BYTES,
     })?;
-    parse_target_list(
+    parse_host_target_list(
         &receipt.stdout,
-        HIGHEST_REGISTERED_VERSION,
+        dispatch
+            .registered_windows_tuple()
+            .map_or(HIGHEST_REGISTERED_VERSION, |tuple| tuple.reported_version),
         receipt.truncated,
     )
     .map_err(|error| match error {
@@ -295,8 +297,14 @@ pub fn observe_device_identity(
         .lower("observe", Some(connect_key))
         .map_err(BootstrapFailure)?;
     let receipt = dispatch.dispatch(&plan)?;
+    // A registered Windows tuple's listing is read by its own family
+    // (CHG-2026-078) unless the caller already names the observed version.
+    let windows = dispatch
+        .registered_windows_tuple()
+        .map(|tuple| tuple.reported_version);
     let expected = Expected {
         connect_key: Some(connect_key),
+        tool_version: expected.tool_version.or(windows),
         ..expected
     };
     summary(
