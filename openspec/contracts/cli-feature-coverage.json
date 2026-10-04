@@ -3798,7 +3798,7 @@
       "feature": "runtime.tool.register",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "Only --kind deveco is served by this RPC; --kind hdc retains its in-process Bootstrap registration.",

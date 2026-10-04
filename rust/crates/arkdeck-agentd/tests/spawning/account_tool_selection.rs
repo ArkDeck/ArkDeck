@@ -23,10 +23,17 @@
 //! tool as the account's selection and asks to select it. The tool-selection
 //! owner answers with its typed action, as Swift's daemon answered and its
 //! CLI printed it: the active tool is no candidate, so the action is drifted
-//! (`tool.selectionFactsUnavailable`) and nothing is dispatched. An
-//! awaiting-approval answer needs a second registered tool and a healthy
-//! server proof, which only a registered tuple's server gives (#2501), so the
-//! leaf is not counted in `WINDOWS_MEASURED_LEAVES` here. Every account
+//! (`tool.selectionFactsUnavailable`) and nothing is dispatched.
+//!
+//! It then registers a second executable a fixture tuple names (`runtime
+//! tool register --kind hdc`): retained and listed beside the selection in
+//! the macOS Runtime's answer shape, idempotent, and an executable no tuple
+//! names is refused. Registration admits by the composition's own tuple
+//! table, as the selection does (`BootstrapReaders::open_existing_identified`),
+//! so the leaf is counted in `WINDOWS_MEASURED_LEAVES`. Selecting that
+//! candidate still drifts: an awaiting-approval answer needs a healthy server
+//! proof from the HDC lifecycle owner, which only a registered tuple's server
+//! gives (#2501), so `runtime tool select` is not counted here. Every account
 //! daemon starter is held off
 //! for the whole run (`StarterLock`), as the account-location tests hold
 //! them. Nothing installed, no `hdc` and no device is involved.
@@ -102,14 +109,20 @@ fn the_signed_account_daemon() {
 /// its registered tuples replaced by the fixture's.
 fn serve(sha256: String) -> Result<(), Box<dyn std::error::Error>> {
     let port: u16 = std::env::var(arkdeck_provider_hdc::SERVER_PORT_VARIABLE)?.parse()?;
-    let tuples: &'static [arkdeck_provider_hdc::WindowsHdcTuple] =
-        Box::leak(Box::new([arkdeck_provider_hdc::WindowsHdcTuple {
-            candidate: "stand-in",
-            executable_sha256: Box::leak(sha256.into_boxed_str()),
-            reported_version: "3.2.0d",
-            version_stdout: b"Ver: 3.2.0d\r\n",
-            endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
-        }]));
+    // One tuple for each digest the test names, all on the same endpoint.
+    let tuples: &'static [arkdeck_provider_hdc::WindowsHdcTuple] = Box::leak(
+        sha256
+            .split(',')
+            .map(|digest| arkdeck_provider_hdc::WindowsHdcTuple {
+                candidate: "stand-in",
+                executable_sha256: Box::leak(digest.to_owned().into_boxed_str()),
+                reported_version: "3.2.0d",
+                version_stdout: b"Ver: 3.2.0d\r\n",
+                endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
+    );
     let windows_lifecycle::Serving {
         stop,
         listener,
@@ -168,10 +181,18 @@ fn temporary(prefix: &str) -> PathBuf {
     ))
 }
 
-/// The stand-in compiled into `directory`.
-fn stand_in(directory: &Path) -> Vec<u8> {
+/// The stand-in compiled into `directory`, its bytes made its own by
+/// `variant`.
+fn stand_in(directory: &Path, variant: &str) -> Vec<u8> {
     std::fs::create_dir_all(directory).unwrap();
-    std::fs::write(directory.join("hdc.rs"), STAND_IN).unwrap();
+    std::fs::write(
+        directory.join("hdc.rs"),
+        format!(
+            "{STAND_IN}\n#[used]\nstatic VARIANT: [u8; {}] = *b\"{variant}\";\n",
+            variant.len()
+        ),
+    )
+    .unwrap();
     let rustc = std::env::var_os("RUSTC").unwrap_or_else(|| "rustc".into());
     let output = Command::new(rustc)
         .arg("--edition=2021")
@@ -342,7 +363,7 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
     };
     let profile = scratch.join("profile");
     std::fs::create_dir_all(profile.join("AppData").join("Local")).unwrap();
-    let bytes = stand_in(&scratch.join("stand-in"));
+    let bytes = stand_in(&scratch.join("stand-in"), "a");
     // The configured file in a private directory of the fake account, as an
     // installed DevEco keeps its `hdc.exe`.
     let sdk = profile.join("sdk");
@@ -354,13 +375,24 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
     )
     .unwrap();
     let sha256 = arkdeck_contract::sha256_hex(&bytes);
+    // A second registered tool: another stand-in, its own digest in the
+    // fixture tuple table, kept in the same private directory.
+    let other_bytes = stand_in(&scratch.join("stand-in-b"), "b");
+    let other = sdk.join("hdc-b.exe");
+    std::io::Write::write_all(
+        &mut arkdeck_platform::create_private_file(&other).unwrap(),
+        &other_bytes,
+    )
+    .unwrap();
+    let other_sha256 = arkdeck_contract::sha256_hex(&other_bytes);
+    assert_ne!(other_sha256, sha256);
     let port = loopback_ports::free_port();
     let daemon = AccountDaemon::start(
         &executable,
         &pin,
         &profile,
         &[
-            (TUPLE, sha256.clone()),
+            (TUPLE, format!("{sha256},{other_sha256}")),
             ("ARKDECK_HDC_PATH", hdc.display().to_string()),
             (arkdeck_provider_hdc::SERVER_PORT_VARIABLE, port.to_string()),
         ],
@@ -419,6 +451,144 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
     let (status, again) = daemon.cli(&["runtime", "tool", "list"]);
     assert_eq!(status, Some(0), "{again}");
     assert_eq!(again["result"]["items"], listed["result"]["items"]);
+
+    // `runtime tool register --kind hdc` of a second executable a tuple
+    // names: retained and registered beside the selection, answered in the
+    // shape the macOS Runtime answers (`ControlFrames/
+    // runtime.tool.register.jsonl`), never selected or run.
+    let register = [
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc",
+        "--file",
+        other.to_str().unwrap(),
+    ];
+    let (status, registered) = daemon.cli(&register);
+    assert_eq!(status, Some(0), "{registered}");
+    assert_eq!(
+        registered["command"], "runtime.tool.register",
+        "{registered}"
+    );
+    let tool_row = &registered["result"];
+    let macos: Value = include_str!(
+        "../../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.register.jsonl"
+    )
+    .lines()
+    .map(|line| serde_json::from_str::<Value>(line).unwrap())
+    .find(|frame| frame["ok"] == true && frame["result"]["kind"] == "hdc")
+    .expect("the macOS Runtime's HDC registration")["result"]
+        .clone();
+    let keys =
+        |value: &Value| -> Vec<String> { value.as_object().unwrap().keys().cloned().collect() };
+    assert_eq!(keys(tool_row), keys(&macos), "{registered}");
+    assert_eq!(
+        keys(&tool_row["trust"]),
+        keys(&macos["trust"]),
+        "{registered}"
+    );
+    for (key, value) in [
+        ("kind", "hdc"),
+        ("platform", "windows"),
+        ("state", "available"),
+        ("generation", "1"),
+        ("source", "registeredCopy"),
+        ("executableSHA256", other_sha256.as_str()),
+    ] {
+        assert_eq!(tool_row[key], value, "{key}: {registered}");
+    }
+    assert_eq!(tool_row["selected"], false, "{registered}");
+    assert_eq!(tool_row["contentRetained"], true, "{registered}");
+    assert_eq!(
+        tool_row["trust"]["registeredIdentity"], true,
+        "{registered}"
+    );
+    assert_eq!(tool_row["trust"]["toolVersion"], "3.2.0d", "{registered}");
+    let other_ref = tool_row["toolRef"].as_str().unwrap().to_owned();
+    assert!(other_ref.starts_with("tool:sha256:"), "{registered}");
+    // Registered again: the same row.
+    let (status, again) = daemon.cli(&register);
+    assert_eq!(status, Some(0), "{again}");
+    assert_eq!(again["result"], *tool_row, "{again}");
+    // Listed beside the selection, which is unchanged.
+    let (status, both) = daemon.cli(&["runtime", "tool", "list"]);
+    assert_eq!(status, Some(0), "{both}");
+    let rows = both["result"]["items"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "{both}");
+    assert!(
+        rows.iter()
+            .any(|row| row["toolRef"] == other_ref.as_str() && row["selected"] == false),
+        "{both}"
+    );
+    assert!(
+        rows.iter()
+            .any(|row| row["toolRef"] == tool.as_str() && row["selected"] == true),
+        "{both}"
+    );
+    // An hdc.exe no tuple names is refused, and nothing is retained.
+    let untupled_bytes = stand_in(&scratch.join("stand-in-c"), "c");
+    let untupled = sdk.join("hdc-c.exe");
+    std::io::Write::write_all(
+        &mut arkdeck_platform::create_private_file(&untupled).unwrap(),
+        &untupled_bytes,
+    )
+    .unwrap();
+    let (status, refused) = daemon.cli(&[
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc",
+        "--file",
+        untupled.to_str().unwrap(),
+    ]);
+    assert_ne!(status, Some(0), "{refused}");
+    assert_eq!(refused["error"]["code"], "admissionDenied", "{refused}");
+    let (_, after) = daemon.cli(&["runtime", "tool", "list"]);
+    assert_eq!(after["result"]["items"], both["result"]["items"], "{after}");
+
+    // Selecting the registered candidate still drifts: the selection's
+    // impact reads the managed server's health through the HDC lifecycle
+    // owner, which no Windows composition proves healthy yet (#2501), so
+    // `runtime tool select` is not counted. Nothing is dispatched.
+    let (status, selection) = daemon.cli(&[
+        "runtime",
+        "tool",
+        "select",
+        "--tool",
+        &other_ref,
+        "--expected-active-generation",
+        "1",
+        "--action-request-id",
+        "request-account-tool-select-b",
+    ]);
+    assert_eq!(status, Some(0), "{selection}");
+    assert_eq!(
+        selection["result"]["state"], "previewDrifted",
+        "{selection}"
+    );
+    assert_eq!(
+        selection["result"]["blockerReasonCode"], "tool.selectionFactsUnavailable",
+        "{selection}"
+    );
+    assert_eq!(selection["result"]["dispatchCount"], 0, "{selection}");
     daemon.stop();
     let _ = std::fs::remove_dir_all(&scratch);
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    let windows = |feature: &str| -> Value {
+        coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["feature"] == feature)
+            .unwrap_or_else(|| panic!("{feature}"))["implementationStatusByPlatform"]["windows"]
+            .clone()
+    };
+    assert_eq!(windows("runtime.tool.register"), "implemented");
+    assert_eq!(windows("runtime.tool.select"), "partial");
 }

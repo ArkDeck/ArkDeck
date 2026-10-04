@@ -37,7 +37,7 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 | `port-forward.create@1`, `.remove@1` | 1 | now | `port-forward` oracle; needs fake answers |
 | `capture.diagnostic-session@1` | 1 | ruling | Reached through `job submit` alone (a generic leaf). Its live control `diagnostic.session.mark|status|stop` is measured over the `diagnostic-session` oracle through the real CLI (`tests/spawning/diagnostic_session_cli.rs`, TASK-XPA-005) |
 | `job.archive`, `job.archive.preview` | — | now | Composed on Windows (#2468); no Swift oracle (Swift retired), measure against the macOS Rust answers |
-| `runtime.tool.register` (`--kind hdc`), `runtime.tool.select` | 1 | now | Tuple registered (#2472), selection composed (#2524, #2541); `tool-selection-registry` oracle |
+| `runtime.tool.select` | 1 | now | `runtime.tool.register` is measured (`--kind hdc` over the account composition, `tests/spawning/account_tool_selection.rs`, TASK-XPA-012). Selecting a registered candidate still answers only a drifted action: its impact needs the HDC lifecycle owner's healthy server proof (#2501) |
 | `workspace.continuation.run`, `.submit` | 5 | now | `workspace-continuation` oracle |
 | `workspace.sign-openharmony-hap@1` (`workspace sign`) | 5 | now | `workspace-sign-oracle`; in flight (#2508) |
 | `workspace.symbolize-crash@1` (`workspace symbolize`) | 5 | now | `workspace-test-symbolize-oracle`; in flight (#2512) |
