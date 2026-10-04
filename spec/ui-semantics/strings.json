@@ -7613,6 +7613,72 @@
       "table": "Localizable",
       "en": "binding %lld",
       "zh-Hans": "binding %lld"
+    },
+    {
+      "key": "jobRecovery.action.openHistory",
+      "table": "JobsLocalizable",
+      "en": "Review in History",
+      "zh-Hans": "在历史记录中检查"
+    },
+    {
+      "key": "jobRecovery.count",
+      "table": "JobsLocalizable",
+      "en": "%d records need review",
+      "zh-Hans": "%d 条记录待检查"
+    },
+    {
+      "key": "jobRecovery.list",
+      "table": "JobsLocalizable",
+      "en": "Recovery records",
+      "zh-Hans": "恢复记录"
+    },
+    {
+      "key": "jobRecovery.archivePending.guidance",
+      "table": "JobsLocalizable",
+      "en": "Runtime is waiting for a safe boundary before the recovery record can finish. This App cannot force the current step to stop.",
+      "zh-Hans": "Runtime 正在等待安全边界，之后才能完成恢复记录；此 App 不能强制停止当前步骤。"
+    },
+    {
+      "key": "jobRecovery.archivePending.title",
+      "table": "JobsLocalizable",
+      "en": "Recovery archive is pending",
+      "zh-Hans": "恢复归档正在等待"
+    },
+    {
+      "key": "jobRecovery.outcomeUnknown.guidance",
+      "table": "JobsLocalizable",
+      "en": "Keep the device unchanged when possible. Do not start another device operation until the outstanding effect is reconciled through an approved Runtime path.",
+      "zh-Hans": "条件允许时请保持设备状态不变。在通过已批准的 Runtime 路径核对未决影响前，不要开始其他设备操作。"
+    },
+    {
+      "key": "jobRecovery.outcomeUnknown.title",
+      "table": "JobsLocalizable",
+      "en": "Device effect is unknown",
+      "zh-Hans": "设备影响未知"
+    },
+    {
+      "key": "jobRecovery.resumeSafe.guidance",
+      "table": "JobsLocalizable",
+      "en": "Runtime recorded a confirmed safe boundary. Review the record before resuming through an approved Runtime path.",
+      "zh-Hans": "Runtime 已记录确认过的安全边界。请先检查记录，再通过已批准的 Runtime 路径恢复。"
+    },
+    {
+      "key": "jobRecovery.resumeSafe.title",
+      "table": "JobsLocalizable",
+      "en": "A safe recovery boundary is available",
+      "zh-Hans": "已有安全恢复边界"
+    },
+    {
+      "key": "jobRecovery.waiting.guidance",
+      "table": "JobsLocalizable",
+      "en": "Keep the current device state unchanged and review the Runtime record for the required recovery step.",
+      "zh-Hans": "请保持设备当前状态不变，并在 Runtime 记录中检查所需的恢复步骤。"
+    },
+    {
+      "key": "jobRecovery.waiting.title",
+      "table": "JobsLocalizable",
+      "en": "Recovery is waiting",
+      "zh-Hans": "恢复正在等待"
     }
   ]
 }
