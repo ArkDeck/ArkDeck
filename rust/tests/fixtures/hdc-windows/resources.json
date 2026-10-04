@@ -1,18 +1,18 @@
 {
   "schemaVersion": "1.0.0",
-  "packVersion": "1.0.0",
+  "packVersion": "1.1.0",
   "registryId": "OPENHARMONY-HDC-WINDOWS-PROBES",
-  "registryVersion": "1.0.0",
-  "integrationProfile": "OPENHARMONY-TOOLS@0.7.0",
+  "registryVersion": "1.1.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.7.1",
   "registeredBy": "CHG-2026-078-windows-hdc-registration/TASK-WHR-002",
   "canonicalRegistry": {
     "path": "openspec/integrations/openharmony/windows-probes.yaml",
-    "bytes": 15262,
-    "sha256": "205c4977cd07ce7e4ad1d3ad84d5cbdee3130b4cd77fb6ac53144d79a6d059cb"
+    "bytes": 17390,
+    "sha256": "cad5444a7c78b39d3c466929fb30407cad0f51ffa14e1721e6f13906f18089c1"
   },
   "candidate": "c2",
   "executableSHA256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
-  "provenance": "Captured 2026-10-04 on the Windows 11 x64 reference host with rust/scripts/windows-hdc-sample.ps1 and redacted by rust/scripts/windows_sample_process.py (#2457): connect keys are same-length a runs, COM<n> port names are kept, no hash of key-bearing raw bytes is kept. Run record: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/hdc-windows-sample-20261004-run.md (#2456).",
+  "provenance": "Captured 2026-10-04 on the Windows 11 x64 reference host with rust/scripts/windows-hdc-sample.ps1 and redacted by rust/scripts/windows_sample_process.py (#2457): connect keys are same-length a runs, COM<n> port names are kept, no hash of key-bearing raw bytes is kept. Run record: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/hdc-windows-sample-20261004-run.md (#2456). The server-startup listing (CHG-2026-078 r3) was captured on 2026-10-04 by the agent's own read-only reproduction against its own server on 127.0.0.1:8710; it holds no identifier. Run record: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md.",
   "families": {
     "version": [
       {
@@ -66,6 +66,12 @@
         "bytes": 127,
         "sha256": "95f2d8900e51ab1e9d51d7c8dc1144c3294a8838af20cf0083b1fbda4ba72a4e",
         "expectedOutcome": "observedEmpty"
+      },
+      {
+        "file": "c2/server-startup/list-targets-server-startup.stdout.bin",
+        "bytes": 14,
+        "sha256": "04944aafdaafa5db8d3d38221d275e64e6b2fff949539768db6296201fcdbc70",
+        "expectedOutcome": "notYetObservable"
       }
     ],
     "serverIdentityGeneration": [
@@ -219,6 +225,16 @@
       "file": "c2/no-board/version.stdout.bin",
       "bytes": 13,
       "sha256": "78c4d7b4ffc0bb7bb0bac0512e5fe9da25be07c481ff7a41dfc9732f7da0a424"
+    },
+    {
+      "file": "c2/server-startup/list-targets-server-startup.stderr.bin",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "c2/server-startup/list-targets-server-startup.stdout.bin",
+      "bytes": 14,
+      "sha256": "04944aafdaafa5db8d3d38221d275e64e6b2fff949539768db6296201fcdbc70"
     },
     {
       "file": "c2/stop-server/kill-server.stderr.bin",

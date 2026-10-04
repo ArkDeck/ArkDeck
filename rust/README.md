@@ -2616,7 +2616,14 @@ well.
   `WINDOWS_HDC_TUPLES`, the registered `deviceObservationSnapshot` grammar
   `parse_registered_windows_presence` (six columns; only `USB` rows are
   devices; the sampled `COM<n>`/`UART`/`Ready` rows are excluded; `[Empty]`,
-  zero bytes and every other form `unknown`). `healthyCheckserver` is no
+  zero bytes and every other form `unknown`). CHG-2026-078 r3 adds one form:
+  the server-startup listing `[Empty]` CR TAB `hdc` CR LF
+  (`WINDOWS_SERVER_STARTUP_LISTING`, exit 0, empty stderr) is
+  `ObservationFailure::NotYetObservable` (`unknown`, retryable), never no
+  device. On Windows `ManagedHdcServer::start` settles past it
+  (`settle_startup_listing`, at most `WINDOWS_STARTUP_SETTLE` = 3 s) and
+  records `StartupListing::Settled` or `Unsettled`; an unsettled server's
+  observations stay `unknown`. `healthyCheckserver` is no
   registered Windows probe (`checkserver` starts a server when none runs);
   Windows server health is the commandless `runtime.hdc.status` observation.
   Catalog lowering is unchanged here: `observe.device`'s `probeHDCServer`

@@ -1,12 +1,12 @@
 # Integration adapter 输入的版本登记(V2:普通 profile 不逐文件 hash pin;历史对比用 git;
 # golden fixture 与 production probe resource 例外:逐文件 SHA-256 pin)
-lock: INTEGRATION-PROFILES-0.8.0
+lock: INTEGRATION-PROFILES-0.8.1
 status: current
 updated_at: 2026-10-04
 
 profiles:
   - id: OPENHARMONY-TOOLS
-    version: 0.7.0
+    version: 0.7.1
     path: openspec/integrations/openharmony/profile.md
 
 catalogs:
@@ -233,14 +233,14 @@ supervisor_observation_probe_resources:
 
 windows_probe_registries:
   - id: OPENHARMONY-HDC-WINDOWS-PROBES
-    version: 1.0.0
-    profile: OPENHARMONY-TOOLS@0.7.0
+    version: 1.1.0
+    profile: OPENHARMONY-TOOLS@0.7.1
     platform: windows
     tool_reported_version: 3.2.0g
     tool_executable_sha256: c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e
     endpoint: 127.0.0.1:8710
     path: openspec/integrations/openharmony/windows-probes.yaml
-    sha256: 205c4977cd07ce7e4ad1d3ad84d5cbdee3130b4cd77fb6ac53144d79a6d059cb
+    sha256: cad5444a7c78b39d3c466929fb30407cad0f51ffa14e1721e6f13906f18089c1
 
 windows_probe_resources:
   - id: whr-gitattributes
@@ -367,14 +367,30 @@ windows_probe_resources:
     version: 1.0.0
     path: rust/tests/fixtures/hdc-windows/c2/tool.json
     sha256: acc84be99323f57572addb21b7c0683809eaf210bc3b37d3d98bb6efe31553aa
+  - id: whr-c2-server-startup-list-targets-server-startup-stderr-bin
+    version: 1.1.0
+    path: rust/tests/fixtures/hdc-windows/c2/server-startup/list-targets-server-startup.stderr.bin
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  - id: whr-c2-server-startup-list-targets-server-startup-stdout-bin
+    version: 1.1.0
+    path: rust/tests/fixtures/hdc-windows/c2/server-startup/list-targets-server-startup.stdout.bin
+    sha256: 04944aafdaafa5db8d3d38221d275e64e6b2fff949539768db6296201fcdbc70
   - id: whr-resources-json
-    version: 1.0.0
+    version: 1.1.0
     path: rust/tests/fixtures/hdc-windows/resources.json
-    sha256: c4b9f81e924f34e374f4a38acc27ba4c4ffc5254cd3ec32c054a5b6660ad8f77
+    sha256: 400345520e299d18478ff32d1763d2fd521737b4c321ff99f90d5ed24ec48ed2
 
 adoption_boundary:
-  previous_lock: INTEGRATION-PROFILES-0.7.0
-  previous_openharmony_profile: OPENHARMONY-TOOLS@0.6.0
+  previous_lock: INTEGRATION-PROFILES-0.8.0
+  previous_openharmony_profile: OPENHARMONY-TOOLS@0.7.0
+  windows_server_startup_rule: >-
+    OPENHARMONY-HDC-WINDOWS-PROBES@1.1.0 (CHG-2026-078 r3) adds exactly one form to the Windows
+    deviceObservationSnapshot family: the 14-byte server-startup listing [Empty] CR TAB hdc CR LF
+    with exit 0 and empty stderr is notYetObservable (unknown, retryable), never no device and
+    never a disappearance. A managed start settles past it for at most 3 s; past the bound every
+    observation stays unknown. Every other [Empty] form stays unknown. Nothing else changes.
+  historic_windows_registration_previous_lock: INTEGRATION-PROFILES-0.7.0
+  historic_windows_registration_previous_profile: OPENHARMONY-TOOLS@0.6.0
   windows_probe_rule: >-
     The Windows registry OPENHARMONY-HDC-WINDOWS-PROBES@1.0.0 (CHG-2026-078) registers exactly
     the DevEco Studio 26.0.0.43 hdc.exe (3.2.0g, executable SHA-256 c7951849...101e) on

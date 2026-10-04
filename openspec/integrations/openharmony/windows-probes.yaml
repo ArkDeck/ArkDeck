@@ -2,8 +2,8 @@
   "schemaVersion": "1.0.0",
   "serializationFormat": "json-compatible-yaml-1.2",
   "registryId": "OPENHARMONY-HDC-WINDOWS-PROBES",
-  "registryVersion": "1.0.0",
-  "integrationProfile": "OPENHARMONY-TOOLS@0.7.0",
+  "registryVersion": "1.1.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.7.1",
   "registeredBy": "CHG-2026-078-windows-hdc-registration/TASK-WHR-002",
   "unknownFamilyDisposition": "unknown",
   "toolContext": {
@@ -159,9 +159,9 @@
         "zeroByteStdoutDisposition": "unknown",
         "emptyMarker": {
           "literal": "[Empty]",
-          "observed": false,
+          "observed": true,
           "disposition": "unknown",
-          "note": "Never emitted on the sampled host: hdc lists the host's serial ports as UART rows in every phase. Not registered as empty (maintainer ruling 2026-10-04, item 2)."
+          "note": "Never emitted by an enumerated server on the sampled host: hdc lists the host's serial ports as UART rows. The only observed [Empty] form is serverStartupListing below; every other [Empty] form ([Empty] CR LF, [Empty] LF, the marker beside rows) stays unknown."
         },
         "row": {
           "delimiter": "TAB",
@@ -239,6 +239,22 @@
           "match": "connectKey matches ^COM[0-9]+$, deviceName empty, transport UART, state Ready, hostTag unknown..., sixth column hdc",
           "disposition": "excluded; never a device observation",
           "otherUartForms": "unknown"
+        },
+        "serverStartupListing": {
+          "basis": "maintainer ruling 2026-10-04 (register the observed [Empty] form), refined by CHG-2026-078 r3 from the evidence that it is a server-startup race: notYetObservable instead of no device",
+          "exactBytesHex": "5b456d7074795d0d096864630d0a",
+          "exactBytes": "[Empty]\r\thdc\r\n",
+          "bytes": 14,
+          "exitCode": 0,
+          "stderrMustBeEmpty": true,
+          "disposition": "notYetObservable",
+          "classification": "unknown",
+          "retryable": true,
+          "neverObservedEmpty": true,
+          "neverDisappearance": true,
+          "observedWhen": "only while a server the same tool had just started had not enumerated yet: from the moment its listener answered until at most 1.257 s after the server's spawn (at most 0.712 s after the listener answered), in 15 of 15 listener-waited starts; never after the first enumerated listing (the first came 0.967 to 1.495 s after the spawn); independent of the server's and the client's environment",
+          "settleRule": "after a managed start, list again every poll interval for at most 3 s until a registered enumerated form is read; past the bound the server stays up and every observation stays unknown (fail closed); a consumer that reads this listing at any other time treats it as unknown",
+          "evidence": "CHG-2026-074 evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md"
         }
       },
       "semanticMappings": [
@@ -255,7 +271,11 @@
           "result": "observed.connectedSet"
         },
         {
-          "input": "emptyMarkerLine",
+          "input": "serverStartupListing",
+          "result": "notYetObservable (unknown, retryable)"
+        },
+        {
+          "input": "emptyMarkerLineInAnyOtherForm",
           "result": "unknown"
         },
         {
@@ -316,6 +336,12 @@
           "bytes": 127,
           "sha256": "95f2d8900e51ab1e9d51d7c8dc1144c3294a8838af20cf0083b1fbda4ba72a4e",
           "expectedOutcome": "observedEmpty"
+        },
+        "serverStartup": {
+          "file": "rust/tests/fixtures/hdc-windows/c2/server-startup/list-targets-server-startup.stdout.bin",
+          "bytes": 14,
+          "sha256": "04944aafdaafa5db8d3d38221d275e64e6b2fff949539768db6296201fcdbc70",
+          "expectedOutcome": "notYetObservable"
         }
       }
     },
@@ -389,5 +415,6 @@
       ],
       "fixtures": "rust/tests/fixtures/hdc-windows/c2/{no-board,board-connected,board-removed}/sample.json (listener/owner brackets)"
     }
-  ]
+  ],
+  "amendedBy": "CHG-2026-078-windows-hdc-registration r3 (maintainer ruling 2026-10-04, refined by the server-startup evidence)"
 }
