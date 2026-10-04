@@ -161,3 +161,30 @@ baseline and outputs regenerated; the archive proof/dispatch behavior is unchang
 Fresh CI on the compatibility head is pending. The prior all-green result is not
 represented as validation of a different head, and no maintainer or hardware
 approval is inferred. No full local unified gate or device operation was run.
+
+## Shared-resource compatibility with October 4 main updates
+
+The previous archive head `d1f01bd61` passed all selected Swift CI lanes in run
+`37189187886`; current-merge SDD Guard run `37191326873` also passed. The obsolete
+base-change run `37189334908` failed before validation because its event contained
+the previous merge SHA; no test assertion or SHA guard was weakened.
+
+This merge inherits recovery-controls head `b748ab46b` and main `1f05dce05`.
+The shared registry keeps all incoming Windows resource keys and all 19 archive
+keys, and the three Windows resource outputs were regenerated. The archive proof,
+dispatch behavior, Swift/App sources, and design-system prototype are unchanged
+from the previously verified archive head.
+
+### Local targeted checks
+
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-hoststore --lib job_archive::tests`: 7 passed, exit 0 (`/tmp/arkdeck-macos-closeout-20261004/archive-main2-rust.log`).
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd --bin arkdeck-agentd app_ingress_tests::recovery_tests::`: 4 passed, exit 0 (same log).
+- Windows string generation and consumer-reference checks: exit 0; 1,280 entries, 46 snapshots and 286 resource references resolve (`archive-main2-strings.log`).
+- `cargo fmt --all --check --manifest-path rust/Cargo.toml`, `sh scripts/check-sdd.sh`, and staged/unstaged `git diff --check`: exit 0; SDD reports zero errors and warnings (`archive-main2-sdd.log`).
+- Swift, App and design-system checks were not repeated locally because their inputs did not change; the previous head passed those CI lanes. The full unified gate runs only in PR CI.
+
+### CI
+
+Fresh PR #2468 CI is pending for this merge. Previous-head results above do not
+validate the new commit. No device execution, runtime-authority write, maintainer
+approval or real-device acceptance is claimed.

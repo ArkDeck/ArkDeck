@@ -52,10 +52,19 @@ internal sealed class AppSession : IDisposable
         return FindExe() ?? throw new AssertInconclusiveException("skipped: the App is not built (dotnet build windows/ArkDeck.Windows.slnx -c Release)");
     }
 
+    private static readonly Lazy<string> RemoteSourcesRoot = new(() => Directory.CreateTempSubdirectory("arkdeck-uitest-remote-sources-").FullName);
+
     public static AppSession Launch(string exe, IEnumerable<string> arguments, IReadOnlyDictionary<string, string>? environment = null)
     {
         var start = new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe)! };
         foreach (var argument in arguments) start.ArgumentList.Add(argument);
+        // The remote build sources of a test run are its own (files in a temporary directory,
+        // credentials in the ArkDeck-fixture namespace), never the person's.
+        if (!start.ArgumentList.Contains("--remote-sources-root"))
+        {
+            start.ArgumentList.Add("--remote-sources-root");
+            start.ArgumentList.Add(RemoteSourcesRoot.Value);
+        }
         // No inherited ArkDeck configuration: each test states the daemon it means.
         foreach (var key in start.Environment.Keys.ToArray())
         {

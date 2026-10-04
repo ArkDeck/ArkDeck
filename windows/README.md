@@ -179,6 +179,17 @@ first, `ControlResult` back.
   opened in the Trace viewer — or a HiLog summary verified as macOS verifies it. No Diagnostic
   Session capture provider is composed, so Arm and Mark (Ctrl+M) say so with the macOS reason
   code `diagnostic_session_capture_not_connected`.
+- **Remote build sources (TASK-XPA-020).** The macOS App-side SSH servers: Settings › Servers
+  saves an SSH endpoint after a probe verifies the connection, the credential, the SFTP build root
+  and the host key (its fingerprint shown, trusted only by saving that probe); Debug › Artifacts ›
+  Remote server browses the folders below the verified root and chooses a lib*.so, which is
+  fetched, checked and prepared like a local file. SSH runs through Windows' built-in OpenSSH
+  client (`%SystemRoot%\System32\OpenSSH\ssh.exe`, argv only, `-F none`, the `sftp` subsystem)
+  with a per-connection known-hosts file holding only the pinned key; secrets stay in Credential
+  Manager (`ArkDeck/app/com.arkdeck.remote-build-source.v1/<id>`, in parts beyond 2,560 bytes) and
+  reach the client only through the App's own askpass mode over an owner-only pipe. The files
+  (`sources-v1.json`, `target-bindings-v1.json`, `audit-v1.jsonl`) are owner-only under
+  `%LOCALAPPDATA%\ArkDeck\App\RemoteBuildSources`; no Runtime call is made.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for

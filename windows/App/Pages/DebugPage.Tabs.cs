@@ -1,5 +1,6 @@
 using ArkDeck.App.Controls;
 using ArkDeck.App.Core.Presentation;
+using ArkDeck.App.Core.RemoteSources;
 using ArkDeck.App.Core.Strings;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -22,6 +23,9 @@ public sealed partial class DebugPage
     private JobTerminal? _nativeTerminal;
     private string? _nativeFailure;
     private bool _remoteSource;
+    // The remote library chosen in the browser (macOS DebugRemoteLibrarySelection): fetched,
+    // checked and staged only when the plan is prepared.
+    private (Guid SourceId, string SourceName, string RelativePath, string Name)? _remoteLibrary;
     private TextBlock _artifactsStatus = Ui.Status("debug.artifacts.status");
 
     private void ArtifactsTab(DebugState state)
@@ -51,6 +55,7 @@ public sealed partial class DebugPage
             if (remote == _remoteSource) return;
             _remoteSource = remote;
             _libraryPath = null;
+            _remoteLibrary = null;
             _preparation = null;
             RenderTab();
         };
@@ -62,7 +67,12 @@ public sealed partial class DebugPage
             ? Ui.Row(Ui.Button("debug.artifacts.browseRemote", S.Text(UiStrings.DebugArtifactsBrowseRemote), async (_, _) => await RemoteBrowserAsync()))
             : Ui.Row(Ui.Button("debug.artifacts.chooseLibrary", S.Text(UiStrings.DebugArtifactsChooseLibrary), async (_, _) => await ChooseLibraryAsync())));
         sourcePanel.Children.Add(Ui.Fact("debug.artifacts.selectedLibrary", S.Text(UiStrings.DebugArtifactsSelectedLibrary),
-            _libraryPath is null ? S.Text(UiStrings.DebugArtifactsNoLibrary) : Path.GetFileName(_libraryPath)));
+            _remoteLibrary is { } remoteLibrary ? remoteLibrary.Name
+            : _libraryPath is null ? S.Text(UiStrings.DebugArtifactsNoLibrary) : Path.GetFileName(_libraryPath)));
+        if (_remoteLibrary is { } chosenRemote)
+        {
+            sourcePanel.Children.Add(Ui.Text("debug.artifacts.selectedLibrary.source", $"{chosenRemote.SourceName} · {chosenRemote.RelativePath}", "ArkDeckMonoStyle"));
+        }
         sourcePanel.Children.Add(Ui.Text("debug.artifacts.sourceBoundary", S.Text(UiStrings.DebugArtifactsSourceBoundary), "ArkDeckCaptionStyle"));
 
         // Deployment inputs.
@@ -157,24 +167,6 @@ public sealed partial class DebugPage
         RenderTab();
     }
 
-    /// <summary>The macOS remote build browser. Remote build servers are an App-side SSH
-    /// setting the Windows App does not have, so the browser opens on its no-servers state.</summary>
-    private async Task RemoteBrowserAsync()
-    {
-        var content = Ui.Stack(6,
-            Ui.Text("debug.artifacts.remoteBrowser.detail", S.Text(UiStrings.DebugArtifactsRemoteBrowserDetail), "ArkDeckCaptionStyle"),
-            Ui.Heading("debug.artifacts.remoteBrowser.empty.title", S.Text(UiStrings.DebugArtifactsRemoteBrowserEmptyTitle), AutomationHeadingLevel.Level3),
-            Ui.Text("debug.artifacts.remoteBrowser.empty.detail", S.Text(UiStrings.DebugArtifactsRemoteBrowserEmptyDetail)),
-            Ui.Text("debug.artifacts.remoteBrowser.windows", S.Text(UiStrings.WindowsDebugRemoteUnavailable), "ArkDeckCaptionStyle"));
-        var dialog = Ui.Dialog(XamlRoot, "debug.artifacts.remoteBrowser", S.Text(UiStrings.DebugArtifactsRemoteBrowserTitle), content,
-            S.Text(UiStrings.DebugArtifactsSourceLocal), S.Text(UiStrings.DebugArtifactsRemoteBrowserCancel));
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary)
-        {
-            _remoteSource = false;
-            RenderTab();
-        }
-    }
-
     private async Task PreviewNativeAsync(OperationFacts? operation)
     {
         if (_preparation is { } ready)
@@ -182,22 +174,51 @@ public sealed partial class DebugPage
             await ReviewNativeAsync(ready);
             return;
         }
-        var inputsValid = _libraryPath is not null && DebugOperations.IsValidBundleName(_targetBundle) && DebugOperations.IsValidNativeLibraryName(_libraryName);
+        var chosen = _remoteSource ? _remoteLibrary is not null : _libraryPath is not null;
+        var inputsValid = chosen && DebugOperations.IsValidBundleName(_targetBundle) && DebugOperations.IsValidNativeLibraryName(_libraryName);
         if (Blocker(operation, inputsValid, _preparing || _nativeJobId is not null) is { } blocked)
         {
             Ui.Say(_artifactsStatus, blocked);
             return;
         }
         var target = Target!;
-        var path = _libraryPath!;
+        var remote = _remoteSource ? _remoteLibrary : null;
+        var path = _libraryPath;
         _preparing = true;
         _nativeFailure = null;
         _nativeTerminal = null;
         RenderTab();
         Ui.Say(_artifactsStatus, S.Text(UiStrings.DebugArtifactsPreparing));
         var steps = operation!.Steps;
-        var outcome = await Task.Run(() => App.Loader.PrepareNativeLibraryAsync(target, path, _targetBundle, _libraryName, "hashProcessAndMaps", "autoRollback", steps,
-            CancellationToken.None));
+        if (remote is { } library)
+        {
+            // macOS prepareRemoteNativeLibrary: fetch through the pinned SSH source, check the bytes
+            // against what the read reported, stage them owner-only and prepare that file.
+            try
+            {
+                var fetched = await Task.Run(() => App.RemoteSources.FetchNativeLibraryAsync(library.SourceId, library.RelativePath));
+                path = RemoteNativeLibraryStaging.Write(fetched);
+            }
+            catch (RemoteBuildSourceException error)
+            {
+                _preparing = false;
+                _nativeFailure = SettingsPage.RemoteError(error);
+                RenderTab();
+                Ui.Say(_artifactsStatus, _nativeFailure);
+                return;
+            }
+        }
+        var staged = remote is not null ? path : null;
+        NativeLibraryOutcome outcome;
+        try
+        {
+            outcome = await Task.Run(() => App.Loader.PrepareNativeLibraryAsync(target, path!, _targetBundle, _libraryName, "hashProcessAndMaps", "autoRollback", steps,
+                CancellationToken.None));
+        }
+        finally
+        {
+            if (staged is not null) RemoteNativeLibraryStaging.Remove(staged);
+        }
         MainWindow.Instance.Report(outcome);
         _preparing = false;
         _preparation = outcome.Prepared;

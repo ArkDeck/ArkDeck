@@ -95,3 +95,28 @@ lockfile-based `npm ci --ignore-scripts` installed them before the passing run.
 PR #2467's previous head was green; compatibility-head CI is pending. The
 previous archive PR #2468 head `024511e9` passed Windows and macOS workspace,
 Swift and App checks in run `37186647925`; both contract-parity lanes subsequently passed and run `37186647925` concluded success.
+
+
+## Second current-main compatibility update
+
+### CI
+
+Head `545d4fdee` passed every selected check in Swift CI `37188933420`, including
+all three platforms' workspace and contract parity lanes; the `swift` aggregate
+and SDD `37188933147` passed. Main then advanced to `1f05dce05` with Windows remote
+sources and HDC owner changes, producing a shared-string append conflict.
+
+The merge retains all main changes and all 12 recovery resource keys by a
+three-way merge keyed by resource identity, with an assertion against conflicting
+values. The three Windows resource consumers are regenerated. The 29-line
+`app_job_recovery_allowed` guard is byte-identical; no recovery behavior changes.
+
+### Local targeted checks
+
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd --bin arkdeck-agentd app_ingress_tests::recovery_tests::`: 3 passed, exit 0, `recovery-main2-rust.log`.
+- `python3 windows/scripts/generate-ui-strings.py --check`: 1,261 strings pass. `check-windows-resource-references.py` checks all 46 snapshots, 286 references and literal UI-test resource lookups: pass, exit 0, `recovery-main2-strings.log`. The initial generator invocation omitted its required `--write` mode and exited 2; the explicit write/check succeeded.
+- No App, Swift package or prototype file changes from the already-verified head were introduced by this merge; their green checks above remain the relevant local evidence. Native Windows validation and the full combined diff are rechecked by fresh PR CI.
+
+Logs remain under `/tmp/arkdeck-macos-closeout-20261004/`. The compatibility
+commit is not an amendment of the green head; fresh CI and maintainer review are
+required for its combined tree.

@@ -12,9 +12,10 @@
 //!     register, and `runtime.tool.select` with no tool-selection owner;
 //!   - what Windows cannot hold is refused with zero dispatch and writes
 //!     nothing: an absent package, and a package whose daemon is not signed
-//!     as this (unsigned) daemon is; an HDC (no Windows HDC tuple is
-//!     registered, CHG-2026-078); a macOS-spelled path; and an absent bundle,
-//!     tool or toolchain;
+//!     as this (unsigned) daemon is; an absent `hdc.exe`, and a real one,
+//!     since no Windows HDC tuple is registered (`WINDOWS_HDC_TUPLES` is
+//!     empty, CHG-2026-078); a macOS-spelled path; and an absent bundle, tool
+//!     or toolchain;
 //!   - the registry reads back the same after a restart.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
@@ -96,6 +97,21 @@ impl Drop for Root {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+/// An owner-private `hdc.exe` below the root: a copy of a `System32` program,
+/// never run, which no registered Windows HDC tuple names.
+fn hdc(root: &Root) -> String {
+    let directory = root.0.join("hdc-sdk");
+    if !directory.exists() {
+        arkdeck_platform::create_private_directory(&directory).unwrap();
+        std::fs::copy(
+            PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join(r"System32\whoami.exe"),
+            directory.join("hdc.exe"),
+        )
+        .unwrap();
+    }
+    directory.join("hdc.exe").to_str().unwrap().to_owned()
 }
 
 /// A release-candidate package tree below the root, owner-private, laid out as
@@ -371,8 +387,15 @@ fn empty_registry_answers(pipe: &str, root: &Root) {
         pipe,
         "runtime.tool.register",
         json!({"kind": "hdc", "file": root.path("hdc.exe")}),
+        "fileIdentityChanged",
+        "the HDC source is absent or unreadable; nothing was captured",
+    );
+    refused(
+        pipe,
+        "runtime.tool.register",
+        json!({"kind": "hdc", "file": hdc(root)}),
         "admissionDenied",
-        "no Windows HDC tuple is registered (CHG-2026-078); nothing was captured",
+        "no registered Windows HDC tuple names this hdc.exe (CHG-2026-078); nothing was retained",
     );
     // A macOS spelling is not a local path here.
     refused(
@@ -432,7 +455,7 @@ fn the_registry_owners_answer_over_the_pipe_and_across_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, controlActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
                 .to_owned()
         ),
         "{:?}",
@@ -708,7 +731,7 @@ fn the_registry_leaves_run_through_the_cli_against_a_dev_signed_daemon() {
         "runtime.bundle.inspect",
         "runtime.bundle.remove",
     ]);
-    let hdc_file = root.path("hdc.exe");
+    let hdc_file = hdc(&root);
     cli_refused(
         &daemon,
         &pin,

@@ -44,7 +44,8 @@ mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
 pub use bootstrap_tree::{
     BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublication,
-    BootstrapBundlePublishError, BootstrapEntry, BootstrapTree, inspect_bootstrap_tree,
+    BootstrapBundlePublishError, BootstrapEntry, BootstrapToolCapture, BootstrapToolCaptureError,
+    BootstrapToolPublication, BootstrapToolPublishError, BootstrapTree, inspect_bootstrap_tree,
 };
 pub use code_signature::{
     DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,

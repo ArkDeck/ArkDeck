@@ -4114,10 +4114,6 @@ SHA-256：%4$@</value>
     <value>调试</value>
     <comment>windows.navigation.debug (Windows only)</comment>
   </data>
-  <data name="windows_debug_remote_unavailable" xml:space="preserve">
-    <value>远程构建服务器在 macOS App 的设置中配置；Windows App 暂无。请选择本地库。</value>
-    <comment>windows.debug.remote.unavailable (Windows only)</comment>
-  </data>
   <data name="windows_debug_jobs_cancelFailed" xml:space="preserve">
     <value>Runtime 拒绝了取消请求</value>
     <comment>windows.debug.jobs.cancelFailed (Windows only)</comment>
@@ -4634,13 +4630,397 @@ SHA-256：%4$@</value>
     <value>打标记（Ctrl+M）</value>
     <comment>windows.diagnostics.capture.mark (Windows only)</comment>
   </data>
-  <data name="jobRecovery_action_reconcile" xml:space="preserve">
-    <value>重新核对恢复状态</value>
-    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
+  <data name="settings_remoteSources_add" xml:space="preserve">
+    <value>添加服务器</value>
+    <comment>settings.remoteSources.add (SettingsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_observed" xml:space="preserve">
-    <value>Runtime 已返回更新后的状态</value>
-    <comment>jobRecovery.action.observed (JobsLocalizable.xcstrings)</comment>
+  <data name="settings_remoteSources_auth_password" xml:space="preserve">
+    <value>密码</value>
+    <comment>settings.remoteSources.auth.password (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_auth_privateKey" xml:space="preserve">
+    <value>OpenSSH 私钥</value>
+    <comment>settings.remoteSources.auth.privateKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_choosePrivateKey" xml:space="preserve">
+    <value>选择私钥…</value>
+    <comment>settings.remoteSources.choosePrivateKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_credentialSystemDefault" xml:space="preserve">
+    <value>系统 SSH</value>
+    <comment>settings.remoteSources.credentialSystemDefault (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_credentialStored" xml:space="preserve">
+    <value>Keychain</value>
+    <comment>settings.remoteSources.credentialStored (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_edit" xml:space="preserve">
+    <value>编辑</value>
+    <comment>settings.remoteSources.edit (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_addTitle" xml:space="preserve">
+    <value>添加服务器</value>
+    <comment>settings.remoteSources.editor.addTitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_credential" xml:space="preserve">
+    <value>凭据</value>
+    <comment>settings.remoteSources.editor.credential (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_detail" xml:space="preserve">
+    <value>ArkDeck 只会浏览已验证编译根目录以内的内容，并导入选中的 lib*.so 文件。</value>
+    <comment>settings.remoteSources.editor.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_editTitle" xml:space="preserve">
+    <value>编辑服务器</value>
+    <comment>settings.remoteSources.editor.editTitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_server" xml:space="preserve">
+    <value>SSH 服务器</value>
+    <comment>settings.remoteSources.editor.server (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_verify" xml:space="preserve">
+    <value>验证与信任</value>
+    <comment>settings.remoteSources.editor.verify (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_empty_detail" xml:space="preserve">
+    <value>先添加 SSH 服务器，随后即可在 Debug 中浏览远端编译产物。</value>
+    <comment>settings.remoteSources.empty.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_empty_title" xml:space="preserve">
+    <value>尚未配置服务器</value>
+    <comment>settings.remoteSources.empty.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_authentication" xml:space="preserve">
+    <value>认证方式</value>
+    <comment>settings.remoteSources.field.authentication (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_host" xml:space="preserve">
+    <value>主机名或 IP</value>
+    <comment>settings.remoteSources.field.host (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_name" xml:space="preserve">
+    <value>显示名称</value>
+    <comment>settings.remoteSources.field.name (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_passphrase" xml:space="preserve">
+    <value>私钥口令（可选）</value>
+    <comment>settings.remoteSources.field.passphrase (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_password" xml:space="preserve">
+    <value>密码</value>
+    <comment>settings.remoteSources.field.password (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_passwordOptional" xml:space="preserve">
+    <value>新密码（留空则使用 Keychain）</value>
+    <comment>settings.remoteSources.field.passwordOptional (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_port" xml:space="preserve">
+    <value>端口</value>
+    <comment>settings.remoteSources.field.port (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_root" xml:space="preserve">
+    <value>编译根目录（绝对路径）</value>
+    <comment>settings.remoteSources.field.root (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_username" xml:space="preserve">
+    <value>用户名</value>
+    <comment>settings.remoteSources.field.username (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_noPrivateKey" xml:space="preserve">
+    <value>尚未选择替换私钥</value>
+    <comment>settings.remoteSources.noPrivateKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_privateKeyReadFailed" xml:space="preserve">
+    <value>无法读取该私钥，请重新选择文件。</value>
+    <comment>settings.remoteSources.privateKeyReadFailed (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_privateKeyInvalid" xml:space="preserve">
+    <value>请选择不超过 256 KiB 的非空 OpenSSH 私钥。</value>
+    <comment>settings.remoteSources.privateKeyInvalid (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_refresh" xml:space="preserve">
+    <value>刷新</value>
+    <comment>settings.remoteSources.refresh (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_remove" xml:space="preserve">
+    <value>移除服务器</value>
+    <comment>settings.remoteSources.remove (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_remove_detail" xml:space="preserve">
+    <value>服务器配置及其 Keychain 凭据将从这台 Mac 上移除。</value>
+    <comment>settings.remoteSources.remove.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_remove_title" xml:space="preserve">
+    <value>移除此服务器？</value>
+    <comment>settings.remoteSources.remove.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_save" xml:space="preserve">
+    <value>保存已验证服务器</value>
+    <comment>settings.remoteSources.save (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_hostKey" xml:space="preserve">
+    <value>固定 SSH 主机密钥</value>
+    <comment>settings.remoteSources.security.hostKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_hostKey_detail" xml:space="preserve">
+    <value>首次验证的指纹需显式保存；后续连接若主机密钥变化将直接拒绝。</value>
+    <comment>settings.remoteSources.security.hostKey.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_keychain" xml:space="preserve">
+    <value>凭据秘密始终受保护</value>
+    <comment>settings.remoteSources.security.keychain (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_keychain_detail" xml:space="preserve">
+    <value>导入的凭据只存入 Keychain；系统默认仅只读当前用户私有的 id_rsa 与 id_ed25519，秘密不会进入配置、日志、命令行或 Runtime XPC。</value>
+    <comment>settings.remoteSources.security.keychain.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_readOnly" xml:space="preserve">
+    <value>只读 SFTP 能力</value>
+    <comment>settings.remoteSources.security.readOnly (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_readOnly_detail" xml:space="preserve">
+    <value>ArkDeck 不开放 SSH 命令、Shell、上传、删除、重命名或任意路径接口。</value>
+    <comment>settings.remoteSources.security.readOnly.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_title" xml:space="preserve">
+    <value>安全边界</value>
+    <comment>settings.remoteSources.security.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_subtitle" xml:space="preserve">
+    <value>管理用于浏览和导入远端编译产物的 SSH 服务器。</value>
+    <comment>settings.remoteSources.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_systemDefaultHint" xml:space="preserve">
+    <value>不选择文件时，ArkDeck 依次尝试 ~/.ssh/id_rsa、~/.ssh/id_ed25519；不会读取 SSH config、known_hosts 或其他文件。</value>
+    <comment>settings.remoteSources.systemDefaultHint (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_systemDefaultIdentity" xml:space="preserve">
+    <value>系统默认（id_rsa → id_ed25519）</value>
+    <comment>settings.remoteSources.systemDefaultIdentity (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_testConnection" xml:space="preserve">
+    <value>测试连接并检查主机密钥</value>
+    <comment>settings.remoteSources.testConnection (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_testing" xml:space="preserve">
+    <value>正在通过 SSH/SFTP 连接……</value>
+    <comment>settings.remoteSources.testing (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_title" xml:space="preserve">
+    <value>已保存服务器</value>
+    <comment>settings.remoteSources.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_trustOnSave" xml:space="preserve">
+    <value>请核对该指纹；保存后只信任这一枚主机密钥。</value>
+    <comment>settings.remoteSources.trustOnSave (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_useSystemDefault" xml:space="preserve">
+    <value>使用系统默认</value>
+    <comment>settings.remoteSources.useSystemDefault (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_usingStoredCredential" xml:space="preserve">
+    <value>本次测试将使用 Keychain 中已保存的凭据。</value>
+    <comment>settings.remoteSources.usingStoredCredential (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_verified" xml:space="preserve">
+    <value>连接、凭据、SFTP 根目录与主机密钥均已验证</value>
+    <comment>settings.remoteSources.verified (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_remoteSources" xml:space="preserve">
+    <value>服务器</value>
+    <comment>settings.tab.remoteSources (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_label" xml:space="preserve">
+    <value>远端构建服务器</value>
+    <comment>overview.record.remoteServer.label (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_loading" xml:space="preserve">
+    <value>正在读取绑定…</value>
+    <comment>overview.record.remoteServer.loading (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_unbound" xml:space="preserve">
+    <value>未绑定</value>
+    <comment>overview.record.remoteServer.unbound (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_unboundDetail" xml:space="preserve">
+    <value>在 Debug 中选择远端产物后，会把已验证服务器绑定到当前目标。</value>
+    <comment>overview.record.remoteServer.unboundDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_bound" xml:space="preserve">
+    <value>已绑定</value>
+    <comment>overview.record.remoteServer.bound (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_stale" xml:space="preserve">
+    <value>绑定需要处理</value>
+    <comment>overview.record.remoteServer.stale (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_staleDetail" xml:space="preserve">
+    <value>已绑定的服务器已被删除，请在 Debug 中重新选择远端产物。</value>
+    <comment>overview.record.remoteServer.staleDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_unavailable" xml:space="preserve">
+    <value>无法读取绑定</value>
+    <comment>overview.record.remoteServer.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_remoteSources_credentialStored" xml:space="preserve">
+    <value>凭据管理器</value>
+    <comment>windows.remoteSources.credentialStored (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_security_credentials_detail" xml:space="preserve">
+    <value>导入的密钥仅保存在 Windows 凭据管理器中。系统默认仅读取 %USERPROFILE%\.ssh 中仅所有者可访问的 id_rsa 与 id_ed25519；密钥不会进入配置文件、日志、命令行或 Runtime 调用。</value>
+    <comment>windows.remoteSources.security.credentials.detail (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_field_passwordOptional" xml:space="preserve">
+    <value>新密码（留空则使用凭据管理器中的密码）</value>
+    <comment>windows.remoteSources.field.passwordOptional (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_usingStoredCredential" xml:space="preserve">
+    <value>本次测试将使用凭据管理器中已保存的凭据。</value>
+    <comment>windows.remoteSources.usingStoredCredential (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_remove_detail" xml:space="preserve">
+    <value>将从此电脑移除该服务器配置及其凭据管理器中的凭据。</value>
+    <comment>windows.remoteSources.remove.detail (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_systemDefaultHint" xml:space="preserve">
+    <value>未选择文件时，ArkDeck 依次尝试 %USERPROFILE%\.ssh\id_rsa 与 id_ed25519。不会读取 SSH 配置、known_hosts 或其他文件。</value>
+    <comment>windows.remoteSources.systemDefaultHint (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_systemDefaultIdentity" xml:space="preserve">
+    <value>系统默认（id_rsa → id_ed25519）</value>
+    <comment>windows.remoteSources.systemDefaultIdentity (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_client" xml:space="preserve">
+    <value>连接使用 Windows 内置的 OpenSSH 客户端与 ArkDeck 自己固定的主机密钥；不会使用你的 known_hosts 文件与 SSH 配置。</value>
+    <comment>windows.remoteSources.client (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_saveNeedsProbe" xml:space="preserve">
+    <value>请先测试连接：保存时只信任刚刚验证过的主机密钥。</value>
+    <comment>windows.remoteSources.saveNeedsProbe (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_privateKeyChosen" xml:space="preserve">
+    <value>已选择私钥：%@</value>
+    <comment>windows.remoteSources.privateKeyChosen (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_endpoint" xml:space="preserve">
+    <value>连接地址</value>
+    <comment>windows.remoteSources.endpoint (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_root" xml:space="preserve">
+    <value>编译根目录</value>
+    <comment>windows.remoteSources.root (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_canonicalRoot" xml:space="preserve">
+    <value>已验证根目录</value>
+    <comment>windows.remoteSources.canonicalRoot (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_fingerprint" xml:space="preserve">
+    <value>主机密钥指纹</value>
+    <comment>windows.remoteSources.fingerprint (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_loading" xml:space="preserve">
+    <value>正在加载服务器…</value>
+    <comment>windows.remoteSources.loading (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_removed" xml:space="preserve">
+    <value>服务器已移除。</value>
+    <comment>windows.remoteSources.removed (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_saved" xml:space="preserve">
+    <value>服务器已保存。</value>
+    <comment>windows.remoteSources.saved (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidName" xml:space="preserve">
+    <value>服务器名称不能为空，且最多 80 个字符。</value>
+    <comment>windows.remoteSources.error.invalidName (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidHost" xml:space="preserve">
+    <value>主机名或 IP 地址格式无效。</value>
+    <comment>windows.remoteSources.error.invalidHost (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidPort" xml:space="preserve">
+    <value>SSH 端口必须在 1 到 65535 之间。</value>
+    <comment>windows.remoteSources.error.invalidPort (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidUsername" xml:space="preserve">
+    <value>SSH 用户名只能包含字母、数字、点、下划线和连字符。</value>
+    <comment>windows.remoteSources.error.invalidUsername (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidRoot" xml:space="preserve">
+    <value>编译根目录必须是非根级的绝对 POSIX 路径，且不能包含 . 或 ..。</value>
+    <comment>windows.remoteSources.error.invalidRoot (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidCredential" xml:space="preserve">
+    <value>凭据为空、过大或私钥格式不受支持。</value>
+    <comment>windows.remoteSources.error.invalidCredential (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_systemCredentialUnavailable" xml:space="preserve">
+    <value>未找到可用的系统默认 OpenSSH 私钥。请配置仅所有者可访问的 %USERPROFILE%\.ssh\id_rsa 或 id_ed25519，或手动选择私钥。</value>
+    <comment>windows.remoteSources.error.systemCredentialUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_sourceNotFound" xml:space="preserve">
+    <value>远端构建源不存在或已被删除。</value>
+    <comment>windows.remoteSources.error.sourceNotFound (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_credentialUnavailable" xml:space="preserve">
+    <value>凭据管理器中没有可用凭据，请在设置中重新测试并保存。</value>
+    <comment>windows.remoteSources.error.credentialUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_probeExpired" xml:space="preserve">
+    <value>连接测试已过期，请重新测试后再保存。</value>
+    <comment>windows.remoteSources.error.probeExpired (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_hostKeyChanged" xml:space="preserve">
+    <value>SSH 主机密钥与已保存的指纹不一致，连接已拒绝。</value>
+    <comment>windows.remoteSources.error.hostKeyChanged (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_rootChanged" xml:space="preserve">
+    <value>远端编译根目录的真实路径已变化，连接已拒绝。</value>
+    <comment>windows.remoteSources.error.rootChanged (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_pathOutsideRoot" xml:space="preserve">
+    <value>远端路径超出已保存的编译根目录。</value>
+    <comment>windows.remoteSources.error.pathOutsideRoot (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_tooManyEntries" xml:space="preserve">
+    <value>目录包含超过 500 个可见条目，请配置更具体的编译根目录。</value>
+    <comment>windows.remoteSources.error.tooManyEntries (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidLibraryName" xml:space="preserve">
+    <value>只能导入名称为 lib&lt;name&gt;.so 的远端文件。</value>
+    <comment>windows.remoteSources.error.invalidLibraryName (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidLibrarySize" xml:space="preserve">
+    <value>远端动态库必须在 64 字节到 64 MiB 之间。</value>
+    <comment>windows.remoteSources.error.invalidLibrarySize (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_fileChanged" xml:space="preserve">
+    <value>远端文件在读取期间发生变化，请重新选择。</value>
+    <comment>windows.remoteSources.error.fileChanged (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_connectionFailed" xml:space="preserve">
+    <value>SSH/SFTP 连接失败：%@</value>
+    <comment>windows.remoteSources.error.connectionFailed (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_credentialStoreFailed" xml:space="preserve">
+    <value>凭据管理器操作失败（%@）。</value>
+    <comment>windows.remoteSources.error.credentialStoreFailed (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_storageFailed" xml:space="preserve">
+    <value>无法安全保存远端构建源。</value>
+    <comment>windows.remoteSources.error.storageFailed (Windows only)</comment>
+  </data>
+  <data name="jobRecovery_action_rebound" xml:space="preserve">
+    <value>Loader 绑定已核验；请查看此 Job 的当前恢复状态</value>
+    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
+    <value>未能确认请求结果。请先刷新此 Job，再决定后续操作。</value>
+    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_stillUnknown" xml:space="preserve">
+    <value>原操作结果仍然未知</value>
+    <comment>jobRecovery.action.stillUnknown (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_refused" xml:space="preserve">
     <value>恢复操作不可用</value>
@@ -4650,112 +5030,108 @@ SHA-256：%4$@</value>
     <value>核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。</value>
     <comment>jobRecovery.action.rebind.detail (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_reconcile_detail" xml:space="preserve">
-    <value>Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。</value>
-    <comment>jobRecovery.action.reconcile.detail (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
+    <value>仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。</value>
+    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile" xml:space="preserve">
+    <value>重新核对恢复状态</value>
+    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_resume" xml:space="preserve">
     <value>从已确认的安全边界继续</value>
     <comment>jobRecovery.action.resume (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_rebound" xml:space="preserve">
-    <value>Loader 绑定已核验；请查看此 Job 的当前恢复状态</value>
-    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_action_rebind" xml:space="preserve">
+    <value>核验并重新绑定 Loader</value>
+    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile_detail" xml:space="preserve">
+    <value>Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。</value>
+    <comment>jobRecovery.action.reconcile.detail (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_action_working" xml:space="preserve">
     <value>正在核对这个 Job…</value>
     <comment>jobRecovery.action.working (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_action_stillUnknown" xml:space="preserve">
-    <value>原操作结果仍然未知</value>
-    <comment>jobRecovery.action.stillUnknown (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
-    <value>未能确认请求结果。请先刷新此 Job，再决定后续操作。</value>
-    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
-    <value>仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。</value>
-    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_action_rebind" xml:space="preserve">
-    <value>核验并重新绑定 Loader</value>
-    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_blocker_active" xml:space="preserve">
-    <value>Runtime 仍在处理此 Job，请等待其到达安全边界。</value>
-    <comment>jobRecovery.archive.blocker.active (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_blocker_hazards" xml:space="preserve">
-    <value>未解决的风险或设备残留仍需与此 Job 关联。</value>
-    <comment>jobRecovery.archive.blocker.hazards (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
-    <value>当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。</value>
-    <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_blocker_process" xml:space="preserve">
-    <value>尚不能证明托管进程或补偿状态可安全结束。</value>
-    <comment>jobRecovery.archive.blocker.process (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_blocker_refresh" xml:space="preserve">
-    <value>归档前需要重新核对 Job 记录与日志的恢复状态。</value>
-    <comment>jobRecovery.archive.blocker.refresh (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_blocker_storage" xml:space="preserve">
-    <value>Session 存储不可用，请恢复存储后再归档。</value>
-    <comment>jobRecovery.archive.blocker.storage (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_blocker_unknown" xml:space="preserve">
-    <value>仍有操作结果未知，需保留此 Job 进行恢复。</value>
-    <comment>jobRecovery.archive.blocker.unknown (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_complete" xml:space="preserve">
-    <value>已按中断状态归档，Session 保留原始证据。</value>
-    <comment>jobRecovery.archive.complete (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_action_observed" xml:space="preserve">
+    <value>Runtime 已返回更新后的状态</value>
+    <comment>jobRecovery.action.observed (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_confirm" xml:space="preserve">
     <value>按中断状态归档</value>
     <comment>jobRecovery.archive.confirm (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_detail" xml:space="preserve">
-    <value>归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。</value>
-    <comment>jobRecovery.archive.detail (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_active" xml:space="preserve">
+    <value>Runtime 仍在处理此 Job，请等待其到达安全边界。</value>
+    <comment>jobRecovery.archive.blocker.active (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_dismiss" xml:space="preserve">
-    <value>返回</value>
-    <comment>jobRecovery.archive.dismiss (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_storage" xml:space="preserve">
+    <value>Session 存储不可用，请恢复存储后再归档。</value>
+    <comment>jobRecovery.archive.blocker.storage (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_existingDecision" xml:space="preserve">
-    <value>已有归档决策记录。此操作仅补齐原决策的审计或 Session 发布。</value>
-    <comment>jobRecovery.archive.existingDecision (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_blocker_hazards" xml:space="preserve">
+    <value>未解决的风险或设备残留仍需与此 Job 关联。</value>
+    <comment>jobRecovery.archive.blocker.hazards (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_finish" xml:space="preserve">
     <value>完成已记录的归档</value>
     <comment>jobRecovery.archive.finish (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_lastStep" xml:space="preserve">
-    <value>最后确认的步骤</value>
-    <comment>jobRecovery.archive.lastStep (JobsLocalizable.xcstrings)</comment>
-  </data>
-  <data name="jobRecovery_archive_publicationPending" xml:space="preserve">
-    <value>中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。</value>
-    <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
-  </data>
   <data name="jobRecovery_archive_review" xml:space="preserve">
     <value>检查归档条件…</value>
     <comment>jobRecovery.archive.review (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_title" xml:space="preserve">
-    <value>归档中断的 Job</value>
-    <comment>jobRecovery.archive.title (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_dismiss" xml:space="preserve">
+    <value>返回</value>
+    <comment>jobRecovery.archive.dismiss (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_working" xml:space="preserve">
+    <value>正在核对归档状态…</value>
+    <comment>jobRecovery.archive.working (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_lastStep" xml:space="preserve">
+    <value>最后确认的步骤</value>
+    <comment>jobRecovery.archive.lastStep (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_existingDecision" xml:space="preserve">
+    <value>已有归档决策记录。此操作仅补齐原决策的审计或 Session 发布。</value>
+    <comment>jobRecovery.archive.existingDecision (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_unknown" xml:space="preserve">
+    <value>仍有操作结果未知，需保留此 Job 进行恢复。</value>
+    <comment>jobRecovery.archive.blocker.unknown (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_refresh" xml:space="preserve">
+    <value>归档前需要重新核对 Job 记录与日志的恢复状态。</value>
+    <comment>jobRecovery.archive.blocker.refresh (JobsLocalizable.xcstrings)</comment>
   </data>
   <data name="jobRecovery_archive_unavailable" xml:space="preserve">
     <value>暂时无法归档。请刷新此 Job 并检查恢复状态。</value>
     <comment>jobRecovery.archive.unavailable (JobsLocalizable.xcstrings)</comment>
   </data>
-  <data name="jobRecovery_archive_working" xml:space="preserve">
-    <value>正在核对归档状态…</value>
-    <comment>jobRecovery.archive.working (JobsLocalizable.xcstrings)</comment>
+  <data name="jobRecovery_archive_publicationPending" xml:space="preserve">
+    <value>中断决策已记录，Session 尚未发布。请再次检查归档条件以完成发布。</value>
+    <comment>jobRecovery.archive.publicationPending (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_complete" xml:space="preserve">
+    <value>已按中断状态归档，Session 保留原始证据。</value>
+    <comment>jobRecovery.archive.complete (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_title" xml:space="preserve">
+    <value>归档中断的 Job</value>
+    <comment>jobRecovery.archive.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_process" xml:space="preserve">
+    <value>尚不能证明托管进程或补偿状态可安全结束。</value>
+    <comment>jobRecovery.archive.blocker.process (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_detail" xml:space="preserve">
+    <value>归档结束此 Job 并保留证据，不会恢复设备或清理设备状态。Runtime 必须证明没有仍在运行的托管进程、未知结果或未解决风险。</value>
+    <comment>jobRecovery.archive.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
+    <value>当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。</value>
+    <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>
   </data>
 </root>

@@ -329,12 +329,36 @@ impl fmt::Display for BootstrapBundlePublishError {
 }
 impl std::error::Error for BootstrapBundlePublishError {}
 
-fn changed() -> BootstrapBundleCaptureError {
-    BootstrapBundleCaptureError::new(
-        "fileIdentityChanged",
-        "Bootstrap bundle source or staging identity changed",
-    )
+/// An HDC capture's answers: the shapes of a Bundle capture's, which macOS
+/// declares as separate types of the same shape.
+pub type BootstrapToolCaptureError = BootstrapBundleCaptureError;
+pub type BootstrapToolPublication = BootstrapBundlePublication;
+pub type BootstrapToolPublishError = BootstrapBundlePublishError;
+
+/// What a capture kind says when its source or staging changed, and when
+/// its local I/O failed.
+#[derive(Clone, Copy)]
+struct Labels {
+    changed: &'static str,
+    io: &'static str,
 }
+impl Labels {
+    fn changed(self) -> BootstrapBundleCaptureError {
+        BootstrapBundleCaptureError::new("fileIdentityChanged", self.changed)
+    }
+    fn io(self) -> BootstrapBundleCaptureError {
+        BootstrapBundleCaptureError::new("ioFailure", self.io)
+    }
+}
+const BUNDLE: Labels = Labels {
+    changed: "Bootstrap bundle source or staging identity changed",
+    io: "Bootstrap bundle capture could not complete its local I/O",
+};
+const TOOL: Labels = Labels {
+    changed: "Bootstrap tool source or staging identity changed",
+    io: "Bootstrap tool capture could not complete its local I/O",
+};
+
 fn source_refused(error: io::Error) -> BootstrapBundleCaptureError {
     match error.kind() {
         io::ErrorKind::NotFound => BootstrapBundleCaptureError::new(
@@ -351,21 +375,17 @@ fn source_refused(error: io::Error) -> BootstrapBundleCaptureError {
         ),
     }
 }
-fn io_failure(_: io::Error) -> BootstrapBundleCaptureError {
-    BootstrapBundleCaptureError::new("ioFailure", "the Bundle could not be staged")
-}
 
-/// A Bundle capture on NTFS: the source tree held as inspected, and the
-/// private staging copy of it in the store.
-pub struct BootstrapBundleCapture {
-    source_path: PathBuf,
-    source: BootstrapTree,
+/// A fresh private staging directory of the store: what one capture created
+/// there, removed when the capture is dropped unpublished, and its exclusive
+/// publication under a content name.
+struct Stage {
+    labels: Labels,
     store: File,
     staging: File,
-    name: String,
     path: PathBuf,
-    /// Every entry this capture created below its staging directory, in
-    /// creation order, with the identity it was created with.
+    /// Every entry created below the staging directory, in creation order,
+    /// with the identity it was created with.
     created: Vec<(String, bool, Stat)>,
     /// The staging directory's own identity.
     staged: Stat,
@@ -373,122 +393,136 @@ pub struct BootstrapBundleCapture {
     publication_uncertain: bool,
 }
 
-impl BootstrapBundleCapture {
-    /// Copy the tree at `source` into a fresh private staging directory of
-    /// the store at `registry_root`, every file checked against its
-    /// inspected SHA-256. A capture that fails, or is dropped before its
-    /// publication, removes exactly what it created.
-    pub fn capture(
+impl Stage {
+    fn new(
+        labels: Labels,
         registry_root: &Path,
-        source: &Path,
+        prefix: &str,
     ) -> Result<Self, BootstrapBundleCaptureError> {
-        let tree = inspect_bootstrap_tree(source).map_err(source_refused)?;
-        let store =
-            host_fs::open_directory_path(registry_root, DIRECTORY_WRITE).map_err(io_failure)?;
+        let io = |_| labels.io();
+        let store = host_fs::open_directory_path(registry_root, DIRECTORY_WRITE).map_err(io)?;
         let nonce: String = crate::random_bytes::<16>()
-            .map_err(io_failure)?
+            .map_err(io)?
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        let name = format!(".staging-{nonce}");
-        let private = Descriptor::private(true).map_err(io_failure)?;
+        let name = format!("{prefix}{nonce}");
         let staging = host_fs::open_relative(
             &store,
-            &segment(&name).map_err(io_failure)?,
+            &segment(&name).map_err(io)?,
             DIRECTORY_WRITE | DELETE,
             FILE_CREATE,
             Kind::Directory,
-            Some(&private),
+            Some(&Descriptor::private(true).map_err(io)?),
         )
-        .map_err(io_failure)?;
-        let staged = Stat::of(&staging).map_err(io_failure)?;
-        let mut capture = Self {
-            source_path: source.to_path_buf(),
-            source: tree,
+        .map_err(io)?;
+        let staged = Stat::of(&staging).map_err(io)?;
+        Ok(Self {
+            labels,
             store,
             staging,
             path: registry_root.join(&name),
-            name,
             created: Vec::new(),
             staged,
             published: false,
             publication_uncertain: false,
-        };
-        capture.copy()?;
-        Ok(capture)
+        })
     }
 
-    fn copy(&mut self) -> Result<(), BootstrapBundleCaptureError> {
-        let private = Descriptor::private(true).map_err(io_failure)?;
-        let file_descriptor = Descriptor::private(false).map_err(io_failure)?;
-        let mut directories: BTreeMap<String, File> = BTreeMap::new();
-        for entry in self.source.entries.iter().skip(1) {
-            let (parent_path, leaf) = entry.path.rsplit_once('/').unwrap_or(("", &entry.path));
-            let parent = if parent_path.is_empty() {
-                &self.staging
-            } else {
-                directories.get(parent_path).ok_or_else(changed)?
-            };
-            let leaf = segment(leaf).map_err(io_failure)?;
-            if entry.directory {
-                let created = host_fs::open_relative(
-                    parent,
-                    &leaf,
-                    DIRECTORY_WRITE,
-                    FILE_CREATE,
-                    Kind::Directory,
-                    Some(&private),
-                )
-                .map_err(io_failure)?;
-                self.created.push((
-                    entry.path.clone(),
-                    true,
-                    Stat::of(&created).map_err(io_failure)?,
-                ));
-                directories.insert(entry.path.clone(), created);
-            } else {
-                let mut from = self
-                    .source
-                    .open_relative_file(&self.source_path, &entry.path)
-                    .map_err(|_| changed())?;
-                let mut to = host_fs::open_relative(
-                    parent,
-                    &leaf,
-                    host_fs::WRITE,
-                    FILE_CREATE,
-                    Kind::NonDirectory,
-                    Some(&file_descriptor),
-                )
-                .map_err(io_failure)?;
-                self.created.push((
-                    entry.path.clone(),
-                    false,
-                    Stat::of(&to).map_err(io_failure)?,
-                ));
-                let mut hasher = Sha256::new();
-                let mut remaining = entry.byte_count;
-                let mut buffer = vec![0u8; 256 * 1024];
-                while remaining > 0 {
-                    let want = usize::try_from(remaining.min(buffer.len() as u64))
-                        .map_err(|_| changed())?;
-                    let read = from.read(&mut buffer[..want]).map_err(|_| changed())?;
-                    if read == 0 {
-                        return Err(changed());
-                    }
-                    hasher.update(&buffer[..read]);
-                    to.write_all(&buffer[..read]).map_err(io_failure)?;
-                    remaining -= read as u64;
-                }
-                if entry.sha256.as_deref() != Some(format!("{:x}", hasher.finalize()).as_str()) {
-                    return Err(changed());
-                }
-                host_fs::flush(&to).map_err(io_failure)?;
+    fn parent<'a>(
+        &'a self,
+        directories: &'a BTreeMap<String, File>,
+        relative: &'a str,
+    ) -> Result<(&'a File, &'a str), BootstrapBundleCaptureError> {
+        let (parent_path, leaf) = relative.rsplit_once('/').unwrap_or(("", relative));
+        let parent = if parent_path.is_empty() {
+            &self.staging
+        } else {
+            directories
+                .get(parent_path)
+                .ok_or_else(|| self.labels.changed())?
+        };
+        Ok((parent, leaf))
+    }
+
+    /// Create the private directory `relative`, its parent created before.
+    fn directory(
+        &mut self,
+        directories: &mut BTreeMap<String, File>,
+        relative: &str,
+    ) -> Result<(), BootstrapBundleCaptureError> {
+        let labels = self.labels;
+        let io = |_| labels.io();
+        let (parent, leaf) = self.parent(directories, relative)?;
+        let created = host_fs::open_relative(
+            parent,
+            &segment(leaf).map_err(io)?,
+            DIRECTORY_WRITE,
+            FILE_CREATE,
+            Kind::Directory,
+            Some(&Descriptor::private(true).map_err(io)?),
+        )
+        .map_err(io)?;
+        let stat = Stat::of(&created).map_err(io)?;
+        self.created.push((relative.to_owned(), true, stat));
+        directories.insert(relative.to_owned(), created);
+        Ok(())
+    }
+
+    /// Create the private file `relative` holding exactly `size` bytes of
+    /// `from`, read from its start; the copied bytes' SHA-256.
+    fn file(
+        &mut self,
+        directories: &BTreeMap<String, File>,
+        relative: &str,
+        from: &mut File,
+        size: u64,
+    ) -> Result<String, BootstrapBundleCaptureError> {
+        use std::io::{Seek, SeekFrom};
+        let labels = self.labels;
+        let io = |_| labels.io();
+        let (parent, leaf) = self.parent(directories, relative)?;
+        let mut to = host_fs::open_relative(
+            parent,
+            &segment(leaf).map_err(io)?,
+            host_fs::WRITE,
+            FILE_CREATE,
+            Kind::NonDirectory,
+            Some(&Descriptor::private(false).map_err(io)?),
+        )
+        .map_err(io)?;
+        let stat = Stat::of(&to).map_err(io)?;
+        self.created.push((relative.to_owned(), false, stat));
+        from.seek(SeekFrom::Start(0))
+            .map_err(|_| labels.changed())?;
+        let mut hasher = Sha256::new();
+        let mut remaining = size;
+        let mut buffer = vec![0u8; 256 * 1024];
+        while remaining > 0 {
+            let want = usize::try_from(remaining.min(buffer.len() as u64))
+                .map_err(|_| labels.changed())?;
+            let read = from
+                .read(&mut buffer[..want])
+                .map_err(|_| labels.changed())?;
+            if read == 0 {
+                return Err(labels.changed());
             }
+            hasher.update(&buffer[..read]);
+            to.write_all(&buffer[..read]).map_err(io)?;
+            remaining -= read as u64;
         }
+        host_fs::flush(&to).map_err(io)?;
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    fn flush(
+        &self,
+        directories: &BTreeMap<String, File>,
+    ) -> Result<(), BootstrapBundleCaptureError> {
         for directory in directories.values() {
-            host_fs::flush_directory(directory).map_err(io_failure)?;
+            host_fs::flush_directory(directory).map_err(|_| self.labels.io())?;
         }
-        host_fs::flush_directory(&self.staging).map_err(io_failure)
+        host_fs::flush_directory(&self.staging).map_err(|_| self.labels.io())
     }
 
     /// Open one created entry below the staging directory for its removal,
@@ -518,10 +552,10 @@ impl BootstrapBundleCapture {
         held.ok_or_else(refusal)
     }
 
-    /// Remove what this capture created, deepest first, each entry only if
-    /// it is still the one created; then the staging directory itself, only
-    /// if it is empty. Anything else is left for inspection.
-    fn cleanup_owned_stage(&self) -> io::Result<()> {
+    /// Remove what this stage created, deepest first, each entry only if it
+    /// is still the one created; then the staging directory itself, only if
+    /// it is empty. Anything else is left for inspection.
+    fn cleanup(&self) -> io::Result<()> {
         if self.published || self.publication_uncertain {
             return Ok(());
         }
@@ -543,19 +577,100 @@ impl BootstrapBundleCapture {
         host_fs::delete(&self.staging)
     }
 
+    /// Publish the staging copy as the store's `<name>` exclusively; an
+    /// existing entry of that name is left as it is (and this stage is
+    /// removed when it is dropped).
+    fn publish_as(
+        &mut self,
+        name: &str,
+    ) -> Result<BootstrapBundlePublication, BootstrapBundlePublishError> {
+        use BootstrapBundlePublishError::{BeforePublication, OutcomeUnknown};
+        let labels = self.labels;
+        let target = segment(name).map_err(|_| BeforePublication(labels.io()))?;
+        let destination = self
+            .path
+            .parent()
+            .map(|parent| parent.join(name))
+            .ok_or_else(|| BeforePublication(labels.changed()))?;
+        match host_fs::inspect_relative(&self.store, &target) {
+            Ok(_) => return Ok(BootstrapBundlePublication::AlreadyExists(destination)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(_) => return Err(BeforePublication(labels.io())),
+        }
+        if let Err(error) = host_fs::rename(&self.staging, &self.store, &target, false) {
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                return Err(BeforePublication(labels.changed()));
+            }
+            self.publication_uncertain = true;
+            return Err(OutcomeUnknown(labels.io()));
+        }
+        self.published = true;
+        host_fs::flush_directory(&self.store).map_err(|_| OutcomeUnknown(labels.io()))?;
+        self.path = destination.clone();
+        Ok(BootstrapBundlePublication::Published(destination))
+    }
+}
+
+impl Drop for Stage {
+    fn drop(&mut self) {
+        let _ = self.cleanup();
+    }
+}
+
+/// A Bundle capture on NTFS: the source tree held as inspected, and the
+/// private staging copy of it in the store.
+pub struct BootstrapBundleCapture {
+    source_path: PathBuf,
+    source: BootstrapTree,
+    stage: Stage,
+}
+
+impl BootstrapBundleCapture {
+    /// Copy the tree at `source` into a fresh private staging directory of
+    /// the store at `registry_root`, every file checked against its
+    /// inspected SHA-256. A capture that fails, or is dropped before its
+    /// publication, removes exactly what it created.
+    pub fn capture(
+        registry_root: &Path,
+        source: &Path,
+    ) -> Result<Self, BootstrapBundleCaptureError> {
+        let tree = inspect_bootstrap_tree(source).map_err(source_refused)?;
+        let mut stage = Stage::new(BUNDLE, registry_root, ".staging-")?;
+        let mut directories = BTreeMap::new();
+        for entry in tree.entries.iter().skip(1) {
+            if entry.directory {
+                stage.directory(&mut directories, &entry.path)?;
+            } else {
+                let mut from = tree
+                    .open_relative_file(source, &entry.path)
+                    .map_err(|_| BUNDLE.changed())?;
+                let copied = stage.file(&directories, &entry.path, &mut from, entry.byte_count)?;
+                if entry.sha256.as_deref() != Some(copied.as_str()) {
+                    return Err(BUNDLE.changed());
+                }
+            }
+        }
+        stage.flush(&directories)?;
+        Ok(Self {
+            source_path: source.to_path_buf(),
+            source: tree,
+            stage,
+        })
+    }
+
     /// The staging copy's path, for the owner's native checks.
     pub fn path(&self) -> &Path {
-        &self.path
+        &self.stage.path
     }
 
     /// The source still exactly as captured, and the staging copy the same
     /// content.
     pub fn revalidate_sources(&self) -> Result<(), BootstrapBundleCaptureError> {
-        let source = inspect_bootstrap_tree(&self.source_path).map_err(|_| changed())?;
+        let source = inspect_bootstrap_tree(&self.source_path).map_err(|_| BUNDLE.changed())?;
         if source != self.source {
-            return Err(changed());
+            return Err(BUNDLE.changed());
         }
-        let staged = inspect_bootstrap_tree(&self.path).map_err(|_| changed())?;
+        let staged = inspect_bootstrap_tree(&self.stage.path).map_err(|_| BUNDLE.changed())?;
         let same = staged.content().len() == self.source.content().len()
             && staged
                 .content()
@@ -568,7 +683,7 @@ impl BootstrapBundleCapture {
                         && a.sha256 == b.sha256
                 });
         if !same {
-            return Err(changed());
+            return Err(BUNDLE.changed());
         }
         Ok(())
     }
@@ -589,36 +704,190 @@ impl BootstrapBundleCapture {
         &mut self,
         name: &str,
     ) -> Result<BootstrapBundlePublication, BootstrapBundlePublishError> {
-        use BootstrapBundlePublishError::{BeforePublication, OutcomeUnknown};
-        let target = segment(name).map_err(|error| BeforePublication(io_failure(error)))?;
-        let destination = self
-            .path
-            .parent()
-            .map(|parent| parent.join(name))
-            .ok_or_else(|| BeforePublication(changed()))?;
-        match host_fs::inspect_relative(&self.store, &target) {
-            Ok(_) => return Ok(BootstrapBundlePublication::AlreadyExists(destination)),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(BeforePublication(io_failure(error))),
-        }
-        if let Err(error) = host_fs::rename(&self.staging, &self.store, &target, false) {
-            if error.kind() == io::ErrorKind::AlreadyExists {
-                return Err(BeforePublication(changed()));
-            }
-            self.publication_uncertain = true;
-            return Err(OutcomeUnknown(io_failure(error)));
-        }
-        self.published = true;
-        host_fs::flush_directory(&self.store).map_err(|error| OutcomeUnknown(io_failure(error)))?;
-        self.name = name.to_owned();
-        self.path = destination.clone();
-        Ok(BootstrapBundlePublication::Published(destination))
+        self.stage.publish_as(name)
     }
 }
 
-impl Drop for BootstrapBundleCapture {
-    fn drop(&mut self) {
-        let _ = self.cleanup_owned_stage();
+const HDC: &str = "hdc.exe";
+const USB: &str = "libusb_shared.dll";
+const MAX_TOOL_BYTES: u64 = 256 * 1024 * 1024;
+const MAX_TOOL_LIBRARY_BYTES: u64 = 32 * 1024 * 1024;
+
+fn tool_invalid() -> BootstrapToolCaptureError {
+    BootstrapToolCaptureError::new(
+        "invalidInput",
+        "HDC capture requires bounded regular native files and local paths",
+    )
+}
+fn tool_bounded() -> BootstrapToolCaptureError {
+    BootstrapToolCaptureError::new(
+        "inputTooLarge",
+        "HDC and its fixed sibling exceed the byte bound",
+    )
+}
+
+/// One source file of an HDC capture as it was copied.
+struct ToolSource {
+    name: String,
+    identity: Identity,
+    sha256: String,
+}
+
+/// An HDC capture on NTFS, the counterpart of the macOS one: the program at
+/// the source path and, when it imports it, the fixed sibling
+/// `libusb_shared.dll` of the same directory, each opened relative to the
+/// held directory, never through a reparse point, owned by the user or a
+/// trusted principal and changeable by nobody else; copied as `hdc.exe` and
+/// `libusb_shared.dll` into a private `.tool-staging-<nonce>` and published
+/// as `tool-<digest>.hdc`. Nothing is executed.
+pub struct BootstrapToolCapture {
+    directory_path: PathBuf,
+    directory: Identity,
+    sources: Vec<ToolSource>,
+    byte_count: u64,
+    /// The staging copy as captured, once it is complete.
+    tree: Option<BootstrapTree>,
+    stage: Stage,
+}
+
+impl BootstrapToolCapture {
+    /// The callback reads held source files only. `library` identifies the
+    /// fixed USB sibling; the program's result says whether that sibling is
+    /// required. The owner uses its bounded PE parser.
+    pub fn capture(
+        registry_root: &Path,
+        source: &Path,
+        inspect_image: impl Fn(&File, bool) -> Result<bool, BootstrapToolCaptureError>,
+    ) -> Result<Self, BootstrapToolCaptureError> {
+        let name = source
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(tool_invalid)?
+            .to_owned();
+        segment(&name).map_err(|_| tool_invalid())?;
+        let directory_path = source.parent().ok_or_else(tool_invalid)?.to_path_buf();
+        let directory = open_root(&directory_path).map_err(|_| tool_invalid())?;
+        guarded(&directory).map_err(|_| TOOL.changed())?;
+        let mut capture = Self {
+            directory: Stat::of(&directory).map_err(|_| TOOL.io())?.into(),
+            directory_path,
+            sources: Vec::new(),
+            byte_count: 0,
+            tree: None,
+            stage: Stage::new(TOOL, registry_root, ".tool-staging-")?,
+        };
+        if capture.capture_one(&directory, &name, HDC, false, &inspect_image)? {
+            capture.capture_one(&directory, USB, USB, true, &inspect_image)?;
+        }
+        capture.stage.flush(&BTreeMap::new())?;
+        capture.revalidate_source_files()?;
+        capture.tree =
+            Some(inspect_bootstrap_tree(&capture.stage.path).map_err(|_| TOOL.changed())?);
+        capture.revalidate_sources()?;
+        Ok(capture)
+    }
+
+    fn capture_one(
+        &mut self,
+        directory: &File,
+        name: &str,
+        output: &str,
+        library: bool,
+        inspect: &impl Fn(&File, bool) -> Result<bool, BootstrapToolCaptureError>,
+    ) -> Result<bool, BootstrapToolCaptureError> {
+        let mut source = child(directory, name, Kind::NonDirectory).map_err(|error| {
+            if error.kind() == io::ErrorKind::NotFound {
+                TOOL.io()
+            } else {
+                TOOL.changed()
+            }
+        })?;
+        let before = Stat::of(&source).map_err(|_| TOOL.io())?;
+        if !before.regular() || before.links != 1 || before.size == 0 {
+            return Err(tool_invalid());
+        }
+        let maximum = if library {
+            MAX_TOOL_LIBRARY_BYTES
+        } else {
+            MAX_TOOL_BYTES
+        };
+        if before.size > maximum {
+            return Err(tool_bounded());
+        }
+        let needs_usb = inspect(&source, library)?;
+        if before.size > MAX_TOOL_BYTES - self.byte_count {
+            return Err(tool_bounded());
+        }
+        guarded(&source).map_err(|_| TOOL.changed())?;
+        let sha256 = self
+            .stage
+            .file(&BTreeMap::new(), output, &mut source, before.size)?;
+        if Identity::from(Stat::of(&source).map_err(|_| TOOL.io())?) != Identity::from(before) {
+            return Err(TOOL.changed());
+        }
+        self.byte_count += before.size;
+        self.sources.push(ToolSource {
+            name: name.to_owned(),
+            identity: before.into(),
+            sha256,
+        });
+        Ok(needs_usb)
+    }
+
+    /// The staging copy's path, for the owner's native checks.
+    pub fn path(&self) -> &Path {
+        &self.stage.path
+    }
+
+    /// Each source file, reopened by name, still the one copied, with the
+    /// same bytes.
+    fn revalidate_source_files(&self) -> Result<(), BootstrapToolCaptureError> {
+        let directory = open_root(&self.directory_path).map_err(|_| TOOL.changed())?;
+        if Identity::from(Stat::of(&directory).map_err(|_| TOOL.changed())?) != self.directory {
+            return Err(TOOL.changed());
+        }
+        for source in &self.sources {
+            let mut file =
+                child(&directory, &source.name, Kind::NonDirectory).map_err(|_| TOOL.changed())?;
+            let stat = Stat::of(&file).map_err(|_| TOOL.changed())?;
+            if Identity::from(stat) != source.identity
+                || hash_exactly(&mut file, stat.size).map_err(|_| TOOL.changed())? != source.sha256
+            {
+                return Err(TOOL.changed());
+            }
+        }
+        Ok(())
+    }
+
+    /// Call before and after the native signature check and before
+    /// publication: the sources as copied, and the staging copy exactly as
+    /// captured.
+    pub fn revalidate_sources(&self) -> Result<(), BootstrapToolCaptureError> {
+        self.revalidate_source_files()?;
+        if let Some(tree) = &self.tree
+            && inspect_bootstrap_tree(&self.stage.path).map_err(|_| TOOL.changed())? != *tree
+        {
+            return Err(TOOL.changed());
+        }
+        Ok(())
+    }
+
+    /// Publish the staging copy as the store's `tool-<digest>.hdc`.
+    pub fn publish(
+        &mut self,
+        digest: &str,
+    ) -> Result<BootstrapToolPublication, BootstrapToolPublishError> {
+        use BootstrapBundlePublishError::BeforePublication;
+        if self.stage.published
+            || digest.len() != 64
+            || !digest
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
+            return Err(BeforePublication(tool_invalid()));
+        }
+        self.revalidate_sources().map_err(BeforePublication)?;
+        self.stage.publish_as(&format!("tool-{digest}.hdc"))
     }
 }
 
@@ -778,5 +1047,139 @@ mod tests {
             .collect();
         names.sort();
         assert_eq!(names, ["bundle-fixture.rc"]);
+    }
+
+    fn store_names(store: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(store)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn an_hdc_capture_copies_the_program_and_only_an_imported_sibling() {
+        let scratch = Scratch::new("tool-capture");
+        scratch.file(r"sdk\toolchains\hdc.exe", b"MZ program");
+        scratch.file(r"sdk\toolchains\libusb_shared.dll", b"MZ library");
+        scratch.file(r"sdk\toolchains\other.dll", b"MZ other");
+        crate::create_private_directory(&scratch.0.join("store")).unwrap();
+        let store = scratch.0.join("store");
+        let hdc = scratch.0.join(r"sdk\toolchains\hdc.exe");
+        let digest = "a".repeat(64);
+        let seen = std::cell::RefCell::new(Vec::new());
+
+        // The program imports the sibling: both are copied, nothing else.
+        let mut capture = BootstrapToolCapture::capture(&store, &hdc, |file, library| {
+            let mut bytes = Vec::new();
+            (&*file).read_to_end(&mut bytes).unwrap();
+            seen.borrow_mut().push((library, bytes));
+            Ok(!library)
+        })
+        .unwrap();
+        assert_eq!(
+            *seen.borrow(),
+            [
+                (false, b"MZ program".to_vec()),
+                (true, b"MZ library".to_vec())
+            ]
+        );
+        assert!(
+            capture
+                .path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with(".tool-staging-")
+        );
+        let staged = inspect_bootstrap_tree(capture.path()).unwrap();
+        let paths: Vec<(&str, Option<&str>)> = staged
+            .entries
+            .iter()
+            .map(|e| (e.path.as_str(), e.sha256.as_deref()))
+            .collect();
+        assert_eq!(
+            paths,
+            [
+                ("", None),
+                ("hdc.exe", Some(sha(b"MZ program").as_str())),
+                ("libusb_shared.dll", Some(sha(b"MZ library").as_str())),
+            ]
+        );
+        capture.revalidate_sources().unwrap();
+        assert_eq!(
+            capture.publish("not-a-digest").unwrap_err().to_string(),
+            "invalidInput: HDC capture requires bounded regular native files and local paths"
+        );
+        let published = store.join(format!("tool-{digest}.hdc"));
+        assert_eq!(
+            capture.publish(&digest).unwrap(),
+            BootstrapToolPublication::Published(published.clone())
+        );
+
+        // A program that does not import the sibling is copied alone, and
+        // meets the published copy without touching it.
+        let mut alone = BootstrapToolCapture::capture(&store, &hdc, |_, _| Ok(false)).unwrap();
+        assert_eq!(
+            inspect_bootstrap_tree(alone.path()).unwrap().entries.len(),
+            2
+        );
+        assert_eq!(
+            alone.publish(&digest).unwrap(),
+            BootstrapToolPublication::AlreadyExists(published.clone())
+        );
+        drop(alone);
+
+        // The inspection's refusal is the capture's, leaving nothing staged.
+        let refused = BootstrapToolCapture::capture(&store, &hdc, |_, _| {
+            Err(BootstrapToolCaptureError::new("invalidInput", "not x64"))
+        });
+        assert_eq!(refused.err().unwrap().message, "not x64");
+
+        // A source changed after its capture is refused.
+        let capture = BootstrapToolCapture::capture(&store, &hdc, |_, _| Ok(false)).unwrap();
+        scratch.file(r"sdk\toolchains\hdc.exe", b"MZ changed");
+        assert_eq!(
+            capture.revalidate_sources().unwrap_err().code,
+            "fileIdentityChanged"
+        );
+        drop(capture);
+        assert_eq!(store_names(&store), [format!("tool-{digest}.hdc")]);
+    }
+
+    #[test]
+    fn an_hdc_capture_refuses_a_missing_sibling_an_empty_program_or_a_relative_path() {
+        let scratch = Scratch::new("tool-capture-refusal");
+        scratch.file(r"sdk\hdc.exe", b"MZ program");
+        scratch.file(r"empty\hdc.exe", b"");
+        crate::create_private_directory(&scratch.0.join("store")).unwrap();
+        let store = scratch.0.join("store");
+        let needs_sibling = |_: &File, library: bool| Ok(!library);
+        assert_eq!(
+            BootstrapToolCapture::capture(&store, &scratch.0.join(r"sdk\hdc.exe"), needs_sibling)
+                .err()
+                .unwrap()
+                .code,
+            "ioFailure"
+        );
+        assert_eq!(
+            BootstrapToolCapture::capture(&store, &scratch.0.join(r"empty\hdc.exe"), |_, _| {
+                Ok(false)
+            })
+            .err()
+            .unwrap()
+            .code,
+            "invalidInput"
+        );
+        assert_eq!(
+            BootstrapToolCapture::capture(&store, Path::new(r"sdk\hdc.exe"), |_, _| Ok(false))
+                .err()
+                .unwrap()
+                .code,
+            "invalidInput"
+        );
+        assert!(store_names(&store).is_empty());
     }
 }

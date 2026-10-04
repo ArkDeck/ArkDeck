@@ -61,7 +61,7 @@ mod lifecycle;
 /// The Windows process verification of [`ManagedHdc::status`]: the
 /// receipt names the very child the running server launched.
 #[cfg(windows)]
-struct LaunchedProcess<'a>(&'a Mutex<Option<ManagedHdcServer>>);
+pub(crate) struct LaunchedProcess<'a>(&'a Mutex<Option<ManagedHdcServer>>);
 
 #[cfg(windows)]
 impl arkdeck_provider_hdc::ManagedProcessVerifier for LaunchedProcess<'_> {
@@ -162,10 +162,7 @@ impl ManagedHdc {
             .load(std::sync::atomic::Ordering::Acquire)
     }
 
-    /// The configured executable, by the path it was configured with. Read
-    /// by the HDC control-action owner's impact source, which Windows does
-    /// not compose yet.
-    #[cfg_attr(windows, allow(dead_code))]
+    /// The configured executable, by the path it was configured with.
     pub(crate) fn executable(&self) -> &StatusExecutable {
         &self.executable
     }
@@ -265,10 +262,7 @@ impl ManagedHdc {
     /// managed.
     pub(crate) fn status(&self, now_utc: &dyn Fn() -> String) -> Value {
         let launches = || self.active_launch();
-        #[cfg(target_os = "macos")]
-        let verifier = SystemManagedProcess;
-        #[cfg(windows)]
-        let verifier = LaunchedProcess(&self.server);
+        let verifier = self.process_verifier();
         HdcStatusObserver::new(
             self.executable.clone(),
             self.startup.clone(),
@@ -281,6 +275,18 @@ impl ManagedHdc {
             now_utc,
         )
         .snapshot()
+    }
+
+    /// Who verifies an observed process is the launched one: the kernel's
+    /// argv read on macOS, the launch's provenance on Windows (see
+    /// [`Self::status`]).
+    #[cfg(target_os = "macos")]
+    pub(crate) fn process_verifier(&self) -> SystemManagedProcess {
+        SystemManagedProcess
+    }
+    #[cfg(windows)]
+    pub(crate) fn process_verifier(&self) -> LaunchedProcess<'_> {
+        LaunchedProcess(&self.server)
     }
 
     /// Swift `hdcRuntimeDiagnostics` as `target.availability` encodes it: set
