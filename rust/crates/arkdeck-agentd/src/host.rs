@@ -223,11 +223,16 @@ pub struct Host {
     /// the native RockUSB identity and the live probe over this host's HDC.
     #[cfg(any(target_os = "macos", windows))]
     flash_facts: Option<std::sync::Arc<arkdeck_hoststore::FlashHostFacts>>,
-    /// Test builds on Windows only: the in-process fake HDC the Flash host
-    /// facts oracle replay probes over (`tests/spawning`). No Windows daemon
-    /// composes an HDC until its tuple is registered.
+    /// Test builds on Windows only (`tests/spawning`): an in-process fake HDC
+    /// and the tool digest it answers as, which the Flash host facts replay
+    /// probes over and the signed test daemon (`signed_daemon.rs`) composes.
+    /// The production Windows daemon has no such seam: it composes an HDC
+    /// only for a registered Windows HDC tuple.
     #[cfg(all(windows, test))]
-    flash_test_hdc: Option<std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>>,
+    test_hdc: Option<(
+        std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+        String,
+    )>,
     /// What a Flash `job.plan` reads beyond the Artifact and Import owners
     /// and those facts: the ArkForge provider's availability, the Rockchip
     /// dispatcher's reason and the lane's toolchain, as Swift's daemon
@@ -1353,8 +1358,8 @@ impl Host {
     /// composed (`tests/spawning`), else this host's.
     #[cfg(all(windows, test))]
     fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
-        match &self.flash_test_hdc {
-            Some(fake) => Some(fake.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch),
+        match &self.test_hdc {
+            Some((fake, _)) => Some(fake.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch),
             None => self
                 .hdc
                 .as_deref()
@@ -1362,16 +1367,31 @@ impl Host {
         }
     }
 
-    /// Test builds on Windows only: the Flash facts probe over `hdc`, a fake
-    /// (TASK-XPA-010). The production Windows daemon has no such seam.
+    /// Test builds on Windows only: the fake HDC `hdc`, answering as the tool
+    /// whose digest is `tool_sha256`, is this host's (see `test_hdc`). The
+    /// production Windows daemon has no such seam.
     #[cfg(all(windows, test))]
     #[allow(dead_code)]
-    pub fn with_flash_test_hdc(
+    pub fn with_test_hdc(
         mut self,
         hdc: std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+        tool_sha256: &str,
     ) -> Self {
-        self.flash_test_hdc = Some(hdc);
+        self.test_hdc = Some((hdc, tool_sha256.to_owned()));
         self
+    }
+
+    /// Test builds on Windows only: the fake HDC and its tool digest, when a
+    /// test composed one ([`Self::with_test_hdc`]).
+    #[cfg(all(windows, test))]
+    #[allow(dead_code)]
+    pub(crate) fn test_hdc(&self) -> Option<(&dyn arkdeck_provider_hdc::HdcDispatch, &str)> {
+        self.test_hdc.as_ref().map(|(hdc, sha)| {
+            (
+                hdc.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch,
+                sha.as_str(),
+            )
+        })
     }
 
     /// `flash.bind-current-loader` binds through this owner, against this
@@ -1584,7 +1604,7 @@ impl Host {
             #[cfg(any(target_os = "macos", windows))]
             flash_facts: None,
             #[cfg(all(windows, test))]
-            flash_test_hdc: None,
+            test_hdc: None,
             #[cfg(any(target_os = "macos", windows))]
             flash_planning: None,
             #[cfg(any(target_os = "macos", windows))]

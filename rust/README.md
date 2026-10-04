@@ -40,12 +40,22 @@ released port or dropped listener stays held. A test whose path starts a child
 belongs in `tests/spawning`, which compiles the daemon's modules from their
 sources and runs one test at a time (`turn()`), as do the integration tests
 that listen or take a lock in their own process while spawning.
-On Windows only `flash_host_facts_control.rs` runs there (TASK-XPA-010): the
-Swift Flash host facts oracle through `Control` and the daemon's own host, over
-the shared fake's answers ported in process
-(`arkdeck-provider-hdc/tests/common/oracle_fake.rs`), which the host probes
-through a seam compiled into test builds only. The Windows daemon itself still
-composes no HDC.
+On Windows two things run there:
+- `flash_host_facts_control.rs` (TASK-XPA-010): the Swift Flash host facts
+  oracle through `Control` and the daemon's own host, over the shared fake's
+  answers ported in process (`arkdeck-provider-hdc/tests/common/oracle_fake.rs`).
+- The signed test daemon, `signed_daemon.rs` (TASK-XPA-009). That binary compiles
+  the Windows lifecycle and composition (`windows_lifecycle`) and is copied and
+  signed with the development signer. It serves a development root on its pipe,
+  and the real `arkdeck.exe` drives it with the production peer check.
+
+Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
+into test builds only. The production Windows daemon composes an HDC only for a
+registered Windows HDC tuple.
+
+A module that binary compiles keeps its unit tests beside it only inside
+`daemon_unit_tests!`. `src/main.rs` expands that block under `cfg(test)`, and
+`tests/spawning` expands it to nothing.
 
 Clippy and the workspace tests are the only checks that compile this checkout.
 `generate-contract.py --check` regenerates the manifest and bindings from the
