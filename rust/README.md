@@ -4225,10 +4225,24 @@ and `TMPDIR`, plus the composition's `DEVECO_SDK_HOME`.
 stand-in Node and a pinned `hvigorw.js`. It also checks that the person's own tree is never
 built, and that a changed script never runs.
 
+A registered DevEco toolchain resolves to the installation's own `tools\node\node.exe`,
+`tools\hvigor\bin\hvigorw.js` and `sdk`, spelled `X:\…`. A tool child's working directory is
+handed to it in its standard `X:\…` spelling whenever that names exactly the canonical
+`\\?\` one; Hvigor cannot resolve module paths below a `\\?\` directory.
+
+`arkdeck-agentd/tests/windows_workspace_hvigor_live_process.rs` runs only when
+`ARKDECK_LIVE_DEVECO_ROOT` and `ARKDECK_DEV_SIGNER_THUMBPRINT` are set. It registers the host's
+DevEco, the repository's WaterFlow demo and a build preset through the real CLI, then runs
+`workspace isolate` and `workspace build` on an installed-mode daemon over a fake account. On
+the reference host Hvigor now compiles the copy and stops at `PackageHap` with `spawn java
+ENOENT`: the child's search path is the system directory alone, and Hvigor runs `java` by name.
+Giving the child DevEco's `jbr\bin` needs a ruling, because the search path cannot be overlaid.
+
 The daemon's `--symbolize-crash` mode answers the Swift symbolizer oracle on Windows
 (`crash_symbolizer_mode`). The daemon-level and CLI build, test and symbolize leaves stay
-`partial`. A build or test preset needs a registered, Huawei-signed DevEco, and a symbolization
-needs a device-captured crash
+`partial`: the build stops at packaging as above, a test preset also needs the project's
+`ohpm` dependencies, whose linked `oh_modules` a copy refuses, and a symbolization needs a
+device-captured crash
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md)).
 
 ## Windows analyzer provider (TASK-XPA-011)

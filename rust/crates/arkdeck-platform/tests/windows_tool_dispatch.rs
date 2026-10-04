@@ -686,14 +686,17 @@ mod windows {
         };
         let execution = request(&directory).unwrap();
         assert_eq!(execution.termination, ToolTermination::Exited(0));
+        // The child is handed the directory in its standard spelling, which
+        // names exactly the canonical one (TASK-XPA-011: Hvigor resolves its
+        // modules against it).
+        let plain = PathBuf::from(directory.to_str().unwrap().trim_start_matches(r"\\?\"));
         assert_eq!(
             String::from_utf8(execution.stdout).unwrap(),
-            directory.to_str().unwrap()
+            plain.to_str().unwrap()
         );
         assert_eq!(std::env::current_dir().unwrap(), before);
         // The same directory spelled without the canonical `\\?\` prefix, a
         // relative path, a missing directory and a file are all refused.
-        let plain = PathBuf::from(directory.to_str().unwrap().trim_start_matches(r"\\?\"));
         assert_ne!(plain, directory);
         fs::write(scratch.0.join("file"), b"").unwrap();
         for unavailable in [
