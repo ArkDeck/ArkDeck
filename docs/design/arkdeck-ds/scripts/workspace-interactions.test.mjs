@@ -742,13 +742,20 @@ test('Trace validates each keystroke without rebuilding the focused field', () =
   assert.equal(h.run('S.trace.duration'), '600');
 });
 
-test('Diagnostics defaults to unavailable controls rather than a fake session', () => {
+test('Diagnostics requires a simulated Runtime reply before markers and keeps clock limits visible', () => {
   const h = harness();
-  const markup = h.run('pDiagnostics()');
-  assert.match(markup, /diagnostic_session_capture_not_connected/);
-  assert.match(markup, /disabled data-sync-id="diagnostics.capture.arm"/);
+  let markup = h.run('pDiagnostics()');
   assert.match(markup, /disabled data-sync-id="diagnostics.capture.mark"/);
-  assert.doesNotMatch(markup, /class="diag-timeline|已校准 ±|onclick="startDiagnostic/);
+  assert.match(markup, /disabled data-sync-id="diagnostics.capture.stop"/);
+  assert.match(markup, /diagnostics.capture.boundary/);
+  h.run("diagnosticCaptureDemo('start'); diagnosticCaptureDemo('mark')");
+  markup = h.run('pDiagnostics()');
+  assert.match(markup, /disabled data-sync-id="diagnostics.capture.arm"/);
+  assert.match(markup, /1 \/ 50/);
+  h.run("diagnosticCaptureDemo('stop'); diagnosticCaptureDemo('mark')");
+  assert.equal(h.run('S.diagnostics.captureMarks'), 1);
+  assert.match(h.run('pDiagnostics()'), /disabled data-sync-id="diagnostics.capture.mark"/);
+  assert.doesNotMatch(markup, /class="diag-timeline|已校准 ±/);
   const concept = harness('?concept=diagnostics&lang=en');
   assert.match(concept.run('pDiagnostics()'), /Future concept:/);
 });
@@ -1801,7 +1808,8 @@ test('App type sizes that have a shared role use it', () => {
   const allowed = new Set(['10', '10/semibold', '9/semibold', '36', '28/semibold']);
   const unexpected = [...tiers.keys()].filter(key => !allowed.has(key));
   assert.deepEqual(unexpected, [], 'a new off-scale type size appeared');
-  assert.equal(tiers.get('10') ?? 0, 19, 'the retained 10pt tier changed size');
+  // The removed Diagnostics unavailable-reason code was one 10pt site.
+  assert.equal(tiers.get('10') ?? 0, 18, 'the retained 10pt tier changed size');
 
   assert.match(
     read('ArkDeckApp/DesignSystem/WorkspaceChrome.swift'),

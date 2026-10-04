@@ -11,7 +11,7 @@ use arkdeck_cli::domain_executor::{
     ClientFailure, ExecutionRequest, Executor, ExecutorError, Outcome, Runtime, evidence_facts,
 };
 use arkdeck_client::Client;
-use arkdeck_contract::{CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
+use arkdeck_contract::{CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
 use serde_json::{Map, Value, json};
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -101,9 +101,16 @@ struct Conversation {
 }
 
 fn health() -> Value {
+    // Replay the recorded Runtime's Catalog. The port still negotiates its
+    // current wire contract; a newly added operation must not rewrite the
+    // historical peer's Catalog identity or the receipts it produced.
+    let provenance: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/domain-executor/provenance.json"
+    ))
+    .unwrap();
     json!({"status": "ok", "protocolVersion": PROTOCOL_VERSION,
         "contractIdentity": CONTRACT_IDENTITY, "publishedMethods": METHODS,
-        "catalogDigest": CATALOG_DIGEST, "providers": []})
+        "catalogDigest": provenance["catalogDigest"], "providers": []})
 }
 
 impl Conversation {

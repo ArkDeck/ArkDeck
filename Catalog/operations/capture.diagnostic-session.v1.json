@@ -1,0 +1,257 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "capture.diagnostic-session",
+  "version": 1,
+  "title": "Capture an interactive bounded trace session with Runtime-timed markers",
+  "provider": "hdc",
+  "effect": {
+    "minimum": "deviceMutation",
+    "permitted": [
+      "deviceMutation"
+    ]
+  },
+  "authorization": {
+    "deviceMutation": "standingCapability"
+  },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "durationSeconds": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1,
+        "maximum": 120,
+        "description": "Maximum host monotonic wait after a verified trace-ring anchor; an explicit stop may end the wait earlier."
+      },
+      "traceCategories": {
+        "type": "stringArray",
+        "required": true,
+        "maxItems": 24,
+        "maxLength": 64,
+        "description": "Required bounded trace categories. Runtime verifies the target supports every category before arming."
+      },
+      "traceBufferKB": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1024,
+        "maximum": 65536,
+        "default": 8192,
+        "description": "Per-capture trace buffer size in KiB. Only consulted when traceCategories selects the trace leg; ignored otherwise."
+      },
+      "hilogFilters": {
+        "type": "stringArray",
+        "required": false,
+        "maxItems": 16,
+        "maxLength": 200,
+        "description": "Typed HiLog filter expressions; no shell fragments."
+      },
+      "totalArtifactByteBudget": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1048576,
+        "maximum": 536870912,
+        "default": 134217728,
+        "description": "Ceiling on the total bytes this job may publish across all of its artifacts. Reaching it ends collection rather than silently dropping a product."
+      },
+      "redactionProfile": {
+        "type": "string",
+        "required": false,
+        "enum": [
+          "standard"
+        ],
+        "default": "standard",
+        "description": "Redaction applied to published text. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `standard`. Stronger redaction is not published until its implementation exists."
+      },
+      "maximumMarkers": {
+        "type": "integer",
+        "required": false,
+        "minimum": 1,
+        "maximum": 200,
+        "default": 50,
+        "description": "Maximum Runtime-timed host annotations accepted while this session is recording. Markers do not dispatch screenshots or device input."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "artifactIndex": {
+        "type": "artifactReference",
+        "required": true
+      },
+      "captureSummary": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "preflight-host-storage",
+      "kind": "preflightHostStorage",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "confirm-evidence-target",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-model",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "deviceModel"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "read-evidence-firmware",
+      "kind": "runApprovedRemoteRead",
+      "actionRef": {
+        "catalogId": "arkdeck-remote-operations",
+        "actionId": "firmwareBuild"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "preflight-device-storage",
+      "kind": "preflightDeviceStorage",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "capture-session-trace",
+      "kind": "captureRemoteFile",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "bestEffortCleanup",
+      "notes": "One WAL intent owns begin, verified unique ring anchor, bounded host wait, dump, finish and file readback. A Runtime stop only shortens the host wait; unknown effects never replay."
+    },
+    {
+      "stepID": "capture-hilog",
+      "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "boundedHilog"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none",
+      "notes": "Optional bounded retrospective HiLog drain after the trace snapshot. It does not prove continuous log coverage or cross-clock alignment."
+    },
+    {
+      "stepID": "receive-trace-artifact",
+      "kind": "receiveFile",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Size/hash verified on receive."
+    },
+    {
+      "stepID": "cleanup-remote-temp",
+      "kind": "cleanupOwnedRemotePath",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "bestEffortCleanup",
+      "notes": "Failure records cleanup debt for later reconcile; never silently dropped."
+    },
+    {
+      "stepID": "postprocess-index",
+      "kind": "postprocessArtifact",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 600,
+  "outputByteBudget": 536870912,
+  "retry": {
+    "preflightAttempts": 2,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "hilog.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "sensitive",
+      "required": false
+    },
+    {
+      "name": "trace.htrace",
+      "role": "raw",
+      "mediaType": "application/octet-stream",
+      "privacy": "sensitive",
+      "required": true
+    },
+    {
+      "name": "capture.log",
+      "role": "log",
+      "mediaType": "text/plain",
+      "privacy": "standard",
+      "required": false
+    },
+    {
+      "name": "markers.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    },
+    {
+      "name": "artifact-index.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    },
+    {
+      "name": "capture-summary.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    },
+    {
+      "name": "diagnostic-session.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "openharmony-standard@1",
+    "dayu200"
+  ]
+}

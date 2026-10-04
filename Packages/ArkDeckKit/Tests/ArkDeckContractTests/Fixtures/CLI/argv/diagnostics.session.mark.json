@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "diagnostics",
+        "session",
+        "mark",
+        "--job",
+        "sample",
+        "--marker-id",
+        "marker-1"
+      ],
+      "expected": {
+        "command": "diagnostics.session.mark",
+        "handlerArguments": [
+          "diagnostics",
+          "session",
+          "mark",
+          "--job",
+          "sample",
+          "--marker-id",
+          "marker-1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "session",
+        "mark",
+        "--help"
+      ],
+      "expected": {
+        "command": "diagnostics.session.mark",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "session",
+        "mark",
+        "--job",
+        "sample",
+        "--marker-id",
+        "marker-1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.session.mark",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "session",
+        "mark",
+        "--job",
+        "sample",
+        "--marker-id",
+        "marker-1",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.session.mark",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "session",
+        "mark"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.session.mark",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "session",
+        "mark",
+        "--job",
+        "sample",
+        "--marker-id",
+        "marker-1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "diagnostics.session.mark",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "diagnostics",
+        "session",
+        "mark",
+        "--job",
+        "sample",
+        "--marker-id",
+        "marker-1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "diagnostics.session.mark",
+        "handlerArguments": [
+          "diagnostics",
+          "session",
+          "mark",
+          "--job",
+          "sample",
+          "--marker-id",
+          "marker-1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "diagnostics.session.mark",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "diagnostics",
+    "session",
+    "mark"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

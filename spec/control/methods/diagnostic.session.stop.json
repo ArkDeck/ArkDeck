@@ -1,0 +1,144 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "jobId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "jobId"
+      ],
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "armedAtHostUTC": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "bindingRevision": {
+          "type": "integer"
+        },
+        "controlAvailable": {
+          "type": "boolean"
+        },
+        "elapsedMs": {
+          "type": "integer"
+        },
+        "endedAtHostUTC": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "jobState": {
+          "type": "string"
+        },
+        "markers": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "atHostUTC": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "markerId": {
+                "type": "string"
+              },
+              "offsetMs": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "atHostUTC",
+              "markerId",
+              "offsetMs"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "maximumMarkers": {
+          "type": "integer"
+        },
+        "maximumSeconds": {
+          "type": "integer"
+        },
+        "outcomeUnknown": {
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "stopRequested": {
+          "type": "boolean"
+        },
+        "targetId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "armedAtHostUTC",
+        "bindingRevision",
+        "controlAvailable",
+        "elapsedMs",
+        "endedAtHostUTC",
+        "jobId",
+        "jobState",
+        "markers",
+        "maximumMarkers",
+        "maximumSeconds",
+        "outcomeUnknown",
+        "schemaVersion",
+        "state",
+        "stopRequested",
+        "targetId"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/diagnostic.session.stop.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `diagnostic.session.stop` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/diagnostic.session.stop",
+  "x-arkdeck-contractIdentity": "4bcc7c3eb33214e0712852bb4d9234cb79412c46d6b1960777e48e875fda6024",
+  "x-arkdeck-method": "diagnostic.session.stop",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 1,
+    "request": 4,
+    "result": 3
+  }
+}

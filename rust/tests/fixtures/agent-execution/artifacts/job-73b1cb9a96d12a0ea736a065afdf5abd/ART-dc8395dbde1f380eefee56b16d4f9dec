@@ -1,0 +1,13 @@
+{
+  "artifact" : "binding-snapshot.json",
+  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "expectedBindingRevision" : 1,
+  "firmware" : "OpenHarmony-4.1-release",
+  "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
+  "model" : "OpenHarmony Reference Device",
+  "operation" : "observe.device@1",
+  "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "targetId" : "TGT-3ba3f5f43b92",
+  "transport" : "usb",
+  "value" : "OpenHarmony-4.1-release"
+}

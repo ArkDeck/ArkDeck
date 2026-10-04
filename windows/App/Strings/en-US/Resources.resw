@@ -4326,13 +4326,13 @@ SHA-256: %4$@</value>
     <value>This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.</value>
     <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable" xml:space="preserve">
     <value>Session capture is not available</value>
-    <comment>diagnostics.capture.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable (Windows only)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable_detail" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable_detail" xml:space="preserve">
     <value>Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.</value>
-    <comment>diagnostics.capture.unavailable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable.detail (Windows only)</comment>
   </data>
   <data name="diagnostics_alignment_calibrated" xml:space="preserve">
     <value>Calibrated</value>
@@ -4351,7 +4351,7 @@ SHA-256: %4$@</value>
     <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_arm" xml:space="preserve">
-    <value>Arm a session</value>
+    <value>Start session</value>
     <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_mark" xml:space="preserve">

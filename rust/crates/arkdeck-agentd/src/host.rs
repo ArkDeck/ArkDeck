@@ -2435,6 +2435,20 @@ impl HostServices for Host {
                 }),
             })
     }
+    #[cfg(any(target_os = "macos", windows))]
+    fn diagnostic_session_control(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
+            code: "rejected".into(),
+            message: "Diagnostic Session owner is unavailable".into(),
+            details: None,
+        })?;
+        jobs.diagnostic_session_control(method, params)
+    }
+
     /// `job.result` and `job.evidence` read from the Job and Artifact owners
     /// the isolated composition opened.
     #[cfg(any(target_os = "macos", windows))]

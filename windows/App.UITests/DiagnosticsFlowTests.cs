@@ -52,7 +52,7 @@ public sealed class DiagnosticsFlowTests
 
         // Session capture is not connected: Arm and Mark say so.
         app.Invoke("diagnostics.capture.arm");
-        StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["diagnostics.capture.unavailable"]);
+        StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["windows.diagnostics.capture.unavailable"]);
         Assert.AreEqual("diagnostic_session_capture_not_connected", AppSession.Name(app.Find("diagnostics.capture.reasonCode")));
         Assert.AreEqual(strings["windows.diagnostics.capture.mark"], AppSession.Name(app.Find("diagnostics.capture.mark")));
         foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
@@ -92,6 +92,6 @@ public sealed class DiagnosticsFlowTests
         Assert.AreEqual(strings["diagnostics.session.none"], app.WaitForName("diagnostics.session.empty", n => n.Length > 0));
         Assert.AreEqual(strings["diagnostics.alignment.cannotAlign"], AppSession.Name(app.Find("diagnostics.alignment")));
         app.Invoke("diagnostics.capture.mark");
-        StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["diagnostics.capture.unavailable"]);
+        StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["windows.diagnostics.capture.unavailable"]);
     }
 }

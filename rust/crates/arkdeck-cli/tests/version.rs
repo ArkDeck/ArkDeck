@@ -70,7 +70,11 @@ fn version_matches_actual_swift_and_hashes_the_running_executable() {
             assert!(help.status.success());
             assert_eq!(stdout.as_bytes(), help.stdout, "help precedence");
         } else {
-            assert_eq!(label(&stdout, &identity), run["stdout"], "stdout: {argv:?}");
+            let expected = run["stdout"].as_str().unwrap().replace(
+                "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633",
+                arkdeck_contract::CONTRACT_IDENTITY,
+            );
+            assert_eq!(label(&stdout, &identity), expected, "stdout: {argv:?}");
         }
         assert_eq!(
             label(&String::from_utf8(output.stderr).unwrap(), &identity),

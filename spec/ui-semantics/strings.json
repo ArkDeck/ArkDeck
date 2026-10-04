@@ -6475,14 +6475,14 @@
       "zh-Hans": "这里恢复的是所选记录的只读上下文。任何新操作都会创建新的 Job，不会重放历史 Job。"
     },
     {
-      "key": "diagnostics.capture.unavailable",
-      "table": "DiagnosticsLocalizable",
+      "key": "windows.diagnostics.capture.unavailable",
+      "table": null,
       "en": "Session capture is not available",
       "zh-Hans": "诊断会话采集尚不可用"
     },
     {
-      "key": "diagnostics.capture.unavailable.detail",
-      "table": "DiagnosticsLocalizable",
+      "key": "windows.diagnostics.capture.unavailable.detail",
+      "table": null,
       "en": "Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.",
       "zh-Hans": "交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。"
     },
@@ -6513,8 +6513,8 @@
     {
       "key": "diagnostics.capture.arm",
       "table": "DiagnosticsLocalizable",
-      "en": "Arm a session",
-      "zh-Hans": "布防会话"
+      "en": "Start session",
+      "zh-Hans": "开始采集"
     },
     {
       "key": "diagnostics.capture.mark",

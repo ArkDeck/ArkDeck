@@ -125,18 +125,18 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
 
     private StackPanel CapturePane()
     {
-        void Unavailable() => Ui.Say(_status, S.Text(UiStrings.DiagnosticsCaptureUnavailable) + ". " + S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
+        void Unavailable() => Ui.Say(_status, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailable) + ". " + S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
         var arm = Ui.Button("diagnostics.capture.arm", S.Text(UiStrings.DiagnosticsCaptureArm), (_, _) => Unavailable());
-        ToolTipService.SetToolTip(arm, S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
-        AutomationProperties.SetHelpText(arm, S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
+        ToolTipService.SetToolTip(arm, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
+        AutomationProperties.SetHelpText(arm, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
         var mark = Ui.Button("diagnostics.capture.mark", S.Text(UiStrings.WindowsDiagnosticsCaptureMark), (_, _) => Unavailable());
         mark.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = VirtualKey.M, Modifiers = VirtualKeyModifiers.Control });
-        AutomationProperties.SetHelpText(mark, S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail));
+        AutomationProperties.SetHelpText(mark, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
         var code = Ui.Text("diagnostics.capture.reasonCode", DiagnosticsState.CaptureUnavailableReasonCode, "ArkDeckMonoStyle");
         code.IsTextSelectionEnabled = true;
         var notice = Ui.Stack(4,
-            Ui.Text("diagnostics.capture.unavailable", S.Text(UiStrings.DiagnosticsCaptureUnavailable), "ArkDeckSectionTitleStyle"),
-            Ui.Text("diagnostics.capture.unavailable.detail", S.Text(UiStrings.DiagnosticsCaptureUnavailableDetail), "ArkDeckCaptionStyle"),
+            Ui.Text("diagnostics.capture.unavailable", S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailable), "ArkDeckSectionTitleStyle"),
+            Ui.Text("diagnostics.capture.unavailable.detail", S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail), "ArkDeckCaptionStyle"),
             code);
         return Ui.Stack(8, Ui.Row(arm, mark), notice);
     }

@@ -59,8 +59,7 @@ public struct DiagnosticSessionApplicationReader: Sendable {
     _ context: RuntimeHistoryWorkspaceContext
   ) async -> DiagnosticSessionLoadResult {
     guard
-      context.operationReference
-        == DiagnosticSessionOfflineInspector.operationReference
+      DiagnosticSessionOfflineInspector.supportedOperations.contains(context.operationReference)
     else {
       return .unavailable("diagnostics_unsupported_operation")
     }

@@ -100,7 +100,7 @@ impl JobRunner<'_> {
             return Err(Stop::Publication(detail));
         };
         // Budget the measured received bytes before reading/redacting them.
-        if run.record.operation() == "capture.diagnostics@1" {
+        if crate::device_steps::diagnostic_capture(run.record.operation()) {
             let budget = super::byte_budget(&run.record);
             let used = publisher
                 .published_bytes(&run.record.job_id)

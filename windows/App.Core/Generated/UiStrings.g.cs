@@ -1086,8 +1086,8 @@ public static class UiStrings
     public const string AppNavigationDiagnostics = "app.navigation.diagnostics";
     public const string HistoryActivityOpenDiagnostics = "history.activity.open.diagnostics";
     public const string HistoryContextReadOnly = "history.context.readOnly";
-    public const string DiagnosticsCaptureUnavailable = "diagnostics.capture.unavailable";
-    public const string DiagnosticsCaptureUnavailableDetail = "diagnostics.capture.unavailable.detail";
+    public const string WindowsDiagnosticsCaptureUnavailable = "windows.diagnostics.capture.unavailable";
+    public const string WindowsDiagnosticsCaptureUnavailableDetail = "windows.diagnostics.capture.unavailable.detail";
     public const string DiagnosticsAlignmentCalibrated = "diagnostics.alignment.calibrated";
     public const string DiagnosticsAlignmentCannotAlign = "diagnostics.alignment.cannotAlign";
     public const string DiagnosticsAlignmentExplain = "diagnostics.alignment.explain";
@@ -2339,8 +2339,8 @@ public static class UiStrings
         AppNavigationDiagnostics,
         HistoryActivityOpenDiagnostics,
         HistoryContextReadOnly,
-        DiagnosticsCaptureUnavailable,
-        DiagnosticsCaptureUnavailableDetail,
+        WindowsDiagnosticsCaptureUnavailable,
+        WindowsDiagnosticsCaptureUnavailableDetail,
         DiagnosticsAlignmentCalibrated,
         DiagnosticsAlignmentCannotAlign,
         DiagnosticsAlignmentExplain,

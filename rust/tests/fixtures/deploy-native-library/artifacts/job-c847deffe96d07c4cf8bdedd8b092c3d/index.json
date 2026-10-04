@@ -1,7 +1,7 @@
 {
   "artifacts" : [
     {
-      "artifactID" : "ART-8eea12b1f3257406226d349c7a3e8200",
+      "artifactID" : "ART-0ddb21ed8ce3ce86b5566642e4437b2a",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -25,7 +25,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-c847deffe96d07c4cf8bdedd8b092c3d",
-      "sha256" : "62728f959dba1e07b66abacbe699c27b86eb536bb77c2f3f20d35edddf4cd03d",
+      "sha256" : "096232575192c683349269a4e72b58d9623c2d7fc37ad8831e5915ef58d82fd5",
       "sourceOperation" : "deploy.native-library.app-owned@1",
       "status" : {
         "published" : {
@@ -35,7 +35,7 @@
       "stepID" : "atomic-publish"
     },
     {
-      "artifactID" : "ART-46278d86b27705cf6f4bfc18b7900f4b",
+      "artifactID" : "ART-147ae3a7defa1a0723a0bacc844e1d91",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -59,7 +59,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-c847deffe96d07c4cf8bdedd8b092c3d",
-      "sha256" : "d5445fca4b44e2effbb336729de531bb367da6587a528d16cf56fc7e23ecb704",
+      "sha256" : "86d724bcff98331443091b1040b8a7493a606cd8b5eadfc892f0b6ce8de3d1ac",
       "sourceOperation" : "deploy.native-library.app-owned@1",
       "status" : {
         "published" : {

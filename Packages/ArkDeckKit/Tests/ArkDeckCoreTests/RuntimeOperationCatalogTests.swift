@@ -14,6 +14,7 @@ struct RuntimeOperationCatalogTests {
         "analyzer.extract-crash-signature@1",
         "analyzer.summarize-hilog@1",
         "analyzer.summarize-trace@1",
+        "capture.diagnostic-session@1",
         "capture.diagnostics@1",
         "capture.screen-sequence@1",
         "debug.hap@1",
@@ -122,8 +123,8 @@ struct RuntimeOperationCatalogTests {
       .flatMap(\.inputs)
       .filter { $0.defaultValue != nil }
     #expect(
-      withDefaults.count == 25,
-      "the catalog declares twenty-five input defaults; the runtime must see all of them")
+      withDefaults.count == 29,
+      "the catalog declares twenty-nine input defaults; the runtime must see all of them")
   }
 
   /// Every published input says what it is for.
@@ -191,8 +192,8 @@ struct RuntimeOperationCatalogTests {
       }
     }
     #expect(
-      checked == 25,
-      "the catalog declares twenty-five input defaults; all of them must be exercised here")
+      checked == 29,
+      "the catalog declares twenty-nine input defaults; all of them must be exercised here")
   }
 
   @Test func viewerCanOmitHilogWithoutChangingTheDefaultDiagnosticsPlan() throws {

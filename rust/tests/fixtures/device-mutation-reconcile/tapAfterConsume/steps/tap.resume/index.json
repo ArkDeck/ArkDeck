@@ -7,7 +7,7 @@
       "createdAtUTC" : "2026-09-14T00:00:00Z",
       "idempotencyKey" : "idem-mutation-tap",
       "jobId" : "job-1e1a3d3cf338619f5849e1af38c7db6a",
-      "recordSHA256" : "ca775a05f369ea15933626464d11863c92155b1c3fac5fdda287b7e715287781",
+      "recordSHA256" : "adf2612cadd0a80add8dff22e1ccfa3fab91d5d6ed74f3a2cd4c78e636a46ce9",
       "requestHash" : "32f14d85a797084bf8b35d6b7512499c009de9ac655dc4896ca331a363f39c05",
       "state" : "succeeded",
       "updatedAtUTC" : "2026-09-14T00:00:00Z",

@@ -490,7 +490,10 @@ fn export_destination(input: &str) -> Result<String, CliError> {
 /// diagnostics capture: the selected Artifact is one that
 /// `capture.diagnostics@1` published (`diagnostics export`).
 pub fn require_diagnostics_artifact(metadata: &Value) -> Result<(), CliError> {
-    if metadata["sourceOperation"] != "capture.diagnostics@1" {
+    if !metadata["sourceOperation"]
+        .as_str()
+        .is_some_and(crate::diagnostics_resources::supported_operation)
+    {
         return Err(CliError::new(
             "invalidInput",
             "selected Artifact does not belong to capture.diagnostics@1",
