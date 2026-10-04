@@ -47,6 +47,7 @@ class RealCatalogTests(unittest.TestCase):
                 "analyzer.extract-crash-signature@1",
                 "analyzer.summarize-hilog@1",
                 "analyzer.summarize-trace@1",
+                "capture.diagnostic-session@1",
                 "capture.diagnostics@1",
                 "capture.screen-sequence@1",
                 "debug.hap@1",
@@ -253,6 +254,9 @@ class RealCatalogTests(unittest.TestCase):
         self.assertEqual(
             observed,
             {
+                "capture.diagnostic-session@1/capture-hilog": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
                 "capture.diagnostics@1/capture-hilog": (
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
@@ -299,6 +303,8 @@ class RealCatalogTests(unittest.TestCase):
         self.assertEqual(
             observed,
             {
+                "capture.diagnostic-session@1/read-evidence-model": "deviceModel",
+                "capture.diagnostic-session@1/read-evidence-firmware": "firmwareBuild",
                 "capture.diagnostics@1/read-evidence-model": "deviceModel",
                 "capture.diagnostics@1/read-evidence-firmware": "firmwareBuild",
                 "debug.hap@1/read-evidence-model": "deviceModel",
@@ -710,7 +716,7 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")'
             ),
-            4,
+            5,
         )
         self.assertEqual(
             swift.count(
@@ -738,14 +744,14 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
             ),
-            9,
+            10,
         )
         self.assertEqual(
             swift.count(
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
             ),
-            9,
+            10,
         )
         self.assertEqual(
             swift.count(

@@ -241,6 +241,7 @@
             "enum": [
               "observe.device",
               "capture.diagnostics",
+              "capture.diagnostic-session",
               "debug.hap"
             ]
           }
