@@ -88,7 +88,10 @@ public sealed record JobSummary(
     string? WorkspaceKind = null,
     string? SupersededByRecoveryEpochId = null,
     string? ResolvedByTargetAliasResolutionId = null,
-    long OutstandingResidueCount = 0)
+    long OutstandingResidueCount = 0,
+    string? ThreadId = null,
+    string? ActualEffect = null,
+    string? StartedAtUtc = null)
 {
     /// <summary>The terminal Job states (spec/recovery/job-state-preflight.json, class
     /// "terminal"); every other state counts as active, as the macOS Job Inspector counts.</summary>
@@ -114,7 +117,10 @@ public sealed record JobSummary(
             o.TryGetValue("workspaceKind", out var kind) && kind is JsonString k ? k.Value : null,
             o.TryGetValue("supersededByRecoveryEpochId", out var superseded) && superseded is JsonString se ? se.Value : null,
             o.TryGetValue("resolvedByTargetAliasResolutionId", out var resolved) && resolved is JsonString re ? re.Value : null,
-            o.TryGetValue("outstandingResidueCount", out var residue) && residue is JsonNumber rn && rn.TryGetInt64(out var count) ? count : 0);
+            o.TryGetValue("outstandingResidueCount", out var residue) && residue is JsonNumber rn && rn.TryGetInt64(out var count) ? count : 0,
+            o.TryGetValue("threadId", out var thread) && thread is JsonString th ? th.Value : null,
+            o.TryGetValue("actualEffect", out var effect) && effect is JsonString ef ? ef.Value : null,
+            o.TryGetValue("startedAtUtc", out var started) && started is JsonString st ? st.Value : null);
     }
 
     public static IReadOnlyList<JobSummary> ParsePage(JsonValue value)

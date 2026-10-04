@@ -612,16 +612,18 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual([argv for argv in argvs if argv[:2] == ["cargo", "clippy"]], [])
         self.assertEqual([argv for argv in argvs if argv[:2] == ["cargo", "test"]], argvs[:1])
 
-    def test_only_a_candidate_of_the_published_inputs_leaves_lint_and_tests_to_the_lane(self):
+    def test_only_the_published_view_repeats_lint_and_tests_the_lane_ran(self):
         _, drifted = self.change_candidate()
         identical = contract.candidate(self.published, self.commit, self.commit)
         self.assertEqual(identical["inputDigest"], self.published_info["inputDigest"])
         self.assertNotEqual(drifted["inputDigest"], self.published_info["inputDigest"])
         lint = ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"]
         workspace_tests = ["cargo", "test", "--workspace", "--locked"]
+        contract_and_cli = ["cargo", "test", "--package", "arkdeck-contract",
+                            "--package", "arkdeck-cli", "--locked"]
         for label, info, repeated in (
             ("candidate-of-published-inputs", identical, False),
-            ("candidate-of-drifted-inputs", drifted, True),
+            ("candidate-of-drifted-inputs", drifted, False),
             ("published", self.published_info, True),
         ):
             with self.subTest(view=label):
@@ -636,7 +638,14 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(lint in calls, repeated)
                 self.assertEqual(workspace_tests in calls, repeated)
                 self.assertEqual(
-                    ["cargo", "test", "--package", "arkdeck-contract", "--locked"] in calls, not repeated)
+                    ["cargo", "test", "--package", "arkdeck-contract", "--locked"] in calls,
+                    label == "candidate-of-published-inputs")
+                # Drifted candidate inputs test what reads the candidate kind,
+                # after building the binaries the CLI's process tests launch.
+                self.assertEqual(contract_and_cli in calls, label == "candidate-of-drifted-inputs")
+                if contract_and_cli in calls:
+                    bins = ["cargo", "build", "--workspace", "--bins", "--locked"]
+                    self.assertLess(calls.index(bins), calls.index(contract_and_cli))
                 self.assertIn(["cargo", "build", "--workspace", "--bins", "--locked"], calls)
 
     def test_any_native_stage_failure_stops_that_view_and_is_preserved(self):
@@ -806,6 +815,14 @@ class ContractChecksTests(unittest.TestCase):
 
             with patch.dict(os.environ, {"ARKDECK_RUST_TEST_WORKERS": "2"}):
                 runner.run_view(self.root / label, self.root / "outputs" / label, info, self.published_info, run=run)
+            if label == "candidate":
+                # The candidate is the lane's checkout: the binaries the CLI's
+                # process tests launch, then only its kind's tests.
+                self.assertEqual(calls[0], ["cargo", "build", "--workspace", "--bins", "--locked"])
+                self.assertEqual(calls[1][:2], ["cargo", "test"])
+                self.assertIn("arkdeck-cli", calls[1])
+                self.assertEqual([argv[1] for argv in calls[2:4]], ["run", "build"])
+                continue
             self.assertEqual(calls[0][1], "clippy")
             self.assertEqual(calls[1], [sys.executable, str(self.root / label / "rust/scripts/run-workspace-tests.py")])
             self.assertEqual([argv[1] for argv in calls[2:4]], ["run", "build"])

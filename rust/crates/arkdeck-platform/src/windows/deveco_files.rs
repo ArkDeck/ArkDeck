@@ -13,6 +13,7 @@
 //! | SDK manifest | `sdk/default/sdk-pkg.json` | `sdk\default\sdk-pkg.json` |
 //! | Node | `tools/node/bin/node` | `tools\node\node.exe` |
 //! | Hvigor | `tools/hvigor/bin/hvigorw.js` | `tools\hvigor\bin\hvigorw.js` |
+//! | Java | none: the host's own JDK behind `/usr/bin/java` | `jbr\bin\java.exe`, the bundled runtime Hvigor's packaging runs |
 //! | signed resource envelope | `_CodeSignature/CodeResources` | none: Windows binds no manifest to a publisher signature |
 //!
 //! The root must hold the Windows launcher `bin\devecostudio64.exe` (the
@@ -40,14 +41,18 @@ pub enum DevEcoRole {
     SdkManifest,
     Node,
     Hvigor,
+    /// The bundled JDK's launcher (TASK-XPA-011): Hvigor's packaging runs
+    /// `java` by name, and Windows has no system `java` to find.
+    Java,
 }
 
 impl DevEcoRole {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::ProductManifest,
         Self::SdkManifest,
         Self::Node,
         Self::Hvigor,
+        Self::Java,
     ];
     pub fn name(self) -> &'static str {
         match self {
@@ -55,6 +60,7 @@ impl DevEcoRole {
             Self::SdkManifest => "sdkManifest",
             Self::Node => "node",
             Self::Hvigor => "hvigor",
+            Self::Java => "java",
         }
     }
     /// The role's path relative to the root, `/`-separated as on macOS.
@@ -64,6 +70,7 @@ impl DevEcoRole {
             Self::SdkManifest => "sdk/default/sdk-pkg.json",
             Self::Node => "tools/node/node.exe",
             Self::Hvigor => "tools/hvigor/bin/hvigorw.js",
+            Self::Java => "jbr/bin/java.exe",
         }
     }
     fn maximum(self) -> usize {
@@ -71,6 +78,7 @@ impl DevEcoRole {
             Self::ProductManifest | Self::SdkManifest => 64 * 1024,
             Self::Node => 256 * 1024 * 1024,
             Self::Hvigor => 8 * 1024 * 1024,
+            Self::Java => 16 * 1024 * 1024,
         }
     }
 }
@@ -247,7 +255,7 @@ impl DevEcoRoot {
             || before.size == 0
             || before.size > role.maximum() as u64
             || !Access::of(&file)?.trusted_write_only()
-            || (matches!(role, DevEcoRole::Node) && !executable)
+            || (matches!(role, DevEcoRole::Node | DevEcoRole::Java) && !executable)
         {
             return Err(denied());
         }
