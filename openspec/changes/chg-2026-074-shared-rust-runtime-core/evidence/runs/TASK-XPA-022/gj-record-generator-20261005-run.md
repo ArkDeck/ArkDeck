@@ -72,6 +72,17 @@
 - **GJ-2 "remote file readback".** The Rust `send-hap` is verified on exit status only
   (`["stagedAt"]`); there is no remote hash readback. The generator requires `send-hap` verified,
   which is what the Runtime publishes.
+  - **This is Swift parity, not a port regression.** The last Swift Runtime (`57ba8e36f~1`,
+    `ArkDeckWorkflows/DeviceProviders/DeviceProviderAdapters.swift`) did the same two things.
+    - Lowering refused unless the lease resolved to the Artifact the Job admitted with the
+      expected SHA-256 (around line 1209).
+    - Its verifier returned `verified(["stagedAt"])` on `file send` exit 0 alone (around line
+      2365).
+  - **The deployed bytes are pinned after install instead.** `package-readback` binds its verdict
+    to the resolved Artifact's SHA-256 (`deployedArtifactSha256`), in Rust as in Swift. The
+    generator requires that readback.
+  - A remote hash check before install would be a new behaviour on both platforms, not a parity
+    fix. It is not added here.
 - **GJ-2 "PID readback".** The Rust `process-readback` publishes `running`, not a PID.
 - **Headless runbook §0.** It says `operation list` carries `result.catalogDigest`. On the Rust CLI
   it does not; `runtime health` does.
