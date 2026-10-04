@@ -215,7 +215,13 @@ pub(crate) struct BuildLowering {
 /// clean one: the home it keeps its caches in and its temporary directory,
 /// as the daemon's own environment names them.
 fn inherited_base() -> Vec<(String, String)> {
-    ["HOME", "TMPDIR"]
+    // On Windows the account's profile and temporary directories, which Node
+    // and Hvigor read where macOS reads `HOME` and `TMPDIR`.
+    #[cfg(windows)]
+    let names = ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP"];
+    #[cfg(not(windows))]
+    let names = ["HOME", "TMPDIR"];
+    names
         .into_iter()
         .filter_map(|key| {
             let value = std::env::var(key).ok()?;
@@ -1676,9 +1682,9 @@ impl WorkspaceComposition {
                 profile
                     .build_product(&invocation.preset_id)
                     .map(|product| Landing {
-                        destination: format!(
-                            "{}/{product}",
-                            profile.project_root.trim_end_matches('/')
+                        destination: support::join(
+                            profile.project_root.trim_end_matches('/'),
+                            product,
                         ),
                     })
             }

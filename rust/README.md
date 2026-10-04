@@ -4016,6 +4016,23 @@ a restart. `workspace.inspect` is in `WINDOWS_MEASURED_LEAVES`, so
 `cli-feature-coverage.json`
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-provider-run.md)).
 
+### Hvigor build, tests and crash symbolization on Windows
+
+A Hvigor build or test preset runs on a Runtime-owned copy on Windows. The build product lands
+below the copy's `X:\` root. Node and Hvigor inherit the account's profile and temporary
+directories (`USERPROFILE`, `APPDATA`, `LOCALAPPDATA`, `TEMP`, `TMP`) where macOS gives `HOME`
+and `TMPDIR`, plus the composition's `DEVECO_SDK_HOME`.
+
+`arkdeck-hoststore/tests/windows_workspace_hvigor.rs` builds and tests a copy through a
+stand-in Node and a pinned `hvigorw.js`. It also checks that the person's own tree is never
+built, and that a changed script never runs.
+
+The daemon's `--symbolize-crash` mode answers the Swift symbolizer oracle on Windows
+(`crash_symbolizer_mode`). The daemon-level and CLI build, test and symbolize leaves stay
+`partial`. A build or test preset needs a registered, Huawei-signed DevEco, and a symbolization
+needs a device-captured crash
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md)).
+
 ## Windows analyzer provider (TASK-XPA-011)
 
 The Windows daemon composes the analyzers `ARKDECK_ANALYZER_PATH` names, as
