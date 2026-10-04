@@ -24,10 +24,13 @@ namespace ArkDeck.App.Core.Daemon;
 /// <item><c>--cache-root &lt;directory&gt;</c>: the App's own cache (the Trace inbox and the Trace
 /// viewer's recent list), by default <c>ArkDeck</c> in the per-user temporary directory — never
 /// the Runtime's state root.</item>
+/// <item><c>--remote-sources-root &lt;directory&gt;</c>: the remote build sources' files, by default
+/// <c>%LOCALAPPDATA%\ArkDeck\App\RemoteBuildSources</c>; given, the credentials go to the
+/// <c>ArkDeck-fixture/app</c> Credential Manager namespace instead of <c>ArkDeck/app</c> (tests).</item>
 /// </list>
 /// </summary>
 public sealed record LaunchOptions(string? Language, string? StartPage, string? TestTransport, double TextScale = 1.0, bool HighContrastTokens = false, string? FocusWalkFile = null,
-    string? CacheRootOption = null)
+    string? CacheRootOption = null, string? RemoteSourcesRoot = null)
 {
     public string CacheRoot => CacheRootOption ?? Path.Combine(Path.GetTempPath(), "ArkDeck");
 
@@ -38,6 +41,7 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
         var highContrast = false;
         string? focusWalk = null;
         string? cacheRoot = null;
+        string? remoteSources = null;
         for (var i = 0; i < args.Count; i++)
         {
             switch (args[i])
@@ -48,6 +52,7 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
                 case "--high-contrast-tokens": highContrast = true; break;
                 case "--focus-walk" when i + 1 < args.Count: focusWalk = args[++i]; break;
                 case "--cache-root" when i + 1 < args.Count: cacheRoot = Path.GetFullPath(args[++i]); break;
+                case "--remote-sources-root" when i + 1 < args.Count: remoteSources = Path.GetFullPath(args[++i]); break;
                 case "--text-scale" when i + 1 < args.Count:
                     if (double.TryParse(args[++i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var factor)
                         && factor is >= 1.0 and <= 2.25)
@@ -59,7 +64,7 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
         }
         // Only the scripted transport's test runs may enlarge the text; a real run follows Windows.
         return new LaunchOptions(language, page, transport, transport is null ? 1.0 : scale, transport is not null && highContrast,
-            transport is null ? null : focusWalk, cacheRoot);
+            transport is null ? null : focusWalk, cacheRoot, remoteSources);
     }
 }
 

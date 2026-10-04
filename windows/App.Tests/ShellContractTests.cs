@@ -104,6 +104,14 @@ public sealed class ShellContractTests
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }
+            if (Path.GetFileName(file) == "SshConnector.cs")
+            {
+                // Its one pipe is the remote build source's per-connection SSH_ASKPASS channel
+                // (an owner-only arkdeck-askpass-<random> pipe), not the daemon's.
+                StringAssert.Contains(text, "\"arkdeck-askpass-\" + Guid.NewGuid()");
+                Assert.IsFalse(text.Contains("ClientKit", StringComparison.Ordinal) || text.Contains("ARKDECK_ENDPOINT", StringComparison.Ordinal));
+                continue;
+            }
             Assert.IsFalse(text.Contains("System.IO.Pipes", StringComparison.Ordinal), $"{Path.GetFileName(file)}: the daemon is reached only through ClientKit");
         }
     }
