@@ -66,6 +66,9 @@ jobs:
       - name: Agent PR identity helper contract tests
         run: python3 scripts/test_agent_pr_identity.py
 
+      - name: Agent PR stack helper tests
+        run: python3 scripts/ci/test_agent_pr.py
+
       - name: host-loop contract suite
         working-directory: scripts
         run: python3 -m unittest discover -s host_loop -t .

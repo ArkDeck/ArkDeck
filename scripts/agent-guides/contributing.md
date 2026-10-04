@@ -42,6 +42,11 @@ sandbox 内 `gh auth status` 报未登录或 token 无效时，用受控权限�
   合入可能同时合入其下所有层，未获整段授权不得触发。下层合入后读回自动 rebase/retarget
   结果；普通 PR 链则显式更新剩余分支与 base，squash/rebase 合入时避免重放已合入补丁。
 
-兼容说明：当前 `agent-pr.yml` 自动创建 PR 和身份回读仍固定 `main`。创建上层 PR 后应设置并
-读回实际下层 base；若该 workflow 因固定 base 假设失败，如实报告为自动化兼容缺口，不把
-它计作通过，不为消除此报错把有依赖的 PR 改回 `main`，也不放宽 required checks 或 review。
+自动开 PR 会保留已有 PR 的实际 base；新 PR 从未合入的同仓 PR 中选择唯一最近的祖先。
+首次 push 需要明确父层（例如父层已前进，或有多个可能父层）时，在末尾提交添加
+`Stack-Base: agent/<直接父分支>` trailer；显式新建独立栈可写 `Stack-Base: main`。
+该 trailer 只参与新 PR 的创建，不重设已有 PR，也不代替 restack。
+
+机器人通过 GitHub Stacks REST API 登记依赖链；只创建新栈或在既有栈顶追加新层，并读回
+membership 与顺序。已有不同子层、多个栈交叠或 API 不可用时会明确失败，保留 PR 与 base，
+不重写分支、不拆掉已有栈、不把元数据失败计作通过。先解决报告的依赖问题，再重新 push。
