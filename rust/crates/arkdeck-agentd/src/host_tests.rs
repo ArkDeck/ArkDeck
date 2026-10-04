@@ -539,3 +539,28 @@ mod cancellation_tests {
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[cfg(windows)]
+mod windows_hdc_identity_tests {
+    use crate::bootstrap_readers::windows_hdc_identity;
+
+    /// The registered tuple's digest is admitted with its version; candidate
+    /// 1, the macOS tools and a case fold are not.
+    #[test]
+    fn only_the_registered_windows_tuple_is_a_published_hdc_identity() {
+        assert_eq!(
+            windows_hdc_identity(
+                "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e"
+            ),
+            Some(serde_json::json!({"version": "3.2.0g", "profileReferences": []}))
+        );
+        for other in [
+            "f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b",
+            "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+            "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+            "C79518498AAF4E719733961216444E70C3EB53C8BA7006B933E6D7F2E1C6101E",
+        ] {
+            assert_eq!(windows_hdc_identity(other), None, "{other}");
+        }
+    }
+}

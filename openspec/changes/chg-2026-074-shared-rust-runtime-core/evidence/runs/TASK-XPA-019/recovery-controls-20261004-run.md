@@ -139,3 +139,26 @@ three Windows consumers. No recovery admission or continuation logic changed.
 
 PR #2467 receives a new merge commit and fresh CI. Prior results are not claimed
 for the new head. No device operation or runtime-authority write was performed.
+
+
+## Shared overview resource conflict resolution (2026-10-04)
+
+Merged protected main `587c938b4` into the recovery branch. A three-way merge by
+resource key preserves all 12 recovery additions and all five new overview device
+strings, refusing different values for the same key. The three Windows consumers
+are regenerated from that combined source. `app_job_recovery_allowed` is
+byte-identical to the preceding recovery head; no admission behavior changed.
+
+### Local targeted checks
+
+- `python3 windows/scripts/generate-ui-strings.py --check`: 1,280 strings pass, exit 0 (`/tmp/arkdeck-macos-conflicts-20261004/recovery-strings.log`).
+- `python3 /tmp/arkdeck-macos-closeout-20261004/check-windows-resource-references.py`: 46 snapshots, 291 references and literal UI-test resource lookups pass, exit 0 (`recovery-resource-references.log`).
+- `CARGO_BUILD_JOBS=2 cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd --bin arkdeck-agentd app_ingress_tests::`: 40 pass, exit 0 (`recovery-ingress.log`). An initial `--lib app_ingress::` selector matched zero tests and is not counted as validation.
+- `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter RuntimeJobRecoveryApplicationFacadeTests`: 7 pass, exit 0 (`recovery-swift.log`). Access to the existing host cache required the permitted elevated retry.
+- Daemon all-target Clippy, Rust formatting, SDD and diff checks: exit 0 (`recovery-clippy.log`, `recovery-fmt.log`, `recovery-sdd.log`). Logs are under `/tmp/arkdeck-macos-conflicts-20261004/` unless a full path is given.
+- App build-for-testing and unrelated crate suites were not repeated for this resource-only conflict resolution; complete selected validation runs in PR CI. No device operation was performed.
+
+### CI
+
+PR #2467 receives a new merge commit and fresh selected CI. Earlier successful
+runs are retained above as historical evidence and do not validate this head.

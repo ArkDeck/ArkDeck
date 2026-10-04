@@ -20,7 +20,7 @@
 //!   [`Authority::compose`]); every input that would compose another
 //!   owner on macOS is refused, not ignored, until its store is ported (G01),
 //!   and a development HDC is admitted only by a registered Windows HDC
-//!   tuple (`windows_hdc_gate`, CHG-2026-078), of which there is none yet,
+//!   tuple (`windows_hdc_gate`, CHG-2026-078: DevEco's `hdc.exe` only),
 //!   and then composed only as the root's managed server (`managed_hdc`);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
@@ -460,7 +460,7 @@ impl Authority {
     /// One validated `ARKDECK_ARKFORGE_BUNDLE_PATH` bundle names the
     /// `arkforged.exe` to start and pair, but its authority must name the
     /// managed-control HDC's digest (`hdc_sha256`, the managed server's), and
-    /// no HDC is composed until the Windows HDC tuple is registered: the lane
+    /// no HDC is composed without the registered Windows HDC tuple: the lane
     /// is refused before anything is launched, and the start reports why. Its planning, its facts (over the
     /// Windows USB census, open since the DAYU200 sample confirmed its
     /// mapping) and the device access observer of the lane's
@@ -511,8 +511,8 @@ impl Authority {
                 ),
             ));
         // The executable lane, installed only with a lane and a
-        // descriptor-bound HDC: neither exists on Windows until the managed
-        // HDC is composed, so nothing is installed yet.
+        // descriptor-bound HDC: on Windows only when the registered tuple's
+        // managed HDC is composed; otherwise nothing is installed.
         let host = crate::arkforge_execution::install(
             host,
             &composed,
@@ -1134,7 +1134,8 @@ fn signing_store() -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     Ok((root, image))
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
 
@@ -1163,10 +1164,17 @@ mod tests {
     /// A stand-in HDC compiled from Rust at test time (the macOS tests
     /// compile theirs from C): `-s <endpoint> -m` listens on the endpoint and
     /// accepts until it is ended; `-s <endpoint> checkserver` answers agreeing
-    /// versions; anything else is unregistered (status 64). No real HDC runs.
+    /// versions; `list targets -v` answers the registered UART-only listing,
+    /// so the managed start settles past the server-startup listing at once
+    /// (CHG-2026-078 r3); anything else is unregistered (status 64). No real
+    /// HDC runs.
     const STAND_IN: &str = r#"
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();
+    if arguments[1..] == ["list", "targets", "-v"] {
+        print!("COM1\t\tUART\tReady\tunknown...\thdc\r\n");
+        return;
+    }
     match arguments.get(3).map(String::as_str) {
         Some("-m") => {
             let listener = std::net::TcpListener::bind(&arguments[2]).unwrap();
@@ -1257,7 +1265,8 @@ fn main() {
                 .find(|(key, _)| *key == name)
                 .map(|(_, value)| OsString::from(value))
         };
-        // The draft registry refuses it before anything is launched.
+        // The registered table (DevEco's `hdc.exe` only) refuses this
+        // stand-in before anything is launched.
         assert!(
             crate::windows_hdc_gate::admit(&variable, arkdeck_provider_hdc::WINDOWS_HDC_TUPLES)
                 .is_err()
@@ -1332,4 +1341,5 @@ fn main() {
             );
         }
     }
+}
 }

@@ -198,6 +198,11 @@ first, `ControlResult` back.
   adopted is said to be missing), Device (its Target selected) and Diagnostics. The workspace shows
   the record's read-only context (Job, Target, operation, state, Artifacts) until dismissed;
   nothing is submitted or replayed.
+- **Overview scope (TASK-XPA-020).** The macOS Overview device bar: the adopted device online now
+  (an authorized, current observation with an adopted Target) that the page describes — its name,
+  Target, binding, system and transport, a picker when several are online, "No online device"
+  otherwise — and the remote build server bound to that Target from the App's own bindings
+  (unbound, bound with its endpoint, or stale when the server was removed).
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for
