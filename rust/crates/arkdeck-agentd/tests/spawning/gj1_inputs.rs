@@ -1,15 +1,16 @@
-//! GJ-1's pointer inputs and screen record end to end on Windows
-//! (TASK-XPA-005): the real signed `arkdeck.exe` sends `input tap`, `input
-//! long-press` and `input swipe` (`input.tap@1`, `input.long-press@1`,
-//! `input.swipe@1`) and `screen record` (`capture.screen-sequence@1`) to the
-//! signed test daemon (`signed_daemon.rs`), which composes the production
+//! GJ-1's pointer inputs, screen record and port forwards end to end on
+//! Windows (TASK-XPA-005): the real signed `arkdeck.exe` sends `input tap`,
+//! `input long-press` and `input swipe` (`input.tap@1`, `input.long-press@1`,
+//! `input.swipe@1`), `screen record` (`capture.screen-sequence@1`) and
+//! `port-forward create|remove` (`port-forward.create@1`,
+//! `port-forward.remove@1`) to the signed test daemon (`signed_daemon.rs`), which composes the production
 //! Windows development root with the shared fake HDC's answers in process
 //! (`oracle_fake.rs`), a synthetic USB census naming the fixture's board, the
 //! oracle's fixed clock, and its own Job state for the device mutations'
 //! continuity (`MUTATION_ROOT`).
 //!
 //! Every case each Swift oracle recorded (`rust/tests/fixtures/pointer-input`,
-//! `screen-sequence`) is sent in the oracle's order, with
+//! `screen-sequence`, `port-forward`) is sent in the oracle's order, with
 //! the fake in the case's mode: a Job the oracle ran ends in the oracle's
 //! state, with the oracle's step kinds, after exactly the oracle's calls of
 //! that Job (the device list reads aside, which the CLI's own observation
@@ -321,4 +322,50 @@ fn screen_record_answers_as_the_swift_oracle_over_the_signed_test_daemon() {
     daemon.stop();
     let _ = std::fs::remove_dir_all(&scratch);
     assert_windows_status(&["capture.screen-sequence@1"], "implemented");
+}
+
+/// `port-forward create` and `port-forward remove` over the Swift
+/// port-forward oracle's fake: every case the oracle recorded, a forward and
+/// a reverse rule created and removed, a refused create, a missing rule's
+/// removal, a rule the readback does not list, the unanswered readback's
+/// unknown outcome and the refusals after it, each with the oracle's calls;
+/// the unlisted rule is removed again, and no rule is left on the fake
+/// device but the one whose readback went unanswered.
+#[test]
+fn port_forwards_answer_as_the_swift_oracle_over_the_signed_test_daemon() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-port-forwards");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let fixture = fixtures("port-forward");
+    let (daemon, fake_root) =
+        replay(
+            &scratch,
+            &executable,
+            &pin,
+            &fixture,
+            &|operation| match operation {
+                "port-forward.create" => vec!["port-forward", "create"],
+                "port-forward.remove" => vec!["port-forward", "remove"],
+                other => panic!("no port-forward leaf for {other}"),
+            },
+        );
+    let mut left: Vec<String> = std::fs::read_dir(&fake_root)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with("device-rule-"))
+        .collect();
+    left.sort();
+    assert_eq!(
+        left,
+        ["device-rule-tcp_23456_tcp_34566"],
+        "the rules the device keeps"
+    );
+    daemon.stop();
+    let _ = std::fs::remove_dir_all(&scratch);
+    assert_windows_status(
+        &["port-forward.create@1", "port-forward.remove@1"],
+        "implemented",
+    );
 }

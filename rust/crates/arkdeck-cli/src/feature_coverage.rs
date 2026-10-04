@@ -489,6 +489,12 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // authority, each Job's calls the oracle's (its owned paths named by
     // this run's Job) (`gj1_inputs.rs`).
     "screen.record",
+    // `port-forward create` and `port-forward remove`, the same way over the
+    // Swift port-forward oracle's fake: forward and reverse rules created,
+    // read back and removed, each Job's calls the oracle's
+    // (`gj1_inputs.rs`).
+    "port-forward.create",
+    "port-forward.remove",
     // Not `agent resume` (nor `human-action resume`), although
     // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
     // oracle's `connect` scenario: once its action resolves, a resume

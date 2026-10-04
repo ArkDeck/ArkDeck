@@ -6,8 +6,9 @@
 //! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables, and the
 //! read, file and Trace legs' fragments) and the Debug probe oracle's
 //! (`debug-probe/hdc-answers.sh`), and the GJ-1 pointer inputs'
-//! (`pointer-input/hdc-answers.sh`) and screen record's
-//! (`screen-sequence/hdc-answers.sh`) are ported here, case for case and in
+//! (`pointer-input/hdc-answers.sh`), screen record's
+//! (`screen-sequence/hdc-answers.sh`) and the port forwards'
+//! (`port-forward/hdc-answers.sh`) are ported here, case for case and in
 //! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
@@ -41,6 +42,7 @@ pub enum Answers {
     DebugProbe,
     PointerInput,
     ScreenSequence,
+    PortForward,
 }
 
 impl Answers {
@@ -74,6 +76,9 @@ impl Answers {
                 Self::PointerInput
             }
             line if line.starts_with("# capture.screen-sequence@1 answers") => Self::ScreenSequence,
+            line if line.starts_with("# port-forward.create@1 and port-forward.remove@1") => {
+                Self::PortForward
+            }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -1220,6 +1225,89 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `marker "$@"` of the port-forward fragment: a rule's state file below
+    /// the root, its words joined by `_` in place of `:` and spaces.
+    fn rule(&self, from: &str, to: &str) -> PathBuf {
+        self.root.join(format!(
+            "device-rule-{}",
+            format!("{from} {to}").replace([':', ' '], "_")
+        ))
+    }
+
+    /// `port-forward/hdc-answers.sh`: the fixture's device and its port rules,
+    /// kept as marker files below the root, by mode: a forward the device
+    /// refuses (`createRefused`), a rule list that is not answered
+    /// (`readbackUnanswered`) or that omits every rule (`ruleUnlisted`).
+    fn port_forward(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        if all == format!("-t {KEY} fport ls") {
+            match mode {
+                "readbackUnanswered" => return Answer::exit(1),
+                "ruleUnlisted" => return Answer::exit(0),
+                _ => {}
+            }
+            let mut rules: Vec<PathBuf> = fs::read_dir(&self.root)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|path| {
+                    path.file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .starts_with("device-rule-")
+                })
+                .collect();
+            rules.sort();
+            let mut listed = String::new();
+            for rule in rules {
+                let text = fs::read_to_string(rule).unwrap();
+                let row = text.lines().next().unwrap_or_default();
+                listed.push_str(&format!("{KEY}    {row}\n"));
+            }
+            return Answer::out(listed);
+        }
+        if all.starts_with(&format!("-t {KEY} fport rm ")) {
+            let rule = self.rule(arg(5), arg(6));
+            if !rule.exists() {
+                return Answer::failing(
+                    1,
+                    "[Fail]Remove forward ruler failed, ruler is not exist\n",
+                );
+            }
+            fs::remove_file(rule).unwrap();
+            return Answer::out(format!(
+                "Remove forward ruler success, ruler:{} {}\n",
+                arg(5),
+                arg(6)
+            ));
+        }
+        if all.starts_with(&format!("-t {KEY} fport tcp:")) {
+            if mode == "createRefused" {
+                return Answer::failing(1, "[Fail]Forwardport result failed\n");
+            }
+            fs::write(
+                self.rule(arg(4), arg(5)),
+                format!("{} {}    [Forward]\n", arg(4), arg(5)),
+            )
+            .unwrap();
+            return Answer::out("Forwardport result:OK\n");
+        }
+        if all.starts_with(&format!("-t {KEY} rport tcp:")) {
+            fs::write(
+                self.rule(arg(4), arg(5)),
+                format!("{} {}    [Reverse]\n", arg(4), arg(5)),
+            )
+            .unwrap();
+            return Answer::out("Forwardport result:OK\n");
+        }
+        Answer::unregistered()
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -1254,6 +1342,7 @@ impl HdcDispatch for OracleFake {
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
             Answers::PointerInput => Self::pointer_input(&plan.arguments, &mode),
             Answers::ScreenSequence => self.screen_sequence(&plan.arguments, &mode),
+            Answers::PortForward => self.port_forward(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));
