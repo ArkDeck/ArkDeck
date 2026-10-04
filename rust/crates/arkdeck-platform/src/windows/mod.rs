@@ -88,6 +88,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 pub use stop::{Latch, StopSignal, send_console_break};
 pub use system_tool::{SystemTool, TrustedSystemTool, trusted_system_tool};
+pub(crate) use tool::search_directory;
 pub use verified_source::{VerifiedSource, create_private_directory, create_private_file};
 
 pub(crate) struct Handle(OwnedHandle);

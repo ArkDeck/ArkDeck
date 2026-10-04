@@ -85,6 +85,11 @@ pub struct WorkspaceComposition {
     /// executable finds in its environment (a registered Hvigor preset's
     /// `DEVECO_SDK_HOME`).
     environment: BTreeMap<String, Vec<(String, String)>>,
+    /// The directory a registered toolchain's Node children find first on
+    /// their search path, by the Node launcher's path (Windows: the pinned
+    /// JDK's `jbr\bin`). Only a build or test preset's dispatch reads it;
+    /// every other child keeps the clean search path.
+    search_directories: BTreeMap<String, String>,
     /// Swift `DeviceMutationLaneCoordinator` for the host target every
     /// workspace mutation names: a patch or checkpoint Job's steps hold it
     /// from its running transition to its last step, so one never overlaps
@@ -189,6 +194,11 @@ pub struct ResolvedToolchain {
     pub hvigor_script_path: String,
     pub sdk_root_path: String,
     pub verified_resources: Vec<VerifiedResource>,
+    /// The one directory the Hvigor children of this toolchain's presets
+    /// find first on their search path (Windows: the bundled JDK's
+    /// `jbr\bin`, whose `java.exe` the record pins). `None` keeps the clean
+    /// search path, as on macOS.
+    pub search_directory: Option<String>,
 }
 
 /// Swift `devecoToolchains.resolve(_:expectedGeneration:owner:)` as the
@@ -203,12 +213,18 @@ pub type ToolchainResolver<'a> = &'a dyn Fn(&str, u64, &str) -> Result<ResolvedT
 pub(crate) struct PresetLowering {
     pub(crate) environment: Vec<(String, String)>,
     pub(crate) resources: Vec<VerifiedResource>,
+    /// A test run's Hvigor child's leading search directory, if its
+    /// toolchain names one; never a symbolization's.
+    pub(crate) search_directory: Option<String>,
 }
 
 pub(crate) struct BuildLowering {
     pub(crate) landing: Option<Landing>,
     pub(crate) environment: Vec<(String, String)>,
     pub(crate) resources: Vec<VerifiedResource>,
+    /// The Hvigor child's leading search directory, if its toolchain names
+    /// one.
+    pub(crate) search_directory: Option<String>,
 }
 
 /// The parts of Swift's child base a Hvigor build reads beyond this Runtime's
@@ -330,6 +346,7 @@ struct RegisteredPresets {
     /// their own project.
     signing: BTreeMap<String, Vec<SigningPresetRef>>,
     environment: BTreeMap<String, Vec<(String, String)>>,
+    search_directories: BTreeMap<String, String>,
     composed: BTreeMap<String, (String, u64)>,
     failures: BTreeMap<String, String>,
 }
@@ -415,6 +432,7 @@ fn resolve_registered(
         symbols: BTreeMap::new(),
         signing: BTreeMap::new(),
         environment: BTreeMap::new(),
+        search_directories: BTreeMap::new(),
         composed: BTreeMap::new(),
         failures: BTreeMap::new(),
     };
@@ -490,6 +508,12 @@ fn resolve_registered(
         };
         match toolchains(toolchain, generation, &preset.preset_ref) {
             Ok(toolchain) => {
+                if let Some(directory) = &toolchain.search_directory {
+                    resolved.search_directories.insert(
+                        crate::workspace_support::foundation_standardized(&toolchain.node_path),
+                        directory.clone(),
+                    );
+                }
                 resolved.environment.insert(
                     crate::workspace_support::foundation_standardized(&toolchain.node_path),
                     vec![(
@@ -669,6 +693,7 @@ impl WorkspaceComposition {
                     lane: Mutex::new(()),
                     resources: BTreeMap::new(),
                     environment: BTreeMap::new(),
+                    search_directories: BTreeMap::new(),
                     signing,
                     inspector: None,
                     inspection_roots,
@@ -696,6 +721,7 @@ impl WorkspaceComposition {
                 lane: Mutex::new(()),
                 resources: WorkspaceProfile::resources_by_executable(&resolved),
                 environment: system_tool_environment(presets.environment.clone(), &resolved),
+                search_directories: presets.search_directories.clone(),
                 signing,
                 inspector: None,
                 inspection_roots,
@@ -837,6 +863,7 @@ impl WorkspaceComposition {
             lane: Mutex::new(()),
             resources: WorkspaceProfile::resources_by_executable(&profiles),
             environment: BTreeMap::new(),
+            search_directories: BTreeMap::new(),
             signing: None,
             inspector: None,
             inspection_roots: BTreeMap::new(),
@@ -886,6 +913,15 @@ impl WorkspaceComposition {
                 .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
                 .collect(),
         );
+        self
+    }
+
+    /// The same composition, the children of the Node launcher at `path`
+    /// finding `directory` first on their search path (a registered
+    /// toolchain's pinned JDK directory on Windows).
+    pub fn with_child_search_directory(mut self, path: &str, directory: &str) -> Self {
+        self.search_directories
+            .insert(foundation_standardized(path), directory.to_owned());
         self
     }
 
@@ -1620,6 +1656,13 @@ impl WorkspaceComposition {
             environment,
             resources: self
                 .resources_for(&invocation.executable_path, &invocation.executable_sha256),
+            search_directory: match action {
+                PresetAction::Tests(_) => self
+                    .search_directories
+                    .get(&invocation.executable_path)
+                    .cloned(),
+                PresetAction::Symbolize(_) => None,
+            },
         })
     }
 
@@ -1712,6 +1755,10 @@ impl WorkspaceComposition {
             landing,
             environment,
             resources,
+            search_directory: self
+                .search_directories
+                .get(&invocation.executable_path)
+                .cloned(),
         })
     }
 

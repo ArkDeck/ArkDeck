@@ -283,6 +283,7 @@ a signed `.app` bundle:
 | `node` | `tools/node/bin/node` (execute bits) | `tools\node\node.exe` (a `.exe` the caller holds `FILE_EXECUTE` on) |
 | `hvigor` | `tools/hvigor/bin/hvigorw.js` | `tools\hvigor\bin\hvigorw.js` |
 | `signedResourceEnvelope` | `_CodeSignature/CodeResources` | none: Windows binds no manifest to a publisher signature, so the role does not exist |
+| `java` | none: the host's own JDK behind `/usr/bin/java` | `jbr\bin\java.exe` (a `.exe` the caller holds `FILE_EXECUTE` on), the bundled JDK Hvigor's packaging runs as `java` |
 
 The root must be a canonical drive path holding the Windows launcher
 `bin\devecostudio64.exe`; any other layout (a macOS tree on a Windows disk, a
