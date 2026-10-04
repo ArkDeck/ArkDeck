@@ -126,6 +126,8 @@ WINDOWS_INPUT_PREFIXES = (
     "rust/tests/fixtures/hilog-summary-analyzer/",
     # The App's icon and MSIX assets are the macOS AppIcon (generate-app-icons.py).
     "ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
+    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckKeycapIcon.imageset/",
+    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/",
 )
 WINDOWS_INPUT_FILES = frozenset({
     "Packages/ArkDeckKit/Contracts/control-protocol.json",

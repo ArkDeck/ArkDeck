@@ -11,7 +11,10 @@ size x scale, 16 to 1024 px). Outputs, in windows/App/Assets:
 - the MSIX visual assets Package.appxmanifest names, at scale-100 and scale-200:
   Square44x44Logo (plus the taskbar and Start list's targetsize-16/24/32/48/256 renditions,
   plated and altform-unplated), Square150x150Logo, Wide310x150Logo, StoreLogo, SplashScreen
-  and LockScreenLogo.
+  and LockScreenLogo;
+- AppIcon.Keycap.ico and AppIcon.Waveform.ico: the two icons Settings > General offers for the
+  window and title bar (macOS `ApplicationIconChoice`, its ArkDeckKeycapIcon and
+  ArkDeckWaveformIcon imagesets, 512 and 1024 px), with the same entries as AppIcon.ico.
 
 Nothing is drawn: every pixel is the macOS icon resampled. A square asset is the icon over its
 whole square; a tile (150x150) and a wide tile or splash screen carry the icon at two thirds of
@@ -42,7 +45,12 @@ ICONSET = REPO / "ArkDeckApp" / "Resources" / "Assets.xcassets" / "AppIcon.appic
 ASSETS = REPO / "windows" / "App" / "Assets"
 
 # INPUTS: what the generated assets depend on (the CI planner's windows lane selects on them).
-INPUTS = ("ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",)
+INPUTS = (
+    "ArkDeckApp/Resources/Assets.xcassets/AppIcon.appiconset/",
+    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckKeycapIcon.imageset/",
+    "ArkDeckApp/Resources/Assets.xcassets/ArkDeckWaveformIcon.imageset/",
+)
+CHOICES = {"Keycap": "ArkDeckKeycapIcon", "Waveform": "ArkDeckWaveformIcon"}
 
 ICO_SIZES = (16, 20, 24, 32, 40, 48, 64, 256)
 TARGET_SIZES = (16, 24, 32, 48, 256)
@@ -145,6 +153,17 @@ def renditions() -> dict[int, Path]:
     return by_size
 
 
+def imageset(name: str) -> dict[int, Path]:
+    """An imageset's PNGs by their own pixel size (its Contents.json names no point size)."""
+    folder = ICONSET.parent / f"{name}.imageset"
+    contents = json.loads((folder / "Contents.json").read_text(encoding="utf-8"))
+    by_size: dict[int, Path] = {}
+    for image in contents["images"]:
+        width, _, _ = decode_png((folder / image["filename"]).read_bytes())
+        by_size.setdefault(width, folder / image["filename"])
+    return by_size
+
+
 def weights(source: int, target: int) -> list[list[tuple[int, float]]]:
     """For each target pixel, the source pixels it covers and their coverage (area average)."""
     ratio = source / target
@@ -205,8 +224,8 @@ def resample(size: int, rgba: bytes, target: int) -> list[float]:
 
 
 class Icon:
-    def __init__(self) -> None:
-        self.sources = renditions()
+    def __init__(self, sources: dict[int, Path] | None = None) -> None:
+        self.sources = sources or renditions()
         self.decoded: dict[int, tuple[int, bytes]] = {}
         self.cache: dict[int, bytes] = {}
 
@@ -282,6 +301,9 @@ def build() -> dict[str, bytes]:
     icon = Icon()
     files = {name: encode_png(w, h, icon.canvas(w, h, share)) for name, (w, h, share) in outputs().items()}
     files["AppIcon.ico"] = encode_ico([(size, encode_png(size, size, icon.square(size))) for size in ICO_SIZES])
+    for choice, name in CHOICES.items():
+        alternate = Icon(imageset(name))
+        files[f"AppIcon.{choice}.ico"] = encode_ico([(size, encode_png(size, size, alternate.square(size))) for size in ICO_SIZES])
     return files
 
 

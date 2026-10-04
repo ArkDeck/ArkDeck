@@ -54,6 +54,9 @@ internal sealed class AppSession : IDisposable
 
     private static readonly Lazy<string> RemoteSourcesRoot = new(() => Directory.CreateTempSubdirectory("arkdeck-uitest-remote-sources-").FullName);
 
+    /// <summary>The App's own preferences of a test run (the window icon), never the person's.</summary>
+    public static string NewPreferencesRoot() => Directory.CreateTempSubdirectory("arkdeck-uitest-preferences-").FullName;
+
     public static AppSession Launch(string exe, IEnumerable<string> arguments, IReadOnlyDictionary<string, string>? environment = null)
     {
         var start = new ProcessStartInfo(exe) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(exe)! };
@@ -64,6 +67,11 @@ internal sealed class AppSession : IDisposable
         {
             start.ArgumentList.Add("--remote-sources-root");
             start.ArgumentList.Add(RemoteSourcesRoot.Value);
+        }
+        if (!start.ArgumentList.Contains("--preferences-root"))
+        {
+            start.ArgumentList.Add("--preferences-root");
+            start.ArgumentList.Add(NewPreferencesRoot());
         }
         // No inherited ArkDeck configuration: each test states the daemon it means.
         foreach (var key in start.Environment.Keys.ToArray())

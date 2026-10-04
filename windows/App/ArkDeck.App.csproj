@@ -46,6 +46,9 @@
     <!-- Also beside the unpackaged exe: the window and title bar load it (AppWindow.SetIcon, the
          TitleBar icon), and the xcopy package ships the output folder. -->
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The two icons Settings > General offers for the window (generate-app-icons.py). -->
+    <Content Include="Assets\AppIcon.Keycap.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\AppIcon.Waveform.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
