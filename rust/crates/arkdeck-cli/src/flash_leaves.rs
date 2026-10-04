@@ -191,7 +191,7 @@ pub fn broker_params(fields: &Map<String, Value>) -> Result<Map<String, Value>, 
 /// (`arkdeck-rockchip-binding`, the Runtime's own store). Nothing reaches the
 /// Runtime or the device. `Err` is the refusal as Swift's CLI prints it after
 /// `arkdeck flash: `.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn install_binding(
     rebind: bool,
     application_support_root: &std::path::Path,
@@ -209,7 +209,7 @@ pub fn install_binding(
 
 /// Swift's machine answer of an install: the binding's revision and USB
 /// topology, and whether this install wrote it.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn install_binding_result(installed: &arkdeck_rockchip_binding::BindingInstallation) -> Value {
     json!({
         "created": installed.created,
@@ -219,7 +219,7 @@ pub fn install_binding_result(installed: &arkdeck_rockchip_binding::BindingInsta
 }
 
 /// Swift's human answer of an install, line for line.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn install_binding_human(installed: &arkdeck_rockchip_binding::BindingInstallation) -> String {
     format!(
         "durable DAYU200 cross-mode binding {}\nbinding revision: {}\nUSB topology: {}\n\
@@ -235,10 +235,11 @@ pub fn install_binding_human(installed: &arkdeck_rockchip_binding::BindingInstal
     )
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod install_binding_tests {
     use super::*;
     use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
 
     /// A private temporary Application Support root, removed however the
@@ -252,8 +253,14 @@ mod install_binding_tests {
                 .canonicalize()
                 .unwrap()
                 .join(format!("arkdeck-install-binding-{nonce:x}"));
-            std::fs::create_dir(&root).unwrap();
-            std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+            #[cfg(unix)]
+            {
+                std::fs::create_dir(&root).unwrap();
+                std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+            }
+            // The store's private directory, the Windows way.
+            #[cfg(windows)]
+            arkdeck_platform::HostDirectory::open_or_create_private(&root).unwrap();
             Self(root)
         }
     }

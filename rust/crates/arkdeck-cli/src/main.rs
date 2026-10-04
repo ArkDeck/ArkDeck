@@ -1215,7 +1215,10 @@ fn serve_runtime_service_refusal(
 /// does not warn that the leaf is legacy; a machine answer carries it in
 /// `meta.lifecycle`.
 fn serve_install_binding(invocation: &Invocation, id: &str) -> std::process::ExitCode {
-    #[cfg(target_os = "macos")]
+    // On Windows from one census of the Windows USB registry into the
+    // Rockchip binding store of `%LOCALAPPDATA%\ArkDeck`, the Application
+    // Support root the Windows daemon composes (TASK-XPA-010).
+    #[cfg(any(target_os = "macos", windows))]
     {
         let rebind = invocation
             .params
@@ -1256,7 +1259,7 @@ fn serve_install_binding(invocation: &Invocation, id: &str) -> std::process::Exi
             }
         }
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let error = CliError::new(
             "unsupportedOnPlatform",

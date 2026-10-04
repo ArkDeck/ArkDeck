@@ -8,7 +8,7 @@
 //! * The checked-in helper verifies as Swift verifies the bundled one and is
 //!   composed: the census names `codeSignHelper` in its macOS position.
 //!   `deploy.native-library.app-owned@1` still answers
-//!   `provider_not_registered`: no Windows HDC tuple is registered, and the
+//!   `provider_not_registered`: the test's root composes no HDC, and the
 //!   helper stands ready behind that gate.
 //! * A helper that does not verify is reported ("native deployment stays
 //!   unavailable: …"), is not composed, and the daemon serves; without a

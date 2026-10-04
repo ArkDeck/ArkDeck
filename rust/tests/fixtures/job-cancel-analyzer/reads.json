@@ -32,7 +32,7 @@
         "blockers" : [
 
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -111,7 +111,7 @@
           "blockers" : [
 
           ],
-          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -166,7 +166,7 @@
           "sessionId" : "session-job-7e6c03dd2126fed73de39f82c2485c8e",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "31eed4b21318dc7b8ba29d669a4c0aecb14d29b38e23c6e942bab4b8a4b31dd8",
+            "manifestSha256" : "7bdaa6bca735944cb8c0c74c83140b1c0f085724aaec57966d4c18713dbd26b1",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -190,7 +190,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-7e6c03dd2126fed73de39f82c2485c8e",
           "method" : "job.events"
@@ -229,7 +229,7 @@
           "sessionId" : "session-job-7e6c03dd2126fed73de39f82c2485c8e",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "31eed4b21318dc7b8ba29d669a4c0aecb14d29b38e23c6e942bab4b8a4b31dd8",
+            "manifestSha256" : "7bdaa6bca735944cb8c0c74c83140b1c0f085724aaec57966d4c18713dbd26b1",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -242,7 +242,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "f44eeddedd56080f3bdd72eb7c2d0f4e55beb1801474b30740491407bcf7b571",
+        "materializedPlanDigest" : "925f5ba111c5bea812e5f55bcfaf99a9786403e26b092b79225f47ad7f42c53e",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -317,7 +317,7 @@
         "sessionId" : "session-job-7e6c03dd2126fed73de39f82c2485c8e",
         "sessionPublication" : {
           "catalogGeneration" : "2",
-          "manifestSha256" : "31eed4b21318dc7b8ba29d669a4c0aecb14d29b38e23c6e942bab4b8a4b31dd8",
+          "manifestSha256" : "7bdaa6bca735944cb8c0c74c83140b1c0f085724aaec57966d4c18713dbd26b1",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -354,7 +354,7 @@
         "blockers" : [
           "artifactIntegrityFailed"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -409,7 +409,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -470,7 +470,7 @@
           "sessionId" : "session-job-96d4f821b85e0645362763736ffa1906",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "469d260d35080f923d4b6e10f11b389d5548cb2527687bad2925766a0369d1ab",
+            "manifestSha256" : "3ce9521db186ce7222d529f4c669f6786cbe0973d752d94c1a3827085d1d4fe9",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -492,7 +492,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-96d4f821b85e0645362763736ffa1906",
           "method" : "job.events"
@@ -537,7 +537,7 @@
           "sessionId" : "session-job-96d4f821b85e0645362763736ffa1906",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "469d260d35080f923d4b6e10f11b389d5548cb2527687bad2925766a0369d1ab",
+            "manifestSha256" : "3ce9521db186ce7222d529f4c669f6786cbe0973d752d94c1a3827085d1d4fe9",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -550,7 +550,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "ce0f262ab2bbefa00183489296d92d159ecbec1fd3e0288d9df401ebc0b8fcc1",
+        "materializedPlanDigest" : "caa62b138418c9a534a1e9394c58bf4a27d234f369b939da3794fea6313caeb2",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -628,7 +628,7 @@
         "sessionId" : "session-job-96d4f821b85e0645362763736ffa1906",
         "sessionPublication" : {
           "catalogGeneration" : "1",
-          "manifestSha256" : "469d260d35080f923d4b6e10f11b389d5548cb2527687bad2925766a0369d1ab",
+          "manifestSha256" : "3ce9521db186ce7222d529f4c669f6786cbe0973d752d94c1a3827085d1d4fe9",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -666,7 +666,7 @@
           "artifactIntegrityFailed",
           "resultNotReady"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -723,7 +723,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3",
           "method" : "job.events"
@@ -781,7 +781,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "c36c2ee4f691eaaaecda7ecf1533d17a35ef9284305bf2ad9eb7e4c702249e49",
+        "materializedPlanDigest" : "3710ff03c08f9ce091125c1782852af3bdda190028bdb38b9c10f25db8166d52",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -896,7 +896,7 @@
         "blockers" : [
           "artifactIntegrityFailed"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -951,7 +951,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -1012,7 +1012,7 @@
           "sessionId" : "session-job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
           "sessionPublication" : {
             "catalogGeneration" : "3",
-            "manifestSha256" : "8a4a34253660e72f0abf7bfd0297094dd9776920c40a960085fd632fc7b70d11",
+            "manifestSha256" : "afe6fe95dd1adca2ff8d1a6dcc85e74e7bb5fa7695b81cdde8a955a1e22cc93b",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -1036,7 +1036,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+        "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
         "events" : {
           "jobId" : "job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
           "method" : "job.events"
@@ -1081,7 +1081,7 @@
           "sessionId" : "session-job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
           "sessionPublication" : {
             "catalogGeneration" : "3",
-            "manifestSha256" : "8a4a34253660e72f0abf7bfd0297094dd9776920c40a960085fd632fc7b70d11",
+            "manifestSha256" : "afe6fe95dd1adca2ff8d1a6dcc85e74e7bb5fa7695b81cdde8a955a1e22cc93b",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -1094,7 +1094,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "8404a8179bb0f7333b1cc091cfd28c1d0f4541043f06604645aa218348d4e2fa",
+        "materializedPlanDigest" : "016ec39f8de169d7bfb7e221aacfc97409b58913c6738b5aacd81879ad25a62a",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -1174,7 +1174,7 @@
         "sessionId" : "session-job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
         "sessionPublication" : {
           "catalogGeneration" : "3",
-          "manifestSha256" : "8a4a34253660e72f0abf7bfd0297094dd9776920c40a960085fd632fc7b70d11",
+          "manifestSha256" : "afe6fe95dd1adca2ff8d1a6dcc85e74e7bb5fa7695b81cdde8a955a1e22cc93b",
           "reasonCode" : null,
           "state" : "published"
         },

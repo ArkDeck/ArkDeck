@@ -16,8 +16,8 @@
 //! here.
 //!
 //! This is a host test of the planner and the admitter only. The Windows
-//! daemon composes no HDC provider (no Windows HDC tuple is registered), so
-//! there these requests are refused before admission.
+//! daemon composes the HDC provider only beside a managed registered HDC;
+//! without one, these requests are refused before admission.
 #![cfg(windows)]
 
 use arkdeck_hoststore::{

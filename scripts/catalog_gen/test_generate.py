@@ -55,6 +55,7 @@ class RealCatalogTests(unittest.TestCase):
                 "deploy.native-library.app-owned@1",
                 "flash.dayu200",
                 "flash.full-restore@1",
+                "input.keyboard@1",
                 "input.long-press@1",
                 "input.swipe@1",
                 "input.tap@1",
@@ -744,14 +745,14 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
             ),
-            10,
+            11,
         )
         self.assertEqual(
             swift.count(
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
             ),
-            10,
+            11,
         )
         self.assertEqual(
             swift.count(

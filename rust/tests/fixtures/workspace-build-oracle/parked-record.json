@@ -5,11 +5,11 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-25T00:00:00Z",
-    "consumptionFingerprintSHA256" : "e82963c890c8307ef9138c01dbb894b5f8dcb93a77bcb3f4a477dd45d02c227e",
+    "consumptionFingerprintSHA256" : "5fea2b97b8ad2d3091931683ea9c8fd2c247248df78bda2c0fc1c4b421113edc",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-F7DA723D61C6C38997918F8F1CCDE508053F22E5-G1",
+    "reference" : "CAP-RT-POLICY-0A9AC96FF73D04DC01AC3B4A8DFF1981E7C4FB42-G1",
     "runtimeCapabilityCorrelation" : {
-      "planDigestSHA256" : "4ead8588351f7eec1263a224d66765a662bf7e7745fbe257810616bcb15f6b8a",
+      "planDigestSHA256" : "8c15ef84343d2724e3b193430f08e6b95448088ea5bd68aff9c02511746f7b98",
       "reservationID" : "idempotency-lost-after",
       "stepSetDigestSHA256" : "bbc856fb281f21642645b7d0fa0b62486e1e0e5c540bcfacf1d868808fc5a3ad",
       "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
@@ -17,11 +17,11 @@
     },
     "validUntilUTC" : "2026-10-25T00:00:00Z"
   },
-  "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-25T00:00:00Z",
   "finishedAtUTC" : "2026-09-25T00:00:00Z",
   "jobID" : "job-a1f15a0413cc6c313aaba102f68875e3",
-  "materializedPlanDigest" : "4ead8588351f7eec1263a224d66765a662bf7e7745fbe257810616bcb15f6b8a",
+  "materializedPlanDigest" : "8c15ef84343d2724e3b193430f08e6b95448088ea5bd68aff9c02511746f7b98",
   "operationFailure" : {
     "category" : "unknownOutcome",
     "code" : "outcomeUnknown",
@@ -63,7 +63,7 @@
   "recoveryStepID" : "build-project",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-F7DA723D61C6C38997918F8F1CCDE508053F22E5-G1"
+      "capabilityId" : "CAP-RT-POLICY-0A9AC96FF73D04DC01AC3B4A8DFF1981E7C4FB42-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idempotency-lost-after",

@@ -366,6 +366,12 @@
                 },
                 "y": {
                   "type": "integer"
+                },
+                "inputEpochUtc": {
+                  "type": "string"
+                },
+                "keyboardArtifactLease": {
+                  "type": "string"
                 }
               },
               "type": "object"
@@ -650,7 +656,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 0,
-    "request": 55,
-    "result": 55
+    "request": 56,
+    "result": 56
   }
 }

@@ -133,6 +133,7 @@ public enum WorkflowStepKind: String, CaseIterable, Codable, Sendable {
   /// One primary pointer gesture (tap, long-press or swipe) injected at
   /// device coordinates. There is no observable readback for an injected
   /// gesture, so an unknown outcome stays unknown and is never replayed.
+  case injectKeyboardInput
   case injectPointerInput
   case clearLogBuffer
   case resizeLogBuffer
@@ -310,6 +311,8 @@ package enum WorkflowStepRegistry {
         required: ["forwardId", "hostEndpoint", "deviceEndpoint"], profileExposable: true)
     case .removePortForward:
       deviceMutation(required: ["forwardId"], profileExposable: true)
+    case .injectKeyboardInput:
+      deviceMutation(required: ["sourceArtifactId", "sourceSha256"])
     case .injectPointerInput:
       deviceMutation(
         required: ["gesture", "pointerX", "pointerY"],
@@ -890,6 +893,9 @@ private enum WorkflowStepValidator {
       _ = try reader.string("deviceEndpoint", minimumLength: 1, maximumLength: 255)
     case .removePortForward:
       try reader.identifier("forwardId")
+    case .injectKeyboardInput:
+      try reader.identifier("sourceArtifactId")
+      try reader.sha256("sourceSha256")
     case .injectPointerInput:
       let gesture = try reader.enumeration("gesture", allowed: ["tap", "longPress", "swipe"])
       try reader.integer("pointerX", minimum: 0, maximum: 32767)

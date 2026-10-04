@@ -176,6 +176,13 @@ enum Entry {
     /// start|evaluate|status|list`, then `flash reconcile-alias`, over the
     /// Flash invocation owner and the post-flash alias reconciler.
     Recovery,
+    /// `flash device-access` and `flash lane-preview` over a stand-in for
+    /// `arkforged`'s public endpoint and a stand-in lane plan previewer.
+    FlashReads,
+    /// `flash bind-loader` over the Swift Loader binding oracle's Target
+    /// store, binding and census, with ArkForge's half of the Loader
+    /// observation confirming, then its retry.
+    BindLoader,
 }
 
 fn inputs_file(directory: &Path, exchange: &str) -> (PathBuf, Value) {
@@ -212,6 +219,8 @@ fn run_case(entry: Entry, outcome: &str) {
                 Entry::FlashRun => "flash",
                 Entry::JobLeaves => "job",
                 Entry::Recovery => "recovery",
+                Entry::FlashReads => "reads",
+                Entry::BindLoader => "bind",
             },
         )
         .env("ARKDECK_TEST_FLASH_SOCKET_OUTCOME", outcome)
@@ -275,6 +284,212 @@ fn job_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket() {
 }
 
 #[test]
+fn bind_loader_binds_the_current_loader_over_the_control_socket() {
+    run_case(Entry::BindLoader, "completed");
+}
+
+/// The Swift Loader binding oracle (`rust/tests/fixtures/loader-binding`) as
+/// it stood before its first cross-mode bind (exchange 15): its Target store
+/// and installed binding in an Application Support root, the census of one
+/// unrelated device and the board in Loader mode, and ArkForge's half of the
+/// Loader observation confirming the expected port. `flash bind-loader`
+/// through the CLI answers exchange 15's answer, and its retry exchange 16's.
+fn bind_loader_over_the_cli(sockets: &SocketDirectory) {
+    let fixtures =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/loader-binding");
+    let cases: Value =
+        serde_json::from_slice(&fs::read(fixtures.join("cases.json")).unwrap()).unwrap();
+    let exchange = |index: u64| {
+        cases["exchanges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|exchange| exchange["index"] == index)
+            .unwrap()
+            .clone()
+    };
+    let root = sockets.0.join("application-support");
+    for directory in [root.clone(), root.join("state"), root.join("state/targets")] {
+        #[cfg(unix)]
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&directory)
+            .unwrap();
+        #[cfg(windows)]
+        arkdeck_platform::HostDirectory::open_or_create_private(&directory).unwrap();
+    }
+    fs::write(
+        root.join("state/targets/targets.json"),
+        fs::read(fixtures.join("inputs/targets-a1.json")).unwrap(),
+    )
+    .unwrap();
+    fs::write(
+        root.join("rockchip-binding.json"),
+        fs::read(fixtures.join("inputs/binding-a-installed.json")).unwrap(),
+    )
+    .unwrap();
+    #[cfg(unix)]
+    for file in ["state/targets/targets.json", "rockchip-binding.json"] {
+        fs::set_permissions(root.join(file), fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    let census_devices = exchange(11)["setup"][0]["devices"].clone();
+    let census = move || {
+        Ok(census_devices
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|device| arkdeck_platform::UsbHostDevice {
+                serial: device["serial"].as_str().unwrap().to_owned(),
+                vendor_id: u16::try_from(device["vendorId"].as_u64().unwrap()).unwrap(),
+                product_id: u16::try_from(device["productId"].as_u64().unwrap()).unwrap(),
+                topology: device["topology"].as_str().unwrap().to_owned(),
+                product_name: device["productName"].as_str().map(str::to_owned),
+                registry_entry_id: device["registryEntryId"].as_u64(),
+            })
+            .collect())
+    };
+    let canonical = root.canonicalize().unwrap();
+    #[cfg(windows)]
+    let canonical = canonical
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+        .map_or(canonical.clone(), PathBuf::from);
+    let host = crate::host::Host::from_environment()
+        .with_targets(
+            arkdeck_hoststore::TargetStore::open(&canonical.join("state/targets")).unwrap(),
+        )
+        .with_loader_binding(arkdeck_hoststore::LoaderBinding::new(
+            &root,
+            census,
+            ConfirmingLoader,
+        ));
+    serve(host, &sockets.socket());
+    let socket = sockets.socket();
+    for index in [15, 16] {
+        let recorded = exchange(index);
+        let (status, answer) = cli(
+            &socket,
+            &[
+                "flash",
+                "bind-loader",
+                "--target",
+                recorded["params"]["targetId"].as_str().unwrap(),
+                "--expected-binding-revision",
+                &recorded["params"]["expectedBindingRevision"].to_string(),
+            ],
+        );
+        assert_eq!(status, Some(0), "{index}: {answer}");
+        assert_eq!(
+            answer["result"], recorded["answer"]["result"],
+            "{index}: {answer}"
+        );
+    }
+}
+
+/// ArkForge's half of the Loader observation, confirming the expected port
+/// for the identity it is asked about (the oracle's `confirm` script).
+struct ConfirmingLoader;
+
+impl arkdeck_provider_hdc::LoaderObserver for ConfirmingLoader {
+    fn observe_loader(
+        &self,
+        stable_identity_sha256: &str,
+        expected_usb_topology: Option<&str>,
+        _request_id: &str,
+    ) -> Result<arkdeck_provider_hdc::LoaderIdentity, String> {
+        Ok(arkdeck_provider_hdc::LoaderIdentity {
+            serial_digest_sha256: stable_identity_sha256.to_owned(),
+            topology: expected_usb_topology.unwrap_or_default().to_owned(),
+        })
+    }
+}
+
+#[test]
+fn device_access_and_the_lane_preview_answer_over_the_control_socket() {
+    run_case(Entry::FlashReads, "completed");
+}
+
+/// The lane runtime directory of a case, private, below its scratch.
+fn runtime_directory(scratch: &Path) -> PathBuf {
+    let directory = scratch.join("arkforge");
+    #[cfg(unix)]
+    fs::DirBuilder::new().mode(0o700).create(&directory).ok();
+    #[cfg(windows)]
+    arkdeck_platform::HostDirectory::open_or_create_private(&directory).unwrap();
+    directory
+}
+
+/// One public session of a stand-in `arkforged` on the lane directory's
+/// public endpoint (a Unix socket or a named pipe, as ArkForge's transport
+/// names it), answering `discoverDevices` with these modes; the API it was
+/// asked.
+fn serve_public(
+    scratch: &Path,
+    modes: &'static [&'static str],
+) -> std::thread::JoinHandle<&'static str> {
+    use arkforge_ipc::framing::{read_frame, write_frame};
+    use arkforge_ipc::messages::{Hello, HelloAck, Request, Response};
+    use arkforge_ipc::{Api, PROTOCOL_MAJOR, PROTOCOL_MINOR, SessionKind, Status, wire};
+    use arkforge_platform::{LocalChannel, LocalEndpoint as ForgeEndpoint, LocalListener as Forge};
+    let endpoint = ForgeEndpoint::for_runtime(&runtime_directory(scratch), LocalChannel::Public);
+    let (bound, ready) = std::sync::mpsc::channel();
+    let handle = std::thread::spawn(move || {
+        let mut listener = Forge::bind(&endpoint).unwrap();
+        bound.send(()).unwrap();
+        let mut stream = listener.accept().unwrap();
+        let hello = Hello::decode(&read_frame(&mut stream).unwrap().unwrap()).unwrap();
+        assert_eq!(hello.session_kind, SessionKind::Public);
+        let ack = HelloAck {
+            protocol_major: PROTOCOL_MAJOR,
+            protocol_minor: PROTOCOL_MINOR,
+            session_kind: SessionKind::Public,
+            daemon_version: "0.1.0".into(),
+            refusal: None,
+            execution_ready: false,
+            execution_blockers: vec!["NO_PAIRED_AUTHORITY".into()],
+            toolchain_id: String::new(),
+            toolchain_sha256: String::new(),
+        };
+        write_frame(&mut stream, &ack.encode()).unwrap();
+        let request = Request::decode(&read_frame(&mut stream).unwrap().unwrap()).unwrap();
+        let mut payload = Vec::new();
+        for (index, mode) in modes.iter().enumerate() {
+            let mut observation = Vec::new();
+            wire::write_string(&mut observation, 1, &format!("OBS-{index}"));
+            wire::write_string(&mut observation, 3, mode);
+            wire::write_message(&mut payload, 1, &observation);
+        }
+        let response = Response {
+            request_id: request.request_id.clone(),
+            api: request.api,
+            status: Status::Ok,
+            payload,
+            stream_sequence: 0,
+            stream_end: true,
+        };
+        write_frame(&mut stream, &response.encode()).unwrap();
+        assert_eq!(request.api, Api::DiscoverDevices);
+        "discoverDevices"
+    });
+    ready.recv().unwrap();
+    handle
+}
+
+/// A lane plan previewer that names one available plan for whatever it is
+/// asked, never materializing anything.
+struct StandInPreview;
+
+impl arkdeck_provider_arkforge::LanePlanPreview for StandInPreview {
+    fn preview(&self, _archive: &str, _topology: &str) -> arkdeck_provider_arkforge::LanePreview {
+        arkdeck_provider_arkforge::LanePreview::Available {
+            plan_id: "PLAN-STANDIN".into(),
+            plan_sha256: "f".repeat(64),
+            observation_mode: "hdc-normal".into(),
+        }
+    }
+}
+
+#[test]
 fn the_recovery_broker_flashes_to_completion_over_the_control_socket() {
     run_case(Entry::Recovery, "completed");
 }
@@ -300,6 +515,8 @@ fn flash_socket_process_fixture() {
         Ok("flash") => Entry::FlashRun,
         Ok("job") => Entry::JobLeaves,
         Ok("recovery") => Entry::Recovery,
+        Ok("reads") => Entry::FlashReads,
+        Ok("bind") => Entry::BindLoader,
         other => panic!("no entry named: {other:?}"),
     };
     let unknown = std::env::var("ARKDECK_TEST_FLASH_SOCKET_OUTCOME").as_deref() == Ok("unknown");
@@ -313,6 +530,10 @@ fn flash_socket_process_fixture() {
         });
     }
     let sockets = SocketDirectory::new();
+    if matches!(entry, Entry::BindLoader) {
+        bind_loader_over_the_cli(&sockets);
+        return;
+    }
     let host = flash_host(&root, &fakes);
     // The recovery broker's owner beside the planner's state, and the
     // post-flash alias reconciler over the fixture's Application Support
@@ -326,6 +547,16 @@ fn flash_socket_process_fixture() {
                 &root.0,
                 crate::flash_execution_control::census,
                 || "2026-09-25T00:00:00Z".to_owned(),
+            )),
+        // ArkForge's public endpoint in a lane runtime directory of the
+        // fixture's own, and a plan previewer, both stand-ins in this test
+        // binary: the daemon binary has no seam for them.
+        Entry::FlashReads => host
+            .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
+                runtime_directory(&sockets.0),
+            ))
+            .with_lane_plan_preview(Some(
+                Arc::new(StandInPreview) as Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>
             )),
         _ => host,
     };
@@ -413,6 +644,47 @@ fn flash_socket_process_fixture() {
                 assert_eq!(answer["result"]["bindingRevision"], 1, "{answer}");
             }
             (if unknown { None } else { status }, admitted)
+        }
+        // Served before the Flash host is composed.
+        Entry::BindLoader => unreachable!(),
+        Entry::FlashReads => {
+            let public = serve_public(&sockets.0, &["rockusb-loader", "hdc-normal", "maskrom"]);
+            let (status, access) = cli(&socket, &["flash", "device-access"]);
+            assert_eq!(status, Some(0), "{access}");
+            assert_eq!(
+                access["result"],
+                serde_json::json!({"observationCount": 2,
+                    "observedModes": ["Loader", "Maskrom"]}),
+                "{access}"
+            );
+            assert_eq!(public.join().unwrap(), "discoverDevices");
+            let archive = recorded["inputs"]["bundle"]["archiveSha256"]
+                .as_str()
+                .map_or_else(|| "e".repeat(64), str::to_owned);
+            let (status, preview) = cli(
+                &socket,
+                &[
+                    "flash",
+                    "lane-preview",
+                    "--target",
+                    &target,
+                    "--device-profile",
+                    "dayu200",
+                    "--archive-sha256",
+                    &archive,
+                ],
+            );
+            assert_eq!(status, Some(0), "{preview}");
+            assert_eq!(
+                preview["result"],
+                serde_json::json!({"targetId": target, "bindingRevision": 1,
+                    "state": "available", "planId": "PLAN-STANDIN",
+                    "planSha256": "f".repeat(64), "observationMode": "hdc-normal"}),
+                "{preview}"
+            );
+            // Nothing was planned, admitted or dispatched.
+            assert_eq!(fakes.calls(), (Vec::new(), Vec::new()));
+            return;
         }
         Entry::Recovery => {
             // The completed case drives `recovery flash-invocation`, the

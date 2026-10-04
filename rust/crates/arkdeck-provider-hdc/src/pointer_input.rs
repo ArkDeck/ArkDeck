@@ -378,7 +378,7 @@ impl PointerInput {
 /// Swift `ISO8601Timestamps.parse` for the stamps the gate compares: a UTC
 /// instant `YYYY-MM-DDTHH:MM:SS[.fraction]Z`, as nanoseconds since the
 /// epoch.
-fn utc_nanoseconds(value: &str) -> Option<i128> {
+pub(crate) fn utc_nanoseconds(value: &str) -> Option<i128> {
     let bytes = value.as_bytes();
     if bytes.len() < 20 || bytes[bytes.len() - 1] != b'Z' {
         return None;

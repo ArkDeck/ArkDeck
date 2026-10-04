@@ -359,6 +359,7 @@ fn upload(
     let maximum = match kind {
         "flash-bundle" => 8 * 1024 * 1024 * 1024,
         "workspace-patch" => 512 * 1024,
+        "keyboard-input" => arkdeck_contract::KEYBOARD_PAYLOAD_MAX_BYTES as u64,
         _ => 64 * 1024 * 1024,
     };
     let source = HostImportSource::open(
@@ -420,6 +421,7 @@ fn upload(
     };
     let name = match kind {
         "flash-bundle" => "images.tar.gz".to_owned(),
+        "keyboard-input" => "keyboard-input.json".to_owned(),
         "native-library" => canonical_native_name(&source.name)?,
         _ => source.name.clone(),
     };
