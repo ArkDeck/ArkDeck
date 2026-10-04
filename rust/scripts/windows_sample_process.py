@@ -52,6 +52,11 @@ HDC_PHASES = ["no-board", "board-connected", "board-removed", "stop-server"]
 USB_PHASES = ["before", "after", "removed", "replugged"]
 ROCKCHIP = "VID_2207"
 DOTNET_EPOCH_TICKS = 621355968000000000
+# Windows hdc lists the host's serial ports (`COM1`, ...) as `UART` targets beside the boards.
+# Their names are host port names, not board serials, so they are never redacted.
+UART_PORT = re.compile(r"COM[0-9]+")
+# A device instance ID `ENUMERATOR\hardware-id\suffix`; hardware and compatible IDs have two parts.
+INSTANCE_ID = re.compile(r"[A-Za-z0-9_]+\\[^\\]+\\[^\\]+")
 
 # What the macOS registrations state, compared against each Windows candidate. These are the
 # registered macOS facts (openspec/integrations/openharmony/profile.md), never Windows evidence.
@@ -219,21 +224,26 @@ def connect_keys(root: Path) -> list[str]:
         for path in sorted((root / phase).glob("list-targets*.stdout.bin")) if (root / phase).is_dir() else []:
             for row in list_rows(path.read_bytes()):
                 key = row[0].strip()
+                if UART_PORT.fullmatch(key):
+                    continue
                 if key and key not in keys:
                     keys.append(key)
     return keys
 
 
 class Labels:
+    """Stable labels: `pid-1`, or `<container-1>` for a bracketed prefix such as `<container`."""
+
     def __init__(self, prefix: str) -> None:
         self.prefix = prefix
+        self.close = ">" if prefix.startswith("<") else ""
         self.seen: dict = {}
 
     def __call__(self, value):
         if value is None:
             return None
         if value not in self.seen:
-            self.seen[value] = f"{self.prefix}-{len(self.seen) + 1}"
+            self.seen[value] = f"{self.prefix}-{len(self.seen) + 1}{self.close}"
         return self.seen[value]
 
 
@@ -366,7 +376,7 @@ def process_hdc(root: Path, label: str, tool_dir: str | None, out: Path,
                           (samples["no-board"].get("environment") or {}).get("hdcOnPath") or []],
         },
     }
-    (out / "tool.json").write_text(json.dumps(redactor.json(tool_record), indent=2) + "\n", encoding="utf-8")
+    (out / "tool.json").write_text(json.dumps(redactor.json(tool_record), indent=2) + "\n", encoding="utf-8", newline="\n")
 
     phases = {}
     for phase, sample in samples.items():
@@ -423,13 +433,13 @@ def process_hdc(root: Path, label: str, tool_dir: str | None, out: Path,
             "commands": commands,
         }
         record = redactor.json(record)
-        (directory / "sample.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        (directory / "sample.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8", newline="\n")
         phases[phase] = record
 
     summary = compare_hdc(label, tool_record, phases, server_state(started, tool_sha, pid, clock))
     summary["connectKeys"] = {"count": len(keys), "lengths": [len(k) for k in keys],
                               "characterClasses": sorted({c for k in keys for c in character_classes(k)})}
-    (out / "summary.json").write_text(json.dumps(redactor.json(summary), indent=2) + "\n", encoding="utf-8")
+    (out / "summary.json").write_text(json.dumps(redactor.json(summary), indent=2) + "\n", encoding="utf-8", newline="\n")
     try:
         redactor.scan(out, forbidden)
     except Leak:
@@ -555,6 +565,10 @@ def instance_parts(instance: str) -> tuple[str, str, str]:
     return (parts + ["", "", ""])[:3]
 
 
+def instance_like(item) -> bool:
+    return isinstance(item, str) and INSTANCE_ID.fullmatch(item) is not None
+
+
 def property_value(node: dict, key: str):
     entry = (node.get("properties") or {}).get(key)
     return entry.get("data") if isinstance(entry, dict) else None
@@ -592,16 +606,18 @@ def process_usb(root: Path, hdc_roots: list[Path], out: Path,
     guid = Labels("<container")
 
     def keep_chain(sample: dict) -> list[dict]:
-        nodes = {n["instanceId"]: n for n in (sample.get("presentUsbNodes") or [])}
+        # Keyed by the upper-cased instance ID: Windows spells one ID in different letter cases
+        # (`Parent` and the relation lists lower-case it), and instance IDs compare ignoring case.
+        nodes = {n["instanceId"].upper(): n for n in (sample.get("presentUsbNodes") or [])}
         for n in sample.get("rockchipNodes") or []:
-            nodes.setdefault(n["instanceId"], n)
-        kept = [i for i in nodes if ROCKCHIP in i.upper()]
+            nodes.setdefault(n["instanceId"].upper(), n)
+        kept = [i for i in nodes if ROCKCHIP in i]
         frontier = list(kept)
         while frontier:
             parent = property_value(nodes[frontier.pop()], "DEVPKEY_Device_Parent")
-            if isinstance(parent, str) and parent in nodes and parent not in kept:
-                kept.append(parent)
-                frontier.append(parent)
+            if isinstance(parent, str) and parent.upper() in nodes and parent.upper() not in kept:
+                kept.append(parent.upper())
+                frontier.append(parent.upper())
         return [nodes[i] for i in kept]
 
     times = []
@@ -617,11 +633,11 @@ def process_usb(root: Path, hdc_roots: list[Path], out: Path,
         for key, entry in (node.get("properties") or {}).items():
             data = entry.get("data") if isinstance(entry, dict) else entry
             # Relation lists (Children, Siblings, removal and bus relations) name other
-            # devices: only the kept chain may be named.
-            if isinstance(data, list) and any(isinstance(item, str) and "\\" in item for item in data):
-                data = [item for item in data if item in kept]
-            elif (isinstance(data, str) and re.match(r"^[A-Z]+\\", data)
-                    and data not in kept and key != "DEVPKEY_Device_InstanceId"):
+            # devices: only the kept chain may be named. Only instance-ID-shaped items name a
+            # device; hardware and compatible IDs are kept. `kept` holds upper-cased IDs.
+            if isinstance(data, list) and any(instance_like(item) for item in data):
+                data = [item for item in data if not instance_like(item) or item.upper() in kept]
+            elif (instance_like(data) and data.upper() not in kept and key != "DEVPKEY_Device_InstanceId"):
                 data = "<other-device>"
             if key.endswith("Date") and isinstance(data, str):
                 data = {"order": sorted(set(times)).index(data) if data in times else None}
@@ -641,17 +657,17 @@ def process_usb(root: Path, hdc_roots: list[Path], out: Path,
     phases = {}
     for phase, sample in samples.items():
         chain = keep_chain(sample)
-        kept = {node["instanceId"] for node in chain}
+        kept = {node["instanceId"].upper() for node in chain}
         record = {
             "schema": "arkdeck-windows-usb-sample-sanitized/v1",
             "phase": phase,
             "nodes": [clean_node(node, kept) for node in chain],
         }
         record = redactor.json(record)
-        (out / f"usb-{phase}.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+        (out / f"usb-{phase}.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8", newline="\n")
         phases[phase] = record
     summary = compare_usb(devices, serials, keys, phases)
-    (out / "summary.json").write_text(json.dumps(redactor.json(summary), indent=2) + "\n", encoding="utf-8")
+    (out / "summary.json").write_text(json.dumps(redactor.json(summary), indent=2) + "\n", encoding="utf-8", newline="\n")
     try:
         redactor.scan(out)
     except Leak:
@@ -737,7 +753,7 @@ def render(hdc_outputs: list[Path], usb_output: Path | None, date: str, out: Pat
             lines += ["", f"Connect keys: {keys['count']} redacted, lengths {keys['lengths']}, "
                       f"character classes {keys['characterClasses']}."]
         path = out / f"hdc-windows-sample-{date}-run.md"
-        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         written.append(path)
     if usb_output:
         s = read_json(usb_output / "summary.json")
@@ -757,7 +773,7 @@ def render(hdc_outputs: list[Path], usb_output: Path | None, date: str, out: Pat
                          f"{p['hardwareIds']} | {p['locationPaths']} | {p['locationInfo']} | "
                          f"{p['busReportedDeviceDesc']} | {p['arrivalOrder']} | {p['services']} |")
         path = out / f"dayu200-usb-properties-{date}-run.md"
-        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         written.append(path)
     return written
 
