@@ -303,7 +303,7 @@ fn the_recorded_history_filter_frames_replay_over_the_pipe_across_restarts() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, controlActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
                 .to_owned(),
         ),
         "{:?}",

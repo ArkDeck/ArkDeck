@@ -450,14 +450,13 @@ def full_matrix(cli: Path, directory: Path, rows: list, environment: dict, endpo
             expected = None
         # Keeping no state, it composes no control-action owner either: it answers as
         # Swift's handler without one, which wants an exact identity for show and reconcile.
-        if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "control-action.list"} and platform.system() == "Darwin":
+        # The Windows daemon composes the same union owner only over a state root, so
+        # this rootless one answers the same.
+        if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "control-action.list"} and platform.system() in {"Darwin", "Windows"}:
             expected = "operationUnavailable"
-        # Windows also routes tool selection through the shared missing-owner
-        # handler. Its HDC lifecycle and other control-action routes still use
-        # the foundation refusal; do not widen the macOS override to those.
         if method == "runtime.tool.select" and platform.system() in {"Darwin", "Windows"}:
             expected = "operationUnavailable"
-        if method in {"control-action.show", "control-action.reconcile"} and platform.system() == "Darwin":
+        if method in {"control-action.show", "control-action.reconcile"} and platform.system() in {"Darwin", "Windows"}:
             expected = "invalidInput"
         if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
             expected = "internalError"

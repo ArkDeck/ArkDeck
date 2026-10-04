@@ -35,6 +35,9 @@
     <!-- The resource languages the shared catalogue provides (AC-I18N-001). -->
     <DefaultLanguage>en-US</DefaultLanguage>
     <SatelliteResourceLanguages>en-US;zh-Hans</SatelliteResourceLanguages>
+    <!-- Program.cs is the entry point: the App's executable is also the SSH client's askpass
+         helper for remote build sources, which must answer before any WinUI starts. -->
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

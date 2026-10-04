@@ -751,6 +751,25 @@
         {"automationId": "diagnostics.session.empty", "origin": "macos", "role": "text", "name": ["@diagnostics.session.none"]},
         {"automationId": "diagnostics.session.empty.detail", "origin": "macos", "role": "text", "name": ["@diagnostics.session.none.detail"]}
       ]
+    },
+    {
+      "id": "settings.remoteSources",
+      "scenario": "jobs",
+      "page": "settings",
+      "steps": [{"select": "settings.tab.remoteSources"}],
+      "elements": [
+        {"automationId": "settings.subtitle", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.subtitle"]},
+        {"automationId": "settings.remoteSources.title", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.title"]},
+        {"automationId": "settings.remoteSources.empty.title", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.empty.title"]},
+        {"automationId": "settings.remoteSources.empty.detail", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.empty.detail"]},
+        {"automationId": "settings.remoteSources.add", "origin": "macos", "role": "button", "name": ["@settings.remoteSources.add"]},
+        {"automationId": "settings.remoteSources.refresh", "origin": "macos", "role": "button", "name": ["@settings.remoteSources.refresh"]},
+        {"automationId": "settings.remoteSources.security.title", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.security.title"]},
+        {"automationId": "settings.remoteSources.security.keychain.detail", "origin": "windows", "role": "text", "name": ["@windows.remoteSources.security.credentials.detail"]},
+        {"automationId": "settings.remoteSources.security.hostKey", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.security.hostKey"]},
+        {"automationId": "settings.remoteSources.security.readOnly", "origin": "macos", "role": "text", "name": ["@settings.remoteSources.security.readOnly"]},
+        {"automationId": "settings.remoteSources.client", "origin": "windows", "role": "text", "name": ["@windows.remoteSources.client"]}
+      ]
     }
   ]
 }
