@@ -5,7 +5,7 @@
 //! exact arguments the executor runs, and each receipt judged by the
 //! observation parsers or Swift's capture verdicts. What runs a lowered plan
 //! is an [`HdcDispatch`]; this module starts nothing itself.
-use crate::{ParseError, parse_client_version, parse_server_check, parse_target_list};
+use crate::{ParseError, parse_host_client_version, parse_host_target_list, parse_server_check};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -168,6 +168,37 @@ pub trait HdcDispatch {
     }
 
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure>;
+
+    /// The registered Windows HDC tuple (CHG-2026-078) the executable this
+    /// dispatches is pinned to, if any: its output is read by the Windows
+    /// registry's grammars. Unknown implementations name none.
+    fn registered_windows_tuple(&self) -> Option<&'static crate::WindowsHdcTuple> {
+        None
+    }
+
+    /// The commandless server observation a `probeHDCServer` step lowers to
+    /// on a dispatch pinned to a registered Windows tuple (CHG-2026-078's
+    /// `serverIdentityGeneration`; `checkserver` is never a Windows probe,
+    /// since it starts a server when none runs). Nothing is launched. A
+    /// refusal means nothing was observed; unknown implementations have no
+    /// such observation.
+    fn observe_server(&self) -> Result<ServerObservation, DispatchFailure> {
+        Err(DispatchFailure::Refused(
+            "dispatch refused: this HDC has no commandless server observation".into(),
+        ))
+    }
+}
+
+/// What the commandless server observation read at the registered tuple's
+/// endpoint (Windows): exactly one server of the registered executable, or
+/// why that was not established.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ServerObservation {
+    /// The registered executable's own server listens at its endpoint.
+    Observed,
+    /// No server, another executable's, another owner's, or no answer
+    /// within the deadline.
+    Unknown(String),
 }
 
 /// Swift `ProviderSemanticOutcome`.
@@ -370,13 +401,41 @@ impl Action {
         })
     }
 
+    /// Whether this step lowers to the commandless server observation rather
+    /// than a process: `probeHDCServer` over a dispatch pinned to a
+    /// registered Windows tuple (CHG-2026-078). Elsewhere it is
+    /// `checkserver`, as Swift lowers it.
+    pub fn observes_server_commandlessly(&self, dispatch: &dyn HdcDispatch) -> bool {
+        matches!(self, Self::ObserveServer) && dispatch.registered_windows_tuple().is_some()
+    }
+
+    /// The verdict of the commandless server observation: the registered
+    /// tuple's version as both the client's and the server's, which its
+    /// executable's hash proves, once that executable's own server is
+    /// observed at its endpoint; otherwise unknown, as an unreadable
+    /// `checkserver` answer is.
+    pub fn verify_server_observation(
+        tuple: &crate::WindowsHdcTuple,
+        observation: &ServerObservation,
+    ) -> Outcome {
+        match observation {
+            ServerObservation::Observed => verified([
+                ("clientVersion", tuple.reported_version.to_owned()),
+                ("serverVersion", tuple.reported_version.to_owned()),
+            ]),
+            ServerObservation::Unknown(reason) => Outcome::Unknown(reason.clone()),
+        }
+    }
+
     /// Swift `verify` for these actions, which never read the exit status.
     pub fn verify(&self, receipt: &Receipt, expected: Expected<'_>) -> Outcome {
         match self {
-            Self::ObserveTool => match parse_client_version(&receipt.stdout, receipt.truncated) {
-                Ok(version) => verified([("toolVersion", version)]),
-                Err(error) => parse_outcome(error, "empty observation output"),
-            },
+            Self::ObserveTool => {
+                match parse_host_client_version(&receipt.stdout, receipt.truncated) {
+                    Ok(version) => verified([("toolVersion", version)]),
+                    Err(error) => parse_outcome(error, "empty observation output"),
+                }
+            }
             Self::ObserveServer => match parse_server_check(&receipt.stdout, receipt.truncated) {
                 Ok(check) if check.versions_agree() => verified([
                     ("clientVersion", check.client_version),
@@ -557,7 +616,7 @@ fn parse_outcome(error: ParseError, empty: &str) -> Outcome {
 
 fn observe_device(receipt: &Receipt, expected: Expected<'_>) -> Outcome {
     let version = expected.tool_version.unwrap_or(HIGHEST_REGISTERED_VERSION);
-    let rows = match parse_target_list(&receipt.stdout, version, receipt.truncated) {
+    let rows = match parse_host_target_list(&receipt.stdout, version, receipt.truncated) {
         Ok(rows) => rows,
         Err(error) => return parse_outcome(error, "empty observation output"),
     };

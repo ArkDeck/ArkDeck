@@ -321,6 +321,8 @@ fn write_manifest(path: &str, bytes: &[u8]) -> Result<(), IsolationFailure> {
         let mut file = create_private_new(&staged)?;
         file.write_all(bytes)?;
         file.sync_all()?;
+        // Closed before the rename: Windows renames no file a handle holds.
+        drop(file);
         fs::rename(&staged, path)
     })();
     if written.is_err() {

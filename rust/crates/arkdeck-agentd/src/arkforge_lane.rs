@@ -216,7 +216,8 @@ pub(crate) fn compose(
     }
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
     use arkdeck_platform::ServerStop;
@@ -254,4 +255,5 @@ mod tests {
              after termination"
         );
     }
+}
 }

@@ -198,6 +198,28 @@ first, `ControlResult` back.
   adopted is said to be missing), Device (its Target selected) and Diagnostics. The workspace shows
   the record's read-only context (Job, Target, operation, state, Artifacts) until dismissed;
   nothing is submitted or replayed.
+- **Job recovery banner (TASK-XPA-020).** The macOS global banner above every page: each record
+  the Job Inspector's `job.list` shows needing a person now (an unknown outcome, a person's action,
+  waiting for recovery or a rebind confirmation, a resume at a confirmed safe boundary, an archive)
+  unless the Runtime established a later epoch for it — most urgent first, its kind and guidance,
+  Job and Target, and Open in History; the count when there are several. A change is announced.
+- **Overview scope (TASK-XPA-020).** The macOS Overview device bar: the adopted device online now
+  (an authorized, current observation with an adopted Target) that the page describes — its name,
+  Target, binding, system and transport, a picker when several are online, "No online device"
+  otherwise — and the remote build server bound to that Target from the App's own bindings
+  (unbound, bound with its endpoint, or stale when the server was removed).
+- **Debug deployment queue (TASK-XPA-020).** macOS #2466 in Debug › Artifacts: choose up to four
+  folders (a mapped or UNC share works as any folder) and tick lib*.so files found in them
+  (subfolders searched, hidden entries and reparse points skipped, at most 500 entries and 100
+  libraries), or add the library chosen alone or on a server; up to 16 libraries with different
+  names are each planned for the current Target and bundle, reviewed together, and deployed one at a
+  time, stopping at the first failure or uncertainty; nothing is retried, and changing the Target,
+  bundle or queue invalidates a review.
+- **Job Inspector facts (TASK-XPA-020).** Ctrl+Shift+J shows or hides the inspector (macOS
+  Command-Shift-J); a Job with a later established epoch names the recovery or alias resolution
+  that established it and asks for no one; the device cleanup items left are counted; a Job whose
+  operation declares a log (the Catalog's `log` role) offers Read log locally for a
+  standard-privacy log, checked against its digest, at most 2 MiB, showing its last 200 lines.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for

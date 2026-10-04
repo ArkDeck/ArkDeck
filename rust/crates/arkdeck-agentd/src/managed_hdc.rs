@@ -543,9 +543,7 @@ impl DevelopmentHdc {
         Self { dispatch, managed }
     }
 
-    /// Read by the Job planner's HDC composition, which Windows does not
-    /// compose over this HDC yet.
-    #[cfg_attr(windows, allow(dead_code))]
+    /// Read by the Job planner's HDC composition.
     pub(crate) fn tool_sha256(&self) -> &str {
         self.dispatch.tool_sha256()
     }
@@ -561,6 +559,10 @@ impl DevelopmentHdc {
 }
 
 impl HdcDispatch for DevelopmentHdc {
+    fn registered_windows_tuple(&self) -> Option<&'static arkdeck_provider_hdc::WindowsHdcTuple> {
+        self.dispatch.registered_windows_tuple()
+    }
+
     fn mutation_identity_current(&self) -> bool {
         self.dispatch.mutation_identity_current()
             && self
@@ -579,5 +581,16 @@ impl HdcDispatch for DevelopmentHdc {
             })?;
         }
         self.dispatch.dispatch(plan)
+    }
+
+    /// The commandless server observation, behind the same gate: once the
+    /// managed server is not the one launched, nothing is observed.
+    fn observe_server(&self) -> Result<arkdeck_provider_hdc::ServerObservation, DispatchFailure> {
+        if let Some(managed) = &self.managed {
+            managed.current().map_err(|reason| {
+                DispatchFailure::Refused(format!("dispatch refused: {reason}"))
+            })?;
+        }
+        self.dispatch.observe_server()
     }
 }

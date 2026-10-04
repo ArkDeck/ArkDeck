@@ -7583,6 +7583,408 @@
       "table": "HistoryLocalizable",
       "en": "Artifacts",
       "zh-Hans": "Artifacts"
+    },
+    {
+      "key": "jobRecovery.action.stillUnknown",
+      "table": "JobsLocalizable",
+      "en": "The original outcome is still unknown",
+      "zh-Hans": "原操作结果仍然未知"
+    },
+    {
+      "key": "jobRecovery.action.rebound",
+      "table": "JobsLocalizable",
+      "en": "Loader binding verified; review the Job’s current recovery state",
+      "zh-Hans": "Loader 绑定已核验；请查看此 Job 的当前恢复状态"
+    },
+    {
+      "key": "jobRecovery.action.reconcile.detail",
+      "table": "JobsLocalizable",
+      "en": "Runtime checks durable evidence and current identity. An unknown original action is never replayed.",
+      "zh-Hans": "Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。"
+    },
+    {
+      "key": "jobRecovery.action.resume.detail",
+      "table": "JobsLocalizable",
+      "en": "Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.",
+      "zh-Hans": "仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。"
+    },
+    {
+      "key": "jobRecovery.action.working",
+      "table": "JobsLocalizable",
+      "en": "Checking this Job…",
+      "zh-Hans": "正在核对这个 Job…"
+    },
+    {
+      "key": "jobRecovery.action.unconfirmed",
+      "table": "JobsLocalizable",
+      "en": "The response was not confirmed. Refresh this Job before taking another action.",
+      "zh-Hans": "未能确认请求结果。请先刷新此 Job，再决定后续操作。"
+    },
+    {
+      "key": "jobRecovery.action.reconcile",
+      "table": "JobsLocalizable",
+      "en": "Check recovery state",
+      "zh-Hans": "重新核对恢复状态"
+    },
+    {
+      "key": "jobRecovery.action.rebind.detail",
+      "table": "JobsLocalizable",
+      "en": "Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.",
+      "zh-Hans": "核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。"
+    },
+    {
+      "key": "jobRecovery.action.refused",
+      "table": "JobsLocalizable",
+      "en": "Recovery action unavailable",
+      "zh-Hans": "恢复操作不可用"
+    },
+    {
+      "key": "jobRecovery.action.resume",
+      "table": "JobsLocalizable",
+      "en": "Continue from confirmed safe boundary",
+      "zh-Hans": "从已确认的安全边界继续"
+    },
+    {
+      "key": "jobRecovery.action.observed",
+      "table": "JobsLocalizable",
+      "en": "Runtime reported the updated state",
+      "zh-Hans": "Runtime 已返回更新后的状态"
+    },
+    {
+      "key": "jobRecovery.action.rebind",
+      "table": "JobsLocalizable",
+      "en": "Verify and rebind Loader",
+      "zh-Hans": "核验并重新绑定 Loader"
+    },
+    {
+      "key": "overview.record.device.label",
+      "table": "Localizable",
+      "en": "Device this page describes",
+      "zh-Hans": "本页描述的设备"
+    },
+    {
+      "key": "overview.record.device.none",
+      "table": "Localizable",
+      "en": "No online device",
+      "zh-Hans": "暂无在线设备"
+    },
+    {
+      "key": "overview.record.device.noneDetail",
+      "table": "Localizable",
+      "en": "Connect an adopted device, then refresh.",
+      "zh-Hans": "请连接一台已接管的设备后刷新。"
+    },
+    {
+      "key": "overview.record.device.choose",
+      "table": "Localizable",
+      "en": "Choose a device…",
+      "zh-Hans": "选择一台设备…"
+    },
+    {
+      "key": "overview.record.binding",
+      "table": "Localizable",
+      "en": "binding %lld",
+      "zh-Hans": "binding %lld"
+    },
+    {
+      "key": "jobRecovery.action.openHistory",
+      "table": "JobsLocalizable",
+      "en": "Review in History",
+      "zh-Hans": "在历史记录中检查"
+    },
+    {
+      "key": "jobRecovery.count",
+      "table": "JobsLocalizable",
+      "en": "%d records need review",
+      "zh-Hans": "%d 条记录待检查"
+    },
+    {
+      "key": "jobRecovery.list",
+      "table": "JobsLocalizable",
+      "en": "Recovery records",
+      "zh-Hans": "恢复记录"
+    },
+    {
+      "key": "jobRecovery.archivePending.guidance",
+      "table": "JobsLocalizable",
+      "en": "Runtime is waiting for a safe boundary before the recovery record can finish. This App cannot force the current step to stop.",
+      "zh-Hans": "Runtime 正在等待安全边界，之后才能完成恢复记录；此 App 不能强制停止当前步骤。"
+    },
+    {
+      "key": "jobRecovery.archivePending.title",
+      "table": "JobsLocalizable",
+      "en": "Recovery archive is pending",
+      "zh-Hans": "恢复归档正在等待"
+    },
+    {
+      "key": "jobRecovery.outcomeUnknown.guidance",
+      "table": "JobsLocalizable",
+      "en": "Keep the device unchanged when possible. Do not start another device operation until the outstanding effect is reconciled through an approved Runtime path.",
+      "zh-Hans": "条件允许时请保持设备状态不变。在通过已批准的 Runtime 路径核对未决影响前，不要开始其他设备操作。"
+    },
+    {
+      "key": "jobRecovery.outcomeUnknown.title",
+      "table": "JobsLocalizable",
+      "en": "Device effect is unknown",
+      "zh-Hans": "设备影响未知"
+    },
+    {
+      "key": "jobRecovery.resumeSafe.guidance",
+      "table": "JobsLocalizable",
+      "en": "Runtime recorded a confirmed safe boundary. Review the record before resuming through an approved Runtime path.",
+      "zh-Hans": "Runtime 已记录确认过的安全边界。请先检查记录，再通过已批准的 Runtime 路径恢复。"
+    },
+    {
+      "key": "jobRecovery.resumeSafe.title",
+      "table": "JobsLocalizable",
+      "en": "A safe recovery boundary is available",
+      "zh-Hans": "已有安全恢复边界"
+    },
+    {
+      "key": "jobRecovery.waiting.guidance",
+      "table": "JobsLocalizable",
+      "en": "Keep the current device state unchanged and review the Runtime record for the required recovery step.",
+      "zh-Hans": "请保持设备当前状态不变，并在 Runtime 记录中检查所需的恢复步骤。"
+    },
+    {
+      "key": "jobRecovery.waiting.title",
+      "table": "JobsLocalizable",
+      "en": "Recovery is waiting",
+      "zh-Hans": "恢复正在等待"
+    },
+    {
+      "key": "debug.artifacts.batch.phase.failed",
+      "table": "DebugLocalizable",
+      "en": "Queue stopped; remaining libraries were not submitted",
+      "zh-Hans": "队列已停止，剩余动态库未提交"
+    },
+    {
+      "key": "debug.artifacts.batch.phase.succeeded",
+      "table": "DebugLocalizable",
+      "en": "Every library reported verified success",
+      "zh-Hans": "所有动态库均已验证成功"
+    },
+    {
+      "key": "debug.artifacts.batch.phase.stopped",
+      "table": "DebugLocalizable",
+      "en": "Queue stopped; inspect individual Job results",
+      "zh-Hans": "队列已停止，请查看各 Job 结果"
+    },
+    {
+      "key": "debug.artifacts.batch.phase.running",
+      "table": "DebugLocalizable",
+      "en": "Deploying queue",
+      "zh-Hans": "正在部署队列"
+    },
+    {
+      "key": "debug.artifacts.batch.phase.review",
+      "table": "DebugLocalizable",
+      "en": "Awaiting plan review",
+      "zh-Hans": "等待检查计划"
+    },
+    {
+      "key": "debug.artifacts.batch.phase.preparing",
+      "table": "DebugLocalizable",
+      "en": "Validating queue",
+      "zh-Hans": "正在校验队列"
+    },
+    {
+      "key": "debug.artifacts.batch.phase.idle",
+      "table": "DebugLocalizable",
+      "en": "Ready",
+      "zh-Hans": "待开始"
+    },
+    {
+      "key": "debug.artifacts.batch.row.failed",
+      "table": "DebugLocalizable",
+      "en": "Stopped on failure or uncertainty",
+      "zh-Hans": "因失败或不确定结果停止"
+    },
+    {
+      "key": "debug.artifacts.batch.row.succeeded",
+      "table": "DebugLocalizable",
+      "en": "Verified",
+      "zh-Hans": "验证成功"
+    },
+    {
+      "key": "debug.artifacts.batch.row.running",
+      "table": "DebugLocalizable",
+      "en": "Running",
+      "zh-Hans": "正在执行"
+    },
+    {
+      "key": "debug.artifacts.batch.row.submitting",
+      "table": "DebugLocalizable",
+      "en": "Submitting",
+      "zh-Hans": "正在提交"
+    },
+    {
+      "key": "debug.artifacts.batch.row.prepared",
+      "table": "DebugLocalizable",
+      "en": "Plan ready",
+      "zh-Hans": "计划已就绪"
+    },
+    {
+      "key": "debug.artifacts.batch.row.preparing",
+      "table": "DebugLocalizable",
+      "en": "Validating",
+      "zh-Hans": "正在校验"
+    },
+    {
+      "key": "debug.artifacts.batch.row.pending",
+      "table": "DebugLocalizable",
+      "en": "Pending",
+      "zh-Hans": "待处理"
+    },
+    {
+      "key": "debug.artifacts.batch.run",
+      "table": "DebugLocalizable",
+      "en": "Deploy reviewed queue",
+      "zh-Hans": "部署已检查的队列"
+    },
+    {
+      "key": "debug.artifacts.batch.warning",
+      "table": "DebugLocalizable",
+      "en": "Each library is a separate deployment with its own backup, app restart, readback and rollback. This is not an atomic batch: earlier successful deployments are kept if a later item fails.",
+      "zh-Hans": "每个动态库单独部署，分别执行备份、应用重启、读取验证和失败回滚。整批不具备原子性：后续文件失败时，先前成功的部署会保留。"
+    },
+    {
+      "key": "debug.artifacts.batch.review",
+      "table": "DebugLocalizable",
+      "en": "Review library deployment queue",
+      "zh-Hans": "检查动态库部署队列"
+    },
+    {
+      "key": "debug.artifacts.batch.stop",
+      "table": "DebugLocalizable",
+      "en": "Stop after current Job",
+      "zh-Hans": "当前 Job 完成后停止"
+    },
+    {
+      "key": "debug.artifacts.batch.prepare",
+      "table": "DebugLocalizable",
+      "en": "Validate and review queue",
+      "zh-Hans": "校验并检查队列"
+    },
+    {
+      "key": "debug.artifacts.batch.limit",
+      "table": "DebugLocalizable",
+      "en": "A deployment queue supports at most 16 libraries.",
+      "zh-Hans": "部署队列最多支持 16 个动态库。"
+    },
+    {
+      "key": "debug.artifacts.batch.remove",
+      "table": "DebugLocalizable",
+      "en": "Remove from queue",
+      "zh-Hans": "从队列移除"
+    },
+    {
+      "key": "debug.artifacts.batch.add",
+      "table": "DebugLocalizable",
+      "en": "Add to deployment queue",
+      "zh-Hans": "加入部署队列"
+    },
+    {
+      "key": "debug.artifacts.batch.detail",
+      "table": "DebugLocalizable",
+      "en": "All libraries use the bundle above and keep their filenames. Review every plan before starting. A failed or unknown result stops the queue; completed libraries remain deployed.",
+      "zh-Hans": "所有动态库使用上方 Bundle，保留原文件名。开始前逐项检查计划；失败或结果未知时停止队列，已完成的动态库保留部署结果。"
+    },
+    {
+      "key": "debug.artifacts.batch.title",
+      "table": "DebugLocalizable",
+      "en": "Deployment queue",
+      "zh-Hans": "部署队列"
+    },
+    {
+      "key": "debug.artifacts.directory.empty",
+      "table": "DebugLocalizable",
+      "en": "No lib<name>.so files were found in the selected folders.",
+      "zh-Hans": "所选文件夹中未找到 lib<name>.so 文件。"
+    },
+    {
+      "key": "debug.artifacts.directory.detail",
+      "table": "DebugLocalizable",
+      "en": "Select up to 16 libraries. Search includes subfolders, skips symbolic links, and is limited to 500 entries and 100 libraries.",
+      "zh-Hans": "勾选最多 16 个动态库。扫描包含子目录，跳过符号链接，最多读取 500 个条目、展示 100 个动态库。"
+    },
+    {
+      "key": "debug.artifacts.directory.title",
+      "table": "DebugLocalizable",
+      "en": "Libraries in selected folders",
+      "zh-Hans": "所选文件夹中的动态库"
+    },
+    {
+      "key": "debug.artifacts.wslSource",
+      "table": "DebugLocalizable",
+      "en": "For WSL builds, connect to its SSH server in Settings → Servers.",
+      "zh-Hans": "WSL 构建产物可通过“设置 → 服务器”中的 SSH 连接访问。"
+    },
+    {
+      "key": "debug.artifacts.chooseDirectory",
+      "table": "DebugLocalizable",
+      "en": "Choose folder / mounted SMB…",
+      "zh-Hans": "选择文件夹 / 已挂载 SMB…"
+    },
+    {
+      "key": "jobInspector.fact.recoveryRelation",
+      "table": "JobsLocalizable",
+      "en": "Recovery relation",
+      "zh-Hans": "恢复关系"
+    },
+    {
+      "key": "jobInspector.progress",
+      "table": "JobsLocalizable",
+      "en": "Job in progress",
+      "zh-Hans": "Job 正在进行"
+    },
+    {
+      "key": "jobInspector.residue",
+      "table": "JobsLocalizable",
+      "en": "%d cleanup items remain on the device.",
+      "zh-Hans": "设备上仍有 %d 个清理项。"
+    },
+    {
+      "key": "jobInspector.result.supersededByRecovery",
+      "table": "JobsLocalizable",
+      "en": "This Job's outcome remains unknown, but a later confirmed complete-overwrite recovery established the current target state.",
+      "zh-Hans": "此 Job 的结果仍未知，但后续已确认的完整覆写恢复已建立当前目标状态。"
+    },
+    {
+      "key": "jobInspector.result.targetAliasResolved",
+      "table": "JobsLocalizable",
+      "en": "This Job's outcome remains unknown, but a later confirmed full Flash proved its target was an alias and established the current device state.",
+      "zh-Hans": "此 Job 的结果仍未知，但后续已确认的完整刷机证明其目标是别名，并建立了当前设备状态。"
+    },
+    {
+      "key": "jobInspector.state.currentEpochEstablished",
+      "table": "JobsLocalizable",
+      "en": "Current state established",
+      "zh-Hans": "当前状态已建立"
+    },
+    {
+      "key": "jobInspector.action.readLog",
+      "table": "JobsLocalizable",
+      "en": "Read log locally",
+      "zh-Hans": "在本机读取日志"
+    },
+    {
+      "key": "jobInspector.log.tail",
+      "table": "JobsLocalizable",
+      "en": "Showing at most the last 200 lines. Open this record for all artifacts.",
+      "zh-Hans": "最多显示末尾 200 行。打开此记录可查看全部产物。"
+    },
+    {
+      "key": "jobInspector.log.privacy",
+      "table": "JobsLocalizable",
+      "en": "Only standard logs are previewed here. Read sensitive artifacts explicitly in History.",
+      "zh-Hans": "此处仅预览标准日志。敏感产物需在 History 中显式读取。"
+    },
+    {
+      "key": "jobInspector.log.notText",
+      "table": "JobsLocalizable",
+      "en": "The log is not valid UTF-8 text.",
+      "zh-Hans": "日志不是有效的 UTF-8 文本。"
     }
   ]
 }

@@ -24,6 +24,12 @@ on:
 
 permissions: {}
 
+# Serialize only the short metadata writes, retaining every pending push.
+concurrency:
+  group: agent-pr-stacks
+  queue: max
+  cancel-in-progress: false
+
 jobs:
   open-pr:
     runs-on: ubuntu-latest
@@ -45,83 +51,9 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           HEAD_SHA: ${{ github.sha }}
         run: |
-          set -eu
-          TASK_ID=$(
-            python scripts/agent_pr_identity.py \
-              --repo-root "$GITHUB_WORKSPACE" \
-              --commit-task "$HEAD_SHA"
-          )
-          case "$TASK_ID" in
-            none|TASK-*)
-              ;;
-            *)
-              echo "::error::commit task read-back returned an invalid token"
-              exit 1
-              ;;
-          esac
-
-          CANDIDATES="$RUNNER_TEMP/pull-candidates-before.json"
-          gh api --method GET --paginate --slurp \
-            "/repos/$GITHUB_REPOSITORY/pulls" \
-            -f state=open \
-            -f "head=$GITHUB_REPOSITORY_OWNER:$BRANCH" \
-            -f per_page=100 > "$CANDIDATES"
-          PR_NUMBER=$(
-            python scripts/agent_pr_identity.py \
-              --repo-root "$GITHUB_WORKSPACE" \
-              --pull-list "$CANDIDATES" \
-              --allow-zero
-          )
-          if [ "$PR_NUMBER" = "none" ]; then
-            TITLE=$(git log -1 --pretty=%s)
-            BODY="$RUNNER_TEMP/pull-request-body.md"
-            : > "$BODY"
-            if [ "$TASK_ID" != "none" ]; then
-              printf 'Task: %s\n\n' "$TASK_ID" >> "$BODY"
-            fi
-            printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required exact-head checks are attached by push workflows.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n' "$BRANCH" >> "$BODY"
-            gh pr create \
-              --repo "$GITHUB_REPOSITORY" \
-              --head "$BRANCH" \
-              --base main \
-              --title "$TITLE" \
-              --body-file "$BODY"
-          fi
-
-          CANDIDATES="$RUNNER_TEMP/pull-candidates-after.json"
-          gh api --method GET --paginate --slurp \
-            "/repos/$GITHUB_REPOSITORY/pulls" \
-            -f state=open \
-            -f "head=$GITHUB_REPOSITORY_OWNER:$BRANCH" \
-            -f per_page=100 > "$CANDIDATES"
-          PR_NUMBER=$(
-            python scripts/agent_pr_identity.py \
-              --repo-root "$GITHUB_WORKSPACE" \
-              --pull-list "$CANDIDATES"
-          )
-          case "$PR_NUMBER" in
-            ""|*[!0-9]*)
-              echo "::error::validated PR number is not numeric"
-              exit 1
-              ;;
-          esac
-
-          PULL_REQUEST="$RUNNER_TEMP/pull-request.json"
-          gh api --method GET \
-            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$PULL_REQUEST"
-          VALIDATED_NUMBER=$(
-            python scripts/agent_pr_identity.py \
-              --repo-root "$GITHUB_WORKSPACE" \
-              --pull-request "$PULL_REQUEST" \
-              --expected-repository "$GITHUB_REPOSITORY" \
-              --expected-number "$PR_NUMBER" \
-              --expected-base-ref main \
-              --expected-head-ref "$BRANCH" \
-              --expected-head-oid "$HEAD_SHA" \
-              --expected-author 'github-actions[bot]'
-          )
-          if [ "$VALIDATED_NUMBER" != "$PR_NUMBER" ]; then
-            echo "::error::fixed PR read-back did not preserve the selected number"
-            exit 1
-          fi
-          echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"
+          python3 scripts/ci/agent_pr.py \
+            --repo-root "$GITHUB_WORKSPACE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --branch "$BRANCH" \
+            --head-sha "$HEAD_SHA" \
+            --github-output "$GITHUB_OUTPUT"

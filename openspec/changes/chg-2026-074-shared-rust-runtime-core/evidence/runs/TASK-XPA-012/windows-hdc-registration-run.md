@@ -42,7 +42,7 @@ published identities, checked twice:
 2. on the captured bytes, after the content and signature inspection and before anything is
    published: the same refusal, the staging copy removed.
 
-`WINDOWS_HDC_TUPLES` is empty, so the daemon refuses every `hdc.exe`. When TASK-WHR-002 adds a
+At this run `WINDOWS_HDC_TUPLES` was empty, so the daemon refused every `hdc.exe`. When TASK-WHR-002 adds a
 registered entry, that executable registers with no other change.
 
 ## Delegated minor decisions (pending the next rulings batch)
@@ -92,3 +92,13 @@ no HDC registers end to end on Windows.
 ## Local checks
 
 See the commit message.
+
+## Since: the registered tuple (CHG-2026-078 TASK-WHR-002)
+
+TASK-WHR-002 filled `WINDOWS_HDC_TUPLES` with DevEco Studio 26.0.0.43's `hdc.exe` (c2, `3.2.0g`,
+SHA-256 `c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e`) and no other entry.
+With no change to this slice, registration now admits exactly that executable. Every other
+`hdc.exe` is still refused as above, and the tests here, whose `hdc.exe` is not that executable,
+are unchanged. `bootstrap_readers::windows_hdc_identity` holds the admission:
+- c2 is admitted with `3.2.0g` and no profile;
+- candidate 1, the macOS tools and an upper-cased digest are not.

@@ -13,8 +13,8 @@
 //!   - what Windows cannot hold is refused with zero dispatch and writes
 //!     nothing: an absent package, and a package whose daemon is not signed
 //!     as this (unsigned) daemon is; an absent `hdc.exe`, and a real one,
-//!     since no Windows HDC tuple is registered (`WINDOWS_HDC_TUPLES` is
-//!     empty, CHG-2026-078); a macOS-spelled path; and an absent bundle, tool
+//!     since the stand-in is no registered Windows HDC tuple
+//!     (`WINDOWS_HDC_TUPLES` holds DevEco's `hdc.exe` only, CHG-2026-078); a macOS-spelled path; and an absent bundle, tool
 //!     or toolchain;
 //!   - the registry reads back the same after a restart.
 //! * Through the real CLI against a copy of the daemon signed with the

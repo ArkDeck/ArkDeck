@@ -159,8 +159,9 @@ pub struct Host {
     /// Where the files a device-bound Job receives land: Swift's
     /// `HDCObservationProviderAdapter` default,
     /// `FileManager.default.temporaryDirectory/arkdeck-receive`, which the
-    /// receive argv, and so the plan digest, names.
-    #[cfg(target_os = "macos")]
+    /// receive argv, and so the plan digest, names. On Windows the account's
+    /// temporary directory (`GetTempPath2`), the platform's equivalent.
+    #[cfg(any(target_os = "macos", windows))]
     receive_root: std::path::PathBuf,
     #[cfg(any(target_os = "macos", windows))]
     default_mutation_root: Option<std::path::PathBuf>,
@@ -223,11 +224,16 @@ pub struct Host {
     /// the native RockUSB identity and the live probe over this host's HDC.
     #[cfg(any(target_os = "macos", windows))]
     flash_facts: Option<std::sync::Arc<arkdeck_hoststore::FlashHostFacts>>,
-    /// Test builds on Windows only: the in-process fake HDC the Flash host
-    /// facts oracle replay probes over (`tests/spawning`). No Windows daemon
-    /// composes an HDC until its tuple is registered.
+    /// Test builds on Windows only (`tests/spawning`): an in-process fake HDC
+    /// and the tool digest it answers as, which the Flash host facts replay
+    /// probes over and the signed test daemon (`signed_daemon.rs`) composes.
+    /// The production Windows daemon has no such seam: it composes an HDC
+    /// only for a registered Windows HDC tuple.
     #[cfg(all(windows, test))]
-    flash_test_hdc: Option<std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>>,
+    test_hdc: Option<(
+        std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+        String,
+    )>,
     /// What a Flash `job.plan` reads beyond the Artifact and Import owners
     /// and those facts: the ArkForge provider's availability, the Rockchip
     /// dispatcher's reason and the lane's toolchain, as Swift's daemon
@@ -281,11 +287,8 @@ impl Host {
         let Some(jobs) = &self.jobs else {
             return Ok(None);
         };
-        let recovered = arkdeck_hoststore::recover_active_jobs(
-            jobs,
-            self.capabilities.as_deref(),
-            arkdeck_hoststore::runtime_now,
-        )?;
+        let recovered =
+            arkdeck_hoststore::recover_active_jobs(jobs, self.capabilities.as_deref(), clock_now)?;
         // Recovery answered which records it could not read; `doctor` says so
         // rather than reading them again.
         let _ = self.quarantined.set(recovered.quarantined.clone());
@@ -358,11 +361,14 @@ impl Host {
         self
     }
     /// The Job planner over this Windows composition's owners, as macOS
-    /// builds it: the Artifact and Import owners, the analyzers and the
-    /// workspace provider, and no HDC provider (it waits for the Windows HDC
-    /// tuple's registration).
+    /// builds it: the Artifact and Import owners, the analyzers, the
+    /// workspace provider and the HDC composition, where one is composed.
     #[cfg(windows)]
-    fn planner<'a>(&'a self, state_root: &'a std::path::Path) -> arkdeck_hoststore::JobPlanner<'a> {
+    fn planner<'a>(
+        &'a self,
+        state_root: &'a std::path::Path,
+        hdc: Option<&'a arkdeck_hoststore::HdcComposition<'a>>,
+    ) -> arkdeck_hoststore::JobPlanner<'a> {
         arkdeck_hoststore::JobPlanner {
             imports: self.imports.as_deref(),
             artifacts: self.artifacts.as_deref(),
@@ -371,7 +377,7 @@ impl Host {
                 .as_ref()
                 .map(|(_, analyzers)| analyzers as &dyn arkdeck_hoststore::AnalyzerComposition),
             state_root,
-            hdc: None,
+            hdc,
             workspace: self.workspace.as_deref(),
         }
     }
@@ -386,7 +392,7 @@ impl Host {
     #[cfg(any(target_os = "macos", windows))]
     pub fn collect_expired_artifacts(&self) -> Option<Result<Vec<String>, String>> {
         let (jobs, artifacts) = (self.jobs.as_ref()?, self.artifacts.as_ref()?);
-        Some(match arkdeck_hoststore::runtime_now() {
+        Some(match clock_now() {
             Some(now) => arkdeck_hoststore::collect_expired_artifacts(jobs, artifacts, &now),
             None => Err("the Runtime clock is unavailable".into()),
         })
@@ -465,16 +471,13 @@ impl Host {
     }
     /// The HDC the Target observation owner dispatches through: the
     /// development or managed HDC this composition registered. On Windows
-    /// that is only a registered HDC tuple's managed server, and no Windows
-    /// HDC tuple is registered yet (its integration change waits for the
-    /// maintainer's samples; the gate inventory's G06, G07 and G17a), so the
-    /// Target observation owner observes nothing, dispatches nothing and
-    /// refuses every adoption before admission (`target_adopt`).
+    /// that is only a registered HDC tuple's managed server (CHG-2026-078);
+    /// without one the Target observation owner observes nothing, dispatches
+    /// nothing and refuses every adoption before admission (`target_adopt`).
     #[cfg(any(target_os = "macos", windows))]
     fn hdc_dispatch(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
-        self.hdc
-            .as_deref()
-            .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
+        self.job_hdc()
+            .map(|(hdc, _)| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
     }
     /// Runs `run` over the Target observation owner's sources — the
     /// development HDC, the USB relations, the Target store and the clock —
@@ -491,13 +494,13 @@ impl Host {
     }
     /// The Target observation owner an execution that names no target
     /// observes through, when this composition has its sources.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn observing(&self) -> Option<arkdeck_hoststore::Observing<'_>> {
-        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+        let ((dispatch, _), targets) = (self.job_hdc()?, self.targets.as_ref()?);
         Some(arkdeck_hoststore::Observing {
             owner: &self.target_observations,
             sources: arkdeck_hoststore::Sources {
-                dispatch: &**dispatch,
+                dispatch,
                 relations: &*self.usb,
                 targets,
                 now: &utc_now,
@@ -592,16 +595,73 @@ impl Host {
         run(Some(&source))
     }
 
-    #[cfg(target_os = "macos")]
-    fn hdc(&self) -> Option<arkdeck_hoststore::HdcComposition<'_>> {
-        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+    /// The HDC composition device-bound Jobs plan, admit, run and reconcile
+    /// through: this composition's development HDC over its Target store. On
+    /// Windows that HDC exists only as a registered tuple's managed server
+    /// (`windows_hdc_gate`, CHG-2026-078).
+    #[cfg(any(target_os = "macos", windows))]
+    pub(crate) fn hdc(&self) -> Option<arkdeck_hoststore::HdcComposition<'_>> {
+        let ((dispatch, tool_sha256), targets) = (self.job_hdc()?, self.targets.as_ref()?);
         Some(arkdeck_hoststore::HdcComposition {
             targets,
-            dispatch: &**dispatch,
+            dispatch,
             receive_root: Some(&self.receive_root),
-            tool_sha256: dispatch.tool_sha256(),
-            now: arkdeck_hoststore::runtime_now,
+            tool_sha256,
+            now: clock_now,
             code_sign_helper: self.code_sign_helper.as_ref(),
+        })
+    }
+
+    /// Whether the HDC [`Self::job_hdc`] names still verifies, without
+    /// launching anything (a test's fake always does).
+    #[cfg(any(target_os = "macos", windows))]
+    fn hdc_tool_current(&self) -> bool {
+        #[cfg(all(windows, test))]
+        if self.test_hdc.is_some() {
+            return true;
+        }
+        self.hdc
+            .as_ref()
+            .is_some_and(|dispatch| dispatch.tool_identity_current())
+    }
+
+    /// The HDC this composition's Jobs and Target owners dispatch through,
+    /// with the tool digest it answers as: the development or managed HDC,
+    /// or, in a Windows test build, the in-process fake a test composed
+    /// first (`with_test_hdc`; the production daemon has no such seam).
+    #[cfg(any(target_os = "macos", windows))]
+    fn job_hdc(&self) -> Option<(&(dyn arkdeck_provider_hdc::HdcDispatch + Sync), &str)> {
+        #[cfg(all(windows, test))]
+        if let Some((fake, tool_sha256)) = &self.test_hdc {
+            return Some((&**fake, tool_sha256));
+        }
+        self.hdc.as_deref().map(|hdc| {
+            (
+                hdc as &(dyn arkdeck_provider_hdc::HdcDispatch + Sync),
+                hdc.tool_sha256(),
+            )
+        })
+    }
+
+    /// [`Self::job_hdc`] held beyond this borrow, for a Job run in the
+    /// background.
+    #[cfg(windows)]
+    fn owned_job_hdc(
+        &self,
+    ) -> Option<(
+        std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+        String,
+    )> {
+        #[cfg(test)]
+        if let Some((fake, tool_sha256)) = &self.test_hdc {
+            return Some((fake.clone(), tool_sha256.clone()));
+        }
+        self.hdc.as_ref().map(|hdc| {
+            let sha256 = hdc.tool_sha256().to_owned();
+            (
+                hdc.clone() as std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+                sha256,
+            )
         })
     }
 
@@ -743,7 +803,7 @@ impl Host {
                     dispatch: &**dispatch,
                     receive_root: Some(&receive_root),
                     tool_sha256: dispatch.tool_sha256(),
-                    now: arkdeck_hoststore::runtime_now,
+                    now: clock_now,
                     code_sign_helper: helper.as_ref(),
                 }),
                 _ => None,
@@ -773,8 +833,8 @@ impl Host {
                     analyzer: Some(&analyzer),
                     quota: ARTIFACT_QUOTA,
                     home: &home,
-                    now: arkdeck_hoststore::runtime_now,
-                    precise_now: arkdeck_hoststore::runtime_precise_now,
+                    now: clock_now,
+                    precise_now: clock_precise_now,
                     sessions: publisher.as_ref(),
                     cancellation: Some(&slot.cancellation),
                     after_commit: None,
@@ -835,8 +895,8 @@ impl Host {
     }
     /// Swift `startJob` on Windows: the owned Job runs in the background in
     /// the slot every `job.run` and `job.cancel` of it meets, through the
-    /// runner `job.run` composes here (the composed analyzers and workspace
-    /// provider, and no HDC), and its end is reported to the execution.
+    /// runner `job.run` composes here (the composed analyzers, workspace
+    /// provider and HDC), and its end is reported to the execution.
     #[cfg(windows)]
     fn start_agent_run(&self, start: arkdeck_hoststore::AgentStart) {
         let (Some(agents), Some(jobs), Some(artifacts), Some(planning)) = (
@@ -858,6 +918,9 @@ impl Host {
         let holds = self.holds.clone();
         let imports = self.imports.clone();
         let targets = self.targets.clone();
+        let dispatch = self.owned_job_hdc();
+        let receive_root = self.receive_root.clone();
+        let helper = self.code_sign_helper.clone();
         let flash_runtime = self.flash_runtime.clone();
         let flash_planning = self.flash_planning.clone();
         let flash_facts = self.flash_facts.clone();
@@ -889,10 +952,23 @@ impl Host {
                         holds: &holds,
                     },
                 );
+            let hdc = match (&dispatch, &targets) {
+                (Some((dispatch, tool_sha256)), Some(targets)) => {
+                    Some(arkdeck_hoststore::HdcComposition {
+                        targets,
+                        dispatch: &**dispatch,
+                        receive_root: Some(&receive_root),
+                        tool_sha256,
+                        now: clock_now,
+                        code_sign_helper: helper.as_ref(),
+                    })
+                }
+                _ => None,
+            };
             let params =
                 serde_json::Map::from_iter([("jobId".into(), serde_json::json!(start.job))]);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                // The Flash lane as `job.run` runs it (no HDC to probe over).
+                // The Flash lane as `job.run` runs it.
                 let facts_port = |target: &str| {
                     flash_facts
                         .as_ref()
@@ -901,7 +977,9 @@ impl Host {
                             targets
                                 .as_deref()
                                 .ok_or("Target owner is absent".to_owned())?,
-                            None,
+                            dispatch
+                                .as_ref()
+                                .map(|(hdc, _)| &**hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
                             target,
                         )
                 };
@@ -931,6 +1009,7 @@ impl Host {
                         publisher.as_ref(),
                         Some(&slot.cancellation),
                         workspace.as_deref(),
+                        hdc.as_ref(),
                     ),
                     flash,
                 }
@@ -1034,7 +1113,7 @@ impl Host {
             projects,
             state_root,
             &self.home,
-            arkdeck_hoststore::runtime_now,
+            clock_now,
             &resolve,
             signing,
             symbolizer.map(|path| path.to_string_lossy()).as_deref(),
@@ -1221,7 +1300,7 @@ impl Host {
                 workspace: self.workspace.as_deref(),
             },
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         let accepted = match self.with_flash_admitter(admitter, |admitter| admitter.submit(request))
@@ -1282,7 +1361,8 @@ impl Host {
     }
 
     /// Swift's ArkForge facts port on Windows: the Target store's facts over
-    /// no HDC (none is composed until the Windows HDC tuple is registered).
+    /// the HDC the Flash facts probe (composed only for the registered
+    /// Windows HDC tuple's executable, as the root's managed server).
     #[cfg(windows)]
     fn flash_facts_port(
         &self,
@@ -1290,7 +1370,7 @@ impl Host {
         let (Some(facts), Some(targets)) = (&self.flash_facts, &self.targets) else {
             return None;
         };
-        Some(move |target_id: &str| facts.current_facts(targets, None, target_id))
+        Some(move |target_id: &str| facts.current_facts(targets, self.flash_hdc(), target_id))
     }
 
     /// The Windows `job.plan` planner: the Job planner with the Flash
@@ -1302,8 +1382,9 @@ impl Host {
     ) -> Option<T> {
         let (state_root, _) = self.planning.as_ref()?;
         let facts = self.flash_facts_port();
+        let hdc = self.hdc();
         Some(run(&arkdeck_hoststore::FlashPlanner {
-            planner: self.planner(state_root),
+            planner: self.planner(state_root, hdc.as_ref()),
             flash: self.flash_planning.as_deref(),
             facts: facts
                 .as_ref()
@@ -1340,8 +1421,8 @@ impl Host {
         })
     }
 
-    /// The HDC the Flash facts probe over: this host's (on Windows none
-    /// until its HDC tuple is registered).
+    /// The HDC the Flash facts probe over: this host's (on Windows only a
+    /// registered tuple's managed server).
     #[cfg(any(target_os = "macos", all(windows, not(test))))]
     fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
         self.hdc
@@ -1353,8 +1434,8 @@ impl Host {
     /// composed (`tests/spawning`), else this host's.
     #[cfg(all(windows, test))]
     fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
-        match &self.flash_test_hdc {
-            Some(fake) => Some(fake.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch),
+        match &self.test_hdc {
+            Some((fake, _)) => Some(fake.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch),
             None => self
                 .hdc
                 .as_deref()
@@ -1362,16 +1443,31 @@ impl Host {
         }
     }
 
-    /// Test builds on Windows only: the Flash facts probe over `hdc`, a fake
-    /// (TASK-XPA-010). The production Windows daemon has no such seam.
+    /// Test builds on Windows only: the fake HDC `hdc`, answering as the tool
+    /// whose digest is `tool_sha256`, is this host's (see `test_hdc`). The
+    /// production Windows daemon has no such seam.
     #[cfg(all(windows, test))]
     #[allow(dead_code)]
-    pub fn with_flash_test_hdc(
+    pub fn with_test_hdc(
         mut self,
         hdc: std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>,
+        tool_sha256: &str,
     ) -> Self {
-        self.flash_test_hdc = Some(hdc);
+        self.test_hdc = Some((hdc, tool_sha256.to_owned()));
         self
+    }
+
+    /// Test builds on Windows only: the fake HDC and its tool digest, when a
+    /// test composed one ([`Self::with_test_hdc`]).
+    #[cfg(all(windows, test))]
+    #[allow(dead_code)]
+    pub(crate) fn test_hdc(&self) -> Option<(&dyn arkdeck_provider_hdc::HdcDispatch, &str)> {
+        self.test_hdc.as_ref().map(|(hdc, sha)| {
+            (
+                hdc.as_ref() as &dyn arkdeck_provider_hdc::HdcDispatch,
+                sha.as_str(),
+            )
+        })
     }
 
     /// `flash.bind-current-loader` binds through this owner, against this
@@ -1548,6 +1644,8 @@ impl Host {
             #[cfg(target_os = "macos")]
             receive_root: arkdeck_platform::foundation_temporary_directory()
                 .join("arkdeck-receive"),
+            #[cfg(windows)]
+            receive_root: std::env::temp_dir().join("arkdeck-receive"),
             #[cfg(target_os = "macos")]
             default_mutation_root: arkdeck_platform::runtime_home()
                 .map(std::path::PathBuf::from)
@@ -1584,7 +1682,7 @@ impl Host {
             #[cfg(any(target_os = "macos", windows))]
             flash_facts: None,
             #[cfg(all(windows, test))]
-            flash_test_hdc: None,
+            test_hdc: None,
             #[cfg(any(target_os = "macos", windows))]
             flash_planning: None,
             #[cfg(any(target_os = "macos", windows))]
@@ -1653,8 +1751,9 @@ impl Host {
 /// The Job runner a Windows composition runs a Job with (`job.run`, an
 /// agent execution's owned Job and `job.reconcile`'s finalization): the Job,
 /// Artifact and Import owners, the analyzers the planning composed, the
-/// Session publication writer, the mutation authority and the workspace
-/// provider, with no HDC composition (no Windows HDC tuple is registered).
+/// Session publication writer, the mutation authority, the workspace
+/// provider and the HDC composition, where one is composed (only over a
+/// registered Windows HDC tuple's managed server).
 /// One argument per owner, as the runner's own fields are: the background
 /// run passes its own clones.
 #[cfg(windows)]
@@ -1669,6 +1768,7 @@ fn windows_runner<'a>(
     sessions: Option<&'a arkdeck_hoststore::SessionPublisher<'a>>,
     cancellation: Option<&'a arkdeck_hoststore::RunCancellation>,
     workspace: Option<&'a arkdeck_hoststore::WorkspaceComposition>,
+    hdc: Option<&'a arkdeck_hoststore::HdcComposition<'a>>,
 ) -> arkdeck_hoststore::JobRunner<'a> {
     arkdeck_hoststore::JobRunner {
         imports,
@@ -1681,21 +1781,21 @@ fn windows_runner<'a>(
         analyzer: Some(analyzers),
         quota: ARTIFACT_QUOTA,
         home,
-        now: arkdeck_hoststore::runtime_now,
-        precise_now: arkdeck_hoststore::runtime_precise_now,
+        now: clock_now,
+        precise_now: clock_precise_now,
         sessions,
         cancellation,
         after_commit: None,
-        hdc: None,
+        hdc,
         workspace,
     }
 }
 
 impl HostServices for Host {
-    /// `operation.list` on Windows: the macOS report with this composition's
-    /// owners — the planner, the Job and Artifact owners, the composed
-    /// analyzers and workspace provider, and no HDC.
-    #[cfg(windows)]
+    /// `operation.list`: the availability of each operation over this
+    /// composition's owners, its HDC included (on Windows only a registered
+    /// tuple's managed server).
+    #[cfg(any(target_os = "macos", windows))]
     fn operation_availability(
         &self,
         reference: &str,
@@ -1712,36 +1812,7 @@ impl HostServices for Host {
                     .planning
                     .as_ref()
                     .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
-                // No Windows HDC tuple is registered.
-                hdc_registered: false,
-                mutation_owner: self
-                    .authority()
-                    .zip(self.jobs.as_deref())
-                    .is_some_and(|(authority, jobs)| authority.state_proven_now(jobs)),
-                code_sign_helper: false,
-                hdc_tool_current: false,
-                workspace: self.workspace.as_deref(),
-            },
-        )
-    }
-    #[cfg(target_os = "macos")]
-    fn operation_availability(
-        &self,
-        reference: &str,
-        provider: &str,
-    ) -> Option<Vec<(&'static str, String)>> {
-        arkdeck_hoststore::operation_unavailability(
-            reference,
-            provider,
-            &arkdeck_hoststore::OperationAvailabilityContext {
-                planning_owner: self.planning.is_some(),
-                job_owner: self.jobs.is_some(),
-                artifacts: self.artifacts.is_some(),
-                analyzer: self
-                    .planning
-                    .as_ref()
-                    .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
-                hdc_registered: self.hdc.is_some() && self.targets.is_some(),
+                hdc_registered: self.job_hdc().is_some() && self.targets.is_some(),
                 mutation_owner: self
                     .authority()
                     .zip(self.jobs.as_deref())
@@ -1752,9 +1823,7 @@ impl HostServices for Host {
                 hdc_tool_current: if provider == "hdc"
                     && arkdeck_hoststore::hdc_operation_runs(reference)
                 {
-                    self.hdc
-                        .as_ref()
-                        .is_some_and(|dispatch| dispatch.tool_identity_current())
+                    self.hdc_tool_current()
                 } else {
                     false
                 },
@@ -2027,7 +2096,7 @@ impl HostServices for Host {
                 workspace: self.workspace.as_deref(),
             },
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         // An execution's request is admitted as `job.submit` admits it: a
@@ -2038,7 +2107,7 @@ impl HostServices for Host {
                     targets,
                     jobs,
                     admitter,
-                    now: arkdeck_hoststore::runtime_precise_now,
+                    now: clock_precise_now,
                     observations: self.observing(),
                 };
                 agents.advance(method, params, &engine)
@@ -2075,9 +2144,9 @@ impl HostServices for Host {
     /// `agent.run`, `agent.status`, `agent.list`, `agent.abandon`,
     /// `agent.resume` and `human-action.resume` on Windows: the agent
     /// execution owner over the Target, Job and Artifact owners, admitting an
-    /// execution's request as `job.submit` admits it here. No Target is
-    /// observed (no Windows HDC tuple is registered); a resume reference
-    /// names an execution's action, or a control action's impact approval.
+    /// execution's request as `job.submit` admits it here, observing Targets
+    /// over the composed HDC; a resume reference names an execution's action,
+    /// or a control action's impact approval.
     #[cfg(windows)]
     fn agent_execution(
         &self,
@@ -2110,18 +2179,19 @@ impl HostServices for Host {
                 ])),
             });
         };
+        let hdc = self.hdc();
         let admitter = arkdeck_hoststore::JobAdmitter {
-            planner: self.planner(state_root),
+            planner: self.planner(state_root, hdc.as_ref()),
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         let engine = arkdeck_hoststore::AgentEngine {
             targets,
             jobs,
             admitter: &admitter,
-            now: arkdeck_hoststore::runtime_precise_now,
-            observations: None,
+            now: clock_precise_now,
+            observations: self.observing(),
         };
         let answer = agents
             .advance(method, params, &engine)
@@ -2310,6 +2380,35 @@ impl HostServices for Host {
             .handle_resource(method, params)
     }
     #[cfg(target_os = "macos")]
+    fn app_job_recovery_allowed(&self, job_id: &str, resume: bool) -> bool {
+        let Some(jobs) = &self.jobs else {
+            return false;
+        };
+        let Ok(record) = jobs.read_snapshot(job_id) else {
+            return false;
+        };
+        let Ok(value) = record.value() else {
+            return false;
+        };
+        let eligible = if resume {
+            record.state == "resumeAtConfirmedSafeBoundary" && value["outcomeUnknown"] == false
+        } else {
+            record.state == "waitingForRecovery"
+        };
+        // Admission may materialize the working request. The immutable
+        // original submission retains the App's closed caller vocabulary.
+        let request = value
+            .get("originalSubmissionRequest")
+            .filter(|value| value.is_object())
+            .unwrap_or(&record.request);
+        eligible
+            && serde_json::to_string(request)
+                .ok()
+                .and_then(|request| crate::app_ingress::jobs::kind(&request))
+                .is_some()
+    }
+
+    #[cfg(target_os = "macos")]
     fn job_plan(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
@@ -2356,7 +2455,7 @@ impl HostServices for Host {
     }
     /// `job.submit` on Windows: the Job admitter over the Job store, its
     /// idempotency lookup and admission interlock included, with the
-    /// planner above and no capability authority, under the Flash admission.
+    /// planner above and the capability authority, under the Flash admission.
     #[cfg(windows)]
     fn job_submit(
         &self,
@@ -2369,12 +2468,12 @@ impl HostServices for Host {
                 details: None,
             });
         };
+        let hdc = self.hdc();
         let admitter = arkdeck_hoststore::JobAdmitter {
-            planner: self.planner(state_root),
+            planner: self.planner(state_root, hdc.as_ref()),
             jobs,
-            now: arkdeck_hoststore::runtime_now,
-            // No mutation authority is composed on Windows yet.
-            authority: None,
+            now: clock_now,
+            authority: self.authority(),
         };
         // A Flash is judged through the Flash admission (TASK-XPA-010).
         self.with_flash_admitter(admitter, |admitter| admitter.handle(params))
@@ -2416,7 +2515,7 @@ impl HostServices for Host {
                 workspace: self.workspace.as_deref(),
             },
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             authority: self.authority(),
         };
         self.with_flash_admitter(admitter, |admitter| admitter.handle(params))
@@ -2467,11 +2566,11 @@ impl HostServices for Host {
         arkdeck_hoststore::JobResultReader { jobs, artifacts }.handle(method, params)
     }
     /// `job.run` on Windows: the macOS run over this composition's owners —
-    /// the Job and Artifact owners and the Session publication writer, no
-    /// HDC composition (no Windows HDC tuple is registered), analyzer or
-    /// workspace provider, and no Flash lane — so a device Job is refused
-    /// before its run with zero dispatch, and every concurrent caller for one
-    /// Job joins its one run, as on macOS.
+    /// the Job and Artifact owners, the Session publication writer, the
+    /// analyzers, the workspace provider, the Flash lane where one is
+    /// installed and the HDC composition where one is composed. Without an
+    /// HDC a device Job is refused before its run with zero dispatch, and
+    /// every concurrent caller for one Job joins its one run, as on macOS.
     #[cfg(windows)]
     fn job_run(
         &self,
@@ -2496,6 +2595,7 @@ impl HostServices for Host {
                     probe: &probe,
                 });
         let facts = self.flash_facts_port();
+        let hdc = self.hdc();
         let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
             // A Flash runs through the executable lane where one is installed
             // (TASK-XPA-010); without it the runner refuses it before its run.
@@ -2511,6 +2611,7 @@ impl HostServices for Host {
                     publisher.as_ref(),
                     cancellation,
                     self.workspace.as_deref(),
+                    hdc.as_ref(),
                 ),
                 flash,
             }
@@ -2601,8 +2702,8 @@ impl HostServices for Host {
                 analyzer: Some(analyzer),
                 quota: ARTIFACT_QUOTA,
                 home: &self.home,
-                now: arkdeck_hoststore::runtime_now,
-                precise_now: arkdeck_hoststore::runtime_precise_now,
+                now: clock_now,
+                precise_now: clock_precise_now,
                 sessions: publisher.as_ref(),
                 cancellation,
                 after_commit: None,
@@ -2748,8 +2849,8 @@ impl HostServices for Host {
                 .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
             quota: ARTIFACT_QUOTA,
             home: &self.home,
-            now: arkdeck_hoststore::runtime_now,
-            precise_now: arkdeck_hoststore::runtime_precise_now,
+            now: clock_now,
+            precise_now: clock_precise_now,
             // A continuation publishes no Session and cancels nothing.
             sessions: None,
             cancellation: None,
@@ -2761,11 +2862,10 @@ impl HostServices for Host {
     }
     /// `cleanupDebt.list` and `cleanupDebt.continue` on Windows: the macOS
     /// answers over this composition's Artifact and Job owners, through the
-    /// runner `job.run` uses here. No HDC composition is built (no Windows
-    /// HDC tuple is registered), so a continuation of a debt the ledger owes
-    /// is refused (`rejected`, the provider unavailable) after the ledger and
-    /// the Job are read and before any readback or retry is sent; nothing is
-    /// written to the ledger.
+    /// runner `job.run` uses here. Without an HDC composition a continuation
+    /// of a debt the ledger owes is refused (`rejected`, the provider
+    /// unavailable) after the ledger and the Job are read and before any
+    /// readback or retry is sent; nothing is written to the ledger.
     #[cfg(windows)]
     fn cleanup_debt(
         &self,
@@ -2791,6 +2891,7 @@ impl HostServices for Host {
             return Err(foundation());
         };
         // A continuation publishes no Session and cancels nothing.
+        let hdc = self.hdc();
         windows_runner(
             state_root,
             jobs,
@@ -2801,6 +2902,7 @@ impl HostServices for Host {
             None,
             None,
             self.workspace.as_deref(),
+            hdc.as_ref(),
         )
         .continue_cleanup_debt(params)
     }
@@ -2834,7 +2936,7 @@ impl HostServices for Host {
         let cancel = || {
             arkdeck_hoststore::JobCanceller {
                 jobs,
-                now: arkdeck_hoststore::runtime_now,
+                now: clock_now,
                 sessions: publisher.as_ref(),
             }
             .handle(params)
@@ -2932,8 +3034,8 @@ impl HostServices for Host {
                     analyzer: Some(analyzer),
                     quota: ARTIFACT_QUOTA,
                     home: &self.home,
-                    now: arkdeck_hoststore::runtime_now,
-                    precise_now: arkdeck_hoststore::runtime_precise_now,
+                    now: clock_now,
+                    precise_now: clock_precise_now,
                     sessions: publisher.as_ref(),
                     cancellation: None,
                     after_commit: None,
@@ -2944,7 +3046,7 @@ impl HostServices for Host {
             jobs,
             artifacts,
             imports: self.imports.as_deref(),
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             sessions: publisher.as_ref(),
             hdc: hdc.as_ref(),
             capabilities: self.capabilities.as_deref(),
@@ -2960,9 +3062,10 @@ impl HostServices for Host {
     }
     /// `job.reconcile` on Windows: the macOS reconciler over this
     /// composition's owners, with the Session publication writer and the
-    /// runner its runs use, and no HDC composition (no Windows HDC tuple is
-    /// registered) or Flash lane. A Job a run of this owner holds is decided
-    /// by that run alone, and a concurrent reconcile joins the one under way.
+    /// runner its runs use, the HDC composition where one is composed, and
+    /// the Flash lane where one is installed. A Job a run of this owner holds
+    /// is decided by that run alone, and a concurrent reconcile joins the one
+    /// under way.
     #[cfg(windows)]
     fn job_reconcile(
         &self,
@@ -2984,6 +3087,7 @@ impl HostServices for Host {
                     claims: &self.claims,
                     probe: &probe,
                 });
+        let hdc = self.hdc();
         let runner = self.planning.as_ref().map(|planning| {
             windows_runner(
                 planning,
@@ -2995,15 +3099,16 @@ impl HostServices for Host {
                 publisher.as_ref(),
                 None,
                 self.workspace.as_deref(),
+                hdc.as_ref(),
             )
         });
         let reconciler = arkdeck_hoststore::JobReconciler {
             jobs,
             artifacts,
             imports: self.imports.as_deref(),
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             sessions: publisher.as_ref(),
-            hdc: None,
+            hdc: hdc.as_ref(),
             capabilities: self.capabilities.as_deref(),
             runner: runner.as_ref(),
         };
@@ -3379,7 +3484,7 @@ impl HostServices for Host {
                 (None, _) => Err(unverified()),
             };
             #[cfg(target_os = "macos")]
-            let now = || arkdeck_hoststore::runtime_now().unwrap_or_default();
+            let now = || clock_now().unwrap_or_default();
             // The same whole-second UTC spelling.
             #[cfg(windows)]
             let now = utc_now;
@@ -3608,7 +3713,7 @@ impl HostServices for Host {
                 params,
                 &arkdeck_hoststore::InvocationBroker {
                     plan: &|request| planner.plan(request),
-                    now: &arkdeck_hoststore::runtime_now,
+                    now: &clock_now,
                     mint: &|| fresh_id().ok().map(|id| format!("debug-{id}")),
                     execute: &|request| self.debug_attempt(request),
                 },
@@ -4048,7 +4153,40 @@ pub(crate) fn toolchain_pinning(
     })
 }
 
+/// The Runtime clock the Host's owners read: the system's, or, in a Windows
+/// test build whose process took one, the fixed clock a test chose
+/// ([`TEST_CLOCK`]).
+#[cfg(all(any(target_os = "macos", windows), not(all(windows, test))))]
+use arkdeck_hoststore::{runtime_now as clock_now, runtime_precise_now as clock_precise_now};
+
+/// Test builds on Windows only: the fixed clock (`now`, `precise now`) a
+/// process of the signed test daemon (`tests/spawning/signed_daemon.rs`)
+/// takes before it composes anything, so a replay of a Swift oracle reads the
+/// oracle's own clock. The production daemon has no such clock.
+#[cfg(all(windows, test))]
+pub(crate) static TEST_CLOCK: std::sync::OnceLock<(String, String)> = std::sync::OnceLock::new();
+
+#[cfg(all(windows, test))]
+fn clock_now() -> Option<String> {
+    match TEST_CLOCK.get() {
+        Some((now, _)) => Some(now.clone()),
+        None => arkdeck_hoststore::runtime_now(),
+    }
+}
+
+#[cfg(all(windows, test))]
+fn clock_precise_now() -> Option<String> {
+    match TEST_CLOCK.get() {
+        Some((_, precise)) => Some(precise.clone()),
+        None => arkdeck_hoststore::runtime_precise_now(),
+    }
+}
+
 pub(crate) fn utc_now() -> String {
+    #[cfg(all(windows, test))]
+    if let Some((now, _)) = TEST_CLOCK.get() {
+        return now.clone();
+    }
     timestamp(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)

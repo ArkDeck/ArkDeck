@@ -266,7 +266,8 @@ impl<'a> HdcStatusObserver<'a> {
                         && generation(receipt).and_then(|value| i64::try_from(value).ok())
                             == Some(observed)
                         && receipt.executable_sha256 == self.executable.sha256
-                        && receipt.executable_path == Path::new(&self.executable.path)
+                        && plain_path(&receipt.executable_path)
+                            == plain_path(Path::new(&self.executable.path))
                         && receipt.endpoint.to_string() == self.startup.endpoint
                 });
                 let Some(receipt) = matching else {
@@ -443,6 +444,20 @@ impl CommandlessIdentity {
     }
 }
 
+/// A path in Windows' plain `X:\…` spelling: its verbatim `\\?\` prefix, if
+/// any, removed. Elsewhere the path as it is. A Windows server receipt names
+/// its image as the platform reads it, which may be either spelling of the
+/// same file (measured 2026-10-04 with the registered DevEco `hdc.exe` below
+/// `C:\Program Files\…`, CHG-2026-078 c2), so a receipt is compared with a
+/// configured or canonical path in this one spelling; the digest still
+/// names the bytes.
+fn plain_path(path: &Path) -> std::path::PathBuf {
+    match path.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+        Some(plain) => std::path::PathBuf::from(plain),
+        None => path.to_path_buf(),
+    }
+}
+
 impl IdentityObserver for CommandlessIdentity {
     fn observe(&self, executable: &StatusExecutable, endpoint: &str) -> IdentityObservation {
         if Self::family(&executable.sha256, endpoint).is_none() {
@@ -478,14 +493,15 @@ impl IdentityObserver for CommandlessIdentity {
             Ok(Err(error)) => return IdentityObservation::Unknown(error.to_string()),
             Ok(Ok(receipt)) => receipt,
         };
-        // The selected tool's canonical path in the spelling a receipt names
-        // (Windows' plain `X:\…`, never its `\\?\` form).
-        let selected = std::fs::canonicalize(&executable.path).ok().map(|path| {
-            match path.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
-                Some(plain) => std::path::PathBuf::from(plain),
-                None => path,
-            }
-        });
+        // The selected tool's canonical path and the receipt's, both in
+        // Windows' plain `X:\…` spelling: a receipt names the server's image
+        // as the platform reads it, which for an image below a directory
+        // with spaces (DevEco Studio's `C:\Program Files\…`, CHG-2026-078 c2,
+        // measured 2026-10-04) is the `\\?\` form.
+        let selected = std::fs::canonicalize(&executable.path)
+            .ok()
+            .map(|path| plain_path(&path));
+        let observed = plain_path(&receipt.executable_path);
         let generation = generation(&receipt).and_then(|value| i64::try_from(value).ok());
         match generation {
             Some(generation)
@@ -493,7 +509,7 @@ impl IdentityObserver for CommandlessIdentity {
                     && receipt.start_microseconds < 1_000_000
                     && receipt.endpoint == address
                     && receipt.executable_sha256 == executable.sha256
-                    && selected.as_deref() == Some(receipt.executable_path.as_path()) =>
+                    && selected.as_deref() == Some(observed.as_path()) =>
             {
                 IdentityObservation::Observed {
                     generation,

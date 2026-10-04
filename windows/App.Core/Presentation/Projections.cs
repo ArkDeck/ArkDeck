@@ -85,7 +85,10 @@ public sealed record JobSummary(
     string CreatedAtUtc,
     string? FinishedAtUtc,
     string? SessionId = null,
-    string? WorkspaceKind = null)
+    string? WorkspaceKind = null,
+    string? SupersededByRecoveryEpochId = null,
+    string? ResolvedByTargetAliasResolutionId = null,
+    long OutstandingResidueCount = 0)
 {
     /// <summary>The terminal Job states (spec/recovery/job-state-preflight.json, class
     /// "terminal"); every other state counts as active, as the macOS Job Inspector counts.</summary>
@@ -108,7 +111,10 @@ public sealed record JobSummary(
             TypedJson.Required(o, "createdAtUtc", TypedJson.String),
             o.TryGetValue("finishedAtUtc", out var finished) && finished is JsonString f ? f.Value : null,
             o.TryGetValue("sessionId", out var session) && session is JsonString sid ? sid.Value : null,
-            o.TryGetValue("workspaceKind", out var kind) && kind is JsonString k ? k.Value : null);
+            o.TryGetValue("workspaceKind", out var kind) && kind is JsonString k ? k.Value : null,
+            o.TryGetValue("supersededByRecoveryEpochId", out var superseded) && superseded is JsonString se ? se.Value : null,
+            o.TryGetValue("resolvedByTargetAliasResolutionId", out var resolved) && resolved is JsonString re ? re.Value : null,
+            o.TryGetValue("outstandingResidueCount", out var residue) && residue is JsonNumber rn && rn.TryGetInt64(out var count) ? count : 0);
     }
 
     public static IReadOnlyList<JobSummary> ParsePage(JsonValue value)

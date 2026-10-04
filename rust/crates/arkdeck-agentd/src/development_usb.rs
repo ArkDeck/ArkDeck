@@ -208,7 +208,8 @@ impl UsbRelations for DevelopmentUsbRelations {
     }
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
     use serde_json::json;
@@ -327,4 +328,5 @@ mod tests {
             );
         }
     }
+}
 }

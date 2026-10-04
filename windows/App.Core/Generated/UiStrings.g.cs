@@ -1271,6 +1271,73 @@ public static class UiStrings
     public const string HistoryContextOperation = "history.context.operation";
     public const string HistoryContextState = "history.context.state";
     public const string HistoryContextArtifacts = "history.context.artifacts";
+    public const string JobRecoveryActionStillUnknown = "jobRecovery.action.stillUnknown";
+    public const string JobRecoveryActionRebound = "jobRecovery.action.rebound";
+    public const string JobRecoveryActionReconcileDetail = "jobRecovery.action.reconcile.detail";
+    public const string JobRecoveryActionResumeDetail = "jobRecovery.action.resume.detail";
+    public const string JobRecoveryActionWorking = "jobRecovery.action.working";
+    public const string JobRecoveryActionUnconfirmed = "jobRecovery.action.unconfirmed";
+    public const string JobRecoveryActionReconcile = "jobRecovery.action.reconcile";
+    public const string JobRecoveryActionRebindDetail = "jobRecovery.action.rebind.detail";
+    public const string JobRecoveryActionRefused = "jobRecovery.action.refused";
+    public const string JobRecoveryActionResume = "jobRecovery.action.resume";
+    public const string JobRecoveryActionObserved = "jobRecovery.action.observed";
+    public const string JobRecoveryActionRebind = "jobRecovery.action.rebind";
+    public const string OverviewRecordDeviceLabel = "overview.record.device.label";
+    public const string OverviewRecordDeviceNone = "overview.record.device.none";
+    public const string OverviewRecordDeviceNoneDetail = "overview.record.device.noneDetail";
+    public const string OverviewRecordDeviceChoose = "overview.record.device.choose";
+    public const string OverviewRecordBinding = "overview.record.binding";
+    public const string JobRecoveryActionOpenHistory = "jobRecovery.action.openHistory";
+    public const string JobRecoveryCount = "jobRecovery.count";
+    public const string JobRecoveryList = "jobRecovery.list";
+    public const string JobRecoveryArchivePendingGuidance = "jobRecovery.archivePending.guidance";
+    public const string JobRecoveryArchivePendingTitle = "jobRecovery.archivePending.title";
+    public const string JobRecoveryOutcomeUnknownGuidance = "jobRecovery.outcomeUnknown.guidance";
+    public const string JobRecoveryOutcomeUnknownTitle = "jobRecovery.outcomeUnknown.title";
+    public const string JobRecoveryResumeSafeGuidance = "jobRecovery.resumeSafe.guidance";
+    public const string JobRecoveryResumeSafeTitle = "jobRecovery.resumeSafe.title";
+    public const string JobRecoveryWaitingGuidance = "jobRecovery.waiting.guidance";
+    public const string JobRecoveryWaitingTitle = "jobRecovery.waiting.title";
+    public const string DebugArtifactsBatchPhaseFailed = "debug.artifacts.batch.phase.failed";
+    public const string DebugArtifactsBatchPhaseSucceeded = "debug.artifacts.batch.phase.succeeded";
+    public const string DebugArtifactsBatchPhaseStopped = "debug.artifacts.batch.phase.stopped";
+    public const string DebugArtifactsBatchPhaseRunning = "debug.artifacts.batch.phase.running";
+    public const string DebugArtifactsBatchPhaseReview = "debug.artifacts.batch.phase.review";
+    public const string DebugArtifactsBatchPhasePreparing = "debug.artifacts.batch.phase.preparing";
+    public const string DebugArtifactsBatchPhaseIdle = "debug.artifacts.batch.phase.idle";
+    public const string DebugArtifactsBatchRowFailed = "debug.artifacts.batch.row.failed";
+    public const string DebugArtifactsBatchRowSucceeded = "debug.artifacts.batch.row.succeeded";
+    public const string DebugArtifactsBatchRowRunning = "debug.artifacts.batch.row.running";
+    public const string DebugArtifactsBatchRowSubmitting = "debug.artifacts.batch.row.submitting";
+    public const string DebugArtifactsBatchRowPrepared = "debug.artifacts.batch.row.prepared";
+    public const string DebugArtifactsBatchRowPreparing = "debug.artifacts.batch.row.preparing";
+    public const string DebugArtifactsBatchRowPending = "debug.artifacts.batch.row.pending";
+    public const string DebugArtifactsBatchRun = "debug.artifacts.batch.run";
+    public const string DebugArtifactsBatchWarning = "debug.artifacts.batch.warning";
+    public const string DebugArtifactsBatchReview = "debug.artifacts.batch.review";
+    public const string DebugArtifactsBatchStop = "debug.artifacts.batch.stop";
+    public const string DebugArtifactsBatchPrepare = "debug.artifacts.batch.prepare";
+    public const string DebugArtifactsBatchLimit = "debug.artifacts.batch.limit";
+    public const string DebugArtifactsBatchRemove = "debug.artifacts.batch.remove";
+    public const string DebugArtifactsBatchAdd = "debug.artifacts.batch.add";
+    public const string DebugArtifactsBatchDetail = "debug.artifacts.batch.detail";
+    public const string DebugArtifactsBatchTitle = "debug.artifacts.batch.title";
+    public const string DebugArtifactsDirectoryEmpty = "debug.artifacts.directory.empty";
+    public const string DebugArtifactsDirectoryDetail = "debug.artifacts.directory.detail";
+    public const string DebugArtifactsDirectoryTitle = "debug.artifacts.directory.title";
+    public const string DebugArtifactsWslSource = "debug.artifacts.wslSource";
+    public const string DebugArtifactsChooseDirectory = "debug.artifacts.chooseDirectory";
+    public const string JobInspectorFactRecoveryRelation = "jobInspector.fact.recoveryRelation";
+    public const string JobInspectorProgress = "jobInspector.progress";
+    public const string JobInspectorResidue = "jobInspector.residue";
+    public const string JobInspectorResultSupersededByRecovery = "jobInspector.result.supersededByRecovery";
+    public const string JobInspectorResultTargetAliasResolved = "jobInspector.result.targetAliasResolved";
+    public const string JobInspectorStateCurrentEpochEstablished = "jobInspector.state.currentEpochEstablished";
+    public const string JobInspectorActionReadLog = "jobInspector.action.readLog";
+    public const string JobInspectorLogTail = "jobInspector.log.tail";
+    public const string JobInspectorLogPrivacy = "jobInspector.log.privacy";
+    public const string JobInspectorLogNotText = "jobInspector.log.notText";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2538,5 +2605,72 @@ public static class UiStrings
         HistoryContextOperation,
         HistoryContextState,
         HistoryContextArtifacts,
+        JobRecoveryActionStillUnknown,
+        JobRecoveryActionRebound,
+        JobRecoveryActionReconcileDetail,
+        JobRecoveryActionResumeDetail,
+        JobRecoveryActionWorking,
+        JobRecoveryActionUnconfirmed,
+        JobRecoveryActionReconcile,
+        JobRecoveryActionRebindDetail,
+        JobRecoveryActionRefused,
+        JobRecoveryActionResume,
+        JobRecoveryActionObserved,
+        JobRecoveryActionRebind,
+        OverviewRecordDeviceLabel,
+        OverviewRecordDeviceNone,
+        OverviewRecordDeviceNoneDetail,
+        OverviewRecordDeviceChoose,
+        OverviewRecordBinding,
+        JobRecoveryActionOpenHistory,
+        JobRecoveryCount,
+        JobRecoveryList,
+        JobRecoveryArchivePendingGuidance,
+        JobRecoveryArchivePendingTitle,
+        JobRecoveryOutcomeUnknownGuidance,
+        JobRecoveryOutcomeUnknownTitle,
+        JobRecoveryResumeSafeGuidance,
+        JobRecoveryResumeSafeTitle,
+        JobRecoveryWaitingGuidance,
+        JobRecoveryWaitingTitle,
+        DebugArtifactsBatchPhaseFailed,
+        DebugArtifactsBatchPhaseSucceeded,
+        DebugArtifactsBatchPhaseStopped,
+        DebugArtifactsBatchPhaseRunning,
+        DebugArtifactsBatchPhaseReview,
+        DebugArtifactsBatchPhasePreparing,
+        DebugArtifactsBatchPhaseIdle,
+        DebugArtifactsBatchRowFailed,
+        DebugArtifactsBatchRowSucceeded,
+        DebugArtifactsBatchRowRunning,
+        DebugArtifactsBatchRowSubmitting,
+        DebugArtifactsBatchRowPrepared,
+        DebugArtifactsBatchRowPreparing,
+        DebugArtifactsBatchRowPending,
+        DebugArtifactsBatchRun,
+        DebugArtifactsBatchWarning,
+        DebugArtifactsBatchReview,
+        DebugArtifactsBatchStop,
+        DebugArtifactsBatchPrepare,
+        DebugArtifactsBatchLimit,
+        DebugArtifactsBatchRemove,
+        DebugArtifactsBatchAdd,
+        DebugArtifactsBatchDetail,
+        DebugArtifactsBatchTitle,
+        DebugArtifactsDirectoryEmpty,
+        DebugArtifactsDirectoryDetail,
+        DebugArtifactsDirectoryTitle,
+        DebugArtifactsWslSource,
+        DebugArtifactsChooseDirectory,
+        JobInspectorFactRecoveryRelation,
+        JobInspectorProgress,
+        JobInspectorResidue,
+        JobInspectorResultSupersededByRecovery,
+        JobInspectorResultTargetAliasResolved,
+        JobInspectorStateCurrentEpochEstablished,
+        JobInspectorActionReadLog,
+        JobInspectorLogTail,
+        JobInspectorLogPrivacy,
+        JobInspectorLogNotText,
     ];
 }

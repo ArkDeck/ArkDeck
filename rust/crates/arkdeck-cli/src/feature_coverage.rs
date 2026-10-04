@@ -437,11 +437,21 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "session.cleanup.apply",
     // The Target store (TASK-XPA-004): its reads and display names. Not
     // `target availability` (presence stays unresolved without a registered
-    // HDC) nor `target adopt` (refused before admission without one).
+    // HDC); `target adopt` is measured below, over the registered HDC.
     "target.list",
     "target.show",
     "target.display-name.set",
     "target.display-name.clear",
+    // The Target observation owner over the registered Windows HDC
+    // (CHG-2026-078 c2, TASK-XPA-005): `device candidates` read through the
+    // daemon's managed DevEco `hdc.exe` by the Windows registry's grammar,
+    // the host's UART rows excluded (`windows_hdc_live_process.rs`, over
+    // `ARKDECK_LIVE_WINDOWS_HDC`; the c2 capture replayed in
+    // `arkdeck-hoststore/tests/windows_target_owners.rs`), and `target adopt`
+    // of the DAYU200 it proves, measured with the board attached on
+    // 2026-10-04 through the real CLI and daemon (the same process test).
+    "device.candidates",
+    "target.adopt",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset
@@ -519,6 +529,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // profile-served workspace leaves: no code-owned source tool is trusted
     // on Windows yet, so no registered project resolves to a profile.
     "workspace.inspect",
+    // The profile-served reads, the isolated copy and the sweep (TASK-XPA-011):
+    // the code-owned tools of the ruling of 2026-10-04 resolve the profile.
+    // Not the workspace mutations, which a development root's mutation
+    // authority does not hold.
+    "workspace.read",
+    "workspace.status",
+    "workspace.diff",
+    "workspace.isolate",
+    "workspace.sweep",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -1210,9 +1229,10 @@ mod tests {
             ("health", "implemented"),
             ("job.status", "implemented"),
             ("session.cleanup.apply", "implemented"),
+            // Measured over the registered Windows HDC (CHG-2026-078).
+            ("target.adopt", "implemented"),
             // Refused by the Windows daemon without an HDC or a Job owner.
             ("target.availability", "partial"),
-            ("target.adopt", "partial"),
             ("workspace.project.update", "implemented"),
             ("workspace.preset.register", "implemented"),
             ("trace.cache.purge", "implemented"),

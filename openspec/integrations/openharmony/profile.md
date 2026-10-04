@@ -1,7 +1,7 @@
 # OpenHarmony Tool Integration Profile
 
 > ID：OPENHARMONY-TOOLS  
-> Version：0.6.0
+> Version：0.7.1
 > Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`） / version-probed at runtime  
 > Core baseline：CORE-2.0.0
 
@@ -196,3 +196,64 @@ health 或 client/server/daemon version；external ownership 仍必须由 consum
 3.2.0d readonly、3.2.0f device-observation 与本 registry 是三个独立 authority。
 本登记只发布 integration input 与 macOS mapping；不接 production composition root，
 不改变 Core/platform conformance、hardware/support/release 状态。
+
+## Windows HDC registry（CHG-2026-078 / TASK-WHR-002，2026-10-04）
+
+`OPENHARMONY-HDC-WINDOWS-PROBES@1.1.0` is registered in
+`openspec/integrations/openharmony/windows-probes.yaml` (SHA-256
+`cad5444a7c78b39d3c466929fb30407cad0f51ffa14e1721e6f13906f18089c1`). Its resource manifest is
+`rust/tests/fixtures/hdc-windows/resources.json` (SHA-256
+`400345520e299d18478ff32d1763d2fd521737b4c321ff99f90d5ed24ec48ed2`). Profile `OPENHARMONY-TOOLS@0.7.1`, lock
+`INTEGRATION-PROFILES-0.8.1` (r3 amendment; registered first as `@1.0.0` in
+`OPENHARMONY-TOOLS@0.7.0`, lock `INTEGRATION-PROFILES-0.8.0`).
+
+**Tool identity (read first).** A Windows tuple is the `hdc.exe` executable SHA-256 plus the
+`hdc -v` stdout bytes observed with it.
+
+| Candidate | Source | SHA-256 | `-v` bytes | Registered |
+| --- | --- | --- | --- | --- |
+| c1 | hand-placed tools directory | `f6d6c47551d976f33b0f22b17a74f345c0788e59131873aa5f75d356f5141d9b` | `Ver: 3.2.0b` CR LF | **no** (maintainer ruling 2026-10-04) |
+| c2 | DevEco Studio 26.0.0.43 toolchains (MotW `ZoneId=3`) | `c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e` | `Ver: 3.2.0g` CR LF | **yes** |
+
+Path, file version, timestamp and signature are not identity:
+
+- the only version resource is the bundled winpthread's;
+- the timestamp is normalised;
+- both builds are unsigned.
+
+Tool selection must resolve to the registered DevEco executable. Any other `hdc.exe` is
+`unsupported`, including one found first on `PATH`, and so is a DevEco update with a new hash
+until it is registered.
+
+These are not the macOS 3.2.0d or 3.2.0f tools. No macOS entry, fixture, endpoint or fact
+applies to Windows, or the other way round, even when the version text matches.
+
+| Family | Windows conclusion (as sampled) | Differences from macOS, stated as found |
+| --- | --- | --- |
+| `version` | `supported`: `Ver: 3.2.0g` CR LF (13 B), stderr empty, exit 0, starts no server | the terminator is CR LF (macOS golden: LF) |
+| `healthyCheckserver` | `unsupported`; never dispatched as a probe. Server health is `serverIdentityGeneration` | with no server, `checkserver` **starts one**, then prints the healthy form (CR LF, 56 B) |
+| `deviceObservationSnapshot` | `supported`, existing server on `127.0.0.1:8710` only. 6 TAB columns, CR LF rows. Only `USB` rows are devices (`Connected`/`Offline`, hostTag `localhost`, sixth column `hdc`). The sampled `COM<n>`/`UART`/`Ready`/`unknown...`/`hdc` rows are excluded non-device rows, so UART rows alone mean no device. Any other form is `unknown` | 6 columns, not 5; CR LF rows, not LF; UART rows in every phase once the server has enumerated. A server that has just started answers `[Empty]` CR TAB `hdc` CR LF (14 B, exit 0) until it has enumerated (at most 1.26 s after its start): that exact form is `notYetObservable` (unknown, retryable; r3), never no device; a managed start settles past it for at most 3 s. Every other `[Empty]` form and zero-byte stdout are `unknown`. Unchanged: the removed row is kept and flipped to `Offline` |
+| `serverIdentityGeneration` | `supported`: exactly one listener on `127.0.0.1:8710`, owned by the registered hash, with a stable PID and creation time | per-command brackets exist (closing `DEV-1` for this tuple); the server is started by `checkserver`, never by `-v` |
+
+The registered Windows fixtures under `rust/tests/fixtures/hdc-windows/c2/` are the capture of
+2026-10-04, redacted by `rust/scripts/windows_sample_process.py`:
+
+- connect keys are same-length `a` runs, and `COM<n>` port names are kept;
+- no hash of key-bearing bytes is kept;
+- user paths are relative, and account and machine names are removed.
+
+The run records are CHG-2026-074 `evidence/runs/TASK-XPA-002/hdc-windows-sample-20261004-run.md`
+and `evidence/runs/TASK-XPA-004/dayu200-usb-properties-20261004-run.md`. The server-startup
+listing (`c2/server-startup/`, r3) is from
+`evidence/runs/TASK-XPA-002/hdc-windows-empty-form-20261004-run.md`.
+
+The Rust table `arkdeck_provider_hdc::WINDOWS_HDC_TUPLES` holds exactly the registered tuple, and
+`parse_registered_windows_presence` is the registered `deviceObservationSnapshot` grammar;
+`rust/crates/arkdeck-provider-hdc/tests/windows_hdc_registration.rs` closes both on this registry
+and its resources.
+
+This registration publishes integration input only:
+
+- no consumer is wired;
+- no Core, platform-conformance, hardware, support or release status changes;
+- the Windows daemon adopts the registry in CHG-2026-074 TASK-XPA-004/005.

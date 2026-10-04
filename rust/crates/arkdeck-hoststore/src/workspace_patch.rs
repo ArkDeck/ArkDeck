@@ -177,14 +177,14 @@ pub(crate) fn patch_paths(bytes: &[u8]) -> Result<Vec<String>, Detail> {
 /// Swift `validatePath(_:root:)`: inside the root, through no symbolic link,
 /// and a regular file when it exists.
 fn validate_path(relative: &str, root: &str) -> Result<(), Detail> {
-    let candidate = foundation_standardized(&format!("{root}/{relative}"));
-    if !candidate.starts_with(&format!("{root}/")) {
+    let candidate = foundation_standardized(&support::join(root, relative));
+    if support::relative_to(&candidate, root).is_none() {
         return Err(detail("workspace path escapes the ProjectProfile root"));
     }
     let components: Vec<&str> = relative.split('/').filter(|c| !c.is_empty()).collect();
     let mut cursor = root.to_owned();
     for component in &components[..components.len().saturating_sub(1)] {
-        cursor = format!("{cursor}/{component}");
+        cursor = support::join(&cursor, component);
         // `fileExists` follows a link; a component that exists is refused
         // when it is one.
         if fs::metadata(&cursor).is_ok()
@@ -279,7 +279,7 @@ pub(crate) fn snapshots(paths: &[String], root: &str) -> Result<Vec<FileSnapshot
         .into_iter()
         .map(|path| {
             validate_path(&path, root)?;
-            let url = format!("{root}/{path}");
+            let url = support::join(root, &path);
             if fs::metadata(&url).is_err() {
                 return Ok(FileSnapshot {
                     relative_path: path,
@@ -675,6 +675,8 @@ fn replace(destination: &str, bytes: &[u8], staged: &str) -> io::Result<()> {
         let mut file = support::create_private_staged(Path::new(staged))?;
         file.write_all(bytes)?;
         file.sync_all()?;
+        // Closed before the rename: Windows renames no file a handle holds.
+        drop(file);
         fs::rename(staged, destination)
     })();
     if written.is_err() {
@@ -699,10 +701,9 @@ impl AttemptStore {
     /// in this owner-only store; hashing the opaque Job id keeps it from
     /// becoming a path surface.
     pub(crate) fn checkpoint_archive_path(&self, job_id: &str) -> String {
-        format!(
-            "{}/checkpoint-{}.tar",
-            self.root,
-            support::sha256(job_id.as_bytes())
+        support::join(
+            &self.root,
+            &format!("checkpoint-{}.tar", support::sha256(job_id.as_bytes())),
         )
     }
 
@@ -710,14 +711,14 @@ impl AttemptStore {
         if !valid_reference(reference) {
             return Err(detail("workspace patch attempt ref is malformed"));
         }
-        Ok(format!("{}/{reference}.json", self.root))
+        Ok(support::join(&self.root, &format!("{reference}.json")))
     }
 
     fn patch_path(&self, reference: &str) -> Result<String, Detail> {
         if !valid_reference(reference) {
             return Err(detail("workspace patch attempt ref is malformed"));
         }
-        Ok(format!("{}/{reference}.patch", self.root))
+        Ok(support::join(&self.root, &format!("{reference}.patch")))
     }
 
     fn read(path: &str) -> Option<PatchAttempt> {
@@ -797,6 +798,8 @@ impl AttemptStore {
             let mut file = support::create_private_staged(Path::new(&staged))?;
             file.write_all(&bytes)?;
             file.sync_all()?;
+            // Closed before the rename: Windows renames no file a handle holds.
+            drop(file);
             // Swift moves without replacing: bytes that appeared meanwhile
             // are not overwritten.
             if fs::symlink_metadata(&destination).is_ok() {
@@ -831,7 +834,7 @@ impl AttemptStore {
             if !name.starts_with("patch-") || !name.ends_with(".json") {
                 continue;
             }
-            let attempt = Self::read(&format!("{}/{name}", self.root))
+            let attempt = Self::read(&support::join(&self.root, &name))
                 .ok_or_else(|| detail("workspace patch lineage has an unreadable link"))?;
             if attempt.project_ref == project_ref {
                 attempts.push(attempt);
@@ -1071,13 +1074,10 @@ fn executable_file(path: &str) -> bool {
         .is_ok_and(|measure| measure.executable)
 }
 
-/// The physical spelling of a working directory the spawn needs.
+/// The physical spelling of a working directory the spawn needs (on Windows
+/// the verbatim form the tool runner checks it against).
 fn physical_directory(path: &str) -> io::Result<std::path::PathBuf> {
-    #[cfg(not(windows))]
-    return fs::canonicalize(path);
-    #[cfg(windows)]
-    arkdeck_platform::host_resolved_path(Path::new(path))
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "working directory unresolved"))
+    fs::canonicalize(path)
 }
 
 /// Swift `outputSummary(_:)`.

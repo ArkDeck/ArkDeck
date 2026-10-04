@@ -13,12 +13,12 @@
 //!
 //! On Windows (TASK-XPA-011) the profile, its presets and the registry are
 //! the same, over the host's `X:\…` spelling, and an executable is measured
-//! through one handle that follows no reparse point. A registered project
-//! does not resolve there: Swift's profiles pin code-owned system tools
-//! (`/usr/bin/grep`, `sed`, `patch`, `bsdtar`, `git`, SwiftPM), Windows ships
-//! no such tools, and which ones a Windows Runtime may trust is not decided
-//! (no PATH lookup stands in for that decision). Every profile-served
-//! operation is therefore unavailable, with that reason, before anything
+//! through one handle that follows no reparse point. The code-owned tools
+//! follow the maintainer's ruling of 2026-10-04 (`CodeOwnedTools`): grep,
+//! sed and patch are this daemon's own image, tar and git trusted system
+//! tools by Authenticode publisher and registered path, never PATH. A tool
+//! that does not verify resolves the project to no profile, and every
+//! profile-served operation is unavailable with that reason before anything
 //! is planned or dispatched.
 use crate::operation_catalog::CatalogOperation;
 use crate::workspace_support::{
@@ -39,11 +39,17 @@ use std::sync::OnceLock;
 /// `RuntimeAvailabilityReasonCode` spells, and Swift's reason.
 pub(crate) type Unavailability = (&'static str, String);
 
-/// Why a registered project resolves to no profile on Windows: the
-/// code-owned tools Swift's profiles pin have no decided Windows identity.
+/// Why a code-owned system tool is unavailable on Windows (ruling 69).
 #[cfg(windows)]
-pub(crate) const WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE: &str = "workspace.toolchainUnavailable: \
-    no code-owned source tool (grep, sed, patch, bsdtar, git or SwiftPM) is trusted on Windows";
+fn system_tool_unavailable(
+    tool: arkdeck_platform::SystemTool,
+    error: &dyn std::fmt::Display,
+) -> String {
+    format!(
+        "workspace.toolchainUnavailable: {} is not trusted on Windows: {error}",
+        tool.name()
+    )
+}
 
 /// Swift `RuntimeAvailabilityReasonCode.workspacePresetUnavailable`.
 pub(crate) const PRESET_UNAVAILABLE: &str = "workspace_preset_unavailable";
@@ -259,6 +265,36 @@ impl WorkspaceCommandPreset {
             fixed_arguments.iter().map(|&a| a.to_owned()).collect(),
             timeout_seconds,
             verified_resources,
+        )
+    }
+
+    /// On Windows (maintainer ruling 69): the code-owned system tool `tool`
+    /// — `tar` (`System32\tar.exe`) or `git` (Git for Windows) — at its
+    /// registered absolute path, signed by its pinned Authenticode publisher,
+    /// pinned by the SHA-256 of the image whose signature was verified
+    /// (`arkdeck_platform::trusted_system_tool`). Its dispatch opens the
+    /// executable by that digest, so what runs is what was verified. No
+    /// `PATH` lookup stands in for it; a tool that does not verify is
+    /// `workspace.toolchainUnavailable`.
+    #[cfg(windows)]
+    pub fn trusted_system(
+        preset_id: &str,
+        tool: arkdeck_platform::SystemTool,
+        timeout_seconds: i64,
+    ) -> Result<Self, String> {
+        let trusted = arkdeck_platform::trusted_system_tool(tool)
+            .map_err(|error| system_tool_unavailable(tool, &error))?;
+        let path = trusted
+            .path
+            .to_str()
+            .ok_or_else(|| system_tool_unavailable(tool, &"its path is not Unicode"))?;
+        Self::new(
+            preset_id,
+            ExecutableIdentity::new(path.to_owned(), trusted.sha256)?,
+            None,
+            Vec::new(),
+            timeout_seconds,
+            Vec::new(),
         )
     }
 
@@ -506,7 +542,7 @@ impl WorkspaceProfile {
     /// Swift `WorkspaceProjectProfile.arkDeck(rootURL:projectRef:)`.
     #[cfg(windows)]
     pub fn ark_deck(_root: &str, _project_ref: &str) -> Result<Self, String> {
-        Err(WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE.into())
+        Err("workspace.toolchainUnavailable: no fixed SwiftPM executable exists".into())
     }
 
     /// Swift `WorkspaceProjectProfile.arkDeck(rootURL:projectRef:)`.
@@ -646,7 +682,13 @@ impl WorkspaceProfile {
                 "workspace.projectProfileUnavailable: WaterFlow project or Hvigor is absent".into(),
             );
         }
-        let (inspection, reader, patch, checkpoint, source_control) = code_owned_tools(&root)?;
+        let CodeOwnedTools {
+            inspection,
+            reader,
+            patch,
+            archive: checkpoint,
+            source_control,
+        } = code_owned_tools(&root)?;
         let mut build = Vec::new();
         let mut test = Vec::new();
         let mut build_products = BTreeMap::new();
@@ -1120,47 +1162,119 @@ impl WorkspaceProfile {
     }
 }
 
-/// The code-owned tools an OpenHarmony profile pins: Swift's fixed system
-/// `grep`, `sed`, `patch` and `bsdtar`, and `git` inside a working copy.
-type CodeOwnedTools = (
-    WorkspaceCommandPreset,
-    WorkspaceCommandPreset,
-    WorkspaceCommandPreset,
-    WorkspaceCommandPreset,
-    Option<WorkspaceCommandPreset>,
-);
+/// The code-owned tools an OpenHarmony profile pins, by role: the source
+/// inspection (`grep`), the source reader (`sed`), the patch tool, the
+/// sealed-source archive writer (`tar`) and, inside a git working copy, the
+/// source-control tool (`git`).
+///
+/// | Role | macOS | Windows (ruling of 2026-10-04) |
+/// | --- | --- | --- |
+/// | `inspection`, `reader`, `patch` | `/usr/bin/grep`, `sed`, `patch`, pinned by digest | this daemon's own image run as the tool (`--workspace-tool grep\|sed\|patch`, `workspace_text_tools.rs`), pinned by digest: no external binary |
+/// | `archive` | `/usr/bin/bsdtar`, pinned by digest | `System32\tar.exe` (Microsoft-signed bsdtar), trusted by its Authenticode publisher at its registered absolute path, never PATH |
+/// | `source_control` | `/usr/bin/git`, pinned by digest | Git for Windows, trusted by its Authenticode publisher at its registered absolute path, never PATH |
+///
+/// Any other signer or path fails closed: the project resolves to no profile.
+pub(crate) struct CodeOwnedTools {
+    pub(crate) inspection: WorkspaceCommandPreset,
+    pub(crate) reader: WorkspaceCommandPreset,
+    pub(crate) patch: WorkspaceCommandPreset,
+    pub(crate) archive: WorkspaceCommandPreset,
+    pub(crate) source_control: Option<WorkspaceCommandPreset>,
+}
+
+/// The preset ids and timeouts of the code-owned roles, on every host.
+const INSPECTION: (&str, i64) = ("source-inspection", 30);
+const READER: (&str, i64) = ("source-range", 30);
+const PATCH: (&str, i64) = ("unified-diff", 120);
+const ARCHIVE: (&str, i64) = ("sealed-source-archive", 120);
+const SOURCE_CONTROL: (&str, i64) = ("git", 120);
 
 #[cfg(not(windows))]
 fn code_owned_tools(root: &str) -> Result<CodeOwnedTools, String> {
-    let inspection =
-        WorkspaceCommandPreset::hashing("source-inspection", "/usr/bin/grep", None, &[], 30)?;
-    let reader = WorkspaceCommandPreset::hashing("source-range", "/usr/bin/sed", None, &[], 30)?;
-    let patch = WorkspaceCommandPreset::hashing("unified-diff", "/usr/bin/patch", None, &[], 120)?;
-    let checkpoint = WorkspaceCommandPreset::hashing(
-        "sealed-source-archive",
-        "/usr/bin/bsdtar",
-        None,
-        &[],
-        120,
-    )?;
-    let source_control = if inside_git_working_copy(root) {
-        Some(WorkspaceCommandPreset::hashing(
-            "git",
-            "/usr/bin/git",
+    let fixed = |(preset, timeout): (&str, i64), path: &str| {
+        WorkspaceCommandPreset::hashing(preset, path, None, &[], timeout)
+    };
+    Ok(CodeOwnedTools {
+        inspection: fixed(INSPECTION, "/usr/bin/grep")?,
+        reader: fixed(READER, "/usr/bin/sed")?,
+        patch: fixed(PATCH, "/usr/bin/patch")?,
+        archive: fixed(ARCHIVE, "/usr/bin/bsdtar")?,
+        source_control: if inside_git_working_copy(root) {
+            Some(fixed(SOURCE_CONTROL, "/usr/bin/git")?)
+        } else {
+            None
+        },
+    })
+}
+
+/// The daemon's own image, in its canonical `X:\…` spelling: the
+/// executable the code-owned text tools run as.
+#[cfg(windows)]
+fn daemon_image() -> Result<String, String> {
+    let image = std::env::current_exe()
+        .map_err(|error| format!("workspace.toolchainUnavailable: {error}"))?;
+    arkdeck_platform::host_resolved_path(&image)
+        .and_then(|path| path.to_str().map(str::to_owned))
+        .ok_or_else(|| "workspace.toolchainUnavailable: the daemon image is unresolved".into())
+}
+
+/// On Windows the text tools are this daemon's own image; the external
+/// tools' slots wait for their trusted system tools.
+#[cfg(windows)]
+fn code_owned_tools(root: &str) -> Result<CodeOwnedTools, String> {
+    let image = daemon_image()?;
+    let text = |(preset, timeout): (&str, i64), tool: &str| {
+        WorkspaceCommandPreset::hashing(
+            preset,
+            &image,
             None,
-            &[],
-            120,
+            &[crate::workspace_text_tools::WORKSPACE_TOOL_FLAG, tool],
+            timeout,
+        )
+    };
+    let inspection = text(INSPECTION, "grep")?;
+    let reader = text(READER, "sed")?;
+    let patch = text(PATCH, "patch")?;
+    let (archive, source_control) = external_tools(root)?;
+    Ok(CodeOwnedTools {
+        inspection,
+        reader,
+        patch,
+        archive,
+        source_control,
+    })
+}
+
+/// The archive writer and, inside a git working copy, the source-control
+/// tool on Windows: the trusted system `tar` (`System32\tar.exe`) and `git`
+/// (Git for Windows), each at its registered path and signed by its
+/// publisher (`WorkspaceCommandPreset::trusted_system`). One that does not
+/// verify resolves the project to no profile.
+#[cfg(windows)]
+fn external_tools(
+    root: &str,
+) -> Result<(WorkspaceCommandPreset, Option<WorkspaceCommandPreset>), String> {
+    use arkdeck_platform::SystemTool;
+    let archive = WorkspaceCommandPreset::trusted_system(ARCHIVE.0, SystemTool::Tar, ARCHIVE.1)?;
+    let source_control = if inside_git_working_copy(root) {
+        Some(WorkspaceCommandPreset::trusted_system(
+            SOURCE_CONTROL.0,
+            SystemTool::Git,
+            SOURCE_CONTROL.1,
         )?)
     } else {
         None
     };
-    Ok((inspection, reader, patch, checkpoint, source_control))
+    Ok((archive, source_control))
 }
 
-/// On Windows no code-owned tool is trusted yet.
+/// Swift `WorkspaceProjectProfile.isInsideGitWorkingCopy` on Windows: the
+/// root or any ancestor up to the drive's root holds `.git`.
 #[cfg(windows)]
-fn code_owned_tools(_root: &str) -> Result<CodeOwnedTools, String> {
-    Err(WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE.into())
+fn inside_git_working_copy(root: &str) -> bool {
+    std::path::Path::new(&foundation_standardized(root))
+        .ancestors()
+        .any(|directory| fs::metadata(directory.join(".git")).is_ok())
 }
 
 /// Swift `WorkspaceProjectProfile.isInsideGitWorkingCopy`: the root or any
@@ -1656,5 +1770,162 @@ mod tests {
         .unwrap();
         assert_eq!(document, recorded, "{} ran another tool", pinned.path);
         fs::remove_dir_all(&root).unwrap();
+    }
+}
+
+/// The Windows system tools of maintainer ruling 69 as workspace presets:
+/// the real `System32\tar.exe` and the host's Git for Windows, launched
+/// through the production dispatch by the digest they were verified by.
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+    use crate::workspace_patch::{
+        ToolFailure, ToolInvocation, ToolReceipt, VerifiedToolDispatch, WorkspaceToolDispatch,
+    };
+    use arkdeck_platform::{SystemTool, trusted_system_tool};
+
+    /// Set in the child this file's PATH test starts with a shadowed PATH.
+    const SHADOW: &str = "ARKDECK_TEST_SYSTEM_TOOL_PATH_SHADOW";
+
+    fn run(preset: &WorkspaceCommandPreset, sha256: &str) -> Result<ToolReceipt, ToolFailure> {
+        let arguments = ["--version".to_owned()];
+        VerifiedToolDispatch.dispatch(&ToolInvocation {
+            executable_path: &preset.executable.path,
+            executable_sha256: sha256,
+            argument_zero: None,
+            arguments: &arguments,
+            environment: &[],
+            resources: &[],
+            working_directory: None,
+            timeout_seconds: 30,
+        })
+    }
+
+    fn version(preset: &WorkspaceCommandPreset) -> String {
+        let receipt = run(preset, &preset.executable.sha256).unwrap();
+        assert_eq!(receipt.exit_status, 0, "{receipt:?}");
+        String::from_utf8(receipt.stdout).unwrap()
+    }
+
+    fn presets() -> (WorkspaceCommandPreset, WorkspaceCommandPreset) {
+        (
+            WorkspaceCommandPreset::trusted_system("sealed-source-archive", SystemTool::Tar, 120)
+                .unwrap(),
+            WorkspaceCommandPreset::trusted_system("git", SystemTool::Git, 120).unwrap(),
+        )
+    }
+
+    #[test]
+    fn each_system_tool_is_its_registered_verified_image() {
+        let (tar, git) = presets();
+        for (preset, tool) in [(&tar, SystemTool::Tar), (&git, SystemTool::Git)] {
+            let trusted = trusted_system_tool(tool).unwrap();
+            assert_eq!(preset.executable.path, trusted.path.to_str().unwrap());
+            assert_eq!(preset.executable.sha256, trusted.sha256);
+            assert_eq!(
+                preset.executable,
+                ExecutableIdentity::hashing(&preset.executable.path).unwrap()
+            );
+            assert!(preset.argument_zero.is_none() && preset.fixed_arguments.is_empty());
+        }
+        assert!(tar.executable.path.ends_with(r"\System32\tar.exe"));
+        assert!(git.executable.path.ends_with(r"\Git\mingw64\bin\git.exe"));
+        assert!(version(&tar).starts_with("bsdtar "), "{}", version(&tar));
+        assert!(
+            version(&git).starts_with("git version "),
+            "{}",
+            version(&git)
+        );
+        assert!(version(&git).contains(".windows."), "{}", version(&git));
+    }
+
+    #[test]
+    fn a_launch_by_another_digest_runs_nothing() {
+        let (tar, git) = presets();
+        for preset in [&tar, &git] {
+            let other = support::sha256(preset.executable.sha256.as_bytes());
+            match run(preset, &other) {
+                Err(ToolFailure::Failed(reason)) => {
+                    assert!(reason.starts_with("dispatch refused:"), "{reason}");
+                }
+                other => panic!("{other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn a_refusal_names_the_tool_as_the_toolchain_unavailable() {
+        let refusal = system_tool_unavailable(
+            SystemTool::Git,
+            &"a system tool is not signed by its publisher",
+        );
+        assert_eq!(
+            refusal,
+            "workspace.toolchainUnavailable: git is not trusted on Windows: a system tool \
+             is not signed by its publisher"
+        );
+    }
+
+    /// A directory first on `PATH` holding `tar.exe` and `git.exe` that are
+    /// other programs (`whoami.exe` and a copy of `tar.exe`): neither the
+    /// measurement nor the launch looks there.
+    #[test]
+    fn a_shadowing_path_is_never_consulted() {
+        let system = std::path::PathBuf::from(
+            trusted_system_tool(SystemTool::Tar)
+                .unwrap()
+                .path
+                .parent()
+                .unwrap(),
+        );
+        let shadow = std::env::temp_dir().join(format!(
+            "arkdeck-path-shadow-{:032x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        fs::create_dir(&shadow).unwrap();
+        fs::copy(system.join("whoami.exe"), shadow.join("tar.exe")).unwrap();
+        fs::copy(system.join("tar.exe"), shadow.join("git.exe")).unwrap();
+        let mut path = std::ffi::OsString::from(shadow.as_os_str());
+        if let Some(inherited) = std::env::var_os("PATH") {
+            path.push(";");
+            path.push(inherited);
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "workspace_profile::windows_tests::shadowed_path_child",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("PATH", path)
+            .env(SHADOW, &shadow)
+            .output()
+            .unwrap();
+        fs::remove_dir_all(&shadow).unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert!(output.status.success(), "{stdout}");
+        assert!(stdout.contains("1 passed"), "{stdout}");
+        assert!(stdout.contains("shadowed path checked"), "{stdout}");
+    }
+
+    /// The child half of [`a_shadowing_path_is_never_consulted`]; a no-op
+    /// anywhere else.
+    #[test]
+    fn shadowed_path_child() {
+        let Some(shadow) = std::env::var_os(SHADOW) else {
+            return;
+        };
+        let shadow = std::path::PathBuf::from(shadow);
+        // The shadow is what a PATH search would find first.
+        let first = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+            .next()
+            .unwrap();
+        assert_eq!(first, shadow);
+        let (tar, git) = presets();
+        assert!(!tar.executable.path.starts_with(shadow.to_str().unwrap()));
+        assert!(!git.executable.path.starts_with(shadow.to_str().unwrap()));
+        assert!(version(&tar).starts_with("bsdtar "));
+        assert!(version(&git).starts_with("git version "));
+        println!("shadowed path checked");
     }
 }

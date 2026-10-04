@@ -180,9 +180,11 @@ package enum ArkDeckAgentXPC {
 
   /// These names are generic in the daemon protocol. The XPC endpoint must
   /// additionally prove one of the closed App-owned typed requests and bind
-  /// the returned Job identifier before forwarding run or cancel.
+  /// the returned Job identifier before forwarding run or cancel. Recovery
+  /// reopens only a durable App request in the Runtime-confirmed permitted state.
   package static let gatedAppJobMethods: Set<String> = [
     "job.cancel",
+    "job.reconcile",
     "job.run",
     "job.submit",
   ]

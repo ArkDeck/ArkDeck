@@ -8,6 +8,16 @@ use arkdeck_hoststore::{
 use serde_json::Value;
 use std::{io, path::Path};
 
+/// The published identity of a Windows HDC digest: the registered tuple's
+/// reported version, naming no profile, or none for any other digest
+/// (CHG-2026-078 registers DevEco Studio 26.0.0.43's `hdc.exe` only).
+#[cfg(windows)]
+pub(crate) fn windows_hdc_identity(sha256: &str) -> Option<Value> {
+    arkdeck_provider_hdc::windows_tuple(sha256).map(
+        |tuple| serde_json::json!({"version": tuple.reported_version, "profileReferences": []}),
+    )
+}
+
 pub struct BootstrapReaders {
     tools: ToolRegistryStore,
     bundles: BundleRegistryReadStore,
@@ -20,11 +30,7 @@ impl BootstrapReaders {
         // Windows tuple (CHG-2026-078), exactly as the provider's table
         // holds it; it names no published profile.
         #[cfg(windows)]
-        let tools = tools.with_published_identities(std::sync::Arc::new(|sha256: &str| {
-            arkdeck_provider_hdc::windows_tuple(sha256).map(|tuple| {
-                serde_json::json!({"version": tuple.reported_version, "profileReferences": []})
-            })
-        }));
+        let tools = tools.with_published_identities(std::sync::Arc::new(windows_hdc_identity));
         Ok(Self {
             tools,
             bundles: BundleRegistryReadStore::open_existing(root)?,

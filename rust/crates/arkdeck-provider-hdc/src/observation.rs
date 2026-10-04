@@ -161,6 +161,101 @@ fn target_output_lines(text: &str) -> Vec<&str> {
     lines
 }
 
+/// The `hdc -v` version of a registered HDC family. On Windows a registered
+/// tuple's `version` family is its exact `-v` bytes
+/// (`OPENHARMONY-HDC-WINDOWS-PROBES`, CHG-2026-078: `Ver: 3.2.0g` CR LF, which
+/// the Swift-parity [`parse_client_version`] cannot read, since its lines do
+/// not split at CR LF); every other output is read by
+/// [`parse_client_version`] as before. Which executable answered is pinned
+/// by its dispatcher's hash, never by these bytes.
+pub fn parse_host_client_version(stdout: &[u8], truncated: bool) -> Result<String, ParseError> {
+    if cfg!(windows)
+        && !truncated
+        && let Some(tuple) = crate::WINDOWS_HDC_TUPLES
+            .iter()
+            .find(|tuple| tuple.version_stdout == stdout)
+    {
+        return Ok(tuple.reported_version.to_owned());
+    }
+    parse_client_version(stdout, truncated)
+}
+
+/// `checkserver`'s versions in a registered HDC family. On Windows a
+/// registered tuple answers `Client version:Ver: X, server version:Ver: X`
+/// CR LF (the bytes `OPENHARMONY-HDC-WINDOWS-PROBES` records for
+/// `healthyCheckserver`), which [`parse_server_check`] cannot read since its
+/// lines do not split at CR LF; every other output is read by
+/// [`parse_server_check`] as before. This reads the managed start's own
+/// readiness answer; it registers no `checkserver` probe on Windows.
+pub fn parse_host_server_check(stdout: &[u8], truncated: bool) -> Result<ServerCheck, ParseError> {
+    if cfg!(windows) && !truncated {
+        for tuple in crate::WINDOWS_HDC_TUPLES {
+            let version = tuple.reported_version;
+            let registered =
+                format!("Client version:Ver: {version}, server version:Ver: {version}\r\n");
+            if stdout == registered.as_bytes() {
+                return Ok(ServerCheck {
+                    client_version: version.to_owned(),
+                    server_version: version.to_owned(),
+                });
+            }
+        }
+    }
+    parse_server_check(stdout, truncated)
+}
+
+/// Whether `tool_version` is a registered Windows tuple's version on this
+/// host: only then is its output read by the Windows registry's grammars.
+pub fn is_windows_family(tool_version: &str) -> bool {
+    cfg!(windows)
+        && crate::WINDOWS_HDC_TUPLES
+            .iter()
+            .any(|tuple| tuple.reported_version == tool_version)
+}
+
+/// The registered Windows candidate list (CHG-2026-078, maintainer ruling
+/// 2026-10-04, item 2): the `USB` rows of the registered six-column family
+/// as candidates, the host's UART rows excluded, every other form refused
+/// whole. It shares its row grammar with
+/// [`crate::parse_registered_windows_presence`].
+pub fn parse_windows_target_list(
+    stdout: &[u8],
+    truncated: bool,
+) -> Result<Vec<DeviceCandidate>, ParseError> {
+    if truncated {
+        return Err(ParseError::Truncated);
+    }
+    if stdout.is_empty() {
+        return Err(ParseError::Empty);
+    }
+    let rows = crate::presence::windows_device_rows(stdout).map_err(ParseError::Malformed)?;
+    Ok(rows
+        .into_iter()
+        .map(|row| DeviceCandidate {
+            connect_key: row.connect_key.to_owned(),
+            transport: "usb".into(),
+            state: row.state.to_owned(),
+        })
+        .collect())
+}
+
+/// The candidate list of `tool_version`'s registered family: a registered
+/// Windows tuple's version is read by the Windows registry's grammar
+/// ([`parse_windows_target_list`]); every other version by the macOS
+/// registered grammar ([`parse_target_list`]), unchanged, which refuses an
+/// unregistered version.
+pub fn parse_host_target_list(
+    stdout: &[u8],
+    tool_version: &str,
+    truncated: bool,
+) -> Result<Vec<DeviceCandidate>, ParseError> {
+    if is_windows_family(tool_version) {
+        parse_windows_target_list(stdout, truncated)
+    } else {
+        parse_target_list(stdout, tool_version, truncated)
+    }
+}
+
 /// Swift `HDCObservationSemanticParser.parseClientVersion` parity. This pure
 /// parser recognizes an output family; it does not register the executable.
 pub fn parse_client_version(stdout: &[u8], truncated: bool) -> Result<String, ParseError> {

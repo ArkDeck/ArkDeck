@@ -62,7 +62,10 @@ pub use live_mode::{
     LoaderObserver, UsbProbe,
 };
 #[cfg(any(target_os = "macos", windows))]
-pub use managed_server::{EndpointSelection, ManagedHdcServer, StartBudget, StartFailure};
+pub use managed_server::{
+    EndpointSelection, ManagedHdcServer, StartBudget, StartFailure, StartupListing,
+    WINDOWS_STARTUP_SETTLE, settle_startup_listing,
+};
 pub use native_elf::{
     CodeSignFacts, MAXIMUM_LIBRARY_BYTES, NativeAbi, NativeLibraryFacts, ValidationError,
     is_static_executable, static_executable, validate_elf,
@@ -75,12 +78,13 @@ pub use native_library::{
     published_without_attestation, readback_attestation, sha256_token,
 };
 pub use observation::{
-    DeviceCandidate, ParseError, ServerCheck, parse_client_version, parse_server_check,
-    parse_target_list,
+    DeviceCandidate, ParseError, ServerCheck, is_windows_family, parse_client_version,
+    parse_host_client_version, parse_host_server_check, parse_host_target_list, parse_server_check,
+    parse_target_list, parse_windows_target_list,
 };
 pub use operation::{
     Action, DispatchFailure, Expected, HdcDispatch, Outcome, ProcessPlan, Property, Receipt,
-    property_value, stable_identity_sha256,
+    ServerObservation, property_value, stable_identity_sha256,
 };
 pub use operation::{
     DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT, device_arguments,
@@ -92,7 +96,7 @@ pub use pointer_input::{
 pub use port_forward::{Direction, PORT_MAXIMUM, PORT_MINIMUM, PortAction, PortRule};
 pub use presence::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,
-    parse_registered_presence,
+    WINDOWS_SERVER_STARTUP_LISTING, parse_registered_presence, parse_registered_windows_presence,
 };
 pub use provider::HdcReadOnlyProvider;
 pub use rockchip_hdc::{

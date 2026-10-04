@@ -9,11 +9,17 @@
 //!   read-only policy, runs, and publishes exactly what the inspector prints
 //!   when run directly with the argv the provider builds; after a restart
 //!   the Job and its Artifact read back and a resubmission is the same Job.
-//! * The project resolves to no profile: Swift's profiles pin code-owned
-//!   system tools (`grep`, `sed`, `patch`, `bsdtar`, `git`, SwiftPM), and no
-//!   such tool is trusted on Windows yet. Every profile-served workspace
-//!   operation is unavailable with that reason, and a plan of one is refused
-//!   before admission with zero dispatch.
+//! * The project resolves to its profile through the code-owned tools of
+//!   the ruling of 2026-10-04: the daemon's own image as grep, sed and patch,
+//!   the trusted System32 `tar.exe` and Git for Windows. Inside a git working
+//!   copy every profile-served read (`read-source-range`,
+//!   `inspect-git-status`, `inspect-diff`), the isolated copy and the sweep
+//!   run, each publishing exactly what its tool prints when run directly
+//!   with the argv the provider built; the copy is adopted after a restart
+//!   and destroyed by a wet sweep. Outside a working copy the git reads are
+//!   unavailable and a plan of one is refused before admission with zero
+//!   dispatch. The workspace mutations are the device-mutation authority's,
+//!   which a development root does not hold.
 //! * The census names the workspace provider where the macOS census does.
 //!   An inspector that is no executable refuses the start.
 //!
@@ -50,8 +56,6 @@ mod windows {
     const DAEMON: &str = env!("CARGO_BIN_EXE_arkdeck-agentd");
     const INDEX: &str = "entry/src/main/ets/pages/Index.ets";
     const INDEX_SOURCE: &str = "@Entry\n@Component\nstruct Index {\n  build() {}\n}\n";
-    const TOOLS_REASON: &str = "workspace.toolchainUnavailable: no code-owned source tool \
-        (grep, sed, patch, bsdtar, git or SwiftPM) is trusted on Windows";
 
     /// `grep -r -n --include <glob> -- <symbol> <root>` over a tree of plain
     /// files: every line holding `symbol` in a file whose name `glob`
@@ -108,6 +112,14 @@ mod windows {
         (
             "an_inspector_that_is_no_executable_refuses_the_start",
             an_inspector_that_is_no_executable_refuses_the_start,
+        ),
+        (
+            "the_daemon_image_is_the_code_owned_grep_sed_and_patch",
+            the_daemon_image_is_the_code_owned_grep_sed_and_patch,
+        ),
+        (
+            "the_profile_served_reads_and_the_isolated_copy_run_through_the_code_owned_tools",
+            the_profile_served_reads_and_the_isolated_copy_run_through_the_code_owned_tools,
         ),
     ];
 
@@ -444,32 +456,20 @@ mod windows {
         );
         let pipe = second.serving();
 
-        // The inspection is served; every profile-served read is not, for
-        // the code-owned tools Windows does not trust yet.
-        let inspect = described(&pipe, "workspace.inspect-source@1");
-        assert_eq!(inspect["availability"], "available", "{inspect}");
+        // The inspection is served, and so is every read of the profile the
+        // project resolved to; it is no git working copy, so the git reads
+        // are not.
         for reference in [
+            "workspace.inspect-source@1",
             "workspace.read-source-range@1",
-            "workspace.inspect-git-status@1",
-            "workspace.inspect-diff@1",
             "workspace.prepare-isolated-copy@1",
-            "workspace.build-openharmony@1",
-            "workspace.sign-openharmony-hap@1",
         ] {
             let operation = described(&pipe, reference);
+            assert_eq!(operation["availability"], "available", "{operation}");
+        }
+        for reference in ["workspace.inspect-git-status@1", "workspace.inspect-diff@1"] {
+            let operation = described(&pipe, reference);
             assert_eq!(operation["availability"], "unavailable", "{operation}");
-            // A mutation is also refused for the mutation owner a development
-            // root does not compose.
-            assert!(
-                operation["availabilityReasonCodes"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .all(|code| code == "provider_tool_unavailable"),
-                "{operation}"
-            );
-            let reasons = operation["availabilityReasons"].to_string();
-            assert!(reasons.contains(TOOLS_REASON), "{reference}: {reasons}");
         }
 
         let inspection = job_request(
@@ -526,15 +526,15 @@ mod windows {
             String::from_utf8_lossy(&published)
         );
 
-        // A profile-served read is refused before anything is admitted.
+        // A read the profile does not offer is refused before anything is
+        // admitted.
         let refused = request(
             &pipe,
             "job.plan",
             job_request(
-                "range",
-                "workspace.read-source-range",
-                json!({"projectRef": registered, "filePath": INDEX, "lineStart": 2,
-                    "lineEnd": 4}),
+                "status",
+                "workspace.inspect-git-status",
+                json!({"projectRef": registered}),
             ),
         );
         assert_eq!(refused["ok"], false, "{refused}");
@@ -560,6 +560,361 @@ mod windows {
             .unwrap()
             .to_owned();
         assert_eq!(again, job);
+        third.stop(&root.0);
+    }
+
+    /// `arkdeck-agentd --workspace-tool <tool> <argv>`, with no environment
+    /// and no stdin as the workspace dispatch runs it, answers exactly what
+    /// the reimplemented tool answers, and its tree is the one the tool left.
+    fn the_daemon_image_is_the_code_owned_grep_sed_and_patch() {
+        let root = Root::new("tools");
+        let project = root.project();
+        let index = format!("{project}\\entry\\src\\main\\ets\\pages\\Index.ets");
+        let patch_file = root.0.join("change.patch");
+        std::fs::write(
+            &patch_file,
+            "--- a/entry/src/main/ets/pages/Index.ets\n+++ b/entry/src/main/ets/pages/Index.ets\n@@ -3,3 +3,3 @@\n struct Index {\n-  build() {}\n+  build() { }\n }\n",
+        )
+        .unwrap();
+        let patch_file = patch_file.to_str().unwrap().to_owned();
+        for (tool, arguments) in [
+            ("sed", vec!["-n", "2,4p", index.as_str()]),
+            (
+                "grep",
+                vec![
+                    "-r",
+                    "-n",
+                    "--include",
+                    "*.ets",
+                    "--",
+                    "build",
+                    project.as_str(),
+                ],
+            ),
+            (
+                "patch",
+                vec![
+                    "-f",
+                    "-p1",
+                    "-d",
+                    project.as_str(),
+                    "-i",
+                    patch_file.as_str(),
+                ],
+            ),
+            ("sed", vec!["-n", "4,4p", index.as_str()]),
+            ("sed", vec!["-n", "1,1p", "Z:\\no\\such\\file"]),
+        ] {
+            // The reimplementation's answer first, over a copy of the tree,
+            // when the tool writes.
+            let expected = if tool == "patch" {
+                let copy = root.0.join("copy");
+                std::fs::create_dir_all(copy.join("entry/src/main/ets/pages")).unwrap();
+                std::fs::copy(&index, copy.join("entry/src/main/ets/pages/Index.ets")).unwrap();
+                let copy = copy.to_str().unwrap().to_owned();
+                let mut moved: Vec<String> = arguments.iter().map(|&a| a.to_owned()).collect();
+                moved[3] = copy;
+                arkdeck_hoststore::run_text_tool(tool, &moved)
+            } else {
+                arkdeck_hoststore::run_text_tool(
+                    tool,
+                    &arguments.iter().map(|&a| a.to_owned()).collect::<Vec<_>>(),
+                )
+            };
+            let output = Command::new(DAEMON)
+                .arg(arkdeck_hoststore::WORKSPACE_TOOL_FLAG)
+                .arg(tool)
+                .args(&arguments)
+                .env_clear()
+                .stdin(Stdio::null())
+                .output()
+                .unwrap();
+            assert_eq!(
+                output.status.code(),
+                Some(expected.status),
+                "{tool} {arguments:?}"
+            );
+            assert_eq!(output.stdout, expected.stdout, "{tool} {arguments:?}");
+            assert_eq!(output.stderr, expected.stderr, "{tool} {arguments:?}");
+        }
+        // The patch was applied in place, and the second read shows it.
+        assert_eq!(
+            std::fs::read_to_string(&index).unwrap(),
+            INDEX_SOURCE.replace("build() {}", "build() { }")
+        );
+        let refused = Command::new(DAEMON)
+            .args([arkdeck_hoststore::WORKSPACE_TOOL_FLAG, "awk"])
+            .env_clear()
+            .output()
+            .unwrap();
+        assert_eq!(refused.status.code(), Some(2), "{refused:?}");
+    }
+
+    fn git(project: &str, arguments: &[&str]) {
+        let tool =
+            arkdeck_platform::trusted_system_tool(arkdeck_platform::SystemTool::Git).unwrap();
+        let output = Command::new(&tool.path)
+            .arg("-C")
+            .arg(project)
+            .args(arguments)
+            .env_clear()
+            .envs([
+                ("GIT_CONFIG_NOSYSTEM", "1"),
+                ("GIT_AUTHOR_NAME", "Process"),
+                ("GIT_AUTHOR_EMAIL", "process@invalid.example"),
+                ("GIT_COMMITTER_NAME", "Process"),
+                ("GIT_COMMITTER_EMAIL", "process@invalid.example"),
+            ])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git {arguments:?}: {output:?}");
+    }
+
+    /// Swift `workspaceRevision(root:profileVersion:globs:)` of a git working
+    /// copy: HEAD's object id (a symbolic HEAD's loose ref), the index file's
+    /// digest and every scoped file's digest, in name order.
+    fn workspace_revision(project: &str, files: &[&str]) -> String {
+        let git = Path::new(project).join(".git");
+        let head = std::fs::read_to_string(git.join("HEAD")).unwrap();
+        let head = head.trim();
+        let oid = match head.strip_prefix("ref: ") {
+            Some(reference) => std::fs::read_to_string(git.join(reference))
+                .unwrap()
+                .trim()
+                .to_owned(),
+            None => head.to_owned(),
+        };
+        let index = arkdeck_contract::sha256_hex(&std::fs::read(git.join("index")).unwrap());
+        let mut material =
+            format!("profileVersion\twaterflow-openharmony@1\nhead\t{oid}\nindex\t{index}\n");
+        for file in files {
+            let bytes = std::fs::read(Path::new(project).join(file)).unwrap();
+            material.push_str(&format!(
+                "file\t{file}\t{}\n",
+                arkdeck_contract::sha256_hex(&bytes)
+            ));
+        }
+        arkdeck_contract::sha256_hex(material.as_bytes())
+    }
+
+    /// The trusted git as the workspace dispatch runs it: no system
+    /// configuration, the clean base environment.
+    fn git_output(project: &str, arguments: &[&str]) -> Vec<u8> {
+        let tool =
+            arkdeck_platform::trusted_system_tool(arkdeck_platform::SystemTool::Git).unwrap();
+        let mut command = Command::new(&tool.path);
+        command
+            .arg("-C")
+            .arg(project)
+            .args(arguments)
+            .env_clear()
+            .env("GIT_CONFIG_NOSYSTEM", "1");
+        for key in ["PATH", "SystemRoot", "WINDIR"] {
+            if let Some(value) = std::env::var_os(key) {
+                command.env(key, value);
+            }
+        }
+        let output = command.stdin(Stdio::null()).output().unwrap();
+        assert!(output.status.success(), "git {arguments:?}: {output:?}");
+        output.stdout
+    }
+
+    /// One Job of `operation` run to its end: its status and evidence.
+    fn run_job(pipe: &str, label: &str, operation: &str, inputs: Value) -> (Value, Value) {
+        let request = job_request(label, operation, inputs);
+        let planned = answered(pipe, "job.plan", request.clone());
+        assert_eq!(planned["authorizationPolicy"], "defaultReadOnly", "{label}");
+        assert_eq!(planned["effectiveEffect"], "hostOnly", "{label}");
+        let job = answered(pipe, "job.submit", request)["jobId"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let ran = answered(pipe, "job.run", json!({"jobId": job}));
+        let result = answered(pipe, "job.result", json!({"jobId": job}));
+        (ran, result)
+    }
+
+    /// The trusted system tools and the daemon's own image are the
+    /// code-owned tools: a registered OpenHarmony project inside a git
+    /// working copy resolves to its profile, and every profile-served read,
+    /// the isolated copy and the sweep run, each publishing exactly what its
+    /// tool prints when run directly with the argv the provider built.
+    fn the_profile_served_reads_and_the_isolated_copy_run_through_the_code_owned_tools() {
+        let root = Root::new("lanes");
+        let project = root.project();
+        git(&project, &["init", "--quiet"]);
+        git(&project, &["add", "-A"]);
+        git(&project, &["commit", "--quiet", "-m", "base"]);
+        let mut first = Daemon::spawn(daemon(&root.0));
+        let pipe = first.serving();
+        let registered = answered(
+            &pipe,
+            "workspace.project.register",
+            json!({"registrationRequestId": "workspace-lanes", "kind": "openharmony",
+                "root": project}),
+        )["projectRef"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        first.stop(&root.0);
+
+        let mut second = Daemon::spawn(daemon(&root.0));
+        let pipe = second.serving();
+        let shown = answered(
+            &pipe,
+            "workspace.project.show",
+            json!({"projectRef": registered}),
+        );
+        assert_eq!(shown["configurationStatus"], "active", "{shown}");
+        assert_eq!(shown["availability"], "available", "{shown}");
+        for reference in [
+            "workspace.read-source-range@1",
+            "workspace.inspect-git-status@1",
+            "workspace.inspect-diff@1",
+            "workspace.prepare-isolated-copy@1",
+            "workspace.sweep-isolated-copies@1",
+        ] {
+            let operation = described(&pipe, reference);
+            assert_eq!(operation["availability"], "available", "{operation}");
+        }
+        // A workspace mutation is the device-mutation authority's, which a
+        // development root does not hold (as the macOS isolated owner
+        // without its acknowledged authority).
+        for reference in [
+            "workspace.apply-patch@1",
+            "workspace.revert-patch@1",
+            "workspace.create-checkpoint@1",
+        ] {
+            let operation = described(&pipe, reference);
+            assert_eq!(operation["availability"], "unavailable", "{operation}");
+            assert_eq!(
+                operation["availabilityReasons"],
+                json!(["runtime.mutationOwnerUnavailable"]),
+                "{operation}"
+            );
+        }
+
+        // The isolated copy of the committed tree, then an edit.
+        let scoped = [
+            "entry/src/main/ets/pages/Index.ets",
+            "entry/src/main/ets/pages/Other.txt",
+        ];
+        let revision = workspace_revision(&project, &scoped);
+        let (ran, copied) = run_job(
+            &pipe,
+            "copy",
+            "workspace.prepare-isolated-copy",
+            json!({"projectRef": registered, "allowedFileGlobs": ["entry/src/main/ets/**"],
+                "expectedWorkspaceRevision": revision}),
+        );
+        let timeline = std::fs::read_to_string(
+            root.0
+                .join("jobs-state")
+                .join("jobs")
+                .join(ran["jobId"].as_str().unwrap())
+                .join("job-record.json"),
+        )
+        .unwrap_or_default();
+        assert_eq!(ran["outcome"], "succeeded", "{ran} {timeline}");
+        assert_eq!(copied["evidence"]["status"], "verified", "{copied}");
+        let copies = root.0.join("evolution-workspaces");
+        let tasks: Vec<PathBuf> = std::fs::read_dir(&copies)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .collect();
+        assert_eq!(tasks.len(), 1, "{tasks:?}");
+        let copied_index = tasks[0]
+            .join("workspace")
+            .join("entry/src/main/ets/pages/Index.ets");
+        assert_eq!(
+            std::fs::read_to_string(&copied_index).unwrap(),
+            INDEX_SOURCE
+        );
+        std::fs::write(
+            Path::new(&project).join(INDEX),
+            format!("{INDEX_SOURCE}// edited\n"),
+        )
+        .unwrap();
+
+        let index = format!("{project}\\entry\\src\\main\\ets\\pages\\Index.ets");
+        let sed =
+            arkdeck_hoststore::run_text_tool("sed", &["-n", "2,4p", &index].map(str::to_owned));
+        for (label, operation, inputs, expected) in [
+            (
+                "range",
+                "workspace.read-source-range",
+                json!({"projectRef": registered, "filePath": INDEX, "lineStart": 2,
+                    "lineEnd": 4}),
+                sed.stdout,
+            ),
+            (
+                "status",
+                "workspace.inspect-git-status",
+                json!({"projectRef": registered}),
+                git_output(
+                    &project,
+                    &[
+                        "-C",
+                        &project,
+                        "status",
+                        "--porcelain=v1",
+                        "--untracked-files=all",
+                        "--",
+                        ".",
+                    ],
+                ),
+            ),
+            (
+                "diff",
+                "workspace.inspect-diff",
+                json!({"projectRef": registered, "baseRevision": "HEAD",
+                    "pathScope": "entry"}),
+                git_output(
+                    &project,
+                    &["-C", &project, "diff", "--stat", "HEAD", "--", "entry"],
+                ),
+            ),
+        ] {
+            assert!(!expected.is_empty(), "{label}: the tool answers");
+            let (ran, result) = run_job(&pipe, label, operation, inputs);
+            assert_eq!(ran["outcome"], "succeeded", "{label}: {ran}");
+            assert_eq!(
+                result["evidence"]["status"], "verified",
+                "{label}: {result}"
+            );
+            let job = ran["jobId"].as_str().unwrap();
+            assert_eq!(derived(&pipe, job).1, expected, "{label}");
+        }
+        second.stop(&root.0);
+
+        // After a restart the copy is adopted again, and a wet sweep with no
+        // quiescence or retention destroys it, keeping its manifest.
+        let mut third = Daemon::spawn(daemon(&root.0));
+        let pipe = third.serving();
+        assert!(
+            !third
+                .seen
+                .iter()
+                .any(|line| line.starts_with("runtime workspace not adopted")),
+            "{:?}",
+            third.seen
+        );
+        let (ran, swept) = run_job(
+            &pipe,
+            "sweep",
+            "workspace.sweep-isolated-copies",
+            json!({"dryRun": false, "minimumQuiescentSeconds": 0, "retainLatestCount": 0}),
+        );
+        assert_eq!(ran["outcome"], "succeeded", "{ran}");
+        assert_eq!(swept["evidence"]["status"], "verified", "{swept}");
+        assert!(
+            !tasks[0].join("workspace").exists(),
+            "the copy is destroyed"
+        );
+        assert!(
+            tasks[0].join("workspace.json").exists(),
+            "its manifest is kept"
+        );
         third.stop(&root.0);
     }
 

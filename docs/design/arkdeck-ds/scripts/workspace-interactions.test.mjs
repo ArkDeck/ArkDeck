@@ -2108,3 +2108,38 @@ test('private keyboard panel discloses clipboard scope and never simulates a sen
     assert.equal(h.run('JSON.stringify(S.deviceControl.events)'), before);
   }
 });
+
+test('recovery controls keep unknown work parked and bind only the exact Flash target', () => {
+  const h=harness('?page=overview&jobState=unknown');
+  assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),'reconcile');
+  assert.equal(h.run('inspectorCanRebind(inspectorJobs()[0])'),false);
+  const before=h.run('JSON.stringify(inspectorJobs())');
+  h.run("requestInspectorRecovery('job-demo-global','resume')");
+  assert.equal(h.run('S.inspectorRecovery'),undefined);
+  h.run("requestInspectorRecovery('job-demo-global','reconcile')");
+  assert.equal(h.run('S.inspectorRecovery'),'job-demo-global');
+  assert.equal(h.run('JSON.stringify(inspectorJobs())'),before);
+  assert.match(h.run('inspectorRecoveryHTML(inspectorJobs()[0])'),/jobRecovery.action.result/);
+  for(const language of ['en','zh']){
+    h.run(`S.language='${language}'`);
+    const catalog=JSON.parse(read('ArkDeckApp/Resources/JobsLocalizable.xcstrings')).strings;
+    const lang=language==='en'?'en':'zh-Hans';
+    for(const key of ['reconcile','reconcile.detail','unconfirmed'])
+      assert.ok(h.run('inspectorRecoveryHTML(inspectorJobs()[0])').includes(catalog['jobRecovery.action.'+key].localizations[lang].stringUnit.value));
+  }
+  h.run("S.jobs=[{id:'flash',operation:'flash.full-restore@1',state:'waitingForRecovery',outcomeUnknown:true}]");
+  assert.equal(h.run('inspectorCanRebind(inspectorJobs()[0])'),true);
+  h.run("requestInspectorRecovery('flash','rebind')");
+  assert.equal(h.run('inspectorJobs()[0].outcomeUnknown'),true);
+  for(const state of ['running','succeeded','awaitingRebindConfirmation']){
+    h.run(`S.jobs[0].state='${state}'`);
+    assert.equal(h.run('inspectorCanRebind(inspectorJobs()[0])'),false);
+    assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),null);
+  }
+  h.run("S.jobs[0].state='resumeAtConfirmedSafeBoundary';S.jobs[0].outcomeUnknown=false");
+  assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),null);
+  h.run("S.jobs[0].waitingForHuman=false");
+  assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),'resume');
+  h.run("S.jobs[0].supersededByRecoveryEpochID='epoch-fixture'");
+  assert.equal(h.run('inspectorRecoveryAction(inspectorJobs()[0])'),null);
+});

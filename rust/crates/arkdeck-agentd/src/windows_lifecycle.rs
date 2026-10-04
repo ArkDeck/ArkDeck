@@ -20,7 +20,7 @@
 //!   [`Authority::compose`]); every input that would compose another
 //!   owner on macOS is refused, not ignored, until its store is ported (G01),
 //!   and a development HDC is admitted only by a registered Windows HDC
-//!   tuple (`windows_hdc_gate`, CHG-2026-078), of which there is none yet,
+//!   tuple (`windows_hdc_gate`, CHG-2026-078: DevEco's `hdc.exe` only),
 //!   and then composed only as the root's managed server (`managed_hdc`);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
@@ -460,7 +460,7 @@ impl Authority {
     /// One validated `ARKDECK_ARKFORGE_BUNDLE_PATH` bundle names the
     /// `arkforged.exe` to start and pair, but its authority must name the
     /// managed-control HDC's digest (`hdc_sha256`, the managed server's), and
-    /// no HDC is composed until the Windows HDC tuple is registered: the lane
+    /// no HDC is composed without the registered Windows HDC tuple: the lane
     /// is refused before anything is launched, and the start reports why. Its planning, its facts (over the
     /// Windows USB census, open since the DAYU200 sample confirmed its
     /// mapping) and the device access observer of the lane's
@@ -511,8 +511,8 @@ impl Authority {
                 ),
             ));
         // The executable lane, installed only with a lane and a
-        // descriptor-bound HDC: neither exists on Windows until the managed
-        // HDC is composed, so nothing is installed yet.
+        // descriptor-bound HDC: on Windows only when the registered tuple's
+        // managed HDC is composed; otherwise nothing is installed.
         let host = crate::arkforge_execution::install(
             host,
             &composed,
@@ -1134,7 +1134,8 @@ fn signing_store() -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     Ok((root, image))
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
 
@@ -1163,10 +1164,17 @@ mod tests {
     /// A stand-in HDC compiled from Rust at test time (the macOS tests
     /// compile theirs from C): `-s <endpoint> -m` listens on the endpoint and
     /// accepts until it is ended; `-s <endpoint> checkserver` answers agreeing
-    /// versions; anything else is unregistered (status 64). No real HDC runs.
+    /// versions; `list targets -v` answers the registered UART-only listing,
+    /// so the managed start settles past the server-startup listing at once
+    /// (CHG-2026-078 r3); anything else is unregistered (status 64). No real
+    /// HDC runs.
     const STAND_IN: &str = r#"
 fn main() {
     let arguments: Vec<String> = std::env::args().collect();
+    if arguments[1..] == ["list", "targets", "-v"] {
+        print!("COM1\t\tUART\tReady\tunknown...\thdc\r\n");
+        return;
+    }
     match arguments.get(3).map(String::as_str) {
         Some("-m") => {
             let listener = std::net::TcpListener::bind(&arguments[2]).unwrap();
@@ -1257,7 +1265,8 @@ fn main() {
                 .find(|(key, _)| *key == name)
                 .map(|(_, value)| OsString::from(value))
         };
-        // The draft registry refuses it before anything is launched.
+        // The registered table (DevEco's `hdc.exe` only) refuses this
+        // stand-in before anything is launched.
         assert!(
             crate::windows_hdc_gate::admit(&variable, arkdeck_provider_hdc::WINDOWS_HDC_TUPLES)
                 .is_err()
@@ -1311,7 +1320,42 @@ fn main() {
             })
         );
         assert!(!server.requires_recomposition());
+        // Device-bound Jobs plan, admit, run and reconcile over this HDC
+        // (TASK-XPA-005): with a Target store its composition is built over
+        // the admitted tool, and `operation.list` asks after its identity
+        // rather than calling the provider unregistered.
+        // The temporary directory in its canonical, plain long spelling, which
+        // the Target store compares its root with (an 8.3 TEMP is refused).
+        let temporary = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+        let temporary = temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .map_or(temporary.clone(), std::path::PathBuf::from);
+        let state = temporary.join(format!(
+            "arkdeck-job-hdc-{:x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        arkdeck_platform::HostDirectory::open_or_create_private(&state.join("targets")).unwrap();
+        assert_eq!(host.operation_availability("observe.device@1", "hdc"), None);
+        let host = host
+            .with_targets(arkdeck_hoststore::TargetStore::open(&state.join("targets")).unwrap())
+            .with_planning(&state, None);
+        {
+            let composition = host.hdc().expect("the Jobs' HDC composition");
+            assert_eq!(composition.tool_sha256, sha256);
+            assert!(composition.receive_root.is_some());
+        }
+        let reasons = host
+            .operation_availability("observe.device@1", "hdc")
+            .expect("the HDC provider is registered");
+        assert!(
+            !reasons
+                .iter()
+                .any(|(code, _)| *code == "tool_identity_drift"),
+            "{reasons:?}"
+        );
         drop(host);
+        let _ = std::fs::remove_dir_all(&state);
         let stopped = launched.stop().unwrap();
         assert!(stopped.server.is_ok(), "{stopped:?}");
         assert!(stopped.report(true).is_empty(), "{stopped:?}");
@@ -1332,4 +1376,5 @@ fn main() {
             );
         }
     }
+}
 }

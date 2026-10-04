@@ -1,0 +1,439 @@
+{
+  "schema": "arkdeck-windows-hdc-sample-sanitized/v1",
+  "phase": "no-board",
+  "refused": null,
+  "serverBefore": {
+    "listeners8710": [],
+    "listenerOwners": [],
+    "hdcProcesses": []
+  },
+  "serverAfter": {
+    "listeners8710": [
+      {
+        "localAddress": "127.0.0.1",
+        "localPort": 8710,
+        "pid": "pid-1"
+      }
+    ],
+    "listenerOwners": [
+      {
+        "pid": "pid-1",
+        "alive": true,
+        "name": "hdc",
+        "parentPid": null,
+        "imageIsSelectedTool": true,
+        "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "startSeconds": 0.0
+      }
+    ],
+    "hdcProcesses": [
+      {
+        "pid": "pid-1",
+        "alive": true,
+        "name": "hdc",
+        "parentPid": null,
+        "imageIsSelectedTool": true,
+        "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+        "startSeconds": 0.0
+      }
+    ]
+  },
+  "commands": [
+    {
+      "name": "version",
+      "argv": [
+        "-v"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 84.5617,
+      "streamsClosedWithin5s": true,
+      "stdoutBytes": 13,
+      "stderrBytes": 0,
+      "stdoutRedactedSha256": "78c4d7b4ffc0bb7bb0bac0512e5fe9da25be07c481ff7a41dfc9732f7da0a424",
+      "stderrRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "keyRedacted": false,
+      "stdoutTerminator": "CRLF",
+      "stdoutHasCR": true,
+      "serverBefore": {
+        "listeners8710": [],
+        "listenerOwners": [],
+        "hdcProcesses": []
+      },
+      "serverAfter": {
+        "listeners8710": [],
+        "listenerOwners": [],
+        "hdcProcesses": []
+      },
+      "text": "Ver: 3.2.0g\r\n"
+    },
+    {
+      "name": "checkserver-no-server",
+      "argv": [
+        "checkserver"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 1438.5112,
+      "streamsClosedWithin5s": true,
+      "stdoutBytes": 56,
+      "stderrBytes": 0,
+      "stdoutRedactedSha256": "653e2fe893655835e9c2ed84a2b0b8663cec4af47fa8d50f5304ea912d38c37e",
+      "stderrRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "keyRedacted": false,
+      "stdoutTerminator": "CRLF",
+      "stdoutHasCR": true,
+      "serverBefore": {
+        "listeners8710": [],
+        "listenerOwners": [],
+        "hdcProcesses": []
+      },
+      "serverAfter": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "text": "Client version:Ver: 3.2.0g, server version:Ver: 3.2.0g\r\n"
+    },
+    {
+      "name": "list-targets-first",
+      "argv": [
+        "list",
+        "targets",
+        "-v"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 110.9474,
+      "streamsClosedWithin5s": true,
+      "stdoutBytes": 66,
+      "stderrBytes": 0,
+      "stdoutRedactedSha256": "31ab060ed0339793ebabd7b8b5c36866d5f37ee80aa0d43eecad9ffc897db623",
+      "stderrRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "keyRedacted": false,
+      "stdoutTerminator": "CRLF",
+      "stdoutHasCR": true,
+      "serverBefore": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "serverAfter": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "listFamily": {
+        "bytes": 66,
+        "terminator": "CRLF",
+        "stderrEmpty": true,
+        "exitCode": 0,
+        "form": "rows",
+        "rowCount": 2,
+        "columnCounts": [
+          6
+        ],
+        "rowTerminators": [
+          "CRLF"
+        ],
+        "rowByteLengths": [
+          33,
+          33
+        ],
+        "carriageReturnInsideField": false,
+        "transports": [
+          "UART"
+        ],
+        "states": [
+          "Ready"
+        ],
+        "hostTags": [
+          "unknown..."
+        ],
+        "connectKeyLengths": [
+          4,
+          4
+        ],
+        "connectKeyCharacterClasses": [
+          "digit",
+          "upper"
+        ]
+      }
+    },
+    {
+      "name": "list-targets-empty",
+      "argv": [
+        "list",
+        "targets",
+        "-v"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 50.5273,
+      "streamsClosedWithin5s": true,
+      "stdoutBytes": 66,
+      "stderrBytes": 0,
+      "stdoutRedactedSha256": "31ab060ed0339793ebabd7b8b5c36866d5f37ee80aa0d43eecad9ffc897db623",
+      "stderrRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "keyRedacted": false,
+      "stdoutTerminator": "CRLF",
+      "stdoutHasCR": true,
+      "serverBefore": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "serverAfter": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "listFamily": {
+        "bytes": 66,
+        "terminator": "CRLF",
+        "stderrEmpty": true,
+        "exitCode": 0,
+        "form": "rows",
+        "rowCount": 2,
+        "columnCounts": [
+          6
+        ],
+        "rowTerminators": [
+          "CRLF"
+        ],
+        "rowByteLengths": [
+          33,
+          33
+        ],
+        "carriageReturnInsideField": false,
+        "transports": [
+          "UART"
+        ],
+        "states": [
+          "Ready"
+        ],
+        "hostTags": [
+          "unknown..."
+        ],
+        "connectKeyLengths": [
+          4,
+          4
+        ],
+        "connectKeyCharacterClasses": [
+          "digit",
+          "upper"
+        ]
+      }
+    },
+    {
+      "name": "checkserver-server-up",
+      "argv": [
+        "checkserver"
+      ],
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 117.2317,
+      "streamsClosedWithin5s": true,
+      "stdoutBytes": 56,
+      "stderrBytes": 0,
+      "stdoutRedactedSha256": "653e2fe893655835e9c2ed84a2b0b8663cec4af47fa8d50f5304ea912d38c37e",
+      "stderrRedactedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "keyRedacted": false,
+      "stdoutTerminator": "CRLF",
+      "stdoutHasCR": true,
+      "serverBefore": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "serverAfter": {
+        "listeners8710": [
+          {
+            "localAddress": "127.0.0.1",
+            "localPort": 8710,
+            "pid": "pid-1"
+          }
+        ],
+        "listenerOwners": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ],
+        "hdcProcesses": [
+          {
+            "pid": "pid-1",
+            "alive": true,
+            "name": "hdc",
+            "parentPid": null,
+            "imageIsSelectedTool": true,
+            "imageSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+            "startSeconds": 0.0
+          }
+        ]
+      },
+      "text": "Client version:Ver: 3.2.0g, server version:Ver: 3.2.0g\r\n"
+    }
+  ]
+}

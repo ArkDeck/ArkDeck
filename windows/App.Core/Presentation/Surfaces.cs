@@ -130,7 +130,8 @@ public sealed record OverviewState(
     Loaded<DoctorFacts> Doctor,
     Loaded<IReadOnlyList<JobSummary>> Recent,
     ControlFailure? DaemonFailure,
-    bool Reached) : SurfaceState(DaemonFailure, Reached);
+    bool Reached,
+    Loaded<IReadOnlyList<DeviceCandidate>>? Devices = null) : SurfaceState(DaemonFailure, Reached);
 
 public sealed record DeviceState(
     Loaded<IReadOnlyList<DeviceCandidate>> Candidates,
@@ -149,7 +150,40 @@ public sealed record HistoryState(Loaded<IReadOnlyList<JobSummary>> Jobs, Contro
     : SurfaceState(DaemonFailure, Reached);
 
 public sealed record JobDetailState(string JobId, Loaded<JobSummary> Status, Loaded<IReadOnlyList<JobEvent>> Events,
-    ControlFailure? DaemonFailure, bool Reached) : SurfaceState(DaemonFailure, Reached);
+    ControlFailure? DaemonFailure, bool Reached, Loaded<IReadOnlyList<ArtifactSummary>>? Artifacts = null) : SurfaceState(DaemonFailure, Reached);
+
+/// <summary>The log Artifacts the Catalog declares (role <c>log</c>), by operation: the Job
+/// Inspector previews these (macOS <c>readLog</c>, <c>artifact.role == "log"</c>).</summary>
+public static class JobLogArtifacts
+{
+    public const int MaximumBytes = 2 * 1_024 * 1_024;
+    public const int TailLines = 200;
+
+    public static readonly IReadOnlyDictionary<string, string> Declared = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["capture.diagnostics@1"] = "capture.log",
+        ["capture.diagnostic-session@1"] = "capture.log",
+        ["workspace.build-openharmony@1"] = "build.log",
+        ["workspace.run-tests@1"] = "test-output.log",
+    };
+
+    public static bool IsLog(string operation, ArtifactSummary artifact) =>
+        Declared.TryGetValue(operation, out var name) && artifact.Name == name && artifact.IsPublished && artifact.SourceOperation == operation;
+
+    /// <summary>The last 200 lines of a log, or null when it is not UTF-8 text.</summary>
+    public static string? Tail(byte[] bytes)
+    {
+        try
+        {
+            var lines = new System.Text.UTF8Encoding(false, true).GetString(bytes).Split('\n');
+            return string.Join('\n', lines.Skip(Math.Max(0, lines.Length - TailLines)));
+        }
+        catch (System.Text.DecoderFallbackException)
+        {
+            return null;
+        }
+    }
+}
 
 /// <summary>The History detail of one Job: its status and its Artifacts.</summary>
 public sealed record HistoryDetailState(string JobId, Loaded<JobSummary> Status, Loaded<IReadOnlyList<ArtifactSummary>> Artifacts,
@@ -182,7 +216,8 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
         var doctor = await run.Load(c => c.RequestAsync("doctor", Params(("deep", JsonBool.False))), DoctorFacts.Parse, CliCommands.Doctor);
         var recent = await run.Load(c => c.RequestAsync("job.list", Params(("pageSize", JsonNumber.FromInt64(OverviewRecentCount)))),
             JobSummary.ParsePage, CliCommands.JobList);
-        return new(health, doctor, recent, run.DaemonFailure, run.Reached);
+        var devices = await run.Load(c => c.RequestAsync("device.observations"), DeviceCandidate.ParseAll, CliCommands.DeviceCandidates);
+        return new(health, doctor, recent, run.DaemonFailure, run.Reached, devices);
     }
 
     /// <summary>The Device page: the candidates HDC observes and the Targets adopted before
@@ -246,7 +281,11 @@ public sealed partial class SurfaceLoader(IControlChannel channel)
             CliCommands.ForJob(CliCommands.JobStatus, jobId));
         var events = await run.Load(c => c.RequestAsync("job.events", Params(("jobId", id))), JobEvent.ParsePage,
             CliCommands.ForJob(CliCommands.JobEvents, jobId));
-        return new(jobId, status, events, run.DaemonFailure, run.Reached);
+        // The log Artifacts only for an operation that declares one (no read otherwise).
+        Loaded<IReadOnlyList<ArtifactSummary>>? artifacts = status.Value is { } job && JobLogArtifacts.Declared.ContainsKey(job.Operation)
+            ? await run.LoadPages(c => ArtifactPagesAsync(c, jobId), CliCommands.ArtifactListForJob(jobId))
+            : null;
+        return new(jobId, status, events, run.DaemonFailure, run.Reached, artifacts);
     }
 
     /// <summary>The History detail of one Job: <c>job.status</c>, every <c>artifact.list</c>

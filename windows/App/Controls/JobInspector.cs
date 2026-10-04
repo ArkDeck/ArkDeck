@@ -42,6 +42,13 @@ public sealed partial class JobInspector : UserControl
         AutomationProperties.SetAutomationId(this, "jobInspector");
         AutomationProperties.SetName(this, S.Text(UiStrings.JobInspectorRuntimeFacts));
         _toggle = Ui.Button("jobInspector.toggle", S.Text(UiStrings.JobInspectorActionHide), (_, _) => SetExpanded(!_isExpanded));
+        // macOS Command-Shift-J.
+        _toggle.KeyboardAccelerators.Add(new Microsoft.UI.Xaml.Input.KeyboardAccelerator
+        {
+            Key = Windows.System.VirtualKey.J,
+            Modifiers = Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift,
+            ScopeOwner = null,
+        });
         _compact = Ui.Live(Ui.Text("jobInspector.compact.status", S.Text(UiStrings.JobInspectorRefreshing), "ArkDeckCaptionStyle"), AutomationLiveSetting.Polite);
         _compact.VerticalAlignment = VerticalAlignment.Center;
         var bar = Ui.Row(
@@ -70,6 +77,7 @@ public sealed partial class JobInspector : UserControl
         var state = await Task.Run(App.Loader.HistoryAsync);
         RenderList(state);
         MainWindow.Instance.Report(state);
+        MainWindow.Instance.ShowJobRecovery(state.Jobs.Value);
         if (_selectedJob is { } job) await ShowJobAsync(job);
     }
 
@@ -165,8 +173,12 @@ public sealed partial class JobInspector : UserControl
         _stateText = Ui.Live(Ui.Text("jobInspector.state", label, "ArkDeckSectionTitleStyle"), AutomationLiveSetting.Assertive);
         _detail.Children.Add(Ui.Heading("jobInspector.runtimeFacts", S.Text(UiStrings.JobInspectorRuntimeFacts)));
         _detail.Children.Add(_stateText);
-        if (job.OutcomeUnknown) _detail.Children.Add(Ui.Text("jobInspector.attention", S.Text(UiStrings.JobInspectorResultOutcomeUnknown)));
-        else if (job.WaitingForHuman) _detail.Children.Add(Ui.Text("jobInspector.attention", S.Text(UiStrings.JobInspectorResultWaitingForHuman)));
+        var established = JobRecovery.HasEstablishedCurrentEpoch(job);
+        if (job.IsActive && !established) _detail.Children.Add(Ui.Progress("jobInspector.progress", S.Text(UiStrings.JobInspectorProgress)));
+        // An unknown outcome or a person's action is current attention only while no later
+        // epoch was established for it (macOS needsAttention).
+        if (!established && job.OutcomeUnknown) _detail.Children.Add(Ui.Text("jobInspector.attention", S.Text(UiStrings.JobInspectorResultOutcomeUnknown)));
+        else if (!established && job.WaitingForHuman) _detail.Children.Add(Ui.Text("jobInspector.attention", S.Text(UiStrings.JobInspectorResultWaitingForHuman)));
         Actions(job);
         foreach (var (id, key, value) in new[]
                  {
@@ -179,6 +191,23 @@ public sealed partial class JobInspector : UserControl
         {
             _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
         }
+        // macOS establishedCurrentEpochRelation: the unknown outcome stays recorded, and the later
+        // confirmed action that established the current epoch is named.
+        var relation = job.SupersededByRecoveryEpochId is { } epoch ? (epoch, UiStrings.JobInspectorResultSupersededByRecovery)
+            : job.ResolvedByTargetAliasResolutionId is { } resolution ? (resolution, UiStrings.JobInspectorResultTargetAliasResolved)
+            : ((string, string)?)null;
+        if (relation is { } found)
+        {
+            var (relationId, messageKey) = found;
+            _detail.Children.Add(Ui.Card(Ui.Stack(4,
+                Ui.Text("jobInspector.establishedCurrentEpoch.message", S.Text(messageKey)),
+                Ui.Fact("jobInspector.fact.recoveryRelation", S.Text(UiStrings.JobInspectorFactRecoveryRelation), relationId)), "jobInspector.establishedCurrentEpoch"));
+        }
+        if (job.OutstandingResidueCount > 0)
+        {
+            _detail.Children.Add(Ui.Text("jobInspector.residue", S.Format(UiStrings.JobInspectorResidue, job.OutstandingResidueCount)));
+        }
+        Logs(job, state.Artifacts);
         if (!job.IsActive) Result(job);
         _detail.Children.Add(Ui.Heading("jobInspector.timeline", S.Text(UiStrings.JobInspectorTimeline)));
         if (state.Events.Unavailable is { } eventsWhy)
@@ -204,6 +233,84 @@ public sealed partial class JobInspector : UserControl
         _lastState = job.State;
         if (job.IsActive) _poll.Start();
         else _poll.Stop();
+    }
+
+    // ---- log Artifacts, read locally (macOS readLog) ----
+
+    private readonly Dictionary<string, (string Name, string Text)> _logs = new(StringComparer.Ordinal);
+    private bool _readingLog;
+    private readonly Dictionary<string, string> _logErrors = new(StringComparer.Ordinal);
+
+    private void Logs(JobSummary job, Loaded<IReadOnlyList<ArtifactSummary>>? artifacts)
+    {
+        if (artifacts is null) return;
+        if (artifacts.Unavailable is { } why)
+        {
+            var reason = Ui.Text("jobInspector.artifacts.unavailable", why.ReasonText(S), "ArkDeckCaptionStyle");
+            reason.IsTextSelectionEnabled = true;
+            _detail.Children.Add(reason);
+            return;
+        }
+        foreach (var artifact in artifacts.Value!.Where(a => JobLogArtifacts.IsLog(job.Operation, a)))
+        {
+            var read = Ui.Button("jobInspector.readLog." + artifact.ArtifactId, $"{S.Text(UiStrings.JobInspectorActionReadLog)} · {artifact.Name}",
+                async (_, _) => await ReadLogAsync(job, artifact));
+            ToolTipService.SetToolTip(read, S.Text(UiStrings.JobInspectorLogPrivacy));
+            AutomationProperties.SetHelpText(read, S.Text(UiStrings.JobInspectorLogPrivacy));
+            _detail.Children.Add(Ui.Row(read));
+        }
+        if (_readingLog) _detail.Children.Add(Ui.Progress("jobInspector.log.loading", S.Text(UiStrings.JobInspectorActionReadLog)));
+        if (_logErrors.TryGetValue(job.JobId, out var logError))
+        {
+            _detail.Children.Add(Ui.Live(Ui.Text("jobInspector.log.error", logError, "ArkDeckCaptionStyle"), AutomationLiveSetting.Polite));
+        }
+        if (_logs.TryGetValue(job.JobId, out var log))
+        {
+            _detail.Children.Add(Ui.Text("jobInspector.log.tail", S.Text(UiStrings.JobInspectorLogTail), "ArkDeckCaptionStyle"));
+            var text = Ui.Text("jobInspector.log.text", log.Text, "ArkDeckMonoStyle");
+            text.IsTextSelectionEnabled = true;
+            AutomationProperties.SetName(text, log.Name);
+            _detail.Children.Add(text);
+        }
+    }
+
+    /// <summary>Only a standard-privacy log is previewed here (a sensitive one is read explicitly
+    /// in History); the bytes are checked against the Artifact's digest, at most 2 MiB, and the
+    /// last 200 lines are shown.</summary>
+    private async Task ReadLogAsync(JobSummary job, ArtifactSummary artifact)
+    {
+        if (_readingLog) return;
+        if (artifact.IsSensitive)
+        {
+            _logErrors[job.JobId] = S.Text(UiStrings.JobInspectorLogPrivacy);
+            await ShowJobAsync(job.JobId);
+            return;
+        }
+        _readingLog = true;
+        _logs.Remove(job.JobId);
+        _logErrors.Remove(job.JobId);
+        await ShowJobAsync(job.JobId);
+        try
+        {
+            if (artifact.ByteCount > JobLogArtifacts.MaximumBytes)
+            {
+                _logErrors[job.JobId] = "Artifact is unpublished or exceeds the bounded preview limit";
+                return;
+            }
+            var (bytes, failure) = await Task.Run(() => new ArtifactExporter(App.Loader.Channel).ReadAsync(job.JobId, artifact, allowSensitive: false));
+            if (bytes is null)
+            {
+                _logErrors[job.JobId] = failure!.ReasonText(S);
+                return;
+            }
+            if (JobLogArtifacts.Tail(bytes) is { } tail) _logs[job.JobId] = (artifact.Name, tail);
+            else _logErrors[job.JobId] = S.Text(UiStrings.JobInspectorLogNotText);
+        }
+        finally
+        {
+            _readingLog = false;
+            await ShowJobAsync(job.JobId);
+        }
     }
 
     /// <summary>The macOS inspector actions: open the record in History, and — for a queued or

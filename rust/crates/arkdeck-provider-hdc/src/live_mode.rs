@@ -18,7 +18,7 @@
 //! before an `HdcDispatch` exists, and [`LiveModeFailure::unavailable_tool`]
 //! keeps that report's wording for the composer.
 use crate::{
-    DispatchFailure, HdcDispatch, ParseError, ProcessPlan, Property, parse_target_list,
+    DispatchFailure, HdcDispatch, ParseError, ProcessPlan, Property, parse_host_target_list,
     property_value,
 };
 use sha2::{Digest, Sha256};
@@ -34,7 +34,9 @@ const READ_CAPTURE_BYTES: usize = 64 * 1024;
 /// Swift `buildFingerprint`: a longer readback is not a build.
 const MAXIMUM_BUILD_CHARACTERS: usize = 400;
 /// The registered tool version Swift parses the live target list with
-/// (`profile: .openHarmony320Family, toolVersion: "3.2.0f"`).
+/// (`profile: .openHarmony320Family, toolVersion: "3.2.0f"`). A dispatch
+/// pinned to a registered Windows HDC tuple (CHG-2026-078) is read by that
+/// tuple's own grammar instead ([`target_list_version`]).
 const TARGET_LIST_VERSION: &str = "3.2.0f";
 
 /// The mode the live probe can name. Swift documents `maskrom` as a third
@@ -238,12 +240,23 @@ impl<'a> LiveModeProbe<'a> {
     /// parser cannot read is never downgraded to "the device is not there".
     fn is_connected_over_hdc(&self, connect_key: &str) -> Result<bool, LiveModeFailure> {
         let receipt = self.read(target_list_plan())?;
-        match parse_target_list(&receipt.stdout, TARGET_LIST_VERSION, receipt.truncated) {
+        match parse_host_target_list(
+            &receipt.stdout,
+            target_list_version(self.hdc),
+            receipt.truncated,
+        ) {
             Ok(rows) => Ok(rows
                 .iter()
                 .filter(|row| row.connect_key == connect_key && row.state == "Connected")
                 .count()
                 == 1),
+            // Zero bytes were never observed from the registered Windows
+            // tool (CHG-2026-078): unknown there, never absence.
+            Err(ParseError::Empty) if self.hdc.registered_windows_tuple().is_some() => {
+                Err(not_observable(
+                    "HDC target list is empty, which the registered Windows family never is",
+                ))
+            }
             Err(ParseError::Empty) => Ok(false),
             Err(ParseError::UnsupportedVersion(version)) => Err(not_observable(format!(
                 "HDC target parser does not support {version}"
@@ -316,6 +329,15 @@ impl<'a> LiveModeProbe<'a> {
         }
         Ok(receipt)
     }
+}
+
+/// The version whose registered grammar reads `hdc`'s target list: the
+/// registered Windows tuple's own (its six-column `USB` family, UART rows
+/// excluded) when the dispatch is pinned to one, Swift's macOS family
+/// otherwise, unchanged.
+fn target_list_version(hdc: &dyn HdcDispatch) -> &'static str {
+    hdc.registered_windows_tuple()
+        .map_or(TARGET_LIST_VERSION, |tuple| tuple.reported_version)
 }
 
 fn target_list_plan() -> ProcessPlan {
@@ -399,6 +421,9 @@ mod tests {
     struct Scripted {
         answers: RefCell<VecDeque<Answer>>,
         plans: RefCell<Vec<ProcessPlan>>,
+        /// Pinned to the registered Windows tuple (CHG-2026-078), as a
+        /// dispatch of the registered `hdc.exe` is.
+        windows: bool,
     }
 
     impl Scripted {
@@ -406,6 +431,15 @@ mod tests {
             Self {
                 answers: RefCell::new(answers.into()),
                 plans: RefCell::new(Vec::new()),
+                windows: false,
+            }
+        }
+
+        #[cfg(windows)]
+        fn pinned_to_the_windows_tuple(answers: Vec<Answer>) -> Self {
+            Self {
+                windows: true,
+                ..Self::new(answers)
             }
         }
 
@@ -423,6 +457,12 @@ mod tests {
     }
 
     impl HdcDispatch for Scripted {
+        fn registered_windows_tuple(&self) -> Option<&'static crate::WindowsHdcTuple> {
+            self.windows
+                .then(|| crate::WINDOWS_HDC_TUPLES.first())
+                .flatten()
+        }
+
         fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
             self.plans.borrow_mut().push(plan.clone());
             let answer = self
@@ -747,6 +787,108 @@ mod tests {
             let hdc = Scripted::new(vec![answer]);
             assert_eq!(detail(observe(&hdc, &refusing, None)), expected);
             assert_eq!(hdc.arguments().len(), 1);
+        }
+    }
+
+    /// The registered Windows tuple's own listings (CHG-2026-078, the c2
+    /// captures of 2026-10-04): a dispatch pinned to it reads them by the
+    /// Windows six-column family, `USB` rows only and UART rows excluded.
+    #[cfg(windows)]
+    mod windows_tuple {
+        use super::*;
+
+        /// The redacted connect key of the c2 captures.
+        const C2_KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const CONNECTED: &[u8] = include_bytes!(
+            "../../../tests/fixtures/hdc-windows/c2/board-connected/list-targets-board-connected.stdout.bin"
+        );
+        const REMOVED: &[u8] = include_bytes!(
+            "../../../tests/fixtures/hdc-windows/c2/board-removed/list-targets-board-removed.stdout.bin"
+        );
+        const NO_BOARD: &[u8] = include_bytes!(
+            "../../../tests/fixtures/hdc-windows/c2/no-board/list-targets-empty.stdout.bin"
+        );
+
+        fn observe_c2(
+            hdc: &Scripted,
+            loader: &dyn LoaderObserver,
+            usb: Option<&dyn UsbProbe>,
+        ) -> Result<LiveModeObservation, LiveModeFailure> {
+            LiveModeProbe::new(hdc, loader, usb).observe(C2_KEY, STABLE_IDENTITY)
+        }
+
+        #[test]
+        fn the_connected_capture_is_on_hdc_with_its_build_and_port() {
+            let hdc = Scripted::pinned_to_the_windows_tuple(vec![
+                Answer::Bytes(CONNECTED.to_vec()),
+                Answer::Out(BUILD_ROW),
+            ]);
+            let usb = NormalOnlyUsb::new(C2_KEY, "44");
+            let observation =
+                observe_c2(&hdc, &RefusingLoader("fixture is HDC-normal"), Some(&usb)).unwrap();
+            assert_eq!(
+                observation,
+                LiveModeObservation {
+                    device_mode: DeviceMode::Hdc,
+                    build_fingerprint: Some(BUILD.to_owned()),
+                    usb_topology: Some("44".to_owned()),
+                }
+            );
+            assert_eq!(hdc.arguments()[0], ["list", "targets", "-v"]);
+        }
+
+        #[test]
+        fn the_removed_and_no_board_captures_leave_the_mode_to_the_loader_observer() {
+            for list in [REMOVED, NO_BOARD] {
+                let hdc = Scripted::pinned_to_the_windows_tuple(vec![Answer::Bytes(list.to_vec())]);
+                let loader = FixedLoader::new(STABLE_IDENTITY, "42");
+                let observation = observe_c2(&hdc, &loader, None).unwrap();
+                assert_eq!(observation.device_mode, DeviceMode::Loader);
+                assert_eq!(observation.usb_topology.as_deref(), Some("42"));
+                assert_eq!(hdc.arguments().len(), 1);
+            }
+        }
+
+        #[test]
+        fn the_macos_family_and_unregistered_rows_fail_closed_under_the_windows_tuple() {
+            let lists: [&[u8]; 4] = [
+                // The macOS five-column family.
+                b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa		USB	Connected	localhost
+",
+                // The macOS empty marker, never observed on Windows.
+                b"[Empty]
+",
+                // A UART row outside the sampled form.
+                b"COM1		UART	Connected	localhost	hdc
+",
+                // A sixth column other than `hdc`.
+                b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa		USB	Connected	localhost	x
+",
+            ];
+            for list in lists {
+                let hdc = Scripted::pinned_to_the_windows_tuple(vec![Answer::Bytes(list.to_vec())]);
+                let detail = detail(observe_c2(&hdc, &RefusingLoader("not reached"), None));
+                assert!(
+                    detail.starts_with("HDC target list is malformed: "),
+                    "{list:?}: {detail}"
+                );
+                assert_eq!(hdc.arguments().len(), 1);
+            }
+            // Zero bytes were never observed on Windows: unknown, not absence.
+            let hdc = Scripted::pinned_to_the_windows_tuple(vec![Answer::Bytes(Vec::new())]);
+            assert_eq!(
+                detail(observe_c2(&hdc, &RefusingLoader("not reached"), None)),
+                "HDC target list is empty, which the registered Windows family never is"
+            );
+        }
+
+        #[test]
+        fn an_unpinned_dispatch_keeps_the_macos_family() {
+            let hdc = Scripted::new(vec![Answer::Bytes(CONNECTED.to_vec())]);
+            assert!(
+                detail(observe_c2(&hdc, &RefusingLoader("not reached"), None))
+                    .starts_with("HDC target list is malformed: ")
+            );
         }
     }
 

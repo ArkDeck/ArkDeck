@@ -34,10 +34,28 @@ public static partial class ScriptedDaemon
     /// <see cref="Foundation"/>: the recovery banner appears, then goes away after Retry.</summary>
     public const string Recovers = "recovers";
 
-    /// <summary><see cref="Foundation"/> for the first four connections (the start reads the
-    /// Overview's health, doctor and Jobs and the Job Inspector's Jobs), then nothing answers:
+    /// <summary><see cref="Foundation"/> for the first five connections (the start reads the
+    /// Overview's health, doctor, Jobs and device observations and the Job Inspector's Jobs), then nothing answers:
     /// the daemon goes away while the App shows its data.</summary>
     public const string Outage = "outage";
+
+    /// <summary><see cref="Jobs"/> with two records that need a person now (a Flash waiting for
+    /// recovery, a HAP debug run to resume at a confirmed safe boundary): the global Job
+    /// recovery banner shows them.</summary>
+    public const string Recovery = "recovery";
+
+    public const string WaitingForRecoveryJobId = "job-0000000000000000000000000000a0f1";
+    public const string ResumeSafeJobId = "job-0000000000000000000000000000a0f2";
+
+    /// <summary>A capture of <see cref="Recovery"/> with a published <c>capture.log</c> and two
+    /// device cleanup items left.</summary>
+    public const string LogJobId = "job-0000000000000000000000000000a0f3";
+
+    /// <summary>A Flash of <see cref="Recovery"/> whose outcome stays unknown, superseded by a
+    /// later confirmed recovery epoch (so it needs no one now).</summary>
+    public const string SupersededJobId = "job-0000000000000000000000000000a0f4";
+
+    public const string SupersedingEpochId = "epoch-0000000000000000000000000000e001";
 
     /// <summary>A daemon with a Job store, an Artifact owner and devices: three candidates, one
     /// adopted Target, three Jobs (a running one whose state advances on each
@@ -57,7 +75,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -113,6 +131,8 @@ public static partial class ScriptedDaemon
             Enumerable.Range(0, 300_000).Select(i => (byte)(i * 31 % 251)).ToArray()),
         new(TraceJobId, "ART-00000000000000000000000000000c02", "trace-config.json", "application/json", "standard", "published", "trace.capture@1",
             Encoding.UTF8.GetBytes("{\"durationSeconds\":5,\"tags\":[\"sched\",\"freq\"]}\n")),
+        new(LogJobId, "ART-00000000000000000000000000000d01", "capture.log", "text/plain", "standard", "published", "capture.diagnostics@1",
+            Encoding.UTF8.GetBytes(string.Concat(Enumerable.Range(1, 250).Select(i => $"capture line {i}\n")))),
     ];
 
     public static IControlChannel Channel(string scenario)
@@ -153,7 +173,8 @@ public static partial class ScriptedDaemon
             var mode = scenario switch
             {
                 Recovers => connection <= 2 ? Unavailable : Foundation,
-                Outage => connection <= 4 ? Foundation : Unavailable,
+                Recovery => Jobs,
+                Outage => connection <= 5 ? Foundation : Unavailable,
                 _ => scenario,
             };
             return new Peer(request =>
@@ -243,6 +264,12 @@ public static partial class ScriptedDaemon
             (FailedJobId, "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
             (TraceJobId, "trace.capture@1", "succeeded", "2026-09-30T08:00:00Z"),
             (QueuedJobId, "observe.device@1", _queuedCancelled ? "cancelled" : "queued", "2026-09-30T08:04:00Z"),
+            .. scenario == Recovery
+                ? new[] { (ResumeSafeJobId, "debug.hap@1", "resumeAtConfirmedSafeBoundary", "2026-09-30T07:58:00Z"),
+                          (WaitingForRecoveryJobId, "flash.full-restore@1", "waitingForRecovery", "2026-09-30T07:59:00Z"),
+                          (LogJobId, "capture.diagnostics@1", "succeeded", "2026-09-30T07:57:00Z"),
+                          (SupersededJobId, "flash.full-restore@1", "interrupted", "2026-09-30T07:56:00Z") }
+                : [],
         ];
 
         private byte[] JobStatus(JsonObject request)
@@ -362,7 +389,7 @@ public static partial class ScriptedDaemon
         {
             var owner = (JsonObject)request["params"]["owner"];
             var jobId = ((JsonString)owner["id"]).Value;
-            if (jobId is not (RunningJobId or FailedJobId or TraceJobId)) return Failure(request, "notFound", "no such Job", ArtifactDetails);
+            if (jobId is not (RunningJobId or FailedJobId or TraceJobId or LogJobId)) return Failure(request, "notFound", "no such Job", ArtifactDetails);
             var rows = Artifacts.Where(a => a.JobId == jobId).OrderBy(a => a.Id, StringComparer.Ordinal).Select(a => a.Json());
             return Success(request, Parse($$"""
                 {"hasMore":false,"items":[{{string.Join(",", rows)}}],"nextCursor":null,"order":"createdAtDescArtifactIdAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"0f5e0c1a-0000-4000-8000-000000000001"}
@@ -951,10 +978,20 @@ public static partial class ScriptedDaemon
         var listOnly = list ? "\"current\":true,\"timeline\":null," : string.Empty;
         var schema = list ? "arkdeck.job-summary/1" : "arkdeck.job-status/1";
         var finished = terminal ? $"\"{job.Created}\"" : "null";
-        return $$$"""
+        return RecoveryFacts(job.Id, $$$"""
             {"actualEffect":"readOnly","createdAtUtc":"{{{job.Created}}}",{{{listOnly}}}"executionMode":"execute","failure":null,"finishedAtUtc":{{{finished}}},"jobId":"{{{job.Id}}}","nextAction":{{{next}}},"operation":"{{{job.Operation}}}","outcome":"{{{job.State}}}","outcomeUnknown":false,"outstandingResidueCount":0,"processProgress":null,"recoveryEpochId":null,"resolvedByTargetAliasResolutionId":null,"schemaVersion":"{{{schema}}}","sessionId":"session-{{{job.Id}}}","sessionPublication":{"catalogGeneration":null,"manifestSha256":null,"reasonCode":"noCurrentPublicationRecord","state":"unavailable"},"startedAtUtc":"{{{job.Created}}}","state":"{{{job.State}}}","supersededByRecoveryEpochId":null,"targetId":"TGT-FIXTURE-1","threadId":null,"waitingForHuman":{{{(job.State == "waitingForDevice" ? "true" : "false")}}},"workspaceKind":"device"}
-            """;
+            """);
     }
+
+    /// <summary>The recorded facts of <see cref="Recovery"/>'s Jobs the generic projection cannot
+    /// carry: the superseded Flash's unknown outcome and its epoch, the capture's residue.</summary>
+    private static string RecoveryFacts(string jobId, string json) => jobId switch
+    {
+        SupersededJobId => json.Replace("\"outcomeUnknown\":false", "\"outcomeUnknown\":true", StringComparison.Ordinal)
+            .Replace("\"supersededByRecoveryEpochId\":null", $"\"supersededByRecoveryEpochId\":\"{SupersedingEpochId}\"", StringComparison.Ordinal),
+        LogJobId => json.Replace("\"outstandingResidueCount\":0", "\"outstandingResidueCount\":2", StringComparison.Ordinal),
+        _ => json,
+    };
 
     private static string JobPage(string[] items) => $$"""
         {"hasMore":false,"items":[{{string.Join(",", items)}}],"nextCursor":null,"order":"createdAtDescJobIdAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"r1"}
