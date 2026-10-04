@@ -3873,12 +3873,29 @@ trusts them, and the table is `CodeOwnedTools` in `workspace_profile.rs`:
   their Authenticode publisher at their registered absolute path, never by a
   PATH lookup.
 
-Until the trusted system tools are composed, a registered project resolves to
-no profile. Every profile-served workspace operation is unavailable with
-`workspace.toolchainUnavailable: no trusted system archive (tar) or
-source-control (git) tool is composed on Windows yet`, and a plan of one is
-refused before admission with zero dispatch. `workspace.inspect-source@1`
-needs no profile, so it runs.
+With these tools a registered OpenHarmony project resolves to its profile.
+`external_tools` fills the archive slot with `trusted_system(Tar)` and, inside a
+git working copy, the source-control slot with `trusted_system(Git)`. Git runs
+with `GIT_CONFIG_NOSYSTEM=1`: a verified launch does not name the image Git
+derives its system configuration from, and the Runtime's git reads no host-wide
+configuration. A tool that does not verify resolves the project to no profile.
+
+The profile-served reads (`read-source-range`, `inspect-git-status`,
+`inspect-diff`), the isolated copy and the sweep run end to end on Windows. Three
+changes in the hoststore make this work:
+
+- A relative path below a Windows root is joined with `support::join`, so the
+  patch validation no longer refuses every path as escaping the root.
+- A spawn's working directory is its verbatim spelling.
+- A staged file is closed before it is renamed.
+
+The workspace mutations (`apply-patch`, `revert-patch`, `create-checkpoint`)
+need the device-mutation authority, which a development root does not hold.
+`windows_workspace_provider_process` and
+`windows_signed_runtime::workspace_profile_leaves_run_end_to_end_through_the_pipe`
+measure the rest, and `workspace read|status|diff|isolate|sweep` are in
+`WINDOWS_MEASURED_LEAVES`
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-lanes-run.md)).
 
 `cargo test -p arkdeck-hoststore --test workspace_text_tools_oracle` checks the
 reimplementation against the macOS tools in two ways:

@@ -16,10 +16,10 @@
 //! through one handle that follows no reparse point. The code-owned tools
 //! follow the maintainer's ruling of 2026-10-04 (`CodeOwnedTools`): grep,
 //! sed and patch are this daemon's own image, tar and git trusted system
-//! tools by Authenticode publisher and registered path, never PATH. Until
-//! the system tools are composed a registered project resolves to no
-//! profile, and every profile-served operation is unavailable with that
-//! reason before anything is planned or dispatched.
+//! tools by Authenticode publisher and registered path, never PATH. A tool
+//! that does not verify resolves the project to no profile, and every
+//! profile-served operation is unavailable with that reason before anything
+//! is planned or dispatched.
 use crate::operation_catalog::CatalogOperation;
 use crate::workspace_support::{
     self as support, foundation_resolved, foundation_standardized, is_identifier, is_safe_glob,
@@ -38,12 +38,6 @@ use std::sync::OnceLock;
 /// Why an operation is unavailable: the `operation.list` reason code Swift's
 /// `RuntimeAvailabilityReasonCode` spells, and Swift's reason.
 pub(crate) type Unavailability = (&'static str, String);
-
-/// Why a registered project resolves to no profile on Windows yet: its
-/// external code-owned tools (`tar`, `git`) are not composed.
-#[cfg(windows)]
-pub(crate) const WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE: &str = "workspace.toolchainUnavailable: \
-    no trusted system archive (tar) or source-control (git) tool is composed on Windows yet";
 
 /// Why a code-owned system tool is unavailable on Windows (ruling 69).
 #[cfg(windows)]
@@ -1252,15 +1246,35 @@ fn code_owned_tools(root: &str) -> Result<CodeOwnedTools, String> {
 }
 
 /// The archive writer and, inside a git working copy, the source-control
-/// tool on Windows: none is trusted until the trusted system tools
-/// (`System32\tar.exe`, Git for Windows) are composed, so a project resolves
-/// to no profile.
+/// tool on Windows: the trusted system `tar` (`System32\tar.exe`) and `git`
+/// (Git for Windows), each at its registered path and signed by its
+/// publisher (`WorkspaceCommandPreset::trusted_system`). One that does not
+/// verify resolves the project to no profile.
 #[cfg(windows)]
 fn external_tools(
-    _root: &str,
+    root: &str,
 ) -> Result<(WorkspaceCommandPreset, Option<WorkspaceCommandPreset>), String> {
-    let _ = (ARCHIVE, SOURCE_CONTROL);
-    Err(WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE.into())
+    use arkdeck_platform::SystemTool;
+    let archive = WorkspaceCommandPreset::trusted_system(ARCHIVE.0, SystemTool::Tar, ARCHIVE.1)?;
+    let source_control = if inside_git_working_copy(root) {
+        Some(WorkspaceCommandPreset::trusted_system(
+            SOURCE_CONTROL.0,
+            SystemTool::Git,
+            SOURCE_CONTROL.1,
+        )?)
+    } else {
+        None
+    };
+    Ok((archive, source_control))
+}
+
+/// Swift `WorkspaceProjectProfile.isInsideGitWorkingCopy` on Windows: the
+/// root or any ancestor up to the drive's root holds `.git`.
+#[cfg(windows)]
+fn inside_git_working_copy(root: &str) -> bool {
+    std::path::Path::new(&foundation_standardized(root))
+        .ancestors()
+        .any(|directory| fs::metadata(directory.join(".git")).is_ok())
 }
 
 /// Swift `WorkspaceProjectProfile.isInsideGitWorkingCopy`: the root or any
