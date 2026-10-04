@@ -2658,11 +2658,8 @@ well.
   observations stay `unknown`. `healthyCheckserver` is no
   registered Windows probe (`checkserver` starts a server when none runs);
   Windows server health is the commandless `runtime.hdc.status` observation.
-  Catalog lowering is unchanged here: `observe.device`'s `probeHDCServer`
-  still lowers to `checkserver`, and on Windows it reaches only the managed
-  development HDC, whose dispatch first proves its own launched server is
-  current. Porting that step to the commandless observation is
-  TASK-XPA-005's adoption. `tests/windows_hdc_registration.rs`
+  `observe.device`'s `probeHDCServer` lowers to that commandless
+  observation on a registered Windows tuple (TASK-XPA-005, below). `tests/windows_hdc_registration.rs`
   closes the table and grammar on `openspec/integrations/openharmony/
   windows-probes.yaml`, `rust/tests/fixtures/hdc-windows/` and the lock. No
   consumer reads the Windows grammar yet (CHG-2026-074 TASK-XPA-004/005);
@@ -2686,8 +2683,19 @@ well.
   mutex file and exits 0), and a server receipt's `\\?\` image path is
   compared in the plain spelling. `windows_hdc_live_process.rs` runs the
   real daemon and CLI over the registered `hdc.exe`
-  (`ARKDECK_LIVE_WINDOWS_HDC`). Jobs still reach no HDC on Windows, so
-  `probeHDCServer`'s commandless lowering waits for Windows Job execution.
+  (`ARKDECK_LIVE_WINDOWS_HDC`).
+- `probeHDCServer` on a registered Windows tuple (TASK-XPA-005, WHR-002's open
+  point): the step is the commandless server observation
+  (`serverIdentityGeneration`, `HdcDispatch::observe_server`), never
+  `checkserver`. `ProcessDispatch` observes its pinned executable's own
+  listener at the tuple's endpoint (`CommandlessIdentity`), and
+  `DevelopmentHdc` does so only while its launched server is current. The plan
+  names the step `"processKind": "commandless"` with no argv, the run launches
+  nothing, and the step verifies the tuple's version as the client's and the
+  server's once that server is observed, or is unknown otherwise. A dispatch
+  pinned to no Windows tuple keeps Swift's `checkserver`
+  (`hoststore/tests/windows_observe_device_commandless.rs`,
+  `provider-hdc/tests/windows_hdc_adoption.rs`).
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider

@@ -268,6 +268,16 @@ impl StepAction {
         }
     }
 
+    /// Whether the step lowers to the commandless server observation over
+    /// `dispatch` rather than to a process (`probeHDCServer` on a registered
+    /// Windows tuple, CHG-2026-078).
+    pub(crate) fn observes_server_commandlessly(
+        &self,
+        dispatch: &dyn arkdeck_provider_hdc::HdcDispatch,
+    ) -> bool {
+        matches!(self, Self::Hdc(action) if action.observes_server_commandlessly(dispatch))
+    }
+
     /// The one process the step lowers to, against the Target's connect key.
     pub(crate) fn lower(
         &self,
