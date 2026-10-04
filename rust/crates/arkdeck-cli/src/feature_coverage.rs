@@ -200,6 +200,8 @@ const RULINGS: &[(&str, Ruling)] = &[
     ("human-action.list", leaf("human-action.list")),
     ("human-action.resume", leaf("human-action.resume")),
     ("human-action.show", leaf("human-action.show")),
+    ("job.archive", leaf("job.archive.apply")),
+    ("job.archive.preview", leaf("job.archive.preview")),
     ("job.cancel", leaf("job.cancel")),
     ("job.events", leaf("job.events")),
     ("job.evidence", leaf("job.evidence")),
@@ -452,6 +454,22 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // 2026-10-04 through the real CLI and daemon (the same process test).
     "device.candidates",
     "target.adopt",
+    // GJ-1's device leaves (TASK-XPA-005): `target observe`
+    // (`observe.device@1`) and `diagnostics capture` (`capture.diagnostics@1`)
+    // run end to end through the real signed CLI against a signed test
+    // daemon, the production Windows composition with the shared fake HDC
+    // in process and a synthetic census naming the oracle's board
+    // (`arkdeck-agentd/tests/spawning/gj1_device_leaves.rs`); each Job's calls
+    // are the Swift oracle's. A pause is kept and resumed there too.
+    "target.observe",
+    "diagnostics.capture",
+    // The Debug probe over the Target store and the HDC (TASK-XPA-008;
+    // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
+    // against the signed test daemon over the Swift oracle's answers). Not
+    // `debug template run`: it runs the `debug.template@1` Job, whose
+    // admission observes the Target, and no Swift oracle records that Job's
+    // HDC answers.
+    "debug.probe",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset
@@ -538,6 +556,39 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.diff",
     "workspace.isolate",
     "workspace.sweep",
+    // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
+    // state through `flash run`, and the Flash host reads over the same
+    // composition, by the real CLI against a signed copy of the daemon's test
+    // build over its control pipe, with the Swift Flash run oracle's fake lane
+    // and Rockchip host and an in-process fake HDC
+    // (`tests/spawning/flash_socket_control.rs`). No board is flashed. The
+    // shared generic leaves the same test drives (`agent run`, `job plan|
+    // submit|run`) are not counted until every operation they reach on
+    // Windows answers as Swift does (the lead's ruling of 2026-10-04 for
+    // GJ-2/3).
+    "flash.run",
+    "flash.bootloader-status",
+    "flash.prerequisites",
+    // The protected Flash recovery broker over the Flash invocation owner
+    // (TASK-XPA-010): an invocation started, its pinned full restore executed
+    // to a terminal state, shown and listed (`recovery flash-invocation …`
+    // and `debug …`), by the same CLI against the same signed test daemon. Not `flash reconcile-alias`, whose reconciler the
+    // CLI reaches but whose repair no fake lineage exercises there (the
+    // flash-host-reads oracle replays it through the Windows Host).
+    "recovery.flash-invocation.start",
+    "recovery.flash-invocation.evaluate",
+    "recovery.flash-invocation.status",
+    "recovery.flash-invocation.list",
+    // Their `debug start|evaluate|status` spellings, the same handlers.
+    "debug.start",
+    "debug.evaluate",
+    "debug.status",
+    // ArkForge's device access and the lane's plan preview (TASK-XPA-010):
+    // through the same CLI against the same signed test daemon, over a
+    // stand-in for `arkforged`'s public pipe (ArkForge's own codec and
+    // transport) and a stand-in plan previewer, both in the test binary.
+    "flash.device-access",
+    "flash.lane-preview",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -557,10 +608,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "agentd.status",
     "agentd.verify",
     "agentd.uninstall",
-    // DevEco's password material is not read on Windows (TASK-XPA-011); the
-    // other signing leaves are served there over Credential Manager.
-    "runtime.signing.migrate-deveco",
-    "signing.migrate-deveco",
     "runtime.update.check",
     "runtime.update.download",
     "runtime.update.handoff",
@@ -1248,6 +1295,7 @@ mod tests {
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
+            // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),
@@ -1300,16 +1348,16 @@ mod tests {
             document["summary"]["bySource"]["daemon"],
             serde_json::json!(METHODS.len() - 1)
         );
-        let mut expected = vec![
-            "daemon method job.unruled has no coverage ruling".to_owned(),
-            "coverage names a daemon method the registry does not classify: job.status".to_owned(),
-        ];
+        let mut expected = vec!["daemon method job.unruled has no coverage ruling".to_owned()];
         for method in [
+            "job.archive",
+            "job.archive.preview",
+            "job.status",
             "diagnostic.session.status",
             "diagnostic.session.mark",
             "diagnostic.session.stop",
         ] {
-            if !METHODS.contains(&method) {
+            if !methods.contains(&method) {
                 expected.push(format!(
                     "coverage names a daemon method the registry does not classify: {method}"
                 ));

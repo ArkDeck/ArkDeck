@@ -98,13 +98,13 @@ fn the_export_writes_the_bundle_this_build_renders() {
         written.push(format!("fixtures/{}", product.relative_path));
     }
     assert_eq!(result["written"], json!(written));
-    assert_eq!(written.len(), 238);
+    assert_eq!(written.len(), 240);
     // The atomic writes leave nothing beside the products.
     let check = run("check", &scratch, true);
     assert_eq!(check.status.code(), Some(0), "{check:?}");
     let report = &envelope(&check)["result"];
     assert_eq!(report["clean"], true);
-    assert_eq!(report["checked"], 238);
+    assert_eq!(report["checked"], 240);
     assert_eq!(report["unexpected"], json!([]));
 }
 
@@ -127,7 +127,7 @@ fn a_drifted_bundle_is_reported_then_fails_without_a_second_document() {
     assert_eq!(answer["ok"], true);
     let report = &answer["result"];
     assert_eq!(report["clean"], false);
-    assert_eq!(report["checked"], 238);
+    assert_eq!(report["checked"], 240);
     assert_eq!(report["drifted"], json!(["fixtures/argv/job.status.json"]));
     assert_eq!(report["missing"], json!(["contracts/cli-page.schema.json"]));
     assert_eq!(
@@ -163,7 +163,7 @@ fn the_human_rendering_is_swifts() {
     assert_eq!(
         String::from_utf8(output.stdout).unwrap(),
         format!(
-            "bundleVersion: arkdeck.cli.contracts/1\nchecked: 238\nclean: true\ncontractsDirectory: {}\ndrifted: (none)\nfixturesDirectory: {}\nmissing: (none)\nunexpected: (none)\n",
+            "bundleVersion: arkdeck.cli.contracts/1\nchecked: 240\nclean: true\ncontractsDirectory: {}\ndrifted: (none)\nfixturesDirectory: {}\nmissing: (none)\nunexpected: (none)\n",
             contracts.display(),
             fixtures.display()
         )
@@ -274,7 +274,7 @@ fn the_committed_bundle_checks_clean() {
     );
     let report = &envelope(&output)["result"];
     assert_eq!(report["clean"], true);
-    assert_eq!(report["checked"], 238);
+    assert_eq!(report["checked"], 240);
 }
 
 #[test]
@@ -438,10 +438,12 @@ fn normalized(bytes: &[u8], root: &str) -> String {
 /// envelope shape and rendering assertions exact; never rewrite the recording.
 #[cfg(unix)]
 fn current_bundle_case(recorded: &Value) -> Value {
-    const ADDED: [&str; 3] = [
+    const ADDED: [&str; 5] = [
         "fixtures/argv/diagnostics.session.mark.json",
         "fixtures/argv/diagnostics.session.status.json",
         "fixtures/argv/diagnostics.session.stop.json",
+        "fixtures/argv/job.archive.apply.json",
+        "fixtures/argv/job.archive.preview.json",
     ];
     const REGENERATED: [&str; 5] = [
         "contracts/cli-command-registry.yaml",
@@ -456,7 +458,7 @@ fn current_bundle_case(recorded: &Value) -> Value {
         let mut envelope: Value = serde_json::from_str(stdout).unwrap();
         if let Some(checked) = envelope["result"].get_mut("checked") {
             assert_eq!(*checked, 235);
-            *checked = json!(238);
+            *checked = json!(240);
         }
         if let Some(written) = envelope["result"].get_mut("written") {
             let written = written.as_array_mut().unwrap();
@@ -471,11 +473,29 @@ fn current_bundle_case(recorded: &Value) -> Value {
         }
         json!(format!("{}\n", serde_json::to_string(&envelope).unwrap()))
     } else {
-        let additions = ADDED.map(|path| format!("  - {path}\n")).join("");
-        json!(stdout.replace("checked: 235\n", "checked: 238\n").replace(
-            "  - fixtures/argv/doctor.json\n",
-            &format!("{additions}  - fixtures/argv/doctor.json\n")
-        ))
+        let mut lines: Vec<String> = stdout
+            .replace("checked: 235\n", "checked: 240\n")
+            .split_inclusive('\n')
+            .map(str::to_owned)
+            .collect();
+        if recorded["verb"] == "export"
+            && let Some(start) = lines.iter().position(|line| line.starts_with("written: "))
+        {
+            for path in ADDED {
+                let at = lines
+                    .iter()
+                    .enumerate()
+                    .skip(start + 1)
+                    .find_map(|(at, line)| {
+                        line.strip_prefix("  - ")
+                            .filter(|existing| existing.trim_end() > path)
+                            .map(|_| at)
+                    })
+                    .expect("historical export has a following path");
+                lines.insert(at, format!("  - {path}\n"));
+            }
+        }
+        json!(lines.concat())
     };
     if recorded["verb"] == "export" {
         let products = contract_products()

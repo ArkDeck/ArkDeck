@@ -398,6 +398,31 @@ impl Authority {
                 format!("the workspace provider is unusable: {error}; nothing was started")
             })?
             .with_planning(self.root.path(), Some(analyzers));
+        // Swift's Flash invocation owner keeps its documents in the state
+        // directory its engine plans in, and creates their directories at its
+        // start, as both macOS compositions compose it: the recovery broker
+        // writes an attempt's permit there and the planner reads it from
+        // there (TASK-XPA-010).
+        // The state directory is named as the file system resolves the
+        // opened handle (`StateRoot::private_child`), the canonical plain
+        // spelling the owner's private-directory check opens and compares,
+        // which a short (`AD-FAK~1`) or verbatim spelling of the root is not.
+        let unusable = |error: &dyn std::fmt::Display| {
+            format!(
+                "the Flash invocation owner {} is unusable: {error}; nothing was started",
+                self.root.path().display()
+            )
+        };
+        let documents = self
+            .root
+            .private_child("runtime-debug-invocations")
+            .map_err(|error| unusable(&error))?;
+        let state = documents
+            .parent()
+            .ok_or_else(|| unusable(&"the invocation documents have no state directory"))?;
+        let invocations =
+            arkdeck_hoststore::FlashInvocations::open(state).map_err(|error| unusable(&error))?;
+        let host = host.with_flash_invocations(invocations);
         let host = host.with_trace_cache(self.trace_cache()?);
         let host = host.with_bootstrap(&bootstrap).map_err(|error| {
             format!(
@@ -498,6 +523,14 @@ impl Authority {
                 &composed.runtime_directory,
             ))
             .with_lane_plan_preview(composed.lane_plan_preview())
+            // Swift's post-flash alias reconciler over the same Application
+            // Support root, reading the board from the same Windows USB census
+            // as the facts, as the macOS compositions compose it.
+            .with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
+                &application_support,
+                arkdeck_platform::usb_host_devices,
+                crate::host::utc_now,
+            ))
             // The Loader binding coordinator, as the macOS compositions
             // compose it: the same root and census, ArkForge's half of the
             // Loader observation through the lane's directory, and the
@@ -957,6 +990,42 @@ fn already_running(root: &StateRoot) -> Result<Start, String> {
     }
 }
 
+/// The guard is held by another daemon: Swift's second instance answer when
+/// this root's instance document names it. When it does not (a daemon of
+/// another root that shares this guard and pipe, as the account's daemon of
+/// another profile does), the start is refused naming the guard, the pipe
+/// and the process that serves it, so the holder can be found.
+fn guard_held(
+    root: &StateRoot,
+    scope: &arkdeck_platform::InstanceScope,
+    endpoint: &LocalEndpoint,
+) -> Result<Start, String> {
+    if let Some(instance) = read_instance(root) {
+        return Ok(Start::AlreadyRunning(instance));
+    }
+    let served = match arkdeck_platform::pipe_server_pid(endpoint) {
+        Ok(Some(pid)) => format!(
+            ", and its pipe {} is served by pid {pid}",
+            endpoint.as_path().display()
+        ),
+        Ok(None) => format!(
+            ", and its pipe {} is not served",
+            endpoint.as_path().display()
+        ),
+        Err(error) => format!(
+            ", and the process serving its pipe {} is unknown: {error}",
+            endpoint.as_path().display()
+        ),
+    };
+    Err(format!(
+        "another Runtime holds this daemon's single-instance guard {}{served}; it left no \
+         instance document in the state root {}, so it serves another root; nothing was \
+         started",
+        scope.guard_name(),
+        root.path().display()
+    ))
+}
+
 /// Decides the composition and, for one that owns a state root, takes it
 /// (see the module's documentation).
 pub(crate) fn start(
@@ -1017,7 +1086,7 @@ pub(crate) fn start(
         .map_err(|error| unusable("the single-instance guard", error))?
     {
         GuardAcquisition::Owned { guard, abandoned } => (guard, abandoned),
-        GuardAcquisition::Held => return already_running(&root),
+        GuardAcquisition::Held => return guard_held(&root, &scope, &expected),
     };
     let Some(owner) = root
         .lock_owner()

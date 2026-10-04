@@ -64,11 +64,30 @@ impl JournalWriter {
     /// record only before terminal publication and behind a durable jobCreated
     /// (Swift `FileDurableJournal.init`); any other replay failure refuses.
     pub fn open(job_directory: &Path, create: bool) -> Result<Self, JournalWriteError> {
+        Self::open_with_repair(job_directory, create, true)
+    }
+
+    /// A reviewed lifecycle decision must not repair a changed/torn journal
+    /// while acquiring its writer. Recovery remains an independent action.
+    pub(crate) fn open_without_repair(job_directory: &Path) -> Result<Self, JournalWriteError> {
+        Self::open_with_repair(job_directory, false, false)
+    }
+
+    fn open_with_repair(
+        job_directory: &Path,
+        create: bool,
+        repair: bool,
+    ) -> Result<Self, JournalWriteError> {
         let (appender, bytes) =
             HostJournalAppender::open(job_directory, create, |bytes, terminal| {
                 let replay = ReplayState::replay(bytes).map_err(violation)?;
                 if !replay.torn {
                     return Ok(None);
+                }
+                if !repair {
+                    return Err(violation(
+                        "reviewed lifecycle action cannot repair a torn journal",
+                    ));
                 }
                 if terminal {
                     return Err(violation(

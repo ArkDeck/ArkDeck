@@ -202,6 +202,21 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// Archive a proven quiescent Job or inspect its current decision preview.
+    fn job_archive(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "Job archive is unavailable in this Runtime".into(),
+            details: None,
+        })
+    }
+    fn app_job_archive_allowed(&self, _job_id: &str) -> bool {
+        false
+    }
     /// `agent.run`, `agent.status`, `agent.list` and `agent.abandon` advance,
     /// read, list and abandon agent executions. A host without an agent
     /// execution owner answers as the read-only foundation always has.
@@ -835,6 +850,10 @@ impl<H: HostServices> Control<H> {
         self.host.app_job_recovery_allowed(job_id, resume)
     }
 
+    pub fn app_job_archive_allowed(&self, job_id: &str) -> bool {
+        self.host.app_job_archive_allowed(job_id)
+    }
+
     pub fn handle_app_frame(&self, bytes: &[u8]) -> Vec<u8> {
         self.handle_frame_from(bytes, Origin::App)
     }
@@ -1213,6 +1232,10 @@ impl<H: HostServices> Control<H> {
             "job.cancel" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_cancel(&params),
+            },
+            "job.archive" | "job.archive.preview" => Response {
+                id: request.id.clone(),
+                outcome: self.host.job_archive(&request.method, &params),
             },
             "diagnostic.session.status" | "diagnostic.session.mark" | "diagnostic.session.stop" => {
                 Response {

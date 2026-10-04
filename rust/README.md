@@ -52,6 +52,16 @@ On Windows two things run there:
   For that, the test daemon alone takes three inputs: the oracle's clock, the
   replay root's own Job state as the mutation root, and the recorded code-sign
   helper's facts.
+  and the real `arkdeck.exe` drives it with the production peer check. Started
+  with a board (`SignedDaemon::start_with_board`), it also reads a synthetic
+  USB census naming one HDC-normal DAYU200 by the fixture's serial, through the
+  production census relations (`Host::with_usb_registry_relations`), so the
+  fake's device is proved the adopted Target's.
+- `gj1_device_leaves.rs` (TASK-XPA-005): GJ-1's device leaves through that
+  daemon, end to end. `target observe` pauses without the board, keeps its run
+  owner-only below the account's local application data, and resumes after a
+  restart with the board (`agent resume --resume-token`). `target observe` and
+  `diagnostics capture` complete, and each Job's calls are the Swift oracle's.
 
 Both reach the fake through the Host's `with_test_hdc` seam, which is compiled
 into test builds only. The production Windows daemon composes an HDC only for a
@@ -2658,11 +2668,8 @@ well.
   observations stay `unknown`. `healthyCheckserver` is no
   registered Windows probe (`checkserver` starts a server when none runs);
   Windows server health is the commandless `runtime.hdc.status` observation.
-  Catalog lowering is unchanged here: `observe.device`'s `probeHDCServer`
-  still lowers to `checkserver`, and on Windows it reaches only the managed
-  development HDC, whose dispatch first proves its own launched server is
-  current. Porting that step to the commandless observation is
-  TASK-XPA-005's adoption. `tests/windows_hdc_registration.rs`
+  `observe.device`'s `probeHDCServer` lowers to that commandless
+  observation on a registered Windows tuple (TASK-XPA-005, below). `tests/windows_hdc_registration.rs`
   closes the table and grammar on `openspec/integrations/openharmony/
   windows-probes.yaml`, `rust/tests/fixtures/hdc-windows/` and the lock. No
   consumer reads the Windows grammar yet (CHG-2026-074 TASK-XPA-004/005);
@@ -2686,8 +2693,19 @@ well.
   mutex file and exits 0), and a server receipt's `\\?\` image path is
   compared in the plain spelling. `windows_hdc_live_process.rs` runs the
   real daemon and CLI over the registered `hdc.exe`
-  (`ARKDECK_LIVE_WINDOWS_HDC`). Jobs still reach no HDC on Windows, so
-  `probeHDCServer`'s commandless lowering waits for Windows Job execution.
+  (`ARKDECK_LIVE_WINDOWS_HDC`).
+- `probeHDCServer` on a registered Windows tuple (TASK-XPA-005, WHR-002's open
+  point): the step is the commandless server observation
+  (`serverIdentityGeneration`, `HdcDispatch::observe_server`), never
+  `checkserver`. `ProcessDispatch` observes its pinned executable's own
+  listener at the tuple's endpoint (`CommandlessIdentity`), and
+  `DevelopmentHdc` does so only while its launched server is current. The plan
+  names the step `"processKind": "commandless"` with no argv, the run launches
+  nothing, and the step verifies the tuple's version as the client's and the
+  server's once that server is observed, or is unknown otherwise. A dispatch
+  pinned to no Windows tuple keeps Swift's `checkserver`
+  (`hoststore/tests/windows_observe_device_commandless.rs`,
+  `provider-hdc/tests/windows_hdc_adoption.rs`).
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
@@ -2841,6 +2859,31 @@ bundle is refused with nothing published, and, with
 releases. Run record:
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
 
+## Windows Debug reads (TASK-XPA-008)
+
+The Windows daemon answers `debug.probe` and `debug.template.run` as Swift's
+daemon composes its Debug probe. Each reads through the Host's HDC composition
+(`HdcComposition::debug_read`, now built on Windows). That composition is the
+registered tuple's managed server, or a Windows test build's fake.
+
+The tests replay the Swift oracles on Windows:
+
+- `arkdeck-agentd --test spawning debug_probe_replay` replays every exchange
+  of the Debug probe oracle (23, every mode) through the production Host and
+  Control. It checks the fake's calls too.
+- `debug_leaves_cli` runs `debug probe` through the real CLI against the signed
+  test daemon, for the 7 probes the leaf can send.
+- `arkdeck-hoststore`'s `tests/debug_invocation.rs` replays the 68 exchanges of
+  the Flash recovery broker oracle. It now runs on Windows too.
+
+The shared fake's Debug probe answers are ported in process (`oracle_fake.rs`,
+`Answers::DebugProbe`). `debug.probe` is in `WINDOWS_MEASURED_LEAVES`.
+
+`debug template run` stays `partial`. It runs the `debug.template@1` Job, whose
+admission observes the Target, and no Swift oracle records that Job's HDC
+answers. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-debug-reads-run.md`.
+
 ## Windows History filter owner (TASK-XPA-012)
 
 `arkdeck-hoststore` builds the History filter owner (`HistoryStore`) on
@@ -2909,6 +2952,43 @@ composed on Windows. So a verified bundle is refused before its
 `job.submit` is refused before admission with that reason and zero
 dispatch (`windows_flash_lane_process.rs`).
 
+Over a composed HDC (TASK-XPA-005's Job composition) a Flash runs end to end
+on Windows against fakes: the Swift Flash run oracle's fake lane and
+Rockchip host (`arkdeck-hoststore/tests/support/flash_lane.rs`) and an
+in-process fake HDC given through the test seam (`Host::with_test_hdc`).
+`tests/spawning/flash_execution_control.rs` plans, admits, runs and
+reconciles `flash.full-restore@1` through the Host and Control; an unknown
+outcome stays unknown and is never replayed. `flash_socket_control.rs` drives
+the same Flash with the real CLI (`flash run`, `agent run`, `job plan|submit|
+run`, and `flash bootloader-status|prerequisites` over the same
+composition) against a copy of the test binary signed with the development
+signer, serving on a private pipe, which the CLI verifies as it verifies an
+installed daemon. An agent execution admits its Flash through the Flash
+admission on Windows too, as on macOS (`Host::agent_execution`).
+`flash_plan_control.rs` answers a Flash `job.plan` and `job.submit` in each
+composition as Swift's daemon does, on Windows as on macOS. No board is
+flashed and no `arkforged` runs.
+
+The Windows daemon composes Swift's Flash invocation owner beside the Job
+state it plans in, and the post-flash alias reconciler over its Application
+Support root and the Windows USB census, as the macOS compositions do; the
+census names `flashAliasReconciler` and `flashInvocations` at their macOS
+positions. `flash_host_reads_control.rs` replays the Swift flash-host-reads
+oracle (`flash.reconcile-alias`, `debug.status`,
+`recovery.flash-invocation.list`, 61 exchanges) through the Windows Host,
+`tests/spawning/flash_broker_control.rs` executes the recovery broker's
+pinned full restore through it, and `flash_socket_control.rs` drives
+`recovery flash-invocation start|evaluate|status|list` (and the `debug`
+spellings) and `flash reconcile-alias` through the real CLI against the
+signed test daemon.
+`device_access_control.rs` replays Swift's `flash.device-access` control
+frames on Windows against a stand-in serving ArkForge's public named pipe for
+the lane directory (`arkforge_platform`'s transport), and
+`flash_socket_control.rs` drives `flash device-access` and `flash
+lane-preview` through the CLI against the signed test daemon, over that
+stand-in and a stand-in plan previewer in the test binary; the daemon binary
+has no seam for either.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in
@@ -2967,9 +3047,30 @@ remove` (and the `signing …` spellings) on Windows; the daemon it binds is the
 one it would start (`ARKDECK_DAEMON_PATH` or `arkdeck-agentd.exe` beside it),
 and the maintenance leaves first require that image to satisfy a configured
 signing pin (`ARKDECK_DAEMON_SIGNER_SHA256` or the publisher identity) before
-Credential Manager is opened. `migrate-deveco` and `install --build-profile`,
-which read DevEco's encrypted password material, are `unsupportedOnPlatform`
-on Windows. The installed Windows daemon composes the workspace presets'
+Credential Manager is opened.
+
+`install --build-profile` and `migrate-deveco` read DevEco's encrypted
+passwords on Windows too, at macOS parity, so the maintainer never handles a
+plaintext password:
+
+- **Build profile.** It is read through one handle that follows no reparse
+  point, in its spelling on disk, and must be trusted-write-only. Its single
+  `storeFile` is the JSON string DevEco writes (a `\\`-escaped drive path).
+- **Password material.** It sits beside the keystore
+  (`material\fd\<slot>\<file>` ×3, `material\ac`, `material\ce`), the
+  layout DevEco writes on macOS too. Each directory must be trusted-write-only
+  and in its spelling on disk. Each file is read as the file it measured, and
+  must have a single link.
+- **`migrate-deveco --daemon`.** It must name the installed, pinned daemon.
+
+`arkdeck-provider-workspace`'s `deveco_password` test replays the Swift vectors
+on Windows. The CLI's `windows_signing_leaves` test installs and migrates from
+a Windows-spelled build profile and decodes it with the Swift vectors. With
+`ARKDECK_LIVE_DEVECO_BUILD_PROFILE`, it decodes one of the host's DevEco build
+profiles through the host's own material, checking only the shape and printing
+nothing.
+
+The installed Windows daemon composes the workspace presets'
 credential pinning over the account's preset root, bound to its own image, and
 Windows attempts go under `SigningPresetStore::attempts_root`
 (`<preset root>\Attempts`).

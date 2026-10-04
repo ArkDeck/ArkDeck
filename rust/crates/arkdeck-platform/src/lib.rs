@@ -128,7 +128,7 @@ pub use windows::{
     Latch, ListenerLock, LocalConnection, LocalListener, LoopbackServerLease, ManagedServer,
     OWNER_ONLY_REMEDY, OwnerLock, Readiness, SingleInstanceGuard, StarterLock, StateRoot,
     StopSignal, await_pipe_instance, default_user_endpoint, end_proved_process, pipe_present,
-    send_console_break, verify_daemon_image,
+    pipe_server_pid, send_console_break, verify_daemon_image,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
@@ -417,6 +417,7 @@ pub use windows::{
 #[cfg(windows)]
 pub use windows::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
+    trusted_write_only_directory,
 };
 // The system tools a Windows Runtime trusts for workspace operations
 // (TASK-XPA-011, maintainer ruling 69): `tar` and `git` by their registered

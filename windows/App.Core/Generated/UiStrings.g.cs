@@ -1431,6 +1431,25 @@ public static class UiStrings
     public const string HistoryRecoveryReadOnly = "history.recovery.readOnly";
     public const string HistoryRecoveryResidue = "history.recovery.residue";
     public const string HistoryRecoveryWaitingForHuman = "history.recovery.waitingForHuman";
+    public const string JobRecoveryArchiveBlockerMutation = "jobRecovery.archive.blocker.mutation";
+    public const string JobRecoveryArchiveUnavailable = "jobRecovery.archive.unavailable";
+    public const string JobRecoveryArchiveTitle = "jobRecovery.archive.title";
+    public const string JobRecoveryArchiveFinish = "jobRecovery.archive.finish";
+    public const string JobRecoveryArchiveConfirm = "jobRecovery.archive.confirm";
+    public const string JobRecoveryArchiveBlockerHazards = "jobRecovery.archive.blocker.hazards";
+    public const string JobRecoveryArchiveDetail = "jobRecovery.archive.detail";
+    public const string JobRecoveryArchiveLastStep = "jobRecovery.archive.lastStep";
+    public const string JobRecoveryArchiveBlockerProcess = "jobRecovery.archive.blocker.process";
+    public const string JobRecoveryArchiveBlockerStorage = "jobRecovery.archive.blocker.storage";
+    public const string JobRecoveryArchiveExistingDecision = "jobRecovery.archive.existingDecision";
+    public const string JobRecoveryArchiveBlockerUnknown = "jobRecovery.archive.blocker.unknown";
+    public const string JobRecoveryArchiveWorking = "jobRecovery.archive.working";
+    public const string JobRecoveryArchiveComplete = "jobRecovery.archive.complete";
+    public const string JobRecoveryArchiveBlockerActive = "jobRecovery.archive.blocker.active";
+    public const string JobRecoveryArchiveDismiss = "jobRecovery.archive.dismiss";
+    public const string JobRecoveryArchiveBlockerRefresh = "jobRecovery.archive.blocker.refresh";
+    public const string JobRecoveryArchiveReview = "jobRecovery.archive.review";
+    public const string JobRecoveryArchivePublicationPending = "jobRecovery.archive.publicationPending";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2858,5 +2877,24 @@ public static class UiStrings
         HistoryRecoveryReadOnly,
         HistoryRecoveryResidue,
         HistoryRecoveryWaitingForHuman,
+        JobRecoveryArchiveBlockerMutation,
+        JobRecoveryArchiveUnavailable,
+        JobRecoveryArchiveTitle,
+        JobRecoveryArchiveFinish,
+        JobRecoveryArchiveConfirm,
+        JobRecoveryArchiveBlockerHazards,
+        JobRecoveryArchiveDetail,
+        JobRecoveryArchiveLastStep,
+        JobRecoveryArchiveBlockerProcess,
+        JobRecoveryArchiveBlockerStorage,
+        JobRecoveryArchiveExistingDecision,
+        JobRecoveryArchiveBlockerUnknown,
+        JobRecoveryArchiveWorking,
+        JobRecoveryArchiveComplete,
+        JobRecoveryArchiveBlockerActive,
+        JobRecoveryArchiveDismiss,
+        JobRecoveryArchiveBlockerRefresh,
+        JobRecoveryArchiveReview,
+        JobRecoveryArchivePublicationPending,
     ];
 }

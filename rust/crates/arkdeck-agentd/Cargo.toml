@@ -22,9 +22,11 @@ arkdeck-hoststore.workspace = true
 # The ArkForge lane (TASK-XPA-010).
 arkdeck-provider-arkforge.workspace = true
 
-# A stand-in for `arkforged`'s public socket, spoken with ArkForge's own codec.
-[target.'cfg(target_os = "macos")'.dev-dependencies]
+# A stand-in for `arkforged`'s public socket (pipe on Windows), spoken with
+# ArkForge's own codec and transport.
+[target.'cfg(any(target_os = "macos", windows))'.dev-dependencies]
 arkforge-ipc.workspace = true
+arkforge-platform.workspace = true
 
 # The Windows client start path and service leaves, driven against this
 # crate's daemon (`tests/windows_client_start_process.rs`).
