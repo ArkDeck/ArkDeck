@@ -538,6 +538,19 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.diff",
     "workspace.isolate",
     "workspace.sweep",
+    // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
+    // state through `flash run`, and the Flash host reads over the same
+    // composition, by the real CLI against a signed copy of the daemon's test
+    // build over its control pipe, with the Swift Flash run oracle's fake lane
+    // and Rockchip host and an in-process fake HDC
+    // (`tests/spawning/flash_socket_control.rs`). No board is flashed. The
+    // shared generic leaves the same test drives (`agent run`, `job plan|
+    // submit|run`) are not counted until every operation they reach on
+    // Windows answers as Swift does (the lead's ruling of 2026-10-04 for
+    // GJ-2/3).
+    "flash.run",
+    "flash.bootloader-status",
+    "flash.prerequisites",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -1248,6 +1261,7 @@ mod tests {
             ("artifact.import.list", "implemented"),
             ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
+            // A generic Catalog operation reached through `job submit`.
             ("flash.dayu200", "partial"),
             ("artifact.import.begin", "implemented"),
             ("artifact.import.workspace-patch", "implemented"),

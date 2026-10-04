@@ -1,5 +1,14 @@
 //! Host/control Flash execution with real Runtime owners and fake external ports.
 //! Each fixture runs alone in a child, and spawning holds the suite turn.
+//!
+//! On Windows (TASK-XPA-010) the same fixtures run over the same owners: the
+//! roots are the stores' private directories below the temporary directory,
+//! the device mutation proves its continuity against the fixture's Job state
+//! as the Windows composition names its own (`with_mutation_root`), and the
+//! HDC is an in-process fake answering what the macOS fixture's script
+//! answers, given through the test seam (`Host::with_test_hdc`) that Jobs,
+//! the Flash facts and the Target observation read. The production Windows
+//! daemon composes an HDC only for a registered Windows HDC tuple.
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION};
 use arkdeck_control::Control;
 use arkdeck_hoststore::{
@@ -8,6 +17,7 @@ use arkdeck_hoststore::{
 };
 use serde_json::{Value, json};
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -21,7 +31,7 @@ impl Root {
     /// The oracle's Artifact root and Target store, laid down as Swift left
     /// them, beside an empty Job state.
     pub(crate) fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = temporary().join(format!(
             "flash-plan-control-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
@@ -44,7 +54,11 @@ impl Root {
             directory(destination.parent().unwrap());
             fs::write(&destination, fs::read(source).unwrap()).unwrap();
             let mode = u32::from_str_radix(input["mode"].as_str().unwrap(), 8).unwrap();
+            #[cfg(unix)]
             fs::set_permissions(&destination, fs::Permissions::from_mode(mode)).unwrap();
+            // Owner-only on Windows is the private DACL the file inherits.
+            #[cfg(windows)]
+            assert_eq!(mode & 0o077, 0, "{path}");
         }
         Self(root)
     }
@@ -67,6 +81,22 @@ impl Drop for Root {
     }
 }
 
+#[cfg(unix)]
+fn temporary() -> PathBuf {
+    std::env::temp_dir().canonicalize().unwrap()
+}
+
+/// The temporary directory in its plain canonical spelling.
+#[cfg(windows)]
+fn temporary() -> PathBuf {
+    let temporary = std::env::temp_dir().canonicalize().unwrap();
+    temporary
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+        .map_or(temporary.clone(), PathBuf::from)
+}
+
+#[cfg(unix)]
 fn directory(path: &Path) {
     fs::DirBuilder::new()
         .recursive(true)
@@ -74,6 +104,12 @@ fn directory(path: &Path) {
         .create(path)
         .unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+/// The store's private directory, every missing level created owner-only.
+#[cfg(windows)]
+fn directory(path: &Path) {
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
 }
 
 fn cases() -> Value {
@@ -113,9 +149,14 @@ fn control(host: crate::host::Host) -> Control<crate::host::Host> {
 
 // Reuse the Swift oracle's fake lane and receipts. Only the Host/control and
 // durable Runtime owners are real; the fixture shell never reaches a device.
+#[cfg(not(windows))]
 #[path = "../../../arkdeck-hoststore/tests/support/flash_lane.rs"]
 #[allow(dead_code)]
 pub(crate) mod execution_fakes;
+// On Windows this binary already compiles the hoststore replays' support,
+// which holds the same module (`crate::support`).
+#[cfg(windows)]
+pub(crate) use crate::support::flash_lane as execution_fakes;
 
 #[test]
 fn flash_execution_reaches_the_runtime_owner_in_a_separate_process() {
@@ -242,6 +283,7 @@ fn flash_execution_process_fixture() {
 /// beside the Target's Rockchip binding, the Flash facts, planning and
 /// execution over the fake lane and Rockchip host, and the Agent execution
 /// owner, whose executions admit and run as `job.submit` and `job.run` do.
+#[cfg(unix)]
 pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::host::Host {
     use execution_fakes::{FakeHost, FakeLane};
     use std::sync::Arc;
@@ -302,6 +344,103 @@ esac
         )
         .with_development_mutation_root(root.0.join("jobs"))
         .with_development_hdc(Some(arkdeck_provider_hdc::ProcessDispatch::new(tool, None)))
+        .with_flash_host_facts(FlashHostFacts::new(&root.0, census).with_rockusb(rockusb))
+        .with_flash_planning(FlashPlanning::new(
+            None,
+            || None,
+            Some(execution_fakes::TOOLCHAIN.into()),
+        ))
+        .with_flash_execution(
+            Arc::new(FakeLane::new(fakes)),
+            Arc::new(FakeHost(fakes.clone())),
+            "org.openharmony.dayu200@1.0.0".into(),
+        )
+}
+
+/// What the macOS fixture's `hdc` script answers, in process: the bound
+/// board connected, its build and model, the registered version; anything
+/// else exits 1. Every plan it was asked is kept.
+#[cfg(windows)]
+#[derive(Default)]
+pub(crate) struct ScriptedHdc(std::sync::Mutex<Vec<Vec<String>>>);
+
+#[cfg(windows)]
+impl arkdeck_provider_hdc::HdcDispatch for ScriptedHdc {
+    fn dispatch(
+        &self,
+        plan: &arkdeck_provider_hdc::ProcessPlan,
+    ) -> Result<arkdeck_provider_hdc::Receipt, arkdeck_provider_hdc::DispatchFailure> {
+        self.0.lock().unwrap().push(plan.arguments.clone());
+        let line = plan.arguments.join(" ");
+        let stdout: &[u8] = if line.contains("list targets") {
+            b"150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+        } else if line.contains("param get const.ohos.fullname") {
+            b"OpenHarmony-7.0.0.35-20260728_180253\n"
+        } else if line.contains("param get const.product.model") {
+            b"DAYU200\n"
+        } else if line == "-v" {
+            b"Ver: 3.2.0f\n"
+        } else {
+            b""
+        };
+        Ok(arkdeck_provider_hdc::Receipt {
+            exit_status: if stdout.is_empty() { 1 } else { 0 },
+            stdout: stdout.to_vec(),
+            stderr: Vec::new(),
+            truncated: false,
+            duration: std::time::Duration::ZERO,
+        })
+    }
+}
+
+/// The Windows Host of a Flash fixture: as the macOS one, with the fake HDC
+/// given through the test seam and the mutation root the fixture's Job state.
+#[cfg(windows)]
+pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::host::Host {
+    use execution_fakes::{FakeHost, FakeLane};
+    use std::sync::Arc;
+    // The configured `arkforged` the RockUSB identity measures: never run.
+    let arkforged_bytes = b"arkforged stand-in";
+    let arkforged = root.0.join("arkforged.exe");
+    fs::write(&arkforged, arkforged_bytes).unwrap();
+    let rockusb = NativeRockUsbIdentity::configured(
+        Some(arkforged.to_string_lossy().into_owned()),
+        Some(arkdeck_contract::sha256_hex(arkforged_bytes)),
+    );
+    fs::write(
+        root.0.join("rockchip-binding.json"),
+        serde_json::to_vec(&json!({
+            "revision": 1, "serial": "150100424a544e4600", "usbTopology": "42",
+            "evidence": [format!("identity:serial-sha256={}",
+                arkdeck_contract::sha256_hex(b"150100424a544e4600"))]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    directory(&root.0.join("agents"));
+    let census = || {
+        Ok(vec![arkdeck_platform::UsbHostDevice {
+            serial: "150100424a544e4600".into(),
+            vendor_id: 0x2207,
+            product_id: 0x5000,
+            topology: "42".into(),
+            product_name: Some("HDC Device".into()),
+            registry_entry_id: Some(1),
+        }])
+    };
+    root.host()
+        .with_usb_registry_relations(arkdeck_provider_hdc::UsbRegistryRelations::new(census))
+        .with_agent_executions(
+            arkdeck_hoststore::AgentExecutionStore::open(&root.0.join("agents")).unwrap(),
+        )
+        .with_capabilities(
+            arkdeck_hoststore::CapabilityStore::open(&root.0.join("jobs/capabilities")).unwrap(),
+        )
+        .with_mutation_root(root.0.join("jobs"))
+        .with_test_hdc(
+            Arc::new(ScriptedHdc::default()),
+            &arkdeck_contract::sha256_hex(b"fixture hdc"),
+        )
         .with_flash_host_facts(FlashHostFacts::new(&root.0, census).with_rockusb(rockusb))
         .with_flash_planning(FlashPlanning::new(
             None,

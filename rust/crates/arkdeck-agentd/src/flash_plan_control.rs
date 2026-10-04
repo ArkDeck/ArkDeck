@@ -7,6 +7,12 @@
 //! are replayed against Swift in `arkdeck-hoststore` (`tests/flash_plan.rs`).
 //! A `job.submit` of a Flash materializes over the same composition and is
 //! refused where its plan is; nothing is admitted.
+//!
+//! On Windows (TASK-XPA-010) the same compositions answer the same way over a
+//! root below the temporary directory: every directory is the store's private
+//! one and every input inherits its DACL (the oracle's inputs are owner-only);
+//! the configured `arkforged` stand-in is an `.exe`, which is what makes a
+//! file executable there. Every answer must still be Swift's.
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION};
 use arkdeck_control::Control;
 use arkdeck_hoststore::{
@@ -15,6 +21,7 @@ use arkdeck_hoststore::{
 };
 use serde_json::{Value, json};
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -28,7 +35,7 @@ impl Root {
     /// The oracle's Artifact root and Target store, laid down as Swift left
     /// them, beside an empty Job state.
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = temporary().join(format!(
             "flash-plan-control-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
@@ -51,7 +58,11 @@ impl Root {
             directory(destination.parent().unwrap());
             fs::write(&destination, fs::read(source).unwrap()).unwrap();
             let mode = u32::from_str_radix(input["mode"].as_str().unwrap(), 8).unwrap();
+            #[cfg(unix)]
             fs::set_permissions(&destination, fs::Permissions::from_mode(mode)).unwrap();
+            // Owner-only on Windows is the private DACL the file inherits.
+            #[cfg(windows)]
+            assert_eq!(mode & 0o077, 0, "{path}");
         }
         Self(root)
     }
@@ -79,6 +90,22 @@ impl Drop for Root {
     }
 }
 
+#[cfg(unix)]
+fn temporary() -> PathBuf {
+    std::env::temp_dir().canonicalize().unwrap()
+}
+
+/// The temporary directory in its plain canonical spelling.
+#[cfg(windows)]
+fn temporary() -> PathBuf {
+    let temporary = std::env::temp_dir().canonicalize().unwrap();
+    temporary
+        .to_str()
+        .and_then(|text| text.strip_prefix(r"\\?\"))
+        .map_or(temporary.clone(), PathBuf::from)
+}
+
+#[cfg(unix)]
 fn directory(path: &Path) {
     fs::DirBuilder::new()
         .recursive(true)
@@ -86,6 +113,28 @@ fn directory(path: &Path) {
         .create(path)
         .unwrap();
     fs::set_permissions(path, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+/// The store's private directory, every missing level created owner-only.
+#[cfg(windows)]
+fn directory(path: &Path) {
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
+}
+
+/// A configured `arkforged` stand-in: never run, only measured.
+#[cfg(unix)]
+fn arkforged(root: &Path) -> PathBuf {
+    let daemon = root.join("arkforged");
+    fs::write(&daemon, b"#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&daemon, fs::Permissions::from_mode(0o755)).unwrap();
+    daemon
+}
+
+#[cfg(windows)]
+fn arkforged(root: &Path) -> PathBuf {
+    let daemon = root.join("arkforged.exe");
+    fs::write(&daemon, b"#!/bin/sh\nexit 0\n").unwrap();
+    daemon
 }
 
 fn cases() -> Value {
@@ -154,9 +203,7 @@ fn a_flash_plan_is_answered_as_swifts_daemon_answers_it_in_each_composition() {
     let root = Root::new();
     let canonical = request("canonical.full");
     let alias = request("alias.full");
-    let daemon = root.0.join("arkforged");
-    fs::write(&daemon, b"#!/bin/sh\nexit 0\n").unwrap();
-    fs::set_permissions(&daemon, fs::Permissions::from_mode(0o755)).unwrap();
+    let daemon = arkforged(&root.0);
     let rockusb = NativeRockUsbIdentity::configured(
         Some(daemon.to_string_lossy().into_owned()),
         Some(arkdeck_contract::sha256_hex(b"#!/bin/sh\nexit 0\n")),
@@ -248,6 +295,7 @@ fn a_flash_plan_is_answered_as_swifts_daemon_answers_it_in_each_composition() {
     }
     let records = fs::symlink_metadata(root.0.join("state/rockchip-runtime")).unwrap();
     assert!(records.is_dir());
+    #[cfg(unix)]
     assert_eq!(records.mode() & 0o7777, 0o700);
 
     // The facts port over the Host's Target store, which measures its own
