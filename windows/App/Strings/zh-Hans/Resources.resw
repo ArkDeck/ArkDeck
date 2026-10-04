@@ -5066,6 +5066,26 @@ SHA-256：%4$@</value>
     <value>Artifacts</value>
     <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="overview_record_device_label" xml:space="preserve">
+    <value>本页描述的设备</value>
+    <comment>overview.record.device.label (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_none" xml:space="preserve">
+    <value>暂无在线设备</value>
+    <comment>overview.record.device.none (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_noneDetail" xml:space="preserve">
+    <value>请连接一台已接管的设备后刷新。</value>
+    <comment>overview.record.device.noneDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_device_choose" xml:space="preserve">
+    <value>选择一台设备…</value>
+    <comment>overview.record.device.choose (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_binding" xml:space="preserve">
+    <value>binding %lld</value>
+    <comment>overview.record.binding (Localizable.xcstrings)</comment>
+  </data>
   <data name="jobRecovery_action_openHistory" xml:space="preserve">
     <value>在历史记录中检查</value>
     <comment>jobRecovery.action.openHistory (JobsLocalizable.xcstrings)</comment>

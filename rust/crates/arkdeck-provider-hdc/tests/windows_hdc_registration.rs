@@ -1,5 +1,5 @@
-//! The Windows HDC registration (CHG-2026-078, TASK-WHR-002): the registry
-//! `OPENHARMONY-HDC-WINDOWS-PROBES@1.0.0`, its fixtures, the profile and the
+//! The Windows HDC registration (CHG-2026-078, TASK-WHR-002, amended by r3):
+//! the registry `OPENHARMONY-HDC-WINDOWS-PROBES@1.1.0`, its fixtures, the profile and the
 //! lock close on exact hashes; the Rust tuple table is the registry's; the
 //! registered fixtures classify as their families; every other tool, form
 //! and endpoint fails closed; and nothing crosses between the Windows and
@@ -15,8 +15,8 @@ use std::path::{Path, PathBuf};
 use arkdeck_provider_hdc::CommandlessIdentity;
 use arkdeck_provider_hdc::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,
-    WINDOWS_HDC_TUPLES, malformed_windows_tuple, parse_registered_presence,
-    parse_registered_windows_presence, windows_tuple,
+    WINDOWS_HDC_TUPLES, WINDOWS_SERVER_STARTUP_LISTING, malformed_windows_tuple,
+    parse_registered_presence, parse_registered_windows_presence, windows_tuple,
 };
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -74,8 +74,8 @@ fn windows(stdout: &[u8]) -> Result<PresenceSnapshot, ObservationFailure> {
 fn the_tuple_table_is_the_registry_and_names_candidate_2_only() {
     let registry = json(REGISTRY);
     assert_eq!(registry["registryId"], "OPENHARMONY-HDC-WINDOWS-PROBES");
-    assert_eq!(registry["registryVersion"], "1.0.0");
-    assert_eq!(registry["integrationProfile"], "OPENHARMONY-TOOLS@0.7.0");
+    assert_eq!(registry["registryVersion"], "1.1.0");
+    assert_eq!(registry["integrationProfile"], "OPENHARMONY-TOOLS@0.7.1");
     assert_eq!(registry["toolContext"]["platform"], "windows");
     assert!(registry.get("draftNotice").is_none());
 
@@ -149,12 +149,12 @@ fn registry_resources_profile_and_lock_close_on_exact_hashes() {
         assert!(lock.contains(pin.as_str()), "lock lacks {pin}");
     }
     assert_eq!(
-        profile.matches("> Version：0.7.0").count(),
+        profile.matches("> Version：0.7.1").count(),
         1,
-        "the profile is OPENHARMONY-TOOLS@0.7.0"
+        "the profile is OPENHARMONY-TOOLS@0.7.1"
     );
-    assert!(lock.contains("lock: INTEGRATION-PROFILES-0.8.0"));
-    assert!(lock.contains("  - id: OPENHARMONY-TOOLS\n    version: 0.7.0\n"));
+    assert!(lock.contains("lock: INTEGRATION-PROFILES-0.8.1"));
+    assert!(lock.contains("  - id: OPENHARMONY-TOOLS\n    version: 0.7.1\n"));
 
     // Every manifest entry matches its file, and every file is listed.
     let mut listed = Vec::new();
@@ -231,10 +231,19 @@ fn the_registered_fixtures_classify_as_their_families() {
     );
 
     let observations = families["deviceObservationSnapshot"].as_array().unwrap();
-    assert_eq!(observations.len(), 6);
+    assert_eq!(observations.len(), 7);
     for fixture in observations {
         let path = fixture["file"].as_str().unwrap();
         let bytes = fs::read(fixtures().join(path)).unwrap();
+        if fixture["expectedOutcome"] == "notYetObservable" {
+            // r3: the server-startup listing is unknown and retryable, never
+            // a snapshot.
+            assert_eq!(bytes, WINDOWS_SERVER_STARTUP_LISTING, "{path}");
+            let failure = windows(&bytes).unwrap_err();
+            assert!(failure.is_not_yet_observable(), "{path}: {failure:?}");
+            assert_eq!(failure.classification(), "unknown");
+            continue;
+        }
         let snapshot = windows(&bytes).unwrap_or_else(|failure| panic!("{path}: {failure}"));
         match fixture["expectedOutcome"].as_str().unwrap() {
             "observedEmpty" => assert_eq!(snapshot, PresenceSnapshot::ObservedEmpty, "{path}"),
@@ -499,4 +508,132 @@ fn checkserver_is_never_a_windows_probe() {
             .iter()
             .any(|effect| effect == "serverStart")
     );
+}
+
+/// CHG-2026-078 r3: the server-startup listing `[Empty]` CR TAB `hdc` CR LF
+/// is `notYetObservable` (unknown, retryable) and only that exact form with
+/// exit 0 and empty stderr. It is never read as absent: never
+/// `observedEmpty`, never a device set. Every near miss is plain `unknown`,
+/// and the macOS grammar never reads it.
+#[test]
+fn the_server_startup_listing_is_not_yet_observable_and_never_absent() {
+    assert_eq!(WINDOWS_SERVER_STARTUP_LISTING, b"[Empty]\r\thdc\r\n");
+    assert_eq!(WINDOWS_SERVER_STARTUP_LISTING.len(), 14);
+    let startup = windows(WINDOWS_SERVER_STARTUP_LISTING);
+    assert!(matches!(
+        startup,
+        Err(ObservationFailure::NotYetObservable(_))
+    ));
+    assert!(!matches!(startup, Ok(PresenceSnapshot::ObservedEmpty)));
+    assert_eq!(startup.unwrap_err().classification(), "unknown");
+    assert!(matches!(
+        parse_registered_presence(&exited(WINDOWS_SERVER_STARTUP_LISTING), &KEY),
+        Err(ObservationFailure::Unknown(_))
+    ));
+
+    let uart = "COM1\t\tUART\tReady\tunknown...\thdc\r\n";
+    let near_misses: [(&str, Vec<u8>); 9] = [
+        ("LF only", b"[Empty]\r\thdc\n".to_vec()),
+        ("no final CR LF", b"[Empty]\r\thdc".to_vec()),
+        ("no TAB", b"[Empty]\rhdc\r\n".to_vec()),
+        ("no hdc", b"[Empty]\r\t\r\n".to_vec()),
+        ("another sixth column", b"[Empty]\r\tflashd\r\n".to_vec()),
+        ("no CR before the TAB", b"[Empty]\thdc\r\n".to_vec()),
+        (
+            "twice",
+            [
+                WINDOWS_SERVER_STARTUP_LISTING,
+                WINDOWS_SERVER_STARTUP_LISTING,
+            ]
+            .concat(),
+        ),
+        (
+            "beside a UART row",
+            [WINDOWS_SERVER_STARTUP_LISTING, uart.as_bytes()].concat(),
+        ),
+        ("lower case", b"[empty]\r\thdc\r\n".to_vec()),
+    ];
+    for (name, stdout) in near_misses {
+        let failure = windows(&stdout).unwrap_err();
+        assert!(
+            matches!(failure, ObservationFailure::Unknown(_)),
+            "{name}: {failure:?}"
+        );
+    }
+    // The execution must be the registered one too.
+    for execution in [
+        ObservationInput::exited(WINDOWS_SERVER_STARTUP_LISTING, b"warning", 0),
+        ObservationInput::exited(WINDOWS_SERVER_STARTUP_LISTING, b"", 1),
+        ObservationInput {
+            stdout: WINDOWS_SERVER_STARTUP_LISTING,
+            stderr: b"",
+            termination: ObservationTermination::Exited(0),
+            stdout_truncated: true,
+        },
+    ] {
+        assert!(matches!(
+            parse_registered_windows_presence(&execution, &KEY),
+            Err(ObservationFailure::Unknown(_))
+        ));
+    }
+}
+
+/// CHG-2026-078 r3: a managed start settles past the startup listing,
+/// stopping at the first registered enumerated listing, and gives up at its
+/// bound without ever turning the startup listing into a snapshot.
+#[cfg(any(target_os = "macos", windows))]
+#[test]
+fn the_managed_start_settles_past_the_startup_listing_within_its_bound() {
+    use arkdeck_provider_hdc::{StartupListing, WINDOWS_STARTUP_SETTLE, settle_startup_listing};
+    use std::cell::Cell;
+    use std::time::{Duration, Instant};
+
+    assert_eq!(WINDOWS_STARTUP_SETTLE, Duration::from_secs(3));
+    let uart = b"COM1\t\tUART\tReady\tunknown...\thdc\r\nCOM2\t\tUART\tReady\tunknown...\thdc\r\n";
+
+    // Startup, startup, then enumerated: settled on the third listing.
+    let calls = Cell::new(0);
+    let settled = settle_startup_listing(
+        || {
+            calls.set(calls.get() + 1);
+            windows(if calls.get() < 3 {
+                WINDOWS_SERVER_STARTUP_LISTING
+            } else {
+                uart
+            })
+        },
+        Duration::from_secs(3),
+        Duration::from_millis(5),
+    );
+    assert_eq!(settled, StartupListing::Settled);
+    assert_eq!(calls.get(), 3);
+
+    // Never enumerated: unsettled at the bound, and every listing it read
+    // stayed not-yet-observable rather than empty.
+    let calls = Cell::new(0);
+    let started = Instant::now();
+    let unsettled = settle_startup_listing(
+        || {
+            calls.set(calls.get() + 1);
+            let listing = windows(WINDOWS_SERVER_STARTUP_LISTING);
+            assert!(matches!(
+                listing,
+                Err(ObservationFailure::NotYetObservable(_))
+            ));
+            listing
+        },
+        Duration::from_millis(200),
+        Duration::from_millis(20),
+    );
+    assert_eq!(unsettled, StartupListing::Unsettled);
+    assert!(calls.get() >= 2);
+    assert!(started.elapsed() < Duration::from_secs(2));
+
+    // Another unknown form never settles either.
+    let unknown = settle_startup_listing(
+        || windows(b"[Empty]\r\n"),
+        Duration::from_millis(50),
+        Duration::from_millis(10),
+    );
+    assert_eq!(unknown, StartupListing::Unsettled);
 }

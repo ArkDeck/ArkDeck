@@ -3,7 +3,7 @@
 - Task: sweep item 3 of `winui-history-handoff-run.md`: the macOS `GlobalRecoveryBannerView`
   (`ArkDeckApp/Features/Jobs/GlobalJobInspectorView.swift`) and
   `RuntimeJobSummaryPresentation.requiresRecoveryGuidance`. Base: branch
-  `agent/xpa-020-winui-job-recovery-20261004`, one commit on `origin/main` `08e8da7d`; nothing is
+  `agent/xpa-020-winui-job-recovery-20261004`, one commit on `origin/main` `08e8da7d`, with `origin/main` merged in after #2483 (the stacked copy #2489 was closed); nothing is
   force-pushed. Host and boundaries as the earlier WinUI runs; no device, `hdc` or DAYU200.
 
 ## What was built

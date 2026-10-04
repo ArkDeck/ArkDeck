@@ -1271,6 +1271,11 @@ public static class UiStrings
     public const string HistoryContextOperation = "history.context.operation";
     public const string HistoryContextState = "history.context.state";
     public const string HistoryContextArtifacts = "history.context.artifacts";
+    public const string OverviewRecordDeviceLabel = "overview.record.device.label";
+    public const string OverviewRecordDeviceNone = "overview.record.device.none";
+    public const string OverviewRecordDeviceNoneDetail = "overview.record.device.noneDetail";
+    public const string OverviewRecordDeviceChoose = "overview.record.device.choose";
+    public const string OverviewRecordBinding = "overview.record.binding";
     public const string JobRecoveryActionOpenHistory = "jobRecovery.action.openHistory";
     public const string JobRecoveryCount = "jobRecovery.count";
     public const string JobRecoveryList = "jobRecovery.list";
@@ -2549,6 +2554,11 @@ public static class UiStrings
         HistoryContextOperation,
         HistoryContextState,
         HistoryContextArtifacts,
+        OverviewRecordDeviceLabel,
+        OverviewRecordDeviceNone,
+        OverviewRecordDeviceNoneDetail,
+        OverviewRecordDeviceChoose,
+        OverviewRecordBinding,
         JobRecoveryActionOpenHistory,
         JobRecoveryCount,
         JobRecoveryList,

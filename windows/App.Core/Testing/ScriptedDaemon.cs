@@ -34,8 +34,8 @@ public static partial class ScriptedDaemon
     /// <see cref="Foundation"/>: the recovery banner appears, then goes away after Retry.</summary>
     public const string Recovers = "recovers";
 
-    /// <summary><see cref="Foundation"/> for the first four connections (the start reads the
-    /// Overview's health, doctor and Jobs and the Job Inspector's Jobs), then nothing answers:
+    /// <summary><see cref="Foundation"/> for the first five connections (the start reads the
+    /// Overview's health, doctor, Jobs and device observations and the Job Inspector's Jobs), then nothing answers:
     /// the daemon goes away while the App shows its data.</summary>
     public const string Outage = "outage";
 
@@ -161,8 +161,8 @@ public static partial class ScriptedDaemon
             var mode = scenario switch
             {
                 Recovers => connection <= 2 ? Unavailable : Foundation,
-                Outage => connection <= 4 ? Foundation : Unavailable,
                 Recovery => Jobs,
+                Outage => connection <= 5 ? Foundation : Unavailable,
                 _ => scenario,
             };
             return new Peer(request =>
