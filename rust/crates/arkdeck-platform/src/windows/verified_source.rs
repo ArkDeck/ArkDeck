@@ -102,7 +102,7 @@ fn private_attributes(descriptor: &Descriptor) -> SECURITY_ATTRIBUTES {
 pub fn create_private_directory(path: &Path) -> io::Result<()> {
     let descriptor = Descriptor::private(true)?;
     let attributes = private_attributes(&descriptor);
-    let name = wide(path.as_os_str())?;
+    let name = wide(super::extended_length(path).as_os_str())?;
     // SAFETY: a NUL-terminated path and live security attributes.
     bool_result(unsafe { CreateDirectoryW(name.as_ptr(), &attributes) })
 }
@@ -113,7 +113,7 @@ pub fn create_private_directory(path: &Path) -> io::Result<()> {
 pub fn create_private_file(path: &Path) -> io::Result<File> {
     let descriptor = Descriptor::private(false)?;
     let attributes = private_attributes(&descriptor);
-    let name = wide(path.as_os_str())?;
+    let name = wide(super::extended_length(path).as_os_str())?;
     // SAFETY: a NUL-terminated path and live security attributes; a valid
     // result is a new handle owned by the File below.
     let handle = unsafe {

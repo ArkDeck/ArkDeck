@@ -579,6 +579,11 @@ struct Copy {
     #[cfg(not(windows))]
     physical: String,
     destination: String,
+    /// Where the copy is published once whole (it is made beside it and
+    /// renamed): a recreated Windows junction names its directory there,
+    /// since a junction's target is absolute.
+    #[cfg(windows)]
+    published: String,
     entries: usize,
     bytes: u64,
 }
@@ -643,10 +648,45 @@ impl Copy {
         Ok(())
     }
 
-    /// A Windows link or junction is never recreated: it is refused.
+    /// Swift keeps a link that resolves inside the source tree. On Windows
+    /// (TASK-XPA-011) that is a directory junction (what `ohpm` links
+    /// `oh_modules` with) whose target, every link on the way resolved,
+    /// is a directory inside the source root: it is recreated as a junction
+    /// naming the copy's corresponding directory, as macOS rewrites an
+    /// absolute in-tree link relative. A junction naming a volume, a UNC or
+    /// device path, or anything outside the tree, a symbolic link and every
+    /// other reparse point are refused.
     #[cfg(windows)]
-    fn link(&self, relative: &str, _path: &str, _output: &str) -> Result<(), IsolationFailure> {
-        Err(unsafe_entry(relative))
+    fn link(&self, relative: &str, path: &str, output: &str) -> Result<(), IsolationFailure> {
+        let refused = || unsafe_entry(relative);
+        // A junction to a drive-letter directory; anything else is refused.
+        arkdeck_platform::junction_target(Path::new(path))
+            .map_err(|_| refused())?
+            .ok_or_else(refused)?;
+        let resolved = fs::canonicalize(path).map_err(|_| refused())?;
+        let source = fs::canonicalize(&self.source).map_err(other)?;
+        if !resolved.is_dir() {
+            return Err(refused());
+        }
+        let inside = resolved.strip_prefix(&source).map_err(|_| refused())?;
+        if !inside
+            .components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+        {
+            return Err(refused());
+        }
+        let destination = self.published.trim_start_matches(r"\\?\");
+        let target = inside
+            .to_str()
+            .map(|inside| {
+                if inside.is_empty() {
+                    destination.to_owned()
+                } else {
+                    support::join(destination, inside)
+                }
+            })
+            .ok_or_else(refused)?;
+        arkdeck_platform::create_junction(Path::new(output), Path::new(&target)).map_err(other)
     }
 
     fn entry(&mut self, relative: &str) -> Result<(), IsolationFailure> {
@@ -689,7 +729,13 @@ impl Copy {
 }
 
 /// Swift `copyIsolatedTree(from:to:)`.
-fn copy_isolated_tree(source: &str, destination: &str) -> Result<(), IsolationFailure> {
+///
+/// `published` is where `destination` is renamed to once whole.
+fn copy_isolated_tree(
+    source: &str,
+    destination: &str,
+    #[cfg_attr(not(windows), allow(unused_variables))] published: &str,
+) -> Result<(), IsolationFailure> {
     let source = foundation_resolved(source);
     #[cfg(not(windows))]
     let physical = fs::canonicalize(&source)
@@ -710,6 +756,8 @@ fn copy_isolated_tree(source: &str, destination: &str) -> Result<(), IsolationFa
         #[cfg(not(windows))]
         physical,
         destination,
+        #[cfg(windows)]
+        published: published.to_owned(),
         entries: 0,
         bytes: 0,
     }
@@ -862,7 +910,7 @@ impl WorkspaceComposition {
         private_directory(&task_root).map_err(other)?;
         let temporary = support::join(&task_root, ".workspace.tmp");
         let prepared = (|| {
-            copy_isolated_tree(&source.project_root, &temporary)?;
+            copy_isolated_tree(&source.project_root, &temporary, &workspace_root)?;
             if fs::symlink_metadata(&workspace_root).is_ok() {
                 return Err(IsolationFailure::Other);
             }
@@ -1495,5 +1543,154 @@ mod tests {
         assert!(!safe_scope("Sources/[ab]"));
         assert!(!safe_scope("Sources/./x"));
         assert!(!safe_scope(".git/config"));
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_link_tests {
+    use super::{IsolationFailure, copy_isolated_tree};
+    use arkdeck_platform::{create_junction, junction_target};
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    struct Scratch(PathBuf);
+    impl Scratch {
+        fn new() -> Self {
+            let temporary = std::env::temp_dir().canonicalize().unwrap();
+            let temporary = temporary.to_str().unwrap().trim_start_matches(r"\\?\");
+            let path = Path::new(temporary).join(format!(
+                "ad-isolation-links-{:016x}",
+                u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap())
+            ));
+            fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    const STORE: &str = r"oh_modules\.ohpm\@ohos+hypium@1.0.21\oh_modules\@ohos\hypium";
+    const DEEP: &str = r"src\main\module\assert\matchers\deeply\nested\directory\levels\and\still\more\levels\below\of\the\package\assertPromiseIsRejectedWithError.js";
+
+    /// A project whose `oh_modules\@ohos\hypium` is a junction into its own
+    /// `.ohpm` store, as `ohpm install` leaves it.
+    fn project(scratch: &Scratch) -> PathBuf {
+        let source = scratch.0.join("project");
+        fs::create_dir_all(source.join(STORE)).unwrap();
+        fs::write(source.join(STORE).join("index.ets"), b"export {}\n").unwrap();
+        // A file whose copy lies past `MAX_PATH`, as `ohpm`'s store does.
+        let deep = source.join(STORE).join(DEEP);
+        fs::create_dir_all(deep.parent().unwrap()).unwrap();
+        fs::write(&deep, b"deep\n").unwrap();
+        fs::write(source.join("build-profile.json5"), b"{}\n").unwrap();
+        create_junction(
+            &source.join(r"oh_modules\@ohos\hypium").tap_parent(),
+            &source.join(STORE),
+        )
+        .unwrap();
+        source
+    }
+
+    trait TapParent {
+        fn tap_parent(self) -> Self;
+    }
+    impl TapParent for PathBuf {
+        fn tap_parent(self) -> Self {
+            fs::create_dir_all(self.parent().unwrap()).unwrap();
+            self
+        }
+    }
+
+    fn copy(source: &Path, destination: &Path) -> Result<(), IsolationFailure> {
+        let destination = destination.to_str().unwrap();
+        copy_isolated_tree(source.to_str().unwrap(), destination, destination)
+    }
+
+    fn refused_entry(result: Result<(), IsolationFailure>) -> String {
+        match result {
+            Err(IsolationFailure::Refused(error)) => error.swift(),
+            Err(IsolationFailure::Other) => "other".into(),
+            Ok(()) => "copied".into(),
+        }
+    }
+
+    #[test]
+    fn an_in_tree_junction_is_recreated_inside_the_copy() {
+        let scratch = Scratch::new();
+        let source = project(&scratch);
+        // Made beside its published path, then renamed there, as `prepare`
+        // publishes a copy: the junction names the published copy.
+        let destination = scratch.0.join("copy");
+        let temporary = scratch.0.join("copy.tmp");
+        copy_isolated_tree(
+            source.to_str().unwrap(),
+            temporary.to_str().unwrap(),
+            destination.to_str().unwrap(),
+        )
+        .unwrap();
+        fs::rename(&temporary, &destination).unwrap();
+        let link = destination.join(r"oh_modules\@ohos\hypium");
+        assert_eq!(
+            junction_target(&link).unwrap(),
+            Some(destination.join(STORE)),
+            "the copy's junction names the copy's own store"
+        );
+        assert_eq!(fs::read(link.join("index.ets")).unwrap(), b"export {}\n");
+        let deep = destination.join(STORE).join(DEEP);
+        assert!(deep.to_str().unwrap().len() > 260, "{}", deep.display());
+        assert_eq!(fs::read(&deep).unwrap(), b"deep\n");
+        // Through the copy's junction, the copy changes, never the source.
+        fs::write(link.join("index.ets"), b"changed\n").unwrap();
+        assert_eq!(
+            fs::read(destination.join(STORE).join("index.ets")).unwrap(),
+            b"changed\n"
+        );
+        assert_eq!(
+            fs::read(source.join(STORE).join("index.ets")).unwrap(),
+            b"export {}\n"
+        );
+        // Removing the copy leaves the source whole.
+        fs::remove_dir_all(&destination).unwrap();
+        assert!(source.join(STORE).join("index.ets").is_file());
+        assert!(source.join(r"oh_modules\@ohos\hypium\index.ets").is_file());
+    }
+
+    #[test]
+    fn a_junction_that_leaves_the_tree_is_refused() {
+        let scratch = Scratch::new();
+        let outside = scratch.0.join("outside");
+        fs::create_dir_all(&outside).unwrap();
+
+        // Straight out of the tree.
+        let source = project(&scratch);
+        create_junction(&source.join("escape"), &outside).unwrap();
+        assert!(
+            refused_entry(copy(&source, &scratch.0.join("copy-1"))).contains("escape"),
+            "a junction naming a directory outside the tree"
+        );
+        fs::remove_dir(source.join("escape")).unwrap();
+
+        // In-tree by name, out of the tree once resolved: an in-tree junction
+        // naming an in-tree junction that leaves.
+        create_junction(&source.join("hop"), &outside).unwrap();
+        create_junction(&source.join("via"), &source.join("hop")).unwrap();
+        let reason = refused_entry(copy(&source, &scratch.0.join("copy-2")));
+        assert!(reason.contains("hop") || reason.contains("via"), "{reason}");
+        fs::remove_dir(source.join("via")).unwrap();
+        fs::remove_dir(source.join("hop")).unwrap();
+
+        // A junction to a directory that no longer exists.
+        let gone = source.join("gone");
+        fs::create_dir(&gone).unwrap();
+        create_junction(&source.join("dangling"), &gone).unwrap();
+        fs::remove_dir(&gone).unwrap();
+        assert!(refused_entry(copy(&source, &scratch.0.join("copy-3"))).contains("dangling"));
+        fs::remove_dir(source.join("dangling")).unwrap();
+
+        // What remains copies.
+        copy(&source, &scratch.0.join("copy-4")).unwrap();
     }
 }

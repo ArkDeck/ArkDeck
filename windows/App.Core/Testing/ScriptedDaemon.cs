@@ -82,7 +82,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -182,6 +182,7 @@ public static partial class ScriptedDaemon
                 Recovers => connection <= 2 ? Unavailable : Foundation,
                 Recovery => Jobs,
                 History => Jobs,
+                Continue => Jobs,
                 Outage => connection <= 5 ? Foundation : Unavailable,
                 _ => scenario,
             };
@@ -238,7 +239,7 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? Debug(request, method) ?? method switch
+                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(Observations)),
@@ -267,7 +268,7 @@ public static partial class ScriptedDaemon
             };
         }
 
-        private (string Id, string Operation, string State, string Created)[] JobsNow() =>
+        private (string Id, string Operation, string State, string Created)[] JobsNow() => scenario == Continue ? [.. ContinueJobs, .. _continued] :
         [
             (RunningJobId, "observe.device@1", RunningJobStates[Math.Min(_statusReads, RunningJobStates.Count - 1)], "2026-09-30T08:02:00Z"),
             (FailedJobId, "flash.images@1", "failed", "2026-09-30T08:01:00Z"),
@@ -527,9 +528,9 @@ public static partial class ScriptedDaemon
         private static JsonObject Evidence((string Id, string Operation, string State, string Created) job)
         {
             var terminal = Presentation.JobSummary.TerminalStates.Contains(job.State);
-            return (JsonObject)Parse($$"""
+            return (JsonObject)Parse(ContinueEvidence(job.Id, $$"""
                 {"actualEffect":{{(terminal ? "\"readOnly\"" : "null")}},"actualStepKinds":{{(terminal ? "[\"probeHostTool\",\"probeHDCServer\",\"probeDevice\"]" : "null")}},"artifacts":[],"authority":{"admittedAtUtc":"{{job.Created}}","consumptionFingerprintSha256":null,"kind":"defaultReadOnlyPolicy","recoveryEpoch":null,"reference":"default-read-only-policy","validUntilUtc":null},"bindingRevision":3,"blockers":{{(job.State == "failed" ? "[\"executionFailed\"]" : "[]")}},"catalogDigest":"508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684","executionMode":"execute","finishedAtUtc":{{(terminal ? $"\"{job.Created}\"" : "null")}},"firstEvidenceStepAtUtc":{{(terminal ? $"\"{job.Created}\"" : "null")}},"inventoryAvailable":true,"jobId":"{{job.Id}}","missingRequiredArtifacts":[],"observation":null,"operationReference":"{{job.Operation}}","outcomeUnknown":false,"parameters":{},"providerId":"hdc","recoveryEpoch":null,"schemaVersion":"arkdeck.job-evidence/1","startedAtUtc":"{{job.Created}}","status":"{{(job.State == "succeeded" ? "verified" : terminal ? job.State : "resultNotReady")}}","targetId":"TGT-FIXTURE-1","terminalState":{{(terminal ? $"\"{job.State}\"" : "null")}},"traceProbeAfter":null,"traceProbeBefore":null}
-                """);
+                """));
         }
 
         /// <summary>The recorded Sessions (as the Windows Session owner lists them over the
@@ -1001,9 +1002,9 @@ public static partial class ScriptedDaemon
         var listOnly = list ? "\"current\":true,\"timeline\":null," : string.Empty;
         var schema = list ? "arkdeck.job-summary/1" : "arkdeck.job-status/1";
         var finished = terminal ? $"\"{job.Created}\"" : "null";
-        return RecoveryFacts(job.Id, $$$"""
+        return ContinueFacts(job.Id, RecoveryFacts(job.Id, $$$"""
             {"actualEffect":"readOnly","createdAtUtc":"{{{job.Created}}}",{{{listOnly}}}"executionMode":"execute","failure":null,"finishedAtUtc":{{{finished}}},"jobId":"{{{job.Id}}}","nextAction":{{{next}}},"operation":"{{{job.Operation}}}","outcome":"{{{job.State}}}","outcomeUnknown":false,"outstandingResidueCount":0,"processProgress":null,"recoveryEpochId":null,"resolvedByTargetAliasResolutionId":null,"schemaVersion":"{{{schema}}}","sessionId":"session-{{{job.Id}}}","sessionPublication":{"catalogGeneration":null,"manifestSha256":null,"reasonCode":"noCurrentPublicationRecord","state":"unavailable"},"startedAtUtc":"{{{job.Created}}}","state":"{{{job.State}}}","supersededByRecoveryEpochId":null,"targetId":"TGT-FIXTURE-1","threadId":null,"waitingForHuman":{{{(job.State == "waitingForDevice" ? "true" : "false")}}},"workspaceKind":"device"}
-            """);
+            """));
     }
 
     /// <summary>The recorded facts of <see cref="Recovery"/>'s Jobs the generic projection cannot

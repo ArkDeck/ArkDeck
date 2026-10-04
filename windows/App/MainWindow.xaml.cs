@@ -141,6 +141,44 @@ public sealed partial class MainWindow : Window
         Select(tag);
     }
 
+    private ContinuationCard? _continuation;
+
+    /// <summary>The navigation tag of a workspace kind.</summary>
+    public static string Tag(WorkspaceKind kind) => kind switch
+    {
+        WorkspaceKind.Flash => "flash",
+        WorkspaceKind.Viewer => "viewer",
+        WorkspaceKind.Trace => "trace",
+        WorkspaceKind.Debug => "debug",
+        WorkspaceKind.Device => "device",
+        _ => "diagnostics",
+    };
+
+    /// <summary>Overview's "Prepare inputs" (macOS <c>onPrepare</c>): the draft is shown above its
+    /// workspace, which opens; nothing is submitted until the person starts it there.</summary>
+    public void PrepareContinuation(WorkspaceContinuation draft, string? currentTargetId, long? currentBindingRevision)
+    {
+        _continuation = new ContinuationCard(draft, currentTargetId, currentBindingRevision, () =>
+        {
+            _continuation = null;
+            ShowContinuation(null);
+        });
+        var tag = Tag(draft.Kind);
+        if (ReferenceEquals(NavView.SelectedItem, NavView.MenuItems.Concat(NavView.FooterMenuItems).OfType<NavigationViewItem>().FirstOrDefault(i => (string)i.Tag == tag)))
+        {
+            ShowContinuation(tag);
+            return;
+        }
+        Select(tag);
+    }
+
+    private void ShowContinuation(string? tag)
+    {
+        var show = _continuation is { } card && tag == Tag(card.Draft.Kind);
+        ContinuationHost.Content = show ? _continuation : null;
+        ContinuationHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     /// <summary>Settings, on one of its tabs (the remote browser's Open Server Settings).</summary>
     public void OpenSettings(string tab)
     {
@@ -264,6 +302,7 @@ public sealed partial class MainWindow : Window
             _pages[tag] = page;
         }
         PageHost.Content = page;
+        ShowContinuation(tag);
         if (page is TraceViewerPage viewer && _pendingTrace is { } pending)
         {
             _pendingTrace = null;

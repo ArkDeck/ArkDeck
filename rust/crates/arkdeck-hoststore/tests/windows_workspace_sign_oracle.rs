@@ -1491,6 +1491,7 @@ mod windows {
                 hvigor_script_path: stand_in.clone(),
                 sdk_root_path: sdk.clone(),
                 verified_resources: Vec::new(),
+                search_directory: None,
             })
         };
         let request = |label: &str| {

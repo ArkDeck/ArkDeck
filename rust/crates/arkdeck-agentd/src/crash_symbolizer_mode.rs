@@ -13,11 +13,11 @@
 //! that is not a JSON object, is exit 1 and a line naming the error. That line
 //! never carries a path or the bytes, where Swift's Foundation error text
 //! names the path.
+//!
+//! On Windows (TASK-XPA-011) an absolute path is a drive and its root
+//! (`X:\…`), and the report is written to the process's standard output.
 use std::ffi::OsString;
-use std::fs::File;
 use std::io::{self, Write};
-use std::os::fd::AsFd;
-use std::os::unix::ffi::OsStrExt;
 
 pub(crate) const FLAG: &str = "--symbolize-crash";
 const USAGE: &str = "--symbolize-crash requires an absolute source map path and dump path\n";
@@ -30,10 +30,7 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
         let _ = io::stderr().write_all(USAGE.as_bytes());
         return 64;
     };
-    if ![map, dump]
-        .iter()
-        .all(|path| path.as_bytes().starts_with(b"/"))
-    {
+    if ![map, dump].iter().all(|path| absolute(path)) {
         let _ = io::stderr().write_all(USAGE.as_bytes());
         return 64;
     }
@@ -50,13 +47,7 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
             return 1;
         }
     };
-    // Delivered, or the mode fails: written through its own handle on stdout,
-    // where the standard library's would take a stdout that is not open for
-    // writing as a stream to discard.
-    let delivered = io::stdout()
-        .as_fd()
-        .try_clone_to_owned()
-        .and_then(|stdout| File::from(stdout).write_all(report.as_bytes()));
+    let delivered = deliver(report.as_bytes());
     match delivered {
         Ok(()) => 0,
         Err(error) => {
@@ -64,4 +55,45 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
             1
         }
     }
+}
+
+/// Whether `path` is an explicit absolute path as this host spells one.
+#[cfg(not(windows))]
+fn absolute(path: &OsString) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    path.as_bytes().starts_with(b"/")
+}
+
+/// On Windows: a drive and its root, `X:\` (or `X:/`).
+#[cfg(windows)]
+fn absolute(path: &OsString) -> bool {
+    let Some(text) = path.to_str() else {
+        return false;
+    };
+    let bytes = text.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/')
+}
+
+/// Delivered, or the mode fails: written through its own handle on stdout,
+/// where the standard library's would take a stdout that is not open for
+/// writing as a stream to discard.
+#[cfg(not(windows))]
+fn deliver(report: &[u8]) -> io::Result<()> {
+    use std::fs::File;
+    use std::os::fd::AsFd;
+    io::stdout()
+        .as_fd()
+        .try_clone_to_owned()
+        .and_then(|stdout| File::from(stdout).write_all(report))
+}
+
+/// On Windows: the process's standard output, flushed.
+#[cfg(windows)]
+fn deliver(report: &[u8]) -> io::Result<()> {
+    let mut stdout = io::stdout();
+    stdout.write_all(report)?;
+    stdout.flush()
 }

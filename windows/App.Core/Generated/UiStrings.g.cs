@@ -1450,6 +1450,66 @@ public static class UiStrings
     public const string JobRecoveryArchiveBlockerRefresh = "jobRecovery.archive.blocker.refresh";
     public const string JobRecoveryArchiveReview = "jobRecovery.archive.review";
     public const string JobRecoveryArchivePublicationPending = "jobRecovery.archive.publicationPending";
+    public const string OverviewContinuationClose = "overview.continuation.close";
+    public const string OverviewContinuationExplanation = "overview.continuation.explanation";
+    public const string OverviewContinuationOpenJob = "overview.continuation.openJob";
+    public const string OverviewContinuationStatusNote = "overview.continuation.statusNote";
+    public const string OverviewContinuationSubmit = "overview.continuation.submit";
+    public const string OverviewContinuationSubmitted = "overview.continuation.submitted";
+    public const string OverviewContinuationTitle = "overview.continuation.title";
+    public const string OverviewRecordNextAttention = "overview.record.next.attention";
+    public const string OverviewRecordNextEmptyDetail = "overview.record.next.empty.detail";
+    public const string OverviewRecordNextEmptyTitle = "overview.record.next.empty.title";
+    public const string OverviewRecordNextRecentDetail = "overview.record.next.recentDetail";
+    public const string OverviewRecordNextResidueDetail = "overview.record.next.residueDetail";
+    public const string OverviewRecordNextTitle = "overview.record.next.title";
+    public const string OverviewRecordNextUnknownDetail = "overview.record.next.unknownDetail";
+    public const string OverviewRecordNextWaitingDetail = "overview.record.next.waitingDetail";
+    public const string OverviewRecordRecentAll = "overview.record.recent.all";
+    public const string OverviewRecordRefusalEffectUnknown = "overview.record.refusal.effectUnknown";
+    public const string OverviewRecordRefusalNeverReplayed = "overview.record.refusal.neverReplayed";
+    public const string OverviewRecordRefusalNotTerminal = "overview.record.refusal.notTerminal";
+    public const string OverviewRecordRefusalParametersNotReported = "overview.record.refusal.parametersNotReported";
+    public const string OverviewRecordResidue = "overview.record.residue";
+    public const string OverviewRecordRunAgain = "overview.record.run.again";
+    public const string OverviewRecordRunAgainGated = "overview.record.run.againGated";
+    public const string OverviewRecordRunOpen = "overview.record.run.open";
+    public const string OverviewRecordRunOutcomeUnknown = "overview.record.run.outcomeUnknown";
+    public const string OverviewRecordRunCount = "overview.record.runCount";
+    public const string OverviewRecordThreadMore = "overview.record.thread.more";
+    public const string OverviewRecordThreadNeedsAttention = "overview.record.thread.needsAttention";
+    public const string OverviewRecordThreadUngrouped = "overview.record.thread.ungrouped";
+    public const string OverviewRecordWorkspaceDebug = "overview.record.workspace.debug";
+    public const string OverviewRecordWorkspaceDevice = "overview.record.workspace.device";
+    public const string OverviewRecordWorkspaceFlash = "overview.record.workspace.flash";
+    public const string OverviewRecordWorkspaceTrace = "overview.record.workspace.trace";
+    public const string OverviewRecordWorkspaceViewer = "overview.record.workspace.viewer";
+    public const string OverviewResumeCancel = "overview.resume.cancel";
+    public const string OverviewResumeCatalogDigest = "overview.resume.catalogDigest";
+    public const string OverviewResumeDriftBinding = "overview.resume.drift.binding";
+    public const string OverviewResumeDriftTarget = "overview.resume.drift.target";
+    public const string OverviewResumeDriftUnknown = "overview.resume.drift.unknown";
+    public const string OverviewResumeEffect = "overview.resume.effect";
+    public const string OverviewResumeEffectUnrecorded = "overview.resume.effect.unrecorded";
+    public const string OverviewResumeExplanation = "overview.resume.explanation";
+    public const string OverviewResumeGated = "overview.resume.gated";
+    public const string OverviewResumeLoading = "overview.resume.loading";
+    public const string OverviewResumeNeverReplayed = "overview.resume.neverReplayed";
+    public const string OverviewResumeNoParameters = "overview.resume.noParameters";
+    public const string OverviewResumeNotRepeatable = "overview.resume.notRepeatable";
+    public const string OverviewResumeOpen = "overview.resume.open";
+    public const string OverviewResumeParameters = "overview.resume.parameters";
+    public const string OverviewResumeParametersNote = "overview.resume.parameters.note";
+    public const string OverviewResumePrepare = "overview.resume.prepare";
+    public const string OverviewResumePrepareUnavailable = "overview.resume.prepare.unavailable";
+    public const string OverviewResumeSource = "overview.resume.source";
+    public const string OverviewResumeTarget = "overview.resume.target";
+    public const string OverviewResumeThread = "overview.resume.thread";
+    public const string OverviewResumeTitle = "overview.resume.title";
+    public const string WindowsOverviewThreadLess = "windows.overview.thread.less";
+    public const string WindowsOverviewResumeOpenRefused = "windows.overview.resume.openRefused";
+    public const string WindowsOverviewResumeOpenUnknown = "windows.overview.resume.openUnknown";
+    public const string WindowsOverviewContinuationAttempted = "windows.overview.continuation.attempted";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2896,5 +2956,65 @@ public static class UiStrings
         JobRecoveryArchiveBlockerRefresh,
         JobRecoveryArchiveReview,
         JobRecoveryArchivePublicationPending,
+        OverviewContinuationClose,
+        OverviewContinuationExplanation,
+        OverviewContinuationOpenJob,
+        OverviewContinuationStatusNote,
+        OverviewContinuationSubmit,
+        OverviewContinuationSubmitted,
+        OverviewContinuationTitle,
+        OverviewRecordNextAttention,
+        OverviewRecordNextEmptyDetail,
+        OverviewRecordNextEmptyTitle,
+        OverviewRecordNextRecentDetail,
+        OverviewRecordNextResidueDetail,
+        OverviewRecordNextTitle,
+        OverviewRecordNextUnknownDetail,
+        OverviewRecordNextWaitingDetail,
+        OverviewRecordRecentAll,
+        OverviewRecordRefusalEffectUnknown,
+        OverviewRecordRefusalNeverReplayed,
+        OverviewRecordRefusalNotTerminal,
+        OverviewRecordRefusalParametersNotReported,
+        OverviewRecordResidue,
+        OverviewRecordRunAgain,
+        OverviewRecordRunAgainGated,
+        OverviewRecordRunOpen,
+        OverviewRecordRunOutcomeUnknown,
+        OverviewRecordRunCount,
+        OverviewRecordThreadMore,
+        OverviewRecordThreadNeedsAttention,
+        OverviewRecordThreadUngrouped,
+        OverviewRecordWorkspaceDebug,
+        OverviewRecordWorkspaceDevice,
+        OverviewRecordWorkspaceFlash,
+        OverviewRecordWorkspaceTrace,
+        OverviewRecordWorkspaceViewer,
+        OverviewResumeCancel,
+        OverviewResumeCatalogDigest,
+        OverviewResumeDriftBinding,
+        OverviewResumeDriftTarget,
+        OverviewResumeDriftUnknown,
+        OverviewResumeEffect,
+        OverviewResumeEffectUnrecorded,
+        OverviewResumeExplanation,
+        OverviewResumeGated,
+        OverviewResumeLoading,
+        OverviewResumeNeverReplayed,
+        OverviewResumeNoParameters,
+        OverviewResumeNotRepeatable,
+        OverviewResumeOpen,
+        OverviewResumeParameters,
+        OverviewResumeParametersNote,
+        OverviewResumePrepare,
+        OverviewResumePrepareUnavailable,
+        OverviewResumeSource,
+        OverviewResumeTarget,
+        OverviewResumeThread,
+        OverviewResumeTitle,
+        WindowsOverviewThreadLess,
+        WindowsOverviewResumeOpenRefused,
+        WindowsOverviewResumeOpenUnknown,
+        WindowsOverviewContinuationAttempted,
     ];
 }

@@ -53,6 +53,11 @@ pub struct VerifiedTool {
     pub(crate) identity: crate::windows::FileIdentity,
     #[cfg(windows)]
     _namespace: Vec<File>,
+    /// The one directory a child of this tool finds before the system
+    /// directory on its search path (`with_search_directory`), in its
+    /// standard spelling; `None` is the clean search path.
+    #[cfg(windows)]
+    pub(crate) search_directory: Option<String>,
 }
 
 impl VerifiedTool {
@@ -90,6 +95,8 @@ impl VerifiedTool {
             identity,
             #[cfg(windows)]
             _namespace: namespace,
+            #[cfg(windows)]
+            search_directory: None,
         };
         tool.revalidate()?;
         // A shim runs whichever developer tool the kernel names it by, which
@@ -122,6 +129,18 @@ impl VerifiedTool {
 
     pub fn sha256(&self) -> &str {
         &self.sha256
+    }
+
+    /// The same tool, its children finding `directory` before the system
+    /// directory on their search path (TASK-XPA-011: a registered DevEco
+    /// toolchain's pinned JDK, which Hvigor's packaging runs as `java`).
+    /// The directory must be an existing directory named in its standard
+    /// `X:\…` spelling, exactly the spelling of its canonical path; a caller
+    /// still cannot overlay `PATH` itself.
+    #[cfg(windows)]
+    pub fn with_search_directory(mut self, directory: &Path) -> io::Result<Self> {
+        self.search_directory = Some(crate::windows::search_directory(directory)?);
+        Ok(self)
     }
 
     pub fn run_read_only(

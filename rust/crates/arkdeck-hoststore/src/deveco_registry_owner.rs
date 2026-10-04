@@ -706,6 +706,7 @@ mod windows_registration_tests {
                     "hostname.exe",
                     sign_node,
                 )
+                || !self.executable(r"DevEco Studio\jbr\bin\java.exe", "where.exe", true)
             {
                 return None;
             }
@@ -803,7 +804,13 @@ mod windows_registration_tests {
             .iter()
             .map(|c| c["role"].as_str().unwrap())
             .collect();
-        assert_eq!(roles, ["productManifest", "sdkManifest", "node", "hvigor"]);
+        assert_eq!(
+            roles,
+            ["productManifest", "sdkManifest", "node", "hvigor", "java"]
+        );
+        // The bundled JDK's launcher: executable, its signature verified.
+        assert_eq!(children[4]["executable"], true);
+        assert_eq!(children[4]["trust"]["signature"], "verified");
         // node: executable, its own Authenticode signature verified and named.
         assert_eq!(children[2]["executable"], true);
         assert_eq!(children[2]["trust"]["signature"], "verified");
@@ -962,6 +969,15 @@ mod windows_registration_tests {
             store.register(&root, NOW).unwrap_err().code,
             "admissionDenied"
         );
+        // The DevEco publisher's launcher, but an unsigned JDK launcher.
+        {
+            let _publisher = Publisher::development();
+            assert!(scratch.executable(r"DevEco Studio\jbr\bin\java.exe", "where.exe", false));
+            assert_eq!(
+                store.register(&root, NOW).unwrap_err().code,
+                "admissionDenied"
+            );
+        }
         assert_eq!(scratch.index(), EMPTY_DEVECO);
     }
 
@@ -1017,7 +1033,12 @@ mod windows_registration_tests {
                 "children":roles.iter().map(|role| child(role)).collect::<Vec<_>>(),
                 "generation":1,"state":"available","references":[]}]})
         };
-        let windows = ["productManifest", "sdkManifest", "node", "hvigor"];
+        let windows = ["productManifest", "sdkManifest", "node", "hvigor", "java"];
+        // A record registered before the JDK was pinned stays readable.
+        let legacy = ["productManifest", "sdkManifest", "node", "hvigor"];
+        assert!(
+            read_index(&serde_json::to_vec(&record(r"C:\DevEco Studio", &legacy)).unwrap()).is_ok()
+        );
         let macos = [
             "productManifest",
             "sdkManifest",

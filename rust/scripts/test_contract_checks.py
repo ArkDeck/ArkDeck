@@ -640,8 +640,12 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(
                     ["cargo", "test", "--package", "arkdeck-contract", "--locked"] in calls,
                     label == "candidate-of-published-inputs")
-                # Drifted candidate inputs test what reads the candidate kind.
+                # Drifted candidate inputs test what reads the candidate kind,
+                # after building the binaries the CLI's process tests launch.
                 self.assertEqual(contract_and_cli in calls, label == "candidate-of-drifted-inputs")
+                if contract_and_cli in calls:
+                    bins = ["cargo", "build", "--workspace", "--bins", "--locked"]
+                    self.assertLess(calls.index(bins), calls.index(contract_and_cli))
                 self.assertIn(["cargo", "build", "--workspace", "--bins", "--locked"], calls)
 
     def test_any_native_stage_failure_stops_that_view_and_is_preserved(self):
@@ -812,10 +816,12 @@ class ContractChecksTests(unittest.TestCase):
             with patch.dict(os.environ, {"ARKDECK_RUST_TEST_WORKERS": "2"}):
                 runner.run_view(self.root / label, self.root / "outputs" / label, info, self.published_info, run=run)
             if label == "candidate":
-                # The candidate is the lane's checkout; only its kind's tests.
-                self.assertEqual(calls[0][:2], ["cargo", "test"])
-                self.assertIn("arkdeck-cli", calls[0])
-                self.assertEqual([argv[1] for argv in calls[1:3]], ["run", "build"])
+                # The candidate is the lane's checkout: the binaries the CLI's
+                # process tests launch, then only its kind's tests.
+                self.assertEqual(calls[0], ["cargo", "build", "--workspace", "--bins", "--locked"])
+                self.assertEqual(calls[1][:2], ["cargo", "test"])
+                self.assertIn("arkdeck-cli", calls[1])
+                self.assertEqual([argv[1] for argv in calls[2:4]], ["run", "build"])
                 continue
             self.assertEqual(calls[0][1], "clippy")
             self.assertEqual(calls[1], [sys.executable, str(self.root / label / "rust/scripts/run-workspace-tests.py")])

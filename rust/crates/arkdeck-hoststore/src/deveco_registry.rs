@@ -123,7 +123,15 @@ const ROLES: &[&str] = &[
     "signedResourceEnvelope",
 ];
 #[cfg(windows)]
-const ROLES: &[&str] = &["productManifest", "sdkManifest", "node", "hvigor"];
+const ROLES: &[&str] = &["productManifest", "sdkManifest", "node", "hvigor", "java"];
+/// The roles a Windows record registered before the bundled JDK was pinned
+/// carries: still read, so the index stays readable, but such a record no
+/// longer verifies against its root and resolves no preset; the toolchain is
+/// registered again.
+#[cfg(windows)]
+const LEGACY_ROLES: &[&str] = &["productManifest", "sdkManifest", "node", "hvigor"];
+#[cfg(not(windows))]
+const LEGACY_ROLES: &[&str] = ROLES;
 
 /// A registered root of this host: `/…` on macOS, a standard `X:\…` path on
 /// Windows.
@@ -198,8 +206,9 @@ pub(crate) fn read_index(bytes: &[u8]) -> Result<(Index, Vec<u8>), DecodeError> 
             || !version(&record.sdk_version)
             || !identifier(&record.api_version)
             || !record.bundle_trust.well_formed()
-            || record.children.len() != ROLES.len()
-            || roles != ROLES.iter().copied().collect()
+            || !(record.children.len() == ROLES.len() && roles == ROLES.iter().copied().collect()
+                || record.children.len() == LEGACY_ROLES.len()
+                    && roles == LEGACY_ROLES.iter().copied().collect())
             || !record
                 .children
                 .iter()
