@@ -1,6 +1,6 @@
 # TASK-XPA-011 — Windows Hvigor build end to end: the pinned JDK and tool image spelling (WM3 GJ-5, PR 6 layer 2), 2026-10-05
 
-- Task: TASK-XPA-011, WM3 slice GJ-5. This is the second layer of the Hvigor PR (#2512), on
+- Task: TASK-XPA-011, WM3 slice GJ-5. This is the second layer of the Hvigor PR (#2549, on `main`), on
   top of `windows-workspace-hvigor-run.md`. That layer's live build stopped at Hvigor's
   `PackageHap` (`spawn java ENOENT`).
 - Host: the Windows 11 x64 reference host, non-elevated. The installed DevEco Studio

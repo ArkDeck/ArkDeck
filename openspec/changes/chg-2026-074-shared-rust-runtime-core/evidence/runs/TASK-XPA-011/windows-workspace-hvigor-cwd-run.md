@@ -1,6 +1,6 @@
 # TASK-XPA-011 — Windows Hvigor children never run a command from the project's directory (WM3 GJ-5, PR 6 layer 3), 2026-10-05
 
-- Task: TASK-XPA-011, WM3 slice GJ-5. This is the third layer of the Hvigor PR (#2512), after
+- Task: TASK-XPA-011, WM3 slice GJ-5. This is the third layer of the Hvigor PR (#2549, on `main`), after
   `windows-workspace-hvigor-jdk-run.md`. The lead decided on 2026-10-04 that it must not wait
   for a rulings batch: project content is untrusted, and a planted command must never run ahead
   of the pinned toolchain under the Runtime's capability.

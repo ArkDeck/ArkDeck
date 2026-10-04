@@ -1,6 +1,6 @@
 # TASK-XPA-011 — A Windows workspace copy recreates in-tree junctions, and `workspace test` runs end to end (WM3 GJ-5, PR 6 layer 4), 2026-10-05
 
-- Task: TASK-XPA-011, WM3 slice GJ-5. This is the fourth layer of the Hvigor PR (#2512), after
+- Task: TASK-XPA-011, WM3 slice GJ-5. This is the fourth layer of the Hvigor PR (#2549, on `main`), after
   `windows-workspace-hvigor-cwd-run.md`.
 - Decision: the lead's of 2026-10-04 (macOS parity). A macOS Runtime copy keeps a link that
   resolves inside the source tree and rewrites an absolute one relative. On Windows, an

@@ -1,8 +1,9 @@
 # TASK-XPA-011 — Windows Hvigor build, tests and crash symbolization (WM3 GJ-5, PR 6), 2026-10-04
 
-- Task: TASK-XPA-011, WM3 slice GJ-5, the Hvigor layer. It is stacked on the signing layer
-  (#2508, `agent/xpa-011-windows-sign-registered-20261004`), which is stacked on the mutations
-  layer (#2506) and the lanes layer (#2500). Hvigor build and test presets now run on a
+- Task: TASK-XPA-011, WM3 slice GJ-5, the Hvigor layer: the first commit of the Hvigor PR
+  #2549 (`agent/xpa-011-windows-workspace-hvigor-r2-20261005`), on `main` after the lanes
+  (#2500), mutations (#2506) and signing (#2508) layers merged. It was first pushed as #2512,
+  stacked on #2508; #2512 is closed as superseded by #2549. Hvigor build and test presets now run on a
   Runtime-owned copy on Windows, and the daemon's `--symbolize-crash` mode, which a symbol
   preset runs, answers on Windows too.
 - Host: the Windows 11 x64 reference host, non-elevated. The composition-level test uses a
