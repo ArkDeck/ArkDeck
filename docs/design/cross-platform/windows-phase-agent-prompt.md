@@ -385,7 +385,7 @@ Host github-arkdeck-agent
 - workspace 与 analyzer 两个 provider；
 - 密钥库口令存到 Credential Manager；
 - 工具链只认已登记的引用，不从 PATH 取；
-- 存在性检查走 HAR console challenge；
+- 不设口令存在性门：与 macOS 一致，Runtime 读取 Credential Manager 不交互（2026-10-04 裁定，见 TASK-XPA-011 run record `windows-workspace-sign-oracle-run.md`）；
 - 任何秘密都不进 argv、环境变量或 receipt。
 - DevEco、hvigor、hap-sign-tool、node 在 Windows 上的安装形态，先用一份 crib 让维护者确认。
 
