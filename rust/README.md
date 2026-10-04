@@ -1024,6 +1024,18 @@ checks the daemon over its pipe and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`,
 through `arkdeck job plan|submit` against a dev-signed daemon, before and
 after a restart.
 
+GJ-1's two device operations run on Windows host code too:
+`arkdeck-hoststore/tests/windows_gj1_replays.rs` replays the Swift
+`observe.device@1` and `capture.diagnostics@1` oracles (28 exchanges each)
+through the planner, admitter, runner, result reader and Artifact pager over
+the shared fake's two tables ported in process (`oracle_fake.rs`'s
+`ObserveDevice` and `CaptureDiagnostics` arms). Every answer is Swift's (a
+refusal's wording T2), the fake receives Swift's 11 and 16 calls in order,
+and the Jobs' index, records, Journals, Artifacts and Sessions are Swift's
+byte for byte, read with the host paths in the oracle's spelling, the
+Session platform as the oracle's and a manifest's derived values relabelled
+(`hdc_oracle::assert_read_only_replays`).
+
 ## Windows Session owner, publication and snapshot pages (TASK-XPA-005/014)
 
 `arkdeck-hoststore` builds on Windows the snapshot pager (`snapshot_pager`,

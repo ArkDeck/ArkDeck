@@ -1,9 +1,10 @@
 //! `HDCOracleFake` in process, for a Windows host (TASK-XPA-008/009): the
 //! shared fake HDC of the Swift oracles answers from a POSIX shell fragment
 //! (`hdc-answers.sh`) the driver sources, which a Windows host cannot run. The
-//! debug-hap and deploy-native-library fragments, and the Flash host facts
-//! oracle's own (`flash-host-facts/hdc-answers.sh`), are ported here, case
-//! for case and in their order, over the same root: the call log the driver
+//! debug-hap and deploy-native-library fragments, the Flash host facts
+//! oracle's own (`flash-host-facts/hdc-answers.sh`), and `observe.device@1`'s
+//! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables) are
+//! ported here, case for case and in their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
 //! It reports its tool identity current, as the macOS dispatch over the fake's
@@ -27,6 +28,8 @@ pub enum Answers {
     DebugHap,
     NativeLibrary,
     FlashHostFacts,
+    ObserveDevice,
+    CaptureDiagnostics,
 }
 
 impl Answers {
@@ -38,6 +41,15 @@ impl Answers {
                 Self::NativeLibrary
             }
             line if line.starts_with("# flash.prerequisites answers") => Self::FlashHostFacts,
+            line if line.starts_with("# observe.device@1 answers of ArkDeckFakeHDCFixture") => {
+                Self::ObserveDevice
+            }
+            line if line.starts_with(
+                "# capture.diagnostics@1 answers of ArkDeckFakeHDCFixture and the scripted",
+            ) =>
+            {
+                Self::CaptureDiagnostics
+            }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -381,6 +393,91 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `observe-device/hdc-answers.sh`: `ArkDeckFakeHDCFixture`'s
+    /// `observe.device@1` table, by mode.
+    fn observe_device(argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        if all == "-v" {
+            return Answer::out(if mode == "emptyVersion" {
+                ""
+            } else {
+                "Ver: 3.2.0d\n"
+            });
+        }
+        if all == "checkserver" {
+            let server = if mode == "serverMismatch" {
+                "3.2.0f"
+            } else {
+                "3.2.0d"
+            };
+            return Answer::out(format!(
+                "Client version:Ver: 3.2.0d, server version:Ver: {server}\n"
+            ));
+        }
+        Self::fixture_device(&all, mode).unwrap_or_else(Answer::unregistered)
+    }
+
+    /// `capture-diagnostics/hdc-answers.sh`: the same fixture's
+    /// `capture.diagnostics@1` table and the scripted dispatcher's, by mode.
+    fn capture_diagnostics(argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        let shell = format!("-t {KEY} shell ");
+        if all == "-v" {
+            return Answer::out("Ver: 3.2.0d\n");
+        }
+        if all == "checkserver" {
+            return Answer::out("Client version:Ver: 3.2.0d, server version:Ver: 3.2.0d\n");
+        }
+        if let Some(answer) = Self::fixture_device(&all, mode) {
+            return answer;
+        }
+        if all == format!("{shell}df -k /data/local/tmp") {
+            let available = if mode == "lowStorage" {
+                "16"
+            } else {
+                "1047552"
+            };
+            return Answer::out(format!(
+                "Filesystem 1K-blocks Used Available Use% Mounted on\n\
+                 /dev/block/data 1048576 1024 {available} 1% /data\n"
+            ));
+        }
+        if all == format!("{shell}hilog -x") {
+            return Answer::out(if mode == "emptyHilog" {
+                ""
+            } else {
+                "01-01 00:00:00 I app: hello\n"
+            });
+        }
+        if all == format!("{shell}hidumper -s WindowManagerService -a -a") {
+            return Answer::out("{\"windows\":[]}\n");
+        }
+        Answer::unregistered()
+    }
+
+    /// The fixture's device rows and property reads, which both tables share:
+    /// the one target (another device's in `otherDevice`), its product name
+    /// and its full build.
+    fn fixture_device(all: &str, mode: &str) -> Option<Answer> {
+        if all == "list targets -v" {
+            let row = if mode == "otherDevice" {
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            } else {
+                KEY
+            };
+            return Some(Answer::out(format!("{row}\t\tUSB\tConnected\tlocalhost\n")));
+        }
+        if all == format!("-t {KEY} shell param get const.product.name") {
+            return Some(Answer::out("OpenHarmony Reference Device\n"));
+        }
+        if all == format!("-t {KEY} shell param get const.ohos.fullname") {
+            return Some(Answer::out("OpenHarmony-4.1-release\n"));
+        }
+        None
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -406,6 +503,8 @@ impl HdcDispatch for OracleFake {
             Answers::DebugHap => self.debug_hap(&plan.arguments, &mode),
             Answers::NativeLibrary => self.native_library(&plan.arguments, &mode),
             Answers::FlashHostFacts => Self::flash_host_facts(&plan.arguments, &mode),
+            Answers::ObserveDevice => Self::observe_device(&plan.arguments, &mode),
+            Answers::CaptureDiagnostics => Self::capture_diagnostics(&plan.arguments, &mode),
         };
         Ok(Receipt {
             exit_status: answer.status,

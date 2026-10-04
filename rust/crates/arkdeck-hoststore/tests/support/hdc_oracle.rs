@@ -286,14 +286,46 @@ const SEALS: [&str; 2] = ["checkpointSeal", "journalSeal"];
 /// from them read as Swift's (`debug_hap::HostLabels`); every other byte
 /// must be Swift's. On macOS nothing is respelled or relabelled.
 pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
+    replay(name, exchanges, calls, Mutations::Owned);
+}
+
+/// The oracle's Jobs, as [`assert_replays`] replays them.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum Mutations {
+    /// Each Job mutates the device under its one Runtime capability use, and
+    /// every answer is Swift's, message included.
+    Owned,
+    /// The Jobs are read-only, admitted and run with no mutation owner as the
+    /// oracle ran them (`observe.device@1`, `capture.diagnostics@1`), and a
+    /// refusal's message is Swift's wording (T2): reported, not compared.
+    ReadOnly,
+}
+
+/// [`assert_replays`] for an oracle of read-only Jobs ([`Mutations::ReadOnly`]):
+/// the same exchanges, calls and leftovers, with no capability store.
+pub fn assert_read_only_replays(name: &str, exchanges: usize, calls: usize) {
+    replay(name, exchanges, calls, Mutations::ReadOnly);
+}
+
+fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
+    let owned = mutations == Mutations::Owned;
     let _lock = debug_hap::exclusive();
     let fixture = super::fixture(name);
     let cases = document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc(&owners.dispatch);
-    let admitter = owners.admitter(&hdc, &owners.default_root);
+    let admitter = if owned {
+        owners.admitter(&hdc, &owners.default_root)
+    } else {
+        JobAdmitter {
+            planner: owners.planner(&hdc),
+            jobs: &owners.jobs,
+            now: fixed_now,
+            authority: None,
+        }
+    };
     let publisher = owners.publisher();
-    let runner = owners.runner(&hdc, &publisher, true);
+    let runner = owners.runner(&hdc, &publisher, owned);
     let reader = JobResultReader {
         jobs: &owners.jobs,
         artifacts: &owners.artifacts,
@@ -333,7 +365,11 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
         serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
     };
     let mut labels = debug_hap::HostLabels::default();
-    let swift_capabilities = document(&fixture, "store/capabilities/runtime-capabilities.json");
+    let swift_capabilities = if owned {
+        document(&fixture, "store/capabilities/runtime-capabilities.json")
+    } else {
+        Value::Null
+    };
     let (mut answers, mut replayed) = (Vec::new(), 0);
     for exchange in cases["exchanges"].as_array().unwrap() {
         let (name, method) = (&exchange["name"], exchange["method"].as_str().unwrap());
@@ -449,7 +485,7 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
 
     // Each Job consumed its one use before its first mutation; every later
     // mutation of its run, and a continuation's retry, continued under it.
-    for (case, job) in cases["jobs"].as_object().unwrap() {
+    for (case, job) in cases["jobs"].as_object().unwrap().iter().filter(|_| owned) {
         let timeline = owners.record(job.as_str().unwrap())["timeline"].clone();
         let consumed = timeline
             .as_array()
@@ -527,11 +563,26 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
         labels.learn(actual, expected, "/result/materializedPlanDigest");
         labels.learn_keys(actual, expected, &ANSWER_DERIVED);
     }
+    // A read-only oracle's refusal wording is Swift's (T2): reported.
+    let semantic = |answer: &Value| {
+        let mut answer = answer.clone();
+        if !owned && let Some(error) = answer.get_mut("error").and_then(Value::as_object_mut) {
+            error.remove("message");
+        }
+        answer
+    };
     let differences: Vec<String> = answers
         .iter()
         .filter_map(|(name, actual, expected)| {
             let actual = labels.swift(actual);
-            (actual != *expected).then(|| format!("{name}:\n  swift {expected}\n  rust  {actual}"))
+            if semantic(&actual) == semantic(expected) && actual != *expected {
+                eprintln!(
+                    "refusal wording (T2): {name}: swift {:?}, rust {:?}",
+                    expected["error"]["message"], actual["error"]["message"]
+                );
+            }
+            (semantic(&actual) != semantic(expected))
+                .then(|| format!("{name}:\n  swift {expected}\n  rust  {actual}"))
         })
         .collect();
     assert!(differences.is_empty(), "{}", differences.join("\n"));
