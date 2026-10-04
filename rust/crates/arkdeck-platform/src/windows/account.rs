@@ -29,7 +29,7 @@ pub fn runtime_home() -> Option<String> {
 }
 
 /// A Known Folder of this process's token, absolute.
-fn known_folder(folder: &GUID) -> Option<PathBuf> {
+pub(crate) fn known_folder(folder: &GUID) -> Option<PathBuf> {
     let mut path = null_mut();
     // SAFETY: a documented Known Folder id, the process token (null) and an
     // output pointer; the returned string is freed below whatever the result.
