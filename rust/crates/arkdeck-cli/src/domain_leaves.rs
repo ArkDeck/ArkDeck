@@ -30,6 +30,7 @@ pub const SERVED: &[&str] = &[
     "analyze.hilog-summary",
     "analyze.crash-signature",
     "target.observe",
+    "input.keyboard",
     "input.tap",
     "input.long-press",
     "input.swipe",

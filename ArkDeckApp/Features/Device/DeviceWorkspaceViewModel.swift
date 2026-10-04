@@ -340,6 +340,32 @@ final class DeviceWorkspaceViewModel {
 
   func cancelKeyboardSwipe() { keyboardPointer.cancelSwipe() }
 
+  func sendDeviceKeyboard(_ command: DeviceKeyboardCommand) async {
+    guard canSendInput, command.isValid, let target else { return }
+    let generation = screenGeneration
+    isSendingGesture = true
+    keyboardPointer.cancelSwipe()
+    defer { isSendingGesture = false }
+    let outcome = await provider.sendKeyboard(command, to: target)
+    if screenGeneration == generation, self.target == target {
+      liveness.settled(outcome)
+      pendingMarker = nil
+    }
+    // Private text and key sequences never enter the UI history, including
+    // when a reply arrives after navigation or a target change.
+    switch outcome {
+    case .confirmed:
+      append(title: deviceText("device.input.accepted"), detail: target.id,
+        systemImage: "checkmark.circle.fill", tint: "confirmed")
+    case .failed:
+      append(title: deviceText("device.input.failed"), detail: target.id,
+        systemImage: "xmark.circle.fill", tint: "failed")
+    case .unknown:
+      append(title: deviceText("device.input.unknown"), detail: target.id,
+        systemImage: "questionmark.circle.fill", tint: "unknown")
+    }
+  }
+
   func sendKeyboardGesture(_ gesture: DeviceGesture) async {
     guard canSendInput, let frame,
       let request = keyboardPointer.request(gesture, frame: frame)

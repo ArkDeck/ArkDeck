@@ -67,6 +67,10 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
           catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
         "port-forward.create@1/read-evidence-firmware": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
+        "input.keyboard@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "input.keyboard@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
         "input.tap@1/read-evidence-model": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
         "input.tap@1/read-evidence-firmware": CatalogActionReference(

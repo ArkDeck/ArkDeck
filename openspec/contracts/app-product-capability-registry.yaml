@@ -51,10 +51,12 @@
       - "arkdeck input tap ..."
       - "arkdeck input long-press ..."
       - "arkdeck input swipe ..."
+      - "arkdeck artifact import keyboard-input ..."
+      - "arkdeck input keyboard --inputs-file <path>"
     "id": "app.device.control"
     "owner": "Device"
     "surface": "device.control"
-    "title": "Typed pointer input"
+    "title": "Typed pointer and private keyboard input"
   - "classification": "direct"
     "cliEquivalent":
       - "arkdeck screen capture"
