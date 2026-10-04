@@ -27,8 +27,21 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 const JOB: &str = "job-73b1cb9a96d12a0ea736a065afdf5abd";
-const STANDARD: &str = "ART-5ab8ddce1b835cb95173c1a4b08a7e5d";
-const SENSITIVE: &str = "ART-e04cd422be1334393565566a35c7ff20";
+// Artifact identities depend on the producer's Catalog/plan hash. Read the
+// immutable recording selected for this contract view, preserving its bytes.
+fn recorded_id(name: &str) -> &'static str {
+    static INDEX: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    let rows = INDEX.get_or_init(index)["artifacts"].as_array().unwrap();
+    let matches: Vec<_> = rows.iter().filter(|row| row["name"] == name).collect();
+    assert_eq!(matches.len(), 1);
+    matches[0]["artifactID"].as_str().unwrap()
+}
+fn standard() -> &'static str {
+    recorded_id("tool-facts.json")
+}
+fn sensitive() -> &'static str {
+    recorded_id("device-facts.json")
+}
 
 fn recorded(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -161,7 +174,7 @@ fn recorded_job_artifacts_list_inspect_and_read_with_their_recorded_bytes() {
     let inspected = store
         .handle_resource(
             "artifact.inspect",
-            &params(json!({"owner": owner(), "artifactId": STANDARD})),
+            &params(json!({"owner": owner(), "artifactId": standard()})),
             accept,
         )
         .unwrap();
@@ -170,7 +183,7 @@ fn recorded_job_artifacts_list_inspect_and_read_with_their_recorded_bytes() {
     let read = store
         .handle_resource(
             "artifact.read",
-            &params(json!({"owner": owner(), "artifactId": STANDARD})),
+            &params(json!({"owner": owner(), "artifactId": standard()})),
             accept,
         )
         .unwrap();
@@ -179,7 +192,7 @@ fn recorded_job_artifacts_list_inspect_and_read_with_their_recorded_bytes() {
     let denied = store
         .handle_resource(
             "artifact.read",
-            &params(json!({"owner": owner(), "artifactId": SENSITIVE})),
+            &params(json!({"owner": owner(), "artifactId": sensitive()})),
             accept,
         )
         .unwrap_err();
@@ -202,7 +215,7 @@ fn recorded_job_artifacts_list_inspect_and_read_with_their_recorded_bytes() {
     let refused = store
         .handle_resource(
             "artifact.read",
-            &params(json!({"owner": owner(), "artifactId": STANDARD})),
+            &params(json!({"owner": owner(), "artifactId": standard()})),
             |_| {
                 Err(arkdeck_contract::WireError {
                     code: "operationUnavailable".into(),
@@ -219,29 +232,29 @@ fn recorded_job_artifacts_list_inspect_and_read_with_their_recorded_bytes() {
 fn a_changed_payload_or_index_is_refused_before_any_byte_is_returned() {
     let scratch = Scratch::new("ad-winart").with_recorded_job();
     let store = scratch.store();
-    store.read(JOB, STANDARD, 0, 16, true).unwrap();
+    store.read(JOB, standard(), 0, 16, true).unwrap();
     // The recorded payload replaced by different bytes of the same size.
     let job = HostDirectory::open(&scratch.artifacts().join(JOB)).unwrap();
-    let mut changed = std::fs::read(recorded(STANDARD)).unwrap();
+    let mut changed = std::fs::read(recorded(standard())).unwrap();
     changed[0] ^= 1;
     std::fs::rename(
-        scratch.artifacts().join(JOB).join(STANDARD),
+        scratch.artifacts().join(JOB).join(standard()),
         scratch.0.join("moved-away"),
     )
     .unwrap();
-    job.create_document(STANDARD, &changed).unwrap();
-    job.seal_document(STANDARD).unwrap();
+    job.create_document(standard(), &changed).unwrap();
+    job.seal_document(standard()).unwrap();
     assert_eq!(
-        store.read(JOB, STANDARD, 0, 16, true).unwrap_err().kind(),
+        store.read(JOB, standard(), 0, 16, true).unwrap_err().kind(),
         ErrorKind::InvalidData
     );
     // Every published row is verified, so another row's read is refused too.
-    assert!(store.read(JOB, SENSITIVE, 0, 16, true).is_err());
+    assert!(store.read(JOB, sensitive(), 0, 16, true).is_err());
     assert!(store.list(JOB).is_err());
 }
 
 fn export(store: &ArtifactReadStore, destination: &Path, extra: Value) -> Result<Value, String> {
-    let mut request = json!({"owner": owner(), "artifactId": STANDARD,
+    let mut request = json!({"owner": owner(), "artifactId": standard(),
         "destinationDirectory": destination.to_str().unwrap()});
     for (key, value) in extra.as_object().unwrap() {
         request[key] = value.clone();
@@ -281,12 +294,12 @@ fn export_publishes_one_verified_file_and_refuses_what_macos_refuses() {
     let destination = scratch.destination("exports");
     let receipt = export(&store, &destination, json!({})).unwrap();
     arkdeck_contract::validate_method_value("artifact.export", "result", &receipt).unwrap();
-    let file = format!("{STANDARD}-tool-facts.json");
-    let bytes = std::fs::read(recorded(STANDARD)).unwrap();
+    let file = format!("{}-tool-facts.json", standard());
+    let bytes = std::fs::read(recorded(standard())).unwrap();
     assert_eq!(
         receipt,
         json!({"schemaVersion": "arkdeck.artifact-export/1", "owner": owner(),
-            "artifactId": STANDARD, "artifactDigest": sha256_hex(&bytes), "byteCount": 240,
+            "artifactId": standard(), "artifactDigest": sha256_hex(&bytes), "byteCount": 240,
             "privacy": "standard", "exportedPath": destination.join(&file).to_str().unwrap(),
             "overwritten": false})
     );
@@ -348,7 +361,7 @@ fn export_publishes_one_verified_file_and_refuses_what_macos_refuses() {
     );
     // Not a local drive's absolute path.
     for path in [r"relative\exports", r"\\localhost\c$\exports", r"C:exports"] {
-        let request = json!({"owner": owner(), "artifactId": STANDARD,
+        let request = json!({"owner": owner(), "artifactId": standard(),
             "destinationDirectory": path});
         assert_eq!(
             store
@@ -372,7 +385,7 @@ fn export_publishes_one_verified_file_and_refuses_what_macos_refuses() {
     assert!(!windows.join(&file).exists());
 
     // A sensitive Artifact needs the explicit opt-in.
-    let request = json!({"owner": owner(), "artifactId": SENSITIVE,
+    let request = json!({"owner": owner(), "artifactId": sensitive(),
         "destinationDirectory": destination.to_str().unwrap()});
     assert_eq!(
         store
@@ -388,14 +401,14 @@ fn export_publishes_one_verified_file_and_refuses_what_macos_refuses() {
         .unwrap();
     assert_eq!(receipt["privacy"], "sensitive");
     assert_eq!(
-        std::fs::read(destination.join(format!("{SENSITIVE}-device-facts.json"))).unwrap(),
-        std::fs::read(recorded(SENSITIVE)).unwrap()
+        std::fs::read(destination.join(format!("{}-device-facts.json", sensitive()))).unwrap(),
+        std::fs::read(recorded(sensitive())).unwrap()
     );
     // The export never wrote the Artifact store.
     assert_eq!(scratch.tree(), before);
     // The request's own parsing: a Windows path stays a Windows path.
     let request = ArtifactExportRequest::from_params(&params(json!({"owner": owner(),
-        "artifactId": STANDARD, "destinationDirectory": r"c:\Users\..\Temp\.\x"})))
+        "artifactId": standard(), "destinationDirectory": r"c:\Users\..\Temp\.\x"})))
     .unwrap();
     assert_eq!(request.reference().job_id(), JOB);
 }

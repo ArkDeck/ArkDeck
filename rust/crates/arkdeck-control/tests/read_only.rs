@@ -77,15 +77,23 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
         } else {
             let actual = actual.as_array().unwrap();
             let expected = recorded["result"].as_array().unwrap();
-            assert_eq!(actual.len(), expected.len() + 1);
             let session = actual
                 .iter()
-                .find(|row| row["reference"] == "capture.diagnostic-session@1")
-                .unwrap();
-            assert_eq!(session["minimumEffect"], "deviceMutation");
-            assert_eq!(session["binding"], "confirmedDevice");
-            assert_eq!(session["availability"], "unavailable");
-            assert_eq!(session["reasonCodes"], json!(["provider_not_registered"]));
+                .find(|row| row["reference"] == "capture.diagnostic-session@1");
+            if METHODS.contains(&"diagnostic.session.status") {
+                assert_eq!(actual.len(), expected.len() + 1);
+                let session = session.expect("the current Catalog publishes Diagnostic Session");
+                assert_eq!(session["minimumEffect"], "deviceMutation");
+                assert_eq!(session["binding"], "confirmedDevice");
+                assert_eq!(session["availability"], "unavailable");
+                assert_eq!(session["reasonCodes"], json!(["provider_not_registered"]));
+            } else {
+                assert_eq!(actual.len(), expected.len());
+                assert!(
+                    session.is_none(),
+                    "the old published Catalog cannot advertise the new operation"
+                );
+            }
             for expected in expected {
                 let actual = actual
                     .iter()

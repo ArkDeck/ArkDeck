@@ -1263,7 +1263,10 @@ mod tests {
             .map(|entry| entry["feature"].as_str().unwrap())
             .collect();
         assert!(!features.contains(&"job.unruled"));
-        assert_eq!(document["summary"]["bySource"]["daemon"], 107);
+        assert_eq!(
+            document["summary"]["bySource"]["daemon"],
+            serde_json::json!(METHODS.len() - 1)
+        );
         assert_eq!(
             problems_for(&methods),
             [

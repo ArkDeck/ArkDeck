@@ -564,6 +564,18 @@ fn rust_captures_the_trace_legs_of_the_swift_fake_device() {
 /// lifecycle vocabulary; none of these bytes are hardware evidence.
 #[test]
 fn diagnostic_session_publishes_host_marks_and_stops_after_an_unknown_anchor() {
+    if !arkdeck_contract::METHODS.contains(&"diagnostic.session.status") {
+        let operations: Value =
+            serde_json::from_str(arkdeck_contract::CATALOG_CANONICAL_JSON).unwrap();
+        assert!(
+            !operations
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|op| op["id"] == "capture.diagnostic-session")
+        );
+        return; // The previous published view has no interactive operation to execute.
+    }
     use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt};
     use std::sync::Mutex;
     use std::time::{Duration, Instant};

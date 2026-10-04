@@ -206,7 +206,16 @@ public sealed class WireCorpusTests
             var response = Wire.DecodeResponse(Wire.EncodeFrame(wire, ControlContract.MaxResponseBytes).AsSpan()[..^1], id, method);
             Assert.AreEqual(ok, response.Ok, $"{method} row {index}");
             if (ok) Assert.AreEqual(row["result"], response.Result);
-            if (method == "health") Wire.ValidateHealth(response);
+            if (method == "health")
+            {
+                // The original Swift health frame remains readable provenance,
+                // but its old method surface must not negotiate as current.
+                if (response.Result!["contractIdentity"] is JsonString
+                    { Value: "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633" })
+                    Assert.AreEqual(ContractErrorKind.ContractMismatch,
+                        Assert.ThrowsExactly<ContractException>(() => Wire.ValidateHealth(response)).Kind);
+                else Wire.ValidateHealth(response);
+            }
         }
     }
 

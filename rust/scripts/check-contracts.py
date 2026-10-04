@@ -13,12 +13,14 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import io
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+import tarfile
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,9 +32,33 @@ CODE_SIGN_HELPER = "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkd
 
 
 def review_projection() -> bytes:
-    # This is a checkout implementation companion, not a published protocol input.
-    # Both views compile the current Rust implementation and its drift assertion.
+    # The candidate companion is snapshotted and checked for concurrent edits.
+    # A differing published Catalog receives its immutable original projection.
     return (ROOT / REVIEW_PROJECTION).read_bytes()
+
+
+def published_catalog_companions(commit: str) -> dict[str, tuple[bytes, int]]:
+    """Recorded plan/ledger hashes and the review projection belong to their Catalog.
+
+    Both views still compile the checkout's implementation. When the Catalog
+    changes, a published view must replay its original recorded inputs, not
+    fixtures re-recorded against the candidate's different plan hashes.
+    """
+    archive = contract.git("archive", commit, "--", "rust/tests/fixtures", REVIEW_PROJECTION)
+    result = {}
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as members:
+        for member in members:
+            if member.isdir():
+                continue
+            path = Path(member.name)
+            if (not member.isfile() or path.is_absolute() or ".." in path.parts
+                    or not (member.name.startswith("rust/tests/fixtures/")
+                            or member.name == REVIEW_PROJECTION)):
+                raise ValueError(f"unsafe published Catalog companion: {member.name}")
+            result[member.name] = (members.extractfile(member).read(), member.mode & 0o777)
+    if REVIEW_PROJECTION not in result:
+        raise ValueError("published Catalog has no matching App review projection")
+    return result
 
 
 def load_module(name: str, path: Path, contents: bytes | None = None):
@@ -79,7 +105,8 @@ def rust_digest(source: Path) -> str:
 
 def materialize(destination: Path, inputs, info: dict, published_info: dict,
                 rust_source: Path | None = None, catalog_source: str | None = None,
-                review_source: bytes | None = None) -> None:
+                review_source: bytes | None = None,
+                catalog_companions: dict[str, tuple[bytes, int]] | None = None) -> None:
     """All fixture readers and include_str! consumers see the same input view."""
     copy_rust(rust_source or ROOT / "rust", destination / "rust")
     for path, contents in inputs.files.items():
@@ -89,6 +116,25 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
     companion = destination / REVIEW_PROJECTION
     companion.parent.mkdir(parents=True, exist_ok=True)
     companion.write_bytes(review_projection() if review_source is None else review_source)
+    if catalog_companions is not None:
+        # Replace complete historical fixture groups so candidate Artifact IDs
+        # do not become unindexed leftovers in the old view. New fixture groups
+        # remain for tests of newly added implementation code.
+        groups = {Path(path).parts[3] for path in catalog_companions
+                  if path.startswith("rust/tests/fixtures/") and len(Path(path).parts) > 4}
+        for group in sorted(groups):
+            directory = destination / "rust/tests/fixtures" / group
+            if directory.is_dir():
+                shutil.rmtree(directory)
+        for path, (data, mode) in catalog_companions.items():
+            file = destination / path
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_bytes(data)
+            file.chmod(mode)
+        write_json(destination / "catalog-fixture-provenance.json", {
+            "sourceCommit": published_info["commit"], "catalogDigest": info["catalogDigest"],
+            "files": {path: contract.sha(data) for path, (data, _) in sorted(catalog_companions.items())},
+        })
     # The views compile and test the checkout's own Rust, which reads this
     # resource at its repository path.
     helper = ROOT / CODE_SIGN_HELPER
@@ -175,6 +221,11 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
                   "sourceRevision": contract.git("rev-parse", "HEAD").decode().strip(),
                   "generatedRustSourceDigest": rust_digest(view / "rust"),
                   "deviceAcceptance": False, "completed": False, "commands": []}
+    fixture_provenance = view / "catalog-fixture-provenance.json"
+    if fixture_provenance.exists():
+        fixture_bytes = fixture_provenance.read_bytes()
+        (output / "catalog-fixture-provenance.json").write_bytes(fixture_bytes)
+        provenance["catalogFixtureProvenanceSHA256"] = contract.sha(fixture_bytes)
     path = output / "provenance.json"
     write_json(path, provenance)
     # Each view owns its compilation artifacts, even if the caller uses a shared
@@ -233,6 +284,9 @@ def check(output_root: Path) -> Path:
     current = contract.working_inputs()
     current_info = contract.candidate(
         current, published_commit, contract.git("rev-parse", "HEAD").decode().strip())
+    published_companions = (published_catalog_companions(published_commit)
+                            if published_info["catalogDigest"] != current_info["catalogDigest"]
+                            else None)
     # Unsupported candidate vocabulary or stale current Catalog output remains a
     # failure. Regeneration in isolation must not hide a stale committed Catalog.
     contract.generate(current_info, current)
@@ -280,7 +334,8 @@ def check(output_root: Path) -> Path:
         for name, inputs, info in views:
             view = Path(directory) / name
             try:
-                materialize(view, inputs, info, published_info, rust_source, catalogs[name], review_source)
+                materialize(view, inputs, info, published_info, rust_source, catalogs[name], review_source,
+                            catalog_companions=published_companions if name == "published" else None)
                 if os.environ.get("ARKDECK_RUST_STABLE_VIEWS") == "1":
                     stable = temporary_root / name
                     ci_workspace.sync_tree(view, stable, preserve=(("rust", "target"),))

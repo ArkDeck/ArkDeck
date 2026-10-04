@@ -222,6 +222,10 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
         ),
     ] {
         let reply = ingress.handle(&frame(method, params), root.peer());
+        if !METHODS.contains(&method) {
+            assert_eq!(code(&reply), "unknownMethod");
+            continue;
+        }
         assert_eq!(
             decode_response(reply.trim_ascii_end(), "request-1", method)
                 .unwrap()
@@ -468,7 +472,11 @@ fn diagnostic_controls_require_an_app_owned_job_and_accept_no_foreign_reference(
     ] {
         assert_eq!(
             code(&ingress.handle(&frame(method, params), root.peer())),
-            "methodNotAllowlisted"
+            if METHODS.contains(&method) {
+                "methodNotAllowlisted"
+            } else {
+                "unknownMethod"
+            }
         );
     }
     assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);

@@ -1078,7 +1078,13 @@ mod hap_provenance_tests {
             "../../../tests/fixtures/historical-hap-provenance/job-record.json"
         ))
         .unwrap();
-        assert_ne!(record["catalogDigest"], arkdeck_contract::CATALOG_DIGEST);
+        assert_eq!(
+            record["catalogDigest"],
+            "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684"
+        );
+        if arkdeck_contract::METHODS.contains(&"diagnostic.session.status") {
+            assert_ne!(record["catalogDigest"], arkdeck_contract::CATALOG_DIGEST);
+        }
         // The exact fourteen normal steps in the pre-#1773 Swift producer.
         // Independently matched to the 2026-09-07 historical failed HAP Job;
         // use the existing fake-HDC fixture, never copy local authority data.

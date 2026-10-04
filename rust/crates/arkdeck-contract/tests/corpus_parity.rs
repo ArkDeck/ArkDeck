@@ -119,17 +119,19 @@ fn all_methods_and_recorded_shapes_in_the_input_manifest_replay_through_rust() {
                     });
             assert_eq!(response.value(), response_value);
             if *method == "health" {
-                if row["result"]["contractIdentity"]
-                    == "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633"
-                {
+                if row["result"]["contractIdentity"] == CONTRACT_IDENTITY {
+                    validate_health(&response).unwrap();
+                } else {
                     // The retained Swift frame is readable provenance; its old
                     // method surface must not negotiate as the current Runtime.
+                    assert_eq!(
+                        row["result"]["contractIdentity"],
+                        "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633"
+                    );
                     assert_eq!(
                         validate_health(&response),
                         Err(arkdeck_contract::ContractError::ContractMismatch)
                     );
-                } else {
-                    validate_health(&response).unwrap();
                 }
             }
         }

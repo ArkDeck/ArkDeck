@@ -59,7 +59,20 @@ fn turn() -> MutexGuard<'static, ()> {
 
 const DEADLINE: Duration = Duration::from_secs(60);
 const JOB: &str = "job-73b1cb9a96d12a0ea736a065afdf5abd";
-const ARTIFACT: &str = "ART-5ab8ddce1b835cb95173c1a4b08a7e5d";
+fn artifact() -> &'static str {
+    static INDEX: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    let index = INDEX.get_or_init(|| {
+        serde_json::from_slice(&std::fs::read(recorded().join("index.json")).unwrap()).unwrap()
+    });
+    let rows: Vec<_> = index["artifacts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["name"] == "tool-facts.json")
+        .collect();
+    assert_eq!(rows.len(), 1);
+    rows[0]["artifactID"].as_str().unwrap()
+}
 /// A Job no owner holds.
 const ABSENT: &str = "job-00000000000000000000000000000000";
 
@@ -460,14 +473,14 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     let reply = request(
         &pipe,
         "artifact.export",
-        json!({"owner": owner(), "artifactId": ARTIFACT,
+        json!({"owner": owner(), "artifactId": artifact(),
             "destinationDirectory": exports.to_str().unwrap()}),
     );
     assert_eq!(reply["ok"], true, "{reply}");
     let receipt = &reply["result"];
     arkdeck_contract::validate_method_value("artifact.export", "result", receipt).unwrap();
-    let bytes = std::fs::read(recorded().join(ARTIFACT)).unwrap();
-    let file = exports.join(format!("{ARTIFACT}-tool-facts.json"));
+    let bytes = std::fs::read(recorded().join(artifact())).unwrap();
+    let file = exports.join(format!("{}-tool-facts.json", artifact()));
     assert_eq!(receipt["exportedPath"], file.to_str().unwrap(), "{receipt}");
     assert_eq!(
         receipt["artifactDigest"],
@@ -482,7 +495,7 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
         ),
         (
             "artifact.inspect",
-            json!({"owner": {"kind": "job", "id": ABSENT}, "artifactId": ARTIFACT}),
+            json!({"owner": {"kind": "job", "id": ABSENT}, "artifactId": artifact()}),
         ),
     ] {
         let reply = refused(&pipe, method, params, "resourceNotFound");
@@ -499,7 +512,7 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     let reply = refused(
         &pipe,
         "artifact.export",
-        json!({"owner": owner(), "artifactId": ARTIFACT,
+        json!({"owner": owner(), "artifactId": artifact(),
             "destinationDirectory": r"\\localhost\c$\exports"}),
         "invalidInput",
     );
@@ -510,7 +523,7 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
         &pipe,
         "artifact.inspect",
         json!({"owner": {"kind": "import", "id": "imp-00000000-0000-4000-8000-000000000000"},
-            "artifactId": ARTIFACT}),
+            "artifactId": artifact()}),
         "resourceNotFound",
     );
     assert_eq!(
@@ -689,13 +702,13 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
             "--job",
             JOB,
             "--artifact",
-            ARTIFACT,
+            artifact(),
             "--destination",
             &exports_text,
         ],
     );
     assert_eq!(status, Some(0), "{envelope}");
-    let file = exports.join(format!("{ARTIFACT}-tool-facts.json"));
+    let file = exports.join(format!("{}-tool-facts.json", artifact()));
     assert_eq!(
         envelope["result"]["exportedPath"],
         file.to_str().unwrap(),
@@ -703,7 +716,7 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     );
     assert_eq!(
         std::fs::read(&file).unwrap(),
-        std::fs::read(recorded().join(ARTIFACT)).unwrap()
+        std::fs::read(recorded().join(artifact())).unwrap()
     );
     running.stop(&root.0);
     assert_eq!(Root::tree(&root.artifacts().join(JOB)), job_artifacts);
