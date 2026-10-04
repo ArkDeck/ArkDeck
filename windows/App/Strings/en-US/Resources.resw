@@ -5066,6 +5066,54 @@ SHA-256: %4$@</value>
     <value>Artifacts</value>
     <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_action_stillUnknown" xml:space="preserve">
+    <value>The original outcome is still unknown</value>
+    <comment>jobRecovery.action.stillUnknown (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebound" xml:space="preserve">
+    <value>Loader binding verified; review the Job’s current recovery state</value>
+    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile_detail" xml:space="preserve">
+    <value>Runtime checks durable evidence and current identity. An unknown original action is never replayed.</value>
+    <comment>jobRecovery.action.reconcile.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
+    <value>Continue this Job only from the safe boundary confirmed by Runtime. Its original plan and admission still apply.</value>
+    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_working" xml:space="preserve">
+    <value>Checking this Job…</value>
+    <comment>jobRecovery.action.working (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
+    <value>The response was not confirmed. Refresh this Job before taking another action.</value>
+    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile" xml:space="preserve">
+    <value>Check recovery state</value>
+    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebind_detail" xml:space="preserve">
+    <value>Verify this Job’s exact target against the connected Loader. This does not continue flashing or confirm the previous outcome.</value>
+    <comment>jobRecovery.action.rebind.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_refused" xml:space="preserve">
+    <value>Recovery action unavailable</value>
+    <comment>jobRecovery.action.refused (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_resume" xml:space="preserve">
+    <value>Continue from confirmed safe boundary</value>
+    <comment>jobRecovery.action.resume (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_observed" xml:space="preserve">
+    <value>Runtime reported the updated state</value>
+    <comment>jobRecovery.action.observed (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebind" xml:space="preserve">
+    <value>Verify and rebind Loader</value>
+    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="overview_record_device_label" xml:space="preserve">
     <value>Device this page describes</value>
     <comment>overview.record.device.label (Localizable.xcstrings)</comment>
@@ -5085,5 +5133,49 @@ SHA-256: %4$@</value>
   <data name="overview_record_binding" xml:space="preserve">
     <value>binding %lld</value>
     <comment>overview.record.binding (Localizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_openHistory" xml:space="preserve">
+    <value>Review in History</value>
+    <comment>jobRecovery.action.openHistory (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_count" xml:space="preserve">
+    <value>%d records need review</value>
+    <comment>jobRecovery.count (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_list" xml:space="preserve">
+    <value>Recovery records</value>
+    <comment>jobRecovery.list (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_guidance" xml:space="preserve">
+    <value>Runtime is waiting for a safe boundary before the recovery record can finish. This App cannot force the current step to stop.</value>
+    <comment>jobRecovery.archivePending.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_title" xml:space="preserve">
+    <value>Recovery archive is pending</value>
+    <comment>jobRecovery.archivePending.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_guidance" xml:space="preserve">
+    <value>Keep the device unchanged when possible. Do not start another device operation until the outstanding effect is reconciled through an approved Runtime path.</value>
+    <comment>jobRecovery.outcomeUnknown.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_title" xml:space="preserve">
+    <value>Device effect is unknown</value>
+    <comment>jobRecovery.outcomeUnknown.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_guidance" xml:space="preserve">
+    <value>Runtime recorded a confirmed safe boundary. Review the record before resuming through an approved Runtime path.</value>
+    <comment>jobRecovery.resumeSafe.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_title" xml:space="preserve">
+    <value>A safe recovery boundary is available</value>
+    <comment>jobRecovery.resumeSafe.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_guidance" xml:space="preserve">
+    <value>Keep the current device state unchanged and review the Runtime record for the required recovery step.</value>
+    <comment>jobRecovery.waiting.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_title" xml:space="preserve">
+    <value>Recovery is waiting</value>
+    <comment>jobRecovery.waiting.title (JobsLocalizable.xcstrings)</comment>
   </data>
 </root>

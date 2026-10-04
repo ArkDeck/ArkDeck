@@ -23,10 +23,14 @@ private final class GlobalJobInspectorModel {
   private(set) var cancellingJobID: String?
   private(set) var cancellationJobID: String?
   private(set) var cancellationMessage: String?
+  private(set) var recoveringJobID: String?
+  private(set) var recoveryJobID: String?
+  private(set) var recoveryMessage: String?
   private var generation = UUID()
   private var loadedJobID: String?
   @ObservationIgnored private let reader = RuntimeJobDetailApplicationFacade.make()
   @ObservationIgnored private let control = RuntimeJobControlApplicationFacade.make()
+  @ObservationIgnored private let recovery = RuntimeJobRecoveryApplicationFacade.make()
 
   func load(_ job: RuntimeJobSummaryPresentation?) {
     loadedJobID = job?.id
@@ -47,7 +51,7 @@ private final class GlobalJobInspectorModel {
   }
 
   func cancel(_ job: RuntimeJobSummaryPresentation, onRefresh: @escaping () -> Void) {
-    guard cancellingJobID == nil else { return }
+    guard cancellingJobID == nil, recoveringJobID == nil else { return }
     cancellingJobID = job.id
     cancellationJobID = job.id
     cancellationMessage = nil
@@ -62,6 +66,29 @@ private final class GlobalJobInspectorModel {
       }
       onRefresh()
       // A late cancellation response must not replace a newly selected Job.
+      if loadedJobID == job.id { load(job) }
+    }
+  }
+
+  func recover(_ action: RuntimeJobRecoveryAction, job: RuntimeJobSummaryPresentation, onRefresh: @escaping () -> Void) {
+    guard recoveringJobID == nil, cancellingJobID == nil else { return }
+    recoveringJobID = job.id
+    recoveryJobID = job.id
+    recoveryMessage = nil
+    Task { [weak self, recovery] in
+      let result = await recovery.perform(action, for: job)
+      guard let self else { return }
+      recoveringJobID = nil
+      switch result {
+      case .observed(let state, let unknown):
+        recoveryMessage = jobsText(unknown ? "jobRecovery.action.stillUnknown" : "jobRecovery.action.observed")
+          + " · " + jobsText("job.state.\(state)")
+      case .rebound(let revision):
+        recoveryMessage = jobsText("jobRecovery.action.rebound") + " · " + String(revision)
+      case .refused(let reason): recoveryMessage = jobsText("jobRecovery.action.refused") + " · " + reason
+      case .unconfirmed: recoveryMessage = jobsText("jobRecovery.action.unconfirmed")
+      }
+      onRefresh()
       if loadedJobID == job.id { load(job) }
     }
   }
@@ -272,9 +299,40 @@ struct GlobalJobInspectorView: View {
               Button(jobsText("jobInspector.action.cancel")) {
                 actions.cancel(job, onRefresh: onRefresh)
               }
-              .disabled(actions.cancellingJobID != nil)
+              .disabled(actions.cancellingJobID != nil || actions.recoveringJobID != nil)
               .accessibilityIdentifier("jobInspector.cancel")
             }
+          }
+          if let recoveryAction = RuntimeJobRecoveryApplicationFacade.action(for: job) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+              Button(jobsText(recoveryAction == .reconcile ? "jobRecovery.action.reconcile" : "jobRecovery.action.resume")) {
+                actions.recover(recoveryAction, job: job, onRefresh: onRefresh)
+              }
+              .disabled(actions.cancellingJobID != nil || actions.recoveringJobID != nil)
+              .accessibilityIdentifier("jobRecovery.perform")
+              Text(jobsText(recoveryAction == .reconcile ? "jobRecovery.action.reconcile.detail" : "jobRecovery.action.resume.detail"))
+                .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          if RuntimeJobRecoveryApplicationFacade.canRebindLoader(job) {
+            VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+              Button(jobsText("jobRecovery.action.rebind")) {
+                actions.recover(.rebindLoader, job: job, onRefresh: onRefresh)
+              }
+              .disabled(actions.cancellingJobID != nil || actions.recoveringJobID != nil)
+              .accessibilityIdentifier("jobRecovery.rebind")
+              Text(jobsText("jobRecovery.action.rebind.detail"))
+                .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+          }
+          if actions.recoveringJobID == job.id {
+            ProgressView(jobsText("jobRecovery.action.working")).controlSize(.small)
+          }
+          if actions.recoveryJobID == job.id, let message = actions.recoveryMessage {
+            Text(message).font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+              .accessibilityIdentifier("jobRecovery.action.result")
           }
           if actions.cancellationJobID == job.id, let message = actions.cancellationMessage {
             Text(message).font(WorkspaceFont.secondary).foregroundStyle(.secondary)

@@ -5066,6 +5066,54 @@ SHA-256：%4$@</value>
     <value>Artifacts</value>
     <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_action_stillUnknown" xml:space="preserve">
+    <value>原操作结果仍然未知</value>
+    <comment>jobRecovery.action.stillUnknown (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebound" xml:space="preserve">
+    <value>Loader 绑定已核验；请查看此 Job 的当前恢复状态</value>
+    <comment>jobRecovery.action.rebound (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile_detail" xml:space="preserve">
+    <value>Runtime 核对持久证据与当前身份；不会重放结果未知的原操作。</value>
+    <comment>jobRecovery.action.reconcile.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_resume_detail" xml:space="preserve">
+    <value>仅从 Runtime 已确认的安全边界继续此 Job，仍使用原计划并接受 Runtime 准入检查。</value>
+    <comment>jobRecovery.action.resume.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_working" xml:space="preserve">
+    <value>正在核对这个 Job…</value>
+    <comment>jobRecovery.action.working (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_unconfirmed" xml:space="preserve">
+    <value>未能确认请求结果。请先刷新此 Job，再决定后续操作。</value>
+    <comment>jobRecovery.action.unconfirmed (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_reconcile" xml:space="preserve">
+    <value>重新核对恢复状态</value>
+    <comment>jobRecovery.action.reconcile (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebind_detail" xml:space="preserve">
+    <value>核验当前 Loader 是否属于此 Job 的目标。重新绑定不会继续刷机，也不会确认原操作结果。</value>
+    <comment>jobRecovery.action.rebind.detail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_refused" xml:space="preserve">
+    <value>恢复操作不可用</value>
+    <comment>jobRecovery.action.refused (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_resume" xml:space="preserve">
+    <value>从已确认的安全边界继续</value>
+    <comment>jobRecovery.action.resume (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_observed" xml:space="preserve">
+    <value>Runtime 已返回更新后的状态</value>
+    <comment>jobRecovery.action.observed (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_rebind" xml:space="preserve">
+    <value>核验并重新绑定 Loader</value>
+    <comment>jobRecovery.action.rebind (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="overview_record_device_label" xml:space="preserve">
     <value>本页描述的设备</value>
     <comment>overview.record.device.label (Localizable.xcstrings)</comment>
@@ -5085,5 +5133,49 @@ SHA-256：%4$@</value>
   <data name="overview_record_binding" xml:space="preserve">
     <value>binding %lld</value>
     <comment>overview.record.binding (Localizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_action_openHistory" xml:space="preserve">
+    <value>在历史记录中检查</value>
+    <comment>jobRecovery.action.openHistory (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_count" xml:space="preserve">
+    <value>%d 条记录待检查</value>
+    <comment>jobRecovery.count (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_list" xml:space="preserve">
+    <value>恢复记录</value>
+    <comment>jobRecovery.list (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_guidance" xml:space="preserve">
+    <value>Runtime 正在等待安全边界，之后才能完成恢复记录；此 App 不能强制停止当前步骤。</value>
+    <comment>jobRecovery.archivePending.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archivePending_title" xml:space="preserve">
+    <value>恢复归档正在等待</value>
+    <comment>jobRecovery.archivePending.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_guidance" xml:space="preserve">
+    <value>条件允许时请保持设备状态不变。在通过已批准的 Runtime 路径核对未决影响前，不要开始其他设备操作。</value>
+    <comment>jobRecovery.outcomeUnknown.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_outcomeUnknown_title" xml:space="preserve">
+    <value>设备影响未知</value>
+    <comment>jobRecovery.outcomeUnknown.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_guidance" xml:space="preserve">
+    <value>Runtime 已记录确认过的安全边界。请先检查记录，再通过已批准的 Runtime 路径恢复。</value>
+    <comment>jobRecovery.resumeSafe.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_resumeSafe_title" xml:space="preserve">
+    <value>已有安全恢复边界</value>
+    <comment>jobRecovery.resumeSafe.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_guidance" xml:space="preserve">
+    <value>请保持设备当前状态不变，并在 Runtime 记录中检查所需的恢复步骤。</value>
+    <comment>jobRecovery.waiting.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_waiting_title" xml:space="preserve">
+    <value>恢复正在等待</value>
+    <comment>jobRecovery.waiting.title (JobsLocalizable.xcstrings)</comment>
   </data>
 </root>

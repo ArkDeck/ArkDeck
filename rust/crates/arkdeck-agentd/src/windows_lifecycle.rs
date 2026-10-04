@@ -1320,7 +1320,42 @@ fn main() {
             })
         );
         assert!(!server.requires_recomposition());
+        // Device-bound Jobs plan, admit, run and reconcile over this HDC
+        // (TASK-XPA-005): with a Target store its composition is built over
+        // the admitted tool, and `operation.list` asks after its identity
+        // rather than calling the provider unregistered.
+        // The temporary directory in its canonical, plain long spelling, which
+        // the Target store compares its root with (an 8.3 TEMP is refused).
+        let temporary = std::fs::canonicalize(std::env::temp_dir()).unwrap();
+        let temporary = temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .map_or(temporary.clone(), std::path::PathBuf::from);
+        let state = temporary.join(format!(
+            "arkdeck-job-hdc-{:x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        arkdeck_platform::HostDirectory::open_or_create_private(&state.join("targets")).unwrap();
+        assert_eq!(host.operation_availability("observe.device@1", "hdc"), None);
+        let host = host
+            .with_targets(arkdeck_hoststore::TargetStore::open(&state.join("targets")).unwrap())
+            .with_planning(&state, None);
+        {
+            let composition = host.hdc().expect("the Jobs' HDC composition");
+            assert_eq!(composition.tool_sha256, sha256);
+            assert!(composition.receive_root.is_some());
+        }
+        let reasons = host
+            .operation_availability("observe.device@1", "hdc")
+            .expect("the HDC provider is registered");
+        assert!(
+            !reasons
+                .iter()
+                .any(|(code, _)| *code == "tool_identity_drift"),
+            "{reasons:?}"
+        );
         drop(host);
+        let _ = std::fs::remove_dir_all(&state);
         let stopped = launched.stop().unwrap();
         assert!(stopped.server.is_ok(), "{stopped:?}");
         assert!(stopped.report(true).is_empty(), "{stopped:?}");

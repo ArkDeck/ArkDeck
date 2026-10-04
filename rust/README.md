@@ -996,13 +996,20 @@ answer what macOS answers without the owner. On macOS only attributes were
 added.
 
 The Windows daemon composes the planner over its root with the Artifact
-owner and no HDC provider (no Windows HDC tuple is registered; the
-integration change waits for the maintainer's samples), so `job.plan` and
-`job.submit` of `observe.device@1` are refused `provider hdc is not
-registered`, `{"phase": "preAdmission", "newDispatchCount": 0}`, and
-nothing is admitted; a retry of an existing Job is answered with it
-(`deduplicated`), the idempotency lookup coming before materialization. A
-Flash operation is `… is not materialized by the Rust Runtime yet`.
+owner and, where one is composed, its HDC: the HDC composition the planner,
+the admitter (with the capability authority), the runner, the reconciler,
+the cleanup-debt continuation and an agent execution's owned Job all read
+(`Host::hdc`, as on macOS), with the receive root below the account's
+temporary directory (`%TEMP%rkdeck-receive`). That HDC exists only as a
+registered Windows HDC tuple's managed server (`windows_hdc_gate`,
+CHG-2026-078), and `operation.list` then asks after its tool identity as
+macOS does. Without one, `job.plan` and `job.submit` of `observe.device@1`
+are refused `provider hdc is not registered`, `{"phase": "preAdmission",
+"newDispatchCount": 0}`, and nothing is admitted; a retry of an existing Job
+is answered with it (`deduplicated`), the idempotency lookup coming before
+materialization. A Flash operation is `… is not materialized by the Rust
+Runtime yet`. `windows_lifecycle`'s admitted-HDC test checks the composition
+over a stand-in tuple.
 
 Tests on Windows: `arkdeck-hoststore/tests/windows_observe_device_admission.rs`
 replays the Swift `observe.device@1` oracle's `job.plan` and `job.submit`
@@ -1238,11 +1245,12 @@ on Windows as a Job this Runtime does not reconcile: the workspace Jobs
 delegated Flash's lane receipt (`flash_reconcile.rs`, AF-W1).
 
 The Windows daemon composes `job.reconcile` (the Session publication writer
-and the runner its runs use, no HDC composition or Flash lane), the agent
-execution owner in `agent-executions` and the human-action owner in
-`human-action-snapshots` (`agent.*`, `human-action.*`), on the development
-and the account root. An execution admits its Job as `job.submit` does here
-and observes no Target, since no Windows HDC tuple is registered. The census
+and the runner its runs use, the HDC composition where one is composed, and
+the Flash lane where one is installed), the agent execution owner in
+`agent-executions` and the human-action owner in `human-action-snapshots`
+(`agent.*`, `human-action.*`), on the development and the account root. An
+execution admits its Job as `job.submit` does here and observes Targets over
+the composed HDC; without one it observes none. The census
 reads `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
 workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache`.
 
@@ -1515,11 +1523,11 @@ query and scope fingerprints, its receipt and outcome hashes) as Swift's
 through a one-to-one relabelling (`support::debug_hap::HostLabels`); every other
 byte of the answers, the capability store and ledger, the Job records, the
 admission journals and the index rows must be Swift's, and on macOS nothing is
-relabelled. With no HDC composition (the Windows daemon's until the Windows HDC
-tuple is registered) an admitted HAP or deployment is refused before its first
-step with zero dispatch and no use consumed, and the daemon refuses every
-recorded `debug.hap@1` plan and submission before admission
-(`windows_job_admission_process.rs`).
+relabelled. With no HDC composition (the Windows daemon's unless a registered
+Windows HDC tuple's managed server is composed) an admitted HAP or deployment
+is refused before its first step with zero dispatch and no use consumed, and
+the daemon refuses every recorded `debug.hap@1` plan and submission before
+admission (`windows_job_admission_process.rs`).
 
 The runs replay on Windows host code too (TASK-XPA-009): `debug_hap_run.rs` and
 `native_library_run.rs`, both oracles' full replays (every run, result,
@@ -1797,7 +1805,7 @@ what no oracle records.
 
 On Windows (TASK-XPA-012) the same code builds and the daemon answers both
 methods from its Artifact and Job owners, through the runner `job.run` uses
-there (`windows_runner`), with no HDC composition: a continuation of a debt the
+there (`windows_runner`). Without an HDC composition a continuation of a debt the
 ledger owes reads the ledger and loads the Job, then is refused (`rejected`,
 `internalFailure("provider hdc is unavailable")`) before any readback or retry,
 and the ledger is not written. The control-layer corpus replay
@@ -2938,11 +2946,38 @@ signing pin (`ARKDECK_DAEMON_SIGNER_SHA256` or the publisher identity) before
 Credential Manager is opened. `migrate-deveco` and `install --build-profile`,
 which read DevEco's encrypted password material, are `unsupportedOnPlatform`
 on Windows. The installed Windows daemon composes the workspace presets'
-credential pinning over the account's preset root, bound to its own image; the
-signing dispatch (the workspace composition) stays macOS-only, and Windows
-attempts go under `SigningPresetStore::attempts_root` (`<preset root>\Attempts`).
+credential pinning over the account's preset root, bound to its own image, and
+Windows attempts go under `SigningPresetStore::attempts_root`
+(`<preset root>\Attempts`).
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-leaves-run.md`.
+
+`workspace.sign-openharmony-hap@1` runs end to end on Windows through the
+planner, admitter, runner, reconciler and result reader. `cargo test -p
+arkdeck-hoststore --test windows_workspace_sign_oracle` (`harness = false`)
+replays the Swift sign oracle (`tests/fixtures/workspace-sign-oracle`, 19
+frames), with the same root layout under the temporary directory. The test
+binary plays `hap-signer.sh` as `tools\java.exe` on a pseudo console.
+
+Every answer must be Swift's, and so must the two parked records, the
+credential owner's ledger and the signed HAPs and reports. Before comparing,
+the test relabels what differs only because of the host (rulings 48 and 61):
+
+- the stand-in Java's SHA-256 and byte count;
+- the 9 digests derived from them: the credential reference, three plan
+  digests, two signing reports and their Artifact IDs;
+- the root's spelling;
+- the console's `observedOutputBytes`.
+
+No material, input or signed-HAP digest is relabelled. The test also covers the
+macOS replay's checks: a parked Job is never signed again, a drifted
+certificate refuses before the signer runs, attempt directories are removed,
+neither password reaches any file, and results read back after the owners
+close.
+
+Signing has no presence gate on either platform. Runtime reads are never
+interactive: `interactionNotAllowed` on macOS, and `CredReadW` never prompts
+on Windows.
 
 ## Windows DevEco toolchain registration (TASK-XPA-011)
 
@@ -3890,14 +3925,39 @@ Windows. Two things change there:
   execute, measured through `measure_host_file`. A copy refuses a link or
   junction inside the tree instead of recreating it.
 
-A registered project resolves to no profile on Windows. Swift's profiles pin
-code-owned system tools (`/usr/bin/grep`, `sed`, `patch`, `bsdtar`, `git`, and
-SwiftPM), Windows ships none of them, and no rule yet decides which ones a
-Windows Runtime may trust. No PATH lookup stands in for that decision. So every
-profile-served workspace operation is unavailable with
-`workspace.toolchainUnavailable: no code-owned source tool … is trusted on
-Windows`, and a plan of one is refused before admission with zero dispatch.
-`workspace.inspect-source@1` needs no profile, so it runs.
+Swift's profiles pin code-owned system tools (`/usr/bin/grep`, `sed`,
+`patch`, `bsdtar`, `git`). The maintainer ruled on 2026-10-04 how Windows
+trusts them, and the table is `CodeOwnedTools` in `workspace_profile.rs`:
+
+- **grep, sed and patch** are reimplemented in Rust (`workspace_text_tools.rs`)
+  for exactly the argv the provider builds. The daemon runs its own image as
+  each one (`arkdeck-agentd --workspace-tool grep|sed|patch …`), pinned by
+  digest, so no external binary is trusted for them.
+- **tar** (`System32\tar.exe`) and **git** (Git for Windows) are trusted by
+  their Authenticode publisher at their registered absolute path, never by a
+  PATH lookup.
+
+Until the trusted system tools are composed, a registered project resolves to
+no profile. Every profile-served workspace operation is unavailable with
+`workspace.toolchainUnavailable: no trusted system archive (tar) or
+source-control (git) tool is composed on Windows yet`, and a plan of one is
+refused before admission with zero dispatch. `workspace.inspect-source@1`
+needs no profile, so it runs.
+
+`cargo test -p arkdeck-hoststore --test workspace_text_tools_oracle` checks the
+reimplementation against the macOS tools in two ways:
+
+- **On every host**, it replays the recorded Swift oracles.
+  `workspace-read-oracle`'s `/usr/bin/grep` and `/usr/bin/sed` artifacts must
+  match byte for byte. `workspace-patch-oracle`'s tree after `/usr/bin/patch`
+  must match digest for digest, including the failed hunk's
+  `@@ -1,1 +1,1 @@` reject and its `.orig` backup.
+- **On macOS**, the host's own `/usr/bin/grep`, `sed` and `patch` must answer a
+  corpus of the provider's argv shapes exactly as the reimplementation does:
+  exit status, stdout, stderr and the tree.
+
+`windows_workspace_provider_process` runs the daemon image as each tool and
+compares its answer with the reimplementation's.
 
 Maintainer ruling 69 decides the rule. `grep`, `sed` and `patch` are
 reimplemented in process. `tar` and `git` are trusted by a registered absolute
@@ -3930,7 +3990,7 @@ test binary as the inspector; the binary answers as `grep -r -n` does. The
 inspection is planned under the default read-only policy and runs. It
 publishes exactly what the inspector prints when run directly, and it reads
 back and deduplicates after a restart. The test also checks that the
-profile-served operations carry the code-owned tools reason, that a plan of
+profile-served operations carry the system tools reason, that a plan of
 one is refused with zero dispatch, and that an inspector that is not an
 executable refuses the start.
 

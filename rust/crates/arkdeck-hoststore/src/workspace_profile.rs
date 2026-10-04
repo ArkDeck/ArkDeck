@@ -13,15 +13,13 @@
 //!
 //! On Windows (TASK-XPA-011) the profile, its presets and the registry are
 //! the same, over the host's `X:\…` spelling, and an executable is measured
-//! through one handle that follows no reparse point. A registered project
-//! does not resolve there: Swift's profiles pin code-owned system tools
-//! (`/usr/bin/grep`, `sed`, `patch`, `bsdtar`, `git`, SwiftPM), and Windows
-//! ships no such tools. Maintainer ruling 69 decides them: `grep`, `sed` and
-//! `patch` are reimplemented in process, and `tar` and `git` are the
-//! registered, publisher-signed system tools a preset pins through
-//! `WorkspaceCommandPreset::trusted_system` (never a PATH lookup). Until the
-//! code-owned tool table uses them, every profile-served operation is
-//! unavailable, with that reason, before anything is planned or dispatched.
+//! through one handle that follows no reparse point. The code-owned tools
+//! follow the maintainer's ruling of 2026-10-04 (`CodeOwnedTools`): grep,
+//! sed and patch are this daemon's own image, tar and git trusted system
+//! tools by Authenticode publisher and registered path, never PATH. Until
+//! the system tools are composed a registered project resolves to no
+//! profile, and every profile-served operation is unavailable with that
+//! reason before anything is planned or dispatched.
 use crate::operation_catalog::CatalogOperation;
 use crate::workspace_support::{
     self as support, foundation_resolved, foundation_standardized, is_identifier, is_safe_glob,
@@ -41,11 +39,11 @@ use std::sync::OnceLock;
 /// `RuntimeAvailabilityReasonCode` spells, and Swift's reason.
 pub(crate) type Unavailability = (&'static str, String);
 
-/// Why a registered project resolves to no profile on Windows: the
-/// code-owned tools Swift's profiles pin have no decided Windows identity.
+/// Why a registered project resolves to no profile on Windows yet: its
+/// external code-owned tools (`tar`, `git`) are not composed.
 #[cfg(windows)]
 pub(crate) const WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE: &str = "workspace.toolchainUnavailable: \
-    no code-owned source tool (grep, sed, patch, bsdtar, git or SwiftPM) is trusted on Windows";
+    no trusted system archive (tar) or source-control (git) tool is composed on Windows yet";
 
 /// Why a code-owned system tool is unavailable on Windows (ruling 69).
 #[cfg(windows)]
@@ -550,7 +548,7 @@ impl WorkspaceProfile {
     /// Swift `WorkspaceProjectProfile.arkDeck(rootURL:projectRef:)`.
     #[cfg(windows)]
     pub fn ark_deck(_root: &str, _project_ref: &str) -> Result<Self, String> {
-        Err(WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE.into())
+        Err("workspace.toolchainUnavailable: no fixed SwiftPM executable exists".into())
     }
 
     /// Swift `WorkspaceProjectProfile.arkDeck(rootURL:projectRef:)`.
@@ -690,7 +688,13 @@ impl WorkspaceProfile {
                 "workspace.projectProfileUnavailable: WaterFlow project or Hvigor is absent".into(),
             );
         }
-        let (inspection, reader, patch, checkpoint, source_control) = code_owned_tools(&root)?;
+        let CodeOwnedTools {
+            inspection,
+            reader,
+            patch,
+            archive: checkpoint,
+            source_control,
+        } = code_owned_tools(&root)?;
         let mut build = Vec::new();
         let mut test = Vec::new();
         let mut build_products = BTreeMap::new();
@@ -1164,46 +1168,98 @@ impl WorkspaceProfile {
     }
 }
 
-/// The code-owned tools an OpenHarmony profile pins: Swift's fixed system
-/// `grep`, `sed`, `patch` and `bsdtar`, and `git` inside a working copy.
-type CodeOwnedTools = (
-    WorkspaceCommandPreset,
-    WorkspaceCommandPreset,
-    WorkspaceCommandPreset,
-    WorkspaceCommandPreset,
-    Option<WorkspaceCommandPreset>,
-);
+/// The code-owned tools an OpenHarmony profile pins, by role: the source
+/// inspection (`grep`), the source reader (`sed`), the patch tool, the
+/// sealed-source archive writer (`tar`) and, inside a git working copy, the
+/// source-control tool (`git`).
+///
+/// | Role | macOS | Windows (ruling of 2026-10-04) |
+/// | --- | --- | --- |
+/// | `inspection`, `reader`, `patch` | `/usr/bin/grep`, `sed`, `patch`, pinned by digest | this daemon's own image run as the tool (`--workspace-tool grep\|sed\|patch`, `workspace_text_tools.rs`), pinned by digest: no external binary |
+/// | `archive` | `/usr/bin/bsdtar`, pinned by digest | `System32\tar.exe` (Microsoft-signed bsdtar), trusted by its Authenticode publisher at its registered absolute path, never PATH |
+/// | `source_control` | `/usr/bin/git`, pinned by digest | Git for Windows, trusted by its Authenticode publisher at its registered absolute path, never PATH |
+///
+/// Any other signer or path fails closed: the project resolves to no profile.
+pub(crate) struct CodeOwnedTools {
+    pub(crate) inspection: WorkspaceCommandPreset,
+    pub(crate) reader: WorkspaceCommandPreset,
+    pub(crate) patch: WorkspaceCommandPreset,
+    pub(crate) archive: WorkspaceCommandPreset,
+    pub(crate) source_control: Option<WorkspaceCommandPreset>,
+}
+
+/// The preset ids and timeouts of the code-owned roles, on every host.
+const INSPECTION: (&str, i64) = ("source-inspection", 30);
+const READER: (&str, i64) = ("source-range", 30);
+const PATCH: (&str, i64) = ("unified-diff", 120);
+const ARCHIVE: (&str, i64) = ("sealed-source-archive", 120);
+const SOURCE_CONTROL: (&str, i64) = ("git", 120);
 
 #[cfg(not(windows))]
 fn code_owned_tools(root: &str) -> Result<CodeOwnedTools, String> {
-    let inspection =
-        WorkspaceCommandPreset::hashing("source-inspection", "/usr/bin/grep", None, &[], 30)?;
-    let reader = WorkspaceCommandPreset::hashing("source-range", "/usr/bin/sed", None, &[], 30)?;
-    let patch = WorkspaceCommandPreset::hashing("unified-diff", "/usr/bin/patch", None, &[], 120)?;
-    let checkpoint = WorkspaceCommandPreset::hashing(
-        "sealed-source-archive",
-        "/usr/bin/bsdtar",
-        None,
-        &[],
-        120,
-    )?;
-    let source_control = if inside_git_working_copy(root) {
-        Some(WorkspaceCommandPreset::hashing(
-            "git",
-            "/usr/bin/git",
-            None,
-            &[],
-            120,
-        )?)
-    } else {
-        None
+    let fixed = |(preset, timeout): (&str, i64), path: &str| {
+        WorkspaceCommandPreset::hashing(preset, path, None, &[], timeout)
     };
-    Ok((inspection, reader, patch, checkpoint, source_control))
+    Ok(CodeOwnedTools {
+        inspection: fixed(INSPECTION, "/usr/bin/grep")?,
+        reader: fixed(READER, "/usr/bin/sed")?,
+        patch: fixed(PATCH, "/usr/bin/patch")?,
+        archive: fixed(ARCHIVE, "/usr/bin/bsdtar")?,
+        source_control: if inside_git_working_copy(root) {
+            Some(fixed(SOURCE_CONTROL, "/usr/bin/git")?)
+        } else {
+            None
+        },
+    })
 }
 
-/// On Windows no code-owned tool is trusted yet.
+/// The daemon's own image, in its canonical `X:\…` spelling: the
+/// executable the code-owned text tools run as.
 #[cfg(windows)]
-fn code_owned_tools(_root: &str) -> Result<CodeOwnedTools, String> {
+fn daemon_image() -> Result<String, String> {
+    let image = std::env::current_exe()
+        .map_err(|error| format!("workspace.toolchainUnavailable: {error}"))?;
+    arkdeck_platform::host_resolved_path(&image)
+        .and_then(|path| path.to_str().map(str::to_owned))
+        .ok_or_else(|| "workspace.toolchainUnavailable: the daemon image is unresolved".into())
+}
+
+/// On Windows the text tools are this daemon's own image; the external
+/// tools' slots wait for their trusted system tools.
+#[cfg(windows)]
+fn code_owned_tools(root: &str) -> Result<CodeOwnedTools, String> {
+    let image = daemon_image()?;
+    let text = |(preset, timeout): (&str, i64), tool: &str| {
+        WorkspaceCommandPreset::hashing(
+            preset,
+            &image,
+            None,
+            &[crate::workspace_text_tools::WORKSPACE_TOOL_FLAG, tool],
+            timeout,
+        )
+    };
+    let inspection = text(INSPECTION, "grep")?;
+    let reader = text(READER, "sed")?;
+    let patch = text(PATCH, "patch")?;
+    let (archive, source_control) = external_tools(root)?;
+    Ok(CodeOwnedTools {
+        inspection,
+        reader,
+        patch,
+        archive,
+        source_control,
+    })
+}
+
+/// The archive writer and, inside a git working copy, the source-control
+/// tool on Windows: none is trusted until the trusted system tools
+/// (`System32\tar.exe`, Git for Windows) are composed, so a project resolves
+/// to no profile.
+#[cfg(windows)]
+fn external_tools(
+    _root: &str,
+) -> Result<(WorkspaceCommandPreset, Option<WorkspaceCommandPreset>), String> {
+    let _ = (ARCHIVE, SOURCE_CONTROL);
     Err(WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE.into())
 }
 
