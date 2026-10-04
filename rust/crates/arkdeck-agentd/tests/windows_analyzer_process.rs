@@ -298,6 +298,12 @@ fn the_runtime_runs_the_daemon_as_its_own_crash_ledger_analyzer_across_a_restart
     assert_eq!(raw_bytes, unbase64(expected["input"].as_str().unwrap()));
 
     let mut first = start(&root.0);
+    // The census names the analyzer owner where the macOS census does.
+    let owners = first.line_starting("arkdeck-agentd owners: ");
+    assert!(
+        owners.contains(", planning, analyzer, agentExecutions,"),
+        "{owners}"
+    );
     let pipe = first.serving();
     let described = answered(
         &pipe,

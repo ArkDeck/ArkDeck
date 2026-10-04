@@ -1443,6 +1443,12 @@ impl Host {
             ("workspaceProjects", self.workspace_projects.is_some()),
             ("bootstrap", self.bootstrap.is_some()),
             ("planning", self.planning.is_some()),
+            (
+                "analyzer",
+                self.planning
+                    .as_ref()
+                    .is_some_and(|(_, analyzer)| !analyzer.profiles().is_empty()),
+            ),
             ("agentExecutions", self.agents.is_some()),
             ("humanActions", self.human_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
