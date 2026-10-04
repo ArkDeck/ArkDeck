@@ -64,8 +64,12 @@ notDerived、Artifact 元数据、显式文本读取和已发布 Trace 的转交
 Diagnostics reader，不改写原分类、target、binding 或参数，也不提交新 Job。由该 reader 打开
 Trace 时仍展示同一 History 来源，不能因原分类是 Viewer 而丢失关联。
 
-交互式布防/追加 Marker/停止仍未发布为可调用的会话操作。App 保持禁用并显示
-`diagnostic_session_capture_not_connected`，没有“本地已布防”状态。无时钟校准时固定显示“无法对齐”；
+CHG-2026-079 实现独立 `capture.diagnostic-session@1` 与 Runtime 的 status / mark / stop：
+App 先检查精确绑定、Trace 支持和 128 MiB 存储预算，只在 Runtime 读回唯一 ring anchor 后显示录制并允许标记。
+时长可选 30 / 60 / 120 秒，最多 50 个主机时间标记；停止只缩短已准入的等待窗口，随后保存不可变 Session。
+设备或绑定变化不会把运行中控制移到新目标，丢失回包只读回状态，不自动重发。旧 Runtime 不具备此 operation 时显示不可用原因。
+新能力需维护者 review 并合入 protected main 后才能执行设备操作；fixture 不证明硬件支持。
+Trace 与主机标记没有跨时钟校准，HiLog 只是录制后读取；无校准时固定显示“无法对齐”；
 自动 Marker 没有时间字段时显示“未记录时刻”。以下完整联动体验仍是目标设计。
 详细证据见 [`implementation-audit-2026-08-27.md`](implementation-audit-2026-08-27.md)。
 
@@ -77,7 +81,7 @@ Trace 时仍展示同一 History 来源，不能因原分类是 Viewer 而丢失
 | --- | --- |
 | 屏幕视频 Artifact | 只能看到单张截图，无法逐帧回放复现过程 |
 | 多 channel 并发 arm/stop 证明 | 现有 Artifact 同属一个 Job，不等于采集区间天然重合；当前 lowering 甚至是顺序执行（hilog drain 在前、trace 阻塞在后），两者并不覆盖同一区间 |
-| 交互式回溯会话 | published `ringBuffered` 已支持有界环形采集；这不等于 App 可在运行中 arm/append-marker/stop。完整交互式会话仍缺操作与并发证明 |
+| 多通道交互会话 | CHG-2026-079 提供单 Trace ring 的 start/mark/stop；并发视频、Marker 截图与跨通道覆盖证明仍未实现 |
 | 会话内并发准入 | 采集会话 Job 持有 per-device mutation lane；Marker 截图与 Device 输入在会话期间会被结构性阻塞，需要新的 in-session 准入语义 |
 | source clock calibration | 无法给出 Trace、视频 PTS 与 HiLog 之间的误差上界；Marker 位于 host 时域，还需要 host↔device 校准 |
 | 动态 Marker track | published markers.json 已含请求时给定的手动标记和部分自动标记；运行中追加标记及事后截图时刻尚无完整闭环 |

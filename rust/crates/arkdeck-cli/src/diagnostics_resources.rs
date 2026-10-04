@@ -15,7 +15,12 @@ use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use unicode_segmentation::UnicodeSegmentation;
 
-const OPERATION: &str = "capture.diagnostics@1";
+pub(crate) fn supported_operation(reference: &str) -> bool {
+    matches!(
+        reference,
+        "capture.diagnostics@1" | "capture.diagnostic-session@1"
+    )
+}
 const PARSER: &str = "arkdeck.diagnostics-session-parser";
 const PARSER_VERSION: &str = "1.0.0";
 const INDEX: &str = "artifact-index.json";
@@ -154,6 +159,41 @@ pub(crate) fn configure(
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
+    if !help && command.starts_with("diagnostics.session.") {
+        let valid_id = |key: &str| {
+            fields
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(crate::read_only_resources::identifier)
+        };
+        if !valid_id("jobId")
+            || (command == "diagnostics.session.mark" && !valid_id("markerId"))
+            || fields.get("label").is_some_and(|value| {
+                value.as_str().is_none_or(|label| {
+                    !(1..=64).contains(&label.len())
+                        || !label
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b" ._-".contains(&byte))
+                })
+            })
+        {
+            return Err(fail(
+                "invalidInput",
+                "Diagnostic Session requires an exact Job and bounded marker identity/label",
+            ));
+        }
+        let timeout = fields.remove("timeout");
+        return crate::read_only_resources::duration(
+            timeout.as_ref().and_then(Value::as_str).unwrap_or("30s"),
+        )
+        .map(Some)
+        .ok_or_else(|| {
+            fail(
+                "invalidInput",
+                "diagnostics timeout must be a bounded duration",
+            )
+        });
+    }
     let verb = match command {
         _ if help => return Ok(None),
         "diagnostics.inspect" => "inspect",
@@ -386,7 +426,7 @@ fn read_whole(
 /// Swift `diagnosticsJobRequest`: the Job's own typed request, which must be
 /// the exact diagnostics capture its status names. Answers the request's typed
 /// inputs (Swift decodes an absent or null `inputs` as none).
-fn job_request(job: &str, request: &mut Request) -> Result<Map<String, Value>, CliError> {
+fn job_request(job: &str, request: &mut Request) -> Result<(String, Map<String, Value>), CliError> {
     let show = request(
         "job.show",
         Map::from_iter([("jobId".to_owned(), json!(job))]),
@@ -402,7 +442,11 @@ fn job_request(job: &str, request: &mut Request) -> Result<Map<String, Value>, C
             "Job is not an exact diagnostics capture",
         ));
     };
-    if status["jobId"] != job || status["operation"] != OPERATION {
+    if status["jobId"] != job
+        || !status["operation"]
+            .as_str()
+            .is_some_and(supported_operation)
+    {
         return Err(fail(
             "recordUnreadable",
             "Job is not an exact diagnostics capture",
@@ -414,13 +458,13 @@ fn job_request(job: &str, request: &mut Request) -> Result<Map<String, Value>, C
             "diagnostic session could not be decoded",
         )
     })?;
-    if reference != OPERATION || requested != target {
+    if status["operation"] != reference || requested != target {
         return Err(fail(
             "recordUnreadable",
             "diagnostic Job request does not match its status",
         ));
     }
-    Ok(inputs)
+    Ok((reference, inputs))
 }
 
 /// The part of Swift's `RuntimeOperationRequest` decoding this leaf reads:
@@ -733,6 +777,7 @@ fn provenance(sources: &[&Metadata]) -> Value {
 /// Swift `DiagnosticSessionOfflineInspector.inspect`, encoded as
 /// `diagnosticsInspectionValue`.
 fn inspect_session(
+    operation: &str,
     job: &str,
     typed: &Map<String, Value>,
     inventory: &[Metadata],
@@ -740,13 +785,13 @@ fn inspect_session(
 ) -> Result<Value, CliError> {
     let ids: BTreeSet<&str> = inventory.iter().map(|item| item.id.as_str()).collect();
     let names: BTreeSet<&str> = inventory.iter().map(|item| item.name.as_str()).collect();
-    if job.is_empty() || job.len() > 512 {
+    if !supported_operation(operation) || job.is_empty() || job.len() > 512 {
         return Err(invalid("diagnostics_unsupported_operation"));
     }
     if ids.len() != inventory.len()
         || names.len() != inventory.len()
         || inventory.len() > INVENTORY_MAXIMUM
-        || !inventory.iter().all(|item| item.source == OPERATION)
+        || !inventory.iter().all(|item| item.source == operation)
     {
         return Err(invalid("diagnostics_ambiguous_artifact_inventory"));
     }
@@ -774,8 +819,8 @@ fn inspect_session(
         .collect();
     let consistent = index.job_id == job
         && summary.job_id == job
-        && index.operation == OPERATION
-        && summary.operation == OPERATION
+        && index.operation == operation
+        && summary.operation == operation
         && index.artifacts == summary.artifacts
         && summary.missing_required.as_ref().is_some_and(|missing| {
             let set: BTreeSet<&str> = missing.iter().map(String::as_str).collect();
@@ -818,7 +863,19 @@ fn inspect_session(
             .any(|metadata| metadata.name == name && metadata.status == "published")
     };
     let mut missing: Vec<Value> = Vec::new();
-    let mut requested = requested_products(typed)?;
+    let mut requested = if operation == "capture.diagnostic-session@1" {
+        [
+            "hilog.txt",
+            "trace.htrace",
+            "markers.json",
+            "diagnostic-session.json",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+    } else {
+        requested_products(typed)?
+    };
     if requested.contains("screenshot.png") && is_published("screenshot.jpeg") {
         requested.remove("screenshot.png");
         requested.insert("screenshot.jpeg".into());
@@ -848,7 +905,7 @@ fn inspect_session(
     sorted.sort_by(|left, right| (&left.name, &left.id).cmp(&(&right.name, &right.id)));
     Ok(
         json!({"schemaVersion": "arkdeck.diagnostics-inspection/1", "jobId": job,
-        "operationReference": OPERATION, "derivation": provenance(&sources),
+        "operationReference": operation, "derivation": provenance(&sources),
         "partial": !missing.is_empty(),
         "alignment": {"kind": "cannotAlign", "toleranceMs": null,
             "reason": "capture artifacts contain no host-to-device calibration"},
@@ -906,7 +963,7 @@ pub fn run(
     let inventory = inventory(&owner, job, request)?;
     match verb {
         "inspect" => {
-            let typed = job_request(job, request)?;
+            let (operation, typed) = job_request(job, request)?;
             let mut documents = BTreeMap::new();
             for name in [INDEX, SUMMARY, MARKERS] {
                 let Some(metadata) = inventory
@@ -934,7 +991,7 @@ pub fn run(
                 let bytes = read_whole(&owner, metadata, DOCUMENT_MAXIMUM_BYTES, false, request)?;
                 documents.insert(name, bound(metadata, bytes)?);
             }
-            inspect_session(job, &typed, &inventory, &documents)
+            inspect_session(&operation, job, &typed, &inventory, &documents)
         }
         "preview" => {
             let metadata = options
@@ -961,7 +1018,7 @@ pub fn run(
             }
             let bytes = read_whole(&owner, metadata, PREVIEW_MAXIMUM_BYTES, explicit, request)?;
             let document = bound(metadata, bytes)?;
-            if document.metadata.source != OPERATION
+            if !supported_operation(&document.metadata.source)
                 || !(document.metadata.media_type == "text/plain"
                     || document.metadata.media_type == "application/json")
             {
@@ -987,6 +1044,60 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_produced_interactive_session_preserves_operation_and_product_scope() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/diagnostic-session/interactive.json");
+        let fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        assert_eq!(fixture["fixtureOnly"], true);
+        let inventory: Vec<Metadata> = fixture["inventory"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| metadata_of(row).unwrap())
+            .collect();
+        let mut documents = BTreeMap::new();
+        for name in [INDEX, SUMMARY, MARKERS] {
+            let metadata = inventory.iter().find(|item| item.name == name).unwrap();
+            documents.insert(
+                name,
+                bound(
+                    metadata,
+                    fixture["documents"][name]
+                        .as_str()
+                        .unwrap()
+                        .as_bytes()
+                        .to_vec(),
+                )
+                .unwrap(),
+            );
+        }
+        let job = fixture["jobId"].as_str().unwrap();
+        let inputs = fixture["typedParameters"].as_object().unwrap();
+        let result = inspect_session(
+            "capture.diagnostic-session@1",
+            job,
+            inputs,
+            &inventory,
+            &documents,
+        )
+        .unwrap();
+        assert_eq!(result["operationReference"], "capture.diagnostic-session@1");
+        assert_eq!(result["partial"], false);
+        assert_eq!(result["markers"].as_array().unwrap().len(), 1);
+        assert_eq!(result["alignment"]["kind"], "cannotAlign");
+        assert!(
+            inspect_session("capture.diagnostics@1", job, inputs, &inventory, &documents).is_err()
+        );
+        let trace = fixture["inventory"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["name"] == "trace.htrace")
+            .unwrap();
+        assert!(crate::artifact_resources::require_trace_artifact(trace).is_ok());
+    }
 
     #[test]
     fn a_preview_clips_characters_and_discloses_replaced_bytes() {

@@ -210,6 +210,12 @@ const RULINGS: &[(&str, Ruling)] = &[
     ("job.run", leaf("job.run")),
     ("job.show", leaf("job.show")),
     ("job.status", leaf("job.status")),
+    (
+        "diagnostic.session.status",
+        leaf("diagnostics.session.status"),
+    ),
+    ("diagnostic.session.mark", leaf("diagnostics.session.mark")),
+    ("diagnostic.session.stop", leaf("diagnostics.session.stop")),
     ("job.submit", leaf("job.submit")),
     ("job.timeline", leaf("job.timeline")),
     ("operation.describe", leaf("operation.describe")),
@@ -325,6 +331,9 @@ const LOCAL_COMMANDS: &[&str] = &[
     "ui-dump.inspect",
     "ui-dump.hit-test",
     "diagnostics.inspect",
+    "diagnostics.session.status",
+    "diagnostics.session.mark",
+    "diagnostics.session.stop",
     "diagnostics.preview",
     "diagnostics.export",
     "artifact.quota",
@@ -1254,7 +1263,7 @@ mod tests {
             .map(|entry| entry["feature"].as_str().unwrap())
             .collect();
         assert!(!features.contains(&"job.unruled"));
-        assert_eq!(document["summary"]["bySource"]["daemon"], 104);
+        assert_eq!(document["summary"]["bySource"]["daemon"], 107);
         assert_eq!(
             problems_for(&methods),
             [

@@ -24,14 +24,14 @@ final class DiagnosticsWorkspaceViewModel {
   @ObservationIgnored private var loadTask: Task<Void, Never>?
   @ObservationIgnored private let provider: any RuntimeJobDetailApplicationProviding
 
-  /// No Diagnostic Session capture provider is composed into the App. The
-  /// published capture supports a bounded ring snapshot, but not interactive
-  /// append-marker/stop orchestration. These controls must not imply otherwise.
-  /// An adopted device or a local button press cannot prove recording began.
-  let captureUnavailableReasonCode = "diagnostic_session_capture_not_connected"
+  let capture: DiagnosticCaptureSession
 
-  init(provider: any RuntimeJobDetailApplicationProviding) {
+  init(
+    provider: any RuntimeJobDetailApplicationProviding,
+    captureProvider: any DiagnosticCaptureProviding = DiagnosticCaptureFacade.make()
+  ) {
     self.provider = provider
+    capture = DiagnosticCaptureSession(provider: captureProvider)
   }
 
   func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
@@ -40,7 +40,9 @@ final class DiagnosticsWorkspaceViewModel {
   }
 
   var traceContext: RuntimeHistoryWorkspaceContext? {
-    guard let session, TracePublishedArtifactPolicy.selectRawTrace(from: session.artifacts) != nil else { return nil }
+    guard let session, let context,
+      TracePublishedArtifactPolicy.selectRawTrace(from: session.artifacts, operationReference: context.operationReference) != nil
+    else { return nil }
     return context
   }
 
@@ -158,6 +160,7 @@ final class DiagnosticsWorkspaceViewModel {
 
   func publish(deviceObservation: DeviceListPresentation) {
     self.deviceObservation = deviceObservation
+    capture.selectionChanged(to: target)
   }
 
   func publish(reading: DiagnosticSessionReading) {

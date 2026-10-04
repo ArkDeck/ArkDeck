@@ -32,7 +32,7 @@
         "blockers" : [
 
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -111,7 +111,7 @@
           "blockers" : [
 
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -166,7 +166,7 @@
           "sessionId" : "session-job-107679f20983827cfcdcabfb4debb2f8",
           "sessionPublication" : {
             "catalogGeneration" : "3",
-            "manifestSha256" : "1e50dc00cec995f4bf372ba6295e117c9f576e5ada3a8be599555b4fd86d7569",
+            "manifestSha256" : "904831c783fd575925c46fdac2f5c974a85d38111d7180f6f0dab6ba4da15edb",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -190,7 +190,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "events" : {
           "jobId" : "job-107679f20983827cfcdcabfb4debb2f8",
           "method" : "job.events"
@@ -229,7 +229,7 @@
           "sessionId" : "session-job-107679f20983827cfcdcabfb4debb2f8",
           "sessionPublication" : {
             "catalogGeneration" : "3",
-            "manifestSha256" : "1e50dc00cec995f4bf372ba6295e117c9f576e5ada3a8be599555b4fd86d7569",
+            "manifestSha256" : "904831c783fd575925c46fdac2f5c974a85d38111d7180f6f0dab6ba4da15edb",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -242,7 +242,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "718b8c0fc370f327dea43d39fed6a10479d24936fde55f6c2e3bc78a4f0ef1c0",
+        "materializedPlanDigest" : "8e984011b6d1e187a4711e8ff272118468e354576792087e7adb866392f14e19",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -317,7 +317,7 @@
         "sessionId" : "session-job-107679f20983827cfcdcabfb4debb2f8",
         "sessionPublication" : {
           "catalogGeneration" : "3",
-          "manifestSha256" : "1e50dc00cec995f4bf372ba6295e117c9f576e5ada3a8be599555b4fd86d7569",
+          "manifestSha256" : "904831c783fd575925c46fdac2f5c974a85d38111d7180f6f0dab6ba4da15edb",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -354,7 +354,7 @@
         "blockers" : [
           "artifactIntegrityFailed"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -409,7 +409,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -470,7 +470,7 @@
           "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
+            "manifestSha256" : "77d5134e8ed679713facdabbb4e3c7bcfa69d37ee1452ca7cbac967c4b2048e4",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -494,7 +494,7 @@
         "actualStepKinds" : [
           "runDeterministicAnalyzer"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "events" : {
           "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "method" : "job.events"
@@ -539,7 +539,7 @@
           "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
+            "manifestSha256" : "77d5134e8ed679713facdabbb4e3c7bcfa69d37ee1452ca7cbac967c4b2048e4",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -552,7 +552,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "4e0612fdf11bdbd6a6d26cb786b6adc7477cb08dfa584cccdf22c7ad2bf66ca8",
+        "materializedPlanDigest" : "24de1b638cf8ed1167c388347309be06fcc8697f6022f6e73a4116193e3ba71f",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -634,7 +634,7 @@
         "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
         "sessionPublication" : {
           "catalogGeneration" : "1",
-          "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
+          "manifestSha256" : "77d5134e8ed679713facdabbb4e3c7bcfa69d37ee1452ca7cbac967c4b2048e4",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -671,7 +671,7 @@
         "blockers" : [
           "artifactIntegrityFailed"
         ],
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "executionMode" : "execute",
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
@@ -726,7 +726,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -787,7 +787,7 @@
           "sessionId" : "session-job-e1ca83b654fb71dcfc681bf7e9e67dff",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "f0e72636d92278b55ddfcd8d966f32abce1307cacc81ec7e292d5d500309c904",
+            "manifestSha256" : "1738b5b895091a265cf0b671bc47430da8ca476243472a13f37b2bacd574f48e",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -809,7 +809,7 @@
       "ok" : true,
       "result" : {
         "actualStepKinds" : null,
-        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
         "events" : {
           "jobId" : "job-e1ca83b654fb71dcfc681bf7e9e67dff",
           "method" : "job.events"
@@ -854,7 +854,7 @@
           "sessionId" : "session-job-e1ca83b654fb71dcfc681bf7e9e67dff",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "f0e72636d92278b55ddfcd8d966f32abce1307cacc81ec7e292d5d500309c904",
+            "manifestSha256" : "1738b5b895091a265cf0b671bc47430da8ca476243472a13f37b2bacd574f48e",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -867,7 +867,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "849dc30ade63d0dc2a9b89699df2df150b3ac287f8dc00e1c45b80dafda3c15a",
+        "materializedPlanDigest" : "8fc27e89c8eb91a3f904a9e8f3b88aa0f396de4be96a546b0203b225201d7783",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -947,7 +947,7 @@
         "sessionId" : "session-job-e1ca83b654fb71dcfc681bf7e9e67dff",
         "sessionPublication" : {
           "catalogGeneration" : "2",
-          "manifestSha256" : "f0e72636d92278b55ddfcd8d966f32abce1307cacc81ec7e292d5d500309c904",
+          "manifestSha256" : "1738b5b895091a265cf0b671bc47430da8ca476243472a13f37b2bacd574f48e",
           "reasonCode" : null,
           "state" : "published"
         },

@@ -547,7 +547,7 @@ final class TraceWorkspaceViewModel {
   /// are not mistaken for a raw capture.
   func openHistoryContext(_ context: RuntimeHistoryWorkspaceContext) {
     guard context.workspaceKind == .trace
-      || context.operationReference == TraceApplicationFacade.operationReference
+      || DiagnosticSessionOfflineInspector.supportedOperations.contains(context.operationReference)
     else { return }
     historyPinnedTargetID = context.targetID
     selectedTargetID = context.targetID
@@ -556,7 +556,7 @@ final class TraceWorkspaceViewModel {
     isPreparingViewer = false
     viewerArtifactFailure = nil
     latestViewerArtifactName = nil
-    guard context.operationReference == TraceApplicationFacade.operationReference else { return }
+    guard DiagnosticSessionOfflineInspector.supportedOperations.contains(context.operationReference) else { return }
     Task { [weak self] in
       await self?.openPublishedTrace(jobID: context.jobID, requestGeneration: generation, expectedContext: context)
     }
@@ -577,9 +577,10 @@ final class TraceWorkspaceViewModel {
       if viewerReadGeneration == generation { isPreparingViewer = false }
     }
 
+    let operationReference = expectedContext?.operationReference ?? TraceApplicationFacade.operationReference
     let detail = await detailProvider.loadJobDetail(
       jobID: jobID,
-      operationReference: TraceApplicationFacade.operationReference)
+      operationReference: operationReference)
     guard !Task.isCancelled, viewerReadGeneration == generation else { return }
     if let expectedContext {
       guard detail.jobID == expectedContext.jobID,
@@ -596,7 +597,7 @@ final class TraceWorkspaceViewModel {
       viewerArtifactFailure = traceString("trace.viewer.artifactListUnavailable")
       return
     }
-    guard let artifact = TracePublishedArtifactPolicy.selectRawTrace(from: detail.artifacts) else {
+    guard let artifact = TracePublishedArtifactPolicy.selectRawTrace(from: detail.artifacts, operationReference: operationReference) else {
       viewerArtifactFailure = traceString("trace.viewer.artifactInvalid")
       return
     }

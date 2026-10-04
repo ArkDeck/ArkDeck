@@ -117,10 +117,11 @@ mod tests {
                 assert_eq!(&actual,expected,"{reference}");matched.insert(reference.to_owned());
             }
         }
-        // The schema corpus retains 24 representative signatures, not every
+        // The schema corpus retains 25 representative references, not every
         // Catalog reference. Every retained real result must compare equal.
-        assert_eq!(matched.len(), 24);
+        assert_eq!(matched.len(), 25);
         let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
+        let mut invalid = Vec::new();
         for d in catalog {
             let reference = match d["version"].as_u64() {
                 Some(v) => format!("{}@{v}", d["id"].as_str().unwrap()),
@@ -129,10 +130,31 @@ mod tests {
             let availability = json!({"availability":"unavailable","reasons":["provider is not registered"],
                 "reasonCodes":["provider_not_registered"],"reasonOrigins":["product_build"]});
             let actual = describe(&reference, &availability).unwrap().unwrap();
-            arkdeck_contract::validate_method_value("operation.describe", "result", &actual)
+            if let Some(directory) = std::env::var_os("ARKDECK_CATALOG_CONTRACT_RECORD") {
+                use std::io::Write;
+                std::fs::create_dir_all(&directory).unwrap();
+                let path = std::path::PathBuf::from(directory).join("operation.describe.jsonl");
+                let mut file = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path)
+                    .unwrap();
+                writeln!(
+                    file,
+                    "{}",
+                    json!({"method":"operation.describe", "protocolVersion":"1.0.0",
+                    "params":{"reference":reference}, "ok":true, "result":actual})
+                )
                 .unwrap();
+            }
+            if let Err(error) =
+                arkdeck_contract::validate_method_value("operation.describe", "result", &actual)
+            {
+                invalid.push(format!("{reference}: {error}"));
+            }
             assert_eq!(actual["availability"], "unavailable");
         }
+        assert!(invalid.is_empty(), "{}", invalid.join("; "));
         assert!(describe("unknown@1", &Value::Null).unwrap().is_none());
     }
 }

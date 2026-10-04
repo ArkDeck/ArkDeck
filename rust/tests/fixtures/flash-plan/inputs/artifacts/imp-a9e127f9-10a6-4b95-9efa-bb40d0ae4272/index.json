@@ -1,0 +1,34 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-9c83302e5ffe569b64b0fcaf5ca1f5da",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetID" : "TGT-83405c84ff74"
+      },
+      "byteCount" : 903,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "imp-a9e127f9-10a6-4b95-9efa-bb40d0ae4272",
+      "mediaType" : "application\/gzip",
+      "name" : "images.tar.gz",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "import-imp-a9e127f9-10a6-4b95-9efa-bb40d0ae4272",
+      "sha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "sourceOperation" : "artifact.import-flash-bundle",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-flash-bundle"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

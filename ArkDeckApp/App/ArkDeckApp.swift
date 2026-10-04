@@ -127,7 +127,8 @@ private final class ArkDeckAppModelStore {
   @ObservationIgnored lazy var deviceRecording = DeviceRecordingViewModel(
     provider: DeviceRecordingFixture.provider() ?? DeviceControlFacade.make())
   @ObservationIgnored lazy var diagnosticsWorkspace = DiagnosticsWorkspaceViewModel(
-    provider: RuntimeJobDetailApplicationFacade.make())
+    provider: RuntimeJobDetailApplicationFacade.make(),
+    captureProvider: DiagnosticCaptureUIFixture.provider() ?? DiagnosticCaptureFacade.make())
 
   init() {
     AppStartupPerformance.beginStartup()

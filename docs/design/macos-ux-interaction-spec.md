@@ -23,7 +23,7 @@
 | Trace | 两段式采集/查看入口；已验证 raw `trace.htrace` 打开独立原生 Viewer；时长单位转换与校验 | 原型不应在 unavailable 时启用开始，也不能把非法输入静默改成 10 |
 | Trace Viewer | 最近文件、筛选、搜索、Timeline、事件/范围/标注、两种停靠、加载/取消/错误与帮助；App 普通文案中英双语；通用稿已有 loaded 样本和锁定目录的 19 条快捷键 | 原始字段、进程名和许可证正文不翻译；合成 loaded 图不构成真实 trace/设备验收 |
 | Device | 按需截图、一次 typed 点击/长按/滑动、旧图拒绝输入、2–300 帧有界采集与本机 .mov 合成/校验、实测帧率/缺帧/配额状态 | 无持续预览、键盘输入、设备端编码与按秒启停录屏 |
-| Diagnostics | History 精确来源 → Session reader → index/summary/markers 校验 → timeline/缺口/Artifact；显式读取文本/JSON；已发布 Trace 可转入独立 Viewer | 交互式 arm/append-marker/stop、会话内视频与时钟校准未接通。published bounded ringBuffered 与部分自动 Marker 已存在，不能误报为全缺失；无校准/事件时间时明确无法对齐/未记录时刻 |
+| Diagnostics | 精确 History Session reader、显式读取文本/JSON、Trace Viewer；CHG-2026-079 接通有界 Start/Mark/Stop 和 Runtime 状态，完成后打开同一 Job 的 Session | 新 operation 待维护者 review 并发布 protected main；会话内截图/视频与时钟校准仍未接通。HiLog 为结束后的回顾性采集；无校准/事件时间时明确无法对齐/未记录时刻 |
 | History | 八类筛选、保存/分页、证据、参数、导出与精确来源上下文；Diagnostics 历史 Session 已加载并保留来源 | 不重放；未知 operation 不猜类型；Flash 来源目标已消失时显示缺失，不静默换设备 |
 | Settings | 独立七标签：General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics；Trace 内 Cache / Licenses | 不再内嵌完整更新设置；当前 App 诊断包不提供 device raw 勾选，敏感 Artifact 从 History 单独导出 |
 | Job Inspector / recovery | job.list/status/evidence/artifact.list 精确详情；标准 published 日志显式读取（最多 2 MiB，末 200 行）；已知活动 Job 取消请求先核对 fresh identity | 取消请求不代表终态；敏感产物走 History。unknown 不取消/重放；恢复 rebind/archive 未有 App RPC 接线，仍保留为缺口，不删 accepted spec |
@@ -189,8 +189,11 @@ resolution 不是 App 现有动作。Runtime 已发布且准入的恢复能力�
 
 ### 5.5 Diagnostics
 
-**当前 UI**：已经存在 `DiagnosticsWorkspaceView`，默认显示未打开 Session；布防和打标记禁用，
-显示 `diagnostic_session_capture_not_connected` 与缺失交互式采集接口的说明。
+**当前 UI**：`DiagnosticsWorkspaceView` 提供有界 Trace 会话的开始、主机时间标记和停止保存（CHG-2026-079）。
+开始时先检查精确绑定、支持情况和存储预算；只有 Runtime 确认唯一 ring anchor 后才启用标记。
+默认 60 秒、最多 50 个标记；可选 30 / 120 秒。准备阶段可取消，停止保存与取消语义不同；
+断连不取消 Runtime 时限，丢失回包仅刷新原 Job，不重发。旧 Runtime 显示能力不可用；新 operation 待维护者 review 与发布。
+HiLog 在录制后读取；标记没有截图或设备时间映射。
 保存会话的 reader 已接通：History 传递精确来源，重新查询并校验 index / summary / markers
 的身份、byteCount、SHA-256 与 completeness 后才 `publish(reading:)`。可查看 partial、无时间的
 Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace 可转交 Viewer。不会推算截图时刻，

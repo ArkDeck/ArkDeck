@@ -1,0 +1,237 @@
+{
+  "documents": {
+    "artifact-index.json": "{\n  \"artifacts\" : {\n    \"hilog.txt\" : {\n      \"artifactId\" : \"ART-e43bcfe5613a0cfc123b00871278064c\",\n      \"byteCount\" : 28,\n      \"required\" : false,\n      \"sha256\" : \"8e58ed7ea64151a3b7a907ed6871307a9641e037c4fb72409aaf1b434a41b182\",\n      \"status\" : \"published\"\n    },\n    \"trace.htrace\" : {\n      \"artifactId\" : \"ART-90fd3931d2302850493fd9330e9de65b\",\n      \"byteCount\" : 120,\n      \"required\" : true,\n      \"sha256\" : \"1b3b0eb98f2701637b9d10df941dd041f0b6e38432ff77ffce2e8208708d3b21\",\n      \"status\" : \"published\"\n    }\n  },\n  \"jobId\" : \"job-859b86ab3981a6c5194e9a6c77ac9667\",\n  \"operation\" : \"capture.diagnostic-session@1\",\n  \"trace\" : {\n    \"adapterFamily\" : \"hitrace.dayu200-oh7.text\",\n    \"durationSeconds\" : 3,\n    \"parameters\" : [\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.syntax.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.layout.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"missing\"\n        },\n        \"before\" : {\n          \"state\" : \"missing\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.build.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.measure.debug.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"missing\"\n        },\n        \"before\" : {\n          \"state\" : \"missing\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.sync.debug.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"0\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"0\"\n        },\n        \"desired\" : \"1\",\n        \"name\" : \"persist.ace.debug.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.performance.monitor.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"desired\" : \"1\",\n        \"name\" : \"persist.sys.graphic.openDebugTrace\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"desired\" : \"1\",\n        \"name\" : \"persist.rosen.animationtrace.enabled\",\n        \"restored\" : null\n      }\n    ],\n    \"rawArtifactId\" : \"ART-90fd3931d2302850493fd9330e9de65b\",\n    \"rawByteCount\" : 120,\n    \"rawSha256\" : \"1b3b0eb98f2701637b9d10df941dd041f0b6e38432ff77ffce2e8208708d3b21\",\n    \"tags\" : [\n      \"ohos\"\n    ],\n    \"toolIdentity\" : \"hitrace\"\n  }\n}",
+    "capture-summary.json": "{\n  \"artifacts\" : {\n    \"hilog.txt\" : {\n      \"artifactId\" : \"ART-e43bcfe5613a0cfc123b00871278064c\",\n      \"byteCount\" : 28,\n      \"required\" : false,\n      \"sha256\" : \"8e58ed7ea64151a3b7a907ed6871307a9641e037c4fb72409aaf1b434a41b182\",\n      \"status\" : \"published\"\n    },\n    \"trace.htrace\" : {\n      \"artifactId\" : \"ART-90fd3931d2302850493fd9330e9de65b\",\n      \"byteCount\" : 120,\n      \"required\" : true,\n      \"sha256\" : \"1b3b0eb98f2701637b9d10df941dd041f0b6e38432ff77ffce2e8208708d3b21\",\n      \"status\" : \"published\"\n    }\n  },\n  \"completeness\" : \"complete\",\n  \"jobId\" : \"job-859b86ab3981a6c5194e9a6c77ac9667\",\n  \"missingRequired\" : [\n\n  ],\n  \"operation\" : \"capture.diagnostic-session@1\",\n  \"trace\" : {\n    \"adapterFamily\" : \"hitrace.dayu200-oh7.text\",\n    \"durationSeconds\" : 3,\n    \"parameters\" : [\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.syntax.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.layout.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"missing\"\n        },\n        \"before\" : {\n          \"state\" : \"missing\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.build.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.measure.debug.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"missing\"\n        },\n        \"before\" : {\n          \"state\" : \"missing\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.trace.sync.debug.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"0\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"0\"\n        },\n        \"desired\" : \"1\",\n        \"name\" : \"persist.ace.debug.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"true\"\n        },\n        \"desired\" : \"true\",\n        \"name\" : \"persist.ace.performance.monitor.enabled\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"1\"\n        },\n        \"desired\" : \"1\",\n        \"name\" : \"persist.sys.graphic.openDebugTrace\",\n        \"restored\" : null\n      },\n      {\n        \"after\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"before\" : {\n          \"state\" : \"value\",\n          \"value\" : \"false\"\n        },\n        \"desired\" : \"1\",\n        \"name\" : \"persist.rosen.animationtrace.enabled\",\n        \"restored\" : null\n      }\n    ],\n    \"rawArtifactId\" : \"ART-90fd3931d2302850493fd9330e9de65b\",\n    \"rawByteCount\" : 120,\n    \"rawSha256\" : \"1b3b0eb98f2701637b9d10df941dd041f0b6e38432ff77ffce2e8208708d3b21\",\n    \"tags\" : [\n      \"ohos\"\n    ],\n    \"toolIdentity\" : \"hitrace\"\n  }\n}",
+    "diagnostic-session.json": "{\n  \"alignment\" : \"cannotAlign\",\n  \"armedAtHostUTC\" : \"2026-10-04T04:17:52.281Z\",\n  \"bindingRevision\" : 1,\n  \"documentType\" : \"arkdeck-diagnostic-session\",\n  \"elapsedMs\" : 22,\n  \"endedAtHostUTC\" : \"2026-10-04T04:17:52.303Z\",\n  \"hilogCoverage\" : \"retrospectiveDrainOnly\",\n  \"jobId\" : \"job-859b86ab3981a6c5194e9a6c77ac9667\",\n  \"markerScreenshots\" : \"notCaptured\",\n  \"markers\" : [\n    {\n      \"atHostUTC\" : \"2026-10-04T04:17:52.290Z\",\n      \"markerId\" : \"problem-observed\",\n      \"offsetMs\" : 9\n    }\n  ],\n  \"maximumMarkers\" : 2,\n  \"maximumSeconds\" : 3,\n  \"operationReference\" : \"capture.diagnostic-session@1\",\n  \"phase\" : \"finalizing\",\n  \"schemaVersion\" : \"1.0.0\",\n  \"stopRequested\" : true,\n  \"targetId\" : \"TGT-3ba3f5f43b92\",\n  \"traceReadiness\" : \"verifiedUniqueRingAnchor\"\n}",
+    "markers.json": "{\n  \"coverage\" : {\n    \"anchor\" : \"ARKDECKANCHOR1a6c5194e9a6c77ac9667capturesessiontrace\",\n    \"checkAgainst\" : \"trace.htrace\",\n    \"how\" : \"the anchor marks where this snapshot reaches back to; finding it in the trace is a string search, no decoder needed\",\n    \"ringHeldAnchor\" : true,\n    \"traceStatus\" : \"published\",\n    \"writtenIntoTheDeviceRingAt\" : \"capture-session-trace\"\n  },\n  \"documentType\" : \"arkdeck-diagnostic-markers\",\n  \"jobId\" : \"job-859b86ab3981a6c5194e9a6c77ac9667\",\n  \"markers\" : [\n    {\n      \"atHostUTC\" : \"2026-10-04T04:17:52.290Z\",\n      \"kind\" : \"manual\",\n      \"markerId\" : \"problem-observed\",\n      \"offsetFromReadyMs\" : 9\n    }\n  ],\n  \"notDerived\" : [\n    {\n      \"kind\" : \"frameDeadline\",\n      \"reason\" : \"deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes\"\n    },\n    {\n      \"kind\" : \"logKeyword\",\n      \"reason\" : \"deriving it means reading the captured log, which finalization does not open\"\n    }\n  ],\n  \"schemaVersion\" : \"1.0.0\"\n}"
+  },
+  "fixtureOnly": true,
+  "inventory": [
+    {
+      "artifactDigest": "203e9155b01dc2209c6c092c92134d6f06afed8b2a7a8dd827548f114805f205",
+      "artifactId": "ART-28e13dd72064d00080e98693d6518177",
+      "binding": {
+        "bindingRevision": 1,
+        "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetId": "TGT-3ba3f5f43b92"
+      },
+      "byteCount": 773,
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "lease": "lease-v1:job-859b86ab3981a6c5194e9a6c77ac9667:ART-28e13dd72064d00080e98693d6518177",
+      "mediaType": "application/json",
+      "name": "diagnostic-session.json",
+      "observationWindow": null,
+      "owner": {
+        "id": "job-859b86ab3981a6c5194e9a6c77ac9667",
+        "kind": "job"
+      },
+      "privacy": "standard",
+      "providerId": "hdc",
+      "redactionApplied": false,
+      "retention": {
+        "class": "default",
+        "deadlineUtc": "2026-09-21T00:00:00Z",
+        "pinned": false
+      },
+      "schemaVersion": "arkdeck.artifact/1",
+      "sourceOperation": "capture.diagnostic-session@1",
+      "status": "published"
+    },
+    {
+      "artifactDigest": "f04b58c09a05af7f0165dd9b4607b9648cbbb6b636893df853ff5f5b15ebb12d",
+      "artifactId": "ART-3a03d99df19819e11cefe957280eccf4",
+      "binding": {
+        "bindingRevision": 1,
+        "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetId": "TGT-3ba3f5f43b92"
+      },
+      "byteCount": 3574,
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "lease": "lease-v1:job-859b86ab3981a6c5194e9a6c77ac9667:ART-3a03d99df19819e11cefe957280eccf4",
+      "mediaType": "application/json",
+      "name": "artifact-index.json",
+      "observationWindow": null,
+      "owner": {
+        "id": "job-859b86ab3981a6c5194e9a6c77ac9667",
+        "kind": "job"
+      },
+      "privacy": "standard",
+      "providerId": "hdc",
+      "redactionApplied": false,
+      "retention": {
+        "class": "default",
+        "deadlineUtc": "2026-09-21T00:00:00Z",
+        "pinned": false
+      },
+      "schemaVersion": "arkdeck.artifact/1",
+      "sourceOperation": "capture.diagnostic-session@1",
+      "status": "published"
+    },
+    {
+      "artifactDigest": "56c54cb8ab27ec0d760cffb853350ccfcc6f90591cd193f36cae26a72c165eeb",
+      "artifactId": "ART-539f2e862ffc9ccfc0a29e88a2844b74",
+      "binding": {
+        "bindingRevision": 1,
+        "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetId": "TGT-3ba3f5f43b92"
+      },
+      "byteCount": 1020,
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "lease": "lease-v1:job-859b86ab3981a6c5194e9a6c77ac9667:ART-539f2e862ffc9ccfc0a29e88a2844b74",
+      "mediaType": "application/json",
+      "name": "markers.json",
+      "observationWindow": null,
+      "owner": {
+        "id": "job-859b86ab3981a6c5194e9a6c77ac9667",
+        "kind": "job"
+      },
+      "privacy": "standard",
+      "providerId": "hdc",
+      "redactionApplied": false,
+      "retention": {
+        "class": "default",
+        "deadlineUtc": "2026-09-21T00:00:00Z",
+        "pinned": false
+      },
+      "schemaVersion": "arkdeck.artifact/1",
+      "sourceOperation": "capture.diagnostic-session@1",
+      "status": "published"
+    },
+    {
+      "artifactDigest": "1b3b0eb98f2701637b9d10df941dd041f0b6e38432ff77ffce2e8208708d3b21",
+      "artifactId": "ART-90fd3931d2302850493fd9330e9de65b",
+      "binding": {
+        "bindingRevision": 1,
+        "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetId": "TGT-3ba3f5f43b92"
+      },
+      "byteCount": 120,
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "lease": "lease-v1:job-859b86ab3981a6c5194e9a6c77ac9667:ART-90fd3931d2302850493fd9330e9de65b",
+      "mediaType": "application/octet-stream",
+      "name": "trace.htrace",
+      "observationWindow": {
+        "endUtc": "2026-09-14T00:00:00.000Z",
+        "startUtc": "2026-09-14T00:00:00.000Z"
+      },
+      "owner": {
+        "id": "job-859b86ab3981a6c5194e9a6c77ac9667",
+        "kind": "job"
+      },
+      "privacy": "sensitive",
+      "providerId": "hdc",
+      "redactionApplied": false,
+      "retention": {
+        "class": "default",
+        "deadlineUtc": "2026-09-21T00:00:00Z",
+        "pinned": false
+      },
+      "schemaVersion": "arkdeck.artifact/1",
+      "sourceOperation": "capture.diagnostic-session@1",
+      "status": "published"
+    },
+    {
+      "artifactDigest": "4ac25f226bf0b872f9bc2def10e29d8a55b1fc744f42fa6eca3344c9d1619b2c",
+      "artifactId": "ART-c20c26ca7731ea46386c8b333c796e4c",
+      "binding": {
+        "bindingRevision": 1,
+        "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetId": "TGT-3ba3f5f43b92"
+      },
+      "byteCount": 1260,
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "lease": "lease-v1:job-859b86ab3981a6c5194e9a6c77ac9667:ART-c20c26ca7731ea46386c8b333c796e4c",
+      "mediaType": "text/plain",
+      "name": "capture.log",
+      "observationWindow": null,
+      "owner": {
+        "id": "job-859b86ab3981a6c5194e9a6c77ac9667",
+        "kind": "job"
+      },
+      "privacy": "standard",
+      "providerId": "hdc",
+      "redactionApplied": false,
+      "retention": {
+        "class": "default",
+        "deadlineUtc": "2026-09-21T00:00:00Z",
+        "pinned": false
+      },
+      "schemaVersion": "arkdeck.artifact/1",
+      "sourceOperation": "capture.diagnostic-session@1",
+      "status": "published"
+    },
+    {
+      "artifactDigest": "e3fab175bba895386e6898f14c0768d468ae7b726b15284ca6864439e3e8ee4b",
+      "artifactId": "ART-da6508fb8b1084d9427559e8121115b1",
+      "binding": {
+        "bindingRevision": 1,
+        "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetId": "TGT-3ba3f5f43b92"
+      },
+      "byteCount": 3635,
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "lease": "lease-v1:job-859b86ab3981a6c5194e9a6c77ac9667:ART-da6508fb8b1084d9427559e8121115b1",
+      "mediaType": "application/json",
+      "name": "capture-summary.json",
+      "observationWindow": null,
+      "owner": {
+        "id": "job-859b86ab3981a6c5194e9a6c77ac9667",
+        "kind": "job"
+      },
+      "privacy": "standard",
+      "providerId": "hdc",
+      "redactionApplied": false,
+      "retention": {
+        "class": "default",
+        "deadlineUtc": "2026-09-21T00:00:00Z",
+        "pinned": false
+      },
+      "schemaVersion": "arkdeck.artifact/1",
+      "sourceOperation": "capture.diagnostic-session@1",
+      "status": "published"
+    },
+    {
+      "artifactDigest": "8e58ed7ea64151a3b7a907ed6871307a9641e037c4fb72409aaf1b434a41b182",
+      "artifactId": "ART-e43bcfe5613a0cfc123b00871278064c",
+      "binding": {
+        "bindingRevision": 1,
+        "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetId": "TGT-3ba3f5f43b92"
+      },
+      "byteCount": 28,
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "lease": "lease-v1:job-859b86ab3981a6c5194e9a6c77ac9667:ART-e43bcfe5613a0cfc123b00871278064c",
+      "mediaType": "text/plain",
+      "name": "hilog.txt",
+      "observationWindow": {
+        "endUtc": "2026-09-14T00:00:00.000Z",
+        "startUtc": "2026-09-14T00:00:00.000Z"
+      },
+      "owner": {
+        "id": "job-859b86ab3981a6c5194e9a6c77ac9667",
+        "kind": "job"
+      },
+      "privacy": "sensitive",
+      "providerId": "hdc",
+      "redactionApplied": false,
+      "retention": {
+        "class": "default",
+        "deadlineUtc": "2026-09-21T00:00:00Z",
+        "pinned": false
+      },
+      "schemaVersion": "arkdeck.artifact/1",
+      "sourceOperation": "capture.diagnostic-session@1",
+      "status": "published"
+    }
+  ],
+  "jobId": "job-859b86ab3981a6c5194e9a6c77ac9667",
+  "operationReference": "capture.diagnostic-session@1",
+  "producer": "capture_diagnostics::diagnostic_session_publishes_host_marks_and_stops_after_an_unknown_anchor",
+  "typedParameters": {
+    "durationSeconds": 3,
+    "maximumMarkers": 2,
+    "traceCategories": [
+      "ohos"
+    ]
+  }
+}

@@ -268,7 +268,9 @@ fn materialize_step(
                 })
                 .collect();
         }
-        FilePlan::Receive { .. } => return Err(internal_failure()),
+        FilePlan::Receive { .. } | FilePlan::DiagnosticTrace { .. } => {
+            return Err(internal_failure());
+        }
     }
     Ok(document)
 }

@@ -21,7 +21,7 @@ pub struct OperationAvailabilityContext<'a> {
 
 /// The executable operations that mutate a device: each consumes a Runtime
 /// capability use first, so none is available without the mutation owner.
-const MUTATIONS: [&str; 8] = [
+const MUTATIONS: [&str; 9] = [
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
@@ -29,6 +29,7 @@ const MUTATIONS: [&str; 8] = [
     "port-forward.remove@1",
     "debug.hap@1",
     "capture.screen-sequence@1",
+    "capture.diagnostic-session@1",
     "deploy.native-library.app-owned@1",
 ];
 
@@ -211,6 +212,7 @@ mod tests {
             "port-forward.remove@1",
             "debug.hap@1",
             "capture.screen-sequence@1",
+            "capture.diagnostic-session@1",
             "deploy.native-library.app-owned@1",
         ] {
             assert_eq!(

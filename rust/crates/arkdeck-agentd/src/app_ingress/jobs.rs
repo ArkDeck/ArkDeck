@@ -18,6 +18,7 @@ pub(crate) enum Kind {
     Screenshot,
     Recording,
     Input,
+    DiagnosticSession,
 }
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum Action {
@@ -72,6 +73,9 @@ fn kind(text: &str) -> Option<Kind> {
     }
     Some(match (client, operation) {
         ("ArkDeckApp.TraceWorkspace", "capture.diagnostics") => Kind::Trace,
+        ("ArkDeckApp.DiagnosticsWorkspace", "capture.diagnostic-session") => {
+            Kind::DiagnosticSession
+        }
         ("ArkDeckApp.DebugWorkspace.Logs", "capture.diagnostics") => Kind::Logs,
         ("ArkDeckApp.DebugWorkspace.Artifacts", "deploy.native-library.app-owned") => {
             Kind::NativeLibrary

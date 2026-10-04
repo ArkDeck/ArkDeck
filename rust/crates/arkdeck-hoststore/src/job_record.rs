@@ -448,30 +448,29 @@ impl JobRecord {
                 if !correlation["artifactSHA256"].as_str().is_some_and(digest) {
                     return Err(unreadable(()));
                 }
-                if self.catalog == arkdeck_contract::CATALOG_DIGEST {
-                    let descriptor =
-                        crate::operation_catalog::CatalogOperation::lookup("debug.hap", Some(1))
-                            .ok_or_else(|| unreadable(()))?;
-                    let inputs = self.request["inputs"]
-                        .as_object()
+                // debug.hap@1 retains its step contract across Catalog additions.
+                let descriptor =
+                    crate::operation_catalog::CatalogOperation::lookup("debug.hap", Some(1))
                         .ok_or_else(|| unreadable(()))?;
-                    let expected = crate::job_step_digest::step_set_digest(descriptor, inputs)
-                        .ok_or_else(|| unreadable(()))?;
-                    // Swift #1773 added compensation lines without changing
-                    // the Catalog digest. Earlier terminal records retain the
-                    // exact normal-step digest. Reading one grants no replay
-                    // or compensation authority; uncertain/active records
-                    // still require the complete current digest.
-                    if correlation["stepSetDigestSHA256"] != expected
-                        && !(terminal(&self.state)
-                            && !self.unknown
-                            && correlation["stepSetDigestSHA256"]
-                                == crate::job_step_digest::historical_hap_step_set_digest(
-                                    descriptor, inputs,
-                                ))
-                    {
-                        return Err(unreadable(()));
-                    }
+                let inputs = self.request["inputs"]
+                    .as_object()
+                    .ok_or_else(|| unreadable(()))?;
+                let expected = crate::job_step_digest::step_set_digest(descriptor, inputs)
+                    .ok_or_else(|| unreadable(()))?;
+                // Swift #1773 added compensation lines without changing
+                // the Catalog digest. Earlier terminal records retain the
+                // exact normal-step digest. Reading one grants no replay
+                // or compensation authority; uncertain/active records
+                // still require the complete current digest.
+                if correlation["stepSetDigestSHA256"] != expected
+                    && !(terminal(&self.state)
+                        && !self.unknown
+                        && correlation["stepSetDigestSHA256"]
+                            == crate::job_step_digest::historical_hap_step_set_digest(
+                                descriptor, inputs,
+                            ))
+                {
+                    return Err(unreadable(()));
                 }
             }
             if evidence["reference"] != self.request["authorization"]["capabilityId"]
@@ -973,7 +972,9 @@ impl JobRecord {
             }
             "observe.device" | "observe.devices" => Some("viewer"),
             "analyzer.analyze-trace" | "analyzer.summarize-trace" => Some("trace"),
-            "analyzer.extract-crash-signature" | "analyzer.summarize-hilog" => Some("diagnostics"),
+            "analyzer.extract-crash-signature"
+            | "analyzer.summarize-hilog"
+            | "capture.diagnostic-session" => Some("diagnostics"),
             "capture.diagnostics" => {
                 let inputs = &self.request["inputs"];
                 let yes = |k: &str| inputs[k] == true;
@@ -1074,8 +1075,10 @@ mod hap_provenance_tests {
     #[test]
     fn terminal_hap_before_compensation_digest_can_be_read_without_upgrading_it() {
         let mut record: Value = serde_json::from_slice(include_bytes!(
-            "../../../tests/fixtures/debug-hap/store/jobs/job-e79d1b4e261f4a13d0bfb58a97fbf163/job-record.json"
-        )).unwrap();
+            "../../../tests/fixtures/historical-hap-provenance/job-record.json"
+        ))
+        .unwrap();
+        assert_ne!(record["catalogDigest"], arkdeck_contract::CATALOG_DIGEST);
         // The exact fourteen normal steps in the pre-#1773 Swift producer.
         // Independently matched to the 2026-09-07 historical failed HAP Job;
         // use the existing fake-HDC fixture, never copy local authority data.
@@ -1147,9 +1150,8 @@ mod hap_provenance_tests {
 
     #[test]
     fn reopening_native_hap_rejects_missing_artifact_and_changed_step_correlation() {
-        let bytes = include_bytes!(
-            "../../../tests/fixtures/debug-hap/store/jobs/job-e79d1b4e261f4a13d0bfb58a97fbf163/job-record.json"
-        );
+        let bytes =
+            include_bytes!("../../../tests/fixtures/historical-hap-provenance/job-record.json");
         JobRecord::decode(bytes).expect("native Swift HAP record");
         let original: Value = serde_json::from_slice(bytes).unwrap();
         for field in [

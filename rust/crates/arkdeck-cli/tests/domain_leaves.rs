@@ -13,7 +13,7 @@
 //! Swift's code, words and details, or the plain diagnostic and exit status.
 #![cfg(target_os = "macos")]
 
-use arkdeck_contract::{CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
+use arkdeck_contract::{CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
 use serde_json::{Map, Value, json};
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
@@ -147,9 +147,15 @@ fn clocked(actual: &Value, expected: &Value) -> Value {
 }
 
 fn health() -> Value {
+    // The fake peer belongs to this historical recording, including its
+    // Catalog identity. Only the wire handshake uses the compiled contract.
+    let provenance: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/domain-executor/provenance.json"
+    ))
+    .unwrap();
     json!({"status": "ok", "protocolVersion": PROTOCOL_VERSION,
         "contractIdentity": CONTRACT_IDENTITY, "publishedMethods": METHODS,
-        "catalogDigest": CATALOG_DIGEST, "providers": []})
+        "catalogDigest": provenance["catalogDigest"], "providers": []})
 }
 
 /// What the fake Runtime saw: every frame, labelled, and its connections.
@@ -895,11 +901,26 @@ fn replay_resume(scenario: &Value) -> Result<(), String> {
 
     // The resume.
     let exited = Arc::new(AtomicBool::new(false));
+    let mut resume_health = scenario["resumeHealth"].clone();
+    // These domain fixtures predate later wire methods. Keep their business
+    // facts (especially the intentional changed-Catalog case) exact, while
+    // negotiating the current wire contract just like the pause peer does.
+    assert_eq!(resume_health["protocolVersion"], PROTOCOL_VERSION);
+    assert_eq!(
+        resume_health["contractIdentity"],
+        "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633"
+    );
+    assert_eq!(
+        resume_health["publishedMethods"].as_array().unwrap().len(),
+        105
+    );
+    resume_health["contractIdentity"] = json!(CONTRACT_IDENTITY);
+    resume_health["publishedMethods"] = json!(METHODS);
     let server = serve_answering(
         &socket,
         scenario["resumeScript"].as_array().unwrap().clone(),
         exited.clone(),
-        scenario["resumeHealth"].clone(),
+        resume_health,
     );
     let mut command = Command::new(env!("CARGO_BIN_EXE_arkdeck"));
     command.args(["agent", "resume", "--resume-token", &token]);

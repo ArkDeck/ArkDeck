@@ -1,7 +1,7 @@
 {
   "artifacts" : [
     {
-      "artifactID" : "ART-4114418d0bbb3edc01792000d2d68055",
+      "artifactID" : "ART-0eba73708e99312b1d6657f5fa33e3e1",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -25,7 +25,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-68b3be1c1b8ed4cadb4f985ba34a145e",
-      "sha256" : "88052a3d8135fa3e9ab275e01730516ebca43fef528bf8282b791102adcfc588",
+      "sha256" : "b63773f198972bbf9e15b41081c9557e5356f4c6f4818eceac830077843f7c60",
       "sourceOperation" : "observe.device@1",
       "status" : {
         "published" : {
@@ -35,7 +35,7 @@
       "stepID" : "probe-host-tool"
     },
     {
-      "artifactID" : "ART-4c58c3a82e480ba4bdd1055c1c239c1d",
+      "artifactID" : "ART-a77a38d8e56ce8a6cfd07651fa6a6e03",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -59,7 +59,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-68b3be1c1b8ed4cadb4f985ba34a145e",
-      "sha256" : "3c9e270f34d1d093571b75cc084f411612a9d62c4c5dccac5a6e098238f99264",
+      "sha256" : "63f7b4a578ddc16b006b3aacbebc4c9c3484c38c5a0a38c296a08433b47e84f8",
       "sourceOperation" : "observe.device@1",
       "status" : {
         "published" : {
@@ -69,7 +69,7 @@
       "stepID" : "read-evidence-firmware"
     },
     {
-      "artifactID" : "ART-376b0c9ce01a29bb2b4f20139423edd3",
+      "artifactID" : "ART-eba15b4ec45c7430b317fcbdd0044e61",
       "bindingSnapshot" : {
         "bindingRevision" : 1,
         "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
@@ -93,7 +93,7 @@
         "retentionClass" : "default"
       },
       "sessionID" : "session-job-68b3be1c1b8ed4cadb4f985ba34a145e",
-      "sha256" : "0d2ab188ad360d19f8899649a1a65eec17ebf8d72c7a515303f90767ec853970",
+      "sha256" : "05ecd727a3a011ae2996258bcd96f41771049bb87af3fa772242f6b0b1e72f36",
       "sourceOperation" : "observe.device@1",
       "status" : {
         "published" : {

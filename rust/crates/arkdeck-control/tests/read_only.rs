@@ -1,3 +1,4 @@
+mod support;
 use arkdeck_contract::*;
 use arkdeck_control::{Control, HdcStatus, HostServices};
 use serde_json::{Value, json};
@@ -72,12 +73,24 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
         );
         let actual = response.outcome.unwrap();
         if method == "doctor" {
-            assert_eq!(actual, recorded["result"]);
+            assert_eq!(actual, support::current_catalog_report(&recorded["result"]));
         } else {
             let actual = actual.as_array().unwrap();
             let expected = recorded["result"].as_array().unwrap();
-            assert_eq!(actual.len(), expected.len());
-            for (actual, expected) in actual.iter().zip(expected) {
+            assert_eq!(actual.len(), expected.len() + 1);
+            let session = actual
+                .iter()
+                .find(|row| row["reference"] == "capture.diagnostic-session@1")
+                .unwrap();
+            assert_eq!(session["minimumEffect"], "deviceMutation");
+            assert_eq!(session["binding"], "confirmedDevice");
+            assert_eq!(session["availability"], "unavailable");
+            assert_eq!(session["reasonCodes"], json!(["provider_not_registered"]));
+            for expected in expected {
+                let actual = actual
+                    .iter()
+                    .find(|row| row["reference"] == expected["reference"])
+                    .unwrap();
                 // The Swift recording has an HDC provider. Compare shared
                 // descriptors exactly, and only compare availability where
                 // both hosts lack the operation provider.
@@ -1897,3 +1910,21 @@ const DEVECO_ROOTS: [&str; 3] = [
 const SOURCE_FILE: &str = "/Source.app";
 #[cfg(windows)]
 const SOURCE_FILE: &str = r"C:\Source.app";
+
+#[test]
+fn current_health_frame_is_published_and_can_be_recorded() {
+    let (control, reads) = setup();
+    let response = call(&control, "health", Value::Null);
+    validate_health(&response).unwrap();
+    if let Some(directory) = std::env::var_os("ARKDECK_CATALOG_CONTRACT_RECORD") {
+        std::fs::create_dir_all(&directory).unwrap();
+        let frame = json!({"method":"health", "protocolVersion":"1.0.0", "params":{},
+            "ok":true, "result":response.outcome.unwrap()});
+        std::fs::write(
+            std::path::PathBuf::from(directory).join("health.jsonl"),
+            format!("{frame}\n"),
+        )
+        .unwrap();
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}

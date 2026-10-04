@@ -923,12 +923,11 @@ final class AppShellUITests: XCTestCase {
       XCTAssertTrue(element("diagnostics.session.empty", in: app).waitForExistenceFast(timeout: 10))
       XCTAssertFalse(app.staticTexts["diagnostics.workspace.title"].exists)
       XCTAssertTrue(app.staticTexts[diagnosticsEmptyTitle].exists)
-      // The fixture has an adopted device. That fact alone cannot turn a
-      // disconnected recorder into a running session or save host markers.
-      XCTAssertFalse(app.buttons["diagnostics.capture.arm"].isEnabled)
+      // Start may preflight the adopted target; Mark needs Runtime readiness.
+      XCTAssertTrue(app.buttons["diagnostics.capture.arm"].isEnabled)
       XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
-      XCTAssertTrue(element("diagnostics.capture.unavailable", in: app).exists)
-      XCTAssertTrue(app.staticTexts["diagnostic_session_capture_not_connected"].exists)
+      XCTAssertTrue(element("diagnostics.capture.boundary", in: app).exists)
+      XCTAssertFalse(app.buttons["diagnostics.capture.stop"].isEnabled)
       XCTAssertFalse(element("diagnostics.capture.markCount", in: app).exists)
 
       let diagnosticsScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
@@ -1703,6 +1702,30 @@ final class AppShellUITests: XCTestCase {
     XCTAssertTrue(panel.waitForNonExistenceFast(timeout: 10))
   }
 
+  func testDiagnosticsStartsMarksAndStopsExactSession() {
+    let app = launch(arguments: [
+      "--ui-test-runtime-history", "--ui-test-devices", "--ui-test-diagnostic-capture",
+      "-AppleLanguages", "(en)",
+    ])
+    select("app.navigation.diagnostics", in: app)
+    let start = app.buttons["diagnostics.capture.arm"]
+    XCTAssertTrue(start.waitForExistenceFast(timeout: 10))
+    XCTAssertTrue(start.isEnabled)
+    XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
+    start.click()
+    assertDisplayed(element("diagnostics.capture.state", in: app), equals: "Recording", timeout: 10)
+    XCTAssertFalse(start.isEnabled)
+    app.buttons["diagnostics.capture.mark"].click()
+    assertDisplayed(element("diagnostics.capture.markCount", in: app), equals: "Markers: 1 / 50")
+    app.buttons["diagnostics.capture.stop"].click()
+    assertDisplayed(element("diagnostics.capture.state", in: app), equals: "Session ended")
+    XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
+    XCTAssertFalse(app.buttons["diagnostics.capture.stop"].isEnabled)
+    assertDisplayed(element("diagnostics.capture.job", in: app), equals: "job-ui-diagnostic-capture")
+    assertDisplayed(element("diagnostics.alignment", in: app), equals: "Cannot align")
+    app.terminate()
+  }
+
   func testDiagnosticsReadsPublishedSessionAndGlobalLogWithoutInventingAlignment() throws {
     for (language, alignment, missingTime) in [
       ("(en)", "Cannot align", "Time not reported"),
@@ -1722,7 +1745,7 @@ final class AppShellUITests: XCTestCase {
       assertDisplayed(element("diagnostics.alignment", in: app), equals: alignment)
       assertDisplayed(element("diagnostics.mark.time.1", in: app), equals: missingTime)
       XCTAssertFalse(element("diagnostics.partial", in: app).exists, "an unselected trace channel is not a partial failure")
-      XCTAssertFalse(app.buttons["diagnostics.capture.arm"].isEnabled)
+      XCTAssertTrue(app.buttons["diagnostics.capture.arm"].isEnabled)
       XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
       XCTAssertFalse(element("diagnostics.preview.text", in: app).exists, "raw bytes must not be read on navigation")
       let sessionScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
@@ -1803,7 +1826,7 @@ final class AppShellUITests: XCTestCase {
         XCTAssertFalse(element("diagnostics.preview.text", in: app).exists,
           "returning to capture must not restore an earlier sensitive preview")
         XCTAssertTrue(app.buttons["diagnostics.artifact.read.hilog.txt"].exists)
-        XCTAssertFalse(app.buttons["diagnostics.capture.arm"].isEnabled)
+        XCTAssertTrue(app.buttons["diagnostics.capture.arm"].isEnabled)
         XCTAssertFalse(app.buttons["diagnostics.capture.mark"].isEnabled)
       }
       app.terminate()

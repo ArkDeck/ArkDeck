@@ -213,6 +213,56 @@ struct DiagnosticSessionOfflineInspectorContractTests {
         == DiagnosticSessionOfflineInspector.parserVersion)
   }
 
+  @Test func runtimeProducedInteractiveSessionReadsWithoutPhantomUIDumpAndPinsItsTrace() throws {
+    let path = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+      .appending(path: "../../../../rust/tests/fixtures/diagnostic-session/interactive.json").standardizedFileURL
+    let fixture = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: path)) as? [String: Any])
+    #expect(fixture["fixtureOnly"] as? Bool == true)
+    let rows = try #require(fixture["inventory"] as? [[String: Any]])
+    let inventory = try rows.map { row in
+      try DiagnosticOfflineArtifactMetadata(
+        artifactID: row["artifactId"] as! String, name: row["name"] as! String,
+        mediaType: row["mediaType"] as! String, privacy: row["privacy"] as! String,
+        status: row["status"] as! String, sourceOperation: row["sourceOperation"] as! String,
+        byteCount: row["byteCount"] as! Int, sha256: row["artifactDigest"] as? String)
+    }
+    let text = try #require(fixture["documents"] as? [String: String])
+    var documents: [String: DiagnosticOfflineArtifact] = [:]
+    for name in ["artifact-index.json", "capture-summary.json", "markers.json"] {
+      documents[name] = try DiagnosticOfflineArtifact(
+        metadata: #require(inventory.first { $0.name == name }), data: Data(try #require(text[name]).utf8))
+    }
+    let parameters = try JSONDecoder().decode([String: JSONValue].self,
+      from: JSONSerialization.data(withJSONObject: try #require(fixture["typedParameters"])))
+    let input = DiagnosticSessionOfflineInput(
+      jobID: fixture["jobId"] as! String, operationReference: DiagnosticCaptureFacade.operationReference,
+      typedParameters: parameters, inventory: inventory, documents: documents)
+    let inspection = try DiagnosticSessionOfflineInspector().inspect(input)
+    #expect(!inspection.reading.isPartial)
+    #expect(inspection.reading.missingProducts.isEmpty)
+    #expect(inspection.reading.marks.count == 1)
+    #expect(inspection.operationReference == DiagnosticCaptureFacade.operationReference)
+    let raw = try #require(inventory.first { $0.name == "trace.htrace" })
+    let trace = RuntimeArtifactPresentation(
+      id: raw.artifactID, name: raw.name, role: "raw", mediaType: raw.mediaType,
+      byteCount: Int64(raw.byteCount), sha256: try #require(raw.sha256), privacy: raw.privacy,
+      status: raw.status, statusDetail: nil, sourceOperation: raw.sourceOperation,
+      createdAtUTC: "2026-09-14T00:00:00Z", redactionApplied: false)
+    #expect(TracePublishedArtifactPolicy.selectRawTrace(
+      from: [trace], operationReference: input.operationReference) == trace)
+    #expect(TracePublishedArtifactPolicy.selectRawTrace(from: [trace]) == nil)
+    #expect(inspection.provenance.sources.allSatisfy { $0.sourceOperation == DiagnosticCaptureFacade.operationReference })
+    guard case .cannotAlign = inspection.reading.alignment else {
+      Issue.record("interactive host markers do not establish device clock alignment"); return
+    }
+    let crossOperation = DiagnosticSessionOfflineInput(
+      jobID: input.jobID, operationReference: "capture.diagnostics@1", typedParameters: parameters,
+      inventory: inventory, documents: documents)
+    #expect(throws: DiagnosticSessionOfflineInspectorError.invalid("diagnostics_ambiguous_artifact_inventory")) {
+      try DiagnosticSessionOfflineInspector().inspect(crossOperation)
+    }
+  }
+
   private func fixture() throws
     -> DiagnosticSessionOfflineInput
   {

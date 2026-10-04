@@ -1,0 +1,479 @@
+{
+  "scope": "Synthetic provider fixtures only; no hardware acceptance or usable Runtime authority.",
+  "sourceCommit": "2f75ae8e51b1f16bc293186683c2e592abd97e89",
+  "sourceChange": "Only Catalog/ and the generated RuntimeOperationCatalogGenerated.swift are overlaid from CHG-2026-079. All Swift Runtime implementation and producer assertions are unchanged.",
+  "catalogDigest": "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
+  "recordedOn": "2026-10-04",
+  "producerTestsPassed": 40,
+  "fixtures": [
+    {
+      "fixture": "agent-execution",
+      "filesRecorded": 76
+    },
+    {
+      "fixture": "agent-execution-analyzer",
+      "filesRecorded": 42
+    },
+    {
+      "fixture": "agent-human-action",
+      "filesRecorded": 44
+    },
+    {
+      "fixture": "agent-lifecycle",
+      "filesRecorded": 43
+    },
+    {
+      "fixture": "capture-diagnostics",
+      "filesRecorded": 75
+    },
+    {
+      "fixture": "capture-diagnostics-file-legs",
+      "filesRecorded": 166
+    },
+    {
+      "fixture": "capture-diagnostics-read-legs",
+      "filesRecorded": 194
+    },
+    {
+      "fixture": "capture-diagnostics-trace",
+      "filesRecorded": 248
+    },
+    {
+      "fixture": "crash-window",
+      "filesRecorded": 193
+    },
+    {
+      "fixture": "debug-hap",
+      "filesRecorded": 199
+    },
+    {
+      "fixture": "debug-invocation",
+      "filesRecorded": 16
+    },
+    {
+      "fixture": "deploy-native-library",
+      "filesRecorded": 43
+    },
+    {
+      "fixture": "device-mutation-reconcile",
+      "filesRecorded": 990
+    },
+    {
+      "fixture": "device-reconcile",
+      "filesRecorded": 187
+    },
+    {
+      "fixture": "flash-plan",
+      "filesRecorded": 17
+    },
+    {
+      "fixture": "flash-run",
+      "filesRecorded": 524
+    },
+    {
+      "fixture": "job-cancel-analyzer",
+      "filesRecorded": 95
+    },
+    {
+      "fixture": "job-cancel-running-analyzer",
+      "filesRecorded": 90
+    },
+    {
+      "fixture": "job-plan-analyzer",
+      "filesRecorded": 6
+    },
+    {
+      "fixture": "job-publication-analyzer",
+      "filesRecorded": 107
+    },
+    {
+      "fixture": "job-reconcile-analyzer",
+      "filesRecorded": 238
+    },
+    {
+      "fixture": "job-run-analyzer",
+      "filesRecorded": 74
+    },
+    {
+      "fixture": "job-run-hilog",
+      "filesRecorded": 53
+    },
+    {
+      "fixture": "job-run-trace-analysis",
+      "filesRecorded": 60
+    },
+    {
+      "fixture": "job-run-trace-summary",
+      "filesRecorded": 71
+    },
+    {
+      "fixture": "job-submit-analyzer",
+      "filesRecorded": 19
+    },
+    {
+      "fixture": "observe-device",
+      "filesRecorded": 75
+    },
+    {
+      "fixture": "pointer-input",
+      "filesRecorded": 51
+    },
+    {
+      "fixture": "port-forward",
+      "filesRecorded": 200
+    },
+    {
+      "fixture": "readback-reconcile",
+      "filesRecorded": 190
+    },
+    {
+      "fixture": "screen-sequence",
+      "filesRecorded": 46
+    },
+    {
+      "fixture": "workspace-build-oracle",
+      "filesRecorded": 7
+    },
+    {
+      "fixture": "workspace-checkpoint-oracle",
+      "filesRecorded": 18
+    },
+    {
+      "fixture": "workspace-isolation-oracle",
+      "filesRecorded": 2
+    },
+    {
+      "fixture": "workspace-patch-oracle",
+      "filesRecorded": 12
+    },
+    {
+      "fixture": "workspace-read-oracle",
+      "filesRecorded": 9
+    },
+    {
+      "fixture": "workspace-sign-oracle",
+      "filesRecorded": 15
+    },
+    {
+      "fixture": "workspace-test-symbolize-oracle",
+      "filesRecorded": 13
+    }
+  ],
+  "producers": [
+    {
+      "testClass": "AgentExecutionAnalyzerOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_AGENT_EXECUTION_ANALYZER_RECORD",
+          "fixture": "agent-execution-analyzer"
+        }
+      ]
+    },
+    {
+      "testClass": "AgentExecutionOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_AGENT_EXECUTION_RECORD",
+          "fixture": "agent-execution"
+        }
+      ]
+    },
+    {
+      "testClass": "AgentHumanActionOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_AGENT_HUMAN_ACTION_RECORD",
+          "fixture": "agent-human-action"
+        }
+      ]
+    },
+    {
+      "testClass": "AgentLifecycleOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_AGENT_LIFECYCLE_RECORD",
+          "fixture": "agent-lifecycle"
+        }
+      ]
+    },
+    {
+      "testClass": "CaptureDiagnosticsFileLegsOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_CAPTURE_FILE_LEGS_RECORD",
+          "fixture": "capture-diagnostics-file-legs"
+        }
+      ]
+    },
+    {
+      "testClass": "CaptureDiagnosticsOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_CAPTURE_DIAGNOSTICS_RECORD",
+          "fixture": "capture-diagnostics"
+        }
+      ]
+    },
+    {
+      "testClass": "CaptureDiagnosticsReadLegsOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_CAPTURE_READ_LEGS_RECORD",
+          "fixture": "capture-diagnostics-read-legs"
+        }
+      ]
+    },
+    {
+      "testClass": "CaptureDiagnosticsTraceOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_CAPTURE_TRACE_RECORD",
+          "fixture": "capture-diagnostics-trace"
+        }
+      ]
+    },
+    {
+      "testClass": "CrashWindowOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_CRASH_WINDOW_RECORD",
+          "fixture": "crash-window"
+        }
+      ]
+    },
+    {
+      "testClass": "DebugHapOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_DEBUG_HAP_RECORD",
+          "fixture": "debug-hap"
+        }
+      ]
+    },
+    {
+      "testClass": "DebugInvocationOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_DEBUG_INVOCATION_RECORD",
+          "fixture": "debug-invocation"
+        }
+      ]
+    },
+    {
+      "testClass": "DeviceMutationReconcileOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_DEVICE_MUTATION_RECONCILE_RECORD",
+          "fixture": "device-mutation-reconcile"
+        }
+      ]
+    },
+    {
+      "testClass": "DeviceReconcileOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_DEVICE_RECONCILE_RECORD",
+          "fixture": "device-reconcile"
+        }
+      ]
+    },
+    {
+      "testClass": "FlashPlanOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_FLASH_PLAN_RECORD",
+          "fixture": "flash-plan"
+        }
+      ]
+    },
+    {
+      "testClass": "FlashRunOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_FLASH_RUN_RECORD",
+          "fixture": "flash-run"
+        }
+      ]
+    },
+    {
+      "testClass": "JobPlanAnalyzerOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_JOB_PLAN_RECORD",
+          "fixture": "job-plan-analyzer"
+        }
+      ]
+    },
+    {
+      "testClass": "JobRunAnalyzerOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_JOB_RUN_RECORD",
+          "fixture": "job-run-analyzer"
+        },
+        {
+          "environment": "ARKDECK_RUST_JOB_RUN_HILOG_RECORD",
+          "fixture": "job-run-hilog"
+        },
+        {
+          "environment": "ARKDECK_RUST_JOB_RUN_TRACE_ANALYSIS_RECORD",
+          "fixture": "job-run-trace-analysis"
+        },
+        {
+          "environment": "ARKDECK_RUST_JOB_RUN_TRACE_SUMMARY_RECORD",
+          "fixture": "job-run-trace-summary"
+        },
+        {
+          "environment": "ARKDECK_RUST_JOB_CANCEL_RECORD",
+          "fixture": "job-cancel-analyzer"
+        },
+        {
+          "environment": "ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD",
+          "fixture": "job-cancel-running-analyzer"
+        },
+        {
+          "environment": "ARKDECK_RUST_JOB_PUBLICATION_RECORD",
+          "fixture": "job-publication-analyzer"
+        },
+        {
+          "environment": "ARKDECK_RUST_JOB_RECONCILE_RECORD",
+          "fixture": "job-reconcile-analyzer"
+        }
+      ]
+    },
+    {
+      "testClass": "JobSubmitAnalyzerOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_JOB_SUBMIT_RECORD",
+          "fixture": "job-submit-analyzer"
+        }
+      ]
+    },
+    {
+      "testClass": "NativeLibraryOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_NATIVE_LIBRARY_RECORD",
+          "fixture": "deploy-native-library"
+        }
+      ]
+    },
+    {
+      "testClass": "ObserveDeviceOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_OBSERVE_DEVICE_RECORD",
+          "fixture": "observe-device"
+        }
+      ]
+    },
+    {
+      "testClass": "PointerInputOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_POINTER_INPUT_RECORD",
+          "fixture": "pointer-input"
+        }
+      ]
+    },
+    {
+      "testClass": "PortForwardOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_PORT_FORWARD_RECORD",
+          "fixture": "port-forward"
+        }
+      ]
+    },
+    {
+      "testClass": "ReadbackReconcileOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_READBACK_RECONCILE_RECORD",
+          "fixture": "readback-reconcile"
+        }
+      ]
+    },
+    {
+      "testClass": "ScreenSequenceOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_SCREEN_SEQUENCE_RECORD",
+          "fixture": "screen-sequence"
+        }
+      ]
+    },
+    {
+      "testClass": "WorkspaceBuildOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_WORKSPACE_BUILD_RECORD",
+          "fixture": "workspace-build-oracle"
+        }
+      ]
+    },
+    {
+      "testClass": "WorkspaceCheckpointOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_WORKSPACE_CHECKPOINT_RECORD",
+          "fixture": "workspace-checkpoint-oracle"
+        }
+      ]
+    },
+    {
+      "testClass": "WorkspaceIsolationOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_WORKSPACE_ISOLATION_RECORD",
+          "fixture": "workspace-isolation-oracle"
+        }
+      ]
+    },
+    {
+      "testClass": "WorkspacePatchOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_WORKSPACE_PATCH_RECORD",
+          "fixture": "workspace-patch-oracle"
+        }
+      ]
+    },
+    {
+      "testClass": "WorkspaceReadOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_WORKSPACE_READ_RECORD",
+          "fixture": "workspace-read-oracle"
+        }
+      ]
+    },
+    {
+      "testClass": "WorkspaceSignOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_WORKSPACE_SIGN_RECORD",
+          "fixture": "workspace-sign-oracle"
+        }
+      ]
+    },
+    {
+      "testClass": "WorkspaceTestSymbolizeOracleContractTests",
+      "outputs": [
+        {
+          "environment": "ARKDECK_RUST_WORKSPACE_TEST_SYMBOLIZE_RECORD",
+          "fixture": "workspace-test-symbolize-oracle"
+        }
+      ]
+    }
+  ],
+  "corpusSelection": {
+    "job-plan-analyzer": "The four plan results come from the current recording; original recorded refusal cases remain unchanged, preserving the original Foundation diagnostic spelling. Selection is documented in its provenance.json."
+  },
+  "additionalFrameRecording": {
+    "test": "WorkspaceIsolationOracleContractTests/testTheControlPlanePreparesOneIsolatedCopyAsRecorded",
+    "environment": "ARKDECK_CONTROL_FRAME_LOG=<directory>",
+    "selection": "The four frames from this single test in execution order; the existing snapshot recorder records only tree.json and workspace.json."
+  }
+}

@@ -147,6 +147,7 @@ public struct DiagnosticSessionOfflineInspector: Sendable {
   public static let parserID = "arkdeck.diagnostics-session-parser"
   public static let parserVersion = "1.0.0"
   public static let operationReference = "capture.diagnostics@1"
+  public static let supportedOperations: Set<String> = [operationReference, "capture.diagnostic-session@1"]
   public static let indexArtifactName = "artifact-index.json"
   public static let summaryArtifactName = "capture-summary.json"
   public static let markersArtifactName = "markers.json"
@@ -161,7 +162,7 @@ public struct DiagnosticSessionOfflineInspector: Sendable {
   public func inspect(
     _ input: DiagnosticSessionOfflineInput
   ) throws -> DiagnosticSessionOfflineInspection {
-    guard input.operationReference == Self.operationReference,
+    guard Self.supportedOperations.contains(input.operationReference),
       !input.jobID.isEmpty, input.jobID.utf8.count <= 512
     else {
       throw DiagnosticSessionOfflineInspectorError.invalid(
@@ -236,7 +237,9 @@ public struct DiagnosticSessionOfflineInspector: Sendable {
 
     var missing: [DiagnosticSessionReading.MissingProduct] = []
     if let inputs = input.typedParameters {
-      var requested = try Self.requestedProducts(inputs)
+      var requested: Set<String> = input.operationReference == DiagnosticCaptureFacade.operationReference
+        ? ["hilog.txt", "trace.htrace", "markers.json", "diagnostic-session.json"]
+        : try Self.requestedProducts(inputs)
       if requested.contains("screenshot.png"),
         input.inventory.contains(where: {
           $0.name == "screenshot.jpeg" && $0.status == "published"
@@ -325,7 +328,7 @@ public struct DiagnosticSessionOfflineInspector: Sendable {
     contentAccessExplicit: Bool
   ) throws -> DiagnosticArtifactOfflinePreview {
     let metadata = artifact.metadata
-    guard metadata.sourceOperation == Self.operationReference,
+    guard Self.supportedOperations.contains(metadata.sourceOperation),
       metadata.mediaType == "text/plain" || metadata.mediaType == "application/json"
     else {
       throw DiagnosticSessionOfflineInspectorError.invalid(

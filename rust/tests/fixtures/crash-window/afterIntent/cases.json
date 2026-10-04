@@ -140,7 +140,7 @@
             "newDispatchCount" : 0,
             "phase" : "preAdmission"
           },
-          "message" : "automatic Runtime target lineage is blocked: lineageBlocked(\"target binding has unresolved capability CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1 use 1 outcome outcomeUnknown\")"
+          "message" : "automatic Runtime target lineage is blocked: lineageBlocked(\"target binding has unresolved capability CAP-RT-POLICY-8EDB3AE5C954574686A9F6611BCEF45B5C12E822-G1 use 1 outcome outcomeUnknown\")"
         },
         "ok" : false
       },
@@ -216,7 +216,7 @@
             "probeDevice",
             "runApprovedRemoteRead"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "events" : {
             "jobId" : "job-170e24af76bacc6d8185503ed380ebea",
             "method" : "job.events"
@@ -274,12 +274,12 @@
             "workspaceKind" : "toolkit"
           },
           "materializedBindingRevision" : 1,
-          "materializedPlanDigest" : "2ba2413414359eb134a297290725ac23f9f3391369cf8efab75a153f82f1e7da",
+          "materializedPlanDigest" : "7e7bbcc351ffb9c2d76ca8f61d39e4127ce4c2eae36335065eb3183e7ca53263",
           "materializedStableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
           "providerId" : "hdc",
           "request" : {
             "authorization" : {
-              "capabilityId" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1"
+              "capabilityId" : "CAP-RT-POLICY-8EDB3AE5C954574686A9F6611BCEF45B5C12E822-G1"
             },
             "documentType" : "runtime-operation-request",
             "idempotencyKey" : "idem-crash-tap",
@@ -394,11 +394,11 @@
           "authority" : {
             "admittedAtUtc" : "2026-09-14T00:00:00Z",
             "artifactDigest" : null,
-            "consumptionFingerprintSha256" : "8527e901bb74394aeaeefb5a3a41973da179ffa0d45f1ef3c4ac4ba549524fdb",
+            "consumptionFingerprintSha256" : "56371089a86a767d0fa989210faa3c6d4a4059d8a413d6068a20f03d484c31ee",
             "kind" : "runtimeCapability",
-            "planDigest" : "2ba2413414359eb134a297290725ac23f9f3391369cf8efab75a153f82f1e7da",
+            "planDigest" : "7e7bbcc351ffb9c2d76ca8f61d39e4127ce4c2eae36335065eb3183e7ca53263",
             "recoveryEpoch" : null,
-            "reference" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1",
+            "reference" : "CAP-RT-POLICY-8EDB3AE5C954574686A9F6611BCEF45B5C12E822-G1",
             "reservationId" : "idem-crash-tap",
             "stepSetDigest" : "0aadf1561d767bdee1be731218c20aa87853a63221e4fbddee56223e5c2869c7",
             "targetBindingDigest" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
@@ -409,7 +409,7 @@
           "blockers" : [
             "resultNotReady"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : null,
           "firstEvidenceStepAtUtc" : null,
@@ -479,7 +479,7 @@
         "ok" : true,
         "result" : [
           {
-            "capabilityId" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1",
+            "capabilityId" : "CAP-RT-POLICY-8EDB3AE5C954574686A9F6611BCEF45B5C12E822-G1",
             "consumptionCount" : 1,
             "effectCeiling" : "deviceMutation",
             "lineageAllowsNewExecution" : false,
@@ -500,7 +500,7 @@
         "ok" : true,
         "result" : {
           "capability" : {
-            "capabilityID" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1",
+            "capabilityID" : "CAP-RT-POLICY-8EDB3AE5C954574686A9F6611BCEF45B5C12E822-G1",
             "effectCeiling" : "deviceMutation",
             "exactBindingRevision" : 1,
             "exactInputs" : {
@@ -523,7 +523,7 @@
             "issuedAtUTC" : "2026-09-14T00:00:00Z",
             "issuer" : {
               "kind" : "runtimeDefaultPolicy",
-              "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:input.tap@1"
+              "reference" : "catalog:c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa:input.tap@1"
             },
             "maximumUses" : 2000,
             "operationScope" : [
@@ -548,21 +548,21 @@
               "consumedAtUTC" : "2026-09-14T00:00:00Z",
               "effect" : "deviceMutation",
               "jobID" : "job-170e24af76bacc6d8185503ed380ebea",
-              "materializedPlanDigest" : "2ba2413414359eb134a297290725ac23f9f3391369cf8efab75a153f82f1e7da",
+              "materializedPlanDigest" : "7e7bbcc351ffb9c2d76ca8f61d39e4127ce4c2eae36335065eb3183e7ca53263",
               "operationReference" : "input.tap@1",
               "ordinal" : 1,
               "outcomeHistory" : [
                 {
                   "jobID" : "job-170e24af76bacc6d8185503ed380ebea",
                   "outcome" : "outcomeUnknown",
-                  "previousRecordSHA256" : "b45884dd7e71fccf329bc45d1b165792696aa151ba9ad79d17827544e8401040",
-                  "recordSHA256" : "175385d5b6b316d97344a1d2dd4fcff10fde5147e541885672adc5a4f0e73543",
+                  "previousRecordSHA256" : "59bc76523b9cf09cad33363c3655d95498b1e2158965d7545a7d12c17ac54e1a",
+                  "recordSHA256" : "8204db7dcc24163416f54b86149e0f2882f364db31c23856ce84727971ce6a83",
                   "recordedAtUTC" : "2026-09-14T00:00:00Z",
                   "terminalState" : "waitingForRecovery"
                 }
               ],
-              "queryFingerprintSHA256" : "8527e901bb74394aeaeefb5a3a41973da179ffa0d45f1ef3c4ac4ba549524fdb",
-              "receiptSHA256" : "b45884dd7e71fccf329bc45d1b165792696aa151ba9ad79d17827544e8401040",
+              "queryFingerprintSHA256" : "56371089a86a767d0fa989210faa3c6d4a4059d8a413d6068a20f03d484c31ee",
+              "receiptSHA256" : "59bc76523b9cf09cad33363c3655d95498b1e2158965d7545a7d12c17ac54e1a",
               "remainingUsesAfter" : 1999,
               "reservationID" : "idem-crash-tap",
               "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
@@ -576,7 +576,7 @@
       "method" : "capability.inspect",
       "name" : "capabilities.inspect0",
       "params" : {
-        "capabilityId" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1"
+        "capabilityId" : "CAP-RT-POLICY-8EDB3AE5C954574686A9F6611BCEF45B5C12E822-G1"
       }
     }
   ],

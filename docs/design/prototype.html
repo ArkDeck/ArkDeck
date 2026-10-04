@@ -2837,7 +2837,7 @@ function pDiagnosticSession(){
     ${s.partialReasons.length?`<div class="diag-partial">${icon("warning",true)}<span><b>${lc("部分诊断数据不可用。","Some diagnostic data is unavailable.")}</b><ul>${s.partialReasons.map(r=>`<li>${esc(bi(r))}</li>`).join("")}</ul></span></div>`:""}
     <div class="diag-overview">${diagFramePaneHTML()}${diagContextPaneHTML()}</div>
     ${diagTimelineHTML()}
-    <div class="diag-boundary">${icon("warning",true)} <span><b>${lc("目标设计 · 演示数据。","Target design · demo data.")}</b> ${lc("默认示例即第一版默认形态：无持续录屏、Marker 截图按实际拍摄时刻标注；第二个示例演示显式录屏与断流缺口，第三个演示 Partial 与无法对齐。当前发布的","The default sample is the first version's default shape: no continuous recording, and marker screenshots labelled with the instant they were taken. The second sample shows explicit recording with a stall gap, the third shows Partial and an unalignable clock. The published")} <span class="mono">capture.diagnostics@1</span> ${lc("已有有界 ringBuffered 采集及部分自动 Marker。交互式 arm / append-marker / stop、会话内视频和跨时钟校准尚未接通；此概念稿不能作为已实现证明。","already provides bounded ringBuffered capture and some automatic markers. Interactive arm / append-marker / stop, in-session video and cross-clock calibration are not connected; this concept draft is not evidence that they are implemented.")}</span></div>
+    <div class="diag-boundary">${icon("warning",true)} <span><b>${lc("目标设计 · 演示数据。","Target design · demo data.")}</b> ${lc("默认示例即第一版默认形态：无持续录屏、Marker 截图按实际拍摄时刻标注；第二个示例演示显式录屏与断流缺口，第三个演示 Partial 与无法对齐。当前发布的","The default sample is the first version's default shape: no continuous recording, and marker screenshots labelled with the instant they were taken. The second sample shows explicit recording with a stall gap, the third shows Partial and an unalignable clock. The published")} <span class="mono">capture.diagnostics@1</span> ${lc("已有有界 ringBuffered 采集及部分自动 Marker。会话内视频和跨时钟校准尚未接通；此概念稿不能作为已实现证明。","already provides bounded ringBuffered capture and some automatic markers. In-session video and cross-clock calibration are not connected; this concept draft is not evidence that they are implemented.")}</span></div>
   </div>`;
 }
 function pDiagnosticCapture(){
@@ -2912,20 +2912,12 @@ const DIAGNOSTICS_COPY={
     "zh-Hans": "会话产物"
   },
   "diagnostics.capture.arm": {
-    "en": "Arm a session",
-    "zh-Hans": "布防会话"
+    "en": "Start session",
+    "zh-Hans": "开始采集"
   },
   "diagnostics.capture.mark": {
     "en": "Mark (⌘M)",
     "zh-Hans": "打标记（⌘M）"
-  },
-  "diagnostics.capture.unavailable": {
-    "en": "Session capture is not available",
-    "zh-Hans": "诊断会话采集尚不可用"
-  },
-  "diagnostics.capture.unavailable.detail": {
-    "en": "Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.",
-    "zh-Hans": "交互式布防、追加标记和停止尚未接通。可从 History 打开已保存的有界采集，或使用 Trace 与 Debug › Logs 采集。"
   },
   "diagnostics.mark.auto": {
     "en": "Found",
@@ -3106,16 +3098,106 @@ const DIAGNOSTICS_COPY={
   "diagnostics.hilog.artifactDigest": {
     "en": "Verified summary Artifact SHA-256",
     "zh-Hans": "已核验摘要 Artifact SHA-256"
+  },
+  "diagnostics.capture.duration": {
+    "en": "Maximum recording",
+    "zh-Hans": "最长录制"
+  },
+  "diagnostics.capture.stop": {
+    "en": "Stop and save",
+    "zh-Hans": "停止并保存"
+  },
+  "diagnostics.capture.cancelPreparation": {
+    "en": "Cancel preparation",
+    "zh-Hans": "取消准备"
+  },
+  "diagnostics.capture.refresh": {
+    "en": "Refresh status",
+    "zh-Hans": "刷新状态"
+  },
+  "diagnostics.capture.marks": {
+    "en": "Markers",
+    "zh-Hans": "标记"
+  },
+  "diagnostics.capture.chooseTarget": {
+    "en": "Adopt one device to start a session.",
+    "zh-Hans": "绑定一台设备后开始采集。"
+  },
+  "diagnostics.capture.uncertain": {
+    "en": "Session state is uncertain. Refresh or inspect this Job in History before starting another capture.",
+    "zh-Hans": "会话状态不确定。请刷新状态或在 History 查看此 Job，再决定后续操作。"
+  },
+  "diagnostics.capture.boundary": {
+    "en": "Bounded trace with host-timed markers; logs drain after capture. Markers have no screenshots or device-clock calibration. Recording stops at its Runtime deadline even if this view closes.",
+    "zh-Hans": "有界 Trace 采集，标记使用主机时间；日志在录制后读取。标记不含截图，也未与设备时钟校准。关闭页面后，Runtime 仍会按时限停止录制。"
+  },
+  "diagnostics.capture.state.preparing": {
+    "en": "Preparing",
+    "zh-Hans": "准备中"
+  },
+  "diagnostics.capture.state.recording": {
+    "en": "Recording",
+    "zh-Hans": "录制中"
+  },
+  "diagnostics.capture.state.finalizing": {
+    "en": "Saving",
+    "zh-Hans": "保存中"
+  },
+  "diagnostics.capture.state.interrupted": {
+    "en": "Interrupted · outcome needs inspection",
+    "zh-Hans": "已中断 · 请检查结果"
+  },
+  "diagnostics.capture.state.closed": {
+    "en": "Session ended",
+    "zh-Hans": "会话已结束"
+  },
+  "diagnostics.capture.phase.checking": {
+    "en": "Checking device and storage",
+    "zh-Hans": "检查设备和存储空间"
+  },
+  "diagnostics.capture.phase.submitting": {
+    "en": "Submitting session",
+    "zh-Hans": "提交采集"
+  },
+  "diagnostics.capture.phase.active": {
+    "en": "Waiting for Runtime",
+    "zh-Hans": "等待 Runtime"
+  },
+  "diagnostics.capture.phase.finished": {
+    "en": "Session ended",
+    "zh-Hans": "会话已结束"
+  },
+  "diagnostics.capture.phase.unavailable": {
+    "en": "Unable to start this session",
+    "zh-Hans": "无法开始此次采集"
+  },
+  "diagnostics.capture.phase.uncertain": {
+    "en": "Session state is uncertain",
+    "zh-Hans": "会话状态不确定"
   }
 };
 function diagnosticsCopy(key){return DIAGNOSTICS_COPY[key][S.language];}
+// Prototype controls simulate Runtime replies; they do not contact a device.
+function diagnosticCaptureDemo(action){
+  const d=S.diagnostics;
+  if(action==='start'&&d.capturePhase!=='recording'){d.capturePhase='recording';d.captureMarks=0;}
+  if(action==='mark'&&d.capturePhase==='recording')d.captureMarks=Math.min(50,(d.captureMarks||0)+1);
+  if(action==='stop'&&d.capturePhase==='recording')d.capturePhase='closed';
+  renderPage();
+}
+function diagnosticsCaptureHTML(){
+  const d=S.diagnostics, recording=d.capturePhase==='recording';
+  return `<div class="device-actions"><button class="btn" ${recording?'disabled ':''}data-sync-id="diagnostics.capture.arm" onclick="diagnosticCaptureDemo('start')">${diagnosticsCopy('diagnostics.capture.arm')}</button><label>${diagnosticsCopy('diagnostics.capture.duration')} <select ${recording?'disabled':''} aria-label="${diagnosticsCopy('diagnostics.capture.duration')}"><option>30 s</option><option selected>60 s</option><option>120 s</option></select></label></div>
+    <div class="device-actions"><button class="btn" ${recording&&(d.captureMarks||0)<50?'':'disabled '}data-sync-id="diagnostics.capture.mark" onclick="diagnosticCaptureDemo('mark')">${diagnosticsCopy('diagnostics.capture.mark')}</button><button class="btn" ${recording?'':'disabled '}data-sync-id="diagnostics.capture.stop" onclick="diagnosticCaptureDemo('stop')">${diagnosticsCopy('diagnostics.capture.stop')}</button></div>
+    ${d.capturePhase?`<p role="status" data-sync-id="diagnostics.capture.state">${diagnosticsCopy('diagnostics.capture.state.'+d.capturePhase)} · ${diagnosticsCopy('diagnostics.capture.marks')}: ${d.captureMarks||0} / 50</p>`:''}
+    <p class="hint" data-sync-id="diagnostics.capture.boundary">${diagnosticsCopy('diagnostics.capture.boundary')}</p><p class="hint">${lc('交互稿演示；不连接设备，不生成验收证据。','Design demo; no device connection or acceptance evidence.')}</p>`;
+}
 function pDiagnostics(){
-  if(PARAMS.get('concept')==='diagnostics')return `<div class="warnbox" role="note">${lc("未来交互探索：交互式布防、追加 Marker、停止与跨时钟校准尚未接通。已发布 operation 支持有界 ringBuffered 采集及部分自动标记。以下完整会话是合成演示。","Future concept: interactive arm, append-marker, stop and cross-clock calibration are not connected. The published operation supports bounded ringBuffered capture and some automatic markers. The full session below is synthetic.")}</div>`+pDiagnosticsConcept();
+  if(PARAMS.get('concept')==='diagnostics')return `<div class="warnbox" role="note">${lc("未来交互探索：并发截图、视频与跨时钟校准尚未接通。已发布 operation 支持有界 ringBuffered 采集及部分自动标记。以下完整会话是合成演示。","Future concept: concurrent screenshots, video and cross-clock calibration are not connected. The published operation supports bounded ringBuffered capture and some automatic markers. The full session below is synthetic.")}</div>`+pDiagnosticsConcept();
   if(S.diagnostics.hilogSummary)return hilogSummaryHTML(S.diagnostics.hilogSummary);
   return `<div class="page-lead" data-page-title="Diagnostics"></div><section class="device-section">
     <div class="device-actions"><span class="spacer"></span>${['loaded','partial','trace'].includes(S.diagnostics.reader)?`<button class="btn" onclick="S.diagnostics.preview=null;renderPage()">${diagnosticsCopy('diagnostics.session.reload')}</button>`:''}<span class="chip warn" data-sync-id="diagnostics.alignment">${lc('无法对齐','Cannot align')}</span></div>
-    <div class="device-actions"><button class="btn" disabled data-sync-id="diagnostics.capture.arm">${diagnosticsCopy('diagnostics.capture.arm')}</button><button class="btn" disabled data-sync-id="diagnostics.capture.mark">${diagnosticsCopy('diagnostics.capture.mark')}</button></div>
-    <div class="warnbox" data-sync-id="diagnostics.capture.unavailable"><div><b>${diagnosticsCopy('diagnostics.capture.unavailable')}</b><p class="hint">${diagnosticsCopy('diagnostics.capture.unavailable.detail')}</p><span class="hint mono">diagnostic_session_capture_not_connected</span></div></div>
+    ${diagnosticsCaptureHTML()}
     ${diagnosticsSessionHTML()}
     <p class="hint" data-sync-id="diagnostics.selection">${lc('当前仅选择了时间点','Only a time point is selected')}</p>
   </section>`;

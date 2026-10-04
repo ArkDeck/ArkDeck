@@ -6,7 +6,7 @@
         "result" : {
           "authorizationPolicy" : "defaultReadOnly",
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "readOnly",
           "executionMode" : "planOnly",
@@ -14,7 +14,7 @@
             "durationSeconds" : 5
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "3b19c6411f6540a9f9c046eff5f26d8f01976630b7c944a5ea97945455f8d9e8",
+          "materializedPlanDigest" : "037a80869cada1655468dacac31a6e93fbeb8ddeab65664f5796c3093b83681c",
           "operation" : "capture.diagnostics@1",
           "providerAdmissionBlocker" : null,
           "providerId" : "hdc",
@@ -153,7 +153,7 @@
           "sessionId" : "session-job-67fe6d11d4aaf4e52ddcecc5fd49e9af",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "6266479f2432f69cba4c5efa3a60a4421591bf53bf4ef342b651f53439c3e333",
+            "manifestSha256" : "b0638bb5ccdf3382ceb039cf2ab75e588c2e1756665a8a2df34be8d132845bda",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -179,7 +179,7 @@
         "result" : {
           "authorizationPolicy" : "defaultReadOnly",
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "readOnly",
           "executionMode" : "planOnly",
@@ -187,7 +187,7 @@
             "durationSeconds" : 5
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "3b19c6411f6540a9f9c046eff5f26d8f01976630b7c944a5ea97945455f8d9e8",
+          "materializedPlanDigest" : "037a80869cada1655468dacac31a6e93fbeb8ddeab65664f5796c3093b83681c",
           "operation" : "capture.diagnostics@1",
           "providerAdmissionBlocker" : null,
           "providerId" : "hdc",
@@ -332,7 +332,7 @@
           "sessionId" : "session-job-1a32dbc11d6c48f3ea19824f368e98da",
           "sessionPublication" : {
             "catalogGeneration" : "2",
-            "manifestSha256" : "be95640cc65d9927c2d707a514b08b00a5fd6c0183cdaef00b656126c6170c2b",
+            "manifestSha256" : "a8d3193634eb6bcd5ae255a30ada0747c156d495886e5509149defa908db75b6",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -358,7 +358,7 @@
         "result" : {
           "authorizationPolicy" : "defaultReadOnly",
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "readOnly",
           "executionMode" : "planOnly",
@@ -366,7 +366,7 @@
             "durationSeconds" : 5
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "3b19c6411f6540a9f9c046eff5f26d8f01976630b7c944a5ea97945455f8d9e8",
+          "materializedPlanDigest" : "037a80869cada1655468dacac31a6e93fbeb8ddeab65664f5796c3093b83681c",
           "operation" : "capture.diagnostics@1",
           "providerAdmissionBlocker" : null,
           "providerId" : "hdc",
@@ -537,7 +537,7 @@
         "result" : {
           "authorizationPolicy" : "defaultReadOnly",
           "bindingRevision" : 1,
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "readOnly",
           "executionMode" : "planOnly",
@@ -545,7 +545,7 @@
             "durationSeconds" : 5
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "3b19c6411f6540a9f9c046eff5f26d8f01976630b7c944a5ea97945455f8d9e8",
+          "materializedPlanDigest" : "037a80869cada1655468dacac31a6e93fbeb8ddeab65664f5796c3093b83681c",
           "operation" : "capture.diagnostics@1",
           "providerAdmissionBlocker" : null,
           "providerId" : "hdc",
@@ -1090,7 +1090,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -1174,7 +1174,7 @@
             "sessionId" : "session-job-67fe6d11d4aaf4e52ddcecc5fd49e9af",
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "6266479f2432f69cba4c5efa3a60a4421591bf53bf4ef342b651f53439c3e333",
+              "manifestSha256" : "b0638bb5ccdf3382ceb039cf2ab75e588c2e1756665a8a2df34be8d132845bda",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -1289,7 +1289,7 @@
           "blockers" : [
 
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -1832,7 +1832,7 @@
             "blockers" : [
               "artifactIntegrityFailed"
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -1923,7 +1923,7 @@
             "sessionId" : "session-job-1a32dbc11d6c48f3ea19824f368e98da",
             "sessionPublication" : {
               "catalogGeneration" : "2",
-              "manifestSha256" : "be95640cc65d9927c2d707a514b08b00a5fd6c0183cdaef00b656126c6170c2b",
+              "manifestSha256" : "a8d3193634eb6bcd5ae255a30ada0747c156d495886e5509149defa908db75b6",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -1972,7 +1972,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -2089,7 +2089,7 @@
             "blockers" : [
               "artifactIntegrityFailed"
             ],
-            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : null,
@@ -2198,7 +2198,7 @@
           "blockers" : [
             "artifactIntegrityFailed"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
@@ -2315,7 +2315,7 @@
             "artifactIntegrityFailed",
             "resultNotReady"
           ],
-          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "catalogDigest" : "c581f86e85bd1a247b7a05cd070186753c616f902b8dcd19c1bbb030898f08aa",
           "executionMode" : "execute",
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
