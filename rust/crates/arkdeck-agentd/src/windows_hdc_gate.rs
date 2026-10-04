@@ -111,7 +111,8 @@ pub(crate) fn admit(
     }))
 }
 
-#[cfg(test)]
+// Run by this binary's unit-test build only (`daemon_unit_tests!`).
+daemon_unit_tests! {
 mod tests {
     use super::*;
     use arkdeck_provider_hdc::WINDOWS_HDC_TUPLES;
@@ -306,4 +307,5 @@ mod tests {
             }))
         );
     }
+}
 }
