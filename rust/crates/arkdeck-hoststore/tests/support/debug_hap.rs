@@ -299,6 +299,31 @@ impl HostLabels {
         }
     }
 
+    /// As [`Self::learn_keys`] for `key`, only inside an object under
+    /// `parent`, wherever in the documents that is.
+    pub fn learn_within(&mut self, host: &Value, swift: &Value, parent: &str, key: &str) {
+        match (host, swift) {
+            (Value::Object(host), Value::Object(swift)) => {
+                for (name, value) in host {
+                    let Some(other) = swift.get(name) else {
+                        continue;
+                    };
+                    if name == parent {
+                        self.learn_keys(value, other, &[key]);
+                    } else {
+                        self.learn_within(value, other, parent, key);
+                    }
+                }
+            }
+            (Value::Array(host), Value::Array(swift)) => {
+                for (value, other) in host.iter().zip(swift) {
+                    self.learn_within(value, other, parent, key);
+                }
+            }
+            _ => (),
+        }
+    }
+
     /// A value this host derived where Swift's replay derived `swift`: the
     /// same value on macOS; on Windows learned as its label.
     pub fn derived(&mut self, host: &str, swift: &str) {
@@ -349,7 +374,10 @@ impl HostLabels {
     /// `bytes` with every learned host value read as Swift's where it is a
     /// whole quoted string, in one pass (no replacement is read again).
     pub fn swift_bytes(&self, bytes: &[u8]) -> Vec<u8> {
-        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        // A payload that is not text names no label.
+        let Ok(text) = String::from_utf8(bytes.to_vec()) else {
+            return bytes.to_vec();
+        };
         text.split('"')
             .map(|segment| self.swift.get(segment).map_or(segment, String::as_str))
             .collect::<Vec<_>>()
@@ -360,6 +388,19 @@ impl HostLabels {
     /// `value` with every learned host value read as Swift's.
     pub fn swift(&self, value: &Value) -> Value {
         serde_json::from_slice(&self.swift_bytes(&serde_json::to_vec(value).unwrap())).unwrap()
+    }
+
+    /// `value`, a Swift document, with every learned Swift value read as this
+    /// host's (whole JSON strings, one pass): what the host would have
+    /// written in its place. Unchanged on macOS.
+    pub fn host_json(&self, value: &Value) -> Value {
+        let text = String::from_utf8(serde_json::to_vec(value).unwrap()).unwrap();
+        let text = text
+            .split('"')
+            .map(|segment| self.host.get(segment).map_or(segment, String::as_str))
+            .collect::<Vec<_>>()
+            .join("\"");
+        serde_json::from_str(&text).unwrap()
     }
 
     /// How many host values were relabelled.

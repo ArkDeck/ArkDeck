@@ -16,6 +16,8 @@ pub mod fixture_fs;
 pub mod flash_lane;
 pub mod hdc_oracle;
 pub mod native_library;
+#[path = "../../../arkdeck-provider-hdc/tests/common/oracle_fake.rs"]
+pub mod oracle_fake;
 // The device reconcilers these replays drive are macOS-only, and the shared
 // fake HDC they dispatch to is a POSIX shell script.
 #[cfg(target_os = "macos")]
@@ -24,7 +26,6 @@ pub mod reconcile;
 use arkdeck_hoststore::{StorageProbe, StorageSnapshot};
 use arkdeck_platform::{HostDirectory, HostSqlite, SqliteValue as Sql};
 use serde_json::{Value, json};
-#[cfg(unix)]
 use std::collections::BTreeMap;
 use std::fs;
 #[cfg(unix)]
@@ -348,7 +349,34 @@ pub fn mode(_metadata: &fs::Metadata) -> String {
     "-".into()
 }
 
-#[cfg(unix)]
+/// An entry's mode as the oracle records it: its permission bits on macOS;
+/// on Windows `700` for a directory the store opens as private and `600`
+/// for a document it reads as exactly owner read/write (the DACLs those
+/// modes are), and what the store refused otherwise.
+fn oracle_mode(path: &Path, directory: bool) -> String {
+    #[cfg(unix)]
+    {
+        let _ = directory;
+        format!(
+            "{:o}",
+            fs::symlink_metadata(path).unwrap().permissions().mode() & 0o777
+        )
+    }
+    #[cfg(windows)]
+    {
+        let owned = if directory {
+            HostDirectory::open(path).map(|_| "700")
+        } else {
+            HostDirectory::open(path.parent().unwrap()).and_then(|parent| {
+                parent
+                    .owner_only_document(path.file_name().unwrap().to_str().unwrap())
+                    .map(|_| "600")
+            })
+        };
+        owned.map_or_else(|error| format!("not owner-only: {error}"), str::to_owned)
+    }
+}
+
 /// Every entry below `base` as `prefix/<relative path>`: each file's bytes
 /// (a Job record's read machine-independently) and each entry's kind and mode.
 fn walk(
@@ -380,18 +408,22 @@ fn walk(
         let name = if snapshot {
             format!("{prefix}/snapshots/snapshot-<revision>.json")
         } else {
-            format!("{prefix}/{}", relative.display())
+            format!(
+                "{prefix}/{}",
+                // `/` between components, as the oracle records them.
+                relative
+                    .components()
+                    .map(|component| component.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            )
         };
         let kind = if metadata.is_dir() {
             "directory"
         } else {
             "file"
         };
-        tree.push((
-            name.clone(),
-            kind,
-            format!("{:o}", metadata.permissions().mode() & 0o777),
-        ));
+        tree.push((name.clone(), kind, oracle_mode(&path, metadata.is_dir())));
         if metadata.is_file() && !snapshot {
             let bytes = fs::read(&path).unwrap();
             files.insert(
@@ -425,7 +457,6 @@ fn pager_snapshot(relative: &Path) -> bool {
         })
 }
 
-#[cfg(unix)]
 /// Every Artifact index and payload, and the root's own documents (the
 /// cleanup debt ledger), the verification cache aside.
 fn artifacts(base: &Path) -> BTreeMap<String, Vec<u8>> {
@@ -477,9 +508,37 @@ pub fn assert_leftovers_with(
     expected: impl Fn(&str, Vec<u8>) -> Vec<u8>,
     index_before: impl Fn(&mut Value),
 ) {
+    leftovers(fixture, root, jobs, expected, index_before, |bytes| {
+        bytes.to_vec()
+    });
+}
+
+/// As [`assert_leftovers_at`], with every file the replay left and the index
+/// read through `relabel` first: on Windows the host paths and the values
+/// derived from them spelled as the oracle recorded them; on macOS nothing
+/// changes.
+pub fn assert_leftovers_relabelled(
+    fixture: &Path,
+    root: &Path,
+    jobs: &Path,
+    relabel: impl Fn(&[u8]) -> Vec<u8>,
+) {
+    leftovers(fixture, root, jobs, |_, bytes| bytes, |_| (), relabel);
+}
+
+fn leftovers(
+    fixture: &Path,
+    root: &Path,
+    jobs: &Path,
+    expected: impl Fn(&str, Vec<u8>) -> Vec<u8>,
+    index_before: impl Fn(&mut Value),
+    relabel: impl Fn(&[u8]) -> Vec<u8>,
+) {
     let mut recorded_index = document(fixture, "store/index.json");
     index_before(&mut recorded_index);
-    assert_eq!(index(jobs), recorded_index);
+    let read_index: Value =
+        serde_json::from_slice(&relabel(&serde_json::to_vec(&index(jobs)).unwrap())).unwrap();
+    assert_eq!(read_index, recorded_index);
     let (mut files, mut tree) = (BTreeMap::new(), Vec::new());
     let mut bases = vec![
         (jobs.join("jobs"), "store/jobs"),
@@ -537,7 +596,7 @@ pub fn assert_leftovers_with(
     );
     for (path, bytes) in &recorded {
         assert_eq!(
-            String::from_utf8_lossy(&files[path]),
+            String::from_utf8_lossy(&relabel(&files[path])),
             String::from_utf8_lossy(bytes),
             "{path}"
         );
