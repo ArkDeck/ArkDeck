@@ -149,9 +149,30 @@ first, `ControlResult` back.
   with `job.plan` against the embedded catalog review, bound to the current loader when the plan
   asks, then submitted as reviewed and followed to its terminal Job and evidence. Wherever the
   Runtime refuses (no lane, no validator), the page shows its reason and offers no Flash button.
+- **Trace (TASK-XPA-021).** The macOS Trace workspace: an adopted device (named from the device
+  observation), a capture profile (the five presets and their tags) and a duration (seconds or
+  minutes within the Catalog's range, with quick values), checked against the Runtime's probe of
+  that device (`trace.probe`: the adapter, the nine debug parameters, the tags) and captured as
+  one typed `capture.diagnostics@1` Job (`job.submit`, `job.run`, `job.cancel`). Start never
+  shows disabled: while a capture cannot start, the first reason is the status line. The
+  capture's one raw `trace.htrace` is read and verified (`artifact.read`, SHA-256) into the App's
+  cache (`--cache-root`, by default `%TEMP%\ArkDeck`) and opened in the Trace viewer.
+- **Trace viewer.** The macOS Trace Viewer window as a page: capture or open a Trace, the recent
+  Traces (eight, a missing file shown inert), the timeline pane and the Inspector. Windows has
+  no ArkTrace parser, so the timeline pane shows the macOS "bundled parser is unavailable" state
+  and its diagnostics instead of a timeline; the Inspector shows the file's size and SHA-256 and,
+  for a captured Trace, the Runtime's Trace inspector's answer (`trace.inspect`, refused on
+  Windows today).
+- **Viewer (TASK-XPA-020).** The macOS UI dump Viewer: capture the view of a Connected adopted
+  device (`capture.diagnostics@1` with the UI dump preset), read and verify its same-Job
+  screenshot, component tree and dump, and inspect them on the host (`UIDumpCapture`, checked
+  against the Swift CLI's 19 oracle cases): the screenshot with the components' bounds and
+  hit-testing, the complete tree (a list: arrows move, Left and Right collapse and expand), the
+  search, the selected component's properties, layout, accessibility, raw fields and Advanced
+  Dump (`componentDetail`), and the capture's timings.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
-  have access keys (Alt+O, D, H, N, A, I, B, F, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
   empty Tab stop.
 

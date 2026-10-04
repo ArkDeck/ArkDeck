@@ -613,6 +613,85 @@
         {"automationId": "flash.target.empty", "origin": "macos", "role": "text", "name": ["@flash.target.none"]},
         {"automationId": "flash.target.guidance", "origin": "windows", "role": "text", "name": ["@flash.target.guidance"]}
       ]
+    },
+    {
+      "id": "trace.viewer",
+      "scenario": "viewer",
+      "page": "trace",
+      "elements": [
+        {"automationId": "trace.title", "origin": "macos", "role": "text", "name": ["@app.navigation.trace"]},
+        {"automationId": "trace.refresh", "origin": "macos", "role": "button", "name": ["@trace.action.refresh"]},
+        {"automationId": "trace.workspace.summary", "origin": "macos", "role": "text", "name": ["@trace.workspace.summary"]},
+        {"automationId": "trace.capture.title", "origin": "macos", "role": "text", "name": ["@trace.capture.title"]},
+        {"automationId": "trace.availability.status", "origin": "macos", "role": "text", "name": ["@trace.availability.available"]},
+        {"automationId": "trace.target.picker", "origin": "macos", "role": "comboBox", "name": ["@trace.capture.device"]},
+        {"automationId": "trace.profile.picker", "origin": "macos", "role": "comboBox", "name": ["@trace.capture.profile"]},
+        {"automationId": "trace.profile.detail", "origin": "macos", "role": "text", "name": ["@trace.preset.arkuiDeep.detail"]},
+        {"automationId": "trace.duration.unit", "origin": "macos", "role": "comboBox", "name": ["@trace.duration.unit"]},
+        {"automationId": "trace.duration.quick.seconds.10", "origin": "macos", "role": "button", "name": ["@trace.duration.set10Seconds"]},
+        {"automationId": "trace.capture.status", "origin": "windows", "role": "text", "name": ["@windows.trace.capture.localOnly"]},
+        {"automationId": "trace.start", "origin": "macos", "role": "button", "name": ["@trace.action.start"]},
+        {"automationId": "trace.viewer.title", "origin": "macos", "role": "text", "name": ["@trace.viewer.title"]},
+        {"automationId": "trace.viewer.empty", "origin": "macos", "role": "text", "name": ["@trace.viewer.description"]},
+        {"automationId": "trace.openViewer", "origin": "macos", "role": "button", "name": ["@trace.action.openViewer"]}
+      ]
+    },
+    {
+      "id": "trace.targets",
+      "scenario": "targets",
+      "page": "trace",
+      "elements": [
+        {"automationId": "trace.availability.status", "origin": "macos", "role": "text", "name": ["@trace.availability.unavailable"]},
+        {"automationId": "trace.start", "origin": "macos", "role": "button", "name": ["@trace.action.start"]},
+        {"automationId": "trace.viewer.empty", "origin": "macos", "role": "text", "name": ["@trace.viewer.description"]}
+      ]
+    },
+    {
+      "id": "traceViewer.viewer",
+      "scenario": "viewer",
+      "page": "traceViewer",
+      "elements": [
+        {"automationId": "traceViewer.title", "origin": "windows", "role": "text", "name": ["@windows.traceViewer.title"]},
+        {"automationId": "trace.viewer.capture", "origin": "windows", "role": "button", "name": ["@windows.traceViewer.capture"]},
+        {"automationId": "trace.viewer.open", "origin": "windows", "role": "button", "name": ["@windows.traceViewer.open"]},
+        {"automationId": "trace.viewer.recent.title", "origin": "windows", "role": "text", "name": ["@windows.traceViewer.recent"]},
+        {"automationId": "trace.viewer.idle.title", "origin": "windows", "role": "text", "name": ["@windows.traceViewer.idleTitle"]},
+        {"automationId": "trace.viewer.idle.detail", "origin": "windows", "role": "text", "name": ["@windows.traceViewer.idleDetail"]},
+        {"automationId": "trace.viewer.idle.capture", "origin": "windows", "role": "button", "name": ["@windows.traceViewer.captureTrace"]},
+        {"automationId": "trace.viewer.idle.open", "origin": "windows", "role": "button", "name": ["@windows.traceViewer.openTrace"]},
+        {"automationId": "trace.viewer.inspector.title", "origin": "windows", "role": "text", "name": ["@windows.traceViewer.inspector"]},
+        {"automationId": "trace.viewer.inspector.empty", "origin": "windows", "role": "text", "name": ["@windows.traceViewer.nothingSelected"]}
+      ]
+    },
+    {
+      "id": "viewer.viewer",
+      "scenario": "viewer",
+      "page": "viewer",
+      "steps": [{"invoke": "viewer.recapture"}],
+      "elements": [
+        {"automationId": "viewer.title", "origin": "macos", "role": "text", "name": ["@app.navigation.uiDump"]},
+        {"automationId": "viewer.refresh", "origin": "macos", "role": "button", "name": ["@viewer.toolbar.refresh"]},
+        {"automationId": "viewer.target", "origin": "macos", "role": "comboBox", "name": ["@viewer.toolbar.device"]},
+        {"automationId": "viewer.root", "origin": "macos", "role": "comboBox", "name": ["@viewer.toolbar.currentScreen"]},
+        {"automationId": "viewer.recapture", "origin": "macos", "role": "button", "name": ["@viewer.toolbar.recapture"]},
+        {"automationId": "viewer.pane.screenshot", "origin": "macos", "role": "text", "name": ["@viewer.pane.screenshot"]},
+        {"automationId": "viewer.pane.tree", "origin": "macos", "role": "text", "name": ["@viewer.pane.tree"]},
+        {"automationId": "viewer.tree.scroll", "origin": "macos", "role": "list", "name": ["@viewer.tree.label"]},
+        {"automationId": "viewer.properties.type", "origin": "macos", "role": "text", "name": ["Window"]},
+        {"automationId": "viewer.inspector.tab.properties", "origin": "macos", "role": "button", "name": [{"format": "viewer.action.show", "args": ["@viewer.tab.properties"]}]},
+        {"automationId": "viewer.inspector.tab.advancedDump", "origin": "windows", "role": "button", "name": [{"format": "viewer.action.show", "args": ["@windows.viewer.tab.advancedDump"]}]}
+      ]
+    },
+    {
+      "id": "viewer.targets",
+      "scenario": "targets",
+      "page": "viewer",
+      "elements": [
+        {"automationId": "viewer.target", "origin": "macos", "role": "comboBox", "name": ["@viewer.toolbar.device"]},
+        {"automationId": "viewer.empty.title", "origin": "macos", "role": "text", "name": ["@viewer.empty.title"]},
+        {"automationId": "viewer.empty.message", "origin": "macos", "role": "text", "name": ["@viewer.empty.selectTarget"]},
+        {"automationId": "viewer.recapture", "origin": "macos", "role": "button", "name": ["@viewer.toolbar.capture"]}
+      ]
     }
   ]
 }

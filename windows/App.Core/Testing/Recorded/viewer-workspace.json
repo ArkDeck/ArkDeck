@@ -1,0 +1,779 @@
+{
+ "advancedDump": {
+  "artifact": {
+   "artifactDigest": "a66a3004df7a817c44e994da94a3e72624e57e6b29bba5b6f605a22fd5497d50",
+   "artifactId": "ART-1420828956bcc568a37f7ffd13259ea6",
+   "binding": {
+    "bindingRevision": 1,
+    "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetId": "TGT-3ba3f5f43b92"
+   },
+   "byteCount": 55,
+   "createdAtUtc": "2026-09-14T00:00:00Z",
+   "lease": "lease-v1:job-ab40a6621e2f653e51f7920d88e4aaaf:ART-1420828956bcc568a37f7ffd13259ea6",
+   "mediaType": "text/plain",
+   "name": "advanced-dump.txt",
+   "observationWindow": {
+    "endUtc": "2026-09-14T00:00:00.000Z",
+    "startUtc": "2026-09-14T00:00:00.000Z"
+   },
+   "owner": {
+    "id": "job-ab40a6621e2f653e51f7920d88e4aaaf",
+    "kind": "job"
+   },
+   "privacy": "sensitive",
+   "providerId": "hdc",
+   "redactionApplied": false,
+   "retention": {
+    "class": "default",
+    "deadlineUtc": "2026-09-21T00:00:00Z",
+    "pinned": false
+   },
+   "schemaVersion": "arkdeck.artifact/1",
+   "sourceOperation": "capture.diagnostics@1",
+   "status": "published"
+  },
+  "bytes": "V2luZG93SWQ6IDcKQ29tcG9uZW50SWQ6IDQyCnR5cGU6IEJ1dHRvbgp0ZXh0OiBTaWduIGluCg=="
+ },
+ "probe": {
+  "adapterDisposition": "captureEligible",
+  "bindingRevision": 1,
+  "family": "hitrace.dayu200-oh7.text",
+  "parameters": [
+   {
+    "detail": null,
+    "name": "persist.ace.trace.syntax.enabled",
+    "state": "value",
+    "value": "false"
+   },
+   {
+    "detail": null,
+    "name": "persist.ace.trace.layout.enabled",
+    "state": "value",
+    "value": "true"
+   },
+   {
+    "detail": null,
+    "name": "persist.ace.trace.build.enabled",
+    "state": "missing",
+    "value": null
+   },
+   {
+    "detail": null,
+    "name": "persist.ace.trace.measure.debug.enabled",
+    "state": "value",
+    "value": "1"
+   },
+   {
+    "detail": null,
+    "name": "persist.ace.trace.sync.debug.enabled",
+    "state": "missing",
+    "value": null
+   },
+   {
+    "detail": null,
+    "name": "persist.ace.debug.enabled",
+    "state": "value",
+    "value": "0"
+   },
+   {
+    "detail": null,
+    "name": "persist.ace.performance.monitor.enabled",
+    "state": "value",
+    "value": "true"
+   },
+   {
+    "detail": null,
+    "name": "persist.sys.graphic.openDebugTrace",
+    "state": "value",
+    "value": "1"
+   },
+   {
+    "detail": null,
+    "name": "persist.rosen.animationtrace.enabled",
+    "state": "value",
+    "value": "false"
+   }
+  ],
+  "rawHelp": "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+  "rawHelpSha256": "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+  "supportedTags": [
+   "ability",
+   "accesscontrol",
+   "accessibility",
+   "account",
+   "ace",
+   "animation",
+   "app",
+   "ark",
+   "binder",
+   "bluetooth",
+   "cloud",
+   "commercial",
+   "commonlibrary",
+   "daudio",
+   "dcamera",
+   "deviceauth",
+   "devicemanager",
+   "deviceprofile",
+   "dhfwk",
+   "dinput",
+   "disk",
+   "distributeddatamgr",
+   "dlpcre",
+   "drm",
+   "dsched",
+   "dscreen",
+   "dslm",
+   "dsoftbus",
+   "erofs",
+   "ffrt",
+   "filemanagement",
+   "freq",
+   "graphic",
+   "gresource",
+   "hdcd",
+   "hdf",
+   "hmfs",
+   "huks",
+   "i2c",
+   "idle",
+   "interconn",
+   "ipa",
+   "irq",
+   "irqoff",
+   "load",
+   "mdfs",
+   "membus",
+   "memory",
+   "memreclaim",
+   "misc",
+   "mmc",
+   "msdp",
+   "multimodalinput",
+   "musl",
+   "net",
+   "notification",
+   "nweb",
+   "ohos",
+   "pagecache",
+   "power",
+   "preemptoff",
+   "push",
+   "regulators",
+   "rpc",
+   "samgr",
+   "sched",
+   "schedlt",
+   "security",
+   "sensors",
+   "sync",
+   "ufs",
+   "usb",
+   "useriam",
+   "virse",
+   "window",
+   "workq",
+   "zaudio",
+   "zbinder",
+   "zcamera",
+   "zimage",
+   "zmedia"
+  ],
+  "targetId": "TGT-3ba3f5f43b92",
+  "tool": "hitrace",
+  "tools": [
+   {
+    "detail": null,
+    "disposition": "captureEligible",
+    "family": "hitrace.dayu200-oh7.text",
+    "rawHelpSha256": "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+    "tool": "hitrace"
+   },
+   {
+    "detail": null,
+    "disposition": "probeOnly",
+    "family": "bytrace.dayu200-oh7.text",
+    "rawHelpSha256": "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+    "tool": "bytrace"
+   }
+  ]
+ },
+ "trace": {
+  "artifacts": [
+   {
+    "artifactDigest": "bcfd7fc0aa7e8e27ff8a266f7b19f773ef1aaa69648f806878e38103c095bbb1",
+    "artifactId": "ART-148c3168fc02b640a96d452463b2a8d7",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 80,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-1c209bf5f7b1537cbd2406f5640e0ab8:ART-148c3168fc02b640a96d452463b2a8d7",
+    "mediaType": "application/octet-stream",
+    "name": "trace.htrace",
+    "observationWindow": {
+     "endUtc": "2026-09-14T00:00:00.000Z",
+     "startUtc": "2026-09-14T00:00:00.000Z"
+    },
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   },
+   {
+    "artifactDigest": "a76e23368a6483e1a7efbad094071765cecd87e2a7f0c3f49b720e0419c9b2d4",
+    "artifactId": "ART-254a229f7471f2bbe3d18b818b1fb8d1",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 4839,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-1c209bf5f7b1537cbd2406f5640e0ab8:ART-254a229f7471f2bbe3d18b818b1fb8d1",
+    "mediaType": "application/json",
+    "name": "capture-summary.json",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "standard",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-2fc79c6453db53370b7eca8c65107684",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "application/json",
+    "name": "ui-tree.json",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-3a64ee11fff27d022d706b4a140c5b4e",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "image/jpeg",
+    "name": "screenshot.jpeg",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-57326e4c698f96f7c350ab5c060bedbf",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "application/json",
+    "name": "ui-dump.json",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-7dd8c0054098f31b292d63ee05a0e55d",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "application/json",
+    "name": "application-liveness.json",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "standard",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-89134365f2cbadc9cd9a137f119705d1",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "text/plain",
+    "name": "crash-index.txt",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-a830c2e84842d562d0fb1d7869189616",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "text/plain",
+    "name": "hilog.txt",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-c3d3bf066a3523d957e15cb7164a0364",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "text/plain",
+    "name": "advanced-dump.txt",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-e5cfc2d00d6b1861691082dfdbf20eef",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "text/plain",
+    "name": "crash-log.txt",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": null,
+    "artifactId": "ART-MISSING-e627d1e4d3f19d1d9711fcce3c07e5cd",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 0,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": null,
+    "mediaType": "image/png",
+    "name": "screenshot.png",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "missing"
+   },
+   {
+    "artifactDigest": "af0e0b15bf020432fddb0d8f1ae0784e7bac3f64294728c48c2630432fcf2cbf",
+    "artifactId": "ART-a73e873df5c4994f0105f40c6402e9c0",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 484,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-1c209bf5f7b1537cbd2406f5640e0ab8:ART-a73e873df5c4994f0105f40c6402e9c0",
+    "mediaType": "application/json",
+    "name": "markers.json",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "standard",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   },
+   {
+    "artifactDigest": "ea7af91044beeed89f775d97214e822120fa6863d46588ec538196822c19a8fa",
+    "artifactId": "ART-b34e2fab00558c1e6eee07f5a401e3ca",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 2066,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-1c209bf5f7b1537cbd2406f5640e0ab8:ART-b34e2fab00558c1e6eee07f5a401e3ca",
+    "mediaType": "text/plain",
+    "name": "capture.log",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "standard",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   },
+   {
+    "artifactDigest": "90daa76ddd5196b6d5c44610bf5a53fcff8d02d55e5e0396b753a6777fec8131",
+    "artifactId": "ART-ff047137b0fb56d674b4114810e94149",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 4778,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-1c209bf5f7b1537cbd2406f5640e0ab8:ART-ff047137b0fb56d674b4114810e94149",
+    "mediaType": "application/json",
+    "name": "artifact-index.json",
+    "observationWindow": null,
+    "owner": {
+     "id": "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+     "kind": "job"
+    },
+    "privacy": "standard",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   }
+  ],
+  "bytes": {
+   "ART-148c3168fc02b640a96d452463b2a8d7": "IyB0cmFjZXI6IG5vcAogIGhpdHJhY2UtMSBbMDAwXSAuLi4uICAxLjAwMDAwMDogdHJhY2luZ19tYXJrX3dyaXRlOiBCfDF8Y2FwdHVyZQo=",
+   "ART-254a229f7471f2bbe3d18b818b1fb8d1": "ewogICJhcnRpZmFjdHMiIDogewogICAgImFkdmFuY2VkLWR1bXAudHh0IiA6IHsKICAgICAgImRldGFpbCIgOiAic3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzIiwKICAgICAgInJlcXVpcmVkIiA6IGZhbHNlLAogICAgICAic3RhdHVzIiA6ICJtaXNzaW5nIgogICAgfSwKICAgICJhcHBsaWNhdGlvbi1saXZlbmVzcy5qc29uIiA6IHsKICAgICAgImRldGFpbCIgOiAic3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzIiwKICAgICAgInJlcXVpcmVkIiA6IGZhbHNlLAogICAgICAic3RhdHVzIiA6ICJtaXNzaW5nIgogICAgfSwKICAgICJjcmFzaC1pbmRleC50eHQiIDogewogICAgICAiZGV0YWlsIiA6ICJzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgImNyYXNoLWxvZy50eHQiIDogewogICAgICAiZGV0YWlsIiA6ICJzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgImhpbG9nLnR4dCIgOiB7CiAgICAgICJkZXRhaWwiIDogInN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cyIsCiAgICAgICJyZXF1aXJlZCIgOiBmYWxzZSwKICAgICAgInN0YXR1cyIgOiAibWlzc2luZyIKICAgIH0sCiAgICAic2NyZWVuc2hvdC5qcGVnIiA6IHsKICAgICAgImRldGFpbCIgOiAidXBzdHJlYW0gY2FwdHVyZS1zY3JlZW5zaG90IGRpZCBub3QgcnVuOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgInNjcmVlbnNob3QucG5nIiA6IHsKICAgICAgImRldGFpbCIgOiAidXBzdHJlYW0gY2FwdHVyZS1zY3JlZW5zaG90IGRpZCBub3QgcnVuOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgInRyYWNlLmh0cmFjZSIgOiB7CiAgICAgICJhcnRpZmFjdElkIiA6ICJBUlQtMTQ4YzMxNjhmYzAyYjY0MGE5NmQ0NTI0NjNiMmE4ZDciLAogICAgICAiYnl0ZUNvdW50IiA6IDgwLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzaGEyNTYiIDogImJjZmQ3ZmMwYWE3ZThlMjdmZjhhMjY2ZjdiMTlmNzczZWYxYWFhNjk2NDhmODA2ODc4ZTM4MTAzYzA5NWJiYjEiLAogICAgICAic3RhdHVzIiA6ICJwdWJsaXNoZWQiCiAgICB9LAogICAgInVpLWR1bXAuanNvbiIgOiB7CiAgICAgICJkZXRhaWwiIDogInN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cyIsCiAgICAgICJyZXF1aXJlZCIgOiBmYWxzZSwKICAgICAgInN0YXR1cyIgOiAibWlzc2luZyIKICAgIH0sCiAgICAidWktdHJlZS5qc29uIiA6IHsKICAgICAgImRldGFpbCIgOiAidXBzdHJlYW0gY2FwdHVyZS11aS10cmVlIGRpZCBub3QgcnVuOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9CiAgfSwKICAiY29tcGxldGVuZXNzIiA6ICJjb21wbGV0ZSIsCiAgImpvYklkIiA6ICJqb2ItMWMyMDliZjVmN2IxNTM3Y2JkMjQwNmY1NjQwZTBhYjgiLAogICJtaXNzaW5nUmVxdWlyZWQiIDogWwoKICBdLAogICJvcGVyYXRpb24iIDogImNhcHR1cmUuZGlhZ25vc3RpY3NAMSIsCiAgInRyYWNlIiA6IHsKICAgICJhZGFwdGVyRmFtaWx5IiA6ICJoaXRyYWNlLmRheXUyMDAtb2g3LnRleHQiLAogICAgImR1cmF0aW9uU2Vjb25kcyIgOiA1LAogICAgInBhcmFtZXRlcnMiIDogWwogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJiZWZvcmUiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogInRydWUiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LmFjZS50cmFjZS5zeW50YXguZW5hYmxlZCIsCiAgICAgICAgInJlc3RvcmVkIiA6IG51bGwKICAgICAgfSwKICAgICAgewogICAgICAgICJhZnRlciIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAidHJ1ZSIKICAgICAgICB9LAogICAgICAgICJiZWZvcmUiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogInRydWUiCiAgICAgICAgfSwKICAgICAgICAiZGVzaXJlZCIgOiAidHJ1ZSIsCiAgICAgICAgIm5hbWUiIDogInBlcnNpc3QuYWNlLnRyYWNlLmxheW91dC5lbmFibGVkIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9LAogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAibWlzc2luZyIKICAgICAgICB9LAogICAgICAgICJiZWZvcmUiIDogewogICAgICAgICAgInN0YXRlIiA6ICJtaXNzaW5nIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogInRydWUiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LmFjZS50cmFjZS5idWlsZC5lbmFibGVkIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9LAogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICIxIgogICAgICAgIH0sCiAgICAgICAgImJlZm9yZSIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAiMSIKICAgICAgICB9LAogICAgICAgICJkZXNpcmVkIiA6ICJ0cnVlIiwKICAgICAgICAibmFtZSIgOiAicGVyc2lzdC5hY2UudHJhY2UubWVhc3VyZS5kZWJ1Zy5lbmFibGVkIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9LAogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAibWlzc2luZyIKICAgICAgICB9LAogICAgICAgICJiZWZvcmUiIDogewogICAgICAgICAgInN0YXRlIiA6ICJtaXNzaW5nIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogInRydWUiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LmFjZS50cmFjZS5zeW5jLmRlYnVnLmVuYWJsZWQiLAogICAgICAgICJyZXN0b3JlZCIgOiBudWxsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiYWZ0ZXIiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogIjAiCiAgICAgICAgfSwKICAgICAgICAiYmVmb3JlIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICIwIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogIjEiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LmFjZS5kZWJ1Zy5lbmFibGVkIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9LAogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICJ0cnVlIgogICAgICAgIH0sCiAgICAgICAgImJlZm9yZSIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAidHJ1ZSIKICAgICAgICB9LAogICAgICAgICJkZXNpcmVkIiA6ICJ0cnVlIiwKICAgICAgICAibmFtZSIgOiAicGVyc2lzdC5hY2UucGVyZm9ybWFuY2UubW9uaXRvci5lbmFibGVkIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9LAogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICIxIgogICAgICAgIH0sCiAgICAgICAgImJlZm9yZSIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAiMSIKICAgICAgICB9LAogICAgICAgICJkZXNpcmVkIiA6ICIxIiwKICAgICAgICAibmFtZSIgOiAicGVyc2lzdC5zeXMuZ3JhcGhpYy5vcGVuRGVidWdUcmFjZSIsCiAgICAgICAgInJlc3RvcmVkIiA6IG51bGwKICAgICAgfSwKICAgICAgewogICAgICAgICJhZnRlciIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAiZmFsc2UiCiAgICAgICAgfSwKICAgICAgICAiYmVmb3JlIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJkZXNpcmVkIiA6ICIxIiwKICAgICAgICAibmFtZSIgOiAicGVyc2lzdC5yb3Nlbi5hbmltYXRpb250cmFjZS5lbmFibGVkIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9CiAgICBdLAogICAgInJhd0FydGlmYWN0SWQiIDogIkFSVC0xNDhjMzE2OGZjMDJiNjQwYTk2ZDQ1MjQ2M2IyYThkNyIsCiAgICAicmF3Qnl0ZUNvdW50IiA6IDgwLAogICAgInJhd1NoYTI1NiIgOiAiYmNmZDdmYzBhYTdlOGUyN2ZmOGEyNjZmN2IxOWY3NzNlZjFhYWE2OTY0OGY4MDY4NzhlMzgxMDNjMDk1YmJiMSIsCiAgICAidGFncyIgOiBbCiAgICAgICJhYmlsaXR5IiwKICAgICAgImFjZSIsCiAgICAgICJncmFwaGljIgogICAgXSwKICAgICJ0b29sSWRlbnRpdHkiIDogImhpdHJhY2UiCiAgfQp9",
+   "ART-a73e873df5c4994f0105f40c6402e9c0": "ewogICJkb2N1bWVudFR5cGUiIDogImFya2RlY2stZGlhZ25vc3RpYy1tYXJrZXJzIiwKICAiam9iSWQiIDogImpvYi0xYzIwOWJmNWY3YjE1MzdjYmQyNDA2ZjU2NDBlMGFiOCIsCiAgIm1hcmtlcnMiIDogWwoKICBdLAogICJub3REZXJpdmVkIiA6IFsKICAgIHsKICAgICAgImtpbmQiIDogImZyYW1lRGVhZGxpbmUiLAogICAgICAicmVhc29uIiA6ICJkZXJpdmluZyBpdCBtZWFucyByZWFkaW5nIHRoZSB0cmFjZSwgYW5kIGZpbmFsaXphdGlvbiBob2xkcyBhcnRpZmFjdCBtZXRhZGF0YSByYXRoZXIgdGhhbiBhcnRpZmFjdCBieXRlcyIKICAgIH0sCiAgICB7CiAgICAgICJraW5kIiA6ICJsb2dLZXl3b3JkIiwKICAgICAgInJlYXNvbiIgOiAiZGVyaXZpbmcgaXQgbWVhbnMgcmVhZGluZyB0aGUgY2FwdHVyZWQgbG9nLCB3aGljaCBmaW5hbGl6YXRpb24gZG9lcyBub3Qgb3BlbiIKICAgIH0KICBdLAogICJzY2hlbWFWZXJzaW9uIiA6ICIxLjAuMCIKfQ==",
+   "ART-b34e2fab00558c1e6eee07f5a401e3ca": "am9iQ3JlYXRlZApxdWV1ZWQtPnByZWZsaWdodApwcmVmbGlnaHQtPnJ1bm5pbmcKcmVhc29uOiBzdGVwcy1zdGFydAp0cmFjZSBwYXJhbWV0ZXJzIHNuYXBzaG90dGVkIGJlZm9yZSBjYXB0dXJlCmhvc3Qtc3RlcCBwcmVmbGlnaHQtaG9zdC1zdG9yYWdlCmludGVudCBjb25maXJtLWV2aWRlbmNlLXRhcmdldAp2ZXJpZmllZCBjb25maXJtLWV2aWRlbmNlLXRhcmdldCBbImRldmljZUlkZW50aXR5U0hBMjU2IiwgInN0YXRlIiwgInRyYW5zcG9ydCJdCmV2aWRlbmNlLXByZWZsaWdodCBjb25maXJtLWV2aWRlbmNlLXRhcmdldAppbnRlbnQgcmVhZC1ldmlkZW5jZS1tb2RlbAp2ZXJpZmllZCByZWFkLWV2aWRlbmNlLW1vZGVsIFsidmFsdWUiXQpldmlkZW5jZS1wcmVmbGlnaHQgcmVhZC1ldmlkZW5jZS1tb2RlbAppbnRlbnQgcmVhZC1ldmlkZW5jZS1maXJtd2FyZQp2ZXJpZmllZCByZWFkLWV2aWRlbmNlLWZpcm13YXJlIFsidmFsdWUiXQpldmlkZW5jZS1wcmVmbGlnaHQgcmVhZC1ldmlkZW5jZS1maXJtd2FyZQppbnRlbnQgcHJlZmxpZ2h0LWRldmljZS1zdG9yYWdlCnZlcmlmaWVkIHByZWZsaWdodC1kZXZpY2Utc3RvcmFnZSBbImF2YWlsYWJsZUJ5dGVzIl0Kc2tpcHBlZCBvYnNlcnZlLWFwcGxpY2F0aW9uLWxpdmVuZXNzOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMKc2tpcHBlZCBjYXB0dXJlLWhpbG9nOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMKc2tpcHBlZCBjYXB0dXJlLXVpLWR1bXA6IHN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cwpza2lwcGVkIGNhcHR1cmUtYWR2YW5jZWQtdWktZHVtcDogc3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzCnNraXBwZWQgY2FwdHVyZS1jcmFzaC1pbmRleDogc3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzCnNraXBwZWQgY2FwdHVyZS1jcmFzaC1sb2c6IHN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cwpza2lwcGVkIGNhcHR1cmUtdWktdHJlZTogc3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzCnNraXBwZWQgcmVjZWl2ZS11aS10cmVlOiB1cHN0cmVhbSBjYXB0dXJlLXVpLXRyZWUgZGlkIG5vdCBydW46IHN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cwpza2lwcGVkIGNsZWFudXAtdWktdHJlZS10ZW1wOiB1cHN0cmVhbSBjYXB0dXJlLXVpLXRyZWUgZGlkIG5vdCBydW46IHN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cwpza2lwcGVkIGNhcHR1cmUtc2NyZWVuc2hvdDogc3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzCnNraXBwZWQgcmVjZWl2ZS1zY3JlZW5zaG90OiB1cHN0cmVhbSBjYXB0dXJlLXNjcmVlbnNob3QgZGlkIG5vdCBydW46IHN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cwpza2lwcGVkIGNsZWFudXAtc2NyZWVuc2hvdC10ZW1wOiB1cHN0cmVhbSBjYXB0dXJlLXNjcmVlbnNob3QgZGlkIG5vdCBydW46IHN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cwpjYXBhYmlsaXR5IGNvbnN1bWVkIGJlZm9yZSBmaXJzdCBtdXRhdGlvbgppbnRlbnQgY2FwdHVyZS10cmFjZQp2ZXJpZmllZCBjYXB0dXJlLXRyYWNlIFsicmVtb3RlQnl0ZUNvdW50Il0KaW50ZW50IHJlY2VpdmUtdHJhY2UtYXJ0aWZhY3QKdmVyaWZpZWQgcmVjZWl2ZS10cmFjZS1hcnRpZmFjdCBbImJ5dGVDb3VudCIsICJsb2NhbEFydGlmYWN0IiwgInNoYTI1NiJdCmFydGlmYWN0IHRyYWNlLmh0cmFjZSAtPiBBUlQtMTQ4YzMxNjhmYzAyYjY0MGE5NmQ0NTI0NjNiMmE4ZDcKaW50ZW50IGNsZWFudXAtcmVtb3RlLXRlbXAKdmVyaWZpZWQgY2xlYW51cC1yZW1vdGUtdGVtcCBbImNsZWFuZWQiXQpob3N0LXN0ZXAgcG9zdHByb2Nlc3MtaW5kZXgKaG9zdC1zdGVwIGZpbmFsaXplLXNlc3Npb24KdHJhY2UgcGFyYW1ldGVycyBzbmFwc2hvdHRlZCBhZnRlciBjYXB0dXJlCnJ1bm5pbmctPmZpbmFsaXppbmcKcmVhc29uOiBzdGVwcy1jb21wbGV0ZQo=",
+   "ART-ff047137b0fb56d674b4114810e94149": "ewogICJhcnRpZmFjdHMiIDogewogICAgImFkdmFuY2VkLWR1bXAudHh0IiA6IHsKICAgICAgImRldGFpbCIgOiAic3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzIiwKICAgICAgInJlcXVpcmVkIiA6IGZhbHNlLAogICAgICAic3RhdHVzIiA6ICJtaXNzaW5nIgogICAgfSwKICAgICJhcHBsaWNhdGlvbi1saXZlbmVzcy5qc29uIiA6IHsKICAgICAgImRldGFpbCIgOiAic3RlcCBub3Qgc2VsZWN0ZWQgYnkgdGhlIHJlcXVlc3QgaW5wdXRzIiwKICAgICAgInJlcXVpcmVkIiA6IGZhbHNlLAogICAgICAic3RhdHVzIiA6ICJtaXNzaW5nIgogICAgfSwKICAgICJjcmFzaC1pbmRleC50eHQiIDogewogICAgICAiZGV0YWlsIiA6ICJzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgImNyYXNoLWxvZy50eHQiIDogewogICAgICAiZGV0YWlsIiA6ICJzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgImhpbG9nLnR4dCIgOiB7CiAgICAgICJkZXRhaWwiIDogInN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cyIsCiAgICAgICJyZXF1aXJlZCIgOiBmYWxzZSwKICAgICAgInN0YXR1cyIgOiAibWlzc2luZyIKICAgIH0sCiAgICAic2NyZWVuc2hvdC5qcGVnIiA6IHsKICAgICAgImRldGFpbCIgOiAidXBzdHJlYW0gY2FwdHVyZS1zY3JlZW5zaG90IGRpZCBub3QgcnVuOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgInNjcmVlbnNob3QucG5nIiA6IHsKICAgICAgImRldGFpbCIgOiAidXBzdHJlYW0gY2FwdHVyZS1zY3JlZW5zaG90IGRpZCBub3QgcnVuOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9LAogICAgInRyYWNlLmh0cmFjZSIgOiB7CiAgICAgICJhcnRpZmFjdElkIiA6ICJBUlQtMTQ4YzMxNjhmYzAyYjY0MGE5NmQ0NTI0NjNiMmE4ZDciLAogICAgICAiYnl0ZUNvdW50IiA6IDgwLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzaGEyNTYiIDogImJjZmQ3ZmMwYWE3ZThlMjdmZjhhMjY2ZjdiMTlmNzczZWYxYWFhNjk2NDhmODA2ODc4ZTM4MTAzYzA5NWJiYjEiLAogICAgICAic3RhdHVzIiA6ICJwdWJsaXNoZWQiCiAgICB9LAogICAgInVpLWR1bXAuanNvbiIgOiB7CiAgICAgICJkZXRhaWwiIDogInN0ZXAgbm90IHNlbGVjdGVkIGJ5IHRoZSByZXF1ZXN0IGlucHV0cyIsCiAgICAgICJyZXF1aXJlZCIgOiBmYWxzZSwKICAgICAgInN0YXR1cyIgOiAibWlzc2luZyIKICAgIH0sCiAgICAidWktdHJlZS5qc29uIiA6IHsKICAgICAgImRldGFpbCIgOiAidXBzdHJlYW0gY2FwdHVyZS11aS10cmVlIGRpZCBub3QgcnVuOiBzdGVwIG5vdCBzZWxlY3RlZCBieSB0aGUgcmVxdWVzdCBpbnB1dHMiLAogICAgICAicmVxdWlyZWQiIDogZmFsc2UsCiAgICAgICJzdGF0dXMiIDogIm1pc3NpbmciCiAgICB9CiAgfSwKICAiam9iSWQiIDogImpvYi0xYzIwOWJmNWY3YjE1MzdjYmQyNDA2ZjU2NDBlMGFiOCIsCiAgIm9wZXJhdGlvbiIgOiAiY2FwdHVyZS5kaWFnbm9zdGljc0AxIiwKICAidHJhY2UiIDogewogICAgImFkYXB0ZXJGYW1pbHkiIDogImhpdHJhY2UuZGF5dTIwMC1vaDcudGV4dCIsCiAgICAiZHVyYXRpb25TZWNvbmRzIiA6IDUsCiAgICAicGFyYW1ldGVycyIgOiBbCiAgICAgIHsKICAgICAgICAiYWZ0ZXIiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgImJlZm9yZSIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAiZmFsc2UiCiAgICAgICAgfSwKICAgICAgICAiZGVzaXJlZCIgOiAidHJ1ZSIsCiAgICAgICAgIm5hbWUiIDogInBlcnNpc3QuYWNlLnRyYWNlLnN5bnRheC5lbmFibGVkIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9LAogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICJ0cnVlIgogICAgICAgIH0sCiAgICAgICAgImJlZm9yZSIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAidHJ1ZSIKICAgICAgICB9LAogICAgICAgICJkZXNpcmVkIiA6ICJ0cnVlIiwKICAgICAgICAibmFtZSIgOiAicGVyc2lzdC5hY2UudHJhY2UubGF5b3V0LmVuYWJsZWQiLAogICAgICAgICJyZXN0b3JlZCIgOiBudWxsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiYWZ0ZXIiIDogewogICAgICAgICAgInN0YXRlIiA6ICJtaXNzaW5nIgogICAgICAgIH0sCiAgICAgICAgImJlZm9yZSIgOiB7CiAgICAgICAgICAic3RhdGUiIDogIm1pc3NpbmciCiAgICAgICAgfSwKICAgICAgICAiZGVzaXJlZCIgOiAidHJ1ZSIsCiAgICAgICAgIm5hbWUiIDogInBlcnNpc3QuYWNlLnRyYWNlLmJ1aWxkLmVuYWJsZWQiLAogICAgICAgICJyZXN0b3JlZCIgOiBudWxsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiYWZ0ZXIiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogIjEiCiAgICAgICAgfSwKICAgICAgICAiYmVmb3JlIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICIxIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogInRydWUiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LmFjZS50cmFjZS5tZWFzdXJlLmRlYnVnLmVuYWJsZWQiLAogICAgICAgICJyZXN0b3JlZCIgOiBudWxsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiYWZ0ZXIiIDogewogICAgICAgICAgInN0YXRlIiA6ICJtaXNzaW5nIgogICAgICAgIH0sCiAgICAgICAgImJlZm9yZSIgOiB7CiAgICAgICAgICAic3RhdGUiIDogIm1pc3NpbmciCiAgICAgICAgfSwKICAgICAgICAiZGVzaXJlZCIgOiAidHJ1ZSIsCiAgICAgICAgIm5hbWUiIDogInBlcnNpc3QuYWNlLnRyYWNlLnN5bmMuZGVidWcuZW5hYmxlZCIsCiAgICAgICAgInJlc3RvcmVkIiA6IG51bGwKICAgICAgfSwKICAgICAgewogICAgICAgICJhZnRlciIgOiB7CiAgICAgICAgICAic3RhdGUiIDogInZhbHVlIiwKICAgICAgICAgICJ2YWx1ZSIgOiAiMCIKICAgICAgICB9LAogICAgICAgICJiZWZvcmUiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogIjAiCiAgICAgICAgfSwKICAgICAgICAiZGVzaXJlZCIgOiAiMSIsCiAgICAgICAgIm5hbWUiIDogInBlcnNpc3QuYWNlLmRlYnVnLmVuYWJsZWQiLAogICAgICAgICJyZXN0b3JlZCIgOiBudWxsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiYWZ0ZXIiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogInRydWUiCiAgICAgICAgfSwKICAgICAgICAiYmVmb3JlIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICJ0cnVlIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogInRydWUiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LmFjZS5wZXJmb3JtYW5jZS5tb25pdG9yLmVuYWJsZWQiLAogICAgICAgICJyZXN0b3JlZCIgOiBudWxsCiAgICAgIH0sCiAgICAgIHsKICAgICAgICAiYWZ0ZXIiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogIjEiCiAgICAgICAgfSwKICAgICAgICAiYmVmb3JlIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICIxIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogIjEiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LnN5cy5ncmFwaGljLm9wZW5EZWJ1Z1RyYWNlIiwKICAgICAgICAicmVzdG9yZWQiIDogbnVsbAogICAgICB9LAogICAgICB7CiAgICAgICAgImFmdGVyIiA6IHsKICAgICAgICAgICJzdGF0ZSIgOiAidmFsdWUiLAogICAgICAgICAgInZhbHVlIiA6ICJmYWxzZSIKICAgICAgICB9LAogICAgICAgICJiZWZvcmUiIDogewogICAgICAgICAgInN0YXRlIiA6ICJ2YWx1ZSIsCiAgICAgICAgICAidmFsdWUiIDogImZhbHNlIgogICAgICAgIH0sCiAgICAgICAgImRlc2lyZWQiIDogIjEiLAogICAgICAgICJuYW1lIiA6ICJwZXJzaXN0LnJvc2VuLmFuaW1hdGlvbnRyYWNlLmVuYWJsZWQiLAogICAgICAgICJyZXN0b3JlZCIgOiBudWxsCiAgICAgIH0KICAgIF0sCiAgICAicmF3QXJ0aWZhY3RJZCIgOiAiQVJULTE0OGMzMTY4ZmMwMmI2NDBhOTZkNDUyNDYzYjJhOGQ3IiwKICAgICJyYXdCeXRlQ291bnQiIDogODAsCiAgICAicmF3U2hhMjU2IiA6ICJiY2ZkN2ZjMGFhN2U4ZTI3ZmY4YTI2NmY3YjE5Zjc3M2VmMWFhYTY5NjQ4ZjgwNjg3OGUzODEwM2MwOTViYmIxIiwKICAgICJ0YWdzIiA6IFsKICAgICAgImFiaWxpdHkiLAogICAgICAiYWNlIiwKICAgICAgImdyYXBoaWMiCiAgICBdLAogICAgInRvb2xJZGVudGl0eSIgOiAiaGl0cmFjZSIKICB9Cn0="
+  },
+  "jobId": "job-1c209bf5f7b1537cbd2406f5640e0ab8"
+ },
+ "uiDump": {
+  "artifacts": [
+   {
+    "artifactDigest": "e9d7c179e9b5a2aaedb23818fa833bf8ebb2149469c6cddb195dcc5db6ef9ea6",
+    "artifactId": "ART-00000000000000000000000000000e01",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 2379,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+    "mediaType": "image/png",
+    "name": "screenshot.png",
+    "observationWindow": {
+     "endUtc": "2026-09-14T00:00:00.000Z",
+     "startUtc": "2026-09-14T00:00:00.000Z"
+    },
+    "owner": {
+     "id": "job-ui-dump-oracle",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   },
+   {
+    "artifactDigest": "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+    "artifactId": "ART-00000000000000000000000000000e02",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 9,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+    "mediaType": "application/json",
+    "name": "ui-dump.json",
+    "observationWindow": {
+     "endUtc": "2026-09-14T00:00:00.000Z",
+     "startUtc": "2026-09-14T00:00:00.000Z"
+    },
+    "owner": {
+     "id": "job-ui-dump-oracle",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   },
+   {
+    "artifactDigest": "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+    "artifactId": "ART-00000000000000000000000000000e03",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 1147,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+    "mediaType": "application/json",
+    "name": "ui-tree.json",
+    "observationWindow": {
+     "endUtc": "2026-09-14T00:00:00.000Z",
+     "startUtc": "2026-09-14T00:00:00.000Z"
+    },
+    "owner": {
+     "id": "job-ui-dump-oracle",
+     "kind": "job"
+    },
+    "privacy": "sensitive",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   },
+   {
+    "artifactDigest": "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+    "artifactId": "ART-00000000000000000000000000000e04",
+    "binding": {
+     "bindingRevision": 1,
+     "stableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+     "targetId": "TGT-3ba3f5f43b92"
+    },
+    "byteCount": 4,
+    "createdAtUtc": "2026-09-14T00:00:00Z",
+    "lease": "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+    "mediaType": "text/plain",
+    "name": "hilog.txt",
+    "observationWindow": {
+     "endUtc": "2026-09-14T00:00:00.000Z",
+     "startUtc": "2026-09-14T00:00:00.000Z"
+    },
+    "owner": {
+     "id": "job-ui-dump-oracle",
+     "kind": "job"
+    },
+    "privacy": "standard",
+    "providerId": "hdc",
+    "redactionApplied": false,
+    "retention": {
+     "class": "default",
+     "deadlineUtc": "2026-09-21T00:00:00Z",
+     "pinned": false
+    },
+    "schemaVersion": "arkdeck.artifact/1",
+    "sourceOperation": "capture.diagnostics@1",
+    "status": "published"
+   }
+  ],
+  "bytes": {
+   "ART-00000000000000000000000000000e01": "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAAN6jSQAAAJEklEQVR42u3VoREAMQgAwe+/R1QsTEw8XwMCt2IbOHNf3tcAMPWJAICBAGAgABgIAAYCAAYCgIEAYCAAGAgABgIABgKAgQBgIAAYCAAGAgAGAoCBAGAgABgIAAYCAAYCgIEAYCAAGAgABgIABgKAgQBgIAAYCAAGAgAGAoCBAGAgABgIAAYCAAYCgIEAYCAAGAgAGAgABgKAgQBgIAAYCAAYCAAGAoCBAGAgABgIABgIAAYCgIEAYCAAGAgAGAgABgKAgQBgIAAYCAAYCAAGAoCBAGAgABgIABgIAAYCgIEAYCAAGAgAGAgABgKAgQBgIAAYiAgAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCAAYCAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgACwNJE41AEwZCAAGAoCBAGAgABgIABgIAAYCgIEAYCAAGAgAGAgABgKAgQBgIAAYCAAYCAAGAoCBAGAgABgIABgIAAYCgIEAYCAAGAgAGAgABgKAgQBgIAAYCAAYCAAGAoCBAGAgABiIEAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCAAYCAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCAAYCAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCAiAGAgABgIAAYCgIEAgIEAYCAAGAgABgKAgQCAgQBgIAAYCAAGAoCBAICBAGAgABgIAAYCgIEAgIEAYCAAGAgABgKAgQCAgQCwNZC8rwFgykAAMBAADAQAAwHAQADAQAAwEAAMBAADAcBAAMBAADAQAAwEAAMBwEAAwEAAMBAADAQAAwHAQADAQAAwEAAMBAADAcBAAMBAADAQAAwEAAMBwEAAwEAAMBAADAQAAwHAQIQAwEAAMBAADAQAAwEAAwHAQAAwEAAMBAADAQADAcBAADAQAAwEAAMBAAMBwEAAMBAADAQAAwEAAwHAQAAwEAAMBAADAQADAcBAADAQAAwEAAMBAAMBwEAAMBAADAQAAwEAAwHAQAAwEAAMBAADEQEAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEAAMBwEAAMBAADAQADAQAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEgK2BxKkGgCkDAcBAADAQAAwEAAMBAAMBwEAAMBAADAQAAwEAAwHAQAAwEAAMBAADAQADAcBAADAQAAwEAAMBAAMBwEAAMBAADAQAAwEAAwHAQAAwEAAMBAADAQADAcBAADAQAAwEAAMRAgADAcBAADAQAAwEAAwEAAMBwEAAMBAADAQADAQAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEAAMBwEAAMBAADAQADAQAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEAAMBwEAAMBAADEQEAAwEAAMBwEAAMBAAMBAADAQAAwHAQAAwEAAwEAAMBAADAcBAADAQADAQAAwEAAMBwEAAMBAAMBAADAQAAwHAQAAwEAAwEAC2BpL3NQBMGQgABgKAgQBgIAAYCAAYCAAGAoCBAGAgABgIABgIAAYCgIEAYCAAGAgAGAgABgKAgQBgIAAYCAAYCAAGAoCBAGAgABgIABgIAAYCgIEAYCAAGAgAGAgABgKAgQBgIAAYiBAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCAAYCAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCAAYCAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgIgBgIAAYCAAGAoCBAICBAGAgABgIAAYCgIEAgIEAYCAAGAgABgKAgQCAgQBgIAAYCAAGAoCBAICBAGAgABgIAAYCgIEAgIEAsDWQONUAMGUgABgIAAYCgIEAYCAAYCAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCAAYCAAGAgABgKAgQBgIABgIAAYCAAGAoCBAGAgAGAgABgIAAYCgIEAYCBCAGAgABgIAAYCgIEAgIEAYCAAGAgABgKAgQCAgQBgIAAYCAAGAoCBAICBAGAgABgIAAYCgIEAgIEAYCAAGAgABgKAgQCAgQBgIAAYCAAGAoCBAICBAGAgABgIAAYCgIEAgIEAYCAAGAgABgKAgYgAgIEAYCAAGAgABgIABgKAgQBgIAAYCAAGAgAGAoCBAGAgABgIAAYCAAYCgIEAYCAAGAgABgIABgKAgQBgIAAYCAAGAgAGAsDWQPK+BoApAwHAQAAwEAAMBAADAQADAcBAADAQAAwEAAMBAAMBwEAAMBAADAQAAwEAAwHAQAAwEAAMBAADAQADAcBAADAQAAwEAAMBAAMBwEAAMBAADAQAAwEAAwHAQAAwEAAMBAADEQIAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEAAMBwEAAMBAADAQADAQAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEAAMBwEAAMBAADAQADAQAAwHAQAAwEAAMBAAMBAADAcBAADAQAAxEBAAMBAADAcBAADAQADAQAAwEAAMBwEAAMBAAMBAADAQAAwHAQAAwEAAwEAAMBAADAcBAADAQADAQAAwEAAMBwEAAMBAAMBAAtgYSpxoApgwEAAMBwEAAMBAADAQADAQAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEAAMBwEAAMBAADAQADAQAAwHAQAAwEAAMBAAMBAADAcBAADAQAAwEAAwEAAMBwEAAMBAADEQIAAwEAAMBwEAAMBAAMBAADAQAAwHAQAAwEAAwEAAMBAADAcBAADAQADAQAAwEAAMBwEAAMBAAMBAADAQAAwHAQAAwEAAwEAAMBAADAcBAADAQADAQAAwEAAMBwEAAMBAAMBAADAQAAwHAQAAwEBEAMBAADAQAAwHAQADAQAAwEAAMBAADAcBAAMBAADAQAAwEAAMBwEAAwEAAMBAADAQAAwHAQADAQAAwEAAMBAADAcBAAMBAAFjyA69w69AVnMLeAAAAAElFTkSuQmCC",
+   "ART-00000000000000000000000000000e02": "d2luZG93IDEK",
+   "ART-00000000000000000000000000000e03": "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ=="
+  },
+  "jobId": "job-ui-dump-oracle"
+ }
+}
