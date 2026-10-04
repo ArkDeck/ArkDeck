@@ -5010,4 +5010,60 @@ SHA-256: %4$@</value>
     <value>The remote build source could not be saved safely.</value>
     <comment>windows.remoteSources.error.storageFailed (Windows only)</comment>
   </data>
+  <data name="history_activity_open_flash" xml:space="preserve">
+    <value>Open Flash</value>
+    <comment>history.activity.open.flash (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_viewer" xml:space="preserve">
+    <value>Open Viewer</value>
+    <comment>history.activity.open.viewer (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_trace" xml:space="preserve">
+    <value>Open Trace</value>
+    <comment>history.activity.open.trace (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_debug" xml:space="preserve">
+    <value>Open Debug</value>
+    <comment>history.activity.open.debug (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_device" xml:space="preserve">
+    <value>Open Device</value>
+    <comment>history.activity.open.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_detailUnavailable" xml:space="preserve">
+    <value>Job details are unavailable, so ArkDeck cannot reopen this context.</value>
+    <comment>history.activity.open.detailUnavailable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_unsupported" xml:space="preserve">
+    <value>This record has no workspace that can be reopened.</value>
+    <comment>history.activity.open.unsupported (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_title" xml:space="preserve">
+    <value>Opened from History</value>
+    <comment>history.context.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_dismiss" xml:space="preserve">
+    <value>Close history context</value>
+    <comment>history.context.dismiss (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>history.context.job (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>history.context.target (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_operation" xml:space="preserve">
+    <value>Operation</value>
+    <comment>history.context.operation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_state" xml:space="preserve">
+    <value>State</value>
+    <comment>history.context.state (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_artifacts" xml:space="preserve">
+    <value>Artifacts</value>
+    <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
+  </data>
 </root>

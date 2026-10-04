@@ -15,10 +15,12 @@ public sealed class DiagnosticsFlowTests
 
     public TestContext TestContext { get; set; } = null!;
 
+    /// <summary>Opens a record in Diagnostics: the session (a Trace workspace record) through
+    /// Open Diagnostics, the HiLog summary (a Diagnostics record) through its Open button.</summary>
     private static void Open(AppSession app, string jobId)
     {
         app.Find("history.row." + jobId).Patterns.SelectionItem.Pattern.Select();
-        app.Invoke("history.openDiagnostics");
+        app.Invoke(jobId == HilogJob ? "history.openWorkspace" : "history.openDiagnostics");
     }
 
     [TestMethod]

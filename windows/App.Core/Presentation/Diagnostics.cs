@@ -25,10 +25,8 @@ public sealed record DiagnosticsState(
     /// <summary>The reason the open record could not be read, or null.</summary>
     public string? LoadError => Session?.UnavailableReason ?? Hilog?.UnavailableReason;
 
-    /// <summary>The History record this Job is: the context a page opens, or null when the Job
-    /// has no workspace in Diagnostics (macOS shows Open Diagnostics for every
-    /// <c>capture.diagnostics@1</c> record and for the records whose workspace is
-    /// Diagnostics).</summary>
+    /// <summary>The Diagnostics context of a Job whose workspace is Diagnostics, or of any
+    /// <c>capture.diagnostics@1</c> Job (macOS: Open Diagnostics), else null.</summary>
     public static DiagnosticJobContext? ContextOf(JobSummary job) =>
         IsDiagnosticsRecord(job.Operation, job.WorkspaceKind)
             ? new DiagnosticJobContext(job.JobId, job.Operation, job.TargetId, job.SessionId, job.State, job.ExecutionMode)

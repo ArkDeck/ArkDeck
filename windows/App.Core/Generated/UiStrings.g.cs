@@ -1257,6 +1257,20 @@ public static class UiStrings
     public const string WindowsRemoteSourcesErrorConnectionFailed = "windows.remoteSources.error.connectionFailed";
     public const string WindowsRemoteSourcesErrorCredentialStoreFailed = "windows.remoteSources.error.credentialStoreFailed";
     public const string WindowsRemoteSourcesErrorStorageFailed = "windows.remoteSources.error.storageFailed";
+    public const string HistoryActivityOpenFlash = "history.activity.open.flash";
+    public const string HistoryActivityOpenViewer = "history.activity.open.viewer";
+    public const string HistoryActivityOpenTrace = "history.activity.open.trace";
+    public const string HistoryActivityOpenDebug = "history.activity.open.debug";
+    public const string HistoryActivityOpenDevice = "history.activity.open.device";
+    public const string HistoryActivityOpenDetailUnavailable = "history.activity.open.detailUnavailable";
+    public const string HistoryActivityOpenUnsupported = "history.activity.open.unsupported";
+    public const string HistoryContextTitle = "history.context.title";
+    public const string HistoryContextDismiss = "history.context.dismiss";
+    public const string HistoryContextJob = "history.context.job";
+    public const string HistoryContextTarget = "history.context.target";
+    public const string HistoryContextOperation = "history.context.operation";
+    public const string HistoryContextState = "history.context.state";
+    public const string HistoryContextArtifacts = "history.context.artifacts";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2510,5 +2524,19 @@ public static class UiStrings
         WindowsRemoteSourcesErrorConnectionFailed,
         WindowsRemoteSourcesErrorCredentialStoreFailed,
         WindowsRemoteSourcesErrorStorageFailed,
+        HistoryActivityOpenFlash,
+        HistoryActivityOpenViewer,
+        HistoryActivityOpenTrace,
+        HistoryActivityOpenDebug,
+        HistoryActivityOpenDevice,
+        HistoryActivityOpenDetailUnavailable,
+        HistoryActivityOpenUnsupported,
+        HistoryContextTitle,
+        HistoryContextDismiss,
+        HistoryContextJob,
+        HistoryContextTarget,
+        HistoryContextOperation,
+        HistoryContextState,
+        HistoryContextArtifacts,
     ];
 }

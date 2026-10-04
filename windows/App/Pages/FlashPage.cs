@@ -21,7 +21,7 @@ namespace ArkDeck.App.Pages;
 /// </summary>
 public sealed partial class FlashPage() : SurfacePage<FlashState>(
     "flash", "flash.title", UiStrings.WindowsNavigationFlash,
-    "flash.refresh", UiStrings.FlashActionRefresh, "flash.loading", UiStrings.SettingsCommonLoading)
+    "flash.refresh", UiStrings.FlashActionRefresh, "flash.loading", UiStrings.SettingsCommonLoading), IHistoryContextPage
 {
     // Rebuilt by each render (an element is never moved between renders).
     private StackPanel _primary = new() { Spacing = 12 };
@@ -48,15 +48,40 @@ public sealed partial class FlashPage() : SurfacePage<FlashState>(
 
     private FlashPlan? Plan => _preparation?.Plan is { } plan && plan.Target.TargetId == _targetId ? plan : null;
 
+    private HistoryWorkspaceContext? _history;
+
+    /// <summary>macOS <c>focusHistoryContext</c>: the record's exact Target is selected and any
+    /// plan invalidated, without preparing or submitting one; a Target no longer adopted stays
+    /// selected and missing, so no other device is chosen for the record.</summary>
+    public void OpenHistoryContext(HistoryWorkspaceContext context)
+    {
+        _history = context;
+        if (_targetId == context.TargetId) return;
+        _targetId = context.TargetId;
+        _preparation = null;
+    }
+
     protected override void Render(FlashState state, StackPanel body)
     {
         _state = state;
         var targets = state.Targets.Value ?? [];
-        if (_targetId is null || targets.All(t => t.TargetId != _targetId)) _targetId = targets.FirstOrDefault()?.TargetId;
+        if (_targetId is null || (_history?.TargetId != _targetId && targets.All(t => t.TargetId != _targetId))) _targetId = targets.FirstOrDefault()?.TargetId;
+        if (_history is { } history)
+        {
+            body.Children.Add(HistoryContextBanner.Create(history, async () =>
+            {
+                _history = null;
+                await RefreshAsync();
+            }));
+        }
         var said = _status.Text;
         _status = Ui.Status("flash.status");
         Ui.SetText(_status, said);
         body.Children.Add(Ui.Text("flash.workspace.title", S.Text(UiStrings.FlashWorkspaceSubtitle), "ArkDeckCaptionStyle"));
+        if (_targetId is not null && targets.All(t => t.TargetId != _targetId))
+        {
+            body.Children.Add(Ui.Text("flash.target.historyMissing", S.Text(UiStrings.FlashTargetHistoryMissing), "ArkDeckCaptionStyle"));
+        }
         body.Children.Add(Ui.Card(CurrentDevice(state), "flash.workspace.currentDevice.card"));
         _primary = new StackPanel { Spacing = 12 };
         body.Children.Add(Ui.Card(_primary, "flash.workspace.primary"));

@@ -21,7 +21,7 @@ namespace ArkDeck.App.Pages;
 /// </summary>
 public sealed partial class DevicePage() : SurfacePage<DeviceState>(
     "device", "device.title", UiStrings.AppNavigationDevice,
-    "hdc.devices.refresh", UiStrings.HdcDevicesRefresh, "app.devices.checking", UiStrings.OverviewStatusRefreshing)
+    "hdc.devices.refresh", UiStrings.HdcDevicesRefresh, "app.devices.checking", UiStrings.OverviewStatusRefreshing), IHistoryContextPage
 {
     // Rebuilt by each render (an element is never moved between renders).
     private StackPanel _detail = new() { Spacing = 8 };
@@ -31,8 +31,26 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
 
     protected override Task<DeviceState> LoadAsync() => App.Loader.DeviceAsync();
 
+    private HistoryWorkspaceContext? _history;
+
+    /// <summary>macOS <c>openHistoryContext</c> on Device: the record's Target is selected. The
+    /// macOS Device screen workspace (its historical screenshot) is not part of the Windows App.</summary>
+    public void OpenHistoryContext(HistoryWorkspaceContext context)
+    {
+        _history = context;
+        _selected = context.TargetId;
+    }
+
     protected override void Render(DeviceState state, StackPanel body)
     {
+        if (_history is { } history)
+        {
+            body.Children.Add(HistoryContextBanner.Create(history, async () =>
+            {
+                _history = null;
+                await RefreshAsync();
+            }));
+        }
         if (state.Candidates.Unavailable is { } why)
         {
             var notice = Ui.UnavailableNotice("app.devices.unavailable", UiStrings.AppDevicesUnavailable, why);
