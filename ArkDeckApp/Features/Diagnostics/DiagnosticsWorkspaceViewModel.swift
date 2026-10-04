@@ -188,6 +188,15 @@ final class DiagnosticsWorkspaceViewModel {
 
   var alignmentDetail: String? {
     guard case .cannotAlign(let reason) = reading?.alignment else { return nil }
+    if let observation = reading?.clockObservation {
+      switch observation.status {
+      case .unvalidated:
+        return diagnosticsText("diagnostics.alignment.observedWindow")
+          .replacingOccurrences(of: "{milliseconds}", with: String(observation.windowMilliseconds))
+      case .hostClockDiscontinuity:
+        return diagnosticsText("diagnostics.alignment.clockDiscontinuity")
+      }
+    }
     if reason == "capture artifacts contain no host-to-device calibration" {
       return diagnosticsText("diagnostics.alignment.explain")
     }

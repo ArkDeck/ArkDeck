@@ -11,6 +11,13 @@ use std::path::Path;
 /// bound the wait with a monotonic clock, freeze annotations on exit and
 /// revalidate the admitted target before allowing finalization.
 pub trait DiagnosticTraceControl {
+    /// Bracket only the existing anchor write; these callbacks dispatch nothing.
+    fn before_anchor(&self) -> Result<(), String> {
+        Ok(())
+    }
+    fn after_anchor(&self) -> Result<(), String> {
+        Ok(())
+    }
     fn wait_until_stop(&self, maximum_seconds: u64) -> Result<(), String>;
     fn before_finalize(&self) -> Result<(), String>;
 }
@@ -93,6 +100,9 @@ pub fn run_diagnostic_trace(
     }
     let mut subprocesses = Vec::with_capacity(6);
     for (index, invocation) in arm.iter().enumerate() {
+        if index == 1 {
+            control.before_anchor().map_err(unknown)?;
+        }
         let receipt = invoke(dispatch, invocation).map_err(|error| {
             if index == 0 {
                 error
@@ -117,6 +127,9 @@ pub fn run_diagnostic_trace(
             return Err(unknown(
                 "trace ring did not prove its arm and unique anchor",
             ));
+        }
+        if index == 1 {
+            control.after_anchor().map_err(unknown)?;
         }
         subprocesses.push(receipt);
     }
@@ -314,6 +327,67 @@ mod tests {
                 Err(DispatchFailure::Unobservable(_))
             ));
             assert_eq!(device.calls.lock().unwrap().len(), 3);
+        }
+    }
+
+    #[test]
+    fn clock_bracket_surrounds_only_anchor_write_and_callback_failure_stops_dispatch() {
+        struct Observed<'a> {
+            device: &'a Device,
+            fail: u8,
+            events: Mutex<Vec<usize>>,
+        }
+        impl DiagnosticTraceControl for Observed<'_> {
+            fn before_anchor(&self) -> Result<(), String> {
+                self.events
+                    .lock()
+                    .unwrap()
+                    .push(self.device.calls.lock().unwrap().len());
+                if self.fail == 1 {
+                    Err("clock unavailable".into())
+                } else {
+                    Ok(())
+                }
+            }
+            fn after_anchor(&self) -> Result<(), String> {
+                self.events
+                    .lock()
+                    .unwrap()
+                    .push(self.device.calls.lock().unwrap().len());
+                if self.fail == 2 {
+                    Err("observation publication unknown".into())
+                } else {
+                    Ok(())
+                }
+            }
+            fn wait_until_stop(&self, _: u64) -> Result<(), String> {
+                Ok(())
+            }
+            fn before_finalize(&self) -> Result<(), String> {
+                Ok(())
+            }
+        }
+        let plan = action()
+            .lower_in("capture-session-trace", Some("exact-target"), None)
+            .unwrap();
+        for fail in [0, 1, 2] {
+            let device = Device {
+                calls: Mutex::new(vec![]),
+                fail_at: None,
+            };
+            let observed = Observed {
+                device: &device,
+                fail,
+                events: Mutex::new(vec![]),
+            };
+            let result = run_diagnostic_trace(&plan, &device, &observed);
+            if fail == 0 {
+                assert_eq!(result.unwrap().subprocesses.len(), 6);
+                assert_eq!(*observed.events.lock().unwrap(), [1, 2]);
+            } else {
+                assert!(matches!(result, Err(DispatchFailure::Unobservable(_))));
+                assert_eq!(device.calls.lock().unwrap().len(), usize::from(fail));
+            }
         }
     }
 }

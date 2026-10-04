@@ -242,6 +242,7 @@ struct DiagnosticSessionOfflineInspectorContractTests {
     #expect(inspection.reading.missingProducts.isEmpty)
     #expect(inspection.reading.marks.count == 1)
     #expect(inspection.operationReference == DiagnosticCaptureFacade.operationReference)
+    #expect(inspection.reading.clockObservation?.status == .unvalidated)
     let raw = try #require(inventory.first { $0.name == "trace.htrace" })
     let trace = RuntimeArtifactPresentation(
       id: raw.artifactID, name: raw.name, role: "raw", mediaType: raw.mediaType,

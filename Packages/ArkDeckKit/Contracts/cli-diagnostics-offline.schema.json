@@ -66,7 +66,10 @@
           "maxLength": 4096
         },
         "sourceOperation": {
-          "enum": ["capture.diagnostics@1", "capture.diagnostic-session@1"]
+          "enum": [
+            "capture.diagnostics@1",
+            "capture.diagnostic-session@1"
+          ]
         },
         "byteCount": {
           "type": "integer",
@@ -301,7 +304,10 @@
           "maxLength": 512
         },
         "operationReference": {
-          "enum": ["capture.diagnostics@1", "capture.diagnostic-session@1"]
+          "enum": [
+            "capture.diagnostics@1",
+            "capture.diagnostic-session@1"
+          ]
         },
         "derivation": {
           "$ref": "#/$defs/provenance"
@@ -343,6 +349,9 @@
           "items": {
             "$ref": "#/$defs/artifact"
           }
+        },
+        "clockObservation": {
+          "$ref": "#/$defs/clockObservation"
         }
       }
     },
@@ -372,6 +381,54 @@
         },
         "clipped": {
           "type": "boolean"
+        }
+      }
+    },
+    "clockObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "jobId",
+        "anchor",
+        "startedAtHostUTC",
+        "finishedAtHostUTC",
+        "elapsedNanoseconds",
+        "status"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "arkdeck.trace-clock-observation/1"
+        },
+        "jobId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "anchor": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startedAtHostUTC": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}Z$"
+        },
+        "finishedAtHostUTC": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?!0000)[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}Z$"
+        },
+        "elapsedNanoseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120000000000
+        },
+        "status": {
+          "enum": [
+            "unvalidated",
+            "hostClockDiscontinuity"
+          ]
         }
       }
     }

@@ -697,11 +697,59 @@ fn instant(value: &str) -> bool {
 }
 
 /// The marks, what was never derived, and the ring's held anchor.
-type Reading = (Vec<Value>, Vec<String>, Option<bool>);
+type Reading = (Vec<Value>, Vec<String>, Option<bool>, Option<Value>);
+
+fn clock_observation(value: &Value, job: &str, anchor: Option<&str>) -> Result<Value, CliError> {
+    let malformed = || invalid("diagnostics_invalid_clock_observation");
+    let fields = value.as_object().ok_or_else(malformed)?;
+    let keys = [
+        "schemaVersion",
+        "jobId",
+        "anchor",
+        "startedAtHostUTC",
+        "finishedAtHostUTC",
+        "elapsedNanoseconds",
+        "status",
+    ];
+    if fields.len() != keys.len()
+        || !keys.iter().all(|key| fields.contains_key(*key))
+        || value["schemaVersion"] != "arkdeck.trace-clock-observation/1"
+        || value["jobId"] != job
+        || anchor.is_none_or(str::is_empty)
+        || value["anchor"].as_str() != anchor
+    {
+        return Err(malformed());
+    }
+    let timestamp = |key: &str| -> Result<f64, CliError> {
+        value[key]
+            .as_str()
+            .filter(|s| s.ends_with('Z') && s.len() == 24)
+            .and_then(arkdeck_contract::import_timestamp)
+            .ok_or_else(malformed)
+    };
+    let before = timestamp("startedAtHostUTC")?;
+    let after = timestamp("finishedAtHostUTC")?;
+    // JSON Schema integer and Swift JSONDecoder also accept an exactly
+    // integral numeric spelling (for example 10000000.0), never a boolean.
+    let nanos = value["elapsedNanoseconds"]
+        .as_f64()
+        .filter(|nanos| (0.0..=120_000_000_000.0).contains(nanos) && nanos.fract() == 0.0)
+        .ok_or_else(malformed)?;
+    let wall_nanos = ((after * 1_000.0).round() - (before * 1_000.0).round()) * 1_000_000.0;
+    let status = if wall_nanos >= 0.0 && (wall_nanos - nanos).abs() <= 2_000_000.0 {
+        "unvalidated"
+    } else {
+        "hostClockDiscontinuity"
+    };
+    if value["status"] != status {
+        return Err(malformed());
+    }
+    Ok(value.clone())
+}
 
 /// Swift `MarkerDocument.decode`, then `DiagnosticSessionReading.make` with no
 /// screenshots: every mark, and what the capture never looked for.
-fn markers(bytes: &[u8], job: &str) -> Result<Reading, CliError> {
+fn markers(bytes: &[u8], job: &str, operation: &str) -> Result<Reading, CliError> {
     let malformed = || invalid("diagnostics_invalid_markers_document");
     let document: Value = serde_json::from_slice(bytes).map_err(|_| malformed())?;
     let marks = document["markers"].as_array().ok_or_else(malformed)?;
@@ -764,7 +812,16 @@ fn markers(bytes: &[u8], job: &str) -> Result<Reading, CliError> {
         Value::Number(number) if number.as_f64() == Some(0.0) => Some(false),
         _ => None,
     };
-    Ok((reading, not_derived, anchor))
+    let observation = document
+        .get("clockObservation")
+        .map(|value| {
+            if operation != "capture.diagnostic-session@1" {
+                return Err(invalid("diagnostics_invalid_clock_observation"));
+            }
+            clock_observation(value, job, document["coverage"]["anchor"].as_str())
+        })
+        .transpose()?;
+    Ok((reading, not_derived, anchor, observation))
 }
 
 fn provenance(sources: &[&Metadata]) -> Value {
@@ -891,11 +948,11 @@ fn inspect_session(
             missing.push(json!({"name": name, "reason": reason}));
         }
     }
-    let (marks, not_derived, anchor) = if is_published(MARKERS) {
-        markers(&document(MARKERS)?.bytes, job)?
+    let (marks, not_derived, anchor, observation) = if is_published(MARKERS) {
+        markers(&document(MARKERS)?.bytes, job, operation)?
     } else {
         missing.push(json!({"name": MARKERS, "reason": "marker document was not published"}));
-        (Vec::new(), Vec::new(), None)
+        (Vec::new(), Vec::new(), None, None)
     };
     let sources: Vec<&Metadata> = documents
         .values()
@@ -903,16 +960,18 @@ fn inspect_session(
         .collect();
     let mut sorted: Vec<&Metadata> = inventory.iter().collect();
     sorted.sort_by(|left, right| (&left.name, &left.id).cmp(&(&right.name, &right.id)));
-    Ok(
-        json!({"schemaVersion": "arkdeck.diagnostics-inspection/1", "jobId": job,
+    let mut result = json!({"schemaVersion": "arkdeck.diagnostics-inspection/1", "jobId": job,
         "operationReference": operation, "derivation": provenance(&sources),
         "partial": !missing.is_empty(),
         "alignment": {"kind": "cannotAlign", "toleranceMs": null,
             "reason": "capture artifacts contain no host-to-device calibration"},
         "markers": marks, "missingProducts": missing, "notDerived": not_derived,
         "ringHeldAnchor": anchor,
-        "artifacts": sorted.iter().map(|metadata| metadata.value()).collect::<Vec<_>>()}),
-    )
+        "artifacts": sorted.iter().map(|metadata| metadata.value()).collect::<Vec<_>>()});
+    if let Some(observation) = observation {
+        result["clockObservation"] = observation;
+    }
+    Ok(result)
 }
 
 /// Swift `DiagnosticArtifactTextPreview(bytes:mediaType:maximumCharacters:)`:
@@ -1087,6 +1146,8 @@ mod tests {
         assert_eq!(result["partial"], false);
         assert_eq!(result["markers"].as_array().unwrap().len(), 1);
         assert_eq!(result["alignment"]["kind"], "cannotAlign");
+        assert_eq!(result["clockObservation"]["status"], "unvalidated");
+        assert_eq!(result["clockObservation"]["jobId"], job);
         assert!(
             inspect_session("capture.diagnostics@1", job, inputs, &inventory, &documents).is_err()
         );
@@ -1097,6 +1158,48 @@ mod tests {
             .find(|row| row["name"] == "trace.htrace")
             .unwrap();
         assert!(crate::artifact_resources::require_trace_artifact(trace).is_ok());
+    }
+
+    #[test]
+    fn clock_observations_refuse_changed_identity_false_precision_and_bad_measurements() {
+        let sample = json!({"schemaVersion":"arkdeck.trace-clock-observation/1", "jobId":"job-clock",
+            "anchor":"anchor-fixture", "startedAtHostUTC":"2026-10-04T00:00:00.000Z",
+            "finishedAtHostUTC":"2026-10-04T00:00:00.010Z", "elapsedNanoseconds":10_000_000,
+            "status":"unvalidated"});
+        assert!(clock_observation(&sample, "job-clock", Some("anchor-fixture")).is_ok());
+        assert!(clock_observation(&sample, "other", Some("anchor-fixture")).is_err());
+        for anchor in [None, Some(""), Some("other")] {
+            assert!(clock_observation(&sample, "job-clock", anchor).is_err());
+        }
+        for (key, value) in [
+            ("status", json!("calibrated")),
+            ("elapsedNanoseconds", json!(true)),
+            ("elapsedNanoseconds", json!(-1)),
+            ("elapsedNanoseconds", json!(120_000_000_001_u64)),
+            ("finishedAtHostUTC", json!("2026-10-03T23:59:59.999Z")),
+            ("finishedAtHostUTC", json!("2026-10-04T00:00:01.000Z")),
+            ("unknown", json!(1)),
+        ] {
+            let mut changed = sample.clone();
+            changed[key] = value;
+            assert!(clock_observation(&changed, "job-clock", Some("anchor-fixture")).is_err());
+        }
+        let mut integral = sample.clone();
+        integral["elapsedNanoseconds"] = json!(10_000_000.0);
+        assert!(clock_observation(&integral, "job-clock", Some("anchor-fixture")).is_ok());
+        integral["elapsedNanoseconds"] = json!(10_000_000.5);
+        assert!(clock_observation(&integral, "job-clock", Some("anchor-fixture")).is_err());
+        let mut boundary = sample.clone();
+        boundary["elapsedNanoseconds"] = json!(12_000_000);
+        assert!(clock_observation(&boundary, "job-clock", Some("anchor-fixture")).is_ok());
+        boundary["elapsedNanoseconds"] = json!(12_000_001);
+        assert!(clock_observation(&boundary, "job-clock", Some("anchor-fixture")).is_err());
+        boundary["status"] = json!("hostClockDiscontinuity");
+        assert!(clock_observation(&boundary, "job-clock", Some("anchor-fixture")).is_ok());
+        let mut jumped = sample.clone();
+        jumped["finishedAtHostUTC"] = json!("2026-10-03T23:59:59.999Z");
+        jumped["status"] = json!("hostClockDiscontinuity");
+        assert!(clock_observation(&jumped, "job-clock", Some("anchor-fixture")).is_ok());
     }
 
     #[test]

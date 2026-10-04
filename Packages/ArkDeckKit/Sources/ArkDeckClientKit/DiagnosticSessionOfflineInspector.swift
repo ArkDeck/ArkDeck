@@ -273,11 +273,21 @@ public struct DiagnosticSessionOfflineInspector: Sendable {
     var marks: [DiagnosticSessionReading.Mark] = []
     var notDerived: [String] = []
     var ringHeldAnchor: Bool?
+    var clockObservation: DiagnosticClockObservation?
     if input.inventory.contains(where: {
       $0.name == Self.markersArtifactName && $0.status == "published"
     }) {
       let markerData = try document(Self.markersArtifactName, input: input).data
       let markerDocument = try MarkerDocument.decode(markerData, jobID: input.jobID)
+      if let observed = markerDocument["clockObservation"] {
+        guard input.operationReference == DiagnosticCaptureFacade.operationReference else {
+          throw DiagnosticSessionOfflineInspectorError.invalid("diagnostics_invalid_clock_observation")
+        }
+        let coverage = markerDocument["coverage"] as? [String: Any]
+        clockObservation = try DiagnosticClockObservation.decode(
+          JSONSerialization.data(withJSONObject: observed), jobID: input.jobID,
+          anchor: coverage?["anchor"] as? String)
+      }
       let reading = DiagnosticSessionReading.make(markersDocument: markerDocument)
       marks = reading.marks
       notDerived = reading.notDerived
@@ -308,7 +318,8 @@ public struct DiagnosticSessionOfflineInspector: Sendable {
         reason: "capture artifacts contain no host-to-device calibration"),
       marks: marks,
       missingProducts: missing,
-      notDerived: notDerived)
+      notDerived: notDerived,
+      clockObservation: clockObservation)
     return DiagnosticSessionOfflineInspection(
       schemaVersion: DiagnosticSessionOfflineInspection.schemaVersion,
       jobID: input.jobID,

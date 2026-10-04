@@ -743,6 +743,10 @@ fn diagnostic_session_publishes_host_marks_and_stops_after_an_unknown_anchor() {
         let status = jobs
             .diagnostic_session_control("diagnostic.session.status", &run_params)
             .unwrap();
+        assert!(
+            status.get("clockObservation").is_none(),
+            "closed live control contract is unchanged"
+        );
         let calls = dispatch.calls.lock().unwrap();
         let anchor = calls
             .iter()
@@ -783,6 +787,17 @@ fn diagnostic_session_publishes_host_marks_and_stops_after_an_unknown_anchor() {
             .unwrap();
             let document: Value = serde_json::from_slice(&bytes).unwrap();
             assert_eq!(document["markers"][0]["markerId"], "problem-observed");
+            assert_eq!(document["clockObservation"]["jobId"], id);
+            assert_eq!(
+                document["clockObservation"]["anchor"],
+                document["coverage"]["anchor"]
+            );
+            assert_eq!(document["clockObservation"]["status"], "unvalidated");
+            assert!(
+                document["clockObservation"]["elapsedNanoseconds"]
+                    .as_u64()
+                    .is_some()
+            );
             if let Some(destination) = std::env::var_os("ARKDECK_DIAGNOSTIC_ARTIFACT_RECORD") {
                 let inventory = artifacts
                     .handle_list(

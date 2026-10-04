@@ -259,3 +259,40 @@ fn dropped_owner_and_unreadable_state_cannot_be_reopened() {
     .unwrap();
     assert!(call(&jobs, "status", json!({})).is_err());
 }
+
+#[test]
+fn clock_observation_persists_but_never_makes_a_session_ready_or_replayable() {
+    let root = Root::new();
+    let (jobs, record) = seeded(&root, 60, 2);
+    let owner = jobs.begin_diagnostic_session(&record).unwrap();
+    assert!(owner.session.after_anchor().is_err());
+    owner.session.before_anchor().unwrap();
+    assert!(owner.session.before_anchor().is_err());
+    owner.session.after_anchor().unwrap();
+    assert!(owner.session.after_anchor().is_err());
+    let state = owner.session.state.lock().unwrap();
+    assert_eq!(state.document.phase, "preparing");
+    assert!(
+        state
+            .document
+            .clock_observation
+            .as_ref()
+            .unwrap()
+            .valid_for(&record.job_id)
+    );
+    let saved: Document =
+        serde_json::from_slice(&fs::read(owner.session.path.join(DOCUMENT)).unwrap()).unwrap();
+    saved.validate(&record).unwrap();
+    assert!(saved.clock_observation.is_some());
+    drop(state);
+    let status = call(&jobs, "status", json!({})).unwrap();
+    assert!(status.get("clockObservation").is_none());
+    assert_eq!(status["state"], "preparing");
+    assert!(call(&jobs, "mark", json!({"markerId":"not-ready"})).is_err());
+    drop(owner);
+    assert!(jobs.begin_diagnostic_session(&record).is_err());
+    assert_eq!(
+        call(&jobs, "status", json!({})).unwrap()["state"],
+        "interrupted"
+    );
+}

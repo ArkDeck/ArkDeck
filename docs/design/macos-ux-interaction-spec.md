@@ -23,7 +23,7 @@
 | Trace | 两段式采集/查看入口；已验证 raw `trace.htrace` 打开独立原生 Viewer；时长单位转换与校验 | 原型不应在 unavailable 时启用开始，也不能把非法输入静默改成 10 |
 | Trace Viewer | 最近文件、筛选、搜索、Timeline、事件/范围/标注、两种停靠、加载/取消/错误与帮助；App 普通文案中英双语；通用稿已有 loaded 样本和锁定目录的 19 条快捷键 | 原始字段、进程名和许可证正文不翻译；合成 loaded 图不构成真实 trace/设备验收 |
 | Device | 按需截图、一次 typed 点击/长按/滑动、旧图拒绝输入、2–300 帧有界采集与本机 .mov 合成/校验、实测帧率/缺帧/配额状态 | 无持续预览、键盘输入、设备端编码与按秒启停录屏 |
-| Diagnostics | 精确 History Session reader、显式读取文本/JSON、Trace Viewer；CHG-2026-079 接通有界 Start/Mark/Stop 和 Runtime 状态，完成后打开同一 Job 的 Session | 新 operation 待维护者 review 并发布 protected main；会话内截图/视频与时钟校准仍未接通。HiLog 为结束后的回顾性采集；无校准/事件时间时明确无法对齐/未记录时刻 |
+| Diagnostics | 精确 History Session reader、显式读取文本/JSON、Trace Viewer；CHG-2026-079 接通有界 Start/Mark/Stop 和 Runtime 状态，完成后打开同一 Job 的 Session | 新 operation 待维护者 review 并发布 protected main；anchor 写入的主机时间观测已接通；会话内截图/视频与时钟校准仍未接通。HiLog 为结束后的回顾性采集；无校准/事件时间时明确无法对齐/未记录时刻 |
 | History | 八类筛选、保存/分页、证据、参数、导出与精确来源上下文；Diagnostics 历史 Session 已加载并保留来源 | 不重放；未知 operation 不猜类型；Flash 来源目标已消失时显示缺失，不静默换设备 |
 | Settings | 独立七标签：General / Toolchains / Servers / Storage / Trace / Updates / Diagnostics；Trace 内 Cache / Licenses | 不再内嵌完整更新设置；当前 App 诊断包不提供 device raw 勾选，敏感 Artifact 从 History 单独导出 |
 | Job Inspector / recovery | job.list/status/evidence/artifact.list 精确详情；标准 published 日志显式读取（最多 2 MiB，末 200 行）；已知活动 Job 取消请求先核对 fresh identity | 取消请求不代表终态；敏感产物走 History。unknown 不取消/重放；恢复 rebind/archive 未有 App RPC 接线，仍保留为缺口，不删 accepted spec |

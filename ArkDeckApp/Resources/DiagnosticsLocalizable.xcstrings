@@ -1559,6 +1559,40 @@
           }
         }
       }
+    },
+    "diagnostics.alignment.observedWindow": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clock observation window: {milliseconds} ms. Cross-clock accuracy still needs validation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时钟测量窗口：{milliseconds} ms。跨时钟误差仍待验证。"
+          }
+        }
+      }
+    },
+    "diagnostics.alignment.clockDiscontinuity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The host clock changed during measurement. This observation cannot align the tracks."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "测量期间主机时间发生跳变，不能据此对齐轨道。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

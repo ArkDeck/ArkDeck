@@ -69,6 +69,7 @@ App 先检查精确绑定、Trace 支持和 128 MiB 存储预算，只在 Runtim
 时长可选 30 / 60 / 120 秒，最多 50 个主机时间标记；停止只缩短已准入的等待窗口，随后保存不可变 Session。
 设备或绑定变化不会把运行中控制移到新目标，丢失回包只读回状态，不自动重发。旧 Runtime 不具备此 operation 时显示不可用原因。
 新能力需维护者 review 并合入 protected main 后才能执行设备操作；fixture 不证明硬件支持。
+Runtime 在既有 anchor 写入前后记录主机 UTC 与单调耗时，并把绑定 Job/anchor 的观测保存在不可变 Session 与 markers 产物中；不增加设备命令。App/CLI 可显示观测窗口或主机时钟跳变，但该窗口不是对齐误差，也不能建立校准、录制 readiness 或重启续跑许可。
 Trace 与主机标记没有跨时钟校准，HiLog 只是录制后读取；无校准时固定显示“无法对齐”；
 自动 Marker 没有时间字段时显示“未记录时刻”。以下完整联动体验仍是目标设计。
 详细证据见 [`implementation-audit-2026-08-27.md`](implementation-audit-2026-08-27.md)。

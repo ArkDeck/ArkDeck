@@ -16,6 +16,12 @@ struct Control<'a, 'b> {
 }
 
 impl DiagnosticTraceControl for Control<'_, '_> {
+    fn before_anchor(&self) -> Result<(), String> {
+        self.live.before_anchor()
+    }
+    fn after_anchor(&self) -> Result<(), String> {
+        self.live.after_anchor()
+    }
     fn wait_until_stop(&self, maximum_seconds: u64) -> Result<(), String> {
         self.live.wait(maximum_seconds)
     }
@@ -110,10 +116,13 @@ impl JobRunner<'_> {
         }
         let mut value =
             arkdeck_contract::strict_json(&bytes).map_err(|_| "invalid marker document")?;
-        let marks = value["markers"]
-            .as_array_mut()
-            .ok_or("invalid marker collection")?;
         if let Some(document) = document {
+            if let Some(observation) = &document.clock_observation {
+                value["clockObservation"] = observation.value()?;
+            }
+            let marks = value["markers"]
+                .as_array_mut()
+                .ok_or("invalid marker collection")?;
             let mut manual: Vec<Value> = document
                 .markers
                 .iter()

@@ -20,6 +20,7 @@ The new operation requires a trace ring and records host-timed annotations while
 - A complete materialized plan owns the trace begin, a unique verified anchor, a host wait of at most 120 seconds, dump, finish, receive and cleanup. Stop may only shorten that host wait.
 - `diagnostic.session.status`, `.mark` and `.stop` accept exact Job references. Marker count is fixed at admission, at most 200; Runtime supplies wall and monotonic times. Marker IDs make retries idempotent.
 - Readiness requires the provider's anchor readback, never a submitted Job or local App state. An absent receipt, restart, identity drift or uncertain outcome stops further dispatch and preserves recovery state.
+- The Runtime records UTC and monotonic bounds around its existing anchor write in immutable Session/marker products. This adds no device command and establishes no calibration or alignment tolerance; App and CLI expose the observation while retaining `cannotAlign`.
 - Raw output remains immutable. Runtime annotations are durably acknowledged, frozen before finalization and published with the Job's products.
 - Typed CLI leaves `diagnostics session status|mark|stop` expose the same exact-Job controls, with bounded marker IDs and labels and no caller timestamps or target overrides.
 - App shows preparing, recording, finalizing, result and recovery states; provides explicit start, mark and stop actions; and opens the resulting immutable Session.

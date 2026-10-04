@@ -9,4 +9,6 @@
 - DSC-AC-4: App readiness follows Runtime, rapid controls do not duplicate jobs, lost replies remain explicit, terminal results open exact History context; fixture UI is not hardware acceptance.
 - DSC-AC-5: old capture lowering and contracts remain valid; Catalog generation, schemas, Swift validators and typed Control contracts agree.
 
+- DSC-AC-6: the clock bracket surrounds only the existing anchor write; missing callbacks or uncertain persistence stop subsequent dispatch. Exact Job/anchor identity and wall/monotonic consistency are checked; malformed observations never establish calibration, readiness or restart permission. Older artifacts without observations remain readable.
+
 Local targeted checks and CI results are recorded under `evidence/runs/TASK-DSC-001/`. Hardware execution requires the reviewed operation on protected main and is not claimed by fixture results.

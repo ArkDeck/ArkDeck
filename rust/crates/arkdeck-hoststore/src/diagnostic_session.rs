@@ -16,6 +16,10 @@ pub(crate) const OPERATION: &str = "capture.diagnostic-session@1";
 const DOCUMENT: &str = "diagnostic-control.json";
 const BYTE_LIMIT: usize = 128 * 1024;
 
+#[path = "diagnostic_clock.rs"]
+mod clock_observation;
+use clock_observation::ClockObservation;
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Marker {
@@ -44,6 +48,8 @@ pub(crate) struct Document {
     ended_at_host_utc: Option<String>,
     elapsed_ms: u64,
     pub markers: Vec<Marker>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clock_observation: Option<ClockObservation>,
 }
 
 fn unavailable() -> WireError {
@@ -96,6 +102,7 @@ impl Document {
             ended_at_host_utc: None,
             elapsed_ms: 0,
             markers: Vec::new(),
+            clock_observation: None,
         })
     }
 
@@ -110,6 +117,10 @@ impl Document {
             || self.maximum_seconds != expected.maximum_seconds
             || self.maximum_markers != expected.maximum_markers
             || !["preparing", "recording", "finalizing"].contains(&self.phase.as_str())
+            || self
+                .clock_observation
+                .as_ref()
+                .is_some_and(|sample| !sample.valid_for(&self.job_id))
             || self.markers.len() > self.maximum_markers
             || self.elapsed_ms > self.maximum_seconds * 1_000
             || self
@@ -144,6 +155,7 @@ impl Document {
 struct State {
     document: Document,
     started: Option<Instant>,
+    anchor_started: Option<(Instant, String)>,
     faulted: bool,
     owner_alive: bool,
 }
@@ -264,6 +276,42 @@ impl LiveSession {
         self.replace(&mut state, next)
     }
 
+    pub(crate) fn before_anchor(&self) -> Result<(), String> {
+        let action = || -> Result<(), WireError> {
+            let mut state = self.state.lock().map_err(|_| unavailable())?;
+            if state.faulted
+                || !state.owner_alive
+                || state.document.phase != "preparing"
+                || state.anchor_started.is_some()
+                || state.document.clock_observation.is_some()
+            {
+                return Err(unavailable());
+            }
+            let monotonic = Instant::now();
+            state.anchor_started = Some((monotonic, clock()?));
+            Ok(())
+        };
+        action().map_err(|error| error.message)
+    }
+
+    pub(crate) fn after_anchor(&self) -> Result<(), String> {
+        let action = || -> Result<(), WireError> {
+            let mut state = self.state.lock().map_err(|_| unavailable())?;
+            if state.faulted || !state.owner_alive || state.document.phase != "preparing" {
+                return Err(unavailable());
+            }
+            let (start, at) = state.anchor_started.take().ok_or_else(unavailable)?;
+            let end = clock()?;
+            let elapsed = u64::try_from(start.elapsed().as_nanos()).map_err(|_| unavailable())?;
+            let mut next = state.document.clone();
+            next.clock_observation = Some(
+                ClockObservation::new(&next.job_id, at, end, elapsed).ok_or_else(unavailable)?,
+            );
+            self.replace(&mut state, next)
+        };
+        action().map_err(|error| error.message)
+    }
+
     /// Called only after the provider verified the unique anchor. Readiness
     /// is durable before observers may see it. Stop and deadline freeze marks
     /// under the same mutex, so no annotation can sneak into finalization.
@@ -367,6 +415,7 @@ impl JobStore {
             state: Mutex::new(State {
                 document,
                 started: None,
+                anchor_started: None,
                 faulted: false,
                 owner_alive: true,
             }),
@@ -503,6 +552,12 @@ impl JobStore {
             .as_object_mut()
             .ok_or_else(unavailable)?
             .remove("phase");
+        // Wire status is unchanged. The immutable capture artifacts carry
+        // optional clock observations, never control or execution authority.
+        value
+            .as_object_mut()
+            .ok_or_else(unavailable)?
+            .remove("clockObservation");
         Ok(value)
     }
 }
