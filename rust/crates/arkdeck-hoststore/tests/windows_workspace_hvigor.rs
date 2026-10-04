@@ -64,11 +64,12 @@ mod windows {
         let task = arguments.get(1).map(String::as_str).unwrap_or_default();
         let named = |key: &str| std::env::var(key).unwrap_or_else(|_| "<unset>".into());
         let environment = format!(
-            "DEVECO_SDK_HOME={}\nUSERPROFILE={}\nTEMP={}\nHOME={}\n",
+            "DEVECO_SDK_HOME={}\nUSERPROFILE={}\nTEMP={}\nHOME={}\nPATH={}\n",
             named("DEVECO_SDK_HOME"),
             named("USERPROFILE"),
             named("TEMP"),
             named("HOME"),
+            named("PATH"),
         );
         match task {
             "assembleHap" => {
@@ -159,11 +160,15 @@ mod windows {
         node: PathBuf,
         hvigor: PathBuf,
         sdk: PathBuf,
+        /// The pinned JDK's directory a registered Windows toolchain leads
+        /// its Hvigor children's search path with.
+        jdk: PathBuf,
     }
 
     fn toolchain(root: &Path) -> Toolchain {
         let tools = root.join("toolchain");
         fs::create_dir_all(tools.join("sdk")).unwrap();
+        fs::create_dir_all(tools.join("jbr").join("bin")).unwrap();
         let node = tools.join("node.exe");
         fs::copy(std::env::current_exe().unwrap(), &node).unwrap();
         let hvigor = tools.join("hvigorw.js");
@@ -172,6 +177,7 @@ mod windows {
             node,
             hvigor,
             sdk: tools.join("sdk"),
+            jdk: tools.join("jbr").join("bin"),
         }
     }
 
@@ -388,7 +394,8 @@ mod windows {
         .with_child_environment(
             &text(&tools.node),
             &[("DEVECO_SDK_HOME", &text(&tools.sdk))],
-        );
+        )
+        .with_child_search_directory(&text(&tools.node), &text(&tools.jdk));
         let owners = Owners::new(&root.0, workspace);
 
         // The copy of the whole scope.
@@ -445,6 +452,13 @@ mod windows {
             );
         }
         assert!(environment.contains("HOME=<unset>\n"), "{environment}");
+        // The pinned JDK's directory, then the system directory: nothing else.
+        let system =
+            std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32");
+        assert!(
+            environment.contains(&format!("PATH={};{}\n", text(&tools.jdk), text(&system))),
+            "{environment}"
+        );
         assert!(
             String::from_utf8_lossy(&owners.artifact(&built, "build.log"))
                 .contains("BUILD SUCCESSFUL"),

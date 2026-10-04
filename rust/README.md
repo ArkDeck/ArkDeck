@@ -4090,16 +4090,29 @@ handed to it in its standard `X:\…` spelling whenever that names exactly the c
 `ARKDECK_LIVE_DEVECO_ROOT` and `ARKDECK_DEV_SIGNER_THUMBPRINT` are set. It registers the host's
 DevEco, the repository's WaterFlow demo and a build preset through the real CLI, then runs
 `workspace isolate` and `workspace build` on an installed-mode daemon over a fake account. On
-the reference host Hvigor now compiles the copy and stops at `PackageHap` with `spawn java
-ENOENT`: the child's search path is the system directory alone, and Hvigor runs `java` by name.
-Giving the child DevEco's `jbr\bin` needs a ruling, because the search path cannot be overlaid.
+the reference host the build lands `entry-default-unsigned.hap` as the Job's verified Artifact,
+so `workspace build` is Windows `implemented`.
+
+Hvigor's packaging runs `java` by name, and Windows has no system `java`. A Windows DevEco
+record therefore pins a fifth child, `jbr\bin\java.exe`. It is Authenticode-verified and
+SHA-256-pinned like `node.exe`, under the same ownership rules, and registration refuses an
+unsigned one. Only the Hvigor build or test child of a registered preset gets that one
+directory ahead of the system directory on its search path
+(`VerifiedTool::with_search_directory`). The dispatch holds `java.exe` open by its pinned
+identity while the child runs. Every other child keeps the system directory alone, and a caller
+still cannot overlay `PATH`. A record registered before this pin stays readable but resolves no
+preset; register the toolchain again. The tool runner also names its child by the standard
+`X:\…` spelling of the verified image when that names the same file. Hvigor's first-run
+wrapper bootstrap hands Node's image path to `cmd.exe`, which cannot run a `\\?\` one. Managed
+servers and consoles keep `\\?\`.
 
 The daemon's `--symbolize-crash` mode answers the Swift symbolizer oracle on Windows
-(`crash_symbolizer_mode`). The daemon-level and CLI build, test and symbolize leaves stay
-`partial`: the build stops at packaging as above, a test preset also needs the project's
-`ohpm` dependencies, whose linked `oh_modules` a copy refuses, and a symbolization needs a
-device-captured crash
-([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md)).
+(`crash_symbolizer_mode`). The CLI test and symbolize leaves stay `partial`. A test preset also
+needs the project's `ohpm` dependencies. `ohpm` links those with in-tree junctions, which the
+macOS copy would keep (in-tree links are recreated relative) but a Windows copy refuses. A
+symbolization needs a device-captured crash
+([run records](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md),
+[JDK layer](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-jdk-run.md)).
 
 ## Windows analyzer provider (TASK-XPA-011)
 

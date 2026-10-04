@@ -13,7 +13,7 @@
 //! and its code are the same (`TimedOut`, `Cancelled { drained }`); only the
 //! grace a child could have used to exit on its own is absent (T1, recorded
 //! as a proposal in the run record).
-use super::process::{BASE_ENVIRONMENT, PipeReader, RunningChild, spawn_in, uppercase};
+use super::process::{BASE_ENVIRONMENT, PipeReader, RunningChild, uppercase};
 use super::{bool_result, wide};
 use crate::process::tool_request::check_limits;
 use crate::process::{
@@ -67,7 +67,7 @@ impl VerifiedTool {
     /// `run_tool` for the HDC lifecycle client alone: the child is ended as
     /// every child is, but a process it creates breaks away from its Job, as
     /// the server `hdc kill -r` starts outlives the client in its own
-    /// session on macOS (`process::spawn_detaching`).
+    /// session on macOS (`process::spawn_tool` detaching).
     pub fn run_lifecycle_tool(
         &self,
         request: &ToolRequest<'_>,
@@ -105,16 +105,12 @@ impl VerifiedTool {
         let started = Instant::now();
         // The child starts suspended and is killed unless the retained
         // executable still verifies, so any failure here ran no tool code.
-        let spawn = if detaching {
-            super::process::spawn_detaching
-        } else {
-            spawn_in
-        };
-        let mut child = spawn(
+        let mut child = super::process::spawn_tool(
             self,
             request.arguments,
             request.environment,
             directory.as_deref(),
+            detaching,
         )
         .map_err(ToolRunError::Refused)?;
         let stop = Arc::new(AtomicBool::new(false));
@@ -285,11 +281,30 @@ fn canonical_directory(directory: &Path) -> io::Result<std::path::PathBuf> {
     Ok(canonical)
 }
 
+/// `VerifiedTool::with_search_directory`'s rule: `directory` names an
+/// existing directory in its standard spelling (`X:\…`), exactly the
+/// standard spelling of its canonical path, and holds no `;` or `"`, so it
+/// is one search path entry. Answers that spelling.
+pub(crate) fn search_directory(directory: &Path) -> io::Result<String> {
+    let text = directory
+        .to_str()
+        .filter(|text| !text.contains(';') && !text.contains('"'))
+        .ok_or_else(|| invalid("a search directory must be one plain path"))?;
+    let canonical =
+        std::fs::canonicalize(directory).map_err(|_| invalid("search directory unavailable"))?;
+    if !canonical.is_dir() || standard_spelling(&canonical).as_deref() != Some(text) {
+        return Err(invalid(
+            "a search directory must be an existing directory named as its canonical path",
+        ));
+    }
+    Ok(text.to_owned())
+}
+
 /// `\\?\X:\…` as `X:\…` when Win32 path normalisation leaves that spelling
 /// exactly as written, so both name one directory: a drive-letter path
 /// shorter than a directory's `MAX_PATH` bound, none of whose components
 /// ends in a dot or a space or is a DOS device name. `None` otherwise.
-fn standard_spelling(canonical: &Path) -> Option<String> {
+pub(crate) fn standard_spelling(canonical: &Path) -> Option<String> {
     let text = canonical.to_str()?.strip_prefix(r"\\?\")?;
     let bytes = text.as_bytes();
     if bytes.len() < 3

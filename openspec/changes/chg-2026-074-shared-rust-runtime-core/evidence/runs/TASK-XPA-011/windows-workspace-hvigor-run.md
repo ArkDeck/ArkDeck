@@ -78,6 +78,8 @@ to DevEco's JBR by hand (`TASK-DHA-003` run r4). Windows has no system `java` st
 
 ## Needs a maintainer ruling
 
+The lead decided both on 2026-10-04 as delegated minor decisions. They are implemented in the next layer (`windows-workspace-hvigor-jdk-run.md`), where the live build passes end to end.
+
 - **The JDK on a Hvigor child's search path.** One proposal is to measure DevEco's
   `jbr\bin\java.exe` as a further child of the registered toolchain record, Authenticode-verified
   like `node.exe`. The composition would then give that toolchain's Hvigor children

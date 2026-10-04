@@ -541,6 +541,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.patch",
     "workspace.revert",
     "workspace.checkpoint",
+    // The Hvigor build of a Runtime-owned copy (TASK-XPA-011), with the
+    // host's registered DevEco Studio, its search path led by the
+    // toolchain's pinned JDK, through the real CLI against a dev-signed
+    // installed-mode daemon
+    // (`arkdeck-agentd/tests/windows_workspace_hvigor_live_process.rs`, run
+    // with `ARKDECK_LIVE_DEVECO_ROOT`).
+    "workspace.build",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the

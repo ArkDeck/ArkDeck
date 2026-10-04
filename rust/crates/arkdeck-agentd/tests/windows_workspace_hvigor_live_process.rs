@@ -11,8 +11,12 @@
 //!   preset pinning that toolchain with `workspace preset register`;
 //! * the restarted daemon composes the preset; `workspace isolate` copies the
 //!   project and `workspace build` runs the pinned Node and `hvigorw.js`
-//!   (`assembleHap`) in the copy, landing its unsigned HAP as the Job's
-//!   verified Artifact.
+//!   (`assembleHap`) in the copy, its search path led by the toolchain's
+//!   pinned JDK, landing its unsigned HAP as the Job's verified Artifact.
+//!
+//! The fake account's profile is empty, so Hvigor's wrapper bootstraps
+//! itself on its first run (`npm install pnpm`, over the network), as it does
+//! for a person who has never built with DevEco Studio.
 //!
 //! The daemon runs its account composition over a fake account, as
 //! `windows_workspace_mutation_process.rs` runs it, holding the account's
@@ -252,23 +256,6 @@ fn copy_demo(source: &Path, destination: &Path) {
     }
 }
 
-/// `source` copied to `destination` as it is, links skipped.
-fn copy_tree(source: &Path, destination: &Path) {
-    std::fs::create_dir_all(destination).unwrap();
-    for entry in std::fs::read_dir(source).unwrap() {
-        let entry = entry.unwrap();
-        let kind = entry.file_type().unwrap();
-        let target = destination.join(entry.file_name());
-        if kind.is_symlink() {
-            continue;
-        } else if kind.is_dir() {
-            copy_tree(&entry.path(), &target);
-        } else {
-            std::fs::copy(entry.path(), &target).unwrap();
-        }
-    }
-}
-
 /// Every regular file below `root`, as `/`-separated relative paths.
 fn files(root: &Path, relative: &str, found: &mut Vec<String>) {
     for entry in std::fs::read_dir(root.join(relative)).unwrap() {
@@ -374,15 +361,6 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
     assert!(signing.status.success(), "{signing:?}");
     let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
     let pin = pin["pin"].as_str().unwrap().to_owned();
-    // The Hvigor wrapper's own tools, which `hvigorw.js` otherwise installs
-    // below the account's profile on its first run (`npm install pnpm`,
-    // over the network): a person who builds with DevEco Studio has them.
-    let wrapper = PathBuf::from(std::env::var_os("USERPROFILE").expect("USERPROFILE"))
-        .join(".hvigor")
-        .join("wrapper");
-    if wrapper.is_dir() {
-        copy_tree(&wrapper, &account.0.join(".hvigor").join("wrapper"));
-    }
     let project = account.0.join("p");
     copy_demo(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../tests/waterflow-demo"),
@@ -555,15 +533,33 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
     eprintln!("workspace build succeeded in {elapsed:?}");
     assert_eq!(built["providerID"], "workspace", "{built}");
     assert_eq!(built["evidenceBlockers"], json!([]), "{built}");
-    let hap = built["artifacts"]
-        .as_array()
-        .unwrap()
+    // The HAP Hvigor produced in the copy is published as the Job's
+    // verified Artifact, beside the build log: a ZIP archive whose bytes the
+    // store holds under the digest the result names.
+    let produced = built["artifacts"].as_array().unwrap();
+    assert_eq!(produced.len(), 2, "{built}");
+    let stored = |artifact: &Value| -> Vec<u8> {
+        let reference = artifact["reference"].as_str().unwrap();
+        let (job, id) = reference
+            .strip_prefix("arkdeck-artifact://")
+            .and_then(|rest| rest.split_once('/'))
+            .unwrap();
+        std::fs::read(account.state().join("artifacts").join(job).join(id)).unwrap()
+    };
+    let hap = produced
         .iter()
-        .find(|artifact| artifact["name"] == "unsigned.hap")
+        .find(|artifact| stored(artifact).starts_with(b"PK"))
         .unwrap_or_else(|| panic!("the build publishes its HAP: {built}"));
     assert_eq!(hap["bytesVerified"], true, "{built}");
-    let product = std::fs::read(copy_root.join(PRODUCT)).unwrap();
-    assert!(product.starts_with(b"PK"), "the HAP is a ZIP archive");
+    let bytes = stored(hap);
+    assert_eq!(hap["sha256"], sha256_hex(&bytes).as_str(), "{built}");
+    assert_eq!(hap["byteCount"], bytes.len(), "{built}");
+    assert!(
+        bytes
+            .windows(b"module.json".len())
+            .any(|window| window == b"module.json"),
+        "the HAP carries its module.json"
+    );
     assert!(
         !project.join(PRODUCT).exists(),
         "the person's own tree is never built"
@@ -571,4 +567,18 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
     running.stop();
     assert_account_released();
     drop(account);
+    // What this measured is what the coverage manifest counts.
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .unwrap();
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    let statuses: Vec<&Value> = coverage["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| entry["feature"] == "workspace.build-openharmony@1")
+        .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+        .collect();
+    assert_eq!(statuses, [&json!("implemented")]);
 }
