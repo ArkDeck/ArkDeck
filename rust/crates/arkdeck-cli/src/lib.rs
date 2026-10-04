@@ -27,7 +27,7 @@ pub mod ui_dump;
 pub mod update_feed;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_leaves::{install_binding, install_binding_human, install_binding_result};
 mod device_wait;
 pub mod diagnostics_resources;

@@ -568,6 +568,10 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "flash.run",
     "flash.bootloader-status",
     "flash.prerequisites",
+    // The Loader binding coordinator: `flash bind-loader` over the Swift Loader
+    // binding oracle's state, by the same CLI against the same signed test
+    // daemon (TASK-XPA-010).
+    "flash.bind-loader",
     // The protected Flash recovery broker over the Flash invocation owner
     // (TASK-XPA-010): an invocation started, its pinned full restore executed
     // to a terminal state, shown and listed (`recovery flash-invocation …`
@@ -619,7 +623,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "maintainer.update-feed.assemble",
     "update-feed.prepare",
     "update-feed.assemble",
-    "flash.install-binding",
 ];
 
 /// The App's capability table as published, read once.
