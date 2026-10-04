@@ -92,7 +92,7 @@ pub use pointer_input::{
 pub use port_forward::{Direction, PORT_MAXIMUM, PORT_MINIMUM, PortAction, PortRule};
 pub use presence::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,
-    parse_registered_presence,
+    parse_registered_presence, parse_registered_windows_presence,
 };
 pub use provider::HdcReadOnlyProvider;
 pub use rockchip_hdc::{

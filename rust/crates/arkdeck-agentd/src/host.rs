@@ -1282,7 +1282,8 @@ impl Host {
     }
 
     /// Swift's ArkForge facts port on Windows: the Target store's facts over
-    /// no HDC (none is composed until the Windows HDC tuple is registered).
+    /// no HDC (one is composed only for the registered Windows HDC tuple's
+    /// executable, as the root's managed server).
     #[cfg(windows)]
     fn flash_facts_port(
         &self,

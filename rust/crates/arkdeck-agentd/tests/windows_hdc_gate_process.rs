@@ -1,7 +1,8 @@
 //! The Windows daemon's HDC tuple gate (TASK-XPA-005, CHG-2026-078), as the
 //! real daemon decides it: the Windows daemon composes an HDC only for an
 //! executable whose SHA-256 a registered `OPENHARMONY-HDC-WINDOWS-PROBES`
-//! tuple holds, and the draft registry holds none.
+//! tuple holds; the registry holds DevEco's `hdc.exe` only, never the
+//! stand-in these tests name.
 //!
 //! * A development root naming a stand-in HDC as its managed server is
 //!   refused before the root is opened, naming the digest the registry

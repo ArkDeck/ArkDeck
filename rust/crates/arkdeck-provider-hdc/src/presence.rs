@@ -138,22 +138,146 @@ pub fn parse_registered_presence(
             ));
         }
         if columns[3] == "Connected" {
-            let mut mac = Hmac::<Sha256>::new_from_slice(session_pseudonym_key)
-                .expect("HMAC-SHA-256 accepts a 32-byte key");
-            mac.update(columns[0].as_bytes());
-            let digest = mac.finalize().into_bytes();
-            let mut identifier = String::from("redacted-device-");
-            for byte in &digest[..12] {
-                use std::fmt::Write;
-                write!(identifier, "{byte:02x}").expect("formatting into String cannot fail");
-            }
-            connected.push(identifier);
+            connected.push(pseudonym(session_pseudonym_key, columns[0]));
         }
     }
+    Ok(snapshot(connected))
+}
+
+/// The per-session pseudonym of a connect key: the raw key never leaves the
+/// parser.
+fn pseudonym(session_pseudonym_key: &[u8; 32], connect_key: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(session_pseudonym_key)
+        .expect("HMAC-SHA-256 accepts a 32-byte key");
+    mac.update(connect_key.as_bytes());
+    let digest = mac.finalize().into_bytes();
+    let mut identifier = String::from("redacted-device-");
+    for byte in &digest[..12] {
+        use std::fmt::Write;
+        write!(identifier, "{byte:02x}").expect("formatting into String cannot fail");
+    }
+    identifier
+}
+
+fn snapshot(mut connected: Vec<String>) -> PresenceSnapshot {
     if connected.is_empty() {
-        Ok(PresenceSnapshot::ObservedEmpty)
+        PresenceSnapshot::ObservedEmpty
     } else {
         connected.sort();
-        Ok(PresenceSnapshot::ObservedConnectedSet(connected))
+        PresenceSnapshot::ObservedConnectedSet(connected)
     }
+}
+
+/// The `deviceObservationSnapshot` grammar of the Windows registry
+/// (`OPENHARMONY-HDC-WINDOWS-PROBES@1.0.0`, CHG-2026-078; maintainer ruling
+/// 2026-10-04, item 2), as sampled from the registered `3.2.0g` tool:
+///
+/// - every row has six TAB columns, the sixth always `hdc`; LF or CR LF ends
+///   a row, and no field may keep a CR;
+/// - only `USB` rows are devices: `Connected` or `Offline`, hostTag
+///   `localhost`; presence is the state column, and a removed device keeps
+///   its row as `Offline`;
+/// - a row of exactly the sampled UART form (`COM<digits>`, an empty name,
+///   `UART`, `Ready`, `unknown...`, `hdc`) is a host serial port, not a
+///   device, and is excluded, so a snapshot of only such rows is empty;
+/// - the `[Empty]` marker and zero-byte stdout were never observed on
+///   Windows and are `unknown`, as is any other form: another column count
+///   or sixth column, any other UART row, an unknown literal, a duplicate
+///   key, non-empty stderr, a non-zero exit or a truncated read. One such row
+///   invalidates the whole snapshot.
+///
+/// It never applies to a macOS tool, and the macOS grammar
+/// ([`parse_registered_presence`]) never applies to a Windows tool.
+pub fn parse_registered_windows_presence(
+    execution: &ObservationInput<'_>,
+    session_pseudonym_key: &[u8; 32],
+) -> Result<PresenceSnapshot, ObservationFailure> {
+    match execution.termination {
+        ObservationTermination::TimedOut => {
+            return Err(ObservationFailure::Unavailable(
+                "device observation timed out",
+            ));
+        }
+        ObservationTermination::Cancelled => {
+            return Err(ObservationFailure::Unavailable(
+                "device observation was cancelled",
+            ));
+        }
+        _ => {}
+    }
+    if execution.termination != ObservationTermination::Exited(0)
+        || !execution.stderr.is_empty()
+        || execution.stdout_truncated
+    {
+        return Err(ObservationFailure::Unknown(
+            "stderr was not empty, the exit was nonzero, or stdout truncated",
+        ));
+    }
+    if execution.stdout.is_empty() {
+        return Err(ObservationFailure::Unknown(
+            "zero-byte stdout is outside the registered Windows raw family",
+        ));
+    }
+    let text = std::str::from_utf8(execution.stdout)
+        .ok()
+        .and_then(|text| text.strip_suffix('\n'))
+        .ok_or(ObservationFailure::Unknown(
+            "stdout is not a terminated UTF-8 row family",
+        ))?;
+    let mut keys = HashSet::new();
+    let mut connected = Vec::new();
+    for line in text.split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.contains('\r') {
+            return Err(ObservationFailure::Unknown(
+                "residual carriage return inside a device row field",
+            ));
+        }
+        let columns: Vec<_> = line.split('\t').collect();
+        if columns.len() != 6 || columns[5] != "hdc" {
+            return Err(ObservationFailure::Unknown(
+                "row is not the registered Windows six-column family",
+            ));
+        }
+        if !keys.insert(columns[0]) {
+            return Err(ObservationFailure::Unknown(
+                "duplicate connect key rows are outside the registered family",
+            ));
+        }
+        match columns[2] {
+            "UART" => {
+                let port = columns[0]
+                    .strip_prefix("COM")
+                    .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
+                if !port
+                    || !columns[1].is_empty()
+                    || columns[3] != "Ready"
+                    || columns[4] != "unknown..."
+                {
+                    return Err(ObservationFailure::Unknown(
+                        "UART row is outside the registered non-device form",
+                    ));
+                }
+            }
+            "USB" => {
+                if columns[0].is_empty()
+                    || !matches!(columns[3], "Connected" | "Offline")
+                    || columns[4] != "localhost"
+                {
+                    return Err(ObservationFailure::Unknown(
+                        "device row literal is outside the registered closed sets",
+                    ));
+                }
+                if columns[3] == "Connected" {
+                    connected.push(pseudonym(session_pseudonym_key, columns[0]));
+                }
+            }
+            _ => {
+                return Err(ObservationFailure::Unknown(
+                    "row transport is outside the registered closed set",
+                ));
+            }
+        }
+    }
+    Ok(snapshot(connected))
 }
