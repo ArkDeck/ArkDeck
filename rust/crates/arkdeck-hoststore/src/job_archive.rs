@@ -442,10 +442,14 @@ mod tests {
             Self::with_step(false)
         }
         fn with_step(with_step: bool) -> Self {
-            let base = std::env::temp_dir().canonicalize().unwrap().join(format!(
-                "arkdeck-archive-{:032x}",
-                u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
-            ));
+            // Session settings use the same canonical local-drive spelling as
+            // the production owner; std::canonicalize is verbatim on Windows.
+            let base = crate::session_owner::canonical_path(&std::env::temp_dir())
+                .unwrap()
+                .join(format!(
+                    "arkdeck-archive-{:032x}",
+                    u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+                ));
             for path in [
                 base.clone(),
                 base.join("jobs-state"),

@@ -117,3 +117,22 @@ was `storageUnavailable`, not a failed abandonment decision. macOS workspace,
 Linux, App, Swift, design and Windows ClientKit lanes passed. This diagnostic
 head adds the missing failure detail and a real capacity probe so the Windows
 cause can be fixed from evidence; it does not claim the failure is repaired.
+
+
+### Canonical Windows fixture root correction
+
+Local targeted checks: all seven archive tests pass after the path correction
+(exit 0; `recovery-archive-canonical-path-tests.log`); hoststore Clippy with all
+targets and denied warnings passes (exit 0;
+`recovery-archive-canonical-path-clippy.log`). The fixture now uses the existing
+Session-owner canonical path helper. Windows `std::fs::canonicalize` returns a
+verbatim drive path, while the Session configuration deliberately compares its
+plain local-drive spelling; production path/identity checks are unchanged.
+
+CI: PR #2468 diagnostic run `37185577438`, Windows workspace job `111386888923`,
+passed the real capacity probe but repeated the three publication failures. The
+durable marker identified `recordUnreadable: Session storage is unavailable or
+unsafe` before capacity admission, with an empty selected root. This matches the
+fixture's noncanonical stored path and the existing `locked_storage` comparison.
+The corrected Windows execution is pending in the next PR run; macOS success
+alone is not reported as Windows verification.
