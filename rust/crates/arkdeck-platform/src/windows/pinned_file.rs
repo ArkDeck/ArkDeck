@@ -17,7 +17,7 @@ use std::path::{Component, Path, PathBuf, Prefix};
 use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
 use windows_sys::Win32::Storage::FileSystem::{
     FILE_EXECUTE, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
-    ReOpenFile, SYNCHRONIZE,
+    READ_CONTROL as READ_CONTROL_ACCESS, ReOpenFile, SYNCHRONIZE,
 };
 
 /// What one measurement of a pinned file established.
@@ -188,6 +188,33 @@ pub fn measure_host_file(
         owner_private: access.owner_private(),
         executable,
     })
+}
+
+/// Whether the directory at the local absolute `path` is one only its owner
+/// and the trusted principals may change (TASK-XPA-011, DevEco's signing
+/// material): the Unix "a real directory, `mode & 0o022 == 0`". The path
+/// must be canonical (no link or junction in any component, the spelling on
+/// disk), and the last component is opened without following a reparse
+/// point. `Unreadable` for anything that is not such a directory.
+pub fn trusted_write_only_directory(path: &Path) -> Result<bool, HostFileMeasureError> {
+    use HostFileMeasureError::Unreadable;
+    if !standard_local_path(path) {
+        return Err(Unreadable);
+    }
+    let directory = std::fs::OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES | READ_CONTROL_ACCESS | SYNCHRONIZE)
+        .share_mode(SHARE_ALL)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(path)
+        .map_err(|_| Unreadable)?;
+    let stat = Stat::of(&directory).map_err(|_| Unreadable)?;
+    if !stat.directory() {
+        return Err(Unreadable);
+    }
+    host_fs::canonical(path, &directory).map_err(|_| Unreadable)?;
+    Ok(Access::of(&directory)
+        .map_err(|_| Unreadable)?
+        .trusted_write_only())
 }
 
 /// Read the regular file at the local absolute `path` whole, as Swift's

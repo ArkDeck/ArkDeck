@@ -583,6 +583,12 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "debug.start",
     "debug.evaluate",
     "debug.status",
+    // ArkForge's device access and the lane's plan preview (TASK-XPA-010):
+    // through the same CLI against the same signed test daemon, over a
+    // stand-in for `arkforged`'s public pipe (ArkForge's own codec and
+    // transport) and a stand-in plan previewer, both in the test binary.
+    "flash.device-access",
+    "flash.lane-preview",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -602,10 +608,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "agentd.status",
     "agentd.verify",
     "agentd.uninstall",
-    // DevEco's password material is not read on Windows (TASK-XPA-011); the
-    // other signing leaves are served there over Credential Manager.
-    "runtime.signing.migrate-deveco",
-    "signing.migrate-deveco",
     "runtime.update.check",
     "runtime.update.download",
     "runtime.update.handoff",

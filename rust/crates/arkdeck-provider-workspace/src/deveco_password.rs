@@ -294,7 +294,96 @@ mod material_layout {
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
+mod material_layout {
+    //! The bounded DevEco material layout on Windows (TASK-XPA-011): the same
+    //! layout DevEco writes on macOS (`material/fd/<slot>/<file>` ×3,
+    //! `material/ac/<salt>`, `material/ce/<work key>` beside the keystore,
+    //! measured on this host's DevEco install), judged by the platform's own
+    //! reads: a directory is a real one, in its spelling on disk, that only
+    //! its owner and the trusted principals may change (the Unix
+    //! `mode & 0o022 == 0`); a file is read through one handle that follows
+    //! no reparse point, as the same file it measured.
+    const MAX_MATERIAL_FILE: u64 = 4_096;
+    use crate::SigningError;
+    use arkdeck_platform::Secret;
+    use sha2::{Digest, Sha256};
+    use std::path::{Path, PathBuf};
+
+    fn unsafe_directory() -> SigningError {
+        SigningError::invalid("DevEco signing material directory is absent or unsafe")
+    }
+
+    fn incomplete() -> SigningError {
+        SigningError::invalid("DevEco signing material layout is incomplete")
+    }
+
+    fn unsafe_file() -> SigningError {
+        SigningError::invalid("DevEco signing material file is absent or unsafe")
+    }
+
+    fn validate_directory(directory: &Path) -> Result<(), SigningError> {
+        match arkdeck_platform::trusted_write_only_directory(directory) {
+            Ok(true) => Ok(()),
+            _ => Err(unsafe_directory()),
+        }
+    }
+
+    /// The entries of a validated directory except `.DS_Store`, in name order.
+    fn entries(directory: &Path) -> Result<Vec<PathBuf>, SigningError> {
+        validate_directory(directory)?;
+        let mut entries = std::fs::read_dir(directory)
+            .map_err(|_| unsafe_directory())?
+            .map(|entry| entry.map(|entry| entry.path()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| unsafe_directory())?;
+        entries.retain(|path| path.file_name().is_some_and(|name| name != ".DS_Store"));
+        entries.sort_by(|left, right| left.file_name().cmp(&right.file_name()));
+        Ok(entries)
+    }
+
+    /// Three slots, each holding one 16-byte file.
+    pub(super) fn fd_parts(directory: &Path) -> Result<Vec<Secret>, SigningError> {
+        let slots = entries(directory)?;
+        if slots.len() != 3 {
+            return Err(incomplete());
+        }
+        slots.iter().map(|slot| only_file(slot, Some(16))).collect()
+    }
+
+    /// Exactly one bounded regular file in a validated directory, measured
+    /// (trusted-write-only, its SHA-256) and read as that same file.
+    pub(super) fn only_file(
+        directory: &Path,
+        expected: Option<u64>,
+    ) -> Result<Secret, SigningError> {
+        let files = entries(directory)?;
+        if files.len() != 1 {
+            return Err(incomplete());
+        }
+        let path = &files[0];
+        let measure = arkdeck_platform::measure_host_file(path, MAX_MATERIAL_FILE)
+            .map_err(|_| unsafe_file())?;
+        // A second name of the file is refused, as macOS refuses a link to
+        // it: a symbolic link needs a privilege on Windows, a hard link
+        // does not.
+        if !measure.trusted_write_only
+            || measure.links != 1
+            || expected.is_some_and(|expected| measure.identity.size != expected)
+        {
+            return Err(unsafe_file());
+        }
+        let bytes = Secret::new(
+            arkdeck_platform::read_host_file(path, MAX_MATERIAL_FILE).map_err(|_| unsafe_file())?,
+        );
+        if <[u8; 32]>::from(Sha256::digest(bytes.as_bytes())) != measure.sha256 {
+            return Err(SigningError::drift("DevEco signing material"));
+        }
+        Ok(bytes)
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
 mod material_layout {
     //! DevEco's material layout on this platform has not been measured yet;
     //! nothing is read until it is.
