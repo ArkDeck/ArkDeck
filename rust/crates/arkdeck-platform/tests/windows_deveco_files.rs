@@ -58,6 +58,8 @@ fn deveco(base: &Path, name: &str) -> PathBuf {
         std::fs::write(root.join("product-info.json"), PRODUCT).unwrap();
         std::fs::write(root.join("sdk/default/sdk-pkg.json"), SDK).unwrap();
         std::fs::write(root.join("tools/node/node.exe"), b"MZ node").unwrap();
+        std::fs::create_dir_all(root.join("jbr/bin")).unwrap();
+        std::fs::write(root.join("jbr/bin/java.exe"), b"MZ java").unwrap();
         std::fs::write(root.join("tools/hvigor/bin/hvigorw.js"), b"// hvigor").unwrap();
         root
     }
@@ -293,22 +295,23 @@ fn junction(link: &Path, target: &Path) {
 }
 
 #[test]
-fn the_four_windows_roles_read_with_pinned_identities() {
+fn the_five_windows_roles_read_with_pinned_identities() {
     let scratch = Scratch::new("deveco-roles");
     let path = scratch.deveco("DevEco Studio");
     let root = DevEcoRoot::open(&path).unwrap();
     assert_eq!(root.path(), path);
     root.verify_sdk_directory().unwrap();
     root.require_linked().unwrap();
-    let expected: [(DevEcoRole, &[u8], bool); 4] = [
+    let expected: [(DevEcoRole, &[u8], bool); 5] = [
         (DevEcoRole::ProductManifest, PRODUCT.as_bytes(), false),
         (DevEcoRole::SdkManifest, SDK.as_bytes(), false),
         (DevEcoRole::Node, b"MZ node", true),
         (DevEcoRole::Hvigor, b"// hvigor", false),
+        (DevEcoRole::Java, b"MZ java", true),
     ];
     assert_eq!(
         DevEcoRole::ALL.map(DevEcoRole::name),
-        ["productManifest", "sdkManifest", "node", "hvigor"]
+        ["productManifest", "sdkManifest", "node", "hvigor", "java"]
     );
     for (role, bytes, executable) in expected {
         let read = root.read_role(role).unwrap();
@@ -382,6 +385,12 @@ fn unknown_layouts_links_and_foreign_rights_are_refused() {
     owner_read_only(&path.join("tools/node/node.exe"));
     assert_eq!(
         root.read_role(DevEcoRole::Node).err().unwrap().kind(),
+        ErrorKind::PermissionDenied
+    );
+    // Nor the bundled JDK's launcher.
+    owner_read_only(&path.join("jbr/bin/java.exe"));
+    assert_eq!(
+        root.read_role(DevEcoRole::Java).err().unwrap().kind(),
         ErrorKind::PermissionDenied
     );
 
