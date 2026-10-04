@@ -3851,14 +3851,39 @@ Windows. Two things change there:
   execute, measured through `measure_host_file`. A copy refuses a link or
   junction inside the tree instead of recreating it.
 
-A registered project resolves to no profile on Windows. Swift's profiles pin
-code-owned system tools (`/usr/bin/grep`, `sed`, `patch`, `bsdtar`, `git`, and
-SwiftPM), Windows ships none of them, and no rule yet decides which ones a
-Windows Runtime may trust. No PATH lookup stands in for that decision. So every
-profile-served workspace operation is unavailable with
-`workspace.toolchainUnavailable: no code-owned source tool … is trusted on
-Windows`, and a plan of one is refused before admission with zero dispatch.
-`workspace.inspect-source@1` needs no profile, so it runs.
+Swift's profiles pin code-owned system tools (`/usr/bin/grep`, `sed`,
+`patch`, `bsdtar`, `git`). The maintainer ruled on 2026-10-04 how Windows
+trusts them, and the table is `CodeOwnedTools` in `workspace_profile.rs`:
+
+- **grep, sed and patch** are reimplemented in Rust (`workspace_text_tools.rs`)
+  for exactly the argv the provider builds. The daemon runs its own image as
+  each one (`arkdeck-agentd --workspace-tool grep|sed|patch …`), pinned by
+  digest, so no external binary is trusted for them.
+- **tar** (`System32\tar.exe`) and **git** (Git for Windows) are trusted by
+  their Authenticode publisher at their registered absolute path, never by a
+  PATH lookup.
+
+Until the trusted system tools are composed, a registered project resolves to
+no profile. Every profile-served workspace operation is unavailable with
+`workspace.toolchainUnavailable: no trusted system archive (tar) or
+source-control (git) tool is composed on Windows yet`, and a plan of one is
+refused before admission with zero dispatch. `workspace.inspect-source@1`
+needs no profile, so it runs.
+
+`cargo test -p arkdeck-hoststore --test workspace_text_tools_oracle` checks the
+reimplementation against the macOS tools in two ways:
+
+- **On every host**, it replays the recorded Swift oracles.
+  `workspace-read-oracle`'s `/usr/bin/grep` and `/usr/bin/sed` artifacts must
+  match byte for byte. `workspace-patch-oracle`'s tree after `/usr/bin/patch`
+  must match digest for digest, including the failed hunk's
+  `@@ -1,1 +1,1 @@` reject and its `.orig` backup.
+- **On macOS**, the host's own `/usr/bin/grep`, `sed` and `patch` must answer a
+  corpus of the provider's argv shapes exactly as the reimplementation does:
+  exit status, stdout, stderr and the tree.
+
+`windows_workspace_provider_process` runs the daemon image as each tool and
+compares its answer with the reimplementation's.
 
 `cargo test -p arkdeck-agentd --test windows_workspace_provider_process`
 (`harness = false`) registers a project and restarts the daemon with this
@@ -3866,7 +3891,7 @@ test binary as the inspector; the binary answers as `grep -r -n` does. The
 inspection is planned under the default read-only policy and runs. It
 publishes exactly what the inspector prints when run directly, and it reads
 back and deduplicates after a restart. The test also checks that the
-profile-served operations carry the code-owned tools reason, that a plan of
+profile-served operations carry the system tools reason, that a plan of
 one is refused with zero dispatch, and that an inspector that is not an
 executable refuses the start.
 
