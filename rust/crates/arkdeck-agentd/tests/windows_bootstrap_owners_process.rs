@@ -11,9 +11,10 @@
 //!     range, an invalid tool reference to remove, a relative HDC to
 //!     register, and `runtime.tool.select` with no tool-selection owner;
 //!   - what Windows cannot hold is refused with zero dispatch and writes
-//!     nothing: a daemon Bundle (no Windows daemon-bundle form), an HDC (no
-//!     Windows HDC tuple is registered, CHG-2026-078), a macOS-spelled path,
-//!     and an absent bundle, tool or toolchain;
+//!     nothing: an absent package, and a package whose daemon is not signed
+//!     as this (unsigned) daemon is; an HDC (no Windows HDC tuple is
+//!     registered, CHG-2026-078); a macOS-spelled path; and an absent bundle,
+//!     tool or toolchain;
 //!   - the registry reads back the same after a restart.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
@@ -95,6 +96,43 @@ impl Drop for Root {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+/// A release-candidate package tree below the root, owner-private, laid out as
+/// `windows/scripts/package-rc.ps1` lays one out, its daemon a copy of
+/// `daemon`, and its `rc-manifest.json` naming every other file.
+fn package(root: &Root, name: &str, daemon: &Path) -> String {
+    // Owner-private, as a package unpacked below `%LOCALAPPDATA%` is: the
+    // temporary directory may grant others the right to change it, which the
+    // owner refuses.
+    let tree = root.0.join(name);
+    if !tree.exists() {
+        arkdeck_platform::create_private_directory(&tree).unwrap();
+        arkdeck_platform::create_private_directory(&tree.join("bin")).unwrap();
+    }
+    std::fs::copy(daemon, tree.join("arkdeck-agentd.exe")).unwrap();
+    std::fs::copy(
+        PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join(r"System32\whoami.exe"),
+        tree.join(r"bin\arkdeck.exe"),
+    )
+    .unwrap();
+    std::fs::write(tree.join("ArkDeck.exe"), b"fixture App; never run\n").unwrap();
+    let files: Vec<Value> = ["ArkDeck.exe", "arkdeck-agentd.exe", "bin/arkdeck.exe"]
+        .into_iter()
+        .map(|relative| {
+            let bytes = std::fs::read(tree.join(relative.replace('/', "\\"))).unwrap();
+            json!({"path": relative, "bytes": bytes.len(),
+                "sha256": arkdeck_contract::sha256_hex(&bytes)})
+        })
+        .collect();
+    std::fs::write(
+        tree.join("rc-manifest.json"),
+        serde_json::to_vec_pretty(&json!({"schemaVersion": "arkdeck.windows-rc-package/1",
+            "kind": "windows-rc-app-daemon-cli", "version": "0.1.0", "files": files}))
+        .unwrap(),
+    )
+    .unwrap();
+    tree.to_str().unwrap().to_owned()
 }
 
 fn daemon(executable: &Path, root: &Path) -> Command {
@@ -312,9 +350,22 @@ fn empty_registry_answers(pipe: &str, root: &Root) {
     refused(
         pipe,
         "runtime.bundle.register",
-        json!({"kind": "daemon-bundle", "file": root.path("ArkDeckAgent.app")}),
-        "operationUnavailable",
-        "daemon bundle registration is unavailable on Windows: the Runtime is installed as a signed package",
+        json!({"kind": "daemon-bundle", "file": root.path("absent-package")}),
+        "fileIdentityChanged",
+        "the Bundle source is absent or not a local directory",
+    );
+    // This daemon is not signed, so no package's signer can be pinned to it.
+    let unsigned = package(
+        root,
+        "unsigned-package",
+        Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")),
+    );
+    refused(
+        pipe,
+        "runtime.bundle.register",
+        json!({"kind": "daemon-bundle", "file": unsigned}),
+        "admissionDenied",
+        "captured Bundle failed its native trust policy",
     );
     refused(
         pipe,
@@ -578,22 +629,85 @@ fn the_registry_leaves_run_through_the_cli_against_a_dev_signed_daemon() {
         &["runtime", "tool", "inspect", "--tool", TOOL],
         "resourceNotFound",
     );
-    let bundle_file = root.path("ArkDeckAgent.app");
-    cli_refused(
+    // A package whose daemon is signed as this daemon is registers.
+    let source = package(&root, "package", &daemon);
+    let register = [
+        "runtime",
+        "bundle",
+        "register",
+        "--kind",
+        "daemon-bundle",
+        "--file",
+        &source,
+    ];
+    let bundle = cli_answered(&daemon, &pin, &pipe, &register);
+    assert_eq!(bundle["platform"], "windows", "{bundle}");
+    assert_eq!(bundle["state"], "available", "{bundle}");
+    assert_eq!(bundle["contentRetained"], true, "{bundle}");
+    assert_eq!(
+        bundle["trust"]["teamIdentifier"], "ArkDeck Development Daemon (host-trusted only)",
+        "{bundle}"
+    );
+    let bundle_ref = bundle["bundleRef"].as_str().unwrap().to_owned();
+    assert_eq!(cli_answered(&daemon, &pin, &pipe, &register), bundle);
+    assert_eq!(
+        cli_answered(
+            &daemon,
+            &pin,
+            &pipe,
+            &["runtime", "bundle", "inspect", "--bundle", &bundle_ref]
+        ),
+        bundle
+    );
+    let page = cli_answered(&daemon, &pin, &pipe, &["runtime", "bundle", "list"]);
+    assert_eq!(page["items"], json!([bundle]), "{page}");
+    first.stop(&root.0);
+    let mut first = Daemon::start(&daemon, &root.0);
+    let pipe = first.serving();
+    assert_eq!(
+        cli_answered(
+            &daemon,
+            &pin,
+            &pipe,
+            &["runtime", "bundle", "inspect", "--bundle", &bundle_ref]
+        ),
+        bundle
+    );
+    let retired = cli_answered(
         &daemon,
         &pin,
         &pipe,
         &[
             "runtime",
             "bundle",
-            "register",
-            "--kind",
-            "daemon-bundle",
-            "--file",
-            &bundle_file,
+            "remove",
+            "--bundle",
+            &bundle_ref,
+            "--expected-generation",
+            "1",
         ],
-        "operationUnavailable",
     );
+    assert_eq!(retired["state"], "removed", "{retired}");
+    assert_eq!(retired["generation"], "2", "{retired}");
+    first.stop(&root.0);
+    let mut first = Daemon::start(&daemon, &root.0);
+    let pipe = first.serving();
+    assert_eq!(
+        cli_answered(
+            &daemon,
+            &pin,
+            &pipe,
+            &["runtime", "bundle", "inspect", "--bundle", &bundle_ref]
+        ),
+        retired
+    );
+    // Retired content is not registered again.
+    cli_refused(&daemon, &pin, &pipe, &register, "resourceConflict");
+    assert_measured(&[
+        "runtime.bundle.register",
+        "runtime.bundle.inspect",
+        "runtime.bundle.remove",
+    ]);
     let hdc_file = root.path("hdc.exe");
     cli_refused(
         &daemon,

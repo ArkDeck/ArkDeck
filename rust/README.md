@@ -2886,17 +2886,25 @@ do, over the registry of a development root's private `bootstrap`, or the accoun
 `%LOCALAPPDATA%\ArkDeck\Bootstrap\v1` (the macOS `ArkDeck/Bootstrap/v1` below the product
 directory), created owner-only at the start. The census names `bootstrap` after
 `workspaceProjects`, the macOS order.
-- **Served.** `runtime.bundle.list|inspect|remove` and `runtime.tool.list|inspect|remove` over
+- **Served.** `runtime.bundle.register|list|inspect|remove` and `runtime.tool.list|inspect|remove` over
   `arkdeck-bootstrap`'s store, index, retirement, reference and selection-ledger owners, which
   build on Windows on the NTFS host store; `runtime.tool.register --kind deveco` and a DevEco
   toolchain's inspection, listing and retirement over the DevEco registry. The control layer and
   the CLI take a registration path as the host spells an absolute one (`X:\…` on Windows), and the
   CLI expects the host's `platform` in a returned record.
-- **Refused on Windows**, before the store is locked: registering a daemon Bundle (no Windows
-  daemon-bundle form; the daemon is installed as the signed package) or an HDC (no Windows HDC
-  tuple is registered, CHG-2026-078); a retained record of either is refused as failing its
-  native trust policy. With no HDC to select, `runtime.tool.select` answers Swift's no-owner
-  refusal.
+- **The Windows daemon Bundle** is a release-candidate package tree (`package-rc.ps1`'s xcopy
+  form): it holds exactly the files its `rc-manifest.json` names with their sizes and SHA-256s,
+  and its `arkdeck-agentd.exe` is signed as the running Runtime is (the same development leaf,
+  or the same production publisher, ruling 17). `arkdeck-platform`'s `windows::bootstrap_tree`
+  reads the tree handle-relative on NTFS (no reparse point; nothing another principal may
+  change) and captures it through a private staging directory as `bundle-<digest>.rc`. The
+  record adds `"platform":"windows"` and the signer, and the projection names
+  `arkdeck.windows-daemon-package/1` with the signer as `teamIdentifier`; the content digest is
+  host-tagged. `runtime service update` stays macOS-only (the open question is in
+  `evidence/runs/TASK-XPA-012/windows-daemon-bundle-run.md`).
+- **Refused on Windows**, before the store is locked: registering an HDC (no Windows HDC tuple
+  is registered, CHG-2026-078); a retained HDC record is refused as failing its native trust
+  policy. With no HDC to select, `runtime.tool.select` answers Swift's no-owner refusal.
 - **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
   team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
   `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.

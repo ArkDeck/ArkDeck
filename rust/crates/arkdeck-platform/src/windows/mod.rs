@@ -18,6 +18,7 @@ use windows_sys::Win32::System::Pipes::*;
 use windows_sys::Win32::System::Threading::*;
 
 mod account;
+mod bootstrap_tree;
 mod code_signature;
 mod console_secret;
 mod credential;
@@ -41,9 +42,13 @@ mod stop;
 mod tool;
 mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
+pub use bootstrap_tree::{
+    BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublication,
+    BootstrapBundlePublishError, BootstrapEntry, BootstrapTree, inspect_bootstrap_tree,
+};
 pub use code_signature::{
     DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,
-    inspect_native_code_signature, inspect_publisher,
+    inspect_native_code_signature, inspect_publisher, same_signer,
 };
 pub use console_secret::{TerminalSecretError, read_terminal_secret};
 pub use credential::{

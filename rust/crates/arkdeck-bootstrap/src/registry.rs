@@ -69,6 +69,29 @@ pub(crate) struct BundleRecord {
     pub(crate) generation: u64,
     pub(crate) state: String,
     pub(crate) references: Vec<Owner>,
+    /// A Windows record's host tag, `"windows"`, and its daemon's signer
+    /// name (the leaf's single `O=`, else its `CN=`). A macOS record has
+    /// neither, and each host reads only its own form.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) platform: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) signer: Option<String>,
+}
+
+/// Whether a bundle record is this host's form: macOS records carry no host
+/// tag; a Windows record names `"windows"` and one printable signer name.
+fn host_form(record: &BundleRecord) -> bool {
+    if cfg!(windows) {
+        record.platform.as_deref() == Some("windows")
+            && record.signer.as_deref().is_some_and(|signer| {
+                !signer.is_empty()
+                    && signer.len() <= 256
+                    && signer.trim() == signer
+                    && !signer.chars().any(char::is_control)
+            })
+    } else {
+        record.platform.is_none() && record.signer.is_none()
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -86,16 +109,29 @@ pub fn decode_bundles(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
             .records
             .iter()
             .map(|r| {
+                let (platform, trust) = match r.signer.as_deref() {
+                    // A Windows daemon package: its daemon image's signer,
+                    // pinned to the Runtime's own (maintainer ruling 17).
+                    Some(signer) => (
+                        "windows",
+                        json!({"policy": "arkdeck.windows-daemon-package/1", "signature": "verified",
+                            "teamIdentifier": signer, "executionAssessment": "notPerformed"}),
+                    ),
+                    None => (
+                        "macos",
+                        json!({"policy": "arkdeck.daemon-helper/1", "signature": "verified",
+                            "teamIdentifier": "8AQTYW5FKR", "executionAssessment": "notPerformed"}),
+                    ),
+                };
                 json!({
                     "schemaVersion": "arkdeck.runtime-bundle/1", "bundleRef": r.reference,
-                    "kind": "daemon-bundle", "platform": "macos",
+                    "kind": "daemon-bundle", "platform": platform,
                     "generation": r.generation.to_string(), "state": r.state,
                     "contentDigest": r.digest, "digestAlgorithm": "sha256-jcs",
                     "contentSchemaVersion": "arkdeck.bundle-content/1",
                     "byteCount": r.byte_count.to_string(), "entryCount": r.entry_count.to_string(),
                     "registeredAtUTC": r.registered_at, "version": r.version,
-                    "trust": {"policy": "arkdeck.daemon-helper/1", "signature": "verified",
-                        "teamIdentifier": "8AQTYW5FKR", "executionAssessment": "notPerformed"},
+                    "trust": trust,
                     "references": r.references, "contentRetained": true,
                 })
             })
@@ -127,6 +163,7 @@ pub(crate) fn read_bundles(bytes: &[u8]) -> Result<(BundleIndex, Vec<u8>), Decod
                     !v.is_empty() && v.len() <= 128 && v.bytes().all(|b| (32..127).contains(&b))
                 })
                 || !state(&r.state, r.generation, &r.references)
+                || !host_form(r)
         })
     {
         return Err(DecodeError::Header);
@@ -478,17 +515,47 @@ mod tests {
         .unwrap()
     }
 
-    fn bundles(registered_at: &str) -> Vec<u8> {
+    /// A bundle index of one record in this host's form (a Windows record
+    /// carries its host tag and signer), or in the other host's.
+    fn bundle_index(registered_at: &str, windows: bool) -> Vec<u8> {
+        let mut record = json!({
+            "reference": format!("bundle:sha256:{}", "c".repeat(64)),
+            "digest": "c".repeat(64), "registeredAtUTC": registered_at,
+            "byteCount": 0, "entryCount": 1, "generation": 1,
+            "state": "available", "references": [],
+        });
+        if windows {
+            record["platform"] = json!("windows");
+            record["signer"] = json!("ArkDeck Development Daemon (host-trusted only)");
+        }
         serde_json::to_vec(&json!({
             "schemaVersion": "arkdeck.bootstrap-bundles/1",
-            "records": [{
-                "reference": format!("bundle:sha256:{}", "c".repeat(64)),
-                "digest": "c".repeat(64), "registeredAtUTC": registered_at,
-                "byteCount": 0, "entryCount": 1, "generation": 1,
-                "state": "available", "references": [],
-            }],
+            "records": [record],
         }))
         .unwrap()
+    }
+
+    fn bundles(registered_at: &str) -> Vec<u8> {
+        bundle_index(registered_at, cfg!(windows))
+    }
+
+    #[test]
+    fn each_host_reads_only_its_own_bundle_record_form() {
+        let other = bundle_index("2026-09-30T08:15:00Z", !cfg!(windows));
+        assert!(matches!(decode_bundles(&other), Err(DecodeError::Header)));
+        let decoded = decode_bundles(&bundles("2026-09-30T08:15:00Z")).unwrap();
+        let row = &decoded.projection[0];
+        if cfg!(windows) {
+            assert_eq!(row["platform"], "windows");
+            assert_eq!(row["trust"]["policy"], "arkdeck.windows-daemon-package/1");
+            assert_eq!(
+                row["trust"]["teamIdentifier"],
+                "ArkDeck Development Daemon (host-trusted only)"
+            );
+        } else {
+            assert_eq!(row["platform"], "macos");
+            assert_eq!(row["trust"]["teamIdentifier"], "8AQTYW5FKR");
+        }
     }
 
     #[test]
