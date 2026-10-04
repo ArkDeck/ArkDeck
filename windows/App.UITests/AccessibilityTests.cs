@@ -38,6 +38,7 @@ public sealed class AccessibilityTests
         ["device", "targets", new[] { "device.target.TGT-3ba3f5f43b92" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a003" }],
         ["settings", "targets", new[] { "settings.tab.workspace", "settings.workspace.project.project-04dfc9a54d0e77e090fbb537" }],
+        ["settings", "jobs", new[] { "settings.tab.remoteSources" }],
         ["sessions", "targets", new[] { "sessions.row.session-job-0f77f8c52864d676372962eccb17389c" }],
         ["agents", "jobs", new[] { "agents.humanAction.<har-3>" }],
         ["imports", "jobs", new[] { "imports.row.imp-dcb7943f-d934-43da-b290-65d0066cae35" }],
@@ -52,7 +53,7 @@ public sealed class AccessibilityTests
         ["viewer", "viewer", new[] { "viewer.recapture" }],
         ["diagnostics", "jobs", Array.Empty<string>()],
         ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics" }],
-        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openDiagnostics" }],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openWorkspace" }],
         ["overview", "jobs", new[] { "jobInspector.row.job-0000000000000000000000000000a004" }],
     ];
 
@@ -264,6 +265,7 @@ public sealed class AccessibilityTests
         ["settings", "jobs", new[] { "settings.tab.toolchains" }],
         ["settings", "jobs", new[] { "settings.tab.storage" }],
         ["settings", "jobs", new[] { "settings.tab.trace" }],
+        ["settings", "jobs", new[] { "settings.tab.remoteSources" }],
         ["settings", "targets", new[] { "settings.tab.workspace", "settings.workspace.project.project-04dfc9a54d0e77e090fbb537" }],
         ["sessions", "targets", new[] { "sessions.row.session-job-0f77f8c52864d676372962eccb17389c" }],
         ["sessions", "foundation", Array.Empty<string>()],
@@ -286,7 +288,7 @@ public sealed class AccessibilityTests
         ["viewer", "targets", Array.Empty<string>()],
         ["diagnostics", "jobs", Array.Empty<string>()],
         ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics", "diagnostics.artifact.read.hilog.txt" }],
-        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openDiagnostics" }],
+        ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openWorkspace" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a002" }],
     ];
 

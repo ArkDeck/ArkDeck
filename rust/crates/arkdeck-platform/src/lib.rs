@@ -378,12 +378,13 @@ pub use distribution_tree::{
     tree_snapshot_at,
 };
 
-// The Windows content tree and Bundle capture on NTFS (TASK-XPA-012): the
+// The Windows content tree and Bundle and HDC captures on NTFS (TASK-XPA-012): the
 // same API over held directory handles.
 #[cfg(windows)]
 pub use windows::{
     BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublication,
-    BootstrapBundlePublishError, BootstrapEntry, BootstrapTree, inspect_bootstrap_tree,
+    BootstrapBundlePublishError, BootstrapEntry, BootstrapToolCapture, BootstrapToolCaptureError,
+    BootstrapToolPublication, BootstrapToolPublishError, BootstrapTree, inspect_bootstrap_tree,
 };
 
 #[cfg(target_os = "macos")]

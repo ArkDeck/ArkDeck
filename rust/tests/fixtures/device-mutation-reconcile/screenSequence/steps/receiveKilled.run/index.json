@@ -7,7 +7,7 @@
       "createdAtUTC" : "2026-09-14T00:00:00Z",
       "idempotencyKey" : "idem-mutation-receiveKilled",
       "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
-      "recordSHA256" : "61221ca6df7c8b28649fe843220f808f79e44ff8524d9a8e0bcf4cf37bf0e855",
+      "recordSHA256" : "74c933ed66686810bc945afa9c0c8bc07b055226ed299500c6f2393367404b4a",
       "requestHash" : "032a712e061a6292537c1c02c5386cd8ef3d78050085c6fce7e44b408146271d",
       "state" : "waitingForRecovery",
       "updatedAtUTC" : "2026-09-14T00:00:00Z",

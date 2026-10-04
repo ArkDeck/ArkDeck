@@ -9,7 +9,9 @@
 mod capture_files;
 mod debug_hap;
 mod debug_read;
+mod diagnostic_trace;
 pub use debug_read::{DebugInventory, DebugReadTemplate, debug_inventory};
+pub use diagnostic_trace::{DiagnosticTraceControl, run_diagnostic_trace};
 #[cfg(any(target_os = "macos", windows))]
 mod dispatch;
 mod host_diagnostics;

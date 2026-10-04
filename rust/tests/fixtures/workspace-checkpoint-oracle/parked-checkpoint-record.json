@@ -5,11 +5,11 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-25T00:00:00Z",
-    "consumptionFingerprintSHA256" : "2dcc9f3c29f3ba2a51fb1892d1957ea58799c6754ecbdb10f091bac6d880874e",
+    "consumptionFingerprintSHA256" : "c0016a135fa70b014cac4374ad9d4ae9a67af82eee270b3a622cf238cc1bf98d",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-E721E16507723DBB812451F94366A62F6B43A008-G3",
+    "reference" : "CAP-RT-POLICY-A93906BF0BE61B7B974FA4C0B025321EF3733B0A-G3",
     "runtimeCapabilityCorrelation" : {
-      "planDigestSHA256" : "a280e73e79a181bed16fa86df1c7acc407ba601d8e4b66887ff18deb5bb4a8ad",
+      "planDigestSHA256" : "2e8494d4567dc719c8db38c1962774dd2e4d8328c31792ac8bc97b9a761fbcf9",
       "reservationID" : "idempotency-checkpoint-lost",
       "stepSetDigestSHA256" : "78d0982a8f4e4aa69f2c7e411abcf3fb2938c3ecb6da43d97893df3339961843",
       "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
@@ -17,11 +17,11 @@
     },
     "validUntilUTC" : "2026-10-25T00:00:00Z"
   },
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-25T00:00:00Z",
   "finishedAtUTC" : "2026-09-25T00:00:00Z",
   "jobID" : "job-06dade5ded4e192942c707f07036bcc5",
-  "materializedPlanDigest" : "a280e73e79a181bed16fa86df1c7acc407ba601d8e4b66887ff18deb5bb4a8ad",
+  "materializedPlanDigest" : "2e8494d4567dc719c8db38c1962774dd2e4d8328c31792ac8bc97b9a761fbcf9",
   "operationFailure" : {
     "category" : "unknownOutcome",
     "code" : "outcomeUnknown",
@@ -61,7 +61,7 @@
   "recoveryStepID" : "create-checkpoint",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-E721E16507723DBB812451F94366A62F6B43A008-G3"
+      "capabilityId" : "CAP-RT-POLICY-A93906BF0BE61B7B974FA4C0B025321EF3733B0A-G3"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idempotency-checkpoint-lost",

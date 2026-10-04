@@ -5,12 +5,12 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-20T00:00:00Z",
-    "consumptionFingerprintSHA256" : "dc1c0bea2fcaf5d92b60b47e2fc6148750034e3e74a30062b94c516f1f720af0",
+    "consumptionFingerprintSHA256" : "19bf08739e27bbc906d5e8d85dab3785b6a9b3fdd97b63af36345e16a7b1d9a2",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-77D389B764B44F46E113C3307958F0CDF40A6CD6-G1",
+    "reference" : "CAP-RT-POLICY-D985970B1323038268EBE13A76E5FBB2547BDA0E-G1",
     "runtimeCapabilityCorrelation" : {
       "artifactSHA256" : "f0a60ff8aa51ca5b39e950bf7c57dc8707ccea707c5d7c1eb6ac72797438ed4a",
-      "planDigestSHA256" : "eabbd65f0b1fead35afaafc23c2547a14b315d4301b60ece867e1fbaccaacdd7",
+      "planDigestSHA256" : "e26fbe7a156117bb8f01a94e2d208302512c33803dbf200165610efb0ed9b57d",
       "reservationID" : "idempotency-lost-after",
       "stepSetDigestSHA256" : "6886b49a4248c695ee8a3d0ddfdd9ed6ed3e450cb818f3ff4cb9e1d90b97ff75",
       "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
@@ -18,11 +18,11 @@
     },
     "validUntilUTC" : "2026-10-20T00:00:00Z"
   },
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-20T00:00:00Z",
   "finishedAtUTC" : "2026-09-20T00:00:00Z",
   "jobID" : "job-5a8adf973b71fb93cc2afc8f94076f41",
-  "materializedPlanDigest" : "eabbd65f0b1fead35afaafc23c2547a14b315d4301b60ece867e1fbaccaacdd7",
+  "materializedPlanDigest" : "e26fbe7a156117bb8f01a94e2d208302512c33803dbf200165610efb0ed9b57d",
   "operationFailure" : {
     "category" : "unknownOutcome",
     "code" : "outcomeUnknown",
@@ -67,7 +67,7 @@
   "recoveryStepID" : "apply-patch",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-77D389B764B44F46E113C3307958F0CDF40A6CD6-G1"
+      "capabilityId" : "CAP-RT-POLICY-D985970B1323038268EBE13A76E5FBB2547BDA0E-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idempotency-lost-after",

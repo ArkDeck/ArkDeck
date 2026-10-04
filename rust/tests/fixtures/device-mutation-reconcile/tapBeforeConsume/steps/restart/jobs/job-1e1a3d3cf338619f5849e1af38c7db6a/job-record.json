@@ -4,7 +4,7 @@
     "probeDevice",
     "runApprovedRemoteRead"
   ],
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -67,7 +67,7 @@
   },
   "jobID" : "job-1e1a3d3cf338619f5849e1af38c7db6a",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "bc016c7bca0cfc445703af19062d4e0eaf74e583db498347236ebd55d1be23ee",
+  "materializedPlanDigest" : "88b2869d01541a86a2c376779cb850c1d298dc40c6eb66437ab5e1625c03ee1d",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "input.tap@1",
   "originalSubmissionRequest" : {
@@ -98,7 +98,7 @@
   "providerID" : "hdc",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-E18B623397A5ACD1F87256F3F143C0EE01F3ED88-G1"
+      "capabilityId" : "CAP-RT-POLICY-F567FD60D9F6F576345AA2A59C4CE13087DF922B-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-mutation-tap",

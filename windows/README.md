@@ -171,14 +171,33 @@ first, `ControlResult` back.
   search, the selected component's properties, layout, accessibility, raw fields and Advanced
   Dump (`componentDetail`), and the capture's timings.
 - **Diagnostics (TASK-XPA-020).** The macOS Diagnostics session reader, opened on a History
-  record (Open Diagnostics, for `capture.diagnostics@1` Jobs and the Jobs whose workspace is
-  Diagnostics): a saved session read from its verified Artifacts and inspected on the host
+  record (its Open Diagnostics, or Open Diagnostics beside another workspace's Open for a
+  `capture.diagnostics@1` Job): a saved session read from its verified Artifacts and inspected on the host
   (`DiagnosticSession`, checked against the Swift CLI's 15 diagnostics-inspect oracle cases) —
   the alignment state, the marks and why a mark has no picture, what was never looked for, the
   missing products, the Artifacts with a bounded local text preview and the sensitive Trace
   opened in the Trace viewer — or a HiLog summary verified as macOS verifies it. No Diagnostic
   Session capture provider is composed, so Arm and Mark (Ctrl+M) say so with the macOS reason
   code `diagnostic_session_capture_not_connected`.
+- **Remote build sources (TASK-XPA-020).** The macOS App-side SSH servers: Settings › Servers
+  saves an SSH endpoint after a probe verifies the connection, the credential, the SFTP build root
+  and the host key (its fingerprint shown, trusted only by saving that probe); Debug › Artifacts ›
+  Remote server browses the folders below the verified root and chooses a lib*.so, which is
+  fetched, checked and prepared like a local file. SSH runs through Windows' built-in OpenSSH
+  client (`%SystemRoot%\System32\OpenSSH\ssh.exe`, argv only, `-F none`, the `sftp` subsystem)
+  with a per-connection known-hosts file holding only the pinned key; secrets stay in Credential
+  Manager (`ArkDeck/app/com.arkdeck.remote-build-source.v1/<id>`, in parts beyond 2,560 bytes) and
+  reach the client only through the App's own askpass mode over an owner-only pipe. The files
+  (`sources-v1.json`, `target-bindings-v1.json`, `audit-v1.jsonl`) are owner-only under
+  `%LOCALAPPDATA%\ArkDeck\App\RemoteBuildSources`; no Runtime call is made.
+- **History hand-off (TASK-XPA-020).** A History record's detail has the macOS Open button of the
+  workspace that produced it (the Runtime's `workspaceKind`, else the operation or the capture's
+  typed inputs): Trace (the record's Target pinned; a capture's raw Trace read, verified and opened
+  in the Trace viewer), Viewer (the record's own screenshot, tree and dump read), Debug (its Target
+  and the tab that ran it), Flash (its exact Target, any plan invalidated; a Target no longer
+  adopted is said to be missing), Device (its Target selected) and Diagnostics. The workspace shows
+  the record's read-only context (Job, Target, operation, state, Artifacts) until dismissed;
+  nothing is submitted or replayed.
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for

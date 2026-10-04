@@ -51,7 +51,7 @@ public enum RuntimeWorkspaceKindProjection {
       return .viewer
     case "analyzer.analyze-trace", "analyzer.summarize-trace":
       return .trace
-    case "analyzer.extract-crash-signature", "analyzer.summarize-hilog":
+    case "analyzer.extract-crash-signature", "analyzer.summarize-hilog", "capture.diagnostic-session":
       return .diagnostics
     case "capture.diagnostics":
       return diagnosticsKind(inputs: inputs, clientName: clientName)

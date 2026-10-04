@@ -13,8 +13,6 @@ use crate::session_json;
 use arkdeck_provider_hdc::TraceRequest;
 use serde_json::{Map, Value, json};
 
-const CAPTURE: &str = "capture.diagnostics@1";
-
 fn published(row: &Value) -> bool {
     row["status"].get("published").is_some()
 }
@@ -34,12 +32,12 @@ pub(crate) fn contents(
     finalize_names: &[&str],
 ) -> Result<Vec<u8>, String> {
     let reference = descriptor.reference();
-    if reference == CAPTURE && name == "capture.log" {
+    if crate::device_steps::diagnostic_capture(&reference) && name == "capture.log" {
         let mut log = record.timeline.join("\n");
         log.push('\n');
         return Ok(log.into_bytes());
     }
-    if reference == CAPTURE && name == "markers.json" {
+    if crate::device_steps::diagnostic_capture(&reference) && name == "markers.json" {
         return markers(record, recorded);
     }
     if reference == crate::device_steps::SCREEN_SEQUENCE && name == "sequence.json" {
@@ -114,7 +112,7 @@ fn statuses(
         });
         payload["missingRequired"] = json!(missing_required);
     }
-    if reference == CAPTURE
+    if crate::device_steps::diagnostic_capture(&reference)
         && let Some(tags) = record.request["inputs"]["traceCategories"]
             .as_array()
             .filter(|tags| !tags.is_empty())
@@ -342,16 +340,27 @@ fn markers(record: &JobRecord, recorded: &[Value]) -> Result<Vec<u8>, String> {
     // for and where, not a claim that the search succeeded, since the run
     // never opened the trace. Whether the ring held it is the capture's own
     // readback, or said not to be established where no readback reported.
-    if inputs["ringBuffered"] == true {
+    if inputs["ringBuffered"] == true
+        || record.operation() == crate::device_steps::DIAGNOSTIC_SESSION
+    {
         let ring = record.ring_coverage();
         let anchor = ring.and_then(|ring| ring["anchor"].as_str()).map_or_else(
-            || TraceRequest::anchor(&record.job_id, "capture-trace"),
+            || {
+                TraceRequest::anchor(
+                    &record.job_id,
+                    if record.operation() == crate::device_steps::DIAGNOSTIC_SESSION {
+                        "capture-session-trace"
+                    } else {
+                        "capture-trace"
+                    },
+                )
+            },
             str::to_owned,
         );
         let trace = row(recorded, "trace.htrace").is_some_and(published);
         document["coverage"] = json!({
             "anchor": anchor,
-            "writtenIntoTheDeviceRingAt": "capture-trace",
+            "writtenIntoTheDeviceRingAt": if record.operation() == crate::device_steps::DIAGNOSTIC_SESSION { "capture-session-trace" } else { "capture-trace" },
             "checkAgainst": "trace.htrace",
             "traceStatus": if trace { "published" } else { "absent" },
             "how": "the anchor marks where this snapshot reaches back to; finding it in the \

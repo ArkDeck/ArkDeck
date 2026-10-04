@@ -5,11 +5,11 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-25T00:00:00Z",
-    "consumptionFingerprintSHA256" : "c7558c27c8628a012e99785baeef151d14ddca54e4e24a569e3e91724b9ef2eb",
+    "consumptionFingerprintSHA256" : "5d37e430fb95a92a2d542bececcc7b72b93961ea23233de1f89d3030e97ef857",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-0323F53C0CD0909C26FD3A0E3DFCB07641FEE5ED-G1",
+    "reference" : "CAP-RT-POLICY-985E03BB7630C79389A0FA08B5A71EFF08861B77-G1",
     "runtimeCapabilityCorrelation" : {
-      "planDigestSHA256" : "5512822226158ca97c366eff7242d8df8b73bf852e029ebd888693d93336fe20",
+      "planDigestSHA256" : "fd842756b938691f0fea83656dd1a0bada44fe9312374eff36043d569937cfc2",
       "reservationID" : "idempotency-tests-lost",
       "stepSetDigestSHA256" : "f0e8781789b7dc6742baa1b32ea206f77640432fc48133c79e3bf2f3fa0c8ebe",
       "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
@@ -17,11 +17,11 @@
     },
     "validUntilUTC" : "2026-10-25T00:00:00Z"
   },
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-25T00:00:00Z",
   "finishedAtUTC" : "2026-09-25T00:00:00Z",
   "jobID" : "job-72955b29d95b0612604de209349118d3",
-  "materializedPlanDigest" : "5512822226158ca97c366eff7242d8df8b73bf852e029ebd888693d93336fe20",
+  "materializedPlanDigest" : "fd842756b938691f0fea83656dd1a0bada44fe9312374eff36043d569937cfc2",
   "operationFailure" : {
     "category" : "unknownOutcome",
     "code" : "outcomeUnknown",
@@ -63,7 +63,7 @@
   "recoveryStepID" : "run-tests",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-0323F53C0CD0909C26FD3A0E3DFCB07641FEE5ED-G1"
+      "capabilityId" : "CAP-RT-POLICY-985E03BB7630C79389A0FA08B5A71EFF08861B77-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idempotency-tests-lost",

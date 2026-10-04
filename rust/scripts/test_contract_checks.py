@@ -88,10 +88,15 @@ class ReadOnlyToolSelectionExpectationTests(unittest.TestCase):
                 expected = self.run_owner_matrix(system, error)
                 self.assertEqual(expected.pop("runtime.tool.select"),
                                  "rejected" if system == "Linux" else "operationUnavailable")
+                # The HDC lifecycle and control-action routes answer as Swift's
+                # handler without a control-action owner where the daemon composes
+                # that owner's routes (macOS, and Windows since TASK-XPA-005 H4);
+                # elsewhere they keep the foundation refusal. Tool selection's
+                # override does not set them: Linux stays `rejected`.
                 for method, code in expected.items():
                     self.assertEqual(code, ("invalidInput" if method in {
                         "control-action.show", "control-action.reconcile"} else "operationUnavailable")
-                        if system == "Darwin" else "rejected", method)
+                        if system in {"Darwin", "Windows"} else "rejected", method)
 
     def test_missing_tool_owner_requires_exact_zero_dispatch_refusal(self):
         for system in ("Windows", "Darwin"):

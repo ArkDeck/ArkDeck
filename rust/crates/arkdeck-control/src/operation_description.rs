@@ -118,10 +118,20 @@ mod tests {
             }
         }
         let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
-        // Keep all historical representatives, plus the actual new descriptor.
+        // Keep every historical representative and both Catalog additions.
         let has_keyboard = catalog.iter().any(|entry| entry["id"] == "input.keyboard");
-        assert_eq!(matched.len(), if has_keyboard { 25 } else { 24 });
+        let has_session = catalog
+            .iter()
+            .any(|entry| entry["id"] == "capture.diagnostic-session");
+        assert_eq!(
+            matched.len(),
+            24 + usize::from(has_keyboard) + usize::from(has_session)
+        );
         assert_eq!(matched.contains("input.keyboard@1"), has_keyboard);
+        assert_eq!(
+            matched.contains("capture.diagnostic-session@1"),
+            has_session
+        );
         let mut invalid = Vec::new();
         for d in catalog {
             let reference = match d["version"].as_u64() {

@@ -1,11 +1,11 @@
 {
   "actualEffect" : "destructive",
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-25T00:00:00Z",
   "finishedAtUTC" : "2026-09-25T00:00:00Z",
   "jobID" : "job-06663b63453706cc8ad966e3b0761404",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+  "materializedPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
   "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
   "operationFailure" : {
     "category" : "externalTool",
@@ -42,7 +42,7 @@
   "providerID" : "arkforge",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1"
+      "capabilityId" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-flash-prewarmDrifted",
@@ -67,11 +67,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "1839",
       "lastSequence" : 4,
-      "sha256" : "fe11a1ea1468143750ef94a71cdf9733daff79c560b7cfee4296a2460a133c70"
+      "sha256" : "832697e699eb39386268fe2d1b1281e622d005f09243a7014bae679930898982"
     },
     "claims" : [
       {
@@ -87,20 +87,20 @@
     "journalSeal" : {
       "byteCount" : "2221",
       "lastSequence" : 5,
-      "sha256" : "a8866fa067886931f7a844ab02535fa4d5f3d3ecb4bde6d4002f858462ae6a44"
+      "sha256" : "579d409ee7e51085db5185d77b25c2ea4dadf4350cd6be36f4c5961d05dfa4f3"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-25T00:00:00Z",
       "manifestByteCount" : "1179",
-      "manifestSHA256" : "a3cd04e23165a32d2a7d9d4ae2f2f47d88aa2ce315ad141673f81fa5e4cac85c",
+      "manifestSHA256" : "571c9c82e9876a75ebecb12bf7a26bdd3597386266b6e402ae8c2bb5fea78c59",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "failed"
     },
     "receipt" : {
       "catalogGeneration" : "2",
-      "manifestSHA256" : "a3cd04e23165a32d2a7d9d4ae2f2f47d88aa2ce315ad141673f81fa5e4cac85c",
+      "manifestSHA256" : "571c9c82e9876a75ebecb12bf7a26bdd3597386266b6e402ae8c2bb5fea78c59",
       "publishedAtUTC" : "2026-09-25T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-06663b63453706cc8ad966e3b0761404",
@@ -131,7 +131,7 @@
     "host-step verify-image-bundle",
     "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
     "host-step hash-images",
-    "destructive intent bound to Runtime capability CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
     "delegated enter-loader-mode to the ArkForge lane's own plan",
     "delegated wait-loader-disconnect to the ArkForge lane's own plan",
     "delegated wait-loader-reconnect to the ArkForge lane's own plan",

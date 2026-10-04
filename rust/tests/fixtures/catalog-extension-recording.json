@@ -1,8 +1,8 @@
 {
   "scope": "Synthetic provider fixtures only; no hardware acceptance or usable Runtime authority.",
   "sourceCommit": "2f75ae8e51b1f16bc293186683c2e592abd97e89",
-  "sourceChange": "Catalog/, RuntimeOperationCatalogGenerated.swift and the shared WorkflowStep.swift contract are overlaid from CHG-2026-080. The historical HostStoreStepShadowFixtures switch adds a fail-fast branch for the new keyboard case solely to compile; this test is not recorded. All Runtime, Provider and selected producer test implementations are unchanged.",
-  "catalogDigest": "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "sourceChange": "Catalog/, RuntimeOperationCatalogGenerated.swift and the shared WorkflowStep.swift contract are overlaid from combined CHG-2026-079 and CHG-2026-080. The historical HostStoreStepShadowFixtures switch adds a fail-fast branch for the new keyboard case solely to compile; this test is not recorded. All Runtime, Provider and selected producer test implementations are unchanged.",
+  "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "recordedOn": "2026-10-04",
   "producerTestsPassed": 40,
   "fixtures": [
@@ -473,7 +473,7 @@
     "overlays": [
       {
         "path": "Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift",
-        "sha256": "08442f695f03a450e403047958a62182692f703f61ea1e5e75de884278220873"
+        "sha256": "6e2170d0db1cba7e7d2ff1e3b459c33fcf6e7854047a539024a5263581346244"
       },
       {
         "path": "Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift",

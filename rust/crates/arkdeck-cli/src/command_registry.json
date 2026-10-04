@@ -22402,8 +22402,8 @@
       "summary": "verify a detached signature and assemble the feed"
     },
     {
-      "catalogOperation": "input.keyboard@1",
-      "command": "input.keyboard",
+      "catalogOperation": null,
+      "command": "diagnostics.session.mark",
       "connectsToRuntime": true,
       "kind": "executable",
       "lifecycleStatus": "current",
@@ -22419,48 +22419,52 @@
           "grammar": {
             "kind": "opaque"
           },
-          "name": "--target",
-          "placeholder": "target-id",
+          "name": "--job",
+          "placeholder": "job-id",
           "published": true,
-          "required": false,
+          "required": true,
           "stability": "standard",
-          "summary": "durable target; omitted lets typed discovery choose"
+          "summary": "durable job identity"
         },
         {
+          "name": "--marker-id",
           "form": "value",
           "grammar": {
-            "kind": "opaque"
+            "kind": "pattern",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
           },
-          "name": "--inputs-file",
-          "placeholder": "path",
-          "published": true,
-          "required": false,
-          "stability": "standard",
-          "summary": "typed inputs; `arkdeck operation describe` publishes the schema"
-        },
-        {
-          "form": "value",
-          "grammar": {
-            "kind": "opaque"
-          },
-          "name": "--capability",
-          "placeholder": "CAP-RT-...",
-          "published": true,
-          "required": false,
-          "stability": "standard",
-          "summary": "reference to an existing Runtime capability; never a document"
-        },
-        {
-          "form": "value",
-          "grammar": {
-            "kind": "opaque"
-          },
-          "name": "--execution-id",
           "placeholder": "id",
           "published": true,
+          "required": true,
+          "stability": "standard",
+          "summary": "unique marker identity; repeats with the same label are idempotent"
+        },
+        {
+          "name": "--label",
+          "form": "value",
+          "grammar": {
+            "kind": "pattern",
+            "pattern": "^[A-Za-z0-9 ._-]{1,64}$"
+          },
+          "placeholder": "text",
+          "published": true,
           "required": false,
           "stability": "standard",
-          "summary": "caller-stable execution identity for safe re-entry"
+          "summary": "bounded host marker label"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "duration",
+            "maximumMilliseconds": 86400000,
+            "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+          },
+          "name": "--timeout",
+          "placeholder": "30s",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "how long to wait before giving up; the job keeps running"
         },
         {
           "form": "value",
@@ -22518,13 +22522,222 @@
         "json"
       ],
       "path": [
-        "input",
-        "keyboard"
+        "diagnostics",
+        "session",
+        "mark"
       ],
       "positionals": [],
       "replacementArgvPattern": null,
       "requiresExactlyOneOf": [],
-      "summary": "send one private typed keyboard input through Runtime admission"
+      "summary": "append one bounded Runtime-timed host marker"
+    },
+    {
+      "catalogOperation": null,
+      "command": "diagnostics.session.status",
+      "connectsToRuntime": true,
+      "kind": "executable",
+      "lifecycleStatus": "current",
+      "mutuallyExclusive": [
+        [
+          "--output",
+          "--json"
+        ]
+      ],
+      "options": [
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--job",
+          "placeholder": "job-id",
+          "published": true,
+          "required": true,
+          "stability": "standard",
+          "summary": "durable job identity"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "duration",
+            "maximumMilliseconds": 86400000,
+            "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+          },
+          "name": "--timeout",
+          "placeholder": "30s",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "how long to wait before giving up; the job keeps running"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "enumeration",
+            "values": [
+              "human",
+              "json",
+              "jsonl"
+            ]
+          },
+          "name": "--output",
+          "placeholder": "human|json",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
+        },
+        {
+          "form": "flag",
+          "name": "--json",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "legacy: print the raw reply as JSON, without the result envelope"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "pattern",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "name": "--control-request-id",
+          "placeholder": "id",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "correlate this control-plane call; not a Job or request identity"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--socket",
+          "placeholder": "absolute-path",
+          "published": false,
+          "required": false,
+          "stability": "macosCompatibilityOnly",
+          "summary": "macOS-only compatibility alias for the local Runtime endpoint"
+        }
+      ],
+      "outputModes": [
+        "human",
+        "json"
+      ],
+      "path": [
+        "diagnostics",
+        "session",
+        "status"
+      ],
+      "positionals": [],
+      "replacementArgvPattern": null,
+      "requiresExactlyOneOf": [],
+      "summary": "read one Diagnostic Session state"
+    },
+    {
+      "catalogOperation": null,
+      "command": "diagnostics.session.stop",
+      "connectsToRuntime": true,
+      "kind": "executable",
+      "lifecycleStatus": "current",
+      "mutuallyExclusive": [
+        [
+          "--output",
+          "--json"
+        ]
+      ],
+      "options": [
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--job",
+          "placeholder": "job-id",
+          "published": true,
+          "required": true,
+          "stability": "standard",
+          "summary": "durable job identity"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "duration",
+            "maximumMilliseconds": 86400000,
+            "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
+          },
+          "name": "--timeout",
+          "placeholder": "30s",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "how long to wait before giving up; the job keeps running"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "enumeration",
+            "values": [
+              "human",
+              "json",
+              "jsonl"
+            ]
+          },
+          "name": "--output",
+          "placeholder": "human|json",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
+        },
+        {
+          "form": "flag",
+          "name": "--json",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "legacy: print the raw reply as JSON, without the result envelope"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "pattern",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "name": "--control-request-id",
+          "placeholder": "id",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "correlate this control-plane call; not a Job or request identity"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--socket",
+          "placeholder": "absolute-path",
+          "published": false,
+          "required": false,
+          "stability": "macosCompatibilityOnly",
+          "summary": "macOS-only compatibility alias for the local Runtime endpoint"
+        }
+      ],
+      "outputModes": [
+        "human",
+        "json"
+      ],
+      "path": [
+        "diagnostics",
+        "session",
+        "stop"
+      ],
+      "positionals": [],
+      "replacementArgvPattern": null,
+      "requiresExactlyOneOf": [],
+      "summary": "end the admitted recording wait and save the session"
     },
     {
       "catalogOperation": null,
@@ -22654,6 +22867,131 @@
       "replacementArgvPattern": null,
       "requiresExactlyOneOf": [],
       "summary": "upload and commit a bounded sensitive keyboard JSON file"
+    },
+    {
+      "catalogOperation": "input.keyboard@1",
+      "command": "input.keyboard",
+      "connectsToRuntime": true,
+      "kind": "executable",
+      "lifecycleStatus": "current",
+      "mutuallyExclusive": [
+        [
+          "--output",
+          "--json"
+        ]
+      ],
+      "options": [
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--target",
+          "placeholder": "target-id",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "durable target; omitted lets typed discovery choose"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--inputs-file",
+          "placeholder": "path",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "typed inputs; `arkdeck operation describe` publishes the schema"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--capability",
+          "placeholder": "CAP-RT-...",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "reference to an existing Runtime capability; never a document"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--execution-id",
+          "placeholder": "id",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "caller-stable execution identity for safe re-entry"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "enumeration",
+            "values": [
+              "human",
+              "json",
+              "jsonl"
+            ]
+          },
+          "name": "--output",
+          "placeholder": "human|json",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
+        },
+        {
+          "form": "flag",
+          "name": "--json",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "legacy: print the raw reply as JSON, without the result envelope"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "pattern",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+          },
+          "name": "--control-request-id",
+          "placeholder": "id",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "correlate this control-plane call; not a Job or request identity"
+        },
+        {
+          "form": "value",
+          "grammar": {
+            "kind": "opaque"
+          },
+          "name": "--socket",
+          "placeholder": "absolute-path",
+          "published": false,
+          "required": false,
+          "stability": "macosCompatibilityOnly",
+          "summary": "macOS-only compatibility alias for the local Runtime endpoint"
+        }
+      ],
+      "outputModes": [
+        "human",
+        "json"
+      ],
+      "path": [
+        "input",
+        "keyboard"
+      ],
+      "positionals": [],
+      "replacementArgvPattern": null,
+      "requiresExactlyOneOf": [],
+      "summary": "send one private typed keyboard input through Runtime admission"
     }
   ]
 }

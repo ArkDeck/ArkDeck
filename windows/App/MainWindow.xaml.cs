@@ -117,18 +117,37 @@ public sealed partial class MainWindow : Window
 
     private TraceDocument? _pendingTrace;
 
-    /// <summary>Diagnostics, reading one History record (macOS <c>openHistoryContext</c>).</summary>
-    public async void OpenDiagnostics(DiagnosticJobContext context)
+    /// <summary>Reopens a History record in its workspace (macOS <c>openHistoryWorkspace</c>), or
+    /// in Diagnostics (<c>openHistoryDiagnostics</c>): the page takes the record's read-only
+    /// context, then shows it.</summary>
+    public async void OpenHistoryWorkspace(HistoryWorkspaceContext context, bool inDiagnostics = false)
     {
-        if (!_pages.TryGetValue("diagnostics", out var page)) _pages["diagnostics"] = page = new DiagnosticsPage();
-        var diagnostics = (DiagnosticsPage)page;
-        diagnostics.Open(context);
-        if (ReferenceEquals(NavView.SelectedItem, NavDiagnostics))
+        var tag = inDiagnostics ? "diagnostics" : context.Kind switch
         {
-            await diagnostics.RefreshAsync();
+            WorkspaceKind.Flash => "flash",
+            WorkspaceKind.Viewer => "viewer",
+            WorkspaceKind.Trace => "trace",
+            WorkspaceKind.Debug => "debug",
+            WorkspaceKind.Device => "device",
+            _ => "diagnostics",
+        };
+        if (!_pages.TryGetValue(tag, out var page)) _pages[tag] = page = CreatePage(tag);
+        ((IHistoryContextPage)page).OpenHistoryContext(context);
+        if (ReferenceEquals(PageHost.Content, page))
+        {
+            await ((IRefreshable)page).RefreshAsync();
             return;
         }
-        Select("diagnostics");
+        Select(tag);
+    }
+
+    /// <summary>Settings, on one of its tabs (the remote browser's Open Server Settings).</summary>
+    public void OpenSettings(string tab)
+    {
+        if (!_pages.TryGetValue("settings", out var page)) _pages["settings"] = page = new SettingsPage();
+        ((SettingsPage)page).ShowTab(tab);
+        if (ReferenceEquals(NavView.SelectedItem, NavSettings)) _ = ((SettingsPage)page).RefreshAsync();
+        else Select("settings");
     }
 
     public void Select(string tag)
@@ -175,6 +194,23 @@ public sealed partial class MainWindow : Window
 
     private readonly Dictionary<string, UserControl> _pages = [];
 
+    private static UserControl CreatePage(string tag) => tag switch
+    {
+        "device" => new DevicePage(),
+        "history" => new HistoryPage(),
+        "settings" => new SettingsPage(),
+        "sessions" => new SessionsPage(),
+        "agents" => new AgentsPage(),
+        "imports" => new ImportsPage(),
+        "debug" => new DebugPage(),
+        "flash" => new FlashPage(),
+        "trace" => new TracePage(),
+        "traceViewer" => new TraceViewerPage(),
+        "viewer" => new ViewerPage(),
+        "diagnostics" => new DiagnosticsPage(),
+        _ => new OverviewPage(),
+    };
+
     /// <summary>Shows the page of the selected item and re-reads it. Pages are code-only
     /// controls hosted directly (Frame navigation needs XAML type metadata they do not have).</summary>
     private async void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -183,22 +219,7 @@ public sealed partial class MainWindow : Window
         var tag = (string)item.Tag;
         if (!_pages.TryGetValue(tag, out var page))
         {
-            page = tag switch
-            {
-                "device" => new DevicePage(),
-                "history" => new HistoryPage(),
-                "settings" => new SettingsPage(),
-                "sessions" => new SessionsPage(),
-                "agents" => new AgentsPage(),
-                "imports" => new ImportsPage(),
-                "debug" => new DebugPage(),
-                "flash" => new FlashPage(),
-                "trace" => new TracePage(),
-                "traceViewer" => new TraceViewerPage(),
-                "viewer" => new ViewerPage(),
-                "diagnostics" => new DiagnosticsPage(),
-                _ => new OverviewPage(),
-            };
+            page = CreatePage(tag);
             _pages[tag] = page;
         }
         PageHost.Content = page;

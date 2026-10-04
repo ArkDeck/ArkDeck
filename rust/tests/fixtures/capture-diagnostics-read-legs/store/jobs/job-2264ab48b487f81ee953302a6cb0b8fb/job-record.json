@@ -11,7 +11,7 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -76,7 +76,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-2264ab48b487f81ee953302a6cb0b8fb",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "c876c6d092175e5aa56e997fb58da06de5f1441e73823b7ad1d1f382f44b3eff",
+  "materializedPlanDigest" : "bf36a5406d0c825595d020ccab8a0de0af8db717adf9b299cbadf685e323d8f9",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationFailure" : {
     "category" : "unknownOutcome",

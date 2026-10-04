@@ -2,7 +2,7 @@
   "records" : [
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
+        "capabilityID" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -16,7 +16,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+        "exactPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -39,7 +39,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -63,21 +63,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "destructive",
           "jobID" : "job-4623d73c4f8a218626b71c1c743f72ab",
-          "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+          "materializedPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
           "operationReference" : "flash.full-restore@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-4623d73c4f8a218626b71c1c743f72ab",
               "outcome" : "confirmed",
-              "previousRecordSHA256" : "13be725f23b318abfd900953da702ab73e081cc048cd499bda77a42e0be34aaa",
-              "recordSHA256" : "97202f793a4364a6335d03fb8c0a036eb411491cc180f630e7218ae043c0ab02",
+              "previousRecordSHA256" : "54b7c43f1d001f206e2f25040b7636037b8680ae02419ccfad067da0142cbbfd",
+              "recordSHA256" : "1e279a83df067abd66459a61c6e31ce184722246cda6646ca234afddcb2ca7ca",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "failed"
             }
           ],
-          "queryFingerprintSHA256" : "8a47cbdbf4b18cc425e3b4da0c9a613cdd4c90324952b93682f425792fff2cc4",
-          "receiptSHA256" : "13be725f23b318abfd900953da702ab73e081cc048cd499bda77a42e0be34aaa",
+          "queryFingerprintSHA256" : "77fbeee58a635bed6784a703dc23c5627f20d045ac1bd4322db53c0bce215033",
+          "receiptSHA256" : "54b7c43f1d001f206e2f25040b7636037b8680ae02419ccfad067da0142cbbfd",
           "remainingUsesAfter" : 0,
           "reservationID" : "idem-flash-prepareFailed",
           "targetStableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"
@@ -87,7 +87,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G2",
+        "capabilityID" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G2",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -101,7 +101,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+        "exactPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -124,7 +124,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -148,21 +148,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "destructive",
           "jobID" : "job-f63e8edfecef4382a82c3a05d5395af5",
-          "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+          "materializedPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
           "operationReference" : "flash.full-restore@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-f63e8edfecef4382a82c3a05d5395af5",
               "outcome" : "safeToReflash",
-              "previousRecordSHA256" : "3f32bce3505367317a40dd70ea6a04b7aee076036c0643e1d5d126f4321565ce",
-              "recordSHA256" : "3d6bada1353356241cf4de993d21ecdc3feed89afe97d1f555857d9a698e2c96",
+              "previousRecordSHA256" : "fa76605b4e5e7faa0e0af9d1f5d7f71ff60d91f5dd3b7522b42da86c7df9a328",
+              "recordSHA256" : "d402d5f28a80fcbfadbe22c79a39a1216ba349c788d528a1f88ac449da34f37d",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "failed"
             }
           ],
-          "queryFingerprintSHA256" : "8a47cbdbf4b18cc425e3b4da0c9a613cdd4c90324952b93682f425792fff2cc4",
-          "receiptSHA256" : "3f32bce3505367317a40dd70ea6a04b7aee076036c0643e1d5d126f4321565ce",
+          "queryFingerprintSHA256" : "77fbeee58a635bed6784a703dc23c5627f20d045ac1bd4322db53c0bce215033",
+          "receiptSHA256" : "fa76605b4e5e7faa0e0af9d1f5d7f71ff60d91f5dd3b7522b42da86c7df9a328",
           "remainingUsesAfter" : 0,
           "reservationID" : "idem-flash-prepareNotExecuted",
           "targetStableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"
@@ -172,7 +172,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G3",
+        "capabilityID" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G3",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -186,7 +186,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+        "exactPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -209,7 +209,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -233,21 +233,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "destructive",
           "jobID" : "job-239a1e756f402f1de07051eaf82428d8",
-          "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+          "materializedPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
           "operationReference" : "flash.full-restore@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-239a1e756f402f1de07051eaf82428d8",
               "outcome" : "safeToReflash",
-              "previousRecordSHA256" : "9cdd6c275bc3e4d51055870285ec6cdab97ad01ebb5e290f71ddcb439d4e09fd",
-              "recordSHA256" : "dbdbeb209bd1b3b8fa62f7bc08ca765ff9a5649aa66229b50f6ff9dbeb0fed47",
+              "previousRecordSHA256" : "c82d50a5ba516b4109dd62ddfcda7355bc5ccd1c92f85b60d9be7b63e0119785",
+              "recordSHA256" : "381e7ba43488205f1fbbb9806f1088749de47533de17887fa7b9114dfe110610",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "failed"
             }
           ],
-          "queryFingerprintSHA256" : "8a47cbdbf4b18cc425e3b4da0c9a613cdd4c90324952b93682f425792fff2cc4",
-          "receiptSHA256" : "9cdd6c275bc3e4d51055870285ec6cdab97ad01ebb5e290f71ddcb439d4e09fd",
+          "queryFingerprintSHA256" : "77fbeee58a635bed6784a703dc23c5627f20d045ac1bd4322db53c0bce215033",
+          "receiptSHA256" : "c82d50a5ba516b4109dd62ddfcda7355bc5ccd1c92f85b60d9be7b63e0119785",
           "remainingUsesAfter" : 0,
           "reservationID" : "idem-flash-prepareUncorrelated",
           "targetStableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"
@@ -257,7 +257,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G4",
+        "capabilityID" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G4",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -271,7 +271,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+        "exactPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -294,7 +294,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -318,21 +318,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "destructive",
           "jobID" : "job-4490c8a3230cd95a00775958f7ed4660",
-          "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+          "materializedPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
           "operationReference" : "flash.full-restore@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-4490c8a3230cd95a00775958f7ed4660",
               "outcome" : "confirmed",
-              "previousRecordSHA256" : "7e8c840cfd657c62b50b9f9562382a53e2278776aa2560b1b13f0b1b8f711757",
-              "recordSHA256" : "86fbc5bdf6f5ac0cf4a6bd75ebc80d704ed943b30c920d0ec2285cb8e73f65f8",
+              "previousRecordSHA256" : "398152d3292be2e132fac060e5f883ce427f7a1f4804505ce47234bddd00b027",
+              "recordSHA256" : "48d0334fb678778cade813f5979f2402930437e0f188933bd4a24d00d1bf9472",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "failed"
             }
           ],
-          "queryFingerprintSHA256" : "8a47cbdbf4b18cc425e3b4da0c9a613cdd4c90324952b93682f425792fff2cc4",
-          "receiptSHA256" : "7e8c840cfd657c62b50b9f9562382a53e2278776aa2560b1b13f0b1b8f711757",
+          "queryFingerprintSHA256" : "77fbeee58a635bed6784a703dc23c5627f20d045ac1bd4322db53c0bce215033",
+          "receiptSHA256" : "398152d3292be2e132fac060e5f883ce427f7a1f4804505ce47234bddd00b027",
           "remainingUsesAfter" : 0,
           "reservationID" : "idem-flash-performFailed",
           "targetStableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"
@@ -342,7 +342,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G5",
+        "capabilityID" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G5",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -356,7 +356,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+        "exactPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -379,7 +379,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -403,21 +403,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "destructive",
           "jobID" : "job-e80c21085391fb6373b04a4dfafb4c5f",
-          "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+          "materializedPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
           "operationReference" : "flash.full-restore@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-e80c21085391fb6373b04a4dfafb4c5f",
               "outcome" : "safeToReflash",
-              "previousRecordSHA256" : "8a5c43a092107f955f0473aea5ed12b0801784223abd8514f9eb970e7050e322",
-              "recordSHA256" : "4e7b5c0ca961a23d0a4a3649d81ffbf34d6e8d560fe900c7b5b76ae449e8f5c7",
+              "previousRecordSHA256" : "ff4ba3b580fd795ead2644aa3e518ba3fc12baaa2b193d773ffaa05d5ba31eeb",
+              "recordSHA256" : "df9fce6c36f567d8e9660a9d89c00eeb78208b6459e8e9b7c764205f7f655e20",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "failed"
             }
           ],
-          "queryFingerprintSHA256" : "8a47cbdbf4b18cc425e3b4da0c9a613cdd4c90324952b93682f425792fff2cc4",
-          "receiptSHA256" : "8a5c43a092107f955f0473aea5ed12b0801784223abd8514f9eb970e7050e322",
+          "queryFingerprintSHA256" : "77fbeee58a635bed6784a703dc23c5627f20d045ac1bd4322db53c0bce215033",
+          "receiptSHA256" : "ff4ba3b580fd795ead2644aa3e518ba3fc12baaa2b193d773ffaa05d5ba31eeb",
           "remainingUsesAfter" : 0,
           "reservationID" : "idem-flash-performNotExecuted",
           "targetStableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"
@@ -427,7 +427,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G6",
+        "capabilityID" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G6",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -441,7 +441,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+        "exactPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -464,7 +464,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [

@@ -7,7 +7,7 @@
       "createdAtUTC" : "2026-09-14T00:00:00Z",
       "idempotencyKey" : "agent-execution-9f9edad799be79c932de20387066b97ffaa22b9b6fc137b8cb70f76a03ebafcf",
       "jobId" : "job-a87bf66007211b6ce4701dadfebfefe9",
-      "recordSHA256" : "d2613f7e1714c9050477f16f19c4aee8618dfc9f71541577e99cc8308c505bf7",
+      "recordSHA256" : "3906d4165e96ee079df5422243dc1cc0c66ead352ab32937fc08d98208491184",
       "requestHash" : "97508587fa99392b5e95aa3b7a638fee4b7ab7a7f83069f95f36c534c6d6bb45",
       "state" : "succeeded",
       "updatedAtUTC" : "2026-09-14T00:00:00Z",

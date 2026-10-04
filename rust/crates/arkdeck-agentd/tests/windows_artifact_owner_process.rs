@@ -462,7 +462,7 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     assert_eq!(reply["result"], quota, "{reply}");
     assert!(
         daemon.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, agentExecutions, humanActions, controlActions, traceCache, flashHostFacts, deviceAccess, loaderBinding"
                 .to_owned()
         ),
         "{:?}",

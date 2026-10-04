@@ -99,6 +99,8 @@ use arkdeck_provider_hdc::{
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[path = "device_diagnostic_session.rs"]
+mod diagnostic_session;
 #[path = "device_hap_failure.rs"]
 mod hap_failure;
 #[path = "device_native.rs"]
@@ -109,7 +111,6 @@ mod screen_sequence;
 mod trace;
 
 const OBSERVE: &str = "observe.device@1";
-const CAPTURE: &str = "capture.diagnostics@1";
 const HAP: &str = "debug.hap@1";
 
 /// Swift's evidence preflight, in the order its fragments must arrive.
@@ -1194,7 +1195,12 @@ impl JobRunner<'_> {
             return Err(Stop::Failed(reason.into()));
         };
         // A sequence runs its processes in order, as Swift's dispatcher does.
-        let dispatched = arkdeck_provider_hdc::run(plan, hdc.dispatch).map_err(|error| {
+        let dispatched = if matches!(plan, FilePlan::DiagnosticTrace { .. }) {
+            self.run_diagnostic_trace(run, hdc, plan, target_id, revision)
+        } else {
+            arkdeck_provider_hdc::run(plan, hdc.dispatch)
+        }
+        .map_err(|error| {
             if !matches!(action, StepAction::Keyboard(_)) {
                 return error;
             }
@@ -1700,7 +1706,7 @@ impl JobRunner<'_> {
                 continue;
             }
             let contents = contents(name, &run.record, summary, receipt);
-            if owner.reference == CAPTURE {
+            if device_steps::diagnostic_capture(&owner.reference) {
                 let budget = byte_budget(&run.record);
                 let used = publisher.published_bytes(&owner.job_id).map_err(|error| {
                     Stop::Publication(format!(
@@ -1783,10 +1789,13 @@ impl JobRunner<'_> {
             let Some(declaration) = declaration(descriptor, name) else {
                 continue;
             };
-            let contents =
+            let contents = if owner.reference == device_steps::DIAGNOSTIC_SESSION {
+                self.diagnostic_final_artifact(name, descriptor, &run.record, &recorded, names)
+            } else {
                 capture_documents::contents(name, descriptor, &run.record, &recorded, names)
-                    .map_err(|error| format!("cannot encode final Artifact {name}: {error}"))?;
-            if owner.reference == CAPTURE {
+            }
+            .map_err(|error| format!("cannot encode final Artifact {name}: {error}"))?;
+            if device_steps::diagnostic_capture(&owner.reference) {
                 let budget = byte_budget(&run.record);
                 let used = publisher.published_bytes(&owner.job_id).map_err(|error| {
                     format!("cannot inspect final Artifact budget before {name}: {error}")

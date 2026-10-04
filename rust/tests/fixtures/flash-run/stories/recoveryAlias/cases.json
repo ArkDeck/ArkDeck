@@ -285,7 +285,7 @@
         "ok" : true,
         "result" : [
           {
-            "capabilityId" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
+            "capabilityId" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
             "consumptionCount" : 1,
             "effectCeiling" : "destructive",
             "lineageAllowsNewExecution" : false,
@@ -294,7 +294,7 @@
             "remainingUses" : 0
           },
           {
-            "capabilityId" : "CAP-RT-POLICY-267DD9D406A4051E774D5551DA43B49AC0F5F2F7-G1",
+            "capabilityId" : "CAP-RT-POLICY-3015F8328C41B3E9861EE006C9B262A8C7981C1E-G1",
             "consumptionCount" : 1,
             "effectCeiling" : "destructive",
             "lineageAllowsNewExecution" : false,

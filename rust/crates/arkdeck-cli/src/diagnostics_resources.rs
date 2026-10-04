@@ -15,7 +15,12 @@ use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use unicode_segmentation::UnicodeSegmentation;
 
-const OPERATION: &str = "capture.diagnostics@1";
+pub(crate) fn supported_operation(reference: &str) -> bool {
+    matches!(
+        reference,
+        "capture.diagnostics@1" | "capture.diagnostic-session@1"
+    )
+}
 const PARSER: &str = "arkdeck.diagnostics-session-parser";
 const PARSER_VERSION: &str = "1.0.0";
 const INDEX: &str = "artifact-index.json";
@@ -154,6 +159,41 @@ pub(crate) fn configure(
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
+    if !help && command.starts_with("diagnostics.session.") {
+        let valid_id = |key: &str| {
+            fields
+                .get(key)
+                .and_then(Value::as_str)
+                .is_some_and(crate::read_only_resources::identifier)
+        };
+        if !valid_id("jobId")
+            || (command == "diagnostics.session.mark" && !valid_id("markerId"))
+            || fields.get("label").is_some_and(|value| {
+                value.as_str().is_none_or(|label| {
+                    !(1..=64).contains(&label.len())
+                        || !label
+                            .bytes()
+                            .all(|byte| byte.is_ascii_alphanumeric() || b" ._-".contains(&byte))
+                })
+            })
+        {
+            return Err(fail(
+                "invalidInput",
+                "Diagnostic Session requires an exact Job and bounded marker identity/label",
+            ));
+        }
+        let timeout = fields.remove("timeout");
+        return crate::read_only_resources::duration(
+            timeout.as_ref().and_then(Value::as_str).unwrap_or("30s"),
+        )
+        .map(Some)
+        .ok_or_else(|| {
+            fail(
+                "invalidInput",
+                "diagnostics timeout must be a bounded duration",
+            )
+        });
+    }
     let verb = match command {
         _ if help => return Ok(None),
         "diagnostics.inspect" => "inspect",
@@ -386,7 +426,7 @@ fn read_whole(
 /// Swift `diagnosticsJobRequest`: the Job's own typed request, which must be
 /// the exact diagnostics capture its status names. Answers the request's typed
 /// inputs (Swift decodes an absent or null `inputs` as none).
-fn job_request(job: &str, request: &mut Request) -> Result<Map<String, Value>, CliError> {
+fn job_request(job: &str, request: &mut Request) -> Result<(String, Map<String, Value>), CliError> {
     let show = request(
         "job.show",
         Map::from_iter([("jobId".to_owned(), json!(job))]),
@@ -402,7 +442,11 @@ fn job_request(job: &str, request: &mut Request) -> Result<Map<String, Value>, C
             "Job is not an exact diagnostics capture",
         ));
     };
-    if status["jobId"] != job || status["operation"] != OPERATION {
+    if status["jobId"] != job
+        || !status["operation"]
+            .as_str()
+            .is_some_and(supported_operation)
+    {
         return Err(fail(
             "recordUnreadable",
             "Job is not an exact diagnostics capture",
@@ -414,13 +458,13 @@ fn job_request(job: &str, request: &mut Request) -> Result<Map<String, Value>, C
             "diagnostic session could not be decoded",
         )
     })?;
-    if reference != OPERATION || requested != target {
+    if status["operation"] != reference || requested != target {
         return Err(fail(
             "recordUnreadable",
             "diagnostic Job request does not match its status",
         ));
     }
-    Ok(inputs)
+    Ok((reference, inputs))
 }
 
 /// The part of Swift's `RuntimeOperationRequest` decoding this leaf reads:
@@ -653,11 +697,59 @@ fn instant(value: &str) -> bool {
 }
 
 /// The marks, what was never derived, and the ring's held anchor.
-type Reading = (Vec<Value>, Vec<String>, Option<bool>);
+type Reading = (Vec<Value>, Vec<String>, Option<bool>, Option<Value>);
+
+fn clock_observation(value: &Value, job: &str, anchor: Option<&str>) -> Result<Value, CliError> {
+    let malformed = || invalid("diagnostics_invalid_clock_observation");
+    let fields = value.as_object().ok_or_else(malformed)?;
+    let keys = [
+        "schemaVersion",
+        "jobId",
+        "anchor",
+        "startedAtHostUTC",
+        "finishedAtHostUTC",
+        "elapsedNanoseconds",
+        "status",
+    ];
+    if fields.len() != keys.len()
+        || !keys.iter().all(|key| fields.contains_key(*key))
+        || value["schemaVersion"] != "arkdeck.trace-clock-observation/1"
+        || value["jobId"] != job
+        || anchor.is_none_or(str::is_empty)
+        || value["anchor"].as_str() != anchor
+    {
+        return Err(malformed());
+    }
+    let timestamp = |key: &str| -> Result<f64, CliError> {
+        value[key]
+            .as_str()
+            .filter(|s| s.ends_with('Z') && s.len() == 24)
+            .and_then(arkdeck_contract::import_timestamp)
+            .ok_or_else(malformed)
+    };
+    let before = timestamp("startedAtHostUTC")?;
+    let after = timestamp("finishedAtHostUTC")?;
+    // JSON Schema integer and Swift JSONDecoder also accept an exactly
+    // integral numeric spelling (for example 10000000.0), never a boolean.
+    let nanos = value["elapsedNanoseconds"]
+        .as_f64()
+        .filter(|nanos| (0.0..=120_000_000_000.0).contains(nanos) && nanos.fract() == 0.0)
+        .ok_or_else(malformed)?;
+    let wall_nanos = ((after * 1_000.0).round() - (before * 1_000.0).round()) * 1_000_000.0;
+    let status = if wall_nanos >= 0.0 && (wall_nanos - nanos).abs() <= 2_000_000.0 {
+        "unvalidated"
+    } else {
+        "hostClockDiscontinuity"
+    };
+    if value["status"] != status {
+        return Err(malformed());
+    }
+    Ok(value.clone())
+}
 
 /// Swift `MarkerDocument.decode`, then `DiagnosticSessionReading.make` with no
 /// screenshots: every mark, and what the capture never looked for.
-fn markers(bytes: &[u8], job: &str) -> Result<Reading, CliError> {
+fn markers(bytes: &[u8], job: &str, operation: &str) -> Result<Reading, CliError> {
     let malformed = || invalid("diagnostics_invalid_markers_document");
     let document: Value = serde_json::from_slice(bytes).map_err(|_| malformed())?;
     let marks = document["markers"].as_array().ok_or_else(malformed)?;
@@ -720,7 +812,16 @@ fn markers(bytes: &[u8], job: &str) -> Result<Reading, CliError> {
         Value::Number(number) if number.as_f64() == Some(0.0) => Some(false),
         _ => None,
     };
-    Ok((reading, not_derived, anchor))
+    let observation = document
+        .get("clockObservation")
+        .map(|value| {
+            if operation != "capture.diagnostic-session@1" {
+                return Err(invalid("diagnostics_invalid_clock_observation"));
+            }
+            clock_observation(value, job, document["coverage"]["anchor"].as_str())
+        })
+        .transpose()?;
+    Ok((reading, not_derived, anchor, observation))
 }
 
 fn provenance(sources: &[&Metadata]) -> Value {
@@ -733,6 +834,7 @@ fn provenance(sources: &[&Metadata]) -> Value {
 /// Swift `DiagnosticSessionOfflineInspector.inspect`, encoded as
 /// `diagnosticsInspectionValue`.
 fn inspect_session(
+    operation: &str,
     job: &str,
     typed: &Map<String, Value>,
     inventory: &[Metadata],
@@ -740,13 +842,13 @@ fn inspect_session(
 ) -> Result<Value, CliError> {
     let ids: BTreeSet<&str> = inventory.iter().map(|item| item.id.as_str()).collect();
     let names: BTreeSet<&str> = inventory.iter().map(|item| item.name.as_str()).collect();
-    if job.is_empty() || job.len() > 512 {
+    if !supported_operation(operation) || job.is_empty() || job.len() > 512 {
         return Err(invalid("diagnostics_unsupported_operation"));
     }
     if ids.len() != inventory.len()
         || names.len() != inventory.len()
         || inventory.len() > INVENTORY_MAXIMUM
-        || !inventory.iter().all(|item| item.source == OPERATION)
+        || !inventory.iter().all(|item| item.source == operation)
     {
         return Err(invalid("diagnostics_ambiguous_artifact_inventory"));
     }
@@ -774,8 +876,8 @@ fn inspect_session(
         .collect();
     let consistent = index.job_id == job
         && summary.job_id == job
-        && index.operation == OPERATION
-        && summary.operation == OPERATION
+        && index.operation == operation
+        && summary.operation == operation
         && index.artifacts == summary.artifacts
         && summary.missing_required.as_ref().is_some_and(|missing| {
             let set: BTreeSet<&str> = missing.iter().map(String::as_str).collect();
@@ -818,7 +920,19 @@ fn inspect_session(
             .any(|metadata| metadata.name == name && metadata.status == "published")
     };
     let mut missing: Vec<Value> = Vec::new();
-    let mut requested = requested_products(typed)?;
+    let mut requested = if operation == "capture.diagnostic-session@1" {
+        [
+            "hilog.txt",
+            "trace.htrace",
+            "markers.json",
+            "diagnostic-session.json",
+        ]
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+    } else {
+        requested_products(typed)?
+    };
     if requested.contains("screenshot.png") && is_published("screenshot.jpeg") {
         requested.remove("screenshot.png");
         requested.insert("screenshot.jpeg".into());
@@ -834,11 +948,11 @@ fn inspect_session(
             missing.push(json!({"name": name, "reason": reason}));
         }
     }
-    let (marks, not_derived, anchor) = if is_published(MARKERS) {
-        markers(&document(MARKERS)?.bytes, job)?
+    let (marks, not_derived, anchor, observation) = if is_published(MARKERS) {
+        markers(&document(MARKERS)?.bytes, job, operation)?
     } else {
         missing.push(json!({"name": MARKERS, "reason": "marker document was not published"}));
-        (Vec::new(), Vec::new(), None)
+        (Vec::new(), Vec::new(), None, None)
     };
     let sources: Vec<&Metadata> = documents
         .values()
@@ -846,16 +960,18 @@ fn inspect_session(
         .collect();
     let mut sorted: Vec<&Metadata> = inventory.iter().collect();
     sorted.sort_by(|left, right| (&left.name, &left.id).cmp(&(&right.name, &right.id)));
-    Ok(
-        json!({"schemaVersion": "arkdeck.diagnostics-inspection/1", "jobId": job,
-        "operationReference": OPERATION, "derivation": provenance(&sources),
+    let mut result = json!({"schemaVersion": "arkdeck.diagnostics-inspection/1", "jobId": job,
+        "operationReference": operation, "derivation": provenance(&sources),
         "partial": !missing.is_empty(),
         "alignment": {"kind": "cannotAlign", "toleranceMs": null,
             "reason": "capture artifacts contain no host-to-device calibration"},
         "markers": marks, "missingProducts": missing, "notDerived": not_derived,
         "ringHeldAnchor": anchor,
-        "artifacts": sorted.iter().map(|metadata| metadata.value()).collect::<Vec<_>>()}),
-    )
+        "artifacts": sorted.iter().map(|metadata| metadata.value()).collect::<Vec<_>>()});
+    if let Some(observation) = observation {
+        result["clockObservation"] = observation;
+    }
+    Ok(result)
 }
 
 /// Swift `DiagnosticArtifactTextPreview(bytes:mediaType:maximumCharacters:)`:
@@ -906,7 +1022,7 @@ pub fn run(
     let inventory = inventory(&owner, job, request)?;
     match verb {
         "inspect" => {
-            let typed = job_request(job, request)?;
+            let (operation, typed) = job_request(job, request)?;
             let mut documents = BTreeMap::new();
             for name in [INDEX, SUMMARY, MARKERS] {
                 let Some(metadata) = inventory
@@ -934,7 +1050,7 @@ pub fn run(
                 let bytes = read_whole(&owner, metadata, DOCUMENT_MAXIMUM_BYTES, false, request)?;
                 documents.insert(name, bound(metadata, bytes)?);
             }
-            inspect_session(job, &typed, &inventory, &documents)
+            inspect_session(&operation, job, &typed, &inventory, &documents)
         }
         "preview" => {
             let metadata = options
@@ -961,7 +1077,7 @@ pub fn run(
             }
             let bytes = read_whole(&owner, metadata, PREVIEW_MAXIMUM_BYTES, explicit, request)?;
             let document = bound(metadata, bytes)?;
-            if document.metadata.source != OPERATION
+            if !supported_operation(&document.metadata.source)
                 || !(document.metadata.media_type == "text/plain"
                     || document.metadata.media_type == "application/json")
             {
@@ -987,6 +1103,104 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn runtime_produced_interactive_session_preserves_operation_and_product_scope() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/diagnostic-session/interactive.json");
+        let fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        assert_eq!(fixture["fixtureOnly"], true);
+        let inventory: Vec<Metadata> = fixture["inventory"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| metadata_of(row).unwrap())
+            .collect();
+        let mut documents = BTreeMap::new();
+        for name in [INDEX, SUMMARY, MARKERS] {
+            let metadata = inventory.iter().find(|item| item.name == name).unwrap();
+            documents.insert(
+                name,
+                bound(
+                    metadata,
+                    fixture["documents"][name]
+                        .as_str()
+                        .unwrap()
+                        .as_bytes()
+                        .to_vec(),
+                )
+                .unwrap(),
+            );
+        }
+        let job = fixture["jobId"].as_str().unwrap();
+        let inputs = fixture["typedParameters"].as_object().unwrap();
+        let result = inspect_session(
+            "capture.diagnostic-session@1",
+            job,
+            inputs,
+            &inventory,
+            &documents,
+        )
+        .unwrap();
+        assert_eq!(result["operationReference"], "capture.diagnostic-session@1");
+        assert_eq!(result["partial"], false);
+        assert_eq!(result["markers"].as_array().unwrap().len(), 1);
+        assert_eq!(result["alignment"]["kind"], "cannotAlign");
+        assert_eq!(result["clockObservation"]["status"], "unvalidated");
+        assert_eq!(result["clockObservation"]["jobId"], job);
+        assert!(
+            inspect_session("capture.diagnostics@1", job, inputs, &inventory, &documents).is_err()
+        );
+        let trace = fixture["inventory"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["name"] == "trace.htrace")
+            .unwrap();
+        assert!(crate::artifact_resources::require_trace_artifact(trace).is_ok());
+    }
+
+    #[test]
+    fn clock_observations_refuse_changed_identity_false_precision_and_bad_measurements() {
+        let sample = json!({"schemaVersion":"arkdeck.trace-clock-observation/1", "jobId":"job-clock",
+            "anchor":"anchor-fixture", "startedAtHostUTC":"2026-10-04T00:00:00.000Z",
+            "finishedAtHostUTC":"2026-10-04T00:00:00.010Z", "elapsedNanoseconds":10_000_000,
+            "status":"unvalidated"});
+        assert!(clock_observation(&sample, "job-clock", Some("anchor-fixture")).is_ok());
+        assert!(clock_observation(&sample, "other", Some("anchor-fixture")).is_err());
+        for anchor in [None, Some(""), Some("other")] {
+            assert!(clock_observation(&sample, "job-clock", anchor).is_err());
+        }
+        for (key, value) in [
+            ("status", json!("calibrated")),
+            ("elapsedNanoseconds", json!(true)),
+            ("elapsedNanoseconds", json!(-1)),
+            ("elapsedNanoseconds", json!(120_000_000_001_u64)),
+            ("finishedAtHostUTC", json!("2026-10-03T23:59:59.999Z")),
+            ("finishedAtHostUTC", json!("2026-10-04T00:00:01.000Z")),
+            ("unknown", json!(1)),
+        ] {
+            let mut changed = sample.clone();
+            changed[key] = value;
+            assert!(clock_observation(&changed, "job-clock", Some("anchor-fixture")).is_err());
+        }
+        let mut integral = sample.clone();
+        integral["elapsedNanoseconds"] = json!(10_000_000.0);
+        assert!(clock_observation(&integral, "job-clock", Some("anchor-fixture")).is_ok());
+        integral["elapsedNanoseconds"] = json!(10_000_000.5);
+        assert!(clock_observation(&integral, "job-clock", Some("anchor-fixture")).is_err());
+        let mut boundary = sample.clone();
+        boundary["elapsedNanoseconds"] = json!(12_000_000);
+        assert!(clock_observation(&boundary, "job-clock", Some("anchor-fixture")).is_ok());
+        boundary["elapsedNanoseconds"] = json!(12_000_001);
+        assert!(clock_observation(&boundary, "job-clock", Some("anchor-fixture")).is_err());
+        boundary["status"] = json!("hostClockDiscontinuity");
+        assert!(clock_observation(&boundary, "job-clock", Some("anchor-fixture")).is_ok());
+        let mut jumped = sample.clone();
+        jumped["finishedAtHostUTC"] = json!("2026-10-03T23:59:59.999Z");
+        jumped["status"] = json!("hostClockDiscontinuity");
+        assert!(clock_observation(&jumped, "job-clock", Some("anchor-fixture")).is_ok());
+    }
 
     #[test]
     fn a_preview_clips_characters_and_discloses_replaced_bytes() {

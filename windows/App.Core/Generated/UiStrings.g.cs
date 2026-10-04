@@ -1033,7 +1033,6 @@ public static class UiStrings
     public const string WindowsImportsId = "windows.imports.id";
     public const string WindowsImportsSha256 = "windows.imports.sha256";
     public const string WindowsNavigationDebug = "windows.navigation.debug";
-    public const string WindowsDebugRemoteUnavailable = "windows.debug.remote.unavailable";
     public const string WindowsDebugJobsCancelFailed = "windows.debug.jobs.cancelFailed";
     public const string WindowsDebugNeedsTarget = "windows.debug.needsTarget";
     public const string WindowsDebugNeedsInputs = "windows.debug.needsInputs";
@@ -1087,8 +1086,8 @@ public static class UiStrings
     public const string AppNavigationDiagnostics = "app.navigation.diagnostics";
     public const string HistoryActivityOpenDiagnostics = "history.activity.open.diagnostics";
     public const string HistoryContextReadOnly = "history.context.readOnly";
-    public const string DiagnosticsCaptureUnavailable = "diagnostics.capture.unavailable";
-    public const string DiagnosticsCaptureUnavailableDetail = "diagnostics.capture.unavailable.detail";
+    public const string WindowsDiagnosticsCaptureUnavailable = "windows.diagnostics.capture.unavailable";
+    public const string WindowsDiagnosticsCaptureUnavailableDetail = "windows.diagnostics.capture.unavailable.detail";
     public const string DiagnosticsAlignmentCalibrated = "diagnostics.alignment.calibrated";
     public const string DiagnosticsAlignmentCannotAlign = "diagnostics.alignment.cannotAlign";
     public const string DiagnosticsAlignmentExplain = "diagnostics.alignment.explain";
@@ -1163,6 +1162,115 @@ public static class UiStrings
     public const string DiagnosticsHilogOutputDigest = "diagnostics.hilog.outputDigest";
     public const string DiagnosticsHilogArtifactDigest = "diagnostics.hilog.artifactDigest";
     public const string WindowsDiagnosticsCaptureMark = "windows.diagnostics.capture.mark";
+    public const string SettingsRemoteSourcesAdd = "settings.remoteSources.add";
+    public const string SettingsRemoteSourcesAuthPassword = "settings.remoteSources.auth.password";
+    public const string SettingsRemoteSourcesAuthPrivateKey = "settings.remoteSources.auth.privateKey";
+    public const string SettingsRemoteSourcesChoosePrivateKey = "settings.remoteSources.choosePrivateKey";
+    public const string SettingsRemoteSourcesCredentialSystemDefault = "settings.remoteSources.credentialSystemDefault";
+    public const string SettingsRemoteSourcesCredentialStored = "settings.remoteSources.credentialStored";
+    public const string SettingsRemoteSourcesEdit = "settings.remoteSources.edit";
+    public const string SettingsRemoteSourcesEditorAddTitle = "settings.remoteSources.editor.addTitle";
+    public const string SettingsRemoteSourcesEditorCredential = "settings.remoteSources.editor.credential";
+    public const string SettingsRemoteSourcesEditorDetail = "settings.remoteSources.editor.detail";
+    public const string SettingsRemoteSourcesEditorEditTitle = "settings.remoteSources.editor.editTitle";
+    public const string SettingsRemoteSourcesEditorServer = "settings.remoteSources.editor.server";
+    public const string SettingsRemoteSourcesEditorVerify = "settings.remoteSources.editor.verify";
+    public const string SettingsRemoteSourcesEmptyDetail = "settings.remoteSources.empty.detail";
+    public const string SettingsRemoteSourcesEmptyTitle = "settings.remoteSources.empty.title";
+    public const string SettingsRemoteSourcesFieldAuthentication = "settings.remoteSources.field.authentication";
+    public const string SettingsRemoteSourcesFieldHost = "settings.remoteSources.field.host";
+    public const string SettingsRemoteSourcesFieldName = "settings.remoteSources.field.name";
+    public const string SettingsRemoteSourcesFieldPassphrase = "settings.remoteSources.field.passphrase";
+    public const string SettingsRemoteSourcesFieldPassword = "settings.remoteSources.field.password";
+    public const string SettingsRemoteSourcesFieldPasswordOptional = "settings.remoteSources.field.passwordOptional";
+    public const string SettingsRemoteSourcesFieldPort = "settings.remoteSources.field.port";
+    public const string SettingsRemoteSourcesFieldRoot = "settings.remoteSources.field.root";
+    public const string SettingsRemoteSourcesFieldUsername = "settings.remoteSources.field.username";
+    public const string SettingsRemoteSourcesNoPrivateKey = "settings.remoteSources.noPrivateKey";
+    public const string SettingsRemoteSourcesPrivateKeyReadFailed = "settings.remoteSources.privateKeyReadFailed";
+    public const string SettingsRemoteSourcesPrivateKeyInvalid = "settings.remoteSources.privateKeyInvalid";
+    public const string SettingsRemoteSourcesRefresh = "settings.remoteSources.refresh";
+    public const string SettingsRemoteSourcesRemove = "settings.remoteSources.remove";
+    public const string SettingsRemoteSourcesRemoveDetail = "settings.remoteSources.remove.detail";
+    public const string SettingsRemoteSourcesRemoveTitle = "settings.remoteSources.remove.title";
+    public const string SettingsRemoteSourcesSave = "settings.remoteSources.save";
+    public const string SettingsRemoteSourcesSecurityHostKey = "settings.remoteSources.security.hostKey";
+    public const string SettingsRemoteSourcesSecurityHostKeyDetail = "settings.remoteSources.security.hostKey.detail";
+    public const string SettingsRemoteSourcesSecurityKeychain = "settings.remoteSources.security.keychain";
+    public const string SettingsRemoteSourcesSecurityKeychainDetail = "settings.remoteSources.security.keychain.detail";
+    public const string SettingsRemoteSourcesSecurityReadOnly = "settings.remoteSources.security.readOnly";
+    public const string SettingsRemoteSourcesSecurityReadOnlyDetail = "settings.remoteSources.security.readOnly.detail";
+    public const string SettingsRemoteSourcesSecurityTitle = "settings.remoteSources.security.title";
+    public const string SettingsRemoteSourcesSubtitle = "settings.remoteSources.subtitle";
+    public const string SettingsRemoteSourcesSystemDefaultHint = "settings.remoteSources.systemDefaultHint";
+    public const string SettingsRemoteSourcesSystemDefaultIdentity = "settings.remoteSources.systemDefaultIdentity";
+    public const string SettingsRemoteSourcesTestConnection = "settings.remoteSources.testConnection";
+    public const string SettingsRemoteSourcesTesting = "settings.remoteSources.testing";
+    public const string SettingsRemoteSourcesTitle = "settings.remoteSources.title";
+    public const string SettingsRemoteSourcesTrustOnSave = "settings.remoteSources.trustOnSave";
+    public const string SettingsRemoteSourcesUseSystemDefault = "settings.remoteSources.useSystemDefault";
+    public const string SettingsRemoteSourcesUsingStoredCredential = "settings.remoteSources.usingStoredCredential";
+    public const string SettingsRemoteSourcesVerified = "settings.remoteSources.verified";
+    public const string SettingsTabRemoteSources = "settings.tab.remoteSources";
+    public const string OverviewRecordRemoteServerLabel = "overview.record.remoteServer.label";
+    public const string OverviewRecordRemoteServerLoading = "overview.record.remoteServer.loading";
+    public const string OverviewRecordRemoteServerUnbound = "overview.record.remoteServer.unbound";
+    public const string OverviewRecordRemoteServerUnboundDetail = "overview.record.remoteServer.unboundDetail";
+    public const string OverviewRecordRemoteServerBound = "overview.record.remoteServer.bound";
+    public const string OverviewRecordRemoteServerStale = "overview.record.remoteServer.stale";
+    public const string OverviewRecordRemoteServerStaleDetail = "overview.record.remoteServer.staleDetail";
+    public const string OverviewRecordRemoteServerUnavailable = "overview.record.remoteServer.unavailable";
+    public const string WindowsRemoteSourcesCredentialStored = "windows.remoteSources.credentialStored";
+    public const string WindowsRemoteSourcesSecurityCredentialsDetail = "windows.remoteSources.security.credentials.detail";
+    public const string WindowsRemoteSourcesFieldPasswordOptional = "windows.remoteSources.field.passwordOptional";
+    public const string WindowsRemoteSourcesUsingStoredCredential = "windows.remoteSources.usingStoredCredential";
+    public const string WindowsRemoteSourcesRemoveDetail = "windows.remoteSources.remove.detail";
+    public const string WindowsRemoteSourcesSystemDefaultHint = "windows.remoteSources.systemDefaultHint";
+    public const string WindowsRemoteSourcesSystemDefaultIdentity = "windows.remoteSources.systemDefaultIdentity";
+    public const string WindowsRemoteSourcesClient = "windows.remoteSources.client";
+    public const string WindowsRemoteSourcesSaveNeedsProbe = "windows.remoteSources.saveNeedsProbe";
+    public const string WindowsRemoteSourcesPrivateKeyChosen = "windows.remoteSources.privateKeyChosen";
+    public const string WindowsRemoteSourcesEndpoint = "windows.remoteSources.endpoint";
+    public const string WindowsRemoteSourcesRoot = "windows.remoteSources.root";
+    public const string WindowsRemoteSourcesCanonicalRoot = "windows.remoteSources.canonicalRoot";
+    public const string WindowsRemoteSourcesFingerprint = "windows.remoteSources.fingerprint";
+    public const string WindowsRemoteSourcesLoading = "windows.remoteSources.loading";
+    public const string WindowsRemoteSourcesRemoved = "windows.remoteSources.removed";
+    public const string WindowsRemoteSourcesSaved = "windows.remoteSources.saved";
+    public const string WindowsRemoteSourcesErrorInvalidName = "windows.remoteSources.error.invalidName";
+    public const string WindowsRemoteSourcesErrorInvalidHost = "windows.remoteSources.error.invalidHost";
+    public const string WindowsRemoteSourcesErrorInvalidPort = "windows.remoteSources.error.invalidPort";
+    public const string WindowsRemoteSourcesErrorInvalidUsername = "windows.remoteSources.error.invalidUsername";
+    public const string WindowsRemoteSourcesErrorInvalidRoot = "windows.remoteSources.error.invalidRoot";
+    public const string WindowsRemoteSourcesErrorInvalidCredential = "windows.remoteSources.error.invalidCredential";
+    public const string WindowsRemoteSourcesErrorSystemCredentialUnavailable = "windows.remoteSources.error.systemCredentialUnavailable";
+    public const string WindowsRemoteSourcesErrorSourceNotFound = "windows.remoteSources.error.sourceNotFound";
+    public const string WindowsRemoteSourcesErrorCredentialUnavailable = "windows.remoteSources.error.credentialUnavailable";
+    public const string WindowsRemoteSourcesErrorProbeExpired = "windows.remoteSources.error.probeExpired";
+    public const string WindowsRemoteSourcesErrorHostKeyChanged = "windows.remoteSources.error.hostKeyChanged";
+    public const string WindowsRemoteSourcesErrorRootChanged = "windows.remoteSources.error.rootChanged";
+    public const string WindowsRemoteSourcesErrorPathOutsideRoot = "windows.remoteSources.error.pathOutsideRoot";
+    public const string WindowsRemoteSourcesErrorTooManyEntries = "windows.remoteSources.error.tooManyEntries";
+    public const string WindowsRemoteSourcesErrorInvalidLibraryName = "windows.remoteSources.error.invalidLibraryName";
+    public const string WindowsRemoteSourcesErrorInvalidLibrarySize = "windows.remoteSources.error.invalidLibrarySize";
+    public const string WindowsRemoteSourcesErrorFileChanged = "windows.remoteSources.error.fileChanged";
+    public const string WindowsRemoteSourcesErrorConnectionFailed = "windows.remoteSources.error.connectionFailed";
+    public const string WindowsRemoteSourcesErrorCredentialStoreFailed = "windows.remoteSources.error.credentialStoreFailed";
+    public const string WindowsRemoteSourcesErrorStorageFailed = "windows.remoteSources.error.storageFailed";
+    public const string HistoryActivityOpenFlash = "history.activity.open.flash";
+    public const string HistoryActivityOpenViewer = "history.activity.open.viewer";
+    public const string HistoryActivityOpenTrace = "history.activity.open.trace";
+    public const string HistoryActivityOpenDebug = "history.activity.open.debug";
+    public const string HistoryActivityOpenDevice = "history.activity.open.device";
+    public const string HistoryActivityOpenDetailUnavailable = "history.activity.open.detailUnavailable";
+    public const string HistoryActivityOpenUnsupported = "history.activity.open.unsupported";
+    public const string HistoryContextTitle = "history.context.title";
+    public const string HistoryContextDismiss = "history.context.dismiss";
+    public const string HistoryContextJob = "history.context.job";
+    public const string HistoryContextTarget = "history.context.target";
+    public const string HistoryContextOperation = "history.context.operation";
+    public const string HistoryContextState = "history.context.state";
+    public const string HistoryContextArtifacts = "history.context.artifacts";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -2192,7 +2300,6 @@ public static class UiStrings
         WindowsImportsId,
         WindowsImportsSha256,
         WindowsNavigationDebug,
-        WindowsDebugRemoteUnavailable,
         WindowsDebugJobsCancelFailed,
         WindowsDebugNeedsTarget,
         WindowsDebugNeedsInputs,
@@ -2246,8 +2353,8 @@ public static class UiStrings
         AppNavigationDiagnostics,
         HistoryActivityOpenDiagnostics,
         HistoryContextReadOnly,
-        DiagnosticsCaptureUnavailable,
-        DiagnosticsCaptureUnavailableDetail,
+        WindowsDiagnosticsCaptureUnavailable,
+        WindowsDiagnosticsCaptureUnavailableDetail,
         DiagnosticsAlignmentCalibrated,
         DiagnosticsAlignmentCannotAlign,
         DiagnosticsAlignmentExplain,
@@ -2322,5 +2429,114 @@ public static class UiStrings
         DiagnosticsHilogOutputDigest,
         DiagnosticsHilogArtifactDigest,
         WindowsDiagnosticsCaptureMark,
+        SettingsRemoteSourcesAdd,
+        SettingsRemoteSourcesAuthPassword,
+        SettingsRemoteSourcesAuthPrivateKey,
+        SettingsRemoteSourcesChoosePrivateKey,
+        SettingsRemoteSourcesCredentialSystemDefault,
+        SettingsRemoteSourcesCredentialStored,
+        SettingsRemoteSourcesEdit,
+        SettingsRemoteSourcesEditorAddTitle,
+        SettingsRemoteSourcesEditorCredential,
+        SettingsRemoteSourcesEditorDetail,
+        SettingsRemoteSourcesEditorEditTitle,
+        SettingsRemoteSourcesEditorServer,
+        SettingsRemoteSourcesEditorVerify,
+        SettingsRemoteSourcesEmptyDetail,
+        SettingsRemoteSourcesEmptyTitle,
+        SettingsRemoteSourcesFieldAuthentication,
+        SettingsRemoteSourcesFieldHost,
+        SettingsRemoteSourcesFieldName,
+        SettingsRemoteSourcesFieldPassphrase,
+        SettingsRemoteSourcesFieldPassword,
+        SettingsRemoteSourcesFieldPasswordOptional,
+        SettingsRemoteSourcesFieldPort,
+        SettingsRemoteSourcesFieldRoot,
+        SettingsRemoteSourcesFieldUsername,
+        SettingsRemoteSourcesNoPrivateKey,
+        SettingsRemoteSourcesPrivateKeyReadFailed,
+        SettingsRemoteSourcesPrivateKeyInvalid,
+        SettingsRemoteSourcesRefresh,
+        SettingsRemoteSourcesRemove,
+        SettingsRemoteSourcesRemoveDetail,
+        SettingsRemoteSourcesRemoveTitle,
+        SettingsRemoteSourcesSave,
+        SettingsRemoteSourcesSecurityHostKey,
+        SettingsRemoteSourcesSecurityHostKeyDetail,
+        SettingsRemoteSourcesSecurityKeychain,
+        SettingsRemoteSourcesSecurityKeychainDetail,
+        SettingsRemoteSourcesSecurityReadOnly,
+        SettingsRemoteSourcesSecurityReadOnlyDetail,
+        SettingsRemoteSourcesSecurityTitle,
+        SettingsRemoteSourcesSubtitle,
+        SettingsRemoteSourcesSystemDefaultHint,
+        SettingsRemoteSourcesSystemDefaultIdentity,
+        SettingsRemoteSourcesTestConnection,
+        SettingsRemoteSourcesTesting,
+        SettingsRemoteSourcesTitle,
+        SettingsRemoteSourcesTrustOnSave,
+        SettingsRemoteSourcesUseSystemDefault,
+        SettingsRemoteSourcesUsingStoredCredential,
+        SettingsRemoteSourcesVerified,
+        SettingsTabRemoteSources,
+        OverviewRecordRemoteServerLabel,
+        OverviewRecordRemoteServerLoading,
+        OverviewRecordRemoteServerUnbound,
+        OverviewRecordRemoteServerUnboundDetail,
+        OverviewRecordRemoteServerBound,
+        OverviewRecordRemoteServerStale,
+        OverviewRecordRemoteServerStaleDetail,
+        OverviewRecordRemoteServerUnavailable,
+        WindowsRemoteSourcesCredentialStored,
+        WindowsRemoteSourcesSecurityCredentialsDetail,
+        WindowsRemoteSourcesFieldPasswordOptional,
+        WindowsRemoteSourcesUsingStoredCredential,
+        WindowsRemoteSourcesRemoveDetail,
+        WindowsRemoteSourcesSystemDefaultHint,
+        WindowsRemoteSourcesSystemDefaultIdentity,
+        WindowsRemoteSourcesClient,
+        WindowsRemoteSourcesSaveNeedsProbe,
+        WindowsRemoteSourcesPrivateKeyChosen,
+        WindowsRemoteSourcesEndpoint,
+        WindowsRemoteSourcesRoot,
+        WindowsRemoteSourcesCanonicalRoot,
+        WindowsRemoteSourcesFingerprint,
+        WindowsRemoteSourcesLoading,
+        WindowsRemoteSourcesRemoved,
+        WindowsRemoteSourcesSaved,
+        WindowsRemoteSourcesErrorInvalidName,
+        WindowsRemoteSourcesErrorInvalidHost,
+        WindowsRemoteSourcesErrorInvalidPort,
+        WindowsRemoteSourcesErrorInvalidUsername,
+        WindowsRemoteSourcesErrorInvalidRoot,
+        WindowsRemoteSourcesErrorInvalidCredential,
+        WindowsRemoteSourcesErrorSystemCredentialUnavailable,
+        WindowsRemoteSourcesErrorSourceNotFound,
+        WindowsRemoteSourcesErrorCredentialUnavailable,
+        WindowsRemoteSourcesErrorProbeExpired,
+        WindowsRemoteSourcesErrorHostKeyChanged,
+        WindowsRemoteSourcesErrorRootChanged,
+        WindowsRemoteSourcesErrorPathOutsideRoot,
+        WindowsRemoteSourcesErrorTooManyEntries,
+        WindowsRemoteSourcesErrorInvalidLibraryName,
+        WindowsRemoteSourcesErrorInvalidLibrarySize,
+        WindowsRemoteSourcesErrorFileChanged,
+        WindowsRemoteSourcesErrorConnectionFailed,
+        WindowsRemoteSourcesErrorCredentialStoreFailed,
+        WindowsRemoteSourcesErrorStorageFailed,
+        HistoryActivityOpenFlash,
+        HistoryActivityOpenViewer,
+        HistoryActivityOpenTrace,
+        HistoryActivityOpenDebug,
+        HistoryActivityOpenDevice,
+        HistoryActivityOpenDetailUnavailable,
+        HistoryActivityOpenUnsupported,
+        HistoryContextTitle,
+        HistoryContextDismiss,
+        HistoryContextJob,
+        HistoryContextTarget,
+        HistoryContextOperation,
+        HistoryContextState,
+        HistoryContextArtifacts,
     ];
 }

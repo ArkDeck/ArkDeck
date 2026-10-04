@@ -5,7 +5,7 @@ package enum ArkDeckControlProtocol {
   package static let currentVersion = "1.0.0"
   package static let maximumRequestFrameBytes = 4194304
   package static let maximumResponseFrameBytes = 8388608
-  package static let contractIdentity = "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633"
+  package static let contractIdentity = "4bcc7c3eb33214e0712852bb4d9234cb79412c46d6b1960777e48e875fda6024"
   package static let methods: Set<String> = [
     "agent.abandon",
     "agent.list",
@@ -40,6 +40,9 @@ package enum ArkDeckControlProtocol {
     "device.display-name.clear",
     "device.display-name.set",
     "device.observations",
+    "diagnostic.session.mark",
+    "diagnostic.session.status",
+    "diagnostic.session.stop",
     "doctor",
     "flash.bind-current-loader",
     "flash.bootloader-status",

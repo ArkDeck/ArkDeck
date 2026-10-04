@@ -4114,10 +4114,6 @@ SHA-256: %4$@</value>
     <value>Debug</value>
     <comment>windows.navigation.debug (Windows only)</comment>
   </data>
-  <data name="windows_debug_remote_unavailable" xml:space="preserve">
-    <value>Remote build servers are configured in the macOS App's Settings; the Windows App has none yet. Choose a local library.</value>
-    <comment>windows.debug.remote.unavailable (Windows only)</comment>
-  </data>
   <data name="windows_debug_jobs_cancelFailed" xml:space="preserve">
     <value>Runtime refused the cancellation request</value>
     <comment>windows.debug.jobs.cancelFailed (Windows only)</comment>
@@ -4330,13 +4326,13 @@ SHA-256: %4$@</value>
     <value>This restores the selected record's read-only context. Any new action creates a new Job; the historical Job is never replayed.</value>
     <comment>history.context.readOnly (HistoryLocalizable.xcstrings)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable" xml:space="preserve">
     <value>Session capture is not available</value>
-    <comment>diagnostics.capture.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable (Windows only)</comment>
   </data>
-  <data name="diagnostics_capture_unavailable_detail" xml:space="preserve">
+  <data name="windows_diagnostics_capture_unavailable_detail" xml:space="preserve">
     <value>Interactive arm, append-marker and stop controls are not connected. Open a saved bounded capture from History, or use Trace and Debug › Logs to capture.</value>
-    <comment>diagnostics.capture.unavailable.detail (DiagnosticsLocalizable.xcstrings)</comment>
+    <comment>windows.diagnostics.capture.unavailable.detail (Windows only)</comment>
   </data>
   <data name="diagnostics_alignment_calibrated" xml:space="preserve">
     <value>Calibrated</value>
@@ -4355,7 +4351,7 @@ SHA-256: %4$@</value>
     <comment>diagnostics.alignment.sameClock (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_arm" xml:space="preserve">
-    <value>Arm a session</value>
+    <value>Start session</value>
     <comment>diagnostics.capture.arm (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
   <data name="diagnostics_capture_mark" xml:space="preserve">
@@ -4633,5 +4629,441 @@ SHA-256: %4$@</value>
   <data name="windows_diagnostics_capture_mark" xml:space="preserve">
     <value>Mark (Ctrl+M)</value>
     <comment>windows.diagnostics.capture.mark (Windows only)</comment>
+  </data>
+  <data name="settings_remoteSources_add" xml:space="preserve">
+    <value>Add server</value>
+    <comment>settings.remoteSources.add (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_auth_password" xml:space="preserve">
+    <value>Password</value>
+    <comment>settings.remoteSources.auth.password (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_auth_privateKey" xml:space="preserve">
+    <value>OpenSSH private key</value>
+    <comment>settings.remoteSources.auth.privateKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_choosePrivateKey" xml:space="preserve">
+    <value>Choose private key…</value>
+    <comment>settings.remoteSources.choosePrivateKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_credentialSystemDefault" xml:space="preserve">
+    <value>System SSH</value>
+    <comment>settings.remoteSources.credentialSystemDefault (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_credentialStored" xml:space="preserve">
+    <value>Keychain</value>
+    <comment>settings.remoteSources.credentialStored (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_edit" xml:space="preserve">
+    <value>Edit</value>
+    <comment>settings.remoteSources.edit (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_addTitle" xml:space="preserve">
+    <value>Add server</value>
+    <comment>settings.remoteSources.editor.addTitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_credential" xml:space="preserve">
+    <value>Credential</value>
+    <comment>settings.remoteSources.editor.credential (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_detail" xml:space="preserve">
+    <value>ArkDeck will only browse below the verified build root and import a selected lib*.so file.</value>
+    <comment>settings.remoteSources.editor.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_editTitle" xml:space="preserve">
+    <value>Edit server</value>
+    <comment>settings.remoteSources.editor.editTitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_server" xml:space="preserve">
+    <value>SSH server</value>
+    <comment>settings.remoteSources.editor.server (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_editor_verify" xml:space="preserve">
+    <value>Verify and trust</value>
+    <comment>settings.remoteSources.editor.verify (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_empty_detail" xml:space="preserve">
+    <value>Add an SSH server before browsing remote build artifacts in Debug.</value>
+    <comment>settings.remoteSources.empty.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_empty_title" xml:space="preserve">
+    <value>No servers</value>
+    <comment>settings.remoteSources.empty.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_authentication" xml:space="preserve">
+    <value>Authentication</value>
+    <comment>settings.remoteSources.field.authentication (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_host" xml:space="preserve">
+    <value>Host or IP</value>
+    <comment>settings.remoteSources.field.host (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_name" xml:space="preserve">
+    <value>Display name</value>
+    <comment>settings.remoteSources.field.name (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_passphrase" xml:space="preserve">
+    <value>Private-key passphrase (optional)</value>
+    <comment>settings.remoteSources.field.passphrase (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_password" xml:space="preserve">
+    <value>Password</value>
+    <comment>settings.remoteSources.field.password (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_passwordOptional" xml:space="preserve">
+    <value>New password (leave empty to use Keychain)</value>
+    <comment>settings.remoteSources.field.passwordOptional (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_port" xml:space="preserve">
+    <value>Port</value>
+    <comment>settings.remoteSources.field.port (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_root" xml:space="preserve">
+    <value>Build root (absolute path)</value>
+    <comment>settings.remoteSources.field.root (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_field_username" xml:space="preserve">
+    <value>Username</value>
+    <comment>settings.remoteSources.field.username (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_noPrivateKey" xml:space="preserve">
+    <value>No replacement key selected</value>
+    <comment>settings.remoteSources.noPrivateKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_privateKeyReadFailed" xml:space="preserve">
+    <value>The private key could not be read. Choose the file again.</value>
+    <comment>settings.remoteSources.privateKeyReadFailed (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_privateKeyInvalid" xml:space="preserve">
+    <value>Choose a non-empty OpenSSH private key no larger than 256 KiB.</value>
+    <comment>settings.remoteSources.privateKeyInvalid (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_refresh" xml:space="preserve">
+    <value>Refresh</value>
+    <comment>settings.remoteSources.refresh (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_remove" xml:space="preserve">
+    <value>Remove server</value>
+    <comment>settings.remoteSources.remove (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_remove_detail" xml:space="preserve">
+    <value>The server profile and its Keychain credential will be removed from this Mac.</value>
+    <comment>settings.remoteSources.remove.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_remove_title" xml:space="preserve">
+    <value>Remove this server?</value>
+    <comment>settings.remoteSources.remove.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_save" xml:space="preserve">
+    <value>Save verified server</value>
+    <comment>settings.remoteSources.save (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_hostKey" xml:space="preserve">
+    <value>Pinned SSH host key</value>
+    <comment>settings.remoteSources.security.hostKey (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_hostKey_detail" xml:space="preserve">
+    <value>The first verified fingerprint is saved explicitly. A changed host key is rejected on every later connection.</value>
+    <comment>settings.remoteSources.security.hostKey.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_keychain" xml:space="preserve">
+    <value>Credential secrets stay protected</value>
+    <comment>settings.remoteSources.security.keychain (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_keychain_detail" xml:space="preserve">
+    <value>Imported secrets stay in Keychain. System default reads only owner-private id_rsa and id_ed25519 files; secrets never enter profiles, logs, command lines, or Runtime XPC.</value>
+    <comment>settings.remoteSources.security.keychain.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_readOnly" xml:space="preserve">
+    <value>Read-only SFTP surface</value>
+    <comment>settings.remoteSources.security.readOnly (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_readOnly_detail" xml:space="preserve">
+    <value>ArkDeck exposes no SSH command, shell, upload, delete, rename, or arbitrary path API.</value>
+    <comment>settings.remoteSources.security.readOnly.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_security_title" xml:space="preserve">
+    <value>Security boundary</value>
+    <comment>settings.remoteSources.security.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_subtitle" xml:space="preserve">
+    <value>Manage SSH servers used to browse and import remote build artifacts.</value>
+    <comment>settings.remoteSources.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_systemDefaultHint" xml:space="preserve">
+    <value>If no file is selected, ArkDeck tries ~/.ssh/id_rsa, then ~/.ssh/id_ed25519. SSH config, known_hosts, and other files are not read.</value>
+    <comment>settings.remoteSources.systemDefaultHint (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_systemDefaultIdentity" xml:space="preserve">
+    <value>System default (id_rsa → id_ed25519)</value>
+    <comment>settings.remoteSources.systemDefaultIdentity (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_testConnection" xml:space="preserve">
+    <value>Test connection and inspect host key</value>
+    <comment>settings.remoteSources.testConnection (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_testing" xml:space="preserve">
+    <value>Connecting through SSH/SFTP…</value>
+    <comment>settings.remoteSources.testing (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_title" xml:space="preserve">
+    <value>Saved servers</value>
+    <comment>settings.remoteSources.title (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_trustOnSave" xml:space="preserve">
+    <value>Review this fingerprint. Saving will trust this exact host key for later connections.</value>
+    <comment>settings.remoteSources.trustOnSave (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_useSystemDefault" xml:space="preserve">
+    <value>Use system default</value>
+    <comment>settings.remoteSources.useSystemDefault (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_usingStoredCredential" xml:space="preserve">
+    <value>The saved Keychain credential will be used for this test.</value>
+    <comment>settings.remoteSources.usingStoredCredential (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_remoteSources_verified" xml:space="preserve">
+    <value>Connection, credential, SFTP root, and host key verified</value>
+    <comment>settings.remoteSources.verified (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_remoteSources" xml:space="preserve">
+    <value>Servers</value>
+    <comment>settings.tab.remoteSources (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_label" xml:space="preserve">
+    <value>Remote build server</value>
+    <comment>overview.record.remoteServer.label (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_loading" xml:space="preserve">
+    <value>Checking binding…</value>
+    <comment>overview.record.remoteServer.loading (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_unbound" xml:space="preserve">
+    <value>Not bound</value>
+    <comment>overview.record.remoteServer.unbound (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_unboundDetail" xml:space="preserve">
+    <value>Choose a remote artifact in Debug to bind a verified server to this target.</value>
+    <comment>overview.record.remoteServer.unboundDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_bound" xml:space="preserve">
+    <value>Bound</value>
+    <comment>overview.record.remoteServer.bound (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_stale" xml:space="preserve">
+    <value>Binding needs attention</value>
+    <comment>overview.record.remoteServer.stale (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_staleDetail" xml:space="preserve">
+    <value>The bound server was removed. Choose another remote artifact in Debug.</value>
+    <comment>overview.record.remoteServer.staleDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="overview_record_remoteServer_unavailable" xml:space="preserve">
+    <value>Binding unavailable</value>
+    <comment>overview.record.remoteServer.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_remoteSources_credentialStored" xml:space="preserve">
+    <value>Credential Manager</value>
+    <comment>windows.remoteSources.credentialStored (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_security_credentials_detail" xml:space="preserve">
+    <value>Imported secrets stay in Windows Credential Manager. System default reads only owner-private id_rsa and id_ed25519 in %USERPROFILE%\.ssh; secrets never enter profiles, logs, command lines, or Runtime calls.</value>
+    <comment>windows.remoteSources.security.credentials.detail (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_field_passwordOptional" xml:space="preserve">
+    <value>New password (leave empty to use Credential Manager)</value>
+    <comment>windows.remoteSources.field.passwordOptional (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_usingStoredCredential" xml:space="preserve">
+    <value>The saved Credential Manager credential will be used for this test.</value>
+    <comment>windows.remoteSources.usingStoredCredential (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_remove_detail" xml:space="preserve">
+    <value>The server profile and its Credential Manager credential will be removed from this PC.</value>
+    <comment>windows.remoteSources.remove.detail (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_systemDefaultHint" xml:space="preserve">
+    <value>If no file is selected, ArkDeck tries %USERPROFILE%\.ssh\id_rsa, then id_ed25519. SSH config, known_hosts, and other files are not read.</value>
+    <comment>windows.remoteSources.systemDefaultHint (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_systemDefaultIdentity" xml:space="preserve">
+    <value>System default (id_rsa → id_ed25519)</value>
+    <comment>windows.remoteSources.systemDefaultIdentity (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_client" xml:space="preserve">
+    <value>Connections use Windows' built-in OpenSSH client with ArkDeck's own pinned host key; your known_hosts file and SSH config are not used.</value>
+    <comment>windows.remoteSources.client (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_saveNeedsProbe" xml:space="preserve">
+    <value>Test the connection first: saving trusts only a host key that was just verified.</value>
+    <comment>windows.remoteSources.saveNeedsProbe (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_privateKeyChosen" xml:space="preserve">
+    <value>Chosen key: %@</value>
+    <comment>windows.remoteSources.privateKeyChosen (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_endpoint" xml:space="preserve">
+    <value>Endpoint</value>
+    <comment>windows.remoteSources.endpoint (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_root" xml:space="preserve">
+    <value>Build root</value>
+    <comment>windows.remoteSources.root (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_canonicalRoot" xml:space="preserve">
+    <value>Verified root</value>
+    <comment>windows.remoteSources.canonicalRoot (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_fingerprint" xml:space="preserve">
+    <value>Host key fingerprint</value>
+    <comment>windows.remoteSources.fingerprint (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_loading" xml:space="preserve">
+    <value>Loading servers…</value>
+    <comment>windows.remoteSources.loading (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_removed" xml:space="preserve">
+    <value>Server removed.</value>
+    <comment>windows.remoteSources.removed (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_saved" xml:space="preserve">
+    <value>Server saved.</value>
+    <comment>windows.remoteSources.saved (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidName" xml:space="preserve">
+    <value>The server name must not be empty and may have at most 80 characters.</value>
+    <comment>windows.remoteSources.error.invalidName (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidHost" xml:space="preserve">
+    <value>The host name or IP address is not valid.</value>
+    <comment>windows.remoteSources.error.invalidHost (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidPort" xml:space="preserve">
+    <value>The SSH port must be between 1 and 65535.</value>
+    <comment>windows.remoteSources.error.invalidPort (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidUsername" xml:space="preserve">
+    <value>An SSH user name may contain only letters, digits, dots, underscores and hyphens.</value>
+    <comment>windows.remoteSources.error.invalidUsername (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidRoot" xml:space="preserve">
+    <value>The build root must be an absolute POSIX path other than /, without . or .. segments.</value>
+    <comment>windows.remoteSources.error.invalidRoot (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidCredential" xml:space="preserve">
+    <value>The credential is empty, too large, or a private key of an unsupported type.</value>
+    <comment>windows.remoteSources.error.invalidCredential (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_systemCredentialUnavailable" xml:space="preserve">
+    <value>No usable system-default OpenSSH private key was found. Keep an owner-only %USERPROFILE%\.ssh\id_rsa or id_ed25519, or choose a private key.</value>
+    <comment>windows.remoteSources.error.systemCredentialUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_sourceNotFound" xml:space="preserve">
+    <value>The remote build source does not exist or was removed.</value>
+    <comment>windows.remoteSources.error.sourceNotFound (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_credentialUnavailable" xml:space="preserve">
+    <value>Credential Manager holds no usable credential. Test and save the server again in Settings.</value>
+    <comment>windows.remoteSources.error.credentialUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_probeExpired" xml:space="preserve">
+    <value>The connection test has expired. Test again before saving.</value>
+    <comment>windows.remoteSources.error.probeExpired (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_hostKeyChanged" xml:space="preserve">
+    <value>The SSH host key does not match the saved fingerprint. The connection was refused.</value>
+    <comment>windows.remoteSources.error.hostKeyChanged (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_rootChanged" xml:space="preserve">
+    <value>The real path of the remote build root changed. The connection was refused.</value>
+    <comment>windows.remoteSources.error.rootChanged (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_pathOutsideRoot" xml:space="preserve">
+    <value>The remote path is outside the saved build root.</value>
+    <comment>windows.remoteSources.error.pathOutsideRoot (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_tooManyEntries" xml:space="preserve">
+    <value>The directory has more than 500 visible entries. Configure a more specific build root.</value>
+    <comment>windows.remoteSources.error.tooManyEntries (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidLibraryName" xml:space="preserve">
+    <value>Only a remote file named lib&lt;name&gt;.so can be imported.</value>
+    <comment>windows.remoteSources.error.invalidLibraryName (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_invalidLibrarySize" xml:space="preserve">
+    <value>A remote native library must be between 64 bytes and 64 MiB.</value>
+    <comment>windows.remoteSources.error.invalidLibrarySize (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_fileChanged" xml:space="preserve">
+    <value>The remote file changed while it was read. Choose it again.</value>
+    <comment>windows.remoteSources.error.fileChanged (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_connectionFailed" xml:space="preserve">
+    <value>SSH/SFTP connection failed: %@</value>
+    <comment>windows.remoteSources.error.connectionFailed (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_credentialStoreFailed" xml:space="preserve">
+    <value>Credential Manager operation failed (%@).</value>
+    <comment>windows.remoteSources.error.credentialStoreFailed (Windows only)</comment>
+  </data>
+  <data name="windows_remoteSources_error_storageFailed" xml:space="preserve">
+    <value>The remote build source could not be saved safely.</value>
+    <comment>windows.remoteSources.error.storageFailed (Windows only)</comment>
+  </data>
+  <data name="history_activity_open_flash" xml:space="preserve">
+    <value>Open Flash</value>
+    <comment>history.activity.open.flash (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_viewer" xml:space="preserve">
+    <value>Open Viewer</value>
+    <comment>history.activity.open.viewer (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_trace" xml:space="preserve">
+    <value>Open Trace</value>
+    <comment>history.activity.open.trace (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_debug" xml:space="preserve">
+    <value>Open Debug</value>
+    <comment>history.activity.open.debug (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_device" xml:space="preserve">
+    <value>Open Device</value>
+    <comment>history.activity.open.device (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_detailUnavailable" xml:space="preserve">
+    <value>Job details are unavailable, so ArkDeck cannot reopen this context.</value>
+    <comment>history.activity.open.detailUnavailable (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_activity_open_unsupported" xml:space="preserve">
+    <value>This record has no workspace that can be reopened.</value>
+    <comment>history.activity.open.unsupported (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_title" xml:space="preserve">
+    <value>Opened from History</value>
+    <comment>history.context.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_dismiss" xml:space="preserve">
+    <value>Close history context</value>
+    <comment>history.context.dismiss (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>history.context.job (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>history.context.target (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_operation" xml:space="preserve">
+    <value>Operation</value>
+    <comment>history.context.operation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_state" xml:space="preserve">
+    <value>State</value>
+    <comment>history.context.state (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_context_artifacts" xml:space="preserve">
+    <value>Artifacts</value>
+    <comment>history.context.artifacts (HistoryLocalizable.xcstrings)</comment>
   </data>
 </root>

@@ -11,7 +11,7 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -76,7 +76,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "6cf3605fe82d15ab126362c846cd079a4ac7f3b795e3c52e67ef65a0db75a6b9",
+  "materializedPlanDigest" : "fec72b0e7ed72c44b55b1a20ba474f9c681d974aef24914545f1a84b20e20bac",
   "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
   "operationReference" : "observe.device@1",
   "originalSubmissionRequest" : {
@@ -122,11 +122,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "7888",
       "lastSequence" : 14,
-      "sha256" : "2bcf92665e5e08ecff4cbcf5898cf8433a4eb65dbb64eb8af4dcf327e45d50a2"
+      "sha256" : "a56878b05ba929d07d128d464673a9c65e14d4f90421e8388cb1946fa92c0abf"
     },
     "claims" : [
       {
@@ -142,20 +142,20 @@
     "journalSeal" : {
       "byteCount" : "8274",
       "lastSequence" : 15,
-      "sha256" : "c11a02e9df819f3a40c65f4f3649d2752bdad9edf15cc22407dd45d18f16f0d9"
+      "sha256" : "d7f40db7f930574a7a51190cc82fe7710e8feab8bd5e73c2d9dc34f8e2ce019f"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "4672",
-      "manifestSHA256" : "7d17631cab926175afc4315a8c521a63aecf0941e1a8a6952fa030dc5a117b93",
+      "manifestSHA256" : "b4a6da30b10c164c13d547292c875eac7b7c48cf5d09a5be16edabada14a9232",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "succeeded"
     },
     "receipt" : {
       "catalogGeneration" : "1",
-      "manifestSHA256" : "7d17631cab926175afc4315a8c521a63aecf0941e1a8a6952fa030dc5a117b93",
+      "manifestSHA256" : "b4a6da30b10c164c13d547292c875eac7b7c48cf5d09a5be16edabada14a9232",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-73b1cb9a96d12a0ea736a065afdf5abd",
@@ -183,7 +183,7 @@
     "reason: steps-start",
     "intent probe-host-tool",
     "verified probe-host-tool [\"toolVersion\"]",
-    "artifact tool-facts.json -> ART-4717367bdbcaff1abd0b4ced963c0f38",
+    "artifact tool-facts.json -> ART-f224457ca880ea5d4931599e1ec5eb4d",
     "intent probe-hdc-server",
     "verified probe-hdc-server [\"clientVersion\", \"serverVersion\"]",
     "intent confirm-evidence-target",
@@ -195,8 +195,8 @@
     "intent read-evidence-firmware",
     "verified read-evidence-firmware [\"value\"]",
     "evidence-preflight read-evidence-firmware",
-    "artifact device-facts.json -> ART-6d97a1df251547083344adff46cecfd2",
-    "artifact binding-snapshot.json -> ART-bbb39c15cac588619b3291a566e629ef",
+    "artifact device-facts.json -> ART-e7797eef05f1f37a2ba9d6ac28b11ffe",
+    "artifact binding-snapshot.json -> ART-383748279a56ce9c6ef30ccf725e94d3",
     "host-step finalize-session",
     "running->finalizing",
     "reason: steps-complete",

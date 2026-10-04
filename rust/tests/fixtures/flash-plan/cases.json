@@ -6,22 +6,22 @@
         "result" : {
           "authorizationPolicy" : "runtimeCapability",
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "destructive",
           "executionMode" : "planOnly",
           "inputs" : {
-            "artifactLease" : "lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4",
+            "artifactLease" : "lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3",
             "deviceProfileRef" : "dayu200",
             "intent" : "fullRestore",
             "verification" : "full"
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "89fd1d8d416ea12494aa6f4c066f3e11b1a935d48e9cefb4a8b75fbb2e9e7f1a",
+          "materializedPlanDigest" : "fcf7eae63006d8e81da3c400d8f165f0e9996810333605e1c596fbec6741799f",
           "operation" : "flash.full-restore@1",
           "providerAdmissionBlocker" : null,
           "providerId" : "arkforge",
-          "requestFingerprintSha256" : "4440256b8654c969bcfc006e71fd6ddbcbe4e6d5edece5ab05da40b33e828fa6",
+          "requestFingerprintSha256" : "db2bbd3de555fad82635b8785440ec73602bb9a3ac71fde04beea268d020ff9b",
           "schemaVersion" : "arkdeck.job-plan/1",
           "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
           "steps" : [
@@ -142,7 +142,7 @@
         }
       },
       "name" : "canonical.full",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-canonical-full\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"canonical-full\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-canonical-full\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"canonical-full\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -168,22 +168,22 @@
         "result" : {
           "authorizationPolicy" : "runtimeCapability",
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "destructive",
           "executionMode" : "planOnly",
           "inputs" : {
-            "artifactLease" : "lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4",
+            "artifactLease" : "lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3",
             "deviceProfileRef" : "dayu200",
             "intent" : "fullRestore",
             "verification" : "basic"
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "e370c255cece21fe66ab176ffa13e4795213545e6b182271534777b6daf91dba",
+          "materializedPlanDigest" : "0bd111e868f20b1553358a316612a2c93c0ceed4423a7fadbc3b939b27bcb1cc",
           "operation" : "flash.full-restore@1",
           "providerAdmissionBlocker" : null,
           "providerId" : "arkforge",
-          "requestFingerprintSha256" : "a20f55d780803e22643ccbb9fafdc570d4ea45760d3049d0a786a5084af3645c",
+          "requestFingerprintSha256" : "0b35bf3b8b043025b55b880dab24a33cf6db08dcde2a4f04ea224ee1bcf4db91",
           "schemaVersion" : "arkdeck.job-plan/1",
           "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
           "steps" : [
@@ -304,7 +304,7 @@
         }
       },
       "name" : "canonical.basic",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-canonical-basic\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"basic\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"canonical-basic\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-canonical-basic\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"basic\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"canonical-basic\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -330,13 +330,13 @@
         "result" : {
           "authorizationPolicy" : "runtimeCapability",
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "destructive",
           "executionMode" : "planOnly",
           "inputs" : {
             "deviceProfile" : "dayu200",
-            "imageBundleLease" : "lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4",
+            "imageBundleLease" : "lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3",
             "partitionPlan" : [
               "uboot",
               "resource",
@@ -351,11 +351,11 @@
             "postFlashVerification" : "full"
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "89fd1d8d416ea12494aa6f4c066f3e11b1a935d48e9cefb4a8b75fbb2e9e7f1a",
+          "materializedPlanDigest" : "fcf7eae63006d8e81da3c400d8f165f0e9996810333605e1c596fbec6741799f",
           "operation" : "flash.dayu200",
           "providerAdmissionBlocker" : null,
           "providerId" : "arkforge",
-          "requestFingerprintSha256" : "a5803cffe2bc4d3c2983987e6e8ce2d40e6c32dccc674a104fb42cfb19fd41de",
+          "requestFingerprintSha256" : "41d794335933fbe1519a4d015a533f1c47aee0b68562b01040aac81c376a373b",
           "schemaVersion" : "arkdeck.job-plan/1",
           "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
           "steps" : [
@@ -476,7 +476,7 @@
         }
       },
       "name" : "alias.full",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-full\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-full\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-full\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-full\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -502,13 +502,13 @@
         "result" : {
           "authorizationPolicy" : "runtimeCapability",
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "destructive",
           "executionMode" : "planOnly",
           "inputs" : {
             "deviceProfile" : "dayu200",
-            "imageBundleLease" : "lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4",
+            "imageBundleLease" : "lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3",
             "partitionPlan" : [
               "uboot",
               "resource",
@@ -523,11 +523,11 @@
             "postFlashVerification" : "basic"
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "b7f62f7e5dca867999ae3cc898bab0ddb009f33bfaed5c49116fc890f8c82e23",
+          "materializedPlanDigest" : "1255fc73f8ae11646df32bd2075bd79fc09df67270594794b15ee01f612b045a",
           "operation" : "flash.dayu200",
           "providerAdmissionBlocker" : null,
           "providerId" : "arkforge",
-          "requestFingerprintSha256" : "12a528c240471f169f625edf23beba38ab24a53ed986ccec46a9e95310f478b3",
+          "requestFingerprintSha256" : "69f37104067ebda35e1fc368cb38d4f087c6fa8e10eb26d1d3994c42a9ce12c3",
           "schemaVersion" : "arkdeck.job-plan/1",
           "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
           "steps" : [
@@ -640,7 +640,7 @@
         }
       },
       "name" : "alias.basic",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-basic\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"basic\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-basic\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-basic\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"basic\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-basic\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -666,13 +666,13 @@
         "result" : {
           "authorizationPolicy" : "runtimeCapability",
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "destructive",
           "executionMode" : "planOnly",
           "inputs" : {
             "deviceProfile" : "dayu200",
-            "imageBundleLease" : "lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4",
+            "imageBundleLease" : "lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3",
             "partitionPlan" : [
               "uboot",
               "resource",
@@ -686,11 +686,11 @@
             ]
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "89fd1d8d416ea12494aa6f4c066f3e11b1a935d48e9cefb4a8b75fbb2e9e7f1a",
+          "materializedPlanDigest" : "fcf7eae63006d8e81da3c400d8f165f0e9996810333605e1c596fbec6741799f",
           "operation" : "flash.dayu200",
           "providerAdmissionBlocker" : null,
           "providerId" : "arkforge",
-          "requestFingerprintSha256" : "12fad90d698e73d3f72272be4da3f5fe675b4b83bcef645a7090bb8dfa8b4712",
+          "requestFingerprintSha256" : "5785a8ecf012b2502d2f2fe1d11de99a45f9e480d592283a3c9c2f6f084f2afe",
           "schemaVersion" : "arkdeck.job-plan/1",
           "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
           "steps" : [
@@ -811,7 +811,7 @@
         }
       },
       "name" : "alias.defaultVerification",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-default\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"]},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-default\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-default\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"]},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-default\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -844,7 +844,7 @@
         "ok" : false
       },
       "name" : "alias.reorderedPlan",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-reordered\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"partitionPlan\":[\"userdata\",\"chip_ckm\",\"updater\",\"vendor\",\"system\",\"ramdisk\",\"boot_linux\",\"resource\",\"uboot\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-reordered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-reordered\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"partitionPlan\":[\"userdata\",\"chip_ckm\",\"updater\",\"vendor\",\"system\",\"ramdisk\",\"boot_linux\",\"resource\",\"uboot\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-reordered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -877,7 +877,7 @@
         "ok" : false
       },
       "name" : "alias.shortPlan",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-short\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-short\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-short\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-short\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -910,7 +910,7 @@
         "ok" : false
       },
       "name" : "availability.notRegistered",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-not-registered\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"not-registered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-not-registered\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"not-registered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -943,7 +943,7 @@
         "ok" : false
       },
       "name" : "availability.hardwareGated",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hardware-gated\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"hardware-gated\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hardware-gated\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"hardware-gated\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -976,7 +976,7 @@
         "ok" : false
       },
       "name" : "dispatcher.unavailable",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-dispatcher\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"dispatcher\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-dispatcher\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"dispatcher\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : "ArkForge native RockUSB identity is unavailable: failed(\"ArkForge native RockUSB lane is not configured\")",
         "facts" : {
@@ -1009,7 +1009,7 @@
         "ok" : false
       },
       "name" : "lane.absent",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-lane\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-lane\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-lane\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-lane\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1042,7 +1042,7 @@
         "ok" : false
       },
       "name" : "facts.error",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-error\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-error\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-error\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-error\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1065,7 +1065,7 @@
         "ok" : false
       },
       "name" : "facts.staleRevision",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-stale\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-stale\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-stale\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-stale\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1098,7 +1098,7 @@
         "ok" : false
       },
       "name" : "facts.emptyConnectKey",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-empty-key\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-empty-key\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-empty-key\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-empty-key\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1131,7 +1131,7 @@
         "ok" : false
       },
       "name" : "facts.identityNotDigest",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-identity\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-identity\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-identity\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-identity\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1164,7 +1164,7 @@
         "ok" : false
       },
       "name" : "facts.toolNotDigest",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-tool\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-tool\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-tool\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-tool\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1190,22 +1190,22 @@
         "result" : {
           "authorizationPolicy" : "runtimeCapability",
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "dispatchDisposition" : "notDispatched",
           "effectiveEffect" : "destructive",
           "executionMode" : "planOnly",
           "inputs" : {
-            "artifactLease" : "lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4",
+            "artifactLease" : "lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3",
             "deviceProfileRef" : "dayu200",
             "intent" : "fullRestore",
             "verification" : "full"
           },
           "jobAdmitted" : false,
-          "materializedPlanDigest" : "89fd1d8d416ea12494aa6f4c066f3e11b1a935d48e9cefb4a8b75fbb2e9e7f1a",
+          "materializedPlanDigest" : "fcf7eae63006d8e81da3c400d8f165f0e9996810333605e1c596fbec6741799f",
           "operation" : "flash.full-restore@1",
           "providerAdmissionBlocker" : "flash.crossModeBindingUnprepared: target TGT-83405c84ff74 is not covered by the durable DAYU200 cross-mode binding",
           "providerId" : "arkforge",
-          "requestFingerprintSha256" : "d7f31ef9875cde825cdc30367aa01560b06cf4004bc18290159215b19174f0f5",
+          "requestFingerprintSha256" : "9bfdaf56cf67b0792cc8a0ac541cf7602b5d2311dceb89051c145caa9ca51514",
           "schemaVersion" : "arkdeck.job-plan/1",
           "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
           "steps" : [
@@ -1326,7 +1326,7 @@
         }
       },
       "name" : "facts.crossModeUnprepared",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-cross-mode\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"cross-mode\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-cross-mode\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"cross-mode\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1359,7 +1359,7 @@
         "ok" : false
       },
       "name" : "facts.noAlias",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-alias\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-alias\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-alias\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-alias\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1390,7 +1390,7 @@
         "ok" : false
       },
       "name" : "facts.aliasIdentityMismatch",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-mismatch\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"alias-mismatch\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-mismatch\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"alias-mismatch\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1456,7 +1456,7 @@
         "ok" : false
       },
       "name" : "request.capability",
-      "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-X\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-capability\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"capability\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-X\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-capability\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"capability\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1489,7 +1489,7 @@
         "ok" : false
       },
       "name" : "request.noRevision",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-revision\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-revision\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-revision\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-revision\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1522,7 +1522,7 @@
         "ok" : false
       },
       "name" : "lease.otherTarget",
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-other-target\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-87cb1427-a2e5-4b92-ba91-f04dfbdb81d3:ART-b4199fb5ff0a2105227ce79c751e2c7e\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"other-target\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-other-target\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-b4d63b95-1aab-424e-ad67-69c9efe730b7:ART-9203009a92c0e6e7aa3476a8296af142\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"other-target\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
       "setup" : {
         "dispatchUnavailable" : null,
         "facts" : {
@@ -1546,11 +1546,11 @@
   "inputs" : [
     {
       "mode" : "600",
-      "path" : ".imports-v1/identities/imp-87cb1427-a2e5-4b92-ba91-f04dfbdb81d3.json"
+      "path" : ".imports-v1/identities/imp-2f8a673f-e23d-46c4-900c-f0b7703a0958.json"
     },
     {
       "mode" : "600",
-      "path" : ".imports-v1/identities/imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166.json"
+      "path" : ".imports-v1/identities/imp-b4d63b95-1aab-424e-ad67-69c9efe730b7.json"
     },
     {
       "mode" : "600",
@@ -1562,27 +1562,27 @@
     },
     {
       "mode" : "400",
-      "path" : "imp-87cb1427-a2e5-4b92-ba91-f04dfbdb81d3/.payload-verification-v1.json"
+      "path" : "imp-2f8a673f-e23d-46c4-900c-f0b7703a0958/.payload-verification-v1.json"
     },
     {
       "mode" : "400",
-      "path" : "imp-87cb1427-a2e5-4b92-ba91-f04dfbdb81d3/ART-b4199fb5ff0a2105227ce79c751e2c7e"
+      "path" : "imp-2f8a673f-e23d-46c4-900c-f0b7703a0958/ART-cb0055510a6e851728044f19ae2d72d3"
     },
     {
       "mode" : "600",
-      "path" : "imp-87cb1427-a2e5-4b92-ba91-f04dfbdb81d3/index.json"
+      "path" : "imp-2f8a673f-e23d-46c4-900c-f0b7703a0958/index.json"
     },
     {
       "mode" : "400",
-      "path" : "imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166/.payload-verification-v1.json"
+      "path" : "imp-b4d63b95-1aab-424e-ad67-69c9efe730b7/.payload-verification-v1.json"
     },
     {
       "mode" : "400",
-      "path" : "imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166/ART-bd713264282e6c647f88c6d7f95984a4"
+      "path" : "imp-b4d63b95-1aab-424e-ad67-69c9efe730b7/ART-9203009a92c0e6e7aa3476a8296af142"
     },
     {
       "mode" : "600",
-      "path" : "imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166/index.json"
+      "path" : "imp-b4d63b95-1aab-424e-ad67-69c9efe730b7/index.json"
     },
     {
       "mode" : "600",
@@ -1601,6 +1601,6 @@
       "path" : "../targets/targets.json"
     }
   ],
-  "lease" : "lease-v1:imp-dc8474c2-4eea-4cbb-ab8a-9e68e37cf166:ART-bd713264282e6c647f88c6d7f95984a4",
+  "lease" : "lease-v1:imp-2f8a673f-e23d-46c4-900c-f0b7703a0958:ART-cb0055510a6e851728044f19ae2d72d3",
   "targetId" : "TGT-83405c84ff74"
 }

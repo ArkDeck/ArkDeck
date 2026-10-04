@@ -1,9 +1,9 @@
 {
   "documents" : {
-    "blocked" : "debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd",
-    "exhausted" : "debug-3ade2450-d368-46da-9349-119270ac9e1c",
-    "interrupted" : "debug-d8f03948-39cc-4e0f-8c4e-a5727d246893",
-    "succeeded" : "debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23"
+    "blocked" : "debug-9181addd-f6b5-4aba-b807-4f8e92adde63",
+    "exhausted" : "debug-4c257269-a30d-40a8-b1bc-665d5844febc",
+    "interrupted" : "debug-ed5b848f-0708-4309-8a1c-69e61076b0fe",
+    "succeeded" : "debug-bed3bf62-24b8-4a11-b4fe-b7d6c5926978"
   },
   "exchanges" : [
     {
@@ -19,7 +19,7 @@
       "name" : "start.params.extra",
       "params" : {
         "extra" : true,
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -155,7 +155,7 @@
       "method" : "debug.start",
       "name" : "start.seed.duplicate",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"},\"requestId\":\"again\"}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"},\"requestId\":\"again\"}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -189,7 +189,7 @@
       "method" : "debug.start",
       "name" : "start.seed.governance",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"},\"trustedFacts\":{}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"},\"trustedFacts\":{}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -223,7 +223,7 @@
       "method" : "debug.start",
       "name" : "start.seed.authorization",
       "params" : {
-        "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-X\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-X\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -257,7 +257,7 @@
       "method" : "debug.start",
       "name" : "start.seed.client",
       "params" : {
-        "requestJson" : "{\"clientContext\":{\"clientName\":\"ArkDeckApp.FlashWorkspace\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"clientContext\":{\"clientName\":\"ArkDeckApp.FlashWorkspace\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -291,7 +291,7 @@
       "method" : "debug.start",
       "name" : "start.plan.unknownOperation",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.nothing\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.nothing\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -325,7 +325,7 @@
       "method" : "debug.start",
       "name" : "start.plan.hardwareGated",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -359,7 +359,7 @@
       "method" : "debug.start",
       "name" : "start.plan.aliasNotConvertible",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-reordered\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"partitionPlan\":[\"userdata\",\"chip_ckm\",\"updater\",\"vendor\",\"system\",\"ramdisk\",\"boot_linux\",\"resource\",\"uboot\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-reordered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-reordered\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"partitionPlan\":[\"userdata\",\"chip_ckm\",\"updater\",\"vendor\",\"system\",\"ramdisk\",\"boot_linux\",\"resource\",\"uboot\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-reordered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -393,7 +393,7 @@
       "method" : "debug.start",
       "name" : "start.plan.noRevision",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-no-revision\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-no-revision\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-no-revision\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-no-revision\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -453,7 +453,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:00Z",
           "destructiveEpochsUsed" : 0,
@@ -464,7 +464,7 @@
           "invocationID" : "<invocation-1>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "0439c5b16febd87ae03262f510723b79e98bc102a160edc8cb46fe98f1801f17",
+          "seedRequestFingerprintSHA256" : "b79140fb459b2cc3341db45c3f413f5387d4fac0771012f0be121fb2fcdcecaf",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -472,7 +472,7 @@
       "method" : "debug.start",
       "name" : "start.canonical",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -498,7 +498,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:05Z",
           "destructiveEpochsUsed" : 0,
@@ -509,7 +509,7 @@
           "invocationID" : "<invocation-2>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.dayu200",
-          "seedRequestFingerprintSHA256" : "c4a67e6ffe3dffcaac6dd55dbf0f77ec518b43a558a861b31e6d8ab7a1cd6452",
+          "seedRequestFingerprintSHA256" : "cd91a2ee69c8afa9d60c483b83a96490de5dfda3234c6e72781475eea31a05a0",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -517,7 +517,7 @@
       "method" : "debug.start",
       "name" : "start.alias",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-b\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-b\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-b\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-b\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -543,7 +543,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:10Z",
           "destructiveEpochsUsed" : 0,
@@ -554,7 +554,7 @@
           "invocationID" : "<invocation-3>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "25c5f60a2509bb373aaaedd16c5030de922af4a6cacd6337f87c2a95e4ea4ef8",
+          "seedRequestFingerprintSHA256" : "9e7875d9b885bafb00d59353228ec21b80a08daad99d91db8e4b9e5e844bc9f9",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -562,7 +562,7 @@
       "method" : "debug.start",
       "name" : "start.expiring",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-c\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-c\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-c\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-c\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -588,7 +588,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:15Z",
           "destructiveEpochsUsed" : 0,
@@ -599,7 +599,7 @@
           "invocationID" : "<invocation-4>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "efb3c53cc044f1565b3159335806221319aed4e22022c2911bb701331076a409",
+          "seedRequestFingerprintSHA256" : "123d22bed2065a3f5a12b445249c9ce15128639cd9b4f2dde993104afae6ae41",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -607,7 +607,7 @@
       "method" : "debug.start",
       "name" : "start.executing",
       "params" : {
-        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-d\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-d\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-d\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-d\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -1667,7 +1667,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:00Z",
           "destructiveEpochsUsed" : 0,
@@ -1683,7 +1683,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -1695,7 +1695,7 @@
           "invocationID" : "<invocation-1>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "0439c5b16febd87ae03262f510723b79e98bc102a160edc8cb46fe98f1801f17",
+          "seedRequestFingerprintSHA256" : "b79140fb459b2cc3341db45c3f413f5387d4fac0771012f0be121fb2fcdcecaf",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -1732,7 +1732,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:00Z",
           "destructiveEpochsUsed" : 0,
@@ -1748,7 +1748,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -1766,7 +1766,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -1778,7 +1778,7 @@
           "invocationID" : "<invocation-1>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "0439c5b16febd87ae03262f510723b79e98bc102a160edc8cb46fe98f1801f17",
+          "seedRequestFingerprintSHA256" : "b79140fb459b2cc3341db45c3f413f5387d4fac0771012f0be121fb2fcdcecaf",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -1879,7 +1879,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:05Z",
           "destructiveEpochsUsed" : 0,
@@ -1895,7 +1895,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -1907,7 +1907,7 @@
           "invocationID" : "<invocation-2>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.dayu200",
-          "seedRequestFingerprintSHA256" : "c4a67e6ffe3dffcaac6dd55dbf0f77ec518b43a558a861b31e6d8ab7a1cd6452",
+          "seedRequestFingerprintSHA256" : "cd91a2ee69c8afa9d60c483b83a96490de5dfda3234c6e72781475eea31a05a0",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -1944,7 +1944,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:00Z",
           "destructiveEpochsUsed" : 0,
@@ -1960,7 +1960,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -1978,7 +1978,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -2000,7 +2000,7 @@
           "invocationID" : "<invocation-1>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "0439c5b16febd87ae03262f510723b79e98bc102a160edc8cb46fe98f1801f17",
+          "seedRequestFingerprintSHA256" : "b79140fb459b2cc3341db45c3f413f5387d4fac0771012f0be121fb2fcdcecaf",
           "state" : "stopped",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2195,7 +2195,7 @@
       "params" : {
         "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
         "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
-        "invocationId" : "debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd",
+        "invocationId" : "debug-9181addd-f6b5-4aba-b807-4f8e92adde63",
         "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
       },
       "setup" : {
@@ -2232,7 +2232,7 @@
       "params" : {
         "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
         "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
-        "invocationId" : "debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23",
+        "invocationId" : "debug-bed3bf62-24b8-4a11-b4fe-b7d6c5926978",
         "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
       },
       "setup" : {
@@ -2269,7 +2269,7 @@
       "params" : {
         "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
         "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
-        "invocationId" : "debug-3ade2450-d368-46da-9349-119270ac9e1c",
+        "invocationId" : "debug-4c257269-a30d-40a8-b1bc-665d5844febc",
         "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
       },
       "setup" : {
@@ -2306,7 +2306,7 @@
       "params" : {
         "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
         "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
-        "invocationId" : "debug-d8f03948-39cc-4e0f-8c4e-a5727d246893",
+        "invocationId" : "debug-ed5b848f-0708-4309-8a1c-69e61076b0fe",
         "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000009"
       },
       "setup" : {
@@ -2343,7 +2343,7 @@
       "params" : {
         "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
         "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
-        "invocationId" : "debug-d8f03948-39cc-4e0f-8c4e-a5727d246893",
+        "invocationId" : "debug-ed5b848f-0708-4309-8a1c-69e61076b0fe",
         "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
       },
       "setup" : {
@@ -2370,7 +2370,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:00Z",
           "destructiveEpochsUsed" : 0,
@@ -2386,7 +2386,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -2404,7 +2404,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -2426,7 +2426,7 @@
           "invocationID" : "<invocation-1>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "0439c5b16febd87ae03262f510723b79e98bc102a160edc8cb46fe98f1801f17",
+          "seedRequestFingerprintSHA256" : "b79140fb459b2cc3341db45c3f413f5387d4fac0771012f0be121fb2fcdcecaf",
           "state" : "stopped",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2460,7 +2460,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:05Z",
           "destructiveEpochsUsed" : 0,
@@ -2476,7 +2476,7 @@
               "observation" : {
                 "bindingRevision" : 1,
                 "dispatchDisposition" : "notDispatched",
-                "materializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+                "materializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
                 "observationID" : "pinnedRequest",
                 "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
                 "targetID" : "TGT-83405c84ff74"
@@ -2488,7 +2488,7 @@
           "invocationID" : "<invocation-2>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.dayu200",
-          "seedRequestFingerprintSHA256" : "c4a67e6ffe3dffcaac6dd55dbf0f77ec518b43a558a861b31e6d8ab7a1cd6452",
+          "seedRequestFingerprintSHA256" : "cd91a2ee69c8afa9d60c483b83a96490de5dfda3234c6e72781475eea31a05a0",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2522,7 +2522,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:10Z",
           "destructiveEpochsUsed" : 0,
@@ -2533,7 +2533,7 @@
           "invocationID" : "<invocation-3>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "25c5f60a2509bb373aaaedd16c5030de922af4a6cacd6337f87c2a95e4ea4ef8",
+          "seedRequestFingerprintSHA256" : "9e7875d9b885bafb00d59353228ec21b80a08daad99d91db8e4b9e5e844bc9f9",
           "state" : "expired",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2567,7 +2567,7 @@
       "answer" : {
         "ok" : true,
         "result" : {
-          "baselineMaterializedPlanDigest" : "382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286",
+          "baselineMaterializedPlanDigest" : "e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b",
           "bindingRevision" : 1,
           "createdAtUTC" : "2026-09-25T00:00:15Z",
           "destructiveEpochsUsed" : 0,
@@ -2578,7 +2578,7 @@
           "invocationID" : "<invocation-4>",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "efb3c53cc044f1565b3159335806221319aed4e22022c2911bb701331076a409",
+          "seedRequestFingerprintSHA256" : "123d22bed2065a3f5a12b445249c9ce15128639cd9b4f2dde993104afae6ae41",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2626,18 +2626,18 @@
               "detail" : "oracle driver outcome failedKnown",
               "disposition" : "blockedKnownFailure",
               "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
-              "idempotencyKey" : "runtime-debug-bba42d19bbfd-e1-2d2b943b3079",
+              "idempotencyKey" : "runtime-debug-4f8e92adde63-e1-2d2b943b3079",
               "jobID" : "job-oracle-1",
               "ordinal" : 1,
               "outcome" : "failedKnown",
-              "requestID" : "debug-bba42d19bbfd-e1"
+              "requestID" : "debug-4f8e92adde63-e1"
             }
           ],
           "expiresAtUTC" : "2026-09-25T03:00:00Z",
-          "invocationID" : "debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd",
+          "invocationID" : "debug-9181addd-f6b5-4aba-b807-4f8e92adde63",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f",
+          "seedRequestFingerprintSHA256" : "4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87",
           "state" : "blocked",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2645,7 +2645,7 @@
       "method" : "debug.status",
       "name" : "status.blocked",
       "params" : {
-        "invocationId" : "debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd"
+        "invocationId" : "debug-9181addd-f6b5-4aba-b807-4f8e92adde63"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -2685,11 +2685,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e1-2d2b943b3079",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e1-2d2b943b3079",
               "jobID" : "job-oracle-3",
               "ordinal" : 1,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e1"
+              "requestID" : "debug-665d5844febc-e1"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2700,11 +2700,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:02:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e2-df8a51a73b18",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e2-df8a51a73b18",
               "jobID" : "job-oracle-4",
               "ordinal" : 2,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e2"
+              "requestID" : "debug-665d5844febc-e2"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2715,11 +2715,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:03:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e3-c87418821e00",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e3-c87418821e00",
               "jobID" : "job-oracle-5",
               "ordinal" : 3,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e3"
+              "requestID" : "debug-665d5844febc-e3"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2730,11 +2730,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:04:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e4-4a38125fbc75",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e4-4a38125fbc75",
               "jobID" : "job-oracle-6",
               "ordinal" : 4,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e4"
+              "requestID" : "debug-665d5844febc-e4"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2745,11 +2745,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:05:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e5-41640eeb9c39",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e5-41640eeb9c39",
               "jobID" : "job-oracle-7",
               "ordinal" : 5,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e5"
+              "requestID" : "debug-665d5844febc-e5"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2760,11 +2760,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:06:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e6-1c53991cf88a",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e6-1c53991cf88a",
               "jobID" : "job-oracle-8",
               "ordinal" : 6,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e6"
+              "requestID" : "debug-665d5844febc-e6"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2775,11 +2775,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:07:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e7-81de1ffd7a71",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e7-81de1ffd7a71",
               "jobID" : "job-oracle-9",
               "ordinal" : 7,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e7"
+              "requestID" : "debug-665d5844febc-e7"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2790,11 +2790,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:08:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e8-4184e39a8c9c",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e8-4184e39a8c9c",
               "jobID" : "job-oracle-10",
               "ordinal" : 8,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e8"
+              "requestID" : "debug-665d5844febc-e8"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2805,11 +2805,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:09:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e9-27c2690c75b0",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e9-27c2690c75b0",
               "jobID" : "job-oracle-11",
               "ordinal" : 9,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e9"
+              "requestID" : "debug-665d5844febc-e9"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2820,11 +2820,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:10:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e10-531ff0f59f67",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e10-531ff0f59f67",
               "jobID" : "job-oracle-12",
               "ordinal" : 10,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e10"
+              "requestID" : "debug-665d5844febc-e10"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2835,11 +2835,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:11:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e11-795730c8f5f5",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e11-795730c8f5f5",
               "jobID" : "job-oracle-13",
               "ordinal" : 11,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e11"
+              "requestID" : "debug-665d5844febc-e11"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2850,11 +2850,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:12:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e12-0b727990a30e",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e12-0b727990a30e",
               "jobID" : "job-oracle-14",
               "ordinal" : 12,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e12"
+              "requestID" : "debug-665d5844febc-e12"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2865,11 +2865,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:13:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e13-21e6752852ca",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e13-21e6752852ca",
               "jobID" : "job-oracle-15",
               "ordinal" : 13,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e13"
+              "requestID" : "debug-665d5844febc-e13"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2880,11 +2880,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:14:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e14-c3507539c7d5",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e14-c3507539c7d5",
               "jobID" : "job-oracle-16",
               "ordinal" : 14,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e14"
+              "requestID" : "debug-665d5844febc-e14"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2895,11 +2895,11 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:15:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e15-4cf563283496",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e15-4cf563283496",
               "jobID" : "job-oracle-17",
               "ordinal" : 15,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e15"
+              "requestID" : "debug-665d5844febc-e15"
             },
             {
               "candidateAction" : "executePinnedRequest",
@@ -2910,18 +2910,18 @@
               "detail" : "oracle driver outcome safeToReflash",
               "disposition" : "nextCandidateAllowed",
               "evaluatedAtUTC" : "2026-09-24T23:16:00Z",
-              "idempotencyKey" : "runtime-debug-119270ac9e1c-e16-1a65c61a3058",
+              "idempotencyKey" : "runtime-debug-665d5844febc-e16-1a65c61a3058",
               "jobID" : "job-oracle-18",
               "ordinal" : 16,
               "outcome" : "safeToReflash",
-              "requestID" : "debug-119270ac9e1c-e16"
+              "requestID" : "debug-665d5844febc-e16"
             }
           ],
           "expiresAtUTC" : "2026-09-25T03:00:00Z",
-          "invocationID" : "debug-3ade2450-d368-46da-9349-119270ac9e1c",
+          "invocationID" : "debug-4c257269-a30d-40a8-b1bc-665d5844febc",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f",
+          "seedRequestFingerprintSHA256" : "4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2929,7 +2929,7 @@
       "method" : "debug.status",
       "name" : "status.exhausted",
       "params" : {
-        "invocationId" : "debug-3ade2450-d368-46da-9349-119270ac9e1c"
+        "invocationId" : "debug-4c257269-a30d-40a8-b1bc-665d5844febc"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -2969,16 +2969,16 @@
               "detail" : "Runtime attempt durably prepared",
               "disposition" : "executing",
               "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
-              "idempotencyKey" : "runtime-debug-a5727d246893-e1-2d2b943b3079",
+              "idempotencyKey" : "runtime-debug-69e61076b0fe-e1-2d2b943b3079",
               "ordinal" : 1,
-              "requestID" : "debug-a5727d246893-e1"
+              "requestID" : "debug-69e61076b0fe-e1"
             }
           ],
           "expiresAtUTC" : "2026-09-25T03:00:00Z",
-          "invocationID" : "debug-d8f03948-39cc-4e0f-8c4e-a5727d246893",
+          "invocationID" : "debug-ed5b848f-0708-4309-8a1c-69e61076b0fe",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f",
+          "seedRequestFingerprintSHA256" : "4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87",
           "state" : "active",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -2986,7 +2986,7 @@
       "method" : "debug.status",
       "name" : "status.interrupted",
       "params" : {
-        "invocationId" : "debug-d8f03948-39cc-4e0f-8c4e-a5727d246893"
+        "invocationId" : "debug-ed5b848f-0708-4309-8a1c-69e61076b0fe"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -3026,18 +3026,18 @@
               "detail" : "oracle driver outcome succeeded",
               "disposition" : "succeeded",
               "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
-              "idempotencyKey" : "runtime-debug-5059b8fe7d23-e1-2d2b943b3079",
+              "idempotencyKey" : "runtime-debug-b7d6c5926978-e1-2d2b943b3079",
               "jobID" : "job-oracle-2",
               "ordinal" : 1,
               "outcome" : "succeeded",
-              "requestID" : "debug-5059b8fe7d23-e1"
+              "requestID" : "debug-b7d6c5926978-e1"
             }
           ],
           "expiresAtUTC" : "2026-09-25T03:00:00Z",
-          "invocationID" : "debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23",
+          "invocationID" : "debug-bed3bf62-24b8-4a11-b4fe-b7d6c5926978",
           "maximumDestructiveEpochs" : 16,
           "operationReference" : "flash.full-restore@1",
-          "seedRequestFingerprintSHA256" : "4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f",
+          "seedRequestFingerprintSHA256" : "4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87",
           "state" : "succeeded",
           "targetID" : "TGT-83405c84ff74"
         }
@@ -3045,7 +3045,7 @@
       "method" : "debug.status",
       "name" : "status.succeeded",
       "params" : {
-        "invocationId" : "debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23"
+        "invocationId" : "debug-bed3bf62-24b8-4a11-b4fe-b7d6c5926978"
       },
       "setup" : {
         "dispatchUnavailable" : null,
@@ -3071,7 +3071,7 @@
   "inputs" : [
     {
       "mode" : "600",
-      "path" : "artifacts/.imports-v1/identities/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb.json"
+      "path" : "artifacts/.imports-v1/identities/imp-0df9138e-8dac-4e73-bfe2-6f746c52675b.json"
     },
     {
       "mode" : "600",
@@ -3079,15 +3079,15 @@
     },
     {
       "mode" : "400",
-      "path" : "artifacts/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb/.payload-verification-v1.json"
+      "path" : "artifacts/imp-0df9138e-8dac-4e73-bfe2-6f746c52675b/.payload-verification-v1.json"
     },
     {
       "mode" : "400",
-      "path" : "artifacts/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb/ART-6c4614c81b2ed07d84f0b3106d7e461f"
+      "path" : "artifacts/imp-0df9138e-8dac-4e73-bfe2-6f746c52675b/ART-c92b734732074617de0394c915739aa9"
     },
     {
       "mode" : "600",
-      "path" : "artifacts/imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb/index.json"
+      "path" : "artifacts/imp-0df9138e-8dac-4e73-bfe2-6f746c52675b/index.json"
     },
     {
       "mode" : "600",
@@ -3107,62 +3107,62 @@
     },
     {
       "mode" : "600",
-      "path" : "runtime-debug-invocations/debug-3ade2450-d368-46da-9349-119270ac9e1c.json"
+      "path" : "runtime-debug-invocations/debug-4c257269-a30d-40a8-b1bc-665d5844febc.json"
     },
     {
       "mode" : "600",
-      "path" : "runtime-debug-invocations/debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd.json"
+      "path" : "runtime-debug-invocations/debug-9181addd-f6b5-4aba-b807-4f8e92adde63.json"
     },
     {
       "mode" : "600",
-      "path" : "runtime-debug-invocations/debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23.json"
+      "path" : "runtime-debug-invocations/debug-bed3bf62-24b8-4a11-b4fe-b7d6c5926978.json"
     },
     {
       "mode" : "600",
-      "path" : "runtime-debug-invocations/debug-d8f03948-39cc-4e0f-8c4e-a5727d246893.json"
+      "path" : "runtime-debug-invocations/debug-ed5b848f-0708-4309-8a1c-69e61076b0fe.json"
     }
   ],
-  "lease" : "lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f",
+  "lease" : "lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9",
   "left" : [
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286\",\"createdAtUTC\":\"2026-09-25T00:00:00Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:10:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":1},{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000066\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000002\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:11:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":2},{\"candidateAction\":\"stop\",\"candidateActionSHA256\":\"39093484c035f0eb6f46493daabcd2ac754dd751033e76db05536b18f007ce63\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000067\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000003\",\"detail\":\"operator.cancelled\",\"disposition\":\"stopped\",\"evaluatedAtUTC\":\"2026-09-25T00:30:00Z\",\"ordinal\":3}],\"expiresAtUTC\":\"2026-09-25T04:00:00Z\",\"invocationID\":\"<invocation-1>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"0439c5b16febd87ae03262f510723b79e98bc102a160edc8cb46fe98f1801f17\",\"state\":\"stopped\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b\",\"createdAtUTC\":\"2026-09-25T00:00:00Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:10:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":1},{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000066\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000002\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:11:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":2},{\"candidateAction\":\"stop\",\"candidateActionSHA256\":\"39093484c035f0eb6f46493daabcd2ac754dd751033e76db05536b18f007ce63\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000067\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000003\",\"detail\":\"operator.cancelled\",\"disposition\":\"stopped\",\"evaluatedAtUTC\":\"2026-09-25T00:30:00Z\",\"ordinal\":3}],\"expiresAtUTC\":\"2026-09-25T04:00:00Z\",\"invocationID\":\"<invocation-1>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"b79140fb459b2cc3341db45c3f413f5387d4fac0771012f0be121fb2fcdcecaf\",\"state\":\"stopped\"}",
       "mode" : "600",
       "path" : "<invocation-1>.json"
     },
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286\",\"createdAtUTC\":\"2026-09-25T00:00:05Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:13:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":1}],\"expiresAtUTC\":\"2026-09-25T04:00:05Z\",\"invocationID\":\"<invocation-2>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-b\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-b\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"c4a67e6ffe3dffcaac6dd55dbf0f77ec518b43a558a861b31e6d8ab7a1cd6452\",\"state\":\"active\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b\",\"createdAtUTC\":\"2026-09-25T00:00:05Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:13:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":1}],\"expiresAtUTC\":\"2026-09-25T04:00:05Z\",\"invocationID\":\"<invocation-2>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-b\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-b\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"cd91a2ee69c8afa9d60c483b83a96490de5dfda3234c6e72781475eea31a05a0\",\"state\":\"active\"}",
       "mode" : "600",
       "path" : "<invocation-2>.json"
     },
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286\",\"createdAtUTC\":\"2026-09-25T00:00:10Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[],\"expiresAtUTC\":\"2026-09-25T04:00:10Z\",\"invocationID\":\"<invocation-3>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-c\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-c\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"25c5f60a2509bb373aaaedd16c5030de922af4a6cacd6337f87c2a95e4ea4ef8\",\"state\":\"expired\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b\",\"createdAtUTC\":\"2026-09-25T00:00:10Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[],\"expiresAtUTC\":\"2026-09-25T04:00:10Z\",\"invocationID\":\"<invocation-3>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-c\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-c\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"9e7875d9b885bafb00d59353228ec21b80a08daad99d91db8e4b9e5e844bc9f9\",\"state\":\"expired\"}",
       "mode" : "600",
       "path" : "<invocation-3>.json"
     },
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"382e2e85ca795fa5b9f51b55f41e3dcaec0abdc03cc768667fb48e646652d286\",\"createdAtUTC\":\"2026-09-25T00:00:15Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[],\"expiresAtUTC\":\"2026-09-25T04:00:15Z\",\"invocationID\":\"<invocation-4>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-d\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-d\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"efb3c53cc044f1565b3159335806221319aed4e22022c2911bb701331076a409\",\"state\":\"active\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"e07938fe93dae984c79a363284c47a5a4b0b2c2d51ad87b35c9fb3b515d41d3b\",\"createdAtUTC\":\"2026-09-25T00:00:15Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[],\"expiresAtUTC\":\"2026-09-25T04:00:15Z\",\"invocationID\":\"<invocation-4>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-d\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-d\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"123d22bed2065a3f5a12b445249c9ce15128639cd9b4f2dde993104afae6ae41\",\"state\":\"active\"}",
       "mode" : "600",
       "path" : "<invocation-4>.json"
     },
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":16,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e1-2d2b943b3079\",\"jobID\":\"job-oracle-3\",\"ordinal\":1,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e1\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000066\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000002\",\"destructiveEpoch\":2,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:02:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e2-df8a51a73b18\",\"jobID\":\"job-oracle-4\",\"ordinal\":2,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e2\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000067\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000003\",\"destructiveEpoch\":3,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:03:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e3-c87418821e00\",\"jobID\":\"job-oracle-5\",\"ordinal\":3,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e3\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000068\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000004\",\"destructiveEpoch\":4,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:04:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e4-4a38125fbc75\",\"jobID\":\"job-oracle-6\",\"ordinal\":4,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e4\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000069\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000005\",\"destructiveEpoch\":5,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:05:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e5-41640eeb9c39\",\"jobID\":\"job-oracle-7\",\"ordinal\":5,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e5\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006a\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000006\",\"destructiveEpoch\":6,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:06:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e6-1c53991cf88a\",\"jobID\":\"job-oracle-8\",\"ordinal\":6,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e6\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006b\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000007\",\"destructiveEpoch\":7,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:07:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e7-81de1ffd7a71\",\"jobID\":\"job-oracle-9\",\"ordinal\":7,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e7\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006c\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000008\",\"destructiveEpoch\":8,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:08:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e8-4184e39a8c9c\",\"jobID\":\"job-oracle-10\",\"ordinal\":8,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e8\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006d\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000009\",\"destructiveEpoch\":9,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:09:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e9-27c2690c75b0\",\"jobID\":\"job-oracle-11\",\"ordinal\":9,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e9\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006e\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000a\",\"destructiveEpoch\":10,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:10:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e10-531ff0f59f67\",\"jobID\":\"job-oracle-12\",\"ordinal\":10,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e10\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006f\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000b\",\"destructiveEpoch\":11,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:11:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e11-795730c8f5f5\",\"jobID\":\"job-oracle-13\",\"ordinal\":11,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e11\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000070\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000c\",\"destructiveEpoch\":12,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:12:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e12-0b727990a30e\",\"jobID\":\"job-oracle-14\",\"ordinal\":12,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e12\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000071\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000d\",\"destructiveEpoch\":13,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:13:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e13-21e6752852ca\",\"jobID\":\"job-oracle-15\",\"ordinal\":13,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e13\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000072\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000e\",\"destructiveEpoch\":14,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:14:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e14-c3507539c7d5\",\"jobID\":\"job-oracle-16\",\"ordinal\":14,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e14\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000073\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000f\",\"destructiveEpoch\":15,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:15:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e15-4cf563283496\",\"jobID\":\"job-oracle-17\",\"ordinal\":15,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e15\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000074\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000010\",\"destructiveEpoch\":16,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:16:00Z\",\"idempotencyKey\":\"runtime-debug-119270ac9e1c-e16-1a65c61a3058\",\"jobID\":\"job-oracle-18\",\"ordinal\":16,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-119270ac9e1c-e16\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-3ade2450-d368-46da-9349-119270ac9e1c\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f\",\"state\":\"active\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":16,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e1-2d2b943b3079\",\"jobID\":\"job-oracle-3\",\"ordinal\":1,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e1\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000066\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000002\",\"destructiveEpoch\":2,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:02:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e2-df8a51a73b18\",\"jobID\":\"job-oracle-4\",\"ordinal\":2,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e2\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000067\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000003\",\"destructiveEpoch\":3,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:03:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e3-c87418821e00\",\"jobID\":\"job-oracle-5\",\"ordinal\":3,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e3\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000068\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000004\",\"destructiveEpoch\":4,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:04:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e4-4a38125fbc75\",\"jobID\":\"job-oracle-6\",\"ordinal\":4,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e4\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000069\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000005\",\"destructiveEpoch\":5,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:05:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e5-41640eeb9c39\",\"jobID\":\"job-oracle-7\",\"ordinal\":5,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e5\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006a\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000006\",\"destructiveEpoch\":6,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:06:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e6-1c53991cf88a\",\"jobID\":\"job-oracle-8\",\"ordinal\":6,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e6\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006b\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000007\",\"destructiveEpoch\":7,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:07:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e7-81de1ffd7a71\",\"jobID\":\"job-oracle-9\",\"ordinal\":7,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e7\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006c\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000008\",\"destructiveEpoch\":8,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:08:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e8-4184e39a8c9c\",\"jobID\":\"job-oracle-10\",\"ordinal\":8,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e8\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006d\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000009\",\"destructiveEpoch\":9,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:09:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e9-27c2690c75b0\",\"jobID\":\"job-oracle-11\",\"ordinal\":9,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e9\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006e\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000a\",\"destructiveEpoch\":10,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:10:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e10-531ff0f59f67\",\"jobID\":\"job-oracle-12\",\"ordinal\":10,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e10\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006f\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000b\",\"destructiveEpoch\":11,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:11:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e11-795730c8f5f5\",\"jobID\":\"job-oracle-13\",\"ordinal\":11,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e11\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000070\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000c\",\"destructiveEpoch\":12,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:12:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e12-0b727990a30e\",\"jobID\":\"job-oracle-14\",\"ordinal\":12,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e12\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000071\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000d\",\"destructiveEpoch\":13,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:13:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e13-21e6752852ca\",\"jobID\":\"job-oracle-15\",\"ordinal\":13,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e13\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000072\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000e\",\"destructiveEpoch\":14,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:14:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e14-c3507539c7d5\",\"jobID\":\"job-oracle-16\",\"ordinal\":14,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e14\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000073\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000f\",\"destructiveEpoch\":15,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:15:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e15-4cf563283496\",\"jobID\":\"job-oracle-17\",\"ordinal\":15,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e15\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000074\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000010\",\"destructiveEpoch\":16,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:16:00Z\",\"idempotencyKey\":\"runtime-debug-665d5844febc-e16-1a65c61a3058\",\"jobID\":\"job-oracle-18\",\"ordinal\":16,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-665d5844febc-e16\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-4c257269-a30d-40a8-b1bc-665d5844febc\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87\",\"state\":\"active\"}",
       "mode" : "600",
-      "path" : "debug-3ade2450-d368-46da-9349-119270ac9e1c.json"
+      "path" : "debug-4c257269-a30d-40a8-b1bc-665d5844febc.json"
     },
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome failedKnown\",\"disposition\":\"blockedKnownFailure\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-bba42d19bbfd-e1-2d2b943b3079\",\"jobID\":\"job-oracle-1\",\"ordinal\":1,\"outcome\":\"failedKnown\",\"requestID\":\"debug-bba42d19bbfd-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f\",\"state\":\"blocked\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome failedKnown\",\"disposition\":\"blockedKnownFailure\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-4f8e92adde63-e1-2d2b943b3079\",\"jobID\":\"job-oracle-1\",\"ordinal\":1,\"outcome\":\"failedKnown\",\"requestID\":\"debug-4f8e92adde63-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-9181addd-f6b5-4aba-b807-4f8e92adde63\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87\",\"state\":\"blocked\"}",
       "mode" : "600",
-      "path" : "debug-76f72bb3-22bd-47c3-8683-bba42d19bbfd.json"
+      "path" : "debug-9181addd-f6b5-4aba-b807-4f8e92adde63.json"
     },
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome succeeded\",\"disposition\":\"succeeded\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-5059b8fe7d23-e1-2d2b943b3079\",\"jobID\":\"job-oracle-2\",\"ordinal\":1,\"outcome\":\"succeeded\",\"requestID\":\"debug-5059b8fe7d23-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f\",\"state\":\"succeeded\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome succeeded\",\"disposition\":\"succeeded\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-b7d6c5926978-e1-2d2b943b3079\",\"jobID\":\"job-oracle-2\",\"ordinal\":1,\"outcome\":\"succeeded\",\"requestID\":\"debug-b7d6c5926978-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-bed3bf62-24b8-4a11-b4fe-b7d6c5926978\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87\",\"state\":\"succeeded\"}",
       "mode" : "600",
-      "path" : "debug-c0c32e50-6737-44cd-bb37-5059b8fe7d23.json"
+      "path" : "debug-bed3bf62-24b8-4a11-b4fe-b7d6c5926978.json"
     },
     {
-      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"Runtime attempt durably prepared\",\"disposition\":\"executing\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-a5727d246893-e1-2d2b943b3079\",\"ordinal\":1,\"requestID\":\"debug-a5727d246893-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-d8f03948-39cc-4e0f-8c4e-a5727d246893\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-6a1d8549-6fa8-4cb2-af97-60e4eb32e1bb:ART-6c4614c81b2ed07d84f0b3106d7e461f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4ef09eb3bae9b9be31ff03a63673938c8c5cd675b7cc0c87ff46128308767f9f\",\"state\":\"active\"}",
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"Runtime attempt durably prepared\",\"disposition\":\"executing\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-69e61076b0fe-e1-2d2b943b3079\",\"ordinal\":1,\"requestID\":\"debug-69e61076b0fe-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-ed5b848f-0708-4309-8a1c-69e61076b0fe\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-0df9138e-8dac-4e73-bfe2-6f746c52675b:ART-c92b734732074617de0394c915739aa9\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"4b8692f22814111f525fe88b35dbb9f156b6e2d673ace35c313da591107f9d87\",\"state\":\"active\"}",
       "mode" : "600",
-      "path" : "debug-d8f03948-39cc-4e0f-8c4e-a5727d246893.json"
+      "path" : "debug-ed5b848f-0708-4309-8a1c-69e61076b0fe.json"
     }
   ],
   "targetId" : "TGT-83405c84ff74"

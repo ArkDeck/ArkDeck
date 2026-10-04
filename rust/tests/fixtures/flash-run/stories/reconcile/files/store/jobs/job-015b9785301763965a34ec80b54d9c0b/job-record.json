@@ -5,12 +5,12 @@
   ],
   "admissionEvidence" : {
     "admittedAtUTC" : "2026-09-25T00:00:00Z",
-    "consumptionFingerprintSHA256" : "8a47cbdbf4b18cc425e3b4da0c9a613cdd4c90324952b93682f425792fff2cc4",
+    "consumptionFingerprintSHA256" : "77fbeee58a635bed6784a703dc23c5627f20d045ac1bd4322db53c0bce215033",
     "kind" : "runtimeCapability",
-    "reference" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
+    "reference" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
     "runtimeCapabilityCorrelation" : {
       "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
-      "planDigestSHA256" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+      "planDigestSHA256" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
       "reservationID" : "idem-flash-first",
       "stepSetDigestSHA256" : "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
       "targetBindingDigestSHA256" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
@@ -18,7 +18,7 @@
     },
     "validUntilUTC" : "2026-09-25T04:00:00Z"
   },
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-25T00:00:00Z",
   "evidenceObservation" : {
     "bindingRevision" : 1,
@@ -40,7 +40,7 @@
   "firstEvidenceStepAtUTC" : "2026-09-25T00:00:00Z",
   "jobID" : "job-015b9785301763965a34ec80b54d9c0b",
   "materializedBindingRevision" : 1,
-  "materializedPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+  "materializedPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
   "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
   "operationReference" : "flash.full-restore@1",
   "originalSubmissionRequest" : {
@@ -70,7 +70,7 @@
   "providerID" : "arkforge",
   "request" : {
     "authorization" : {
-      "capabilityId" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1"
+      "capabilityId" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1"
     },
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-flash-first",
@@ -95,11 +95,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "15209",
       "lastSequence" : 26,
-      "sha256" : "380632f5bdf3d028cc7b3aa39948a27c92edb573bf4f2952cde647e104457e9a"
+      "sha256" : "60be4250cf0845f69d1c4e05cb6e9cc1770d5415cba78b8a471d22485035ea12"
     },
     "claims" : [
       {
@@ -115,20 +115,20 @@
     "journalSeal" : {
       "byteCount" : "15595",
       "lastSequence" : 27,
-      "sha256" : "d12759f146d6c03cb679c56c7846f4094a61a84abd4ab794cf3e32f04ed80ebd"
+      "sha256" : "a9c52de88531826c92c88e0db24b90826c67f32c81d299d9e67cce817bc47114"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-25T00:00:00Z",
       "manifestByteCount" : "5781",
-      "manifestSHA256" : "aa1624472ee75074bdbd443cf26a144bf7ab84edb902528241bacabfc01b5c9d",
+      "manifestSHA256" : "07345b6031c58822ecdec4f4bc15fb6a15bcf548a139b4cd48e45c6f9d998aad",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "succeeded"
     },
     "receipt" : {
       "catalogGeneration" : "1",
-      "manifestSHA256" : "aa1624472ee75074bdbd443cf26a144bf7ab84edb902528241bacabfc01b5c9d",
+      "manifestSHA256" : "07345b6031c58822ecdec4f4bc15fb6a15bcf548a139b4cd48e45c6f9d998aad",
       "publishedAtUTC" : "2026-09-25T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-015b9785301763965a34ec80b54d9c0b",
@@ -159,7 +159,7 @@
     "host-step verify-image-bundle",
     "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
     "host-step hash-images",
-    "destructive intent bound to Runtime capability CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
     "delegated enter-loader-mode to the ArkForge lane's own plan",
     "delegated wait-loader-disconnect to the ArkForge lane's own plan",
     "delegated wait-loader-reconnect to the ArkForge lane's own plan",
@@ -191,7 +191,7 @@
     "host-step verify-image-bundle",
     "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
     "host-step hash-images",
-    "destructive intent bound to Runtime capability CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
     "delegated enter-loader-mode to the ArkForge lane's own plan",
     "delegated wait-loader-disconnect to the ArkForge lane's own plan",
     "delegated wait-loader-reconnect to the ArkForge lane's own plan",
@@ -201,7 +201,7 @@
     "delegated reboot-device to the ArkForge lane's own plan",
     "delegated wait-for-hdc to the ArkForge lane's own plan",
     "delegated rebind-and-verify-build to the ArkForge lane's own plan",
-    "artifact post-flash-facts.json -> ART-ad8e3844c2b544c39fc21589fabfbaf0",
+    "artifact post-flash-facts.json -> ART-98bc6f0ce3e0acdaa6319a1859738a86",
     "intent capture-post-flash-diagnostics",
     "verified capture-post-flash-diagnostics [\"byteCount\", \"debugRuntime\", \"recordId\", \"verification\"]",
     "artifact post-flash-hilog.txt -> ART-24d4fec1e2aaed7767b7c0edd9d867b2",

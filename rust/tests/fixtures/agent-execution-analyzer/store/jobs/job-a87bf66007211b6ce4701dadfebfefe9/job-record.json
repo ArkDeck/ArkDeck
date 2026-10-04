@@ -8,11 +8,11 @@
     "kind" : "defaultReadOnlyPolicy",
     "reference" : "default-read-only-policy"
   },
-  "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-a87bf66007211b6ce4701dadfebfefe9",
-  "materializedPlanDigest" : "ec7c53e41b29f86cce657e92b5efc0cb25deb7a8aa12c5f93be0e2a3e3f89e07",
+  "materializedPlanDigest" : "f209dd2f13cd275e35add7f583294dbc368dc3d425007a10f20be48eea25d707",
   "operationReference" : "analyzer.extract-crash-signature@1",
   "originalSubmissionRequest" : {
     "documentType" : "runtime-operation-request",
@@ -55,11 +55,11 @@
     }
   },
   "sessionPublicationRecord" : {
-    "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
     "checkpointSeal" : {
       "byteCount" : "2855",
       "lastSequence" : 6,
-      "sha256" : "eaf8f0e1b836e190daab1df59bca95cdc191ff9258737c07b6761870ed2769b5"
+      "sha256" : "91b4710912b7e1e71c2dbded64c54a585eadf5ff04a99c023bcabf4c6ac4f5b0"
     },
     "claims" : [
       {
@@ -75,20 +75,20 @@
     "journalSeal" : {
       "byteCount" : "3240",
       "lastSequence" : 7,
-      "sha256" : "3935012ef87d4aa01f119c20c1393999d8ef6107f8d43e25c40b60befe85c49d"
+      "sha256" : "cb2da86ce49b01312291641ad57f9c40aef3da86be0c973e45a32b1fe4c4bf2c"
     },
     "phase" : "catalogPublished",
     "policyGeneration" : "1",
     "proposal" : {
       "completedAtUTC" : "2026-09-14T00:00:00Z",
       "manifestByteCount" : "1602",
-      "manifestSHA256" : "60409e55da3bfd4840c02f1325dacc1a9ba8054b81c689c75bc40345c00d7e98",
+      "manifestSHA256" : "f97587bc4a033581daf0c0fd018d438712a75ae59a55a7012184be6c663ede36",
       "outcomeCertainty" : "confirmed",
       "terminalStatus" : "succeeded"
     },
     "receipt" : {
       "catalogGeneration" : "1",
-      "manifestSHA256" : "60409e55da3bfd4840c02f1325dacc1a9ba8054b81c689c75bc40345c00d7e98",
+      "manifestSHA256" : "f97587bc4a033581daf0c0fd018d438712a75ae59a55a7012184be6c663ede36",
       "publishedAtUTC" : "2026-09-14T00:00:00Z"
     },
     "relativeSessionPath" : "2026\/09\/session-job-a87bf66007211b6ce4701dadfebfefe9",

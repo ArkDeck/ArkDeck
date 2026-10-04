@@ -2,7 +2,7 @@
   "records" : [
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-5B48E86F858CBEBA520873913DA8432BBF36230A-G1",
+        "capabilityID" : "CAP-RT-POLICY-AD1C11A0BBB240A4460D7AAB7697531581032347-G1",
         "effectCeiling" : "destructive",
         "exactArtifactFacts" : {
           "artifactByteCount" : "903",
@@ -16,7 +16,7 @@
           "intent" : "fullRestore",
           "verification" : "full"
         },
-        "exactPlanDigest" : "e57640355e5472b0331052db4be139a6d347f56165fc499fce4bab401e28dca9",
+        "exactPlanDigest" : "73272a8d578d3c493faf092bbf56a01b9424fab165f5dfa2158a4d4de434b77a",
         "expiresAtUTC" : "2026-09-25T04:00:00Z",
         "inputConstraints" : {
           "artifactLease" : {
@@ -39,7 +39,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:flash.full-restore@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:flash.full-restore@1"
         },
         "maximumUses" : 1,
         "operationScope" : [

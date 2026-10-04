@@ -135,6 +135,9 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "trace.cache.status",
             "trace.cache.purge",
             "debug.probe",
+            "diagnostic.session.status",
+            "diagnostic.session.mark",
+            "diagnostic.session.stop",
             "trace.probe",
             "flash.bootloader-status",
             "flash.prerequisites",
@@ -208,8 +211,21 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             json!({"targetId":"TGT-1","rawCommand":"shell id"}),
         ),
         ("artifact.import.commit", json!({"importId":"imp-1"})),
+        ("diagnostic.session.status", json!({"jobId":5})),
+        (
+            "diagnostic.session.mark",
+            json!({"jobId":"job-1", "markerId":"mark-1", "atHostUTC":"2026-10-04T00:00:00Z"}),
+        ),
+        (
+            "diagnostic.session.stop",
+            json!({"jobId":"job-1", "targetId":"replacement"}),
+        ),
     ] {
         let reply = ingress.handle(&frame(method, params), root.peer());
+        if !METHODS.contains(&method) {
+            assert_eq!(code(&reply), "unknownMethod");
+            continue;
+        }
         assert_eq!(
             decode_response(reply.trim_ascii_end(), "request-1", method)
                 .unwrap()
@@ -441,3 +457,28 @@ mod loader_binding_tests;
 
 #[path = "production_tests.rs"]
 mod production_tests;
+
+#[test]
+fn diagnostic_controls_require_an_app_owned_job_and_accept_no_foreign_reference() {
+    let root = Root::new();
+    let control = Arc::new(Control::new(crate::host::Host::from_environment()).unwrap());
+    let ingress = AppIngress::new(control, root.peer().euid);
+    for (method, params) in [
+        (
+            "diagnostic.session.mark",
+            json!({"jobId":"foreign-job", "markerId":"mark-one"}),
+        ),
+        ("diagnostic.session.stop", json!({"jobId":"foreign-job"})),
+    ] {
+        assert_eq!(
+            code(&ingress.handle(&frame(method, params), root.peer())),
+            if METHODS.contains(&method) {
+                "methodNotAllowlisted"
+            } else {
+                "unknownMethod"
+            }
+        );
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 0);
+}

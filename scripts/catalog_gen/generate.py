@@ -57,7 +57,7 @@ PROVIDERS = ("hdc", "rockchip", "arkforge", "workspace", "analyzer")
 CONCURRENCY_KEYS = ("device-exclusive", "device-shared-readonly", "host-exclusive")
 COMPENSATIONS = ("none", "bestEffortCleanup", "rollbackPublished")
 ACTION_REFERENCE_REQUIRED_OPERATIONS = frozenset(
-    {"observe.device", "capture.diagnostics", "debug.hap"}
+    {"observe.device", "capture.diagnostics", "capture.diagnostic-session", "debug.hap"}
 )
 FIELD_TYPES = (
     "string",

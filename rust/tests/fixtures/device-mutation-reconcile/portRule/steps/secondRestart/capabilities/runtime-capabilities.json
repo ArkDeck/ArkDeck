@@ -2,7 +2,7 @@
   "records" : [
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-DC6C4765F12932F564F4482EBD518104BCAE1363-G1",
+        "capabilityID" : "CAP-RT-POLICY-10FCCD43EE5A225F3B0F71ABD3A20C1CD3BFD8FA-G1",
         "effectCeiling" : "deviceMutation",
         "exactBindingRevision" : 1,
         "exactInputs" : {
@@ -30,7 +30,7 @@
         "issuedAtUTC" : "2026-09-14T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:port-forward.create@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:port-forward.create@1"
         },
         "maximumUses" : 10000,
         "operationScope" : [

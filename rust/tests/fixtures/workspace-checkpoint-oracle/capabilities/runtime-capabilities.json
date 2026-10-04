@@ -2,12 +2,12 @@
   "records" : [
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-E721E16507723DBB812451F94366A62F6B43A008-G1",
+        "capabilityID" : "CAP-RT-POLICY-A93906BF0BE61B7B974FA4C0B025321EF3733B0A-G1",
         "effectCeiling" : "deviceMutation",
         "exactInputs" : {
           "projectRef" : "CheckpointOracleProject"
         },
-        "exactPlanDigest" : "a280e73e79a181bed16fa86df1c7acc407ba601d8e4b66887ff18deb5bb4a8ad",
+        "exactPlanDigest" : "2e8494d4567dc719c8db38c1962774dd2e4d8328c31792ac8bc97b9a761fbcf9",
         "expiresAtUTC" : "2026-10-25T00:00:00Z",
         "inputConstraints" : {
           "projectRef" : {
@@ -18,7 +18,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:workspace.create-checkpoint@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:workspace.create-checkpoint@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -43,21 +43,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "deviceMutation",
           "jobID" : "job-680032e16e57064ef185177fdba58831",
-          "materializedPlanDigest" : "a280e73e79a181bed16fa86df1c7acc407ba601d8e4b66887ff18deb5bb4a8ad",
+          "materializedPlanDigest" : "2e8494d4567dc719c8db38c1962774dd2e4d8328c31792ac8bc97b9a761fbcf9",
           "operationReference" : "workspace.create-checkpoint@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-680032e16e57064ef185177fdba58831",
               "outcome" : "confirmed",
-              "previousRecordSHA256" : "7e579b7e45f0be6bbf6112a0dba55743d95add816fbb19d0c64095dd8e67198c",
-              "recordSHA256" : "293e2235593e8a4be76f80a19e17b580d2cd0c7d36ed88a5dadbdd120f162a8f",
+              "previousRecordSHA256" : "9e5c014b7a2cfa02f1e917b883c5223e484f7ab8bb0bdda00cbb96eaf2cc0311",
+              "recordSHA256" : "52d78f9474226d01cde0129197264e602d322c23d29fd47a646d6c4e34e8f8c9",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "failed"
             }
           ],
-          "queryFingerprintSHA256" : "2dcc9f3c29f3ba2a51fb1892d1957ea58799c6754ecbdb10f091bac6d880874e",
-          "receiptSHA256" : "7e579b7e45f0be6bbf6112a0dba55743d95add816fbb19d0c64095dd8e67198c",
+          "queryFingerprintSHA256" : "c0016a135fa70b014cac4374ad9d4ae9a67af82eee270b3a622cf238cc1bf98d",
+          "receiptSHA256" : "9e5c014b7a2cfa02f1e917b883c5223e484f7ab8bb0bdda00cbb96eaf2cc0311",
           "remainingUsesAfter" : 0,
           "reservationID" : "idempotency-checkpoint-clean"
         }
@@ -66,12 +66,12 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-E721E16507723DBB812451F94366A62F6B43A008-G2",
+        "capabilityID" : "CAP-RT-POLICY-A93906BF0BE61B7B974FA4C0B025321EF3733B0A-G2",
         "effectCeiling" : "deviceMutation",
         "exactInputs" : {
           "projectRef" : "CheckpointOracleProject"
         },
-        "exactPlanDigest" : "a280e73e79a181bed16fa86df1c7acc407ba601d8e4b66887ff18deb5bb4a8ad",
+        "exactPlanDigest" : "2e8494d4567dc719c8db38c1962774dd2e4d8328c31792ac8bc97b9a761fbcf9",
         "expiresAtUTC" : "2026-10-25T00:00:00Z",
         "inputConstraints" : {
           "projectRef" : {
@@ -82,7 +82,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:workspace.create-checkpoint@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:workspace.create-checkpoint@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -107,21 +107,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "deviceMutation",
           "jobID" : "job-04ec80829b77741ea9b848a297f884b5",
-          "materializedPlanDigest" : "a280e73e79a181bed16fa86df1c7acc407ba601d8e4b66887ff18deb5bb4a8ad",
+          "materializedPlanDigest" : "2e8494d4567dc719c8db38c1962774dd2e4d8328c31792ac8bc97b9a761fbcf9",
           "operationReference" : "workspace.create-checkpoint@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-04ec80829b77741ea9b848a297f884b5",
               "outcome" : "confirmed",
-              "previousRecordSHA256" : "ffbe8760dec6680feabd76ca8fba28c72d87838e0340884dc5d5c6f56afd42e6",
-              "recordSHA256" : "9d3d35273a7fc7812f056c231f63c793a3a55a69399fe5b8a78aa66e7e04c055",
+              "previousRecordSHA256" : "57f966658832285bb46f2601971a8320d65246ed9add39312632427ddcca07d0",
+              "recordSHA256" : "4ef2910373792336a058b606e3066b63f174764e695d1186da9e487a550e4962",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "succeeded"
             }
           ],
-          "queryFingerprintSHA256" : "2dcc9f3c29f3ba2a51fb1892d1957ea58799c6754ecbdb10f091bac6d880874e",
-          "receiptSHA256" : "ffbe8760dec6680feabd76ca8fba28c72d87838e0340884dc5d5c6f56afd42e6",
+          "queryFingerprintSHA256" : "c0016a135fa70b014cac4374ad9d4ae9a67af82eee270b3a622cf238cc1bf98d",
+          "receiptSHA256" : "57f966658832285bb46f2601971a8320d65246ed9add39312632427ddcca07d0",
           "remainingUsesAfter" : 0,
           "reservationID" : "idempotency-checkpoint"
         }
@@ -130,7 +130,7 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-391E296A6F4363A7565121943CCBBAF0449A4DF1-G1",
+        "capabilityID" : "CAP-RT-POLICY-4B974FA4EB225508B53C55CCA3857F1C6756781E-G1",
         "effectCeiling" : "deviceMutation",
         "exactInputs" : {
           "checkpointFilePaths" : [
@@ -139,7 +139,7 @@
           ],
           "projectRef" : "ArchiveOracleProject"
         },
-        "exactPlanDigest" : "433b976a9029dc94cd9ee31d928724a545954d69a730440ab70bfbe3b185d99e",
+        "exactPlanDigest" : "feaa2b7ae4938d9f145370304bb7aecdc91e85fbb573ab5cf1ffd024b9b6287c",
         "expiresAtUTC" : "2026-10-25T00:00:00Z",
         "inputConstraints" : {
           "projectRef" : {
@@ -150,7 +150,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:workspace.create-checkpoint@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:workspace.create-checkpoint@1"
         },
         "maximumUses" : 1,
         "operationScope" : [
@@ -175,21 +175,21 @@
           "consumedAtUTC" : "2026-09-25T00:00:00Z",
           "effect" : "deviceMutation",
           "jobID" : "job-fb3aa03a1e918462b0c827fd52e5692b",
-          "materializedPlanDigest" : "433b976a9029dc94cd9ee31d928724a545954d69a730440ab70bfbe3b185d99e",
+          "materializedPlanDigest" : "feaa2b7ae4938d9f145370304bb7aecdc91e85fbb573ab5cf1ffd024b9b6287c",
           "operationReference" : "workspace.create-checkpoint@1",
           "ordinal" : 1,
           "outcomes" : [
             {
               "jobID" : "job-fb3aa03a1e918462b0c827fd52e5692b",
               "outcome" : "confirmed",
-              "previousRecordSHA256" : "a253a884e84f67d4b0c916cf99c8e315c5074d7960dfd36bc94a6fa189c5a9ec",
-              "recordSHA256" : "035348ee9e5b8332866269629b4de6a86328261a7b6eb1480b7abf920d08ceca",
+              "previousRecordSHA256" : "e78b1435bf528ff65046b85c33165ed27efa643dfcd765c1afc1a69f84bc2e1c",
+              "recordSHA256" : "d0044968771edfdec0299f8c54a79f8cc02d37ffb9892773a9e88f5424d3f43b",
               "recordedAtUTC" : "2026-09-25T00:00:00Z",
               "terminalState" : "succeeded"
             }
           ],
-          "queryFingerprintSHA256" : "6036f23594dc49e95cb990edc33d2a9e0c7aa5295798bbe63aa9467062bae017",
-          "receiptSHA256" : "a253a884e84f67d4b0c916cf99c8e315c5074d7960dfd36bc94a6fa189c5a9ec",
+          "queryFingerprintSHA256" : "3f6b5e2b3995204fc55227d18c62b5e0853792b36ffd0d6bce438dca8b0b1b83",
+          "receiptSHA256" : "e78b1435bf528ff65046b85c33165ed27efa643dfcd765c1afc1a69f84bc2e1c",
           "remainingUsesAfter" : 0,
           "reservationID" : "idempotency-archive"
         }
@@ -198,12 +198,12 @@
     },
     {
       "capability" : {
-        "capabilityID" : "CAP-RT-POLICY-E721E16507723DBB812451F94366A62F6B43A008-G3",
+        "capabilityID" : "CAP-RT-POLICY-A93906BF0BE61B7B974FA4C0B025321EF3733B0A-G3",
         "effectCeiling" : "deviceMutation",
         "exactInputs" : {
           "projectRef" : "CheckpointOracleProject"
         },
-        "exactPlanDigest" : "a280e73e79a181bed16fa86df1c7acc407ba601d8e4b66887ff18deb5bb4a8ad",
+        "exactPlanDigest" : "2e8494d4567dc719c8db38c1962774dd2e4d8328c31792ac8bc97b9a761fbcf9",
         "expiresAtUTC" : "2026-10-25T00:00:00Z",
         "inputConstraints" : {
           "projectRef" : {
@@ -214,7 +214,7 @@
         "issuedAtUTC" : "2026-09-25T00:00:00Z",
         "issuer" : {
           "kind" : "runtimeDefaultPolicy",
-          "reference" : "catalog:e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7:workspace.create-checkpoint@1"
+          "reference" : "catalog:c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036:workspace.create-checkpoint@1"
         },
         "maximumUses" : 1,
         "operationScope" : [

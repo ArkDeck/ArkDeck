@@ -5,7 +5,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "life-observe",
@@ -76,8 +76,8 @@
               "bytesVerified" : true,
               "jobId" : "job-68b3be1c1b8ed4cadb4f985ba34a145e",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-45a4c5be1629a9d520b531de6a6d0a24",
-              "sha256" : "bfe4ce1afeb28a4c214ced3763f7ff1d88f16eed3eca33d94bd2b60973fc092c",
+              "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-979183b3c6706e7d51e001b200f2fa29",
+              "sha256" : "a9370ad69525b276aef5cc4e6f6800bda47952a6978c69dadda3a8ef9aa63c0f",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -87,8 +87,8 @@
               "bytesVerified" : true,
               "jobId" : "job-68b3be1c1b8ed4cadb4f985ba34a145e",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-856b4de44121b4d51d9d31dbbcd1327e",
-              "sha256" : "f1ae6c6fadb58f34c95394a66434779d1f3e2dddcd31cd8995d2b2918dcd0330",
+              "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-0851ce5fd557ce1b9f444b781f46f488",
+              "sha256" : "67f97797a0a1accd81f05d46de8b4f5c4cc6c759cd36c9ac54c043e657223212",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             },
@@ -98,14 +98,14 @@
               "bytesVerified" : true,
               "jobId" : "job-68b3be1c1b8ed4cadb4f985ba34a145e",
               "providerId" : "hdc",
-              "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-edacbb71515921ff805cc6d97714a3f5",
-              "sha256" : "d37e5e67ad2657d40547e3a92d887a4dc9a753172647c8729ee95009414e2827",
+              "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-f7fe4e9aab52edfdf1c16c4e751332db",
+              "sha256" : "2543096135e6396a10c98574227682061d911adeb7d862047bdaa5197f3c5167",
               "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
               "targetId" : "TGT-3ba3f5f43b92"
             }
           ],
           "bindingRevision" : 1,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "evidence" : {
@@ -123,8 +123,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-68b3be1c1b8ed4cadb4f985ba34a145e",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-45a4c5be1629a9d520b531de6a6d0a24",
-                "sha256" : "bfe4ce1afeb28a4c214ced3763f7ff1d88f16eed3eca33d94bd2b60973fc092c",
+                "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-979183b3c6706e7d51e001b200f2fa29",
+                "sha256" : "a9370ad69525b276aef5cc4e6f6800bda47952a6978c69dadda3a8ef9aa63c0f",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -134,8 +134,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-68b3be1c1b8ed4cadb4f985ba34a145e",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-856b4de44121b4d51d9d31dbbcd1327e",
-                "sha256" : "f1ae6c6fadb58f34c95394a66434779d1f3e2dddcd31cd8995d2b2918dcd0330",
+                "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-0851ce5fd557ce1b9f444b781f46f488",
+                "sha256" : "67f97797a0a1accd81f05d46de8b4f5c4cc6c759cd36c9ac54c043e657223212",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               },
@@ -145,8 +145,8 @@
                 "bytesVerified" : true,
                 "jobId" : "job-68b3be1c1b8ed4cadb4f985ba34a145e",
                 "providerId" : "hdc",
-                "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-edacbb71515921ff805cc6d97714a3f5",
-                "sha256" : "d37e5e67ad2657d40547e3a92d887a4dc9a753172647c8729ee95009414e2827",
+                "reference" : "arkdeck-artifact://job-68b3be1c1b8ed4cadb4f985ba34a145e/ART-f7fe4e9aab52edfdf1c16c4e751332db",
+                "sha256" : "2543096135e6396a10c98574227682061d911adeb7d862047bdaa5197f3c5167",
                 "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
                 "targetId" : "TGT-3ba3f5f43b92"
               }
@@ -163,7 +163,7 @@
             "blockers" : [
 
             ],
-            "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+            "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
             "executionMode" : "execute",
             "finishedAtUtc" : "2026-09-14T00:00:00Z",
             "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
@@ -218,7 +218,7 @@
             "outstandingResidueCount" : null,
             "sessionPublication" : {
               "catalogGeneration" : "1",
-              "manifestSha256" : "654d70ed772e91ba406976f4a0b15f05a28fe2c98bca5051906e7534b12f7f04",
+              "manifestSha256" : "610bbdc4060a4a35c15a288241096a866e07ca2c9b16cba1da3303005e28be45",
               "reasonCode" : null,
               "state" : "published"
             },
@@ -317,7 +317,7 @@
           "items" : [
             {
               "bindingRevision" : 1,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-observe",
@@ -346,7 +346,7 @@
             },
             {
               "bindingRevision" : null,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-stale",
@@ -376,7 +376,7 @@
             },
             {
               "bindingRevision" : null,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-unadopted",
@@ -426,7 +426,7 @@
           "items" : [
             {
               "bindingRevision" : 1,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-observe",
@@ -475,7 +475,7 @@
           "items" : [
             {
               "bindingRevision" : null,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-stale",
@@ -526,7 +526,7 @@
           "items" : [
             {
               "bindingRevision" : null,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-unadopted",
@@ -577,7 +577,7 @@
           "items" : [
             {
               "bindingRevision" : 1,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-observe",
@@ -626,7 +626,7 @@
           "items" : [
             {
               "bindingRevision" : null,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-stale",
@@ -676,7 +676,7 @@
           "items" : [
             {
               "bindingRevision" : 1,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-observe",
@@ -833,7 +833,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : null,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "life-unadopted",
@@ -863,7 +863,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : null,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "life-unadopted",
@@ -951,7 +951,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : null,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "life-unadopted",
@@ -980,7 +980,7 @@
         "ok" : true,
         "result" : {
           "bindingRevision" : null,
-          "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+          "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
           "createdAt" : "2026-09-14T00:00:00.000Z",
           "deadline" : "2026-09-14T00:05:00.000Z",
           "executionId" : "life-unadopted",
@@ -1021,7 +1021,7 @@
           "items" : [
             {
               "bindingRevision" : null,
-              "catalogDigest" : "e824d3c5af264f68500c034432e0e8b5b5896d06a9e0553b0e58c0ebdff25ed7",
+              "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
               "createdAt" : "2026-09-14T00:00:00.000Z",
               "deadline" : "2026-09-14T00:05:00.000Z",
               "executionId" : "life-unadopted",

@@ -78,23 +78,27 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
             let actual = actual.as_array().unwrap();
             let expected = recorded["result"].as_array().unwrap();
             let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
-            let has_keyboard = catalog.iter().any(|entry| entry["id"] == "input.keyboard");
-            let keyboard = actual
-                .iter()
-                .find(|row| row["reference"] == "input.keyboard@1");
-            assert_eq!(actual.len(), expected.len() + usize::from(has_keyboard));
-            if has_keyboard {
-                let keyboard = keyboard.expect("current Catalog advertises keyboard input");
-                assert_eq!(keyboard["minimumEffect"], "deviceMutation");
-                assert_eq!(keyboard["binding"], "confirmedDevice");
-                assert_eq!(keyboard["availability"], "unavailable");
-                assert_eq!(keyboard["reasonCodes"], json!(["provider_not_registered"]));
-            } else {
-                assert!(
-                    keyboard.is_none(),
-                    "historical Catalog cannot advertise keyboard input"
-                );
+            let additions = ["input.keyboard", "capture.diagnostic-session"];
+            let mut added = 0;
+            for id in additions {
+                let present = catalog.iter().any(|entry| entry["id"] == id);
+                let reference = format!("{id}@1");
+                let row = actual.iter().find(|row| row["reference"] == reference);
+                if present {
+                    added += 1;
+                    let row = row.expect("current Catalog advertises the added operation");
+                    assert_eq!(row["minimumEffect"], "deviceMutation");
+                    assert_eq!(row["binding"], "confirmedDevice");
+                    assert_eq!(row["availability"], "unavailable");
+                    assert_eq!(row["reasonCodes"], json!(["provider_not_registered"]));
+                } else {
+                    assert!(
+                        row.is_none(),
+                        "historical Catalog cannot advertise {reference}"
+                    );
+                }
             }
+            assert_eq!(actual.len(), expected.len() + added);
             for expected in expected {
                 let actual = actual
                     .iter()
@@ -1919,3 +1923,21 @@ const DEVECO_ROOTS: [&str; 3] = [
 const SOURCE_FILE: &str = "/Source.app";
 #[cfg(windows)]
 const SOURCE_FILE: &str = r"C:\Source.app";
+
+#[test]
+fn current_health_frame_is_published_and_can_be_recorded() {
+    let (control, reads) = setup();
+    let response = call(&control, "health", Value::Null);
+    validate_health(&response).unwrap();
+    if let Some(directory) = std::env::var_os("ARKDECK_CATALOG_CONTRACT_RECORD") {
+        std::fs::create_dir_all(&directory).unwrap();
+        let frame = json!({"method":"health", "protocolVersion":"1.0.0", "params":{},
+            "ok":true, "result":response.outcome.unwrap()});
+        std::fs::write(
+            std::path::PathBuf::from(directory).join("health.jsonl"),
+            format!("{frame}\n"),
+        )
+        .unwrap();
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}

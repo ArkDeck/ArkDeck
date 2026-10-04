@@ -144,6 +144,29 @@ fn materialize_step(
     // Swift lowers the executable's identity at dispatch.
     document["executableSHA256"] = json!("resolved-at-dispatch");
     match plan {
+        FilePlan::DiagnosticTrace {
+            arm,
+            finalize,
+            maximum_seconds,
+        } => {
+            let invocations = |values: &[arkdeck_provider_hdc::Invocation]| -> Value {
+                values
+                    .iter()
+                    .map(|invocation| {
+                        json!({
+                            "arguments": invocation.arguments,
+                            "timeoutSeconds": invocation.timeout.as_secs(),
+                            "continueAfterNonZero": invocation.continue_after_non_zero,
+                        })
+                    })
+                    .collect()
+            };
+            document["processKind"] = json!("diagnosticTraceSession");
+            document["armInvocations"] = invocations(&arm);
+            document["hostWait"] = json!({"maximumSeconds": maximum_seconds, "stopMayShorten": true,
+                "requiresVerifiedAnchor": true, "maximumMarkers": request.inputs.get("maximumMarkers").cloned().unwrap_or(json!(50))});
+            document["finalizeInvocations"] = invocations(&finalize);
+        }
         // A receive is one process; its landing is the dispatcher's to prepare
         // and inspect, and only its argv names it here.
         FilePlan::Process(plan) | FilePlan::Receive { process: plan, .. } => {

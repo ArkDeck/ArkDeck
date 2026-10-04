@@ -68,7 +68,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 29] = [
+const MATERIALIZED: [&str; 30] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -77,6 +77,7 @@ const MATERIALIZED: [&str; 29] = [
     "debug.template@1",
     "capture.diagnostics@1",
     "input.keyboard@1",
+    device_steps::DIAGNOSTIC_SESSION,
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
@@ -696,7 +697,13 @@ impl<'a> JobPlanner<'a> {
         // A screen sequence's and a capture's legs are named for the
         // authorization envelope; a receive among them lowers against the
         // composition's host receive root.
-        if [device_steps::SCREEN_SEQUENCE, device_steps::CAPTURE].contains(&reference.as_str()) {
+        if [
+            device_steps::SCREEN_SEQUENCE,
+            device_steps::CAPTURE,
+            device_steps::DIAGNOSTIC_SESSION,
+        ]
+        .contains(&reference.as_str())
+        {
             return self.materialize_file_capture(request, descriptor, &facts);
         }
         self.refuse_debug_permit(request)?;

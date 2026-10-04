@@ -23,7 +23,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The operations whose results this Runtime reads.
-const READABLE: [&str; 31] = [
+const READABLE: [&str; 32] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -32,6 +32,7 @@ const READABLE: [&str; 31] = [
     "debug.template@1",
     "capture.diagnostics@1",
     "input.keyboard@1",
+    "capture.diagnostic-session@1",
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
