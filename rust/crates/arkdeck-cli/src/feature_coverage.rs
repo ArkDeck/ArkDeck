@@ -576,6 +576,10 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // (`arkdeck-agentd/tests/windows_workspace_hvigor_live_process.rs`, run
     // with `ARKDECK_LIVE_DEVECO_ROOT`).
     "workspace.build",
+    // The module's local unit tests in the same copy, through its test
+    // preset, reaching the project's `ohpm` dependencies through the in-tree
+    // junctions the copy recreates (the same live test).
+    "workspace.test",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test

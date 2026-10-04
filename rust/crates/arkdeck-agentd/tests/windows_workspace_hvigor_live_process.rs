@@ -14,6 +14,10 @@
 //!   (`assembleHap`) in the copy, its search path led by the toolchain's
 //!   pinned JDK, landing its unsigned HAP as the Job's verified Artifact.
 //!
+//! The project's `ohpm` dependencies are installed first, as junctions; the
+//! copy recreates them inside itself, and `workspace test` runs the
+//! module's local unit tests in the copy through the test preset.
+//!
 //! Commands Hvigor and Node run by bare name (`java`, `cmd.exe`, `wmic`)
 //! are planted at the project's root as images and scripts; the build
 //! succeeds through the pinned JDK and the system's tools, and none of them
@@ -286,6 +290,33 @@ fn plant_commands(project: &Path) {
     }
 }
 
+/// The project's `ohpm` dependencies installed as a person's DevEco Studio
+/// installs them (`ohpm install --all`, from the account's cache or the
+/// registry): `oh_modules` junctions into the project's own `.ohpm` store
+/// and into the module's own sources.
+fn install_dependencies(deveco: &str, project: &Path) {
+    let ohpm = Path::new(deveco)
+        .join("tools")
+        .join("ohpm")
+        .join("bin")
+        .join("ohpm.bat");
+    let output = Command::new("cmd.exe")
+        .args(["/d", "/c"])
+        .arg(&ohpm)
+        .args(["install", "--all"])
+        .current_dir(project)
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "ohpm install: {output:?}");
+    assert!(
+        arkdeck_platform::junction_target(&project.join(r"oh_modules\@ohos\hypium"))
+            .unwrap()
+            .is_some(),
+        "ohpm links its packages as junctions"
+    );
+}
+
 /// No planted script ran below `root`.
 fn assert_nothing_planted_ran(root: &Path) {
     for script in PLANTED_SCRIPTS {
@@ -408,6 +439,7 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
         &project,
     );
     plant_commands(&project);
+    install_dependencies(&deveco, &project);
 
     let cli = |pipe: &str, arguments: &[&str]| -> (Option<i32>, Value) {
         let cli = Path::new(DAEMON).with_file_name("arkdeck.exe");
@@ -443,7 +475,13 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
     };
     let run = |pipe: &str, arguments: &[&str]| -> Value {
         let (status, envelope) = cli(pipe, arguments);
-        assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
+        assert_eq!(
+            status,
+            Some(0),
+            "{arguments:?}: {envelope}
+{}",
+            log_tails(&account.state().join("jobs-state"))
+        );
         envelope["result"].clone()
     };
     let inputs = |name: &str, value: Value| {
@@ -481,37 +519,41 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
         .as_str()
         .unwrap()
         .to_owned();
-    let preset = run(
-        &pipe,
-        &[
-            "workspace",
-            "preset",
-            "register",
-            "--registration-request-id",
-            "hvigor-live-build",
-            "--project",
-            &registered,
-            "--kind",
-            "build",
-            "--template",
-            "openharmony.hvigor-build@1",
-            "--timeout-seconds",
-            "600",
-            "--toolchain",
-            &toolchain,
-            "--toolchain-generation",
-            "1",
-            "--module",
-            "entry",
-            "--product",
-            "default",
-            "--build-mode",
-            "debug",
-        ],
-    )["presetRef"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    let register_preset = |request: &str, kind: &str, template: &str| {
+        run(
+            &pipe,
+            &[
+                "workspace",
+                "preset",
+                "register",
+                "--registration-request-id",
+                request,
+                "--project",
+                &registered,
+                "--kind",
+                kind,
+                "--template",
+                template,
+                "--timeout-seconds",
+                "600",
+                "--toolchain",
+                &toolchain,
+                "--toolchain-generation",
+                "1",
+                "--module",
+                "entry",
+                "--product",
+                "default",
+                "--build-mode",
+                "debug",
+            ],
+        )["presetRef"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let test_preset = register_preset("hvigor-live-test", "test", "openharmony.hvigor-test@1");
+    let preset = register_preset("hvigor-live-build", "build", "openharmony.hvigor-build@1");
     running.stop();
 
     // Composed by the next start: the copy, then its build.
@@ -613,6 +655,52 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
     }
     assert_nothing_planted_ran(&copy_root);
     assert_nothing_planted_ran(&project);
+
+    // The local unit tests of the same copy: they import the `ohpm`
+    // dependencies the copy reaches through its recreated in-tree junctions.
+    for linked in [
+        r"oh_modules\@ohos\hypium",
+        r"entry\oh_modules\libcrashprobe.so",
+    ] {
+        let target = arkdeck_platform::junction_target(&copy_root.join(linked))
+            .unwrap()
+            .unwrap_or_else(|| panic!("{linked} is a junction in the copy"));
+        assert!(
+            target.starts_with(copy_root.to_str().unwrap()),
+            "{linked} names {}, inside the copy",
+            target.display()
+        );
+    }
+    let (status, envelope) = cli(
+        &pipe,
+        &[
+            "workspace",
+            "test",
+            "--inputs-file",
+            &inputs(
+                "test",
+                json!({"projectRef": copy, "testPresetRef": test_preset}),
+            ),
+            "--execution-id",
+            "exec-windows-hvigor-test",
+        ],
+    );
+    let tested = &envelope["result"];
+    assert!(
+        status == Some(0) && tested["terminalState"] == "succeeded",
+        "workspace test ({status:?}): {envelope}\n{}",
+        log_tails(&account.state().join("artifacts"))
+    );
+    assert_eq!(tested["evidenceBlockers"], json!([]), "{tested}");
+    let reports = tested["artifacts"].as_array().unwrap();
+    assert!(!reports.is_empty(), "{tested}");
+    assert!(
+        reports
+            .iter()
+            .all(|artifact| artifact["bytesVerified"] == true),
+        "{tested}"
+    );
+    assert_nothing_planted_ran(&copy_root);
     running.stop();
     assert_account_released();
     drop(account);
@@ -622,12 +710,14 @@ fn the_account_daemon_builds_a_copy_with_the_host_s_deveco_through_the_cli() {
         .find(|product| product.relative_path == "cli-feature-coverage.json")
         .unwrap();
     let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
-    let statuses: Vec<&Value> = coverage["entries"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|entry| entry["feature"] == "workspace.build-openharmony@1")
-        .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
-        .collect();
-    assert_eq!(statuses, [&json!("implemented")]);
+    for feature in ["workspace.build-openharmony@1", "workspace.run-tests@1"] {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == feature)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert_eq!(statuses, [&json!("implemented")], "{feature}");
+    }
 }

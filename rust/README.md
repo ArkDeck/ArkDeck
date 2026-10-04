@@ -4260,11 +4260,18 @@ design, as on macOS
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-cwd-run.md)).
 
 The daemon's `--symbolize-crash` mode answers the Swift symbolizer oracle on Windows
-(`crash_symbolizer_mode`). The CLI test and symbolize leaves stay `partial`. A test preset also
-needs the project's `ohpm` dependencies. `ohpm` links those with in-tree junctions, which the
-macOS copy would keep (in-tree links are recreated relative) but a Windows copy refuses. A
-symbolization needs a device-captured crash
-([run records](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md),
+(`crash_symbolizer_mode`). The symbolize leaf stays `partial`, since a symbolization needs a
+device-captured crash.
+
+`ohpm` links a project's packages as directory junctions inside the project. A Windows copy
+recreates such a junction, as macOS keeps an in-tree link, when its fully resolved target is a
+directory inside the source root. The new junction names the copy's corresponding directory at
+the copy's published path. Symbolic links, junctions that leave the tree, and dangling ones are
+still refused. The copy also writes paths past `MAX_PATH` (`\\?\` for long drive-letter paths).
+The live test installs the demo's `ohpm` dependencies and runs `workspace test` on the copy
+after the build, so `workspace test` is Windows `implemented`
+([junction layer](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-copy-junctions-run.md);
+earlier [run records](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-run.md),
 [JDK layer](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-hvigor-jdk-run.md)).
 
 ## Windows analyzer provider (TASK-XPA-011)

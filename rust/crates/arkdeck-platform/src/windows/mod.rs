@@ -31,6 +31,7 @@ pub(crate) mod host_store;
 mod identity;
 mod inflate;
 mod inspected_directory;
+mod junction;
 mod managed;
 mod pinned_file;
 mod process;
@@ -73,6 +74,7 @@ pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_re
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
 pub use inflate::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
 pub use inspected_directory::InspectedDirectory;
+pub use junction::{create_junction, junction_target};
 pub use managed::ManagedServer;
 pub use pinned_file::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file, read_host_file,
@@ -118,6 +120,31 @@ pub(crate) fn bool_result(result: i32) -> io::Result<()> {
     } else {
         Ok(())
     }
+}
+
+/// `path` as the Win32 file APIs can open it past `MAX_PATH`: a long
+/// standard drive-letter path (`X:\…`, 248 characters or more, as the
+/// standard library's own file operations judge it) in its `\\?\` form,
+/// separators made `\`. A path with `.`, `..` or empty components, which
+/// the `\\?\` form would not normalise, and every shorter or other path, is
+/// returned as it is (TASK-XPA-011: a workspace copy's `oh_modules` reach
+/// past `MAX_PATH` below the daemon's state).
+pub(crate) fn extended_length(path: &std::path::Path) -> std::borrow::Cow<'_, std::path::Path> {
+    let Some(text) = path.to_str() else {
+        return path.into();
+    };
+    let bytes = text.as_bytes();
+    if bytes.len() < 248 || !bytes[0].is_ascii_alphabetic() || bytes.get(1..3) != Some(b":\\") {
+        return path.into();
+    }
+    let text = text.replace('/', "\\");
+    if text[3..]
+        .split('\\')
+        .any(|component| component.is_empty() || component == "." || component == "..")
+    {
+        return path.into();
+    }
+    std::path::PathBuf::from(format!(r"\\?\{text}")).into()
 }
 
 pub(crate) fn wide(value: &OsStr) -> io::Result<Vec<u16>> {
@@ -776,5 +803,41 @@ fn transfer(
             }
         }
         Err(error) => Err(error),
+    }
+}
+
+#[cfg(test)]
+mod extended_length_tests {
+    use super::extended_length;
+    use std::path::Path;
+
+    #[test]
+    fn only_a_long_plain_drive_path_takes_the_extended_form() {
+        let segments = ["segment"; 30].join("\\");
+        let long = format!(r"C:\{segments}\file.js");
+        assert!(long.len() >= 248);
+        assert_eq!(
+            extended_length(Path::new(&long)).to_str().unwrap(),
+            format!(r"\\?\{long}")
+        );
+        let mixed = format!(r"C:\{}", long[3..].replacen('\\', "/", 4));
+        assert_eq!(
+            extended_length(Path::new(&mixed)).to_str().unwrap(),
+            format!(r"\\?\{long}")
+        );
+        for kept in [
+            r"C:\short\file".to_owned(),
+            format!(r"\\?\{long}"),
+            format!(r"{long}\..\x"),
+            format!(r"{long}\.\x"),
+            format!(r"{long}\\x"),
+            format!(r"\\server\share\{long}"),
+        ] {
+            assert_eq!(
+                extended_length(Path::new(&kept)),
+                Path::new(&kept),
+                "{kept}"
+            );
+        }
     }
 }
