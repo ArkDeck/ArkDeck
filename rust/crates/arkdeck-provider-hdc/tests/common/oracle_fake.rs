@@ -8,7 +8,9 @@
 //! (`debug-probe/hdc-answers.sh`), and the GJ-1 pointer inputs'
 //! (`pointer-input/hdc-answers.sh`), screen record's
 //! (`screen-sequence/hdc-answers.sh`) and the port forwards'
-//! (`port-forward/hdc-answers.sh`) are ported here, case for case and in
+//! (`port-forward/hdc-answers.sh`) are ported here, with the keyboard
+//! input's synthetic answers of the macOS Rust owner test, which no Swift
+//! oracle records,, case for case and in
 //! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
@@ -43,6 +45,7 @@ pub enum Answers {
     PointerInput,
     ScreenSequence,
     PortForward,
+    KeyboardInput,
 }
 
 impl Answers {
@@ -79,6 +82,7 @@ impl Answers {
             line if line.starts_with("# port-forward.create@1 and port-forward.remove@1") => {
                 Self::PortForward
             }
+            line if line.starts_with("# input.keyboard@1 answers") => Self::KeyboardInput,
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -97,6 +101,9 @@ struct Answer {
     stdout: Vec<u8>,
     stderr: Vec<u8>,
     unobservable: Option<String>,
+    /// A plan the dispatch refuses before any child runs
+    /// (`DispatchFailure::Refused`).
+    declined: Option<String>,
 }
 
 impl Answer {
@@ -109,6 +116,7 @@ impl Answer {
             stdout,
             stderr: Vec::new(),
             unobservable: None,
+            declined: None,
         }
     }
     fn exit(status: i32) -> Self {
@@ -117,6 +125,7 @@ impl Answer {
             stdout: Vec::new(),
             stderr: Vec::new(),
             unobservable: None,
+            declined: None,
         }
     }
     /// Exits `status` after printing `stdout`.
@@ -133,6 +142,14 @@ impl Answer {
             stdout: Vec::new(),
             stderr: stderr.into().into_bytes(),
             unobservable: None,
+            declined: None,
+        }
+    }
+    /// The dispatch's refusal of the plan: no child ran.
+    fn declined(reason: impl Into<String>) -> Self {
+        Self {
+            declined: Some(reason.into()),
+            ..Self::exit(0)
         }
     }
     fn unregistered() -> Self {
@@ -1308,6 +1325,35 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `input.keyboard@1`, which no Swift oracle records: the macOS Rust
+    /// owner test's synthetic transport (`arkdeck-hoststore/tests/
+    /// keyboard_input_run.rs`, `Fake`), by mode. The fixture's device, and one
+    /// UiTest text action acknowledged (`No Error`), echoed without its
+    /// acknowledgement (`missingAck`), left unobserved (`unobservable`) or
+    /// refused (`refused`); the last two carry the private text, as the
+    /// macOS test's do, to prove nothing persists it.
+    fn keyboard_input(argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        let words: Vec<&str> = argv.iter().map(String::as_str).collect();
+        let ["-t", KEY, "shell", "uitest", "uiInput", "text", text] = words.as_slice() else {
+            return Answer::declined("unregistered synthetic transport action");
+        };
+        match mode {
+            "missingAck" => Answer::out(format!("unobserved {text}")),
+            "unobservable" => Answer {
+                unobservable: Some((*text).to_owned()),
+                ..Answer::exit(0)
+            },
+            "refused" => Answer::declined(*text),
+            _ => Answer::out("No Error\n"),
+        }
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -1343,9 +1389,13 @@ impl HdcDispatch for OracleFake {
             Answers::PointerInput => Self::pointer_input(&plan.arguments, &mode),
             Answers::ScreenSequence => self.screen_sequence(&plan.arguments, &mode),
             Answers::PortForward => self.port_forward(&plan.arguments, &mode),
+            Answers::KeyboardInput => Self::keyboard_input(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));
+        }
+        if let Some(reason) = answer.declined {
+            return Err(DispatchFailure::Refused(reason));
         }
         // The runner keeps each stream's first `capture_bytes` bytes and says
         // whether either went past them (`tool_process::capture`).

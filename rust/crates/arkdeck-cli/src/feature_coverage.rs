@@ -495,6 +495,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // (`gj1_inputs.rs`).
     "port-forward.create",
     "port-forward.remove",
+    // `input keyboard` (`input.keyboard@1`), after `artifact import
+    // keyboard-input`, over the same daemon. No Swift oracle records it: it
+    // is measured against the macOS Rust owner test's answers
+    // (`arkdeck-hoststore/tests/keyboard_input_run.rs`), each reply ending as
+    // there, the private text never persisted (`gj1_inputs.rs`).
+    "artifact.import.keyboard-input",
+    "input.keyboard",
     // Not `agent resume` (nor `human-action resume`), although
     // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
     // oracle's `connect` scenario: once its action resolves, a resume

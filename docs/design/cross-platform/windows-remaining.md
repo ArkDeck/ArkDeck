@@ -32,7 +32,7 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 | `device.display-name.set`, `.clear` | 1 | now | Local leaves over a device observation; same fake |
 | `trace.probe` | 1 | now | `trace-probe` oracle, already replayed at Control level (`trace_probe_control.rs`); no signed-CLI test |
 | `input.tap@1`, `input.swipe@1`, `input.long-press@1` | 1 | done | Measured: every `pointer-input` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`); Windows `implemented` |
-| `input.keyboard@1` | 1 | now | No Swift oracle (keyboard input lands with #2473 on macOS); measure against the macOS Rust answers once it merges |
+| `input.keyboard@1` | 1 | done | Measured: `artifact import keyboard-input` and `input keyboard` through the real CLI against the macOS Rust owner test's answers (`keyboard_input_run.rs`, #2473), ported into the shared fake (`gj1_inputs.rs`); no Swift oracle exists; Windows `implemented` |
 | `capture.screen-sequence@1` (`screen record`) | 1 | done | Measured: every `screen-sequence` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`), capability names relabelled as in the GJ-2/3 replays; Windows `implemented` |
 | `port-forward.create@1`, `.remove@1` | 1 | done | Measured: every `port-forward` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`); Windows `implemented` |
 | `capture.diagnostic-session@1`, `diagnostic.session.mark|status|stop` | 1 | now | `diagnostic-session` oracle (#2465); composed on Windows |

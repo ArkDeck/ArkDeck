@@ -3,7 +3,8 @@
 //! `input long-press` and `input swipe` (`input.tap@1`, `input.long-press@1`,
 //! `input.swipe@1`), `screen record` (`capture.screen-sequence@1`) and
 //! `port-forward create|remove` (`port-forward.create@1`,
-//! `port-forward.remove@1`) to the signed test daemon (`signed_daemon.rs`), which composes the production
+//! `port-forward.remove@1`), and `input keyboard` (`input.keyboard@1`) to
+//! the signed test daemon (`signed_daemon.rs`), which composes the production
 //! Windows development root with the shared fake HDC's answers in process
 //! (`oracle_fake.rs`), a synthetic USB census naming the fixture's board, the
 //! oracle's fixed clock, and its own Job state for the device mutations'
@@ -368,4 +369,190 @@ fn port_forwards_answer_as_the_swift_oracle_over_the_signed_test_daemon() {
         &["port-forward.create@1", "port-forward.remove@1"],
         "implemented",
     );
+}
+
+/// The private text the keyboard input sends, as the macOS Rust owner test's
+/// (`arkdeck-hoststore/tests/keyboard_input_run.rs`).
+const PRIVATE_TEXT: &str = "private-fixture-你好-$()-'";
+
+/// Every file's bytes below `path`, if it exists.
+fn every_file(path: &Path) -> Vec<Vec<u8>> {
+    let mut bytes = Vec::new();
+    for entry in std::fs::read_dir(path).into_iter().flatten() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            bytes.extend(every_file(&path));
+        } else {
+            bytes.push(std::fs::read(path).unwrap());
+        }
+    }
+    bytes
+}
+
+/// `artifact import keyboard-input` and `input keyboard`
+/// (`input.keyboard@1`), which no Swift oracle records, against the macOS
+/// Rust owner test's answers (`keyboard_input_run.rs`): its synthetic
+/// transport, ported into the shared fake (`Answers::KeyboardInput`), with a
+/// fragment of its own written beside the replay root. For each of its
+/// replies, over a fresh root: the private text is imported as a sensitive
+/// Import, whose receipt never carries it; an intent older than ten seconds
+/// is refused with nothing sent; the input then ends as the macOS test's does
+/// (acknowledged: `succeeded`; refused: `failed`; unacknowledged or
+/// unobserved: an unknown outcome, the Job `waitingForRecovery`, and the next
+/// input refused, never replayed), the UiTest text action sent exactly once;
+/// and no Job, capability or Session record holds the private text.
+#[test]
+fn keyboard_input_answers_as_the_macos_runtime_over_the_signed_test_daemon() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-keyboard-input");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    // The answers' fragment and tool, and the oracles' adopted Target.
+    let fixture = scratch.join("keyboard-input");
+    std::fs::create_dir_all(fixture.join("targets-state")).unwrap();
+    std::fs::write(
+        fixture.join("hdc-answers.sh"),
+        "# input.keyboard@1 answers of keyboard_input_run.rs's synthetic transport, by mode.\n",
+    )
+    .unwrap();
+    std::fs::write(
+        fixture.join("hdc"),
+        b"keyboard_input_run.rs synthetic transport\n",
+    )
+    .unwrap();
+    std::fs::copy(
+        fixtures("pointer-input").join("targets-state/targets.json"),
+        fixture.join("targets-state/targets.json"),
+    )
+    .unwrap();
+    let payload = scratch.join("keyboard-input.json");
+    std::fs::write(
+        &payload,
+        serde_json::to_vec(&serde_json::json!({
+            "kind": "text",
+            "text": PRIVATE_TEXT,
+            "allowDeviceClipboard": true
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let inputs = scratch.join("inputs.json");
+    let keyboard = |fake_root: &Path| {
+        calls(fake_root)
+            .iter()
+            .filter(|call| call.contains(" shell uitest uiInput text "))
+            .count()
+    };
+    for (mode, ends) in [
+        ("normal", "succeeded"),
+        ("refused", "failed"),
+        ("missingAck", "waitingForRecovery"),
+        ("unobservable", "waitingForRecovery"),
+    ] {
+        let run = scratch.join(mode);
+        std::fs::create_dir_all(&run).unwrap();
+        let (root, fake_root) = roots(&run, &fixture);
+        std::fs::write(fake_root.join("hdc-mode"), format!("{mode}\n")).unwrap();
+        let daemon = SignedDaemon::start_with(
+            &executable,
+            &pin,
+            &root,
+            &fixture,
+            &fake_root,
+            &[
+                (signed_daemon::BOARD, KEY.to_owned()),
+                (
+                    signed_daemon::CLOCK,
+                    "2026-09-14T00:00:00Z|2026-09-14T00:00:00.000Z".to_owned(),
+                ),
+                (
+                    signed_daemon::MUTATION_ROOT,
+                    root.join("jobs-state").to_str().unwrap().to_owned(),
+                ),
+            ],
+        );
+        let (status, imported) = daemon.cli(&[
+            "artifact",
+            "import",
+            "keyboard-input",
+            "--import-request-id",
+            &format!("keyboard-{mode}"),
+            "--target",
+            TARGET,
+            "--file",
+            payload.to_str().unwrap(),
+        ]);
+        assert_eq!(status, Some(0), "{mode}: {imported}");
+        let receipt = &imported["result"]["receipt"];
+        assert_eq!(receipt["privacy"], "sensitive", "{mode}: {imported}");
+        assert!(!imported.to_string().contains(PRIVATE_TEXT), "{mode}");
+        let lease = receipt["lease"].clone();
+        let send = |epoch: &str| {
+            std::fs::write(
+                &inputs,
+                serde_json::to_vec(&serde_json::json!({
+                    "keyboardArtifactLease": lease,
+                    "inputEpochUtc": epoch
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            daemon.cli(&[
+                "input",
+                "keyboard",
+                "--target",
+                TARGET,
+                "--inputs-file",
+                inputs.to_str().unwrap(),
+            ])
+        };
+        // An intent older than ten seconds: refused, nothing sent.
+        let (status, stale) = send("2026-09-13T23:59:40Z");
+        assert_ne!(status, Some(0), "{mode}: {stale}");
+        assert_eq!(stale["ok"], false, "{mode}: {stale}");
+        assert_eq!(keyboard(&fake_root), 0, "{mode}: nothing is sent");
+        // A current intent: the macOS test's end, sent once.
+        let (status, sent) = send("2026-09-14T00:00:00Z");
+        assert_eq!(
+            status,
+            Some(if ends == "succeeded" { 0 } else { 1 }),
+            "{mode}: {sent}"
+        );
+        assert_eq!(sent["ok"], true, "{mode}: {sent}");
+        let job = sent["result"]["jobID"].as_str().unwrap().to_owned();
+        let (_, state) = daemon.cli(&["job", "status", "--job", &job]);
+        assert_eq!(state["result"]["state"], ends, "{mode}: {state}");
+        assert_eq!(
+            sent["result"]["outcomeUnknown"],
+            ends == "waitingForRecovery",
+            "{mode}: {sent}"
+        );
+        assert_eq!(keyboard(&fake_root), 1, "{mode}: sent once");
+        assert!(!sent.to_string().contains(PRIVATE_TEXT), "{mode}");
+        if ends == "waitingForRecovery" {
+            // The unknown use blocks the lineage: the next input is refused
+            // and the first never replayed.
+            let (status, after) = send("2026-09-14T00:00:00Z");
+            assert_ne!(status, Some(0), "{mode}: {after}");
+            let (code, _) = refusal(&after);
+            assert_eq!(code, "admissionDenied", "{mode}: {after}");
+            assert_eq!(keyboard(&fake_root), 1, "{mode}: never replayed");
+        }
+        daemon.stop();
+        // The private bytes belong to the sensitive Import alone.
+        for bytes in every_file(&root.join("jobs-state"))
+            .into_iter()
+            .chain(every_file(&root.join("sessions")))
+        {
+            assert!(
+                !bytes
+                    .windows(PRIVATE_TEXT.len())
+                    .any(|slice| slice == PRIVATE_TEXT.as_bytes()),
+                "{mode}: a Job or Session record holds the private text"
+            );
+        }
+    }
+    let _ = std::fs::remove_dir_all(&scratch);
+    assert_windows_status(&["input.keyboard@1"], "implemented");
 }
