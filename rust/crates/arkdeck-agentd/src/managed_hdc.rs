@@ -30,11 +30,13 @@ use arkdeck_control::ManagedToolFacts;
 use arkdeck_platform::{
     LoopbackServerLease, ServerExit, ServerStop, VerifiedTool, end_proved_process,
 };
+#[cfg(target_os = "macos")]
+use arkdeck_provider_hdc::SystemManagedProcess;
 use arkdeck_provider_hdc::{
     CommandlessIdentity, DispatchFailure, EndpointSelection, HdcDispatch, HdcStatusObserver,
     ManagedHdcServer, ManagedLaunch, NativeSignature, ProcessDispatch, ProcessPlan, Receipt,
     StartBudget, StartFailure, StartupDiagnostics, StatusExecutable, SupervisedServer,
-    SupervisorState, SystemManagedProcess, generation,
+    SupervisorState, generation,
 };
 use serde_json::Value;
 use std::io;
@@ -55,6 +57,22 @@ impl ForegroundLifecycle {
 
 #[path = "managed_hdc_lifecycle.rs"]
 mod lifecycle;
+
+/// The Windows process verification of [`ManagedHdc::status`]: the
+/// receipt names the very child the running server launched.
+#[cfg(windows)]
+struct LaunchedProcess<'a>(&'a Mutex<Option<ManagedHdcServer>>);
+
+#[cfg(windows)]
+impl arkdeck_provider_hdc::ManagedProcessVerifier for LaunchedProcess<'_> {
+    fn verifies(&self, receipt: &arkdeck_platform::ServerIdentityReceipt, _: &[String]) -> bool {
+        self.0
+            .lock()
+            .ok()
+            .and_then(|server| server.as_ref().map(|server| server.verifies(receipt)))
+            .unwrap_or(false)
+    }
+}
 
 /// The managed server and the facts its startup established.
 pub(crate) struct ManagedHdc {
@@ -144,7 +162,10 @@ impl ManagedHdc {
             .load(std::sync::atomic::Ordering::Acquire)
     }
 
-    /// The configured executable, by the path it was configured with.
+    /// The configured executable, by the path it was configured with. Read
+    /// by the HDC control-action owner's impact source, which Windows does
+    /// not compose yet.
+    #[cfg_attr(windows, allow(dead_code))]
     pub(crate) fn executable(&self) -> &StatusExecutable {
         &self.executable
     }
@@ -235,8 +256,19 @@ impl ManagedHdc {
     /// production identity observer, signature inspection, process
     /// verification and the shared Supervisor. As a bare binary it has no
     /// bundle version (Swift's SwiftPM daemon reports none either).
+    ///
+    /// Windows has no supported read of another process's argv, so there
+    /// the process is verified by provenance: the server this owner launched
+    /// proves the receipt names its own child (`ManagedHdcServer::verifies`).
+    /// A replacement a confirmed restart proved is no child of it, so its
+    /// process is never verified there and the status does not call it
+    /// managed.
     pub(crate) fn status(&self, now_utc: &dyn Fn() -> String) -> Value {
         let launches = || self.active_launch();
+        #[cfg(target_os = "macos")]
+        let verifier = SystemManagedProcess;
+        #[cfg(windows)]
+        let verifier = LaunchedProcess(&self.server);
         HdcStatusObserver::new(
             self.executable.clone(),
             self.startup.clone(),
@@ -245,7 +277,7 @@ impl ManagedHdc {
             Some(self),
             &CommandlessIdentity::default(),
             &NativeSignature,
-            &SystemManagedProcess,
+            &verifier,
             now_utc,
         )
         .snapshot()
@@ -505,6 +537,9 @@ impl DevelopmentHdc {
         Self { dispatch, managed }
     }
 
+    /// Read by the Job planner's HDC composition, which Windows does not
+    /// compose over this HDC yet.
+    #[cfg_attr(windows, allow(dead_code))]
     pub(crate) fn tool_sha256(&self) -> &str {
         self.dispatch.tool_sha256()
     }

@@ -171,8 +171,10 @@ pub struct Host {
     claims: std::sync::Arc<arkdeck_hoststore::StorageClaims>,
     /// The isolated owner's development HDC: the executable its
     /// device-bound Jobs dispatch to, through the process dispatch every HDC
-    /// plan takes, and the managed server it started, if it started one.
-    #[cfg(target_os = "macos")]
+    /// plan takes, and the managed server it started, if it started one. On
+    /// Windows only a registered HDC tuple's managed server is composed
+    /// (`windows_hdc_gate`), and none is registered yet.
+    #[cfg(any(target_os = "macos", windows))]
     hdc: Option<std::sync::Arc<crate::managed_hdc::DevelopmentHdc>>,
     /// The device sessions this daemon's control sessions hold (Swift
     /// `deviceSessionHolds`).
@@ -406,7 +408,7 @@ impl Host {
     /// answers `runtime.hdc.status`, its startup facts the tool leg of
     /// `target.availability`, and no plan is dispatched once it is not the
     /// server launched.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_managed_development_hdc(
         mut self,
         dispatch: arkdeck_provider_hdc::ProcessDispatch,
@@ -418,7 +420,7 @@ impl Host {
         self
     }
     /// The managed server this composition started, if it started one.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn managed_hdc(&self) -> Option<&crate::managed_hdc::ManagedHdc> {
         self.hdc.as_ref().and_then(|hdc| hdc.managed())
     }
@@ -463,21 +465,17 @@ impl Host {
         &*self.usb
     }
     /// The HDC the Target observation owner dispatches through: the
-    /// development or managed HDC this composition registered.
-    #[cfg(target_os = "macos")]
+    /// development or managed HDC this composition registered. On Windows
+    /// that is only a registered HDC tuple's managed server, and no Windows
+    /// HDC tuple is registered yet (its integration change waits for the
+    /// maintainer's samples; the gate inventory's G06, G07 and G17a), so the
+    /// Target observation owner observes nothing, dispatches nothing and
+    /// refuses every adoption before admission (`target_adopt`).
+    #[cfg(any(target_os = "macos", windows))]
     fn hdc_dispatch(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
         self.hdc
             .as_deref()
             .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
-    }
-    /// On Windows there is none: no Windows HDC tuple is registered yet (its
-    /// integration change waits for the maintainer's samples; the gate
-    /// inventory's G06, G07 and G17a), so the Target observation owner
-    /// observes nothing, dispatches nothing and refuses every adoption before
-    /// admission (`target_adopt`).
-    #[cfg(windows)]
-    fn hdc_dispatch(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
-        None
     }
     /// Runs `run` over the Target observation owner's sources — the
     /// development HDC, the USB relations, the Target store and the clock —
@@ -610,11 +608,7 @@ impl Host {
     /// On Windows no descriptor-bound HDC is composed until the Windows HDC
     /// tuple is registered, so there is no resolver and no executable lane is
     /// installed (`arkforge_execution::install`).
-    #[cfg(windows)]
-    pub(crate) fn rockchip_hdc_resolver(&self) -> Option<Box<arkdeck_hoststore::HdcResolver>> {
-        None
-    }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn rockchip_hdc_resolver(&self) -> Option<Box<arkdeck_hoststore::HdcResolver>> {
         let dispatch = self.hdc.clone()?;
         Some(Box::new(move || {
@@ -1342,18 +1336,13 @@ impl Host {
         })
     }
 
-    /// The HDC the Flash facts probe over: this host's, on macOS; none on
-    /// Windows until its HDC tuple is registered.
-    #[cfg(target_os = "macos")]
+    /// The HDC the Flash facts probe over: this host's (on Windows none
+    /// until its HDC tuple is registered).
+    #[cfg(any(target_os = "macos", windows))]
     fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
         self.hdc
             .as_deref()
             .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
-    }
-
-    #[cfg(windows)]
-    fn flash_hdc(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
-        None
     }
 
     /// `flash.bind-current-loader` binds through this owner, against this
@@ -1452,6 +1441,8 @@ impl Host {
             ("agentExecutions", self.agents.is_some()),
             ("humanActions", self.human_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
+            ("hdc", self.hdc.is_some()),
+            ("managedHdc", self.managed_hdc().is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("codeSignHelper", self.code_sign_helper.is_some()),
             ("flashHostFacts", self.flash_facts.is_some()),
@@ -1531,7 +1522,7 @@ impl Host {
             default_mutation_root: None,
             #[cfg(any(target_os = "macos", windows))]
             claims: Default::default(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             hdc: None,
             #[cfg(any(target_os = "macos", windows))]
             agents: None,
@@ -3585,15 +3576,16 @@ impl HostServices for Host {
 
     /// Swift's daemon answers from the observer its HDC host gives it, and
     /// `unconfigured()` without one: this composition has a host only when
-    /// the isolated owner started a managed server.
-    #[cfg(target_os = "macos")]
+    /// the isolated owner started a managed server (on Windows, only behind
+    /// a registered HDC tuple).
+    #[cfg(any(target_os = "macos", windows))]
     fn runtime_hdc_status(&self) -> Result<serde_json::Value, WireError> {
         Ok(match self.managed_hdc() {
             Some(managed) => managed.status(&utc_now),
             None => arkdeck_provider_hdc::unconfigured_status(None),
         })
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn managed_hdc_tool(&self) -> Option<arkdeck_control::ManagedToolFacts> {
         self.managed_hdc()
             .map(crate::managed_hdc::ManagedHdc::tool_facts)
@@ -3669,7 +3661,7 @@ impl HostServices for Host {
     fn hdc_status(&self, deep: bool) -> HdcStatus {
         // Swift's status observer exists exactly when its HDC host started:
         // here, when the isolated owner started its managed server.
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         if let Some(managed) = self.managed_hdc() {
             if !deep {
                 return HdcStatus {

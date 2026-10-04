@@ -9,17 +9,23 @@
 //! macOS tool's hash registers nothing here. While the registry is a draft
 //! the table is empty, and every development HDC is refused here, naming the
 //! digest the registry would have to hold.
-use arkdeck_provider_hdc::{WindowsHdcTuple, tuple_in};
+//!
+//! What it admits, `windows_lifecycle` starts as the root's managed server
+//! (`managed_hdc::ManagedHdc`) on the endpoint Swift's selector picks, which
+//! must be the tuple's own.
+use arkdeck_provider_hdc::{EndpointSelection, WindowsHdcTuple, tuple_in};
 use std::ffi::OsString;
 use std::path::PathBuf;
 
 /// The development HDC this gate admits: its path, the digest of the bytes
-/// it was admitted by, and the registered tuple that digest selects.
+/// it was admitted by, the registered tuple that digest selects, and the
+/// endpoint its managed server starts on (Swift's selection, the tuple's).
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct AdmittedHdc {
     pub(crate) path: PathBuf,
     pub(crate) sha256: String,
     pub(crate) tuple: &'static WindowsHdcTuple,
+    pub(crate) selection: EndpointSelection,
 }
 
 /// The development HDC `variable` names, admitted against `table`; `None`
@@ -69,20 +75,38 @@ pub(crate) fn admit(
             path.display()
         ));
     };
-    if let Some(port) = variable(arkdeck_provider_hdc::SERVER_PORT_VARIABLE)
-        && port.to_str() != Some(tuple.endpoint.port().to_string().as_str())
-    {
-        return Err(format!(
-            "{} names another endpoint than the registered HDC {}'s {}; nothing was started",
-            arkdeck_provider_hdc::SERVER_PORT_VARIABLE,
-            tuple.candidate,
-            tuple.endpoint
-        ));
+    // Swift's selector over the inherited port, as the macOS isolated owner
+    // selects its managed server's endpoint; it must pick the tuple's.
+    let inherited = variable(arkdeck_provider_hdc::SERVER_PORT_VARIABLE);
+    let selection = match &inherited {
+        Some(port) => port
+            .to_str()
+            .and_then(|port| EndpointSelection::select(Some(port)).ok()),
+        None => EndpointSelection::select(None).ok(),
     }
+    .filter(|selection| selection.endpoint == tuple.endpoint);
+    let Some(selection) = selection else {
+        return Err(match inherited {
+            Some(_) => format!(
+                "{} names another endpoint than the registered HDC {}'s {}; nothing was started",
+                arkdeck_provider_hdc::SERVER_PORT_VARIABLE,
+                tuple.candidate,
+                tuple.endpoint
+            ),
+            None => format!(
+                "the registered HDC {}'s endpoint {} is not the default one: {} must name its \
+                 port; nothing was started",
+                tuple.candidate,
+                tuple.endpoint,
+                arkdeck_provider_hdc::SERVER_PORT_VARIABLE
+            ),
+        });
+    };
     Ok(Some(AdmittedHdc {
         path,
         sha256,
         tuple,
+        selection,
     }))
 }
 
@@ -159,6 +183,10 @@ mod tests {
                 path: tool.0.clone(),
                 sha256: sha256.to_owned(),
                 tuple: &registered[0],
+                selection: EndpointSelection {
+                    endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8710),
+                    source: "default",
+                },
             }))
         );
         // Another entry, a macOS tool's digest, and today's registry: refused.
@@ -232,14 +260,48 @@ mod tests {
             environment.push(("OHOS_HDC_SERVER_PORT", port));
             admitted(&environment, registered)
         };
-        assert!(matches!(with_port("8710"), Ok(Some(_))));
+        assert!(matches!(
+            with_port("8710"),
+            Ok(Some(AdmittedHdc {
+                selection: EndpointSelection {
+                    source: "inheritedEnvironment",
+                    ..
+                },
+                ..
+            }))
+        ));
+        for port in ["18710", "0", "port"] {
+            assert_eq!(
+                with_port(port),
+                Err(
+                    "OHOS_HDC_SERVER_PORT names another endpoint than the registered HDC c1's \
+                     127.0.0.1:8710; nothing was started"
+                        .to_owned()
+                )
+            );
+        }
+        // A tuple on another endpoint than Swift's default is started there
+        // only when the inherited port names it.
+        let elsewhere = leak(WindowsHdcTuple {
+            endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 18710),
+            ..entry(sha256)
+        });
         assert_eq!(
-            with_port("18710"),
+            admitted(&base, elsewhere),
             Err(
-                "OHOS_HDC_SERVER_PORT names another endpoint than the registered HDC c1's \
-                 127.0.0.1:8710; nothing was started"
+                "the registered HDC c1's endpoint 127.0.0.1:18710 is not the default one: \
+                 OHOS_HDC_SERVER_PORT must name its port; nothing was started"
                     .to_owned()
             )
+        );
+        let mut environment = base.to_vec();
+        environment.push(("OHOS_HDC_SERVER_PORT", "18710"));
+        assert_eq!(
+            admitted(&environment, elsewhere).map(|hdc| hdc.map(|hdc| hdc.selection)),
+            Ok(Some(EndpointSelection {
+                endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 18710),
+                source: "inheritedEnvironment",
+            }))
         );
     }
 }
