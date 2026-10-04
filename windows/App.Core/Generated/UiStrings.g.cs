@@ -1510,6 +1510,60 @@ public static class UiStrings
     public const string WindowsOverviewResumeOpenRefused = "windows.overview.resume.openRefused";
     public const string WindowsOverviewResumeOpenUnknown = "windows.overview.resume.openUnknown";
     public const string WindowsOverviewContinuationAttempted = "windows.overview.continuation.attempted";
+    public const string OverviewAttentionTrust = "overview.attention.trust";
+    public const string OverviewAttentionNextStepRefresh = "overview.attention.nextStep.refresh";
+    public const string OverviewCapabilitiesColumnCapability = "overview.capabilities.column.capability";
+    public const string OverviewCapabilitiesColumnEvidence = "overview.capabilities.column.evidence";
+    public const string OverviewCapabilitiesColumnState = "overview.capabilities.column.state";
+    public const string OverviewCapabilitiesLoading = "overview.capabilities.loading";
+    public const string OverviewCapabilitiesStateAvailable = "overview.capabilities.state.available";
+    public const string OverviewCapabilitiesStateLimited = "overview.capabilities.state.limited";
+    public const string OverviewCapabilitiesStateUnavailable = "overview.capabilities.state.unavailable";
+    public const string OverviewCapabilitiesStateUnknown = "overview.capabilities.state.unknown";
+    public const string OverviewCapabilitiesTitleNoTarget = "overview.capabilities.title.noTarget";
+    public const string OverviewCapabilitiesTitleTarget = "overview.capabilities.title.target";
+    public const string OverviewChannelEncryptedVerified = "overview.channel.encryptedVerified";
+    public const string OverviewChannelUnverified = "overview.channel.unverified";
+    public const string OverviewEnvironmentCollapsed = "overview.environment.collapsed";
+    public const string OverviewEnvironmentExpanded = "overview.environment.expanded";
+    public const string OverviewFieldAuthorization = "overview.field.authorization";
+    public const string OverviewFieldAutoLifecycleDispatches = "overview.field.autoLifecycleDispatches";
+    public const string OverviewFieldAutoSubserverDispatches = "overview.field.autoSubserverDispatches";
+    public const string OverviewFieldChannelProtection = "overview.field.channelProtection";
+    public const string OverviewFieldClientVersion = "overview.field.clientVersion";
+    public const string OverviewFieldDaemonVersion = "overview.field.daemonVersion";
+    public const string OverviewFieldDeviceEvents = "overview.field.deviceEvents";
+    public const string OverviewFieldEndpoint = "overview.field.endpoint";
+    public const string OverviewFieldEndpointSource = "overview.field.endpointSource";
+    public const string OverviewFieldGeneration = "overview.field.generation";
+    public const string OverviewFieldHash = "overview.field.hash";
+    public const string OverviewFieldLifecycleAvailability = "overview.field.lifecycleAvailability";
+    public const string OverviewFieldOwnership = "overview.field.ownership";
+    public const string OverviewFieldOwnershipBasis = "overview.field.ownershipBasis";
+    public const string OverviewFieldPath = "overview.field.path";
+    public const string OverviewFieldPlatformTrust = "overview.field.platformTrust";
+    public const string OverviewFieldServerHealth = "overview.field.serverHealth";
+    public const string OverviewFieldServerVersion = "overview.field.serverVersion";
+    public const string OverviewFieldSource = "overview.field.source";
+    public const string OverviewFieldSubserver = "overview.field.subserver";
+    public const string OverviewSectionAdvanced = "overview.section.advanced";
+    public const string OverviewSectionCapabilities = "overview.section.capabilities";
+    public const string OverviewSectionDeviceChannel = "overview.section.deviceChannel";
+    public const string OverviewSectionServerToolchain = "overview.section.serverToolchain";
+    public const string OverviewServerHealthHealthy = "overview.serverHealth.healthy";
+    public const string OverviewServerHealthUnavailable = "overview.serverHealth.unavailable";
+    public const string OverviewServerHealthUnknown = "overview.serverHealth.unknown";
+    public const string OverviewStatusNeedsAttentionNone = "overview.status.needsAttention.none";
+    public const string OverviewStatusNeedsAttentionOne = "overview.status.needsAttention.one";
+    public const string OverviewStatusNeedsAttentionOther = "overview.status.needsAttention.other";
+    public const string OverviewTrustCancelled = "overview.trust.cancelled";
+    public const string OverviewTrustDenied = "overview.trust.denied";
+    public const string OverviewTrustKeyAccessDenied = "overview.trust.keyAccessDenied";
+    public const string OverviewTrustReady = "overview.trust.ready";
+    public const string OverviewTrustTimedOut = "overview.trust.timedOut";
+    public const string OverviewTrustUnavailable = "overview.trust.unavailable";
+    public const string OverviewTrustWaiting = "overview.trust.waiting";
+    public const string WindowsOverviewHdcCheckHidumper = "windows.overview.hdc.checkHidumper";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3016,5 +3070,59 @@ public static class UiStrings
         WindowsOverviewResumeOpenRefused,
         WindowsOverviewResumeOpenUnknown,
         WindowsOverviewContinuationAttempted,
+        OverviewAttentionTrust,
+        OverviewAttentionNextStepRefresh,
+        OverviewCapabilitiesColumnCapability,
+        OverviewCapabilitiesColumnEvidence,
+        OverviewCapabilitiesColumnState,
+        OverviewCapabilitiesLoading,
+        OverviewCapabilitiesStateAvailable,
+        OverviewCapabilitiesStateLimited,
+        OverviewCapabilitiesStateUnavailable,
+        OverviewCapabilitiesStateUnknown,
+        OverviewCapabilitiesTitleNoTarget,
+        OverviewCapabilitiesTitleTarget,
+        OverviewChannelEncryptedVerified,
+        OverviewChannelUnverified,
+        OverviewEnvironmentCollapsed,
+        OverviewEnvironmentExpanded,
+        OverviewFieldAuthorization,
+        OverviewFieldAutoLifecycleDispatches,
+        OverviewFieldAutoSubserverDispatches,
+        OverviewFieldChannelProtection,
+        OverviewFieldClientVersion,
+        OverviewFieldDaemonVersion,
+        OverviewFieldDeviceEvents,
+        OverviewFieldEndpoint,
+        OverviewFieldEndpointSource,
+        OverviewFieldGeneration,
+        OverviewFieldHash,
+        OverviewFieldLifecycleAvailability,
+        OverviewFieldOwnership,
+        OverviewFieldOwnershipBasis,
+        OverviewFieldPath,
+        OverviewFieldPlatformTrust,
+        OverviewFieldServerHealth,
+        OverviewFieldServerVersion,
+        OverviewFieldSource,
+        OverviewFieldSubserver,
+        OverviewSectionAdvanced,
+        OverviewSectionCapabilities,
+        OverviewSectionDeviceChannel,
+        OverviewSectionServerToolchain,
+        OverviewServerHealthHealthy,
+        OverviewServerHealthUnavailable,
+        OverviewServerHealthUnknown,
+        OverviewStatusNeedsAttentionNone,
+        OverviewStatusNeedsAttentionOne,
+        OverviewStatusNeedsAttentionOther,
+        OverviewTrustCancelled,
+        OverviewTrustDenied,
+        OverviewTrustKeyAccessDenied,
+        OverviewTrustReady,
+        OverviewTrustTimedOut,
+        OverviewTrustUnavailable,
+        OverviewTrustWaiting,
+        WindowsOverviewHdcCheckHidumper,
     ];
 }

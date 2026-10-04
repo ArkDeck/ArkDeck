@@ -9017,6 +9017,330 @@
       "table": null,
       "en": "This draft was already started once and is not started again.",
       "zh-Hans": "此草稿已启动过一次，不会再次启动。"
+    },
+    {
+      "key": "overview.attention.trust",
+      "table": "Localizable",
+      "en": "Device trust is not ready",
+      "zh-Hans": "设备信任未就绪"
+    },
+    {
+      "key": "overview.attention.nextStep.refresh",
+      "table": "Localizable",
+      "en": "Unlock and trust the device, then refresh the overview to re-read the current state.",
+      "zh-Hans": "请解锁并在设备上确认信任，然后刷新概览以重新读取当前状态。"
+    },
+    {
+      "key": "overview.capabilities.column.capability",
+      "table": "Localizable",
+      "en": "Capability",
+      "zh-Hans": "能力"
+    },
+    {
+      "key": "overview.capabilities.column.evidence",
+      "table": "Localizable",
+      "en": "Probe evidence",
+      "zh-Hans": "探测证据"
+    },
+    {
+      "key": "overview.capabilities.column.state",
+      "table": "Localizable",
+      "en": "State",
+      "zh-Hans": "状态"
+    },
+    {
+      "key": "overview.capabilities.loading",
+      "table": "Localizable",
+      "en": "Probing device capabilities…",
+      "zh-Hans": "正在探测设备能力…"
+    },
+    {
+      "key": "overview.capabilities.state.available",
+      "table": "Localizable",
+      "en": "Available",
+      "zh-Hans": "可用"
+    },
+    {
+      "key": "overview.capabilities.state.limited",
+      "table": "Localizable",
+      "en": "Limited",
+      "zh-Hans": "受限"
+    },
+    {
+      "key": "overview.capabilities.state.unavailable",
+      "table": "Localizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "overview.capabilities.state.unknown",
+      "table": "Localizable",
+      "en": "Unknown",
+      "zh-Hans": "无法确认"
+    },
+    {
+      "key": "overview.capabilities.title.noTarget",
+      "table": "Localizable",
+      "en": "Device capability matrix",
+      "zh-Hans": "设备能力矩阵"
+    },
+    {
+      "key": "overview.capabilities.title.target",
+      "table": "Localizable",
+      "en": "Device capability matrix (%1$@ · binding %2$lld)",
+      "zh-Hans": "设备能力矩阵（%1$@ · binding %2$lld）"
+    },
+    {
+      "key": "overview.channel.encryptedVerified",
+      "table": "Localizable",
+      "en": "Encrypted, verified",
+      "zh-Hans": "已加密并验证"
+    },
+    {
+      "key": "overview.channel.unverified",
+      "table": "Localizable",
+      "en": "Unverified",
+      "zh-Hans": "未验证"
+    },
+    {
+      "key": "overview.environment.collapsed",
+      "table": "Localizable",
+      "en": "Collapsed",
+      "zh-Hans": "已收起"
+    },
+    {
+      "key": "overview.environment.expanded",
+      "table": "Localizable",
+      "en": "Expanded",
+      "zh-Hans": "已展开"
+    },
+    {
+      "key": "overview.field.authorization",
+      "table": "Localizable",
+      "en": "Authorization",
+      "zh-Hans": "授权"
+    },
+    {
+      "key": "overview.field.autoLifecycleDispatches",
+      "table": "Localizable",
+      "en": "Automatic lifecycle dispatches",
+      "zh-Hans": "自动生命周期调度次数"
+    },
+    {
+      "key": "overview.field.autoSubserverDispatches",
+      "table": "Localizable",
+      "en": "Automatic subserver dispatches",
+      "zh-Hans": "自动子服务器调度次数"
+    },
+    {
+      "key": "overview.field.channelProtection",
+      "table": "Localizable",
+      "en": "Channel protection",
+      "zh-Hans": "通道保护"
+    },
+    {
+      "key": "overview.field.clientVersion",
+      "table": "Localizable",
+      "en": "Client version",
+      "zh-Hans": "客户端版本"
+    },
+    {
+      "key": "overview.field.daemonVersion",
+      "table": "Localizable",
+      "en": "Daemon version",
+      "zh-Hans": "守护进程版本"
+    },
+    {
+      "key": "overview.field.deviceEvents",
+      "table": "Localizable",
+      "en": "Recent device events",
+      "zh-Hans": "近期设备事件"
+    },
+    {
+      "key": "overview.field.endpoint",
+      "table": "Localizable",
+      "en": "Endpoint",
+      "zh-Hans": "端点"
+    },
+    {
+      "key": "overview.field.endpointSource",
+      "table": "Localizable",
+      "en": "Endpoint source",
+      "zh-Hans": "端点来源"
+    },
+    {
+      "key": "overview.field.generation",
+      "table": "Localizable",
+      "en": "Server generation",
+      "zh-Hans": "服务器代次"
+    },
+    {
+      "key": "overview.field.hash",
+      "table": "Localizable",
+      "en": "Hash",
+      "zh-Hans": "哈希"
+    },
+    {
+      "key": "overview.field.lifecycleAvailability",
+      "table": "Localizable",
+      "en": "Server recovery",
+      "zh-Hans": "服务器恢复"
+    },
+    {
+      "key": "overview.field.ownership",
+      "table": "Localizable",
+      "en": "Ownership",
+      "zh-Hans": "归属"
+    },
+    {
+      "key": "overview.field.ownershipBasis",
+      "table": "Localizable",
+      "en": "Ownership basis",
+      "zh-Hans": "归属判定依据"
+    },
+    {
+      "key": "overview.field.path",
+      "table": "Localizable",
+      "en": "Absolute path",
+      "zh-Hans": "绝对路径"
+    },
+    {
+      "key": "overview.field.platformTrust",
+      "table": "Localizable",
+      "en": "Platform trust",
+      "zh-Hans": "平台信任"
+    },
+    {
+      "key": "overview.field.serverHealth",
+      "table": "Localizable",
+      "en": "Server health",
+      "zh-Hans": "服务器健康状态"
+    },
+    {
+      "key": "overview.field.serverVersion",
+      "table": "Localizable",
+      "en": "Server version",
+      "zh-Hans": "服务器版本"
+    },
+    {
+      "key": "overview.field.source",
+      "table": "Localizable",
+      "en": "HDC source",
+      "zh-Hans": "HDC 来源"
+    },
+    {
+      "key": "overview.field.subserver",
+      "table": "Localizable",
+      "en": "Subserver capability",
+      "zh-Hans": "子服务器能力"
+    },
+    {
+      "key": "overview.section.advanced",
+      "table": "Localizable",
+      "en": "Advanced Diagnostics",
+      "zh-Hans": "高级诊断"
+    },
+    {
+      "key": "overview.section.capabilities",
+      "table": "Localizable",
+      "en": "Capabilities",
+      "zh-Hans": "能力"
+    },
+    {
+      "key": "overview.section.deviceChannel",
+      "table": "Localizable",
+      "en": "Selected Device & Channel",
+      "zh-Hans": "所选设备与通道"
+    },
+    {
+      "key": "overview.section.serverToolchain",
+      "table": "Localizable",
+      "en": "Server & Toolchain",
+      "zh-Hans": "服务器与工具链"
+    },
+    {
+      "key": "overview.serverHealth.healthy",
+      "table": "Localizable",
+      "en": "Healthy",
+      "zh-Hans": "正常"
+    },
+    {
+      "key": "overview.serverHealth.unavailable",
+      "table": "Localizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "overview.serverHealth.unknown",
+      "table": "Localizable",
+      "en": "Unknown",
+      "zh-Hans": "未知"
+    },
+    {
+      "key": "overview.status.needsAttention.none",
+      "table": "Localizable",
+      "en": "None",
+      "zh-Hans": "无"
+    },
+    {
+      "key": "overview.status.needsAttention.one",
+      "table": "Localizable",
+      "en": "1 item",
+      "zh-Hans": "1 项"
+    },
+    {
+      "key": "overview.status.needsAttention.other",
+      "table": "Localizable",
+      "en": "%lld items",
+      "zh-Hans": "%lld 项"
+    },
+    {
+      "key": "overview.trust.cancelled",
+      "table": "Localizable",
+      "en": "Cancelled",
+      "zh-Hans": "已取消"
+    },
+    {
+      "key": "overview.trust.denied",
+      "table": "Localizable",
+      "en": "Denied",
+      "zh-Hans": "已拒绝"
+    },
+    {
+      "key": "overview.trust.keyAccessDenied",
+      "table": "Localizable",
+      "en": "Key access denied",
+      "zh-Hans": "密钥访问被拒绝"
+    },
+    {
+      "key": "overview.trust.ready",
+      "table": "Localizable",
+      "en": "Ready",
+      "zh-Hans": "已就绪"
+    },
+    {
+      "key": "overview.trust.timedOut",
+      "table": "Localizable",
+      "en": "Timed out",
+      "zh-Hans": "已超时"
+    },
+    {
+      "key": "overview.trust.unavailable",
+      "table": "Localizable",
+      "en": "Unavailable",
+      "zh-Hans": "不可用"
+    },
+    {
+      "key": "overview.trust.waiting",
+      "table": "Localizable",
+      "en": "Waiting for trust",
+      "zh-Hans": "等待信任"
+    },
+    {
+      "key": "windows.overview.hdc.checkHidumper",
+      "table": null,
+      "en": "Check hidumper with a read-only window inventory",
+      "zh-Hans": "用只读窗口清单检查 hidumper"
     }
   ]
 }
