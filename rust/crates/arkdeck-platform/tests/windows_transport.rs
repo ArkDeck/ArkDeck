@@ -443,3 +443,35 @@ fn a_closer_ends_a_blocked_read_and_every_later_transfer() {
     client.read_to_end(&mut rest).unwrap();
     assert_eq!(rest, b"reply");
 }
+
+/// The foreground-console origin (maintainer ruling 2026-10-04) of a real
+/// connection: its client is this test process, so the answer is what the
+/// host says of this process: the daemon's own user (always, here) in the
+/// session the console is attached to. On a console logon it is the
+/// console; over Remote Desktop, in a service or on a runner without a
+/// console session it is not.
+#[test]
+fn a_connection_s_console_origin_is_its_client_s_session_and_user() {
+    use windows_sys::Win32::System::RemoteDesktop::{
+        ProcessIdToSessionId, WTSGetActiveConsoleSessionId,
+    };
+    let endpoint = endpoint();
+    let mut listener = LocalListener::bind(&endpoint).unwrap();
+    let opener = {
+        let endpoint = endpoint.clone();
+        std::thread::spawn(move || client(&endpoint))
+    };
+    let connection = listener.accept().unwrap();
+    let _client = opener.join().unwrap();
+    let mut session = 0;
+    // SAFETY: valid output storage for the synchronous call.
+    assert_ne!(
+        unsafe { ProcessIdToSessionId(std::process::id(), &mut session) },
+        0
+    );
+    // SAFETY: no arguments.
+    let active = unsafe { WTSGetActiveConsoleSessionId() };
+    let expected = active != 0xFFFF_FFFF && active == session;
+    eprintln!("session {session}, active console session {active:#x}: console {expected}");
+    assert_eq!(connection.foreground_console(), expected);
+}

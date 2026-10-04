@@ -128,7 +128,14 @@ fn serve_connection<H: HostServices>(
             .get_ref()
             .origin()
             .is_ok_and(|peer| peer.foreground_console);
-        #[cfg(not(target_os = "macos"))]
+        // On Windows: the daemon's own user in the active console session,
+        // read of the client this pipe instance authenticated (maintainer
+        // ruling 2026-10-04, `arkdeck_platform::LocalConnection::
+        // foreground_console`); the human's answer at that console is the
+        // presence proof.
+        #[cfg(windows)]
+        let foreground_console = reader.get_ref().foreground_console();
+        #[cfg(not(any(target_os = "macos", windows)))]
         let foreground_console = false;
         let reply = control.handle_frame_with_console(&frame, foreground_console);
         if reader.get_mut().write_all(&reply).is_err() || reader.get_mut().flush().is_err() {
