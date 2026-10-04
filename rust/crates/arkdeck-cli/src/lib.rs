@@ -95,7 +95,7 @@ pub mod runtime_service_install;
 pub mod runtime_service_verify;
 #[cfg(windows)]
 pub mod runtime_service_windows;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod signing_inputs;
 pub mod signing_leaves;
 

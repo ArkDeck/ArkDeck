@@ -14,10 +14,13 @@
 //! maintenance leaf that writes or removes a credential first requires its
 //! image to satisfy a configured signing pin — the development signer's
 //! certificate SHA-256 or the Artifact Signing publisher identity (maintainer
-//! ruling 17) — before Credential Manager is opened. `migrate-deveco` and
-//! `install --build-profile` read DevEco's encrypted password material, whose
-//! Windows layout has not been measured: they are refused
-//! (`unsupportedOnPlatform`).
+//! ruling 17) — before Credential Manager is opened. `install
+//! --build-profile` and `migrate-deveco` read DevEco's encrypted passwords
+//! from the build profile and the material DevEco keeps beside the keystore,
+//! in the layout DevEco writes on macOS too (measured on this host's DevEco
+//! install), so the maintainer never handles a plaintext password; the
+//! daemon `migrate-deveco --daemon` names must be that installed, pinned
+//! daemon.
 #[cfg(any(target_os = "macos", windows))]
 use serde_json::{Value, json};
 
@@ -187,13 +190,6 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
             "unsupported signing subcommand",
         ));
     }
-    #[cfg(windows)]
-    if matches!(
-        command,
-        "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
-    ) {
-        return Err(deveco_material_unsupported());
-    }
     let root = SigningPresetStore::default_root().ok_or_else(no_home)?;
     #[cfg(target_os = "macos")]
     let daemon = KeychainSigningSecrets::default_daemon_executable().ok_or_else(no_home)?;
@@ -201,7 +197,6 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
     let daemon = pinned_installed_daemon()?;
     let empty = serde_json::Map::new();
     let options = invocation.params.as_ref().unwrap_or(&empty);
-    #[cfg(target_os = "macos")]
     if matches!(
         command,
         "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
@@ -250,14 +245,7 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
         command,
         "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
     ) {
-        #[cfg(target_os = "macos")]
-        {
-            migrate_deveco_document(&root, options, &secrets)
-        }
-        #[cfg(windows)]
-        {
-            Err(deveco_material_unsupported())
-        }
+        migrate_deveco_document(&root, options, &secrets)
     } else {
         remove_document(&root, &secrets).map_err(signing_error)
     }
@@ -380,7 +368,7 @@ pub fn install_document(
         .map_err(signing_error)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn lexical_absolute(path: &std::path::Path) -> std::path::PathBuf {
     let mut result = std::path::PathBuf::new();
     for component in path.components() {
@@ -397,14 +385,14 @@ fn lexical_absolute(path: &std::path::Path) -> std::path::PathBuf {
 
 /// `--build-profile`: DevEco's encrypted passwords for `keystore`, read from
 /// the authenticated build profile beside it.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn build_profile_passwords(
     spelling: &str,
     path: &str,
     keystore: &str,
 ) -> Result<(arkdeck_platform::Secret, arkdeck_platform::Secret), crate::CliError> {
     use std::path::Path;
-    if !path.starts_with('/') {
+    if !Path::new(path).is_absolute() {
         return Err(crate::CliError::plain_usage(format!(
             "{spelling} --build-profile must be an absolute path"
         )));
@@ -418,26 +406,6 @@ fn build_profile_passwords(
         )));
     }
     Ok((material.keystore, material.key))
-}
-
-/// DevEco's password material layout on Windows has not been measured, so
-/// nothing reads it: the build profile's passwords stay DevEco's.
-#[cfg(windows)]
-fn build_profile_passwords(
-    _: &str,
-    _: &str,
-    _: &str,
-) -> Result<(arkdeck_platform::Secret, arkdeck_platform::Secret), crate::CliError> {
-    Err(deveco_material_unsupported())
-}
-
-#[cfg(windows)]
-fn deveco_material_unsupported() -> crate::CliError {
-    crate::CliError::new(
-        "unsupportedOnPlatform",
-        "DevEco's encrypted signing password material is not read on Windows yet; \
-         install with the passwords entered at the console",
-    )
 }
 
 /// The installed daemon this CLI would start and authenticate
@@ -517,9 +485,41 @@ pub fn validate_migration_daemon(
     Ok(())
 }
 
+/// On Windows: `--build-profile` and `--daemon` are absolute paths, and the
+/// daemon is the installed one this CLI pinned (`installed`, its canonical
+/// `X:\…` spelling), by its spelling and by the file it resolves to.
+#[cfg(windows)]
+pub fn validate_migration_daemon(
+    command: &str,
+    options: &serde_json::Map<String, Value>,
+    installed: &std::path::Path,
+) -> Result<(), crate::CliError> {
+    use std::path::Path;
+    let spelling = command.replace('.', " ");
+    let profile = options
+        .get("buildProfile")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let daemon = options.get("daemon").and_then(Value::as_str).unwrap_or("");
+    if !Path::new(profile).is_absolute() || !Path::new(daemon).is_absolute() {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} requires --build-profile and --daemon absolute paths"
+        )));
+    }
+    if lexical_absolute(Path::new(daemon)) != installed
+        || arkdeck_provider_workspace::foundation_resolved_path(daemon).as_deref()
+            != installed.to_str()
+    {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} --daemon must name the canonical installed daemon"
+        )));
+    }
+    Ok(())
+}
+
 /// The authenticated build-profile's adjacent material is the decryption
 /// anchor; only a measured match to the installed keystore may replace it.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn migrate_deveco_document(
     root: &std::path::Path,
     options: &serde_json::Map<String, Value>,
@@ -540,8 +540,11 @@ pub fn migrate_deveco_document(
         .and_then(Value::as_str)
         .ok_or_else(|| crate::CliError::plain_usage("migrate-deveco requires --build-profile"))?;
     let material = crate::signing_inputs::read_deveco_profile(std::path::Path::new(profile))?;
+    let store_file = material.store_file.to_str().ok_or_else(|| {
+        crate::CliError::plain_usage("DevEco build-profile storeFile is not Unicode")
+    })?;
     let source = arkdeck_provider_workspace::measure(
-        material.store_file.to_str().unwrap(),
+        store_file,
         "DevEco build-profile keystore",
         false,
         true,
