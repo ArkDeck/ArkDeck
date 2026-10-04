@@ -598,9 +598,7 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
     // a release-candidate package tree registered, inspected, listed and
     // retired as a daemon Bundle, and a DevEco toolchain's inspection,
-    // listing and retirement. Not `runtime tool register` (an HDC is not
-    // registered until a Windows HDC tuple is, CHG-2026-078) nor `runtime
-    // tool select`, which has nothing to select.
+    // listing and retirement. `runtime tool register` is measured below.
     "runtime.bundle.register",
     "runtime.bundle.inspect",
     "runtime.bundle.list",
@@ -608,6 +606,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "runtime.tool.list",
     "runtime.tool.inspect",
     "runtime.tool.remove",
+    // `runtime tool register`: the DevEco kind as above, and the HDC kind
+    // over the account daemon's composition, an hdc.exe a tuple names
+    // registered beside its selection and one no tuple names refused
+    // (TASK-XPA-012; `arkdeck-agentd/tests/spawning/account_tool_selection.rs`).
+    // Not `runtime tool select`: its impact reads the managed server's health
+    // through the HDC lifecycle owner, which no Windows composition proves
+    // healthy yet (#2501), so it answers only a drifted action.
+    "runtime.tool.register",
     // A diagnostics capture's Artifacts the macOS Runtime recorded, exported
     // (`windows_diagnostics_export_process.rs`).
     "diagnostics.export",
