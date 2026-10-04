@@ -823,6 +823,93 @@ fn compose(
         // Runtime Artifacts stay in the Artifact store; Swift copies none.
         "artifacts": [], "warnings": [], "recovery": null,
     });
+    if status == "interrupted" {
+        let outcome = events
+            .iter()
+            .rev()
+            .find(|event| {
+                event["kind"] == "abandonOutcome"
+                    && event["payload"]["result"] == "archivedInterrupted"
+                    && event["payload"]["releaseAuthorized"] == true
+            })
+            .ok_or_else(|| {
+                stop(
+                    "sourceIntegrityFailed",
+                    "an interrupted Session requires a durable archive outcome",
+                )
+            })?;
+        let intent = events
+            .iter()
+            .find(|event| {
+                event["kind"] == "abandonIntent"
+                    && event["eventId"] == outcome["payload"]["correlatesToAbandonIntentEventId"]
+            })
+            .ok_or_else(|| {
+                stop(
+                    "sourceIntegrityFailed",
+                    "the archive outcome has no original user decision",
+                )
+            })?;
+        if !replay.resource_release_authorized
+            || intent["payload"]["outcomeCertainty"] != "confirmed"
+            || intent["payload"]["managedProcessState"] != "notRunning"
+            || !intent["payload"]["deviceHazards"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+            || !outcome["payload"]["unresolvedHazards"]
+                .as_array()
+                .is_some_and(Vec::is_empty)
+        {
+            return Err(stop(
+                "contractViolation",
+                "the archive is not a confirmed quiescent decision",
+            ));
+        }
+        use crate::recovery_manifest::{
+            RecoveryManifest, RecoveryManifestAbandonConfirmation, RecoveryManifestDeviceMode,
+            RecoveryManifestGuide,
+        };
+        let recovery = RecoveryManifest {
+            needs_attention: true,
+            interrupted_reason: Some(
+                "User archived the interrupted Job; no recovery or device cleanup was performed"
+                    .into(),
+            ),
+            device_hazards: vec![],
+            abandon_audit_event_ids: vec![
+                intent["eventId"].as_str().unwrap_or_default().into(),
+                outcome["eventId"].as_str().unwrap_or_default().into(),
+            ],
+            last_confirmed_step_id: intent["payload"]["lastConfirmedStep"]
+                .as_str()
+                .map(str::to_owned),
+            last_device_mode: RecoveryManifestDeviceMode::Unknown,
+            managed_host_process_state: "notRunning".into(),
+            recovery_guide: RecoveryManifestGuide {
+                provider_identity: record.provider().into(),
+                automatic_recovery_available: false,
+                summary: "This Session records an interrupted Job, not successful recovery".into(),
+                steps: vec![
+                    "Inspect the retained Journal and Artifacts before starting independent work"
+                        .into(),
+                ],
+            },
+            // The archive writer refuses executed steps with compensation descriptors.
+            unexecuted_compensations: vec![],
+            user_confirmation: Some(RecoveryManifestAbandonConfirmation {
+                confirmation_id: intent["payload"]["userConfirmationId"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .into(),
+                confirmed_at: intent["timestamp"].as_str().unwrap_or_default().into(),
+            }),
+            recovery_of_session_id: None,
+            recovery_of_job_id: None,
+        };
+        manifest["sessionDisposition"] = json!("archived");
+        manifest["archivedAt"] = outcome["timestamp"].clone();
+        manifest["recovery"] = recovery.to_value();
+    }
     if let Some(device) = device {
         manifest["runtimeAuthority"] = device.authority;
     }

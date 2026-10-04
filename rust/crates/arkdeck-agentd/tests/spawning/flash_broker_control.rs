@@ -9,6 +9,9 @@
 //! The Host is `flash_execution_control`'s, with the invocation owner beside
 //! the planner's state. Its only external ports are the Swift Flash run
 //! oracle's fake lane and Rockchip host; nothing here is device evidence.
+//!
+//! On Windows (TASK-XPA-010) the Host is `flash_execution_control`'s Windows
+//! one, its HDC the in-process fake given through the test seam.
 use crate::flash_execution_control::{Root, execution_fakes, flash_host, request};
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION};
 use arkdeck_control::Control;

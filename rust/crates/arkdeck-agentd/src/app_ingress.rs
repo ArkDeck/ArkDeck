@@ -193,6 +193,8 @@ impl<H: HostServices> AppIngress<H> {
                     | "job.timeline"
                     | "job.evidence"
                     | "job.reconcile"
+                    | "job.archive.preview"
+                    | "job.archive"
                     | "artifact.list"
                     | "artifact.read"
                     | "artifact.quota"
@@ -267,6 +269,29 @@ impl<H: HostServices> AppIngress<H> {
             }
             _ => None,
         };
+        let _archive = if matches!(
+            request.method.as_str(),
+            "job.archive" | "job.archive.preview"
+        ) {
+            let id = request
+                .params
+                .as_ref()
+                .and_then(|p| p.get("jobId"))
+                .and_then(Value::as_str);
+            let Some(id) = id.filter(|id| self.control.app_job_archive_allowed(id)) else {
+                return not_allowlisted(&request.id);
+            };
+            if request.method == "job.archive" {
+                match self.jobs.begin_recovery(id) {
+                    Some(held) => Some(held),
+                    None => return not_allowlisted(&request.id),
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         if request.method == "job.reconcile" {
             let id = request
                 .params
@@ -320,6 +345,22 @@ fn closed_parameters(request: &Request) -> bool {
                     .is_some_and(|reference| {
                         arkdeck_hoststore::parse_reference(reference).is_ok()
                     }));
+    }
+    if matches!(
+        request.method.as_str(),
+        "job.archive" | "job.archive.preview"
+    ) {
+        let required: &[&str] = if request.method == "job.archive.preview" {
+            &["jobId"]
+        } else {
+            &["jobId", "expectedReviewSha256", "userConfirmationId"]
+        };
+        return params.len() == required.len()
+            && required.iter().all(|key| {
+                params.get(*key).and_then(Value::as_str).is_some_and(|s| {
+                    !s.is_empty() && s.len() <= 128 && !s.chars().any(char::is_control)
+                })
+            });
     }
     if request.method == "job.reconcile" {
         return params.len() == 1

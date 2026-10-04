@@ -172,6 +172,10 @@ enum Entry {
     /// `job plan`, `job submit` and `job run` of the oracle's recorded
     /// request, the reviewed plan digest the plan named.
     JobLeaves,
+    /// The protected Flash recovery broker through `recovery flash-invocation
+    /// start|evaluate|status|list`, then `flash reconcile-alias`, over the
+    /// Flash invocation owner and the post-flash alias reconciler.
+    Recovery,
 }
 
 fn inputs_file(directory: &Path, exchange: &str) -> (PathBuf, Value) {
@@ -207,6 +211,7 @@ fn run_case(entry: Entry, outcome: &str) {
                 Entry::AgentRunAlias => "alias",
                 Entry::FlashRun => "flash",
                 Entry::JobLeaves => "job",
+                Entry::Recovery => "recovery",
             },
         )
         .env("ARKDECK_TEST_FLASH_SOCKET_OUTCOME", outcome)
@@ -270,6 +275,22 @@ fn job_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket() {
 }
 
 #[test]
+fn the_recovery_broker_flashes_to_completion_over_the_control_socket() {
+    run_case(Entry::Recovery, "completed");
+}
+
+#[test]
+fn the_recovery_broker_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket() {
+    run_case(Entry::Recovery, "unknown");
+}
+
+/// The recovery broker's execute action and the sources it is pinned to, as
+/// `flash_broker_control` sends them.
+const RECOVERY_EXECUTE: &str = r#"{"schemaVersion":"1.0.0","action":"executePinnedRequest"}"#;
+const RECOVERY_SOURCE: &str = "0000000000000000000000000000000000000000000000000000000000000001";
+const RECOVERY_BUILD: &str = "0000000000000000000000000000000000000000000000000000000000000065";
+
+#[test]
 #[ignore = "subprocess fixture: invoked by the flash socket cases"]
 fn flash_socket_process_fixture() {
     let _turn = crate::turn();
@@ -278,6 +299,7 @@ fn flash_socket_process_fixture() {
         Ok("alias") => Entry::AgentRunAlias,
         Ok("flash") => Entry::FlashRun,
         Ok("job") => Entry::JobLeaves,
+        Ok("recovery") => Entry::Recovery,
         other => panic!("no entry named: {other:?}"),
     };
     let unknown = std::env::var("ARKDECK_TEST_FLASH_SOCKET_OUTCOME").as_deref() == Ok("unknown");
@@ -291,7 +313,23 @@ fn flash_socket_process_fixture() {
         });
     }
     let sockets = SocketDirectory::new();
-    serve(flash_host(&root, &fakes), &sockets.socket());
+    let host = flash_host(&root, &fakes);
+    // The recovery broker's owner beside the planner's state, and the
+    // post-flash alias reconciler over the fixture's Application Support
+    // root and census, as the daemon compositions compose them.
+    let host = match entry {
+        Entry::Recovery => host
+            .with_flash_invocations(
+                arkdeck_hoststore::FlashInvocations::open(&root.0.join("jobs")).unwrap(),
+            )
+            .with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
+                &root.0,
+                crate::flash_execution_control::census,
+                || "2026-09-25T00:00:00Z".to_owned(),
+            )),
+        _ => host,
+    };
+    serve(host, &sockets.socket());
     let socket = sockets.socket();
     let exchange = match entry {
         Entry::AgentRunAlias => "alias.full",
@@ -376,6 +414,101 @@ fn flash_socket_process_fixture() {
             }
             (if unknown { None } else { status }, admitted)
         }
+        Entry::Recovery => {
+            // The completed case drives `recovery flash-invocation`, the
+            // unknown one its `debug` spelling: the same handlers.
+            let leaf: &[&str] = if unknown {
+                &["debug"]
+            } else {
+                &["recovery", "flash-invocation"]
+            };
+            let verb = |verb: &'static str, rest: &[&str]| -> Vec<String> {
+                leaf.iter()
+                    .chain([verb].iter())
+                    .chain(rest.iter())
+                    .map(|part| (*part).to_owned())
+                    .collect()
+            };
+            let run = |arguments: Vec<String>| {
+                let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
+                cli(&socket, &arguments)
+            };
+            let file = sockets.0.join("request.json");
+            fs::write(&file, request(exchange)).unwrap();
+            let file_argument = file.to_string_lossy().into_owned();
+            let (status, started) = run(verb("start", &["--request-file", &file_argument]));
+            assert_eq!(status, Some(0), "{started}");
+            let invocation = started["result"]["invocationID"]
+                .as_str()
+                .unwrap_or_else(|| panic!("{started}"))
+                .to_owned();
+            let action = sockets.0.join("action.json");
+            fs::write(&action, RECOVERY_EXECUTE).unwrap();
+            let action_argument = action.to_string_lossy().into_owned();
+            let (status, evaluated) = run(verb(
+                "evaluate",
+                &[
+                    "--invocation",
+                    &invocation,
+                    "--action-file",
+                    &action_argument,
+                    "--source-sha256",
+                    RECOVERY_SOURCE,
+                    "--build-sha256",
+                    RECOVERY_BUILD,
+                ],
+            ));
+            assert_eq!(evaluated["ok"], true, "{evaluated}");
+            let (shown, listed) = (
+                run(verb("status", &["--invocation", &invocation])),
+                cli(&socket, &["recovery", "flash-invocation", "list"]),
+            );
+            assert_eq!(shown.0, Some(0), "{}", shown.1);
+            assert_eq!(
+                shown.1["result"]["state"],
+                if unknown { "active" } else { "succeeded" },
+                "{}",
+                shown.1
+            );
+            assert_eq!(listed.0, Some(0), "{}", listed.1);
+            assert!(
+                listed.1["result"]["items"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|item| item["invocationId"] == invocation.as_str()),
+                "{}",
+                listed.1
+            );
+            let reconciled = cli(
+                &socket,
+                &[
+                    "flash",
+                    "reconcile-alias",
+                    "--target",
+                    &target,
+                    "--expected-binding-revision",
+                    "1",
+                ],
+            );
+            // The reconciler is composed and answers as Swift's: the fake
+            // lane's post-flash alias is no reissued lineage of the fixture's
+            // board, so nothing is repaired.
+            assert_eq!(
+                reconciled.1["error"]["details"]["wireCode"], "rejected",
+                "{}",
+                reconciled.1
+            );
+            assert!(
+                reconciled.1["error"]["message"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("post-flash alias reconciliation was refused: admissionRejected"),
+                "{}",
+                reconciled.1
+            );
+            (if unknown { None } else { status }, evaluated)
+        }
     };
     let calls = fakes.calls();
     let job_id = job_of(&answer).unwrap_or_else(|| panic!("{status:?} {answer}; {calls:?}"));
@@ -394,7 +527,7 @@ fn flash_socket_process_fixture() {
             "{job_status}; {answer}"
         );
         assert_eq!(job_status["result"]["outcomeUnknown"], true, "{job_status}");
-        if !matches!(entry, Entry::JobLeaves) {
+        if !matches!(entry, Entry::JobLeaves | Entry::Recovery) {
             assert_ne!(status, Some(0), "{answer}");
         }
         // The unknown intent is never replayed: another run of the same Job

@@ -26,13 +26,20 @@ private final class GlobalJobInspectorModel {
   private(set) var recoveringJobID: String?
   private(set) var recoveryJobID: String?
   private(set) var recoveryMessage: String?
+  private(set) var archivingJobID: String?
+  private(set) var archiveMessageJobID: String?
+  private(set) var archiveMessage: String?
+  var archiveReview: RuntimeJobArchiveReview?
+  var lifecycleBusy: Bool { cancellingJobID != nil || recoveringJobID != nil || archivingJobID != nil }
   private var generation = UUID()
   private var loadedJobID: String?
   @ObservationIgnored private let reader = RuntimeJobDetailApplicationFacade.make()
   @ObservationIgnored private let control = RuntimeJobControlApplicationFacade.make()
   @ObservationIgnored private let recovery = RuntimeJobRecoveryApplicationFacade.make()
+  @ObservationIgnored private let archiver = RuntimeJobArchiveApplicationFacade.make()
 
   func load(_ job: RuntimeJobSummaryPresentation?) {
+    if archiveReview?.job != job { archiveReview = nil }
     loadedJobID = job?.id
     generation = UUID()
     let ticket = generation
@@ -51,7 +58,7 @@ private final class GlobalJobInspectorModel {
   }
 
   func cancel(_ job: RuntimeJobSummaryPresentation, onRefresh: @escaping () -> Void) {
-    guard cancellingJobID == nil, recoveringJobID == nil else { return }
+    guard !lifecycleBusy else { return }
     cancellingJobID = job.id
     cancellationJobID = job.id
     cancellationMessage = nil
@@ -71,7 +78,7 @@ private final class GlobalJobInspectorModel {
   }
 
   func recover(_ action: RuntimeJobRecoveryAction, job: RuntimeJobSummaryPresentation, onRefresh: @escaping () -> Void) {
-    guard recoveringJobID == nil, cancellingJobID == nil else { return }
+    guard !lifecycleBusy else { return }
     recoveringJobID = job.id
     recoveryJobID = job.id
     recoveryMessage = nil
@@ -90,6 +97,46 @@ private final class GlobalJobInspectorModel {
       }
       onRefresh()
       if loadedJobID == job.id { load(job) }
+    }
+  }
+
+  func reviewArchive(_ job: RuntimeJobSummaryPresentation) {
+    guard !lifecycleBusy else { return }
+    let ticket = generation
+    archivingJobID = job.id
+    archiveMessageJobID = job.id
+    archiveMessage = nil
+    Task { [weak self, archiver] in
+      let result = await archiver.preview(job)
+      guard let self else { return }
+      archivingJobID = nil
+      guard generation == ticket, loadedJobID == job.id else { return }
+      switch result {
+      case .review(let review): archiveReview = review
+      case .unavailable: archiveMessage = jobsText("jobRecovery.archive.unavailable")
+      }
+    }
+  }
+
+  func confirmArchive(_ review: RuntimeJobArchiveReview, onRefresh: @escaping () -> Void) {
+    guard !lifecycleBusy, archiveReview == review, loadedJobID == review.job.id,
+      review.canArchive else { return }
+    archiveReview = nil
+    archivingJobID = review.job.id
+    archiveMessageJobID = review.job.id
+    archiveMessage = nil
+    Task { [weak self, archiver] in
+      let result = await archiver.archive(review)
+      guard let self else { return }
+      archivingJobID = nil
+      switch result {
+      case .archived(let published):
+        archiveMessage = jobsText(published ? "jobRecovery.archive.complete" : "jobRecovery.archive.publicationPending")
+      case .refused: archiveMessage = jobsText("jobRecovery.archive.unavailable")
+      case .unconfirmed: archiveMessage = jobsText("jobRecovery.action.unconfirmed")
+      }
+      onRefresh()
+      if loadedJobID == review.job.id { load(review.job) }
     }
   }
 
@@ -179,6 +226,11 @@ struct GlobalJobInspectorView: View {
     }
     .onChange(of: isExpanded) { _, expanded in
       if expanded { actions.load(focusedJob) }
+    }
+    .sheet(item: $actions.archiveReview) { review in
+      JobArchiveReviewSheet(review: review, onDismiss: { actions.archiveReview = nil }) {
+        actions.confirmArchive(review, onRefresh: onRefresh)
+      }
     }
   }
 
@@ -299,7 +351,7 @@ struct GlobalJobInspectorView: View {
               Button(jobsText("jobInspector.action.cancel")) {
                 actions.cancel(job, onRefresh: onRefresh)
               }
-              .disabled(actions.cancellingJobID != nil || actions.recoveringJobID != nil)
+              .disabled(actions.lifecycleBusy)
               .accessibilityIdentifier("jobInspector.cancel")
             }
           }
@@ -308,7 +360,7 @@ struct GlobalJobInspectorView: View {
               Button(jobsText(recoveryAction == .reconcile ? "jobRecovery.action.reconcile" : "jobRecovery.action.resume")) {
                 actions.recover(recoveryAction, job: job, onRefresh: onRefresh)
               }
-              .disabled(actions.cancellingJobID != nil || actions.recoveringJobID != nil)
+              .disabled(actions.lifecycleBusy)
               .accessibilityIdentifier("jobRecovery.perform")
               Text(jobsText(recoveryAction == .reconcile ? "jobRecovery.action.reconcile.detail" : "jobRecovery.action.resume.detail"))
                 .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
@@ -320,12 +372,24 @@ struct GlobalJobInspectorView: View {
               Button(jobsText("jobRecovery.action.rebind")) {
                 actions.recover(.rebindLoader, job: job, onRefresh: onRefresh)
               }
-              .disabled(actions.cancellingJobID != nil || actions.recoveringJobID != nil)
+              .disabled(actions.lifecycleBusy)
               .accessibilityIdentifier("jobRecovery.rebind")
               Text(jobsText("jobRecovery.action.rebind.detail"))
                 .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
+          }
+          if RuntimeJobArchiveApplicationFacade.canInspect(job) {
+            Button(jobsText("jobRecovery.archive.review")) { actions.reviewArchive(job) }
+              .disabled(actions.lifecycleBusy)
+              .accessibilityIdentifier("jobRecovery.archive.review")
+          }
+          if actions.archivingJobID == job.id {
+            ProgressView(jobsText("jobRecovery.archive.working")).controlSize(.small)
+          }
+          if actions.archiveMessageJobID == job.id, let message = actions.archiveMessage {
+            Text(message).font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+              .accessibilityIdentifier("jobRecovery.archive.result")
           }
           if actions.recoveringJobID == job.id {
             ProgressView(jobsText("jobRecovery.action.working")).controlSize(.small)
@@ -836,5 +900,62 @@ struct GlobalRecoveryBannerView: View {
     // outcomeUnknown is warn (the system warning tone), not danger: red
     // claims a known failure, and unknown is precisely not that.
     .warning
+  }
+}
+
+
+private struct JobArchiveReviewSheet: View {
+  let review: RuntimeJobArchiveReview
+  let onDismiss: () -> Void
+  let onConfirm: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
+      Text(jobsText("jobRecovery.archive.title")).font(.title2).accessibilityAddTraits(.isHeader)
+      ScrollView {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
+          Text(jobsText("jobRecovery.archive.detail"))
+            .fixedSize(horizontal: false, vertical: true)
+          WorkspaceFactGrid {
+            GridRow { Text(jobsText("jobInspector.fact.job")); Text(review.job.id).textSelection(.enabled) }
+            GridRow { Text(jobsText("jobInspector.fact.target")); Text(review.job.targetID).textSelection(.enabled) }
+            if let step = review.lastConfirmedStepID {
+              GridRow { Text(jobsText("jobRecovery.archive.lastStep")); Text(step).textSelection(.enabled) }
+            }
+          }
+          if review.mode == "finishAudit" || review.mode == "finishPublication" {
+            Text(jobsText("jobRecovery.archive.existingDecision")).foregroundStyle(.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          ForEach(Array(Set(review.blockers.map(blockerKey))).sorted(), id: \.self) { key in
+            Label(jobsText(key), systemImage: "exclamationmark.circle")
+              .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+          }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+      }
+      .frame(maxHeight: 400)
+      HStack {
+        Spacer()
+        Button(jobsText("jobRecovery.archive.dismiss"), action: onDismiss).keyboardShortcut(.cancelAction)
+        Button(jobsText(review.mode == "archive" ? "jobRecovery.archive.confirm" : "jobRecovery.archive.finish"), action: onConfirm)
+          .disabled(!review.canArchive)
+          .accessibilityIdentifier("jobRecovery.archive.confirm")
+      }
+    }
+    .padding(WorkspaceMetrics.pageInsetHorizontal).frame(width: 560)
+    .accessibilityIdentifier("jobRecovery.archive.sheet")
+  }
+
+  private func blockerKey(_ blocker: String) -> String {
+    switch blocker {
+    case "outcomeNotConfirmed": "jobRecovery.archive.blocker.unknown"
+    case "mutationArchiveProofUnavailable", "capabilityLineageMustRemainHeld": "jobRecovery.archive.blocker.mutation"
+    case "unresolvedHazardsMustRemainHeld": "jobRecovery.archive.blocker.hazards"
+    case "managedProcessOrCompensationProofUnavailable": "jobRecovery.archive.blocker.process"
+    case "jobHeldByActiveRuntime": "jobRecovery.archive.blocker.active"
+    case "sessionPublicationUnavailable": "jobRecovery.archive.blocker.storage"
+    default: "jobRecovery.archive.blocker.refresh"
+    }
   }
 }

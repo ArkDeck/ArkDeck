@@ -443,6 +443,14 @@ fn replay(
     };
     let (mut facts, mut events) = (facts, journal_events(jobs, id)?);
 
+    // Finish only an already durable user archive. No provider is involved.
+    // A failed proof or write leaves this Job held for recovery.
+    if crate::job_archive::complete_pending(&mut record, &mut journal.writer, &events, &clock(now)?)
+        .map_err(|error| internal(error.message))?
+    {
+        return Ok(record);
+    }
+
     // A crash after a reconcile decision may leave its mandatory triggered
     // transition unwritten: finish that journal-only decision first.
     if let Some(last) = events

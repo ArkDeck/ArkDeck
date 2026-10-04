@@ -623,3 +623,72 @@ fn a_refusal_is_reported_as_swifts_parser_reports_it() {
     .collect();
     assert!(parse(&argv).is_ok());
 }
+
+#[test]
+fn archive_uses_the_reviewed_job_and_accepts_no_caller_quiescence_facts() {
+    let argv = |words: &[&str]| words.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+    let preview = parse(&argv(&["job", "archive", "preview", "--job", "job-test"])).unwrap();
+    assert_eq!(preview.method, "job.archive.preview");
+    let hash = "a".repeat(64);
+    let apply = parse(&argv(&[
+        "job",
+        "archive",
+        "apply",
+        "--job",
+        "job-test",
+        "--expected-review-sha256",
+        &hash,
+        "--user-confirmation-id",
+        "user-archive-fixture",
+    ]))
+    .unwrap();
+    assert_eq!(apply.method, "job.archive");
+    assert_eq!(
+        apply.params,
+        Some(
+            json!({"jobId":"job-test","expectedReviewSha256":hash,
+        "userConfirmationId":"user-archive-fixture"})
+            .as_object()
+            .unwrap()
+            .clone()
+        )
+    );
+    for invalid in [
+        vec!["job", "archive", "apply", "--job", "job-test"],
+        vec![
+            "job",
+            "archive",
+            "apply",
+            "--job",
+            "job-test",
+            "--expected-review-sha256",
+            "bad",
+            "--user-confirmation-id",
+            "user",
+        ],
+        vec![
+            "job",
+            "archive",
+            "preview",
+            "--job",
+            "job-test",
+            "--target",
+            "replacement",
+        ],
+        vec![
+            "job",
+            "archive",
+            "apply",
+            "--job",
+            "job-test",
+            "--expected-review-sha256",
+            &hash,
+            "--user-confirmation-id",
+            "user",
+            "--managed-process-state",
+            "notRunning",
+        ],
+    ] {
+        assert!(parse(&argv(&invalid)).is_err(), "{invalid:?}");
+    }
+}
