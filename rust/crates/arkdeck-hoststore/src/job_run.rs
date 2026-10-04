@@ -73,7 +73,7 @@ use std::path::Path;
 #[cfg(any(target_os = "macos", windows))]
 use std::time::Duration;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "workspace_run.rs"]
 mod workspace_run;
 
@@ -104,17 +104,10 @@ const RUNNABLE: [&str; 4] = [
 /// composition, a Runtime-owned workspace copy, the patches applied to and
 /// reverted from a workspace and a workspace build through its workspace
 /// composition. Every other Job is refused before its run starts.
-#[cfg(target_os = "macos")]
 pub(crate) fn executes(operation: &str) -> bool {
     analyzer_composition::EXECUTED.contains(&operation)
         || crate::device_run::runs(operation)
         || workspace_run::runs(operation)
-}
-
-/// On Windows the analyzer and device lanes are built.
-#[cfg(windows)]
-pub(crate) fn executes(operation: &str) -> bool {
-    analyzer_composition::EXECUTED.contains(&operation) || crate::device_run::runs(operation)
 }
 
 /// A `job.run` refusal: its control-plane code, message and details.
@@ -415,14 +408,10 @@ impl JobRunner<'_> {
             ));
         }
         let device = crate::device_run::runs(record.operation()) && self.hdc.is_some();
-        #[cfg(target_os = "macos")]
         let workspace = self
             .workspace
             .filter(|_| workspace_run::runs(record.operation()));
         let analyzer = analyzer_composition::EXECUTED.contains(&record.operation());
-        // The workspace lane is not built on Windows.
-        #[cfg(windows)]
-        let workspace = None::<&crate::WorkspaceComposition>;
         if !analyzer && !device && workspace.is_none() {
             return Err(proven(
                 "rejected",
@@ -437,11 +426,8 @@ impl JobRunner<'_> {
         // Job a reconcile confirmed at its safe boundary, whose products it
         // republished — and a complete-overwrite recovery belongs to the
         // flash lane this Runtime does not hold.
-        #[cfg(target_os = "macos")]
         let resumed_signing = record.operation() == crate::workspace_composition::SIGN
             && state == "resumeAtConfirmedSafeBoundary";
-        #[cfg(windows)]
-        let resumed_signing = false;
         if state != "preflight"
             && !resumed_signing
             && (!device || state == "recoveringByCompleteOverwrite")
@@ -500,7 +486,6 @@ impl JobRunner<'_> {
             self.take_over_held_use(&mut run)
                 .map_err(|message| proven("rejected", message, Some(id)))?;
         }
-        #[cfg(target_os = "macos")]
         match (self.hdc.filter(|_| device), workspace) {
             (Some(hdc), _) => self.execute_device(&mut run, hdc)?,
             (None, Some(workspace))
@@ -541,12 +526,6 @@ impl JobRunner<'_> {
             }
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
-        }
-        // A device or analyzer Job reaches here on Windows.
-        #[cfg(windows)]
-        match self.hdc.filter(|_| device) {
-            Some(hdc) => self.execute_device(&mut run, hdc)?,
-            None => self.execute(&mut run)?,
         }
         run.release(self.jobs, self.sessions, &directory)?;
         Ok(run.record.status())

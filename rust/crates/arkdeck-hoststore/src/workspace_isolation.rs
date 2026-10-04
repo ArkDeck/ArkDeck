@@ -21,6 +21,13 @@
 //! following a link. A copy whose tree moved from its base revision is
 //! adopted only where the durable patch lineage (`workspace_patch.rs`)
 //! derives exactly the revision it measures.
+//!
+//! On Windows (TASK-XPA-011) the copy is the same walk over the host's
+//! `X:\…` spelling, on the refusing side where NTFS differs: a symbolic
+//! link or junction anywhere in the tree is refused as an unsafe entry
+//! (a Windows link is not recreated), a file carries no mode and is
+//! written with the private descriptor, and a file is unchanged when its
+//! length, attributes and creation and write times are.
 use crate::workspace_composition::{Isolation, WorkspaceComposition};
 use crate::workspace_profile::ProfileKind;
 use crate::workspace_support::{
@@ -29,9 +36,8 @@ use crate::workspace_support::{
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use std::fs::{self, DirBuilder, OpenOptions};
+use std::fs;
 use std::io::{self, Read, Write};
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 
 /// The Runtime-owned copies' directory below the state root.
@@ -296,11 +302,7 @@ impl Manifest {
 
 /// A manifest's bytes, read through no link and within its bound.
 fn read_manifest(path: &str) -> Option<Manifest> {
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(path)
-        .ok()?;
+    let file = support::open_no_follow(Path::new(path), false).ok()?;
     let mut bytes = Vec::new();
     file.take(MAXIMUM_MANIFEST + 1)
         .read_to_end(&mut bytes)
@@ -316,12 +318,7 @@ fn write_manifest(path: &str, bytes: &[u8]) -> Result<(), IsolationFailure> {
     let suffix = u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().map_err(other)?);
     let staged = format!("{path}.{suffix:016x}.tmp");
     let written = (|| {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .custom_flags(libc::O_NOFOLLOW)
-            .open(&staged)?;
+        let mut file = create_private_new(&staged)?;
         file.write_all(bytes)?;
         file.sync_all()?;
         fs::rename(&staged, path)
@@ -336,8 +333,33 @@ fn exists(path: &str) -> bool {
     Path::new(path).exists()
 }
 
+/// One new owner-only directory; an existing entry is refused.
 fn private_directory(path: &str) -> io::Result<()> {
-    DirBuilder::new().mode(0o700).create(path)
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new().mode(0o700).create(path)
+    }
+    #[cfg(windows)]
+    arkdeck_platform::create_private_directory(Path::new(path))
+}
+
+/// One new owner-only file for writing, never through a link (`O_EXCL`,
+/// `0o600`, `O_NOFOLLOW`; on Windows `CREATE_NEW` with the private
+/// descriptor).
+fn create_private_new(path: &str) -> io::Result<fs::File> {
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(path)
+    }
+    #[cfg(windows)]
+    arkdeck_platform::create_private_file(Path::new(path))
 }
 
 /// Swift `allowedPathsDigest`: one definition shared by creation and
@@ -418,6 +440,7 @@ impl Policy {
 }
 
 /// Swift `relativeLinkTarget(fromLinkAt:toTreeRelativeTarget:)`.
+#[cfg(not(windows))]
 fn relative_link_target(link: &str, target: &str) -> String {
     let directory: Vec<&str> = link.split('/').filter(|c| !c.is_empty()).collect();
     let directory = &directory[..directory.len().saturating_sub(1)];
@@ -445,8 +468,10 @@ fn leaf(relative: &str) -> &str {
 /// Swift `copyBoundedRegularFile`: read through no link and without
 /// blocking, written exclusively with the source's mode, and refused unless
 /// the source is the same unchanged regular file from first byte to last.
+#[cfg(not(windows))]
 fn copy_regular_file(source: &str, destination: &str, name: &str) -> Result<u64, IsolationFailure> {
-    let mut input = OpenOptions::new()
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+    let mut input = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
         .open(source)
@@ -456,7 +481,7 @@ fn copy_regular_file(source: &str, destination: &str, name: &str) -> Result<u64,
         return Err(unsafe_entry(name));
     }
     let mode = initial.mode() & 0o777;
-    let mut output = OpenOptions::new()
+    let mut output = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(mode)
@@ -501,11 +526,55 @@ fn copy_regular_file(source: &str, destination: &str, name: &str) -> Result<u64,
     Ok(initial.size())
 }
 
+/// On Windows: read through no link, written new with the private
+/// descriptor, and refused unless the source is the same unchanged regular
+/// file from first byte to last.
+#[cfg(windows)]
+fn copy_regular_file(source: &str, destination: &str, name: &str) -> Result<u64, IsolationFailure> {
+    use std::os::windows::fs::MetadataExt;
+    let mut input =
+        support::open_no_follow(Path::new(source), false).map_err(|_| unsafe_entry(name))?;
+    let initial = input.metadata().map_err(|_| unsafe_entry(name))?;
+    if !initial.file_type().is_file() || initial.len() > MAXIMUM_FILE_BYTES {
+        return Err(unsafe_entry(name));
+    }
+    let mut output = create_private_new(destination).map_err(|_| unsafe_entry(name))?;
+    let mut remaining = initial.len();
+    let mut buffer = vec![0u8; 64 * 1024];
+    while remaining > 0 {
+        let requested = buffer.len().min(remaining as usize);
+        let read = input
+            .read(&mut buffer[..requested])
+            .map_err(|_| unsafe_entry(name))?;
+        if read == 0 {
+            return Err(unsafe_entry(name));
+        }
+        output
+            .write_all(&buffer[..read])
+            .map_err(|_| unsafe_entry(name))?;
+        remaining -= read as u64;
+    }
+    let mut extra = [0u8; 1];
+    if input.read(&mut extra).map_err(|_| unsafe_entry(name))? != 0 {
+        return Err(unsafe_entry(name));
+    }
+    let last = input.metadata().map_err(|_| unsafe_entry(name))?;
+    let unchanged = last.len() == initial.len()
+        && last.file_attributes() == initial.file_attributes()
+        && last.creation_time() == initial.creation_time()
+        && last.last_write_time() == initial.last_write_time();
+    if !unchanged {
+        return Err(unsafe_entry(name));
+    }
+    Ok(initial.len())
+}
+
 /// One run of Swift's `copyIsolatedTree`.
 struct Copy {
     /// The canonical source root links must resolve inside.
     source: String,
     /// The physical spelling Foundation's enumerator reports entries under.
+    #[cfg(not(windows))]
     physical: String,
     destination: String,
     entries: usize,
@@ -515,7 +584,7 @@ struct Copy {
 impl Copy {
     fn directory(&mut self, relative: Option<&str>) -> Result<(), IsolationFailure> {
         let directory = match relative {
-            Some(relative) => format!("{}/{relative}", self.source),
+            Some(relative) => support::join(&self.source, relative),
             None => self.source.clone(),
         };
         let mut names = Vec::new();
@@ -539,6 +608,45 @@ impl Copy {
         Ok(())
     }
 
+    /// Swift keeps a link that resolves inside the source tree, an absolute
+    /// one rewritten relative.
+    #[cfg(not(windows))]
+    fn link(&self, relative: &str, path: &str, output: &str) -> Result<(), IsolationFailure> {
+        let target = fs::read_link(path).map_err(other)?;
+        let target = target.to_str().ok_or_else(|| unsafe_entry(relative))?;
+        let resolved = if target.starts_with('/') {
+            foundation_resolved(target)
+        } else {
+            let parent = match relative.rfind('/') {
+                Some(index) => format!("{}/{}", self.physical, &relative[..index]),
+                None => self.physical.clone(),
+            };
+            foundation_resolved(&format!("{parent}/{target}"))
+        };
+        let inside = resolved == self.source || resolved.starts_with(&format!("{}/", self.source));
+        if !inside {
+            return Err(unsafe_entry(relative));
+        }
+        let recreated = if target.starts_with('/') {
+            let tree_relative = if resolved == self.source {
+                ""
+            } else {
+                &resolved[self.source.len() + 1..]
+            };
+            relative_link_target(relative, tree_relative)
+        } else {
+            target.to_owned()
+        };
+        std::os::unix::fs::symlink(recreated, output).map_err(other)?;
+        Ok(())
+    }
+
+    /// A Windows link or junction is never recreated: it is refused.
+    #[cfg(windows)]
+    fn link(&self, relative: &str, _path: &str, _output: &str) -> Result<(), IsolationFailure> {
+        Err(unsafe_entry(relative))
+    }
+
     fn entry(&mut self, relative: &str) -> Result<(), IsolationFailure> {
         self.entries += 1;
         if self.entries > MAXIMUM_ENTRIES {
@@ -552,41 +660,15 @@ impl Copy {
         if relative.split('/').any(|component| component == ".build") {
             return Ok(());
         }
-        let path = format!("{}/{relative}", self.source);
+        let path = support::join(&self.source, relative);
         let kind = fs::symlink_metadata(&path).map_err(other)?.file_type();
         // A worktree's `.git` pointer file would address primary metadata.
         if relative == ".git" && !kind.is_dir() {
             return Ok(());
         }
-        let output = format!("{}/{relative}", self.destination);
+        let output = support::join(&self.destination, relative);
         if kind.is_symlink() {
-            let target = fs::read_link(&path).map_err(other)?;
-            let target = target.to_str().ok_or_else(|| unsafe_entry(relative))?;
-            let resolved = if target.starts_with('/') {
-                foundation_resolved(target)
-            } else {
-                let parent = match relative.rfind('/') {
-                    Some(index) => format!("{}/{}", self.physical, &relative[..index]),
-                    None => self.physical.clone(),
-                };
-                foundation_resolved(&format!("{parent}/{target}"))
-            };
-            let inside =
-                resolved == self.source || resolved.starts_with(&format!("{}/", self.source));
-            if !inside {
-                return Err(unsafe_entry(relative));
-            }
-            let recreated = if target.starts_with('/') {
-                let tree_relative = if resolved == self.source {
-                    ""
-                } else {
-                    &resolved[self.source.len() + 1..]
-                };
-                relative_link_target(relative, tree_relative)
-            } else {
-                target.to_owned()
-            };
-            std::os::unix::fs::symlink(recreated, &output).map_err(other)?;
+            self.link(relative, &path, &output)?;
         } else if kind.is_dir() {
             private_directory(&output).map_err(other)?;
             self.directory(Some(relative))?;
@@ -607,20 +689,23 @@ impl Copy {
 /// Swift `copyIsolatedTree(from:to:)`.
 fn copy_isolated_tree(source: &str, destination: &str) -> Result<(), IsolationFailure> {
     let source = foundation_resolved(source);
+    #[cfg(not(windows))]
     let physical = fs::canonicalize(&source)
         .ok()
         .and_then(|path| path.to_str().map(str::to_owned))
         .unwrap_or_else(|| source.clone());
     let (parent, name) = destination
-        .rsplit_once('/')
+        .rsplit_once(support::SEPARATOR)
         .ok_or(IsolationFailure::Other)?;
-    let destination = format!("{}/{name}", foundation_resolved(parent));
-    if destination == source || destination.starts_with(&format!("{source}/")) {
+    let destination = support::join(&foundation_resolved(parent), name);
+    if support::is_within(&destination, &source) {
         return Err(unsafe_entry("destinationInsideSource"));
     }
     private_directory(&destination).map_err(other)?;
     Copy {
         source,
+        // No link is followed on Windows, so no physical spelling is needed.
+        #[cfg(not(windows))]
         physical,
         destination,
         entries: 0,
@@ -631,7 +716,7 @@ fn copy_isolated_tree(source: &str, destination: &str) -> Result<(), IsolationFa
 
 impl Isolation {
     fn task_root(&self, workspace_id: &str) -> String {
-        format!("{}/{workspace_id}", self.root)
+        support::join(&self.root, workspace_id)
     }
 }
 
@@ -649,7 +734,7 @@ pub(crate) fn manifest_source(copies: &str, project_ref: &str) -> Option<String>
     }
     names.sort();
     names.into_iter().find_map(|name| {
-        let stored = read_manifest(&format!("{copies}/{name}/{MANIFEST}"))?;
+        let stored = read_manifest(&support::join(copies, &format!("{name}/{MANIFEST}")))?;
         let record = stored.workspace;
         (record.htask_id.starts_with("runtime-") && record.project_ref == project_ref)
             .then_some(record.source_project_ref)
@@ -735,8 +820,8 @@ impl WorkspaceComposition {
         let workspace_id = format!("evo-{}", &digest[..24]);
         let project_ref = format!("evolution-{}", &digest[..20]);
         let task_root = isolation.task_root(&workspace_id);
-        let workspace_root = format!("{task_root}/workspace");
-        let manifest_path = format!("{task_root}/{MANIFEST}");
+        let workspace_root = support::join(&task_root, "workspace");
+        let manifest_path = support::join(&task_root, MANIFEST);
         let record = Record {
             workspace_id: workspace_id.clone(),
             htask_id: htask.clone(),
@@ -759,7 +844,7 @@ impl WorkspaceComposition {
             if !exists(&workspace_root) {
                 // A swept copy keeps its manifest for audit; reopening it
                 // is an identity being reused, never a recovery.
-                return Err(if exists(&format!("{task_root}/teardown.json")) {
+                return Err(if exists(&support::join(&task_root, "teardown.json")) {
                     EvolutionError::WorkspaceAlreadyDestroyed(workspace_id)
                 } else {
                     EvolutionError::WorkspaceManifestConflict
@@ -773,7 +858,7 @@ impl WorkspaceComposition {
             return Ok(record);
         }
         private_directory(&task_root).map_err(other)?;
-        let temporary = format!("{task_root}/.workspace.tmp");
+        let temporary = support::join(&task_root, ".workspace.tmp");
         let prepared = (|| {
             copy_isolated_tree(&source.project_root, &temporary)?;
             if fs::symlink_metadata(&workspace_root).is_ok() {
@@ -815,7 +900,7 @@ impl WorkspaceComposition {
                 allowed_paths: Some(policy.allowed_paths.clone()),
             };
             write_manifest(&manifest_path, &manifest.encode()?)?;
-            private_directory(&format!("{task_root}/attempts")).map_err(other)?;
+            private_directory(&support::join(&task_root, "attempts")).map_err(other)?;
             Ok(record)
         })();
         if prepared.is_err() && exists(&temporary) {
@@ -834,8 +919,8 @@ impl WorkspaceComposition {
             return Inspection::Conflicted("workspace isolation cannot be revalidated");
         };
         let task_root = isolation.task_root(&intent.workspace_id);
-        let manifest_path = format!("{task_root}/{MANIFEST}");
-        let workspace_root = format!("{task_root}/workspace");
+        let manifest_path = support::join(&task_root, MANIFEST);
+        let workspace_root = support::join(&task_root, "workspace");
         if !exists(&manifest_path) {
             return if exists(&task_root) {
                 Inspection::Conflicted("workspace isolation manifest is absent")
@@ -918,8 +1003,8 @@ impl WorkspaceComposition {
         names.sort();
         let mut failures = Vec::new();
         for name in names {
-            let entry = format!("{}/{name}", isolation.root);
-            let Some(stored) = read_manifest(&format!("{entry}/{MANIFEST}")) else {
+            let entry = support::join(&isolation.root, &name);
+            let Some(stored) = read_manifest(&support::join(&entry, MANIFEST)) else {
                 continue;
             };
             let record = &stored.workspace;
@@ -935,7 +1020,7 @@ impl WorkspaceComposition {
                 failures.push(failed("metadata"));
                 continue;
             };
-            let workspace_root = format!("{entry}/workspace");
+            let workspace_root = support::join(&entry, "workspace");
             let adopted = (|| {
                 let revision =
                     support::workspace_revision(&workspace_root, &source.profile_id, allowed_paths)
@@ -1078,8 +1163,8 @@ fn remove_item(path: &str) -> io::Result<()> {
 /// `.workspace.doomed`, never a half-deleted `workspace/` that still looks
 /// reopenable; then every destroyable entry is removed.
 fn destroy_isolated_tree(task_root: &str) -> io::Result<()> {
-    let workspace = format!("{task_root}/workspace");
-    let doomed = format!("{task_root}/.workspace.doomed");
+    let workspace = support::join(task_root, "workspace");
+    let doomed = support::join(task_root, ".workspace.doomed");
     if exists(&workspace) {
         if exists(&doomed) {
             remove_item(&doomed)?;
@@ -1087,7 +1172,7 @@ fn destroy_isolated_tree(task_root: &str) -> io::Result<()> {
         fs::rename(&workspace, &doomed)?;
     }
     for name in DESTROYABLE {
-        let entry = format!("{task_root}/{name}");
+        let entry = support::join(task_root, name);
         if exists(&entry) {
             remove_item(&entry)?;
         }
@@ -1118,7 +1203,7 @@ impl WorkspaceComposition {
             return false;
         }
         let Ok(revision) = support::workspace_revision(
-            &format!("{entry}/workspace"),
+            &support::join(entry, "workspace"),
             &source.profile_id,
             allowed_paths,
         ) else {
@@ -1160,8 +1245,8 @@ impl WorkspaceComposition {
         names.sort();
         let mut inventory = Vec::new();
         for name in names {
-            let entry = format!("{}/{name}", isolation.root);
-            let Some(stored) = read_manifest(&format!("{entry}/{MANIFEST}")) else {
+            let entry = support::join(&isolation.root, &name);
+            let Some(stored) = read_manifest(&support::join(&entry, MANIFEST)) else {
                 continue;
             };
             if !stored.workspace.htask_id.starts_with("runtime-") {
@@ -1230,7 +1315,7 @@ impl WorkspaceComposition {
         let mut findings = Vec::new();
         let mut candidates = Vec::new();
         for name in &names {
-            let task_root = format!("{}/{name}", isolation.root);
+            let task_root = support::join(&isolation.root, name);
             if !name.starts_with("evo-")
                 || !fs::symlink_metadata(&task_root).is_ok_and(|metadata| metadata.is_dir())
             {
@@ -1240,7 +1325,7 @@ impl WorkspaceComposition {
                 .get(name.as_str())
                 .copied()
                 .filter(|_| !conflicted.contains(name.as_str()));
-            let stored = read_manifest(&format!("{task_root}/{MANIFEST}"));
+            let stored = read_manifest(&support::join(&task_root, MANIFEST));
             let (Some(reference), Some(stored)) = (reference, stored) else {
                 findings.push(finding(name, Disposition::UnknownTaskRetained, 0));
                 continue;
@@ -1257,8 +1342,8 @@ impl WorkspaceComposition {
             }
             let has_material = DESTROYABLE
                 .iter()
-                .any(|entry| exists(&format!("{task_root}/{entry}")));
-            if !has_material && exists(&format!("{task_root}/{TEARDOWN}")) {
+                .any(|entry| exists(&support::join(&task_root, entry)));
+            if !has_material && exists(&support::join(&task_root, TEARDOWN)) {
                 findings.push(finding(name, Disposition::AlreadyDestroyed, 0));
                 continue;
             }
@@ -1316,7 +1401,7 @@ impl WorkspaceComposition {
             }
             destroy_isolated_tree(&candidate.task_root).map_err(other)?;
             self.registry.unregister_evolution(&candidate.project_ref);
-            let teardown = format!("{}/{TEARDOWN}", candidate.task_root);
+            let teardown = support::join(&candidate.task_root, TEARDOWN);
             if !exists(&teardown) {
                 let record = json!({
                     "documentType": "evolution-workspace-teardown",
@@ -1340,7 +1425,8 @@ impl WorkspaceComposition {
     }
 }
 
-#[cfg(test)]
+// The fixtures are POSIX trees (modes, links).
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
 

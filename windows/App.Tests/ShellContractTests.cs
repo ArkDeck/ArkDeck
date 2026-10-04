@@ -204,7 +204,7 @@ public sealed class ShellContractTests
         foreach (var snapshot in doc.RootElement.GetProperty("snapshots").EnumerateArray())
         {
             Assert.IsTrue(scenarios.Contains(snapshot.GetProperty("scenario").GetString()!));
-            Assert.IsTrue(new[] { "overview", "device", "history", "sessions", "agents", "imports", "debug", "flash", "trace", "traceViewer", "viewer", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
+            Assert.IsTrue(new[] { "overview", "device", "history", "sessions", "agents", "imports", "debug", "flash", "trace", "traceViewer", "viewer", "diagnostics", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
             if (snapshot.TryGetProperty("steps", out var steps))
             {
                 foreach (var step in steps.EnumerateArray())

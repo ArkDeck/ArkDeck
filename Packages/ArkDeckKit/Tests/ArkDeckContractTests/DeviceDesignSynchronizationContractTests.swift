@@ -24,6 +24,8 @@ final class DeviceDesignSynchronizationContractTests: XCTestCase {
       "device.record.headroomUnknown", "device.record.ready", "device.record.gap",
       "device.record.location", "device.record.reveal", "device.record.saveAs", "device.record.again",
       "device.performance", "device.frame.age", "device.boundary",
+      "device.preview.toggle", "device.preview.status", "device.keyboard.position",
+      "device.keyboard.focus", "device.keyboard.tap", "device.keyboard.longPress", "device.keyboard.swipe",
     ] {
       XCTAssertTrue(view.contains("\"\(identifier)\""), "App lost \(identifier)")
       XCTAssertTrue(draft.contains("\"\(identifier)\""), "Draft lost \(identifier)")
@@ -39,7 +41,7 @@ final class DeviceDesignSynchronizationContractTests: XCTestCase {
       "device.screen.empty.title", "device.screen.empty.ready", "device.screen.empty.noTarget",
       "device.stale.refused", "device.stale.refused.detail", "device.boundary",
       "device.record.ceiling", "device.record.timeline", "device.record.headroomUnknown",
-      "device.record.preflighting",
+      "device.record.preflighting", "device.preview.detail", "device.keyboard.help",
       "device.record.noRoom", "device.record.noRoom.detail", "device.performance.detail",
     ] {
       let entry = try XCTUnwrap(strings[key] as? [String: Any])

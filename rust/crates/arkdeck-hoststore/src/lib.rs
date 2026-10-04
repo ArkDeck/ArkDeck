@@ -17,61 +17,52 @@ pub use workspace_project::{
     WorkspacePresetComposition, WorkspaceProjectStore, WorkspaceReference, WorkspaceStartupRecord,
     WorkspaceToolchainPinning, WorkspaceUse,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_composition;
-// The workspace provider has no value on Windows yet (it needs the
-// workspace provider crate and the DevEco owners); the Job planner is the
-// same code with none.
-#[cfg(windows)]
-#[path = "absent_workspace_composition.rs"]
-mod workspace_composition;
-#[cfg(windows)]
-pub use workspace_composition::WorkspaceComposition;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use workspace_composition::{
     CompositionNotes, ResolvedToolchain, ToolchainResolver, WorkspaceComposition,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_isolation;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_patch;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use workspace_patch::{
     ToolFailure, ToolInvocation, ToolReceipt, VerifiedToolDispatch, WorkspaceToolDispatch,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_profile;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use workspace_profile::{
     ProfilePresets, RegisteredBuildPreset, RegisteredKind, RegisteredSymbolPreset,
     SigningPresetRef, VerifiedResource, WorkspaceCommandPreset, WorkspaceProfile,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod crash_symbolizer;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_build;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_checkpoint;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use crash_symbolizer::{SymbolizeError, symbolize_crash};
-// The credential pinning of workspace signing presets is composed on macOS
-// and Windows; the signing dispatch (`SigningSetup`) belongs to the workspace
-// composition, which stays macOS-only (TASK-XPA-011).
+// The credential pinning of workspace signing presets and the signing
+// dispatch (`SigningSetup`) are composed on macOS and Windows (TASK-XPA-011).
 #[cfg(any(target_os = "macos", windows))]
 mod workspace_signing;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use workspace_signing::SigningSetup;
 #[cfg(any(target_os = "macos", windows))]
 pub use workspace_signing::{credential_pinning, keychain_credential_pinning};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_read;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_support;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_sweep;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_tests_symbolize;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use workspace_read::Inspector as WorkspaceInspector;
 
 use serde::{Deserialize, Serialize};

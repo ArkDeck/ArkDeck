@@ -22,9 +22,10 @@ use std::ptr::{null, null_mut};
 use std::sync::OnceLock;
 use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
 use windows_sys::Wdk::Storage::FileSystem::{
-    FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN, FILE_OPEN_REPARSE_POINT,
-    FILE_RENAME_INFORMATION, FILE_RENAME_POSIX_SEMANTICS, FILE_SYNCHRONOUS_IO_NONALERT,
-    FileRenameInformationEx, NtCreateFile, NtSetInformationFile,
+    FILE_DIRECTORY_FILE, FILE_LINK_INFORMATION, FILE_LINK_POSIX_SEMANTICS, FILE_NON_DIRECTORY_FILE,
+    FILE_OPEN, FILE_OPEN_REPARSE_POINT, FILE_RENAME_INFORMATION, FILE_RENAME_POSIX_SEMANTICS,
+    FILE_SYNCHRONOUS_IO_NONALERT, FileLinkInformationEx, FileRenameInformationEx, NtCreateFile,
+    NtSetInformationFile,
 };
 use windows_sys::Win32::Foundation::{
     ERROR_LOCK_VIOLATION, ERROR_NO_MORE_FILES, ERROR_STOPPED_ON_SYMLINK, GENERIC_ALL,
@@ -697,6 +698,35 @@ pub(crate) fn rename(
     })
 }
 
+/// `linkat`: the file `file` is open on gains the name `name` in
+/// `directory`, with POSIX semantics, never replacing an existing name.
+pub(crate) fn link(file: &File, directory: &File, name: &[u16]) -> io::Result<()> {
+    let header = offset_of!(FILE_LINK_INFORMATION, FileName);
+    let size = header + name.len() * 2 + 2;
+    let mut buffer = vec![0u64; size.div_ceil(8)];
+    let info = buffer.as_mut_ptr().cast::<FILE_LINK_INFORMATION>();
+    // SAFETY: the u64 buffer is aligned for, and at least as large as, the
+    // header plus the name and its terminator.
+    unsafe {
+        (*info).Anonymous.Flags = FILE_LINK_POSIX_SEMANTICS;
+        (*info).RootDirectory = directory.as_raw_handle();
+        (*info).FileNameLength = (name.len() * 2) as u32;
+        std::ptr::copy_nonoverlapping(name.as_ptr(), (*info).FileName.as_mut_ptr(), name.len());
+    }
+    // SAFETY: zeroed storage is a valid IO_STATUS_BLOCK output.
+    let mut status_block = unsafe { std::mem::zeroed() };
+    // SAFETY: a live handle and the link information built above.
+    nt_result(unsafe {
+        NtSetInformationFile(
+            file.as_raw_handle(),
+            &mut status_block,
+            info.cast(),
+            size as u32,
+            FileLinkInformationEx,
+        )
+    })
+}
+
 /// `unlinkat` of the entry `file` is open on (opened with DELETE access),
 /// with POSIX semantics: its name is gone when this handle closes, even
 /// while other handles still read it.
@@ -903,7 +933,7 @@ pub(crate) fn canonical(path: &Path, opened: &File) -> io::Result<()> {
 /// Create `path` and every missing ancestor with the private directory
 /// descriptor (Unix `DirBuilder::new().recursive(true).mode(0o700)`).
 /// Existing levels are left as they are.
-pub(crate) fn create_private_directories(path: &Path) -> io::Result<()> {
+pub fn create_private_directories(path: &Path) -> io::Result<()> {
     use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
     use windows_sys::Win32::Storage::FileSystem::CreateDirectoryW;
     let mut missing = Vec::new();

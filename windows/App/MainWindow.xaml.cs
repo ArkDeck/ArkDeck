@@ -50,6 +50,7 @@ public sealed partial class MainWindow : Window
                      (NavTrace, UiStrings.AppNavigationTrace),
                      (NavTraceViewer, UiStrings.WindowsTraceViewerTitle),
                      (NavViewer, UiStrings.AppNavigationUiDump),
+                     (NavDiagnostics, UiStrings.AppNavigationDiagnostics),
                      (NavSettings, UiStrings.WindowsNavigationSettings),
                  })
         {
@@ -116,6 +117,20 @@ public sealed partial class MainWindow : Window
 
     private TraceDocument? _pendingTrace;
 
+    /// <summary>Diagnostics, reading one History record (macOS <c>openHistoryContext</c>).</summary>
+    public async void OpenDiagnostics(DiagnosticJobContext context)
+    {
+        if (!_pages.TryGetValue("diagnostics", out var page)) _pages["diagnostics"] = page = new DiagnosticsPage();
+        var diagnostics = (DiagnosticsPage)page;
+        diagnostics.Open(context);
+        if (ReferenceEquals(NavView.SelectedItem, NavDiagnostics))
+        {
+            await diagnostics.RefreshAsync();
+            return;
+        }
+        Select("diagnostics");
+    }
+
     public void Select(string tag)
     {
         foreach (var item in NavView.MenuItems.Concat(NavView.FooterMenuItems).OfType<NavigationViewItem>())
@@ -181,6 +196,7 @@ public sealed partial class MainWindow : Window
                 "trace" => new TracePage(),
                 "traceViewer" => new TraceViewerPage(),
                 "viewer" => new ViewerPage(),
+                "diagnostics" => new DiagnosticsPage(),
                 _ => new OverviewPage(),
             };
             _pages[tag] = page;

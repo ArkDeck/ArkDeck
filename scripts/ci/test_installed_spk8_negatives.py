@@ -178,30 +178,51 @@ class VersionMismatchTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             subject.judge_mismatch([report(), report()], False)
 
-    def run_case(self, pinned_returncode, reports=None):
+    def run_case(self, pinned_returncode, reports=None, service=SERVICE, live_error=None):
         info = {"CFBundleShortVersionString": "0.1.0", "CFBundleVersion": "2"}
         environment = {"ARKDECK_SPK8_APP": "/Apps/ArkDeck.app", "ARKDECK_SPK8_APP_SHA256": "d" * 64}
         codesign = [completed(), completed(), completed(pinned_returncode)]
         with patch.dict(os.environ, environment), \
                 patch.object(subject.smoke, "inspect_app", return_value=(info, Path("/Apps/ArkDeck"))), \
                 patch.object(subject.ui, "pinned_hash"), \
-                patch.object(subject, "installed_service", return_value=SERVICE), \
+                patch.object(subject, "installed_service", return_value=service), \
+                patch.object(subject.ui, "verify_live_code", side_effect=live_error) as live, \
                 patch.object(subject, "run", side_effect=codesign) as run, \
                 patch.object(subject.ui, "app_processes", return_value=[]), \
                 patch.object(subject, "smoke_app", return_value=(reports or [report(), report()], True)) as app:
             result = subject.version_mismatch(Path("/unused"))
+        owner = run.call_args_list[1].args
+        identity = (subject.LEGACY_FACADE_IDENTITY if service["executable"].endswith("arkdeck-facade")
+                    else subject.SERVER_IDENTITY)
+        self.assertEqual(owner[3], "=" + subject.release_requirement(identity, service["version"], service["build"]))
+        self.assertEqual(owner[4], str(service["pid"]))
         pinned = run.call_args_list[2].args
-        self.assertIn('info[CFBundleShortVersionString] = "0.1.0" and info[CFBundleVersion] = "2"', pinned[3])
-        self.assertEqual(pinned[4], str(SERVICE["pid"]))
+        self.assertEqual(pinned[3], "=" + subject.release_requirement(identity, "0.1.0", "2"))
+        self.assertEqual(pinned[4], str(service["pid"]))
+        self.assertEqual(live.call_count, 2 if result["status"] == "PASS" else 1)
         return result, app
 
     def test_orchestration_requires_an_actual_release_mismatch(self):
         result, app = self.run_case(pinned_returncode=3)
         self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["acceptanceScope"], "pre-cutover-legacy-facade")
         app.assert_called_once()
-        result, app = self.run_case(pinned_returncode=0)
+        result, app = self.run_case(pinned_returncode=0, service={**SERVICE, "build": "2"})
         self.assertEqual(result["status"], "BLOCKED")
         app.assert_not_called()
+
+    def test_standalone_daemon_keeps_its_exact_identity_requirement(self):
+        service = {**SERVICE, "executable": "/x/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd"}
+        result, app = self.run_case(pinned_returncode=3, service=service)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["acceptanceScope"], "installed-daemon-release-mismatch")
+        app.assert_called_once()
+
+    def test_live_code_drift_and_unrecognized_owners_are_not_mismatches(self):
+        with self.assertRaisesRegex(RuntimeError, "code drift"):
+            self.run_case(pinned_returncode=3, live_error=RuntimeError("code drift"))
+        with self.assertRaisesRegex(RuntimeError, "unrecognized"):
+            self.run_case(pinned_returncode=3, service={**SERVICE, "executable": "/x/other"})
 
     def test_orchestration_fails_when_the_app_connects(self):
         with self.assertRaises(RuntimeError):

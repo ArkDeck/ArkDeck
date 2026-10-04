@@ -10,19 +10,40 @@
 //! presets and pinned system tools, and — for an OpenHarmony project — the
 //! Hvigor build presets registered through `workspace.preset.*` whose DevEco
 //! toolchain resolved at start-up (`RegisteredBuildPreset`).
+//!
+//! On Windows (TASK-XPA-011) the profile, its presets and the registry are
+//! the same, over the host's `X:\…` spelling, and an executable is measured
+//! through one handle that follows no reparse point. A registered project
+//! does not resolve there: Swift's profiles pin code-owned system tools
+//! (`/usr/bin/grep`, `sed`, `patch`, `bsdtar`, `git`, SwiftPM), Windows ships
+//! no such tools, and which ones a Windows Runtime may trust is not decided
+//! (no PATH lookup stands in for that decision). Every profile-served
+//! operation is therefore unavailable, with that reason, before anything
+//! is planned or dispatched.
 use crate::operation_catalog::CatalogOperation;
 use crate::workspace_support::{
     self as support, foundation_resolved, foundation_standardized, is_identifier, is_safe_glob,
     is_safe_relative_path, is_sha256,
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
+#[cfg(not(windows))]
+use std::collections::HashMap;
 use std::fs;
+#[cfg(not(windows))]
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
+#[cfg(not(windows))]
+use std::sync::OnceLock;
 
 /// Why an operation is unavailable: the `operation.list` reason code Swift's
 /// `RuntimeAvailabilityReasonCode` spells, and Swift's reason.
 pub(crate) type Unavailability = (&'static str, String);
+
+/// Why a registered project resolves to no profile on Windows: the
+/// code-owned tools Swift's profiles pin have no decided Windows identity.
+#[cfg(windows)]
+pub(crate) const WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE: &str = "workspace.toolchainUnavailable: \
+    no code-owned source tool (grep, sed, patch, bsdtar, git or SwiftPM) is trusted on Windows";
 
 /// Swift `RuntimeAvailabilityReasonCode.workspacePresetUnavailable`.
 pub(crate) const PRESET_UNAVAILABLE: &str = "workspace_preset_unavailable";
@@ -35,24 +56,29 @@ pub struct ExecutableIdentity {
     sha256: String,
 }
 
+#[cfg(not(windows))]
 /// The file identity behind Swift's executable digest memo
 /// (`RuntimeFileDerivedCaches.executableDigest`): a file whose identity has not
 /// moved is not read again.
 type FileIdentity = (String, u64, u64, u64, i64, i64, i64, i64);
 
+#[cfg(not(windows))]
 /// A file's digest, and whether it is an `xcode-select` tool shim.
 type Measured = (String, bool);
 
+#[cfg(not(windows))]
 fn digest_memo() -> &'static Mutex<HashMap<FileIdentity, Measured>> {
     static MEMO: OnceLock<Mutex<HashMap<FileIdentity, Measured>>> = OnceLock::new();
     MEMO.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+#[cfg(not(windows))]
 /// Swift `XcodeToolShim`'s resolutions: the tool each shim resolved to under
 /// the developer directory `xcode-select` had chosen. A new choice resolves
 /// again, and a shim that resolved to nothing is asked again next time.
 type Resolution = (FileIdentity, Option<std::path::PathBuf>);
 
+#[cfg(not(windows))]
 fn resolution_memo() -> &'static Mutex<HashMap<Resolution, String>> {
     static MEMO: OnceLock<Mutex<HashMap<Resolution, String>>> = OnceLock::new();
     MEMO.get_or_init(|| Mutex::new(HashMap::new()))
@@ -65,6 +91,7 @@ impl ExecutableIdentity {
     /// — so it stands for the tool `xcrun --find` resolves for its name. One
     /// that resolves to none, or to another shim, is measured as itself, and
     /// nothing a profile that pinned it offers is then available.
+    #[cfg(not(windows))]
     pub fn hashing(path: &str) -> Result<Self, String> {
         let (identity, shim, key) = Self::measure(path)?;
         if !shim {
@@ -77,12 +104,38 @@ impl ExecutableIdentity {
         }
     }
 
+    /// On Windows no tool shim exists: the executable is the file at `path`.
+    #[cfg(windows)]
+    pub fn hashing(path: &str) -> Result<Self, String> {
+        Self::measuring(path).map(|(identity, _)| identity)
+    }
+
     /// Swift `WorkspaceExecutableIdentity.measuring(path:)`: the file at
     /// `path` itself, and whether it is an `xcode-select` tool shim.
+    #[cfg(not(windows))]
     pub(crate) fn measuring(path: &str) -> Result<(Self, bool), String> {
         Self::measure(path).map(|(identity, shim, _)| (identity, shim))
     }
 
+    /// On Windows: the file at the standardized `path`, measured through one
+    /// handle that follows no reparse point; never a tool shim.
+    #[cfg(windows)]
+    pub(crate) fn measuring(path: &str) -> Result<(Self, bool), String> {
+        let canonical = foundation_standardized(path);
+        let measure = arkdeck_platform::measure_host_file(
+            std::path::Path::new(&canonical),
+            support::MAXIMUM_EXECUTABLE_BYTES,
+        )
+        .map_err(|error| format!("{canonical}: {error:?}"))?;
+        let digest = measure
+            .sha256
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        Ok((Self::new(canonical, digest)?, false))
+    }
+
+    #[cfg(not(windows))]
     fn measure(path: &str) -> Result<(Self, bool, FileIdentity), String> {
         let canonical = foundation_standardized(path);
         let metadata = fs::metadata(&canonical).map_err(|error| format!("{canonical}: {error}"))?;
@@ -115,6 +168,7 @@ impl ExecutableIdentity {
     }
 
     /// The tool the shim `key` resolves to for `name`, as a path.
+    #[cfg(not(windows))]
     fn resolved(key: FileIdentity, name: &str) -> Option<String> {
         let chosen = fs::read_link("/var/db/xcode_select_link").ok();
         let key = (key, chosen);
@@ -137,7 +191,7 @@ impl ExecutableIdentity {
 
     /// Swift's initializer: canonical, absolute and a lowercase digest.
     fn new(path: String, sha256: String) -> Result<Self, String> {
-        if !path.starts_with('/') || foundation_standardized(&path) != path {
+        if !support::is_absolute(&path) || foundation_standardized(&path) != path {
             return Err("workspace executable path must be canonical and absolute".into());
         }
         if !is_sha256(&sha256) {
@@ -234,7 +288,7 @@ impl WorkspaceCommandPreset {
             || verified_resources.len() > 16
             || paths.len() != verified_resources.len()
             || !verified_resources.iter().all(|resource| {
-                resource.path.starts_with('/')
+                support::is_absolute(&resource.path)
                     && foundation_standardized(&resource.path) == resource.path
                     && is_sha256(&resource.sha256)
                     && resource.byte_count > 0
@@ -260,8 +314,11 @@ impl WorkspaceCommandPreset {
         let rebase = |value: &String| {
             if value == source {
                 destination.to_owned()
-            } else if let Some(rest) = value.strip_prefix(&format!("{source}/")) {
-                format!("{destination}/{rest}")
+            } else if let Some(rest) = value
+                .strip_prefix(source)
+                .and_then(|rest| rest.strip_prefix(support::SEPARATOR))
+            {
+                format!("{destination}{}{rest}", support::SEPARATOR)
             } else {
                 value.clone()
             }
@@ -416,7 +473,7 @@ impl WorkspaceProfile {
     /// canonical as Foundation resolves it.
     fn validated(mut profile: Self) -> Result<Self, String> {
         let canonical = foundation_resolved(&profile.project_root);
-        if !profile.project_root.starts_with('/')
+        if !support::is_absolute(&profile.project_root)
             || !fs::metadata(&canonical).is_ok_and(|metadata| metadata.is_dir())
         {
             return Err("workspace project root must be an existing canonical directory".into());
@@ -447,6 +504,13 @@ impl WorkspaceProfile {
     }
 
     /// Swift `WorkspaceProjectProfile.arkDeck(rootURL:projectRef:)`.
+    #[cfg(windows)]
+    pub fn ark_deck(_root: &str, _project_ref: &str) -> Result<Self, String> {
+        Err(WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE.into())
+    }
+
+    /// Swift `WorkspaceProjectProfile.arkDeck(rootURL:projectRef:)`.
+    #[cfg(not(windows))]
     pub fn ark_deck(root: &str, project_ref: &str) -> Result<Self, String> {
         let root = foundation_resolved(root);
         let grep =
@@ -559,7 +623,12 @@ impl WorkspaceProfile {
         symbolizer: Option<&str>,
     ) -> Result<Self, String> {
         let root = foundation_resolved(root);
+        // Swift's privacy-managed folders are a macOS rule.
+        #[cfg(windows)]
+        let _ = home;
+        #[cfg(not(windows))]
         let home = foundation_standardized(home);
+        #[cfg(not(windows))]
         if ["Desktop", "Documents", "Downloads"].iter().any(|folder| {
             let protected = foundation_standardized(&format!("{home}/{folder}"));
             root == protected || root.starts_with(&format!("{protected}/"))
@@ -570,44 +639,21 @@ impl WorkspaceProfile {
                     .into(),
             );
         }
-        if fs::metadata(format!("{root}/build-profile.json5")).is_err()
-            || fs::metadata(format!("{root}/entry/src/main/module.json5")).is_err()
+        if fs::metadata(support::join(&root, "build-profile.json5")).is_err()
+            || fs::metadata(support::join(&root, "entry/src/main/module.json5")).is_err()
         {
             return Err(
                 "workspace.projectProfileUnavailable: WaterFlow project or Hvigor is absent".into(),
             );
         }
-        let inspection =
-            WorkspaceCommandPreset::hashing("source-inspection", "/usr/bin/grep", None, &[], 30)?;
-        let reader =
-            WorkspaceCommandPreset::hashing("source-range", "/usr/bin/sed", None, &[], 30)?;
-        let patch =
-            WorkspaceCommandPreset::hashing("unified-diff", "/usr/bin/patch", None, &[], 120)?;
-        let checkpoint = WorkspaceCommandPreset::hashing(
-            "sealed-source-archive",
-            "/usr/bin/bsdtar",
-            None,
-            &[],
-            120,
-        )?;
-        let source_control = if inside_git_working_copy(&root) {
-            Some(WorkspaceCommandPreset::hashing(
-                "git",
-                "/usr/bin/git",
-                None,
-                &[],
-                120,
-            )?)
-        } else {
-            None
-        };
+        let (inspection, reader, patch, checkpoint, source_control) = code_owned_tools(&root)?;
         let mut build = Vec::new();
         let mut test = Vec::new();
         let mut build_products = BTreeMap::new();
         for preset in registered {
             let hvigor = foundation_resolved(&preset.hvigor_script_path);
-            if !preset.node_path.starts_with('/')
-                || !preset.hvigor_script_path.starts_with('/')
+            if !support::is_absolute(&preset.node_path)
+                || !support::is_absolute(&preset.hvigor_script_path)
                 || fs::metadata(&hvigor).is_err()
             {
                 return Err(
@@ -667,7 +713,7 @@ impl WorkspaceProfile {
                 let Some(map) = &preset.relative_source_map else {
                     continue;
                 };
-                let map = format!("{}/{map}", root.trim_end_matches('/'));
+                let map = support::join(root.trim_end_matches('/'), map);
                 symbol.push(WorkspaceCommandPreset::new(
                     &preset.preset_ref,
                     symbolizer.clone(),
@@ -1074,8 +1120,52 @@ impl WorkspaceProfile {
     }
 }
 
+/// The code-owned tools an OpenHarmony profile pins: Swift's fixed system
+/// `grep`, `sed`, `patch` and `bsdtar`, and `git` inside a working copy.
+type CodeOwnedTools = (
+    WorkspaceCommandPreset,
+    WorkspaceCommandPreset,
+    WorkspaceCommandPreset,
+    WorkspaceCommandPreset,
+    Option<WorkspaceCommandPreset>,
+);
+
+#[cfg(not(windows))]
+fn code_owned_tools(root: &str) -> Result<CodeOwnedTools, String> {
+    let inspection =
+        WorkspaceCommandPreset::hashing("source-inspection", "/usr/bin/grep", None, &[], 30)?;
+    let reader = WorkspaceCommandPreset::hashing("source-range", "/usr/bin/sed", None, &[], 30)?;
+    let patch = WorkspaceCommandPreset::hashing("unified-diff", "/usr/bin/patch", None, &[], 120)?;
+    let checkpoint = WorkspaceCommandPreset::hashing(
+        "sealed-source-archive",
+        "/usr/bin/bsdtar",
+        None,
+        &[],
+        120,
+    )?;
+    let source_control = if inside_git_working_copy(root) {
+        Some(WorkspaceCommandPreset::hashing(
+            "git",
+            "/usr/bin/git",
+            None,
+            &[],
+            120,
+        )?)
+    } else {
+        None
+    };
+    Ok((inspection, reader, patch, checkpoint, source_control))
+}
+
+/// On Windows no code-owned tool is trusted yet.
+#[cfg(windows)]
+fn code_owned_tools(_root: &str) -> Result<CodeOwnedTools, String> {
+    Err(WINDOWS_CODE_OWNED_TOOLS_UNAVAILABLE.into())
+}
+
 /// Swift `WorkspaceProjectProfile.isInsideGitWorkingCopy`: the root or any
 /// ancestor holds `.git`.
+#[cfg(not(windows))]
 fn inside_git_working_copy(root: &str) -> bool {
     let mut current = foundation_standardized(root);
     loop {
@@ -1198,7 +1288,7 @@ impl ProfileRegistry {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
 

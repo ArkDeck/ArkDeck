@@ -16,16 +16,29 @@
 //! - `**` is ICU's `.*`, which crosses no line terminator; `*` and `?` cross
 //!   anything but `/`.
 //!
+//! On Windows (TASK-XPA-011) an absolute path is spelled as the host spells
+//! a standard local one, `X:\a\b`, which is what the project registration
+//! pins and what the platform's verified handles require; a path relative to
+//! a project root keeps Swift's `/` separators. Foundation's `/private`
+//! rule has no Windows meaning, and a symbolic link or junction is resolved
+//! by the handle's final path. An entry is hidden when its name starts with
+//! `.` or it carries the hidden attribute; no directory is a package.
+//!
 //! A refusal is the detail Swift's `DeviceProviderError` describes itself by.
 use arkdeck_contract::sha256_hex;
 use std::collections::HashSet;
-use std::fs;
+use std::fs::{self, File};
+use std::io;
 use std::path::Path;
 
 /// Swift's refusal detail.
 pub(crate) type Refusal = String;
 
 const MAXIMUM_VISITED: usize = 20_000;
+/// The largest executable a workspace tool or inspector is measured up to
+/// on Windows, as an analyzer's.
+#[cfg(windows)]
+pub(crate) const MAXIMUM_EXECUTABLE_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_MATCHED: usize = 2_000;
 
 /// Swift `WorkspaceProviderSupport.sha256`.
@@ -74,6 +87,7 @@ pub(crate) fn is_safe_glob(value: &str) -> bool {
         && value.len() <= 512
         && !value.starts_with('/')
         && !value.contains('\\')
+        && !(cfg!(windows) && value.contains(':'))
         && !value
             .split('/')
             .any(|component| component == ".." || component.is_empty())
@@ -89,6 +103,8 @@ pub(crate) fn is_safe_relative_path(value: &str) -> bool {
         && !value.contains('\\')
         && !value.chars().any(|c| "*?[]".contains(c))
         && !value.chars().any(arkdeck_platform::host_control_character)
+        // A colon names a drive or an alternate data stream on Windows.
+        && !(cfg!(windows) && value.contains(':'))
         && !value
             .split('/')
             .any(|component| component == "." || component == ".." || component.is_empty())
@@ -198,8 +214,57 @@ pub(crate) fn glob_enumeration_anchor(glob: &str) -> Option<String> {
     (!directory.is_empty()).then(|| directory.to_owned())
 }
 
+/// The separator of an absolute path on this host.
+#[cfg(not(windows))]
+pub(crate) const SEPARATOR: char = '/';
+#[cfg(windows)]
+pub(crate) const SEPARATOR: char = '\\';
+
+/// Whether `path` is an explicit absolute path as this host spells one:
+/// `/…`, or on Windows a drive and its root (`X:\…`; `X:/…` is read the
+/// same way and standardized to the former).
+pub(crate) fn is_absolute(path: &str) -> bool {
+    #[cfg(not(windows))]
+    return path.starts_with('/');
+    #[cfg(windows)]
+    {
+        let bytes = path.as_bytes();
+        bytes.len() >= 3
+            && bytes[0].is_ascii_alphabetic()
+            && bytes[1] == b':'
+            && (bytes[2] == b'\\' || bytes[2] == b'/')
+    }
+}
+
+/// `relative` (Swift's `/`-separated spelling) under the absolute `root`.
+pub(crate) fn join(root: &str, relative: &str) -> String {
+    #[cfg(not(windows))]
+    return format!("{root}/{relative}");
+    #[cfg(windows)]
+    return format!(
+        "{}\\{}",
+        root.trim_end_matches('\\'),
+        relative.replace('/', "\\")
+    );
+}
+
+/// The `/`-separated path of `path` strictly below `root`, if it is one.
+pub(crate) fn relative_to(path: &str, root: &str) -> Option<String> {
+    let rest = path.strip_prefix(root)?.strip_prefix(SEPARATOR)?;
+    (!rest.is_empty()).then(|| rest.replace(SEPARATOR, "/"))
+}
+
+/// Whether `path` is `root` or lies below it.
+pub(crate) fn is_within(path: &str, root: &str) -> bool {
+    path == root
+        || path
+            .strip_prefix(root)
+            .is_some_and(|rest| rest.starts_with(SEPARATOR))
+}
+
 /// Foundation's lexical standardization of an absolute path: empty and `.`
 /// components dropped, `..` climbing no higher than the root.
+#[cfg(not(windows))]
 fn lexical(path: &str) -> String {
     let mut parts: Vec<&str> = Vec::new();
     for component in path.split('/') {
@@ -214,7 +279,31 @@ fn lexical(path: &str) -> String {
     format!("/{}", parts.join("/"))
 }
 
+/// On Windows: the drive kept (its letter as written), `/` read as `\`,
+/// empty and `.` components dropped, `..` climbing no higher than the
+/// drive's root. A path without a drive is standardized as relative text.
+#[cfg(windows)]
+fn lexical(path: &str) -> String {
+    let (drive, rest) = if is_absolute(path) {
+        (&path[..2], &path[2..])
+    } else {
+        ("", path)
+    };
+    let mut parts: Vec<&str> = Vec::new();
+    for component in rest.split(['/', '\\']) {
+        match component {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            other => parts.push(other),
+        }
+    }
+    format!("{drive}\\{}", parts.join("\\"))
+}
+
 /// Foundation drops a leading `/private` when what remains still exists.
+#[cfg(not(windows))]
 fn without_private(path: String) -> String {
     match path.strip_prefix("/private") {
         Some(rest) if rest.starts_with('/') && fs::metadata(rest).is_ok() => rest.to_owned(),
@@ -222,7 +311,14 @@ fn without_private(path: String) -> String {
     }
 }
 
+/// No `/private` firmlink exists on Windows.
+#[cfg(windows)]
+fn without_private(path: String) -> String {
+    path
+}
+
 /// Swift `URL(filePath:).resolvingSymlinksInPath().standardizedFileURL.path`.
+#[cfg(not(windows))]
 pub(crate) fn foundation_resolved(path: &str) -> String {
     match fs::canonicalize(path) {
         Ok(physical) => match physical.to_str() {
@@ -233,9 +329,95 @@ pub(crate) fn foundation_resolved(path: &str) -> String {
     }
 }
 
+/// On Windows: the handle's final path (links and junctions resolved, the
+/// spelling on disk) when the entry opens, otherwise the lexical form.
+#[cfg(windows)]
+pub(crate) fn foundation_resolved(path: &str) -> String {
+    let lexical = lexical(path);
+    if !is_absolute(path) {
+        return lexical;
+    }
+    arkdeck_platform::host_resolved_path(Path::new(&lexical))
+        .and_then(|resolved| resolved.to_str().map(str::to_owned))
+        .unwrap_or(lexical)
+}
+
 /// Swift `URL(filePath:).standardizedFileURL.path` of a path without `..`.
 pub(crate) fn foundation_standardized(path: &str) -> String {
     without_private(lexical(path))
+}
+
+/// `path` and every missing ancestor created owner-only
+/// (`DirBuilder::new().recursive(true).mode(0o700)`; on Windows the private
+/// descriptor). Existing levels are left as they are.
+pub(crate) fn create_private_directories(path: &Path) -> io::Result<()> {
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)
+    }
+    #[cfg(windows)]
+    arkdeck_platform::create_private_directories(path)
+}
+
+/// The existing entry at `path` opened for reading (or writing), never
+/// through a link: `O_NOFOLLOW`, or on Windows the entry itself opened and
+/// refused when it is a reparse point.
+pub(crate) fn open_no_follow(path: &Path, write: bool) -> io::Result<File> {
+    let mut options = fs::OpenOptions::new();
+    options.read(!write).write(write);
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+        options.open(path)
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
+        const FILE_FLAG_OPEN_REPARSE_POINT: u32 = 0x0020_0000;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+        let file = options.open(path)?;
+        if file.metadata()?.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a link is not followed",
+            ));
+        }
+        Ok(file)
+    }
+}
+
+/// A staged file at `path` opened for writing owner-only and never through a
+/// link, replacing a stale one (`create`, `truncate`, `0o600`,
+/// `O_NOFOLLOW`; on Windows a stale entry is removed and the file created
+/// new with the private descriptor).
+pub(crate) fn create_private_staged(path: &Path) -> io::Result<File> {
+    #[cfg(not(windows))]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(path)
+    }
+    #[cfg(windows)]
+    {
+        match fs::symlink_metadata(path) {
+            Ok(metadata) if metadata.is_dir() => return Err(io::ErrorKind::AlreadyExists.into()),
+            Ok(_) => fs::remove_file(path)?,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        arkdeck_platform::create_private_file(path)
+    }
 }
 
 /// Swift's `String` order: NFC scalars, which is UTF-8 byte order of the NFC
@@ -276,14 +458,11 @@ impl Walk<'_> {
         }
         names.sort();
         for name in names {
-            let path = format!("{directory}/{name}");
-            let kind = fs::symlink_metadata(&path)
-                .map_err(|_| Stop::EnumerationFailed)?
-                .file_type();
-            let presentation =
-                arkdeck_platform::host_entry_presentation(Path::new(&path), kind.is_dir())
-                    .map_err(|_| Stop::EnumerationFailed)?;
-            if presentation.hidden {
+            let path = join(directory, &name);
+            let metadata = fs::symlink_metadata(&path).map_err(|_| Stop::EnumerationFailed)?;
+            let kind = metadata.file_type();
+            let (hidden, package) = presentation(&path, &name, &metadata)?;
+            if hidden {
                 continue;
             }
             self.visited += 1;
@@ -292,9 +471,9 @@ impl Walk<'_> {
                     "workspace inspection enumeration exceeds 20000 entries".into(),
                 ));
             }
-            let relative = &path[self.root.len() + 1..];
+            let relative = &relative_to(&path, self.root).ok_or(Stop::EnumerationFailed)?;
             if kind.is_dir() {
-                if !presentation.package
+                if !package
                     && self
                         .profile_globs
                         .iter()
@@ -312,7 +491,7 @@ impl Walk<'_> {
                 continue;
             }
             let canonical = foundation_resolved(&path);
-            let Some(relative) = canonical.strip_prefix(&format!("{}/", self.root)) else {
+            let Some(relative) = relative_to(&canonical, self.root) else {
                 return Err(Stop::Refused(
                     "workspace source path escapes the canonical project root".into(),
                 ));
@@ -320,11 +499,11 @@ impl Walk<'_> {
             if self
                 .profile_globs
                 .iter()
-                .any(|glob| matches(relative, glob))
+                .any(|glob| matches(&relative, glob))
                 && self
                     .request_globs
                     .iter()
-                    .any(|glob| matches(relative, glob))
+                    .any(|glob| matches(&relative, glob))
             {
                 self.found.insert(canonical.clone());
                 if self.found.len() > MAXIMUM_MATCHED {
@@ -336,6 +515,26 @@ impl Walk<'_> {
         }
         Ok(())
     }
+}
+
+/// Foundation's hidden and package keys of one enumerated entry.
+#[cfg(not(windows))]
+fn presentation(path: &str, _name: &str, metadata: &fs::Metadata) -> Result<(bool, bool), Stop> {
+    arkdeck_platform::host_entry_presentation(Path::new(path), metadata.is_dir())
+        .map(|presentation| (presentation.hidden, presentation.package))
+        .map_err(|_| Stop::EnumerationFailed)
+}
+
+/// On Windows: hidden by a leading `.` or the hidden attribute; no
+/// directory is a package.
+#[cfg(windows)]
+fn presentation(_path: &str, name: &str, metadata: &fs::Metadata) -> Result<(bool, bool), Stop> {
+    use std::os::windows::fs::MetadataExt;
+    const FILE_ATTRIBUTE_HIDDEN: u32 = 0x2;
+    Ok((
+        name.starts_with('.') || metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0,
+        false,
+    ))
 }
 
 /// Swift `files(root:profileGlobs:requestGlobs:)`: every regular file under
@@ -373,13 +572,11 @@ pub(crate) fn files(
     };
     for anchor in anchors {
         let anchor_path = match &anchor {
-            Some(anchor) => format!("{canonical_root}/{anchor}"),
+            Some(anchor) => join(&canonical_root, anchor),
             None => canonical_root.clone(),
         };
         let lexical_anchor = foundation_standardized(&anchor_path);
-        if lexical_anchor != canonical_root
-            && !lexical_anchor.starts_with(&format!("{canonical_root}/"))
-        {
+        if !is_within(&lexical_anchor, &canonical_root) {
             return Err("workspace enumeration anchor escapes the canonical project root".into());
         }
         if fs::metadata(&lexical_anchor).is_err() {
@@ -458,7 +655,7 @@ pub(crate) fn workspace_revision(
         .unwrap_or_else(|_| "absent".into());
     material.push_str(&format!("index\t{index}\n"));
     for path in files(&canonical_root, globs, globs)? {
-        let relative = path[canonical_root.len()..].trim_start_matches('/');
+        let relative = relative_to(&path, &canonical_root).unwrap_or_default();
         let digest = fs::read(&path)
             .map(|bytes| sha256(&bytes))
             .unwrap_or_else(|_| "absent".into());
@@ -534,6 +731,7 @@ mod tests {
         assert!(!glob_may_match_descendant(".git", "**"));
     }
 
+    #[cfg(not(windows))]
     #[test]
     fn foundation_paths_drop_private_only_when_the_rest_exists() {
         let temporary = fs::canonicalize("/tmp").unwrap();
@@ -545,6 +743,27 @@ mod tests {
             "/private/tmp/arkdeck-no-such-entry/x"
         );
         assert_eq!(foundation_standardized("/private/etc/hosts"), "/etc/hosts");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_paths_keep_the_drive_and_join_relative_paths_with_backslashes() {
+        assert!(is_absolute(r"D:\p") && is_absolute("D:/p"));
+        assert!(!is_absolute(r"\p") && !is_absolute("p") && !is_absolute("D:p"));
+        assert_eq!(foundation_standardized(r"D:\a\.\b\..\c\"), r"D:\a\c");
+        assert_eq!(foundation_standardized("D:/a//b"), r"D:\a\b");
+        assert_eq!(foundation_standardized(r"D:\..\.."), r"D:\");
+        assert_eq!(join(r"D:\p", "entry/src/a.ets"), r"D:\p\entry\src\a.ets");
+        assert_eq!(
+            relative_to(r"D:\p\entry\a.ets", r"D:\p").as_deref(),
+            Some("entry/a.ets")
+        );
+        assert_eq!(relative_to(r"D:\p", r"D:\p"), None);
+        assert_eq!(relative_to(r"D:\pq\a", r"D:\p"), None);
+        assert!(is_within(r"D:\p\a", r"D:\p") && is_within(r"D:\p", r"D:\p"));
+        assert!(!is_within(r"D:\pq", r"D:\p"));
+        // A drive or stream colon is never a relative path.
+        assert!(!is_safe_relative_path("a:b") && !is_safe_glob("a:*"));
     }
 
     #[test]

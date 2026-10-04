@@ -42,7 +42,7 @@ mod flash_plan;
 mod native_library_plan;
 #[path = "screen_sequence_plan.rs"]
 mod screen_sequence_plan;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "workspace_plan.rs"]
 mod workspace_plan;
 #[cfg(any(target_os = "macos", windows))]
@@ -800,7 +800,6 @@ impl<'a> JobPlanner<'a> {
         };
         // `workspace.symbolize-crash@1` reads a crash a device capture
         // collected from another target; Swift checks that product exactly.
-        #[cfg(target_os = "macos")]
         if request.operation_id == "workspace.symbolize-crash" {
             return match crate::workspace_tests_symbolize::dump_refusal(
                 &leased.row,
@@ -935,26 +934,6 @@ impl<'a> JobPlanner<'a> {
         });
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(sha256_hex(&bytes))
-    }
-}
-
-/// No workspace composition is built on Windows yet
-/// (`absent_owners::WorkspaceComposition`), so a workspace operation meets
-/// `workspace_plan`'s refusal without one.
-#[cfg(windows)]
-impl JobPlanner<'_> {
-    fn materialize_workspace(
-        &self,
-        _request: &OperationRequest,
-        descriptor: &CatalogOperation,
-    ) -> Result<(String, BTreeMap<String, String>), PlanRefusal> {
-        let Some(workspace) = self.workspace else {
-            return Err(refusal(
-                "invalidInput",
-                format!("provider {} is not registered", descriptor.provider),
-            ));
-        };
-        match *workspace {}
     }
 }
 

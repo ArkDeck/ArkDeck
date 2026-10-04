@@ -243,9 +243,8 @@ impl Transaction<'_> {
 
     /// Where the record's content is retained.
     fn content(&self, position: usize) -> PathBuf {
-        self.store.path.join(format!(
-            "bundle-{}.app",
-            self.index.records[position].digest
+        self.store.path.join(crate::bundle_content::retained_name(
+            &self.index.records[position].digest,
         ))
     }
 

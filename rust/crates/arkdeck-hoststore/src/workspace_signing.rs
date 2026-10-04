@@ -9,8 +9,8 @@
 //! A secret never leaves that source except into the signer's terminal.
 //!
 //! On Windows (TASK-XPA-011) the credential pinning is composed over
-//! Credential Manager bound to the daemon's Authenticode identity;
-//! `SigningSetup` stays with the macOS-only workspace composition.
+//! Credential Manager bound to the daemon's Authenticode identity, and so
+//! is `SigningSetup`, which the workspace composition takes there too.
 use crate::workspace_project::WorkspaceCredentialPinning;
 use arkdeck_contract::WireError;
 use arkdeck_provider_workspace::credential_owner::CredentialOwner;
@@ -21,7 +21,6 @@ use std::sync::Arc;
 
 /// What the composition root hands the workspace composition for signing:
 /// the preset store's root, the secret source and the attempt store's root.
-#[cfg(target_os = "macos")]
 pub struct SigningSetup {
     pub(crate) store_root: PathBuf,
     pub(crate) secrets: Box<dyn SigningSecrets + Send + Sync>,
@@ -31,7 +30,6 @@ pub struct SigningSetup {
     pub(crate) releases_orphaned_owners: bool,
 }
 
-#[cfg(target_os = "macos")]
 impl SigningSetup {
     /// The installed daemon's signing: the preset store at `store_root`, the
     /// Data Protection Keychain bound to `daemon_executable`'s identity, and

@@ -151,7 +151,10 @@ struct DebugWorkspaceView: View {
       Text(DebugL10n.text("debug.target.label"))
         .font(WorkspaceFont.secondary)
         .foregroundStyle(.secondary)
-      Picker(DebugL10n.text("debug.target.label"), selection: $selectedTargetID) {
+      Picker(DebugL10n.text("debug.target.label"), selection: Binding(
+        get: { selectedTargetID },
+        set: { model.nativeLibraryBatch.invalidate(); selectedTargetID = $0 }
+      )) {
         Text(DebugL10n.text("debug.target.none")).tag(String?.none)
         ForEach(model.workspace.targets) { target in
           Text(target.id).tag(Optional(target.id))
@@ -588,6 +591,12 @@ private struct DebugArtifactsWorkspace: View {
   let onOpenLogs: () -> Void
 
   @State private var isImporterPresented = false
+  @State private var isDirectoryImporterPresented = false
+  @State private var isReadingDirectories = false
+  @State private var directoryCandidates: [NativeLibraryDeploymentSource] = []
+  @State private var queuedLibraries: [NativeLibraryDeploymentSource] = []
+  @State private var isBatchReviewPresented = false
+  @State private var batchPreparationRequest: UUID?
   @State private var presentedPreparation: DebugNativeLibraryPreparation?
   @State private var isRemoteBrowserPresented = false
   @State private var buildSourceKind = BuildSourceKind.local
@@ -680,11 +689,14 @@ private struct DebugArtifactsWorkspace: View {
         buildSource
       } trailing: {
         deploymentInputs
+          .disabled(model.nativeLibraryBatch.isBusy)
       }
       reviewAndRun
         .background {
           DebugAccessibilityAnnouncementBridge(status: currentAccessibilityStatus)
         }
+      if !directoryCandidates.isEmpty { directorySelection }
+      if !queuedLibraries.isEmpty { batchDeployment }
       productionBoundary
       if !runtimeArtifacts.isEmpty { resultArtifacts }
       DebugRecentJobsSection(model: model, jobs: relatedJobs)
@@ -692,9 +704,15 @@ private struct DebugArtifactsWorkspace: View {
     .fileImporter(
       isPresented: $isImporterPresented,
       allowedContentTypes: [UTType(filenameExtension: "so") ?? .data],
-      allowsMultipleSelection: false,
+      allowsMultipleSelection: true,
       onCompletion: handleLibrarySelection
     )
+    .fileImporter(
+      isPresented: $isDirectoryImporterPresented, allowedContentTypes: [.folder],
+      allowsMultipleSelection: true, onCompletion: handleDirectorySelection)
+    .sheet(isPresented: $isBatchReviewPresented) {
+      DebugNativeLibraryBatchSheet(model: model)
+    }
     .sheet(item: $presentedPreparation) {
       DebugNativeLibraryPlanSheet(model: model, preparation: $0)
     }
@@ -721,10 +739,11 @@ private struct DebugArtifactsWorkspace: View {
         isRemoteBrowserPresented = false
       }
     }
-    .onChange(of: target?.id) { _, _ in model.clearNativeLibraryPreparation() }
-    .onChange(of: target?.bindingRevision) { _, _ in model.clearNativeLibraryPreparation() }
-    .onChange(of: targetBundle) { _, _ in model.clearNativeLibraryPreparation() }
+    .onChange(of: target?.id) { _, _ in invalidatePreparations() }
+    .onChange(of: target?.bindingRevision) { _, _ in invalidatePreparations() }
+    .onChange(of: targetBundle) { _, _ in invalidatePreparations() }
     .onChange(of: libraryLogicalName) { _, _ in model.clearNativeLibraryPreparation() }
+    .onDisappear { invalidatePreparations() }
   }
 
   private var targetScope: some View {
@@ -784,6 +803,14 @@ private struct DebugArtifactsWorkspace: View {
             systemImage: "doc.badge.plus")
         }
         .accessibilityIdentifier("debug.artifacts.chooseLibrary")
+        Button {
+          isDirectoryImporterPresented = true
+        } label: {
+          Label(DebugL10n.text("debug.artifacts.chooseDirectory"), systemImage: "folder")
+        }
+        .disabled(isReadingDirectories || model.nativeLibraryBatch.isBusy)
+        .accessibilityIdentifier("debug.artifacts.chooseDirectory")
+        if isReadingDirectories { ProgressView().controlSize(.small) }
       } else {
         Button {
           isRemoteBrowserPresented = true
@@ -793,6 +820,9 @@ private struct DebugArtifactsWorkspace: View {
             systemImage: "server.rack")
         }
         .accessibilityIdentifier("debug.artifacts.browseRemote")
+        Text(DebugL10n.text("debug.artifacts.wslSource"))
+          .font(WorkspaceFont.secondary)
+          .foregroundStyle(.secondary)
       }
       VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
         Text(DebugL10n.text("debug.artifacts.selectedLibrary"))
@@ -820,6 +850,11 @@ private struct DebugArtifactsWorkspace: View {
           .foregroundStyle(.red)
           .fixedSize(horizontal: false, vertical: true)
       }
+      if selectedLibraryURL != nil {
+        Button(DebugL10n.text("debug.artifacts.batch.add")) { addCurrentLibrary() }
+          .disabled(model.nativeLibraryBatch.isBusy)
+          .accessibilityIdentifier("debug.artifacts.batch.add")
+      }
       WorkspaceNotice(tone: .neutral, symbol: "externaldrive") {
         Text(DebugL10n.text("debug.artifacts.sourceBoundary"))
       }
@@ -829,6 +864,152 @@ private struct DebugArtifactsWorkspace: View {
       selectedRemoteLibrary = nil
       selectionError = nil
       model.clearNativeLibraryPreparation()
+    }
+  }
+
+  private var directorySelection: some View {
+    WorkspaceSection(Text(DebugL10n.text("debug.artifacts.directory.title"))) {
+      Text(DebugL10n.text("debug.artifacts.directory.detail"))
+        .font(WorkspaceFont.secondary)
+        .foregroundStyle(.secondary)
+      ScrollView {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.tightGap) {
+          ForEach(directoryCandidates) { source in
+            Toggle(isOn: Binding(
+              get: { queuedLibraries.contains { $0.id == source.id } },
+              set: { selected in
+                if selected { addToBatch(source) }
+                else { removeFromBatch(source.id) }
+              }
+            )) {
+              VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                Text(source.name).font(WorkspaceFont.monospacedValue)
+                Text(source.location).font(WorkspaceFont.caption).foregroundStyle(.secondary)
+                  .lineLimit(1).truncationMode(.middle).help(source.location)
+              }
+            }
+            .toggleStyle(.checkbox)
+            .disabled(model.nativeLibraryBatch.isBusy)
+          }
+        }
+      }
+      .frame(maxHeight: 240)
+    }
+  }
+
+  private var batchDeployment: some View {
+    let batch = model.nativeLibraryBatch
+    return WorkspaceSection(Text(DebugL10n.text("debug.artifacts.batch.title"))) {
+      Text(DebugL10n.text("debug.artifacts.batch.detail"))
+        .font(WorkspaceFont.secondary).foregroundStyle(.secondary)
+      ForEach(queuedLibraries) { source in
+        HStack(alignment: .top, spacing: WorkspaceMetrics.contentGap) {
+          VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+            Text(source.name).font(WorkspaceFont.monospacedValue)
+            Text(source.location).font(WorkspaceFont.caption).foregroundStyle(.secondary)
+              .lineLimit(1).truncationMode(.middle).help(source.location)
+            if let row = batch.rows.first(where: { $0.id == source.id }) {
+              Text(DebugL10n.text("debug.artifacts.batch.row.\(row.state.rawValue)"))
+                .font(WorkspaceFont.secondary)
+              if let jobID = row.jobID {
+                Text(jobID).font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+              }
+            }
+          }
+          Spacer()
+          Button(DebugL10n.text("debug.artifacts.batch.remove"), systemImage: "minus.circle") {
+            removeFromBatch(source.id)
+          }
+          .labelStyle(.iconOnly)
+          .disabled(batch.isBusy)
+        }
+      }
+      if batch.phase != .idle {
+        Text(DebugL10n.text("debug.artifacts.batch.phase.\(batch.phase.rawValue)"))
+          .font(WorkspaceFont.label)
+          .accessibilityIdentifier("debug.artifacts.batch.status")
+        if let batchTarget = batch.target {
+          Text("\(batchTarget.id) · binding r\(batchTarget.bindingRevision) · \(batch.targetBundle)")
+            .font(WorkspaceFont.monospacedDense).foregroundStyle(.secondary)
+        }
+      }
+      if let failure = batch.failure {
+        Text(failure).font(WorkspaceFont.secondary).foregroundStyle(.red).textSelection(.enabled)
+      }
+      HStack(spacing: WorkspaceMetrics.contentGap) {
+        if batch.isBusy {
+          ProgressView().controlSize(.small)
+          Button(DebugL10n.text("debug.artifacts.batch.stop")) { batch.stop() }
+            .disabled(batch.stopRequested)
+        } else {
+          Button(DebugL10n.text("debug.artifacts.batch.prepare")) {
+            guard let target else { return }
+            let sources = queuedLibraries
+            let bundle = targetBundle
+            let request = UUID()
+            batchPreparationRequest = request
+            Task {
+              guard batchPreparationRequest == request else { return }
+              await batch.prepare(sources: sources, target: target, targetBundle: bundle)
+              guard batchPreparationRequest == request else { return }
+              isBatchReviewPresented = batch.phase == .review
+            }
+          }
+          .disabled(target == nil || !operationIsAvailable
+            || !DebugTypedValueValidator.isValidBundleName(targetBundle)
+            || model.isPreparingNativeLibrary || model.isSubmittingNativeLibrary)
+          .accessibilityIdentifier("debug.artifacts.batch.prepare")
+        }
+      }
+    }
+  }
+
+  private func invalidatePreparations() {
+    batchPreparationRequest = nil
+    model.clearNativeLibraryPreparation()
+    model.nativeLibraryBatch.invalidate()
+    isBatchReviewPresented = false
+  }
+
+  private func addCurrentLibrary() {
+    if let selectedRemoteLibrary {
+      addToBatch(.ssh(
+        sourceID: selectedRemoteLibrary.sourceID, sourceName: selectedRemoteLibrary.sourceName,
+        relativePath: selectedRemoteLibrary.entry.relativePath))
+    } else if let selectedLibraryURL { addToBatch(.file(selectedLibraryURL)) }
+  }
+
+  private func addToBatch(_ source: NativeLibraryDeploymentSource) {
+    guard !model.nativeLibraryBatch.isBusy, !queuedLibraries.contains(where: { $0.id == source.id })
+    else { return }
+    guard queuedLibraries.count < NativeLibraryDeploymentBatch.maximumLibraries else {
+      selectionError = DebugL10n.text("debug.artifacts.batch.limit"); return
+    }
+    queuedLibraries.append(source)
+    invalidatePreparations()
+  }
+
+  private func removeFromBatch(_ id: String) {
+    guard !model.nativeLibraryBatch.isBusy else { return }
+    queuedLibraries.removeAll { $0.id == id }
+    invalidatePreparations()
+  }
+
+  private func handleDirectorySelection(_ result: Result<[URL], Error>) {
+    guard case .success(let urls) = result else {
+      if case .failure(let error) = result { selectionError = error.localizedDescription }
+      return
+    }
+    isReadingDirectories = true
+    selectionError = nil
+    Task {
+      defer { isReadingDirectories = false }
+      do {
+        directoryCandidates = try await NativeLibraryDirectorySource.libraries(in: urls)
+        if directoryCandidates.isEmpty {
+          selectionError = DebugL10n.text("debug.artifacts.directory.empty")
+        }
+      } catch { selectionError = error.localizedDescription }
     }
   }
 
@@ -991,6 +1172,7 @@ private struct DebugArtifactsWorkspace: View {
           .disabled(
             !inputsAreValid || !operationIsAvailable
               || model.isPreparingNativeLibrary || model.isSubmittingNativeLibrary
+              || model.nativeLibraryBatch.isBusy
           )
           .accessibilityIdentifier("debug.artifacts.preview")
         }
@@ -1069,9 +1251,67 @@ private struct DebugArtifactsWorkspace: View {
       libraryLogicalName = url.lastPathComponent
       selectionError = nil
       model.clearNativeLibraryPreparation()
+      if urls.count > 1 { for url in urls { addToBatch(.file(url)) } }
     case .failure(let error):
       selectionError = error.localizedDescription
     }
+  }
+}
+
+private struct DebugNativeLibraryBatchSheet: View {
+  @Environment(\.dismiss) private var dismiss
+  var model: DebugWorkspaceViewModel
+
+  var body: some View {
+    let batch = model.nativeLibraryBatch
+    VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
+      Text(DebugL10n.text("debug.artifacts.batch.review"))
+        .font(WorkspaceFont.sectionTitle).accessibilityAddTraits(.isHeader)
+      WorkspaceNotice(tone: .warning) {
+        Text(DebugL10n.text("debug.artifacts.batch.warning"))
+      }
+      if let target = batch.target {
+        Text("\(target.id) · binding r\(target.bindingRevision) · \(batch.targetBundle)")
+          .font(WorkspaceFont.monospacedValue).textSelection(.enabled)
+      }
+      ScrollView {
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+          ForEach(batch.rows) { row in
+            if let plan = row.preparation {
+              DisclosureGroup {
+                VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+                  Text("SHA-256: \(plan.sha256)")
+                  Text("Plan: \(plan.planDigest)")
+                  ForEach(plan.steps) { step in Text("\(step.id) · \(step.kind) · \(step.effect)") }
+                }
+                .font(WorkspaceFont.monospacedDense).textSelection(.enabled)
+              } label: {
+                Text("\(plan.libraryName) · \(plan.abi) · \(plan.byteCount) B")
+                  .font(WorkspaceFont.monospacedValue)
+              }
+            }
+          }
+        }
+      }
+      .frame(minHeight: 240, maxHeight: 380)
+      HStack {
+        Button(DebugL10n.text("debug.artifacts.sheet.back")) { dismiss() }
+        Spacer()
+        Button(DebugL10n.text("debug.artifacts.batch.run")) {
+          let targetID = batch.target?.id
+          Task {
+            await batch.submitReviewed()
+            model.refresh(targetID: targetID)
+          }
+          dismiss()
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(batch.phase != .review || batch.isBusy || batch.stopRequested)
+        .accessibilityIdentifier("debug.artifacts.batch.submit")
+      }
+    }
+    .padding(WorkspaceMetrics.pageInsetHorizontal)
+    .frame(minWidth: 700, minHeight: 480)
   }
 }
 
@@ -3113,12 +3353,14 @@ final class DebugWorkspaceViewModel {
 
   private let provider: any DebugApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding
+  let nativeLibraryBatch: NativeLibraryDeploymentBatch
 
   init(
     provider: any DebugApplicationProviding,
     detailProvider: (any RuntimeJobDetailApplicationProviding)? = nil
   ) {
     self.provider = provider
+    self.nativeLibraryBatch = NativeLibraryDeploymentBatch(provider: provider)
     self.detailProvider = detailProvider ?? RuntimeJobDetailApplicationFacade.make()
   }
 
@@ -3229,6 +3471,12 @@ final class DebugWorkspaceViewModel {
       guard let self, self.refreshState.finish(request) else { return }
       guard !Task.isCancelled else { return }
       self.hasLoadedWorkspace = true
+      if let batchTarget = self.nativeLibraryBatch.target,
+        !next.targets.contains(where: {
+          $0.id == batchTarget.id && $0.bindingRevision == batchTarget.bindingRevision
+        }) {
+        self.nativeLibraryBatch.invalidate()
+      }
       self.workspace = next
       artifacts.merge(self.historyArtifactsByJobID) { _, historical in historical }
       self.artifactsByJobID = artifacts
@@ -3373,7 +3621,7 @@ final class DebugWorkspaceViewModel {
     verificationProfile: String,
     rollbackPolicy: String
   ) async -> Bool {
-    guard !isPreparingNativeLibrary, !isSubmittingNativeLibrary else { return false }
+    guard !isPreparingNativeLibrary, !isSubmittingNativeLibrary, !nativeLibraryBatch.isBusy else { return false }
     nativeLibraryPreparationGeneration += 1
     let preparationGeneration = nativeLibraryPreparationGeneration
     nativeLibraryFeedbackScope = NativeLibraryFeedbackScope(
@@ -3425,7 +3673,7 @@ final class DebugWorkspaceViewModel {
     verificationProfile: String,
     rollbackPolicy: String
   ) async -> Bool {
-    guard !isPreparingNativeLibrary, !isSubmittingNativeLibrary else { return false }
+    guard !isPreparingNativeLibrary, !isSubmittingNativeLibrary, !nativeLibraryBatch.isBusy else { return false }
     nativeLibraryPreparationGeneration += 1
     let preparationGeneration = nativeLibraryPreparationGeneration
     nativeLibraryFeedbackScope = NativeLibraryFeedbackScope(
@@ -3475,7 +3723,7 @@ final class DebugWorkspaceViewModel {
   }
 
   func submitNativeLibrary(_ preparation: DebugNativeLibraryPreparation) {
-    guard !isSubmittingNativeLibrary,
+    guard !isSubmittingNativeLibrary, !nativeLibraryBatch.isBusy,
       nativeLibraryPreparation?.planDigest == preparation.planDigest,
       nativeLibraryFeedbackScope?.targetID == preparation.targetID,
       nativeLibraryFeedbackScope?.bindingRevision == preparation.bindingRevision,
