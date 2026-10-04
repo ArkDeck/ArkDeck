@@ -14,7 +14,9 @@ public enum DeviceKeyboardCommand: Sendable {
     case .key: return true
     case .text(let text, let allowed):
       return allowed && !text.isEmpty && text.utf8.count <= 512
-        && !text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+        // Match the Runtime's Cc rule. Foundation's controlCharacters also
+        // includes Cf characters, including joiners used in text and emoji.
+        && !text.unicodeScalars.contains(where: { $0.properties.generalCategory == .control })
     }
   }
 

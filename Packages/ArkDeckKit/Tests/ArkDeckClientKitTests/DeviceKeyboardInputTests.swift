@@ -107,10 +107,31 @@ struct DeviceKeyboardInputTests {
     let provider = DeviceProductionProvider { try await runtime.send($0, $1) }
     for command in [DeviceKeyboardCommand.text(text, allowDeviceClipboard: false),
       .text(String(repeating: "字", count: 171), allowDeviceClipboard: true),
-      .text("a\nb", allowDeviceClipboard: true), .text("", allowDeviceClipboard: true)] {
+      .text("a\nb", allowDeviceClipboard: true),
+      .text("a\u{0000}b", allowDeviceClipboard: true),
+      .text("a\u{007f}b", allowDeviceClipboard: true),
+      .text("a\u{0085}b", allowDeviceClipboard: true),
+      .text("", allowDeviceClipboard: true)] {
       guard case .failed = await provider.sendKeyboard(command, to: target) else { Issue.record("invalid input accepted"); return }
     }
     #expect(await runtime.calls.isEmpty)
+  }
+
+  @Test func unicodeJoinersSurviveThePrivateUploadWithoutEnteringJobInputs() async throws {
+    for text in ["👩‍💻", "می\u{200c}روم", "a\u{2060}b"] {
+      let runtime = Runtime()
+      let provider = DeviceProductionProvider { try await runtime.send($0, $1) }
+      guard case .confirmed = await provider.sendKeyboard(.text(text, allowDeviceClipboard: true), to: target) else {
+        Issue.record("Unicode format characters are literal text, not C0/C1 controls"); return
+      }
+      let payload = try JSONDecoder().decode([String: JSONValue].self, from: await runtime.payload)
+      #expect(payload["text"] == .string(text))
+      let request = await runtime.submittedRequest
+      guard case .object(let fields) = request, case .object(let inputs)? = fields["inputs"] else {
+        Issue.record("typed request missing"); return
+      }
+      #expect(Set(inputs.keys) == ["keyboardArtifactLease", "inputEpochUtc"])
+    }
   }
 
   @Test func lostUnknownAndForeignReceiptsNeverRetryOrEchoServiceErrors() async {
