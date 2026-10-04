@@ -2383,6 +2383,35 @@ impl HostServices for Host {
             .handle_resource(method, params)
     }
     #[cfg(target_os = "macos")]
+    fn app_job_recovery_allowed(&self, job_id: &str, resume: bool) -> bool {
+        let Some(jobs) = &self.jobs else {
+            return false;
+        };
+        let Ok(record) = jobs.read_snapshot(job_id) else {
+            return false;
+        };
+        let Ok(value) = record.value() else {
+            return false;
+        };
+        let eligible = if resume {
+            record.state == "resumeAtConfirmedSafeBoundary" && value["outcomeUnknown"] == false
+        } else {
+            record.state == "waitingForRecovery"
+        };
+        // Admission may materialize the working request. The immutable
+        // original submission retains the App's closed caller vocabulary.
+        let request = value
+            .get("originalSubmissionRequest")
+            .filter(|value| value.is_object())
+            .unwrap_or(&record.request);
+        eligible
+            && serde_json::to_string(request)
+                .ok()
+                .and_then(|request| crate::app_ingress::jobs::kind(&request))
+                .is_some()
+    }
+
+    #[cfg(target_os = "macos")]
     fn job_plan(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
