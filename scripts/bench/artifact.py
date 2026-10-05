@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import threading
 
-from . import artifact_fixture, clocks, control, harness, journal, recovery
+from . import artifact_fixture, clocks, control, harness, journal, recovery, windows_host
 
 PAGE_BYTES = 4 * 1024 * 1024
 RESERVE_BYTES = 4 * 1024 ** 3
@@ -79,14 +79,28 @@ class RssSampler:
         self.thread = None
 
     def sample(self):
+        windows = harness.on_windows()
         try:
-            result = subprocess.run(['ps', '-o', 'pid=,rss=', '-p', ','.join(map(str, self.pids))],
-                                    capture_output=True, text=True, timeout=5, check=True)
-            values = {int(pid): int(rss) * 1024 for pid, rss in (line.split() for line in result.stdout.splitlines())}
+            if windows:
+                values = {}
+                for pid in self.pids:
+                    facts = windows_host.process_resources(pid)
+                    value = facts['workingSetBytes']
+                    # A PID absent from the subsequent Toolhelp snapshot cannot
+                    # provide a complete observation of the expected process.
+                    if type(value) is not int or value <= 0 or facts['threadCount'] is None:
+                        raise ValueError('expected process RSS is unavailable')
+                    values[pid] = value
+            else:
+                result = subprocess.run(['ps', '-o', 'pid=,rss=', '-p', ','.join(map(str, self.pids))],
+                                        capture_output=True, text=True, timeout=5, check=True)
+                values = {int(pid): int(rss) * 1024 for pid, rss in (line.split() for line in result.stdout.splitlines())}
             row = {'elapsedSeconds': clocks.awake_seconds() - self.started,
                    'daemonBytes': values[self.pids[0]], 'clientBytes': values[self.pids[1]]}
         except (subprocess.SubprocessError, ValueError, KeyError, OSError) as error:
             row = {'elapsedSeconds': clocks.awake_seconds() - self.started, 'unmeasured': type(error).__name__}
+        if windows:
+            row['residentSetSource'] = 'WorkingSetSize'
         self.rows.append(row)
 
     def start(self):
