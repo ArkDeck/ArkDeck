@@ -701,6 +701,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // (`tests/spawning/workspace_sign_leaf.rs`, run with
     // `ARKDECK_LIVE_DEVECO_ROOT`).
     "workspace.sign",
+    // The symbolization of a device's crash through a registered symbol
+    // preset (TASK-XPA-011), by the daemon's own `--symbolize-crash` mode as
+    // its symbolizer: the crash the Swift oracle's device capture published,
+    // laid into the Artifact store, named by its lease through the real CLI
+    // against the signed test daemon
+    // (`tests/spawning/workspace_symbolize_leaf.rs`).
+    "workspace.symbolize",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test
