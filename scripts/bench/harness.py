@@ -538,4 +538,6 @@ def temporary_state_directory(prefix: str = "adkb.") -> pathlib.Path:
 
     # Rust's owner opens canonical paths only. macOS commonly spells TMPDIR
     # through /var, a symlink to /private/var.
+    if windows_host.IS_WINDOWS:
+        return windows_host.temporary_private_directory(prefix)
     return pathlib.Path(tempfile.mkdtemp(prefix=prefix, dir=tempfile.gettempdir())).resolve()

@@ -20,6 +20,11 @@ DEFINITIONS = {
 }
 
 
+def durability_source():
+    return ('production-append-return-FlushFileBuffers' if harness.on_windows()
+            else 'production-append-return-fsync-F_FULLFSYNC')
+
+
 def process_evidence(stdout, stderr, returncode, timed_out, record):
     def bounded(value, limit):
         data = value if isinstance(value, bytes) else (value or '').encode('utf-8')
@@ -107,7 +112,11 @@ def drain(runtime, record, budget_seconds=30):
             params = {'jobId': 'job-recovery-00000', 'pageSize': PAGE_SIZE}
             if cursor is not None:
                 params['afterCursor'] = cursor
-            with control.ControlClient(str(runtime.socket_path), timeout_seconds=max(.001, min(1., deadline.remaining_seconds()))) as client:
+            with control.ControlClient(
+                runtime._address(),
+                timeout_seconds=max(.001, min(1., deadline.remaining_seconds())),
+                expected_server_pid=runtime.process.pid if harness.on_windows() else None,
+            ) as client:
                 page = client.call('job.events', params)
             observed.append(page)
             if (not isinstance(page, dict)
@@ -176,7 +185,7 @@ def measure(daemon, soak, record, require_quiet=True):
                         'seedTimestamp': '2026-09-26T00:00:00Z', 'providerDispatchCount': 0}:
             raise ValueError('journal workload differs')
         proof = recovery.validate_input(root, manifest)
-        record({'kind': 'journalInput', 'durability': 'production-append-return-fsync-F_FULLFSYNC', **proof})
+        record({'kind': 'journalInput', 'durability': durability_source(), **proof})
         guard()
         with harness.IsolatedRuntime(daemon, root, runtime_kind='rust') as runtime:
             runtime.start()
@@ -192,7 +201,7 @@ def measure(daemon, soak, record, require_quiet=True):
             'journalRequestedPageSize': PAGE_SIZE,
             'journalAppendBoundary': 'JournalWriter.append-call-through-return-v1',
             'journalDrainBoundary': 'all-pages-contract-handshakes-readback-v1',
-            'journalEvidence': {'durability': 'production-append-return-fsync-F_FULLFSYNC', **proof, **readback},
+            'journalEvidence': {'durability': durability_source(), **proof, **readback},
         }
     except Exception as error:
         record({'kind': 'journalRun', 'status': 'FAILED', 'errorType': type(error).__name__})

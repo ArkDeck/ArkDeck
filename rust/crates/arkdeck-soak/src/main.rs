@@ -1,19 +1,6 @@
 #[cfg(any(target_os = "macos", windows))]
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    // The fixtures that seed or time the Job store, whose owners are not on
-    // Windows yet (G01): refused there before anything is created.
-    #[cfg(windows)]
-    if let Some(flag) = args.first().filter(|flag| {
-        matches!(
-            flag.as_str(),
-            "--seed-artifact-bench" | "--measure-journal" | "--seed-recovery"
-        )
-    }) {
-        eprintln!("{flag} needs the Job store, which is macOS-only until it reaches Windows (G01)");
-        std::process::exit(1);
-    }
-    #[cfg(target_os = "macos")]
     if args.first().map(String::as_str) == Some("--seed-artifact-bench") {
         let result = (|| {
             if args.len() != 4 {
@@ -37,7 +24,6 @@ fn main() {
         }
         return;
     }
-    #[cfg(target_os = "macos")]
     if args.first().map(String::as_str) == Some("--measure-journal") {
         let result = if args.len() == 2 {
             arkdeck_soak::recovery::measure_journal(std::path::Path::new(&args[1]))
@@ -56,7 +42,6 @@ fn main() {
         }
         return;
     }
-    #[cfg(target_os = "macos")]
     if args.first().map(String::as_str) == Some("--seed-recovery") {
         let result = (|| {
             if args.len() != 4 {
@@ -87,9 +72,11 @@ fn main() {
         ),
         #[cfg(windows)]
         Ok(metrics) => println!(
-            "ArkDeck Rust soak completed workload={} cycles={} peakWorkingSetGrowthBytes={} handleGrowth={}",
+            "ArkDeck Rust soak completed workload={} cycles={} terminalJobs={} verifiedArtifactJobs={} peakWorkingSetGrowthBytes={} handleGrowth={}",
             arkdeck_soak::WORKLOAD,
             metrics.cycle,
+            metrics.terminal_job_count,
+            metrics.verified_artifact_evidence_job_count.unwrap_or(0),
             metrics.resident_set_growth_bytes,
             metrics.open_file_descriptor_growth
         ),

@@ -29,12 +29,16 @@ MODULES = (
     "recovery.py",
 )
 STDLIB_ONLY = {
+    # Standard-library Windows facilities used for held no-follow file reads.
+    "_winapi",
     "argparse",
     "ast",
+    "ctypes",
     "datetime",
     "hashlib",
     "json",
     "math",
+    "msvcrt",
     "os",
     "pathlib",
     "platform",
@@ -543,6 +547,19 @@ class StaticImportAudit(unittest.TestCase):
     def test_only_the_standard_library_is_imported(self) -> None:
         for module in MODULES:
             self.assertLessEqual(self._imports(module), STDLIB_ONLY, module)
+
+    def test_windows_stdlib_is_allowed_but_external_aliases_and_nested_imports_are_not(self) -> None:
+        with mock.patch.object(pathlib.Path, "read_text", return_value=(
+            "import ctypes, msvcrt\nfrom ctypes import wintypes\n"
+            "def native_read():\n    import _winapi\n"
+        )):
+            native = self._imports("fixture.py")
+        self.assertEqual(native, {"ctypes", "msvcrt", "_winapi"})
+        self.assertLessEqual(native, STDLIB_ONLY)
+        for source in ("import requests as ctypes", "from third_party import _winapi",
+                       "def native_read():\n    import numpy.linalg as msvcrt\n"):
+            with self.subTest(source=source), mock.patch.object(pathlib.Path, "read_text", return_value=source):
+                self.assertFalse(self._imports("fixture.py") <= STDLIB_ONLY)
 
     @staticmethod
     def _dotted_name(node: ast.expr) -> str:

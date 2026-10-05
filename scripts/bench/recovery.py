@@ -101,7 +101,11 @@ def verify_completed(runtime, root: pathlib.Path, manifest: dict, deadline,
         if deadline.expired():
             raise RecoveryFailed("recovery completion timed out")
         # A fresh, contract-verified connection per page stays below frame limits.
-        with control.ControlClient(str(runtime.socket_path), timeout_seconds=max(0.001, min(1.0, deadline.remaining_seconds()))) as client:
+        with control.ControlClient(
+            runtime._address(),
+            timeout_seconds=max(0.001, min(1.0, deadline.remaining_seconds())),
+            expected_server_pid=runtime.process.pid if harness.on_windows() else None,
+        ) as client:
             params = {"pageSize": PAGE_SIZE}
             if cursor is not None:
                 params["cursor"] = cursor

@@ -1,7 +1,7 @@
-//! The macOS workload: a bounded simulation over production Rust owners. No
+//! A bounded simulation over production Rust owners on both hosts. No
 //! child, shell, live device transport, capability administration or
 //! unknown-outcome replay. Each owner generation serves the existing control
-//! protocol on a private Unix socket.
+//! protocol on a private local endpoint.
 use crate::{
     Configuration, Metrics, Result, SoakClock, SystemClock, error, pause, persist, resource_gate,
 };
@@ -16,6 +16,7 @@ use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt, U
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 use std::sync::{
@@ -37,9 +38,23 @@ fn now() -> Result<String> {
 }
 const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const DIGEST: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+#[cfg(target_os = "macos")]
 const OWNER_MARKER: &[u8] = b"arkdeck-rust-soak/simulated-only/v1";
+#[cfg(windows)]
+const OWNER_MARKER: &[u8] = b"arkdeck-rust-soak/windows-simulated-only/v1";
 #[cfg(test)]
 static DISPATCH_ATTEMPTS: AtomicU64 = AtomicU64::new(0);
+
+fn home() -> Result<String> {
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var("HOME").map_err(error)
+    }
+    #[cfg(windows)]
+    {
+        arkdeck_platform::runtime_home().ok_or("Runtime home unavailable".into())
+    }
+}
 
 /// This fake handles only the exact production observation plans. It never
 /// executes arguments: each accepted sequence maps to bounded in-memory bytes.
@@ -173,7 +188,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
         claims: &claims,
         probe: &probe,
     };
-    let home = std::env::var("HOME").map_err(error)?;
+    let home = home()?;
     let runner = JobRunner {
         imports: None,
         mutation: None,
@@ -421,6 +436,8 @@ fn collect(
     let usage = inspect_tree(root, false)?;
     let artifacts = inspect_tree(&root.join("artifacts"), false)?;
     let resources = self_resources().map_err(error)?;
+    #[cfg(windows)]
+    let memory = arkdeck_platform::self_memory().map_err(error)?;
     let baseline = baseline.unwrap_or(resources);
     Ok(Metrics {
         schema_version: "arkdeck-runtime-soak/v1".into(),
@@ -460,9 +477,36 @@ fn collect(
         outstanding_cleanup_debt_count: reader.outstanding_cleanup_debt().map_err(error)?.len()
             as u64,
         verified_artifact_evidence_job_count: verified,
-        workload: None,
-        working_set_bytes: None,
-        private_bytes: None,
+        workload: {
+            #[cfg(target_os = "macos")]
+            {
+                None
+            }
+            #[cfg(windows)]
+            {
+                Some(crate::WORKLOAD.into())
+            }
+        },
+        working_set_bytes: {
+            #[cfg(target_os = "macos")]
+            {
+                None
+            }
+            #[cfg(windows)]
+            {
+                Some(memory.working_set_bytes)
+            }
+        },
+        private_bytes: {
+            #[cfg(target_os = "macos")]
+            {
+                None
+            }
+            #[cfg(windows)]
+            {
+                Some(memory.private_bytes)
+            }
+        },
         transport_exchanges_this_cycle: None,
     })
 }
@@ -470,7 +514,15 @@ fn canonical_root(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute() {
         return Err("state root must be absolute".into());
     }
+    reject_installed_state(path)?;
+    #[cfg(target_os = "macos")]
     let root = path.canonicalize().map_err(error)?;
+    #[cfg(windows)]
+    let root = {
+        // Refuse the caller's final reparse point before resolving its spelling.
+        HostDirectory::open(path).map_err(error)?;
+        arkdeck_platform::host_resolved_path(path).ok_or("state root cannot be resolved")?
+    };
     // Accept normal macOS /tmp aliases while all store APIs receive the
     // resolved path. A caller-owned final symlink is never a state root.
     if fs::symlink_metadata(path)
@@ -480,12 +532,112 @@ fn canonical_root(path: &Path) -> Result<PathBuf> {
     {
         return Err("soak state root must not be a symlink".into());
     }
+    #[cfg(target_os = "macos")]
     if let Some(home) = std::env::var_os("HOME")
         && root.starts_with(PathBuf::from(home).join("Library/Application Support/ArkDeck"))
     {
         return Err("soak must not use installed Runtime state".into());
     }
+    reject_installed_state(&root)?;
     Ok(root)
+}
+
+fn reject_installed_state(path: &Path) -> Result<()> {
+    #[cfg(windows)]
+    {
+        let installed = arkdeck_platform::arkdeck_application_support_root()
+            .ok_or("installed Runtime state root unavailable")?;
+        reject_windows_installed_state(path, &installed)?;
+    }
+    #[cfg(target_os = "macos")]
+    let _ = path;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn reject_windows_installed_state(path: &Path, installed: &Path) -> Result<()> {
+    fn contains(root: &Path, path: &Path) -> bool {
+        let mut candidate = path.components();
+        root.components().all(|part| {
+            candidate.next().is_some_and(|next| {
+                part.as_os_str()
+                    .as_encoded_bytes()
+                    .eq_ignore_ascii_case(next.as_os_str().as_encoded_bytes())
+            })
+        })
+    }
+    // The literal check also protects a logical Known Folder spelling before
+    // Windows creates or resolves a packaged application's physical directory.
+    if contains(installed, path) {
+        return Err("soak must not use installed Runtime state".into());
+    }
+    // Resolve existing ancestors without creating anything. Native resolution
+    // restores on-disk case (including Unicode case aliases), long names and
+    // packaged/junction paths. A missing installed suffix is ASCII `ArkDeck`.
+    let resolved_installed = resolve_installed_root(installed)?;
+    let resolved_path = resolve_existing_parent(path)?;
+    if contains(&resolved_installed, &resolved_path) {
+        return Err("soak must not use installed Runtime state".into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn resolve_installed_root(installed: &Path) -> Result<PathBuf> {
+    use std::os::windows::fs::MetadataExt;
+    if let Some(resolved) = arkdeck_platform::host_resolved_path(installed) {
+        return Ok(resolved);
+    }
+    match fs::symlink_metadata(installed) {
+        // An installed directory may deny opening while its no-follow metadata
+        // is visible. Derive only this ordinary leaf from its resolved parent;
+        // an unresolved reparse point or unknown leaf remains a refusal.
+        Ok(metadata) if metadata.is_dir() && metadata.file_attributes() & 0x400 == 0 => {
+            let parent = installed
+                .parent()
+                .ok_or("installed Runtime state root cannot be resolved")?;
+            let name = installed
+                .file_name()
+                .ok_or("installed Runtime state root cannot be resolved")?;
+            arkdeck_platform::host_resolved_path(parent)
+                .map(|parent| parent.join(name))
+                .ok_or("installed Runtime state root cannot be resolved".into())
+        }
+        Err(failure) if failure.kind() == std::io::ErrorKind::NotFound => {
+            resolve_existing_parent(installed)
+                .map_err(|_| "installed Runtime state root cannot be resolved".into())
+        }
+        _ => Err("installed Runtime state root cannot be resolved".into()),
+    }
+}
+
+#[cfg(windows)]
+fn resolve_existing_parent(path: &Path) -> Result<PathBuf> {
+    let mut ancestor = path;
+    let mut missing = Vec::new();
+    loop {
+        match fs::symlink_metadata(ancestor) {
+            Ok(_) => {
+                let mut resolved = arkdeck_platform::host_resolved_path(ancestor)
+                    .ok_or("state root ancestor cannot be resolved")?;
+                for name in missing.iter().rev() {
+                    resolved.push(name);
+                }
+                return Ok(resolved);
+            }
+            Err(failure) if failure.kind() == std::io::ErrorKind::NotFound => {
+                missing.push(
+                    ancestor
+                        .file_name()
+                        .ok_or("state root has no local ancestor")?,
+                );
+                ancestor = ancestor
+                    .parent()
+                    .ok_or("state root has no local ancestor")?;
+            }
+            Err(failure) => return Err(error(failure)),
+        }
+    }
 }
 fn require_marker(directory: &HostDirectory) -> Result<()> {
     if directory.read("runtime-soak-owner", 1024).map_err(error)? != OWNER_MARKER {
@@ -496,6 +648,11 @@ fn require_marker(directory: &HostDirectory) -> Result<()> {
 
 pub fn run(configuration: &Configuration) -> Result<Metrics> {
     configuration.validate()?;
+    // A Windows client cannot verify even one exchange without this pin.
+    // Validate it before creating a caller-selected root or marker.
+    socket_cycle::server_identity()?;
+    reject_installed_state(&configuration.state_directory)?;
+    #[cfg(target_os = "macos")]
     if let Some(home) = std::env::var_os("HOME")
         && configuration
             .state_directory
@@ -504,11 +661,14 @@ pub fn run(configuration: &Configuration) -> Result<Metrics> {
         return Err("soak must not use installed Runtime state".into());
     }
     if !configuration.state_directory.exists() {
+        #[cfg(target_os = "macos")]
         fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
             .create(&configuration.state_directory)
             .map_err(error)?;
+        #[cfg(windows)]
+        create_windows_state_root(&configuration.state_directory)?;
     }
     let root = canonical_root(&configuration.state_directory)?;
     socket_cycle::validate_root(&root)?;
@@ -543,6 +703,24 @@ pub fn run(configuration: &Configuration) -> Result<Metrics> {
         .collect();
     let clock = SystemClock(ContinuousInstant::now().map_err(error)?);
     run_workload(configuration, &root, &run_id, &clock)
+}
+
+#[cfg(windows)]
+fn create_windows_state_root(path: &Path) -> Result<()> {
+    let parent = path
+        .parent()
+        .ok_or("state root must have a private parent")?;
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("invalid state root name")?;
+    // FILE_CREATE through the held private parent refuses a raced existing
+    // entry. It never adopts a directory or rewrites an existing DACL.
+    HostDirectory::open(parent)
+        .map_err(|_| "missing state root requires an existing private parent")?
+        .create_private_child(name)
+        .map_err(error)?;
+    Ok(())
 }
 
 fn run_workload(
@@ -618,7 +796,61 @@ rssGrowthBytes={} fdCount={} stateBytes={} simulatedProvider=true",
     Ok(metrics)
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
+mod installed_state_refusal_tests {
+    use super::*;
+
+    #[test]
+    fn logical_and_resolved_installed_roots_refuse_case_aliases_without_writes() {
+        let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+        let scratch = arkdeck_platform::host_resolved_path(&std::env::temp_dir())
+            .unwrap()
+            .join(format!("adk-installed-refuse-{nonce:x}"));
+        let directory = HostDirectory::open_or_create_private(&scratch).unwrap();
+        let installed = scratch.join("ArkDeck");
+        directory.private_child("ArkDeck").unwrap();
+        let resolved = arkdeck_platform::host_resolved_path(&installed).unwrap();
+        for root in [&installed, &resolved] {
+            let alias = PathBuf::from(root.to_str().unwrap().to_ascii_uppercase());
+            for candidate in [alias.clone(), alias.join("missing-owner-state")] {
+                assert_eq!(
+                    reject_windows_installed_state(&candidate, &installed).unwrap_err(),
+                    "soak must not use installed Runtime state"
+                );
+            }
+        }
+        assert!(fs::read_dir(&installed).unwrap().next().is_none());
+        // Refuse a missing installed root by its existing parent as well, and
+        // keep component boundaries: an adjacent ArkDeck-extra is not installed.
+        let missing = scratch.join("missing").join("ArkDeck");
+        let alias = PathBuf::from(missing.to_str().unwrap().to_ascii_uppercase());
+        assert!(reject_windows_installed_state(&alias.join("child"), &missing).is_err());
+        assert!(!scratch.join("missing").exists());
+        reject_windows_installed_state(&scratch.join("ArkDeck-extra"), &installed).unwrap();
+        fs::remove_dir_all(scratch).unwrap();
+    }
+
+    #[test]
+    fn fresh_root_creation_refuses_existing_entries_without_changing_them() {
+        let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+        let scratch = arkdeck_platform::host_resolved_path(&std::env::temp_dir())
+            .unwrap()
+            .join(format!("adk-create-refuse-{nonce:x}"));
+        let directory = HostDirectory::open_or_create_private(&scratch).unwrap();
+        let root = scratch.join("state");
+        let existing = directory.create_private_child("state").unwrap();
+        existing
+            .publish_document("retain", b"unchanged", 1024)
+            .unwrap();
+        assert!(create_windows_state_root(&root).is_err());
+        assert_eq!(existing.read("retain", 1024).unwrap(), b"unchanged");
+        HostDirectory::open(&root).unwrap();
+        assert!(!root.join("runtime-soak-owner").exists());
+        fs::remove_dir_all(scratch).unwrap();
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
 mod recovery_refusal_tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;

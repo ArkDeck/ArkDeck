@@ -1,15 +1,13 @@
 //! The Runtime soak: bounded cycles over the production serving path, gated
 //! on the process's own resource growth.
 //!
-//! * macOS (`owners`): the simulated-provider workload through production Rust
+//! * Both hosts (`owners`): the simulated-provider workload through production Rust
 //!   owners. No child, shell, live device transport, capability administration
 //!   or unknown-outcome replay. Each owner generation serves the existing
-//!   control protocol on a private Unix socket.
-//! * Windows (`pipe_cycle`): the same serving generations over a private named
-//!   pipe, each drained before the next binds, with the production client's
-//!   identity checks on every connection. The Job workload stays macOS-only
-//!   until the Job store reaches Windows (G01); the Windows run records that it
-//!   is the transport workload, and never counts Jobs it did not run.
+//!   control protocol on a private Unix socket or Windows named pipe, each
+//!   drained before the next binds, with the production client's identity
+//!   checks on every connection. The Windows executable must be signed with
+//!   a certificate the host trusts, pinned by `ARKDECK_SOAK_SIGNER_SHA256`.
 //!
 //! Both gate the same growth bounds (T1) on each platform's own counters; see
 //! `arkdeck_platform::SelfResources` for the Windows counterparts.
@@ -21,14 +19,12 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-#[cfg(target_os = "macos")]
 mod owners;
-#[cfg(target_os = "macos")]
 pub use owners::{artifact_bench, recovery, run, verify_state};
 #[cfg(windows)]
-mod pipe_cycle;
+pub const SIGNER_VARIABLE: &str = "ARKDECK_SOAK_SIGNER_SHA256";
 #[cfg(windows)]
-pub use pipe_cycle::{SIGNER_VARIABLE, WORKLOAD, run};
+pub const WORKLOAD: &str = "windows-owner-workload/v1";
 
 pub type Result<T> = std::result::Result<T, String>;
 fn error(value: impl std::fmt::Debug) -> String {
@@ -139,8 +135,7 @@ pub struct Metrics {
     pub outstanding_cleanup_debt_count: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verified_artifact_evidence_job_count: Option<u64>,
-    /// Which workload produced this document when it is not the Job
-    /// workload: `windows-pipe-transport/v1`.
+    /// Windows names its owner workload explicitly; macOS omits this member.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workload: Option<String>,
     /// Windows: the live working set at this reading.
