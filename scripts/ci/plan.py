@@ -692,6 +692,7 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 (sys.executable, "rust/scripts/workspace-tests.py"),
                 (sys.executable, "rust/scripts/test_contract_checks.py"),
                 (sys.executable, "rust/scripts/test_ci_execution.py"),
+                (sys.executable, "rust/scripts/test_run_cargo.py"),
                 (sys.executable, "rust/scripts/check-contracts.py"),
                 ("cargo", "deny", "--locked", "check"),
                 ("cargo", "vet", "--locked", "--no-registry-suggestions"),
@@ -737,13 +738,18 @@ def run_local(repo_root: pathlib.Path, plan: CIPlan) -> None:
     for command in local_commands(repo_root, plan):
         if skip_windows and _is_windows_lane_command(command):
             continue
-        # rustup discovers rust-toolchain.toml from the working directory,
-        # not --manifest-path. Run each Cargo invocation in the workspace so
-        # local validation uses the same pinned toolchain as hosted CI.
-        cwd = repo_root / RUST_WORKSPACE_DIR if command[0] == "cargo" else repo_root
-        location = f"[{RUST_WORKSPACE_DIR}] " if cwd != repo_root else ""
-        print("+ " + location + " ".join(command), flush=True)
-        subprocess.run(command, cwd=cwd, env=os.environ.copy(), check=True)
+        # Local Cargo and Rust checks use this chat's stable mirror/target,
+        # including the contract views; a new task never gets a new cache.
+        environment = os.environ.copy()
+        runner = str(repo_root / "rust/scripts/run-cargo.py")
+        if command[0] == "cargo":
+            command = (sys.executable, runner, *command[1:])
+            environment["ARKDECK_CARGO_SOURCE_ROOT"] = str(repo_root.resolve())
+        elif len(command) > 1 and command[1].startswith("rust/scripts/"):
+            command = (sys.executable, runner, "exec", "--", *command)
+            environment["ARKDECK_CARGO_SOURCE_ROOT"] = str(repo_root.resolve())
+        print("+ " + " ".join(command), flush=True)
+        subprocess.run(command, cwd=repo_root, env=environment, check=True)
     if skip_windows:
         raise PlanError(
             "the windows lane is not runnable on this host "

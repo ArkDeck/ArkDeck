@@ -87,10 +87,12 @@ Golden Journey 风险最小的解释并说明。旧 E0/E1/E2 或确认流程不�
 
 push 前本地只跑针对性检查（目标 10 分钟内；不拿门锁，不等别的门）：
 
-- `cargo fmt --all --check --manifest-path rust/Cargo.toml`；改动的 crate 及直接依赖它的 crate：
-  `cargo clippy --manifest-path rust/Cargo.toml -p <crate> --all-targets -- -D warnings`（本机 target）与
-  `cargo test --manifest-path rust/Cargo.toml -p <crate>`，带 `CARGO_BUILD_JOBS=2`，多个工作树不共用
-  cargo target；
+- `python3 rust/scripts/run-cargo.py fmt --all --check`；改动的 crate 及直接依赖它的 crate：
+  `python3 rust/scripts/run-cargo.py clippy -p <crate> --all-targets -- -D warnings`（本机 target）与
+  `python3 rust/scripts/run-cargo.py test -p <crate>`。runner 固定 `CARGO_BUILD_JOBS=2`，以
+  `ARKDECK_CARGO_OWNER`（默认 `CODEX_THREAD_ID`，普通终端为 `local`）隔离会话；三个会话各自
+  复用固定镜像与 target，换任务、分支、工作树或源码快照时不新建缓存。同一会话共用锁。
+  `ARKDECK_CARGO_CACHE_ROOT` 只用于指定该会话固定的仓库外可写根，不按任务/快照生成新路径；
 - 改了契约输入（`control-protocol.json`、`spec/control/methods/**`、ControlFrames、CLI argv 语料）才跑
   `python rust/scripts/generate-contract.py --check`；改了 `openspec/**`、`docs/**`、`AGENTS.md` 才跑
   `sh scripts/check-sdd.sh`；

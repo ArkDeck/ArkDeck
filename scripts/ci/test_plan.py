@@ -763,15 +763,23 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertNotIn(f"{sys.executable} rust/scripts/check-readonly.py", commands)
         self.assertNotIn("xcodebuild", "\n".join(commands))
 
-    def test_rust_commands_use_workspace_toolchain_directory(self):
+    def test_rust_commands_use_the_chat_cache_runner(self):
         root = pathlib.Path("/example/ArkDeck")
-        commands = (("python3", "scripts/ci/test_plan.py"), ("cargo", "fmt", "--check"))
+        commands = (("python3", "scripts/ci/test_plan.py"), ("cargo", "fmt", "--check"),
+                    ("python3", "rust/scripts/check-contracts.py"))
         with mock.patch.object(PLAN, "local_commands", return_value=commands):
             with mock.patch.object(PLAN.subprocess, "run") as run:
                 PLAN.run_local(root, self.plan(swift=False, app=False, rust=True))
         self.assertEqual(
-            [call.kwargs["cwd"] for call in run.call_args_list], [root, root / "rust"]
+            [call.kwargs["cwd"] for call in run.call_args_list], [root, root, root]
         )
+        runner = str(root / "rust/scripts/run-cargo.py")
+        self.assertEqual(run.call_args_list[0].args[0], commands[0])
+        self.assertEqual(run.call_args_list[1].args[0], (sys.executable, runner, "fmt", "--check"))
+        self.assertEqual(run.call_args_list[2].args[0],
+                         (sys.executable, runner, "exec", "--", *commands[2]))
+        for call in run.call_args_list[1:]:
+            self.assertEqual(call.kwargs["env"]["ARKDECK_CARGO_SOURCE_ROOT"], str(root))
         self.assertTrue(all(call.kwargs["check"] for call in run.call_args_list))
 
     def test_contract_or_dependency_policy_failure_cannot_pass_local_gate(self):
@@ -845,7 +853,8 @@ class WindowsLaneTests(unittest.TestCase):
                     with self.assertRaisesRegex(PLAN.PlanError, "windows lane is not runnable on this host"):
                         PLAN.run_local(root, plan)
                 ran = [call.args[0] for call in run.call_args_list]
-                self.assertEqual(ran, [commands[0], commands[1]])
+                self.assertEqual(ran, [commands[0], (sys.executable,
+                    str(root / "rust/scripts/run-cargo.py"), *commands[1][1:])])
 
     def test_windows_lane_runs_on_windows(self):
         commands = (

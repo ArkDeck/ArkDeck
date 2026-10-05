@@ -88,6 +88,9 @@ jobs:
       - name: CI cache scope tests
         run: python3 scripts/ci/test_cache_scope.py
 
+      - name: Local Cargo cache runner tests
+        run: python3 rust/scripts/test_run_cargo.py
+
       - name: CI workflow contract tests
         run: python3 scripts/test_agent_pr_workflow.py
 
