@@ -10,8 +10,11 @@ use std::{io, path::Path};
 
 /// The published identity of a Windows HDC digest: the registered tuple's
 /// reported version, naming no profile, or none for any other digest
-/// (CHG-2026-078 registers DevEco Studio 26.0.0.43's `hdc.exe` only).
-#[cfg(windows)]
+/// (CHG-2026-078 registers DevEco Studio 26.0.0.43's `hdc.exe` only). The
+/// Windows composition identifies an HDC by its own tuple table
+/// ([`BootstrapReaders::open_existing_identified`]), which in production is
+/// this one.
+#[cfg(all(windows, test))]
 pub(crate) fn windows_hdc_identity(sha256: &str) -> Option<Value> {
     arkdeck_provider_hdc::windows_tuple(sha256).map(
         |tuple| serde_json::json!({"version": tuple.reported_version, "profileReferences": []}),
@@ -24,13 +27,26 @@ pub struct BootstrapReaders {
     deveco: DevEcoRegistryStore,
 }
 impl BootstrapReaders {
+    #[cfg(target_os = "macos")]
     pub fn open_existing(root: &Path) -> io::Result<Self> {
-        let tools = ToolRegistryStore::open_existing(root)?;
-        // On Windows an HDC is admitted and identified only by a registered
-        // Windows tuple (CHG-2026-078), exactly as the provider's table
-        // holds it; it names no published profile.
-        #[cfg(windows)]
-        let tools = tools.with_published_identities(std::sync::Arc::new(windows_hdc_identity));
+        Self::over(root, ToolRegistryStore::open_existing(root)?)
+    }
+    /// The Windows readers: an HDC is admitted and identified only by a
+    /// registered Windows tuple (CHG-2026-078), naming no published profile,
+    /// by the tuple table of the composition that serves it
+    /// (`windows_lifecycle`), so that registration admits exactly the digests
+    /// its selection admits: the registered tuples in production.
+    #[cfg(windows)]
+    pub fn open_existing_identified(
+        root: &Path,
+        identities: arkdeck_hoststore::PublishedIdentities,
+    ) -> io::Result<Self> {
+        Self::over(
+            root,
+            ToolRegistryStore::open_existing(root)?.with_published_identities(identities),
+        )
+    }
+    fn over(root: &Path, tools: ToolRegistryStore) -> io::Result<Self> {
         Ok(Self {
             tools,
             bundles: BundleRegistryReadStore::open_existing(root)?,

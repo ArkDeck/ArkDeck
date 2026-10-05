@@ -1048,11 +1048,24 @@ impl Host {
         self.trace_cache = Some(cache);
         self
     }
-    #[cfg(any(target_os = "macos", windows))]
+    #[cfg(target_os = "macos")]
     pub fn with_bootstrap(mut self, root: &std::path::Path) -> io::Result<Self> {
         self.bootstrap = Some(crate::bootstrap_readers::BootstrapReaders::open_existing(
             root,
         )?);
+        Ok(self)
+    }
+    /// The Bootstrap readers on Windows, an HDC identified by the
+    /// composition's own tuple table (`BootstrapReaders::open_existing_identified`).
+    #[cfg(windows)]
+    pub fn with_identified_bootstrap(
+        mut self,
+        root: &std::path::Path,
+        identities: arkdeck_hoststore::PublishedIdentities,
+    ) -> io::Result<Self> {
+        self.bootstrap = Some(
+            crate::bootstrap_readers::BootstrapReaders::open_existing_identified(root, identities)?,
+        );
         Ok(self)
     }
 
@@ -2487,7 +2500,7 @@ impl HostServices for Host {
                 });
         let archiver = arkdeck_hoststore::JobArchiver {
             jobs,
-            now: arkdeck_hoststore::runtime_now,
+            now: clock_now,
             sessions: publisher.as_ref(),
         };
         if method == "job.archive.preview" {

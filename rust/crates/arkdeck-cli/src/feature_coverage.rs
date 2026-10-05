@@ -400,6 +400,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.wait",
     "job.cancel",
     "job.reconcile",
+    // The Job archive (#2468): a quiescent Job previewed, a stale review
+    // refused, archived with its Session published and the publication
+    // finished again, against the macOS Rust Runtime's recorded answers (no
+    // Swift oracle records it), through the real CLI and the signed test
+    // daemon (`arkdeck-agentd/tests/spawning/job_archive_cli.rs`).
+    "job.archive.preview",
+    "job.archive.apply",
     // The agent execution and human-action owners over Swift's
     // physical-assistance records (TASK-XPA-005). Not `agent run`, `agent
     // resume` or `human-action resume`; `agent abandon` is counted. See the
@@ -598,9 +605,7 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
     // a release-candidate package tree registered, inspected, listed and
     // retired as a daemon Bundle, and a DevEco toolchain's inspection,
-    // listing and retirement. Not `runtime tool register` (an HDC is not
-    // registered until a Windows HDC tuple is, CHG-2026-078) nor `runtime
-    // tool select`, which has nothing to select.
+    // listing and retirement. `runtime tool register` is measured below.
     "runtime.bundle.register",
     "runtime.bundle.inspect",
     "runtime.bundle.list",
@@ -608,6 +613,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "runtime.tool.list",
     "runtime.tool.inspect",
     "runtime.tool.remove",
+    // `runtime tool register`: the DevEco kind as above, and the HDC kind
+    // over the account daemon's composition, an hdc.exe a tuple names
+    // registered beside its selection and one no tuple names refused
+    // (TASK-XPA-012; `arkdeck-agentd/tests/spawning/account_tool_selection.rs`).
+    // Not `runtime tool select`: its impact reads the managed server's health
+    // through the HDC lifecycle owner, which no Windows composition proves
+    // healthy yet (#2501), so it answers only a drifted action.
+    "runtime.tool.register",
     // A diagnostics capture's Artifacts the macOS Runtime recorded, exported
     // (`windows_diagnostics_export_process.rs`).
     "diagnostics.export",
@@ -647,6 +660,16 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // preset, reaching the project's `ohpm` dependencies through the in-tree
     // junctions the copy recreates (the same live test).
     "workspace.test",
+    // GJ-5's continuation (TASK-XPA-005): a completed `target observe`
+    // continued through `workspace continuation submit` and `run`, by the
+    // real CLI against the signed test daemon over the shared fake HDC, each
+    // answer Swift's draft of the Runtime's reads (the
+    // `workspace-continuation` oracle), the run sending exactly the
+    // `observe-device` oracle Job's calls
+    // (`arkdeck-agentd/tests/spawning/workspace_continuation_cli.rs`). The
+    // Runtime's `health` lists the providers it composes, as Swift's did.
+    "workspace.continuation.submit",
+    "workspace.continuation.run",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test

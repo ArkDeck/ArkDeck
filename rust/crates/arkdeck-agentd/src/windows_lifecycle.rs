@@ -511,12 +511,16 @@ impl Authority {
             arkdeck_hoststore::FlashInvocations::open(state).map_err(|error| unusable(&error))?;
         let host = host.with_flash_invocations(invocations);
         let host = host.with_trace_cache(self.trace_cache()?);
-        let host = host.with_bootstrap(&bootstrap).map_err(|error| {
-            format!(
-                "the Bootstrap registry {} is unusable: {error}; nothing was started",
-                bootstrap.display()
-            )
-        })?;
+        // Registration admits an HDC by the same tuple table as the
+        // selection below (`Self::tool_registry`).
+        let host = host
+            .with_identified_bootstrap(&bootstrap, tuple_identities(self.tuples))
+            .map_err(|error| {
+                format!(
+                    "the Bootstrap registry {} is unusable: {error}; nothing was started",
+                    bootstrap.display()
+                )
+            })?;
         // The managed server, the first thing this composition launches: a
         // development root's admitted HDC, or the account's selected one,
         // started and its pending selection settled as Swift's startup

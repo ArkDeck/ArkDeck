@@ -2931,7 +2931,7 @@
       "feature": "job.archive",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -2949,7 +2949,7 @@
       "feature": "job.archive.preview",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -3798,7 +3798,7 @@
       "feature": "runtime.tool.register",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "Only --kind deveco is served by this RPC; --kind hdc retains its in-process Bootstrap registration.",
@@ -4396,7 +4396,7 @@
       "feature": "workspace.continuation.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4414,7 +4414,7 @@
       "feature": "workspace.continuation.submit",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
