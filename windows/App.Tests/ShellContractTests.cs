@@ -75,7 +75,7 @@ public sealed class ShellContractTests
         // (TASK-XPA-020, app.device.rename: host state, generation-guarded, the CLI's
         // `target display-name set|clear`), named only by the loader; no Job, adoption,
         // device or other business write is named anywhere in the App or App.Core.
-        var forbidden = new[] { "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "agent.run", "agent.chat", "trace.cache.purge", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.storage.policy", "runtime.storage.root", "runtime.tool.select", "runtime.hdc.restart" };
+        var forbidden = new[] { "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "agent.run", "agent.chat", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.tool.select", "runtime.hdc.restart" };
         // TASK-XPA-020 (sessions and Job actions): a Job's cancellation request and the Session
         // catalog's pin, unpin, cleanup and export, each preview-then-apply or generation-guarded.
         var allowed = new[] { "target.display-name.set", "target.display-name.clear", "job.cancel", "session.pin", "session.unpin",
@@ -91,7 +91,12 @@ public sealed class ShellContractTests
             "job.plan", "job.submit", "job.run",
             // TASK-XPA-020 (Flash): binding the board in Loader mode to the selected Target before
             // the one submission, as the macOS Flash page does (flash.bind-current-loader).
-            "flash.bind-current-loader" };
+            "flash.bind-current-loader",
+            // TASK-XPA-020 (Settings; delegated minor decision, macOS parity, pending the next
+            // rulings batch): the macOS SettingsApplicationFacade's generation-bound storage
+            // policy and root, and RuntimeTraceCacheApplicationFacade's purge of inactive derived
+            // databases, each confirmed by the person; the Runtime validates and decides.
+            "runtime.storage.policy", "runtime.storage.root", "trace.cache.purge" };
         var sources = RepoPaths.AppSources("*.cs")
             .Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
                 .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")));
@@ -99,8 +104,8 @@ public sealed class ShellContractTests
         {
             var text = File.ReadAllText(file);
             foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
-            if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs" or "Flash.cs"
-                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs" or "ScriptedDaemon.Continue.cs"))
+            if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Settings.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs" or "Flash.cs"
+                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs" or "ScriptedDaemon.Continue.cs" or "ScriptedDaemon.Settings.cs"))
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }

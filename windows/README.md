@@ -106,7 +106,10 @@ first, `ControlResult` back.
   (`runtime.storage.status`), Trace (`trace.cache.status`) — and two Windows tabs: Runtime
   (`health` and every `doctor` check; service status/verify/restart and signing status as their
   CLI commands, since the App never controls the Runtime) and Workspace
-  (`workspace.project.list|show`, `workspace.preset.list`). All read-only.
+  (`workspace.project.list|show`, `workspace.preset.list`). Read-only except, as on macOS, the
+  Session root and retention policy (`runtime.storage.root|policy`, bound to the generation read,
+  another writer's publication read back) and the purge of inactive derived Trace databases
+  (`trace.cache.purge`), each confirmed first; the Runtime validates and answers.
 - **Sessions and Job actions (TASK-XPA-020).** A Sessions page lists the Session catalog
   (`session.list|show`), pins and unpins by generation, and exports and cleans up through the
   Runtime's preview-then-apply (`session.export.preview|apply`, `session.cleanup.preview|apply`):

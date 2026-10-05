@@ -6238,4 +6238,120 @@ SHA-256: %4$@</value>
     <value>Check hidumper with a read-only window inventory</value>
     <comment>windows.overview.hdc.checkHidumper (Windows only)</comment>
   </data>
+  <data name="settings_storage_chooseRoot" xml:space="preserve">
+    <value>Choose folder…</value>
+    <comment>settings.storage.chooseRoot (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_days" xml:space="preserve">
+    <value>days</value>
+    <comment>settings.storage.days (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_futureJobs" xml:space="preserve">
+    <value>Changing the root affects only new Jobs. Existing Sessions are not moved or deleted.</value>
+    <comment>settings.storage.futureJobs (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_gib" xml:space="preserve">
+    <value>GiB</value>
+    <comment>settings.storage.gib (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_location" xml:space="preserve">
+    <value>Session location</value>
+    <comment>settings.storage.location (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_policy" xml:space="preserve">
+    <value>Retention policy</value>
+    <comment>settings.storage.policy (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_policyDetail" xml:space="preserve">
+    <value>The safety margin must be smaller than the total quota. Policy changes are generation-checked before they are saved.</value>
+    <comment>settings.storage.policyDetail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_resetRoot" xml:space="preserve">
+    <value>Use default</value>
+    <comment>settings.storage.resetRoot (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_rootSource" xml:space="preserve">
+    <value>Source</value>
+    <comment>settings.storage.rootSource (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_rootSource_custom" xml:space="preserve">
+    <value>User-selected folder</value>
+    <comment>settings.storage.rootSource.custom (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_save" xml:space="preserve">
+    <value>Save policy</value>
+    <comment>settings.storage.save (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_selectionError" xml:space="preserve">
+    <value>The storage folder could not be selected. Choose it again.</value>
+    <comment>settings.storage.selectionError (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_validationError" xml:space="preserve">
+    <value>Enter whole numbers greater than zero, with a total quota larger than the safety margin.</value>
+    <comment>settings.storage.validationError (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_saving" xml:space="preserve">
+    <value>Saving</value>
+    <comment>settings.common.saving (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_working" xml:space="preserve">
+    <value>Working</value>
+    <comment>settings.common.working (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_settings_storage_rootSource_default" xml:space="preserve">
+    <value>Local application data default</value>
+    <comment>windows.settings.storage.rootSource.default (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_alreadyDefault" xml:space="preserve">
+    <value>The Session root is already the default.</value>
+    <comment>windows.settings.storage.alreadyDefault (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_confirmPolicy" xml:space="preserve">
+    <value>Save a total quota of %1$@, a safety margin of %2$@ and a retention of %3$lld days? The Runtime checks them against the settings it last reported.</value>
+    <comment>windows.settings.storage.confirmPolicy (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_confirmRoot" xml:space="preserve">
+    <value>Store new Sessions under %@? The Runtime checks the folder before it uses it.</value>
+    <comment>windows.settings.storage.confirmRoot (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_confirmReset" xml:space="preserve">
+    <value>Store new Sessions in the default location again?</value>
+    <comment>windows.settings.storage.confirmReset (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_useFolder" xml:space="preserve">
+    <value>Use this folder</value>
+    <comment>windows.settings.storage.useFolder (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_refused" xml:space="preserve">
+    <value>The Runtime did not save this</value>
+    <comment>windows.settings.storage.refused (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_superseded" xml:space="preserve">
+    <value>Another writer changed the storage settings first. Nothing was saved; the Runtime's current settings are shown.</value>
+    <comment>windows.settings.storage.superseded (Windows only)</comment>
+  </data>
+  <data name="windows_settings_storage_saved" xml:space="preserve">
+    <value>Saved by the Runtime.</value>
+    <comment>windows.settings.storage.saved (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purge" xml:space="preserve">
+    <value>Purge unused entries</value>
+    <comment>windows.settings.trace.purge (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeConfirm" xml:space="preserve">
+    <value>Remove %lld inactive derived Trace databases? Entries in use and original Trace files are never removed.</value>
+    <comment>windows.settings.trace.purgeConfirm (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeDone" xml:space="preserve">
+    <value>Removed %lld unused entries.</value>
+    <comment>windows.settings.trace.purgeDone (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeFailed" xml:space="preserve">
+    <value>The Runtime did not purge the cache</value>
+    <comment>windows.settings.trace.purgeFailed (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_purgeNote" xml:space="preserve">
+    <value>Only inactive derived databases are purged. Original Trace files are never cache targets.</value>
+    <comment>windows.settings.trace.purgeNote (Windows only)</comment>
+  </data>
 </root>
