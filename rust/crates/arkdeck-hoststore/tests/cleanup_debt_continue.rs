@@ -69,7 +69,7 @@ impl HdcDispatch for Faulted<'_> {
 /// A Job of the oracle that owes its staging path, with the fixed root's
 /// lock the caller keeps while it reads.
 struct Owed {
-    _lock: fs::File,
+    _lock: debug_hap::Exclusive,
     owners: Owners,
     job: String,
     staging: String,

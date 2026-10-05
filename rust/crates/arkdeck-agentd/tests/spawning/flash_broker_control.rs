@@ -24,8 +24,11 @@ const EXECUTE: &str = r#"{"schemaVersion":"1.0.0","action":"executePinnedRequest
 
 fn run_case(outcome: &str) {
     let _turn = crate::turn();
+    let root = crate::flash_execution_control::ChildRoot::new();
+    let (key, path) = root.env();
     let output = Command::new(std::env::current_exe().unwrap())
         .env("ARKDECK_TEST_FLASH_BROKER_OUTCOME", outcome)
+        .env(key, path)
         .args([
             "--exact",
             "flash_broker_control::flash_broker_process_fixture",

@@ -9341,6 +9341,180 @@
       "table": null,
       "en": "Check hidumper with a read-only window inventory",
       "zh-Hans": "用只读窗口清单检查 hidumper"
+    },
+    {
+      "key": "settings.storage.chooseRoot",
+      "table": "SettingsLocalizable",
+      "en": "Choose folder…",
+      "zh-Hans": "选择目录…"
+    },
+    {
+      "key": "settings.storage.days",
+      "table": "SettingsLocalizable",
+      "en": "days",
+      "zh-Hans": "天"
+    },
+    {
+      "key": "settings.storage.futureJobs",
+      "table": "SettingsLocalizable",
+      "en": "Changing the root affects only new Jobs. Existing Sessions are not moved or deleted.",
+      "zh-Hans": "更换根目录只影响新任务；已有 Session 不会被移动或删除。"
+    },
+    {
+      "key": "settings.storage.gib",
+      "table": "SettingsLocalizable",
+      "en": "GiB",
+      "zh-Hans": "GiB"
+    },
+    {
+      "key": "settings.storage.location",
+      "table": "SettingsLocalizable",
+      "en": "Session location",
+      "zh-Hans": "Session 位置"
+    },
+    {
+      "key": "settings.storage.policy",
+      "table": "SettingsLocalizable",
+      "en": "Retention policy",
+      "zh-Hans": "保留策略"
+    },
+    {
+      "key": "settings.storage.policyDetail",
+      "table": "SettingsLocalizable",
+      "en": "The safety margin must be smaller than the total quota. Policy changes are generation-checked before they are saved.",
+      "zh-Hans": "安全余量必须小于总配额；策略保存前会校验配置代次。"
+    },
+    {
+      "key": "settings.storage.resetRoot",
+      "table": "SettingsLocalizable",
+      "en": "Use default",
+      "zh-Hans": "恢复默认"
+    },
+    {
+      "key": "settings.storage.rootSource",
+      "table": "SettingsLocalizable",
+      "en": "Source",
+      "zh-Hans": "来源"
+    },
+    {
+      "key": "settings.storage.rootSource.custom",
+      "table": "SettingsLocalizable",
+      "en": "User-selected folder",
+      "zh-Hans": "用户选择的目录"
+    },
+    {
+      "key": "settings.storage.save",
+      "table": "SettingsLocalizable",
+      "en": "Save policy",
+      "zh-Hans": "保存策略"
+    },
+    {
+      "key": "settings.storage.selectionError",
+      "table": "SettingsLocalizable",
+      "en": "The storage folder could not be selected. Choose it again.",
+      "zh-Hans": "无法选择存储目录，请重新选择。"
+    },
+    {
+      "key": "settings.storage.validationError",
+      "table": "SettingsLocalizable",
+      "en": "Enter whole numbers greater than zero, with a total quota larger than the safety margin.",
+      "zh-Hans": "请输入大于零的整数，并确保总配额大于安全余量。"
+    },
+    {
+      "key": "settings.common.saving",
+      "table": "SettingsLocalizable",
+      "en": "Saving",
+      "zh-Hans": "正在保存"
+    },
+    {
+      "key": "settings.common.working",
+      "table": "SettingsLocalizable",
+      "en": "Working",
+      "zh-Hans": "正在处理"
+    },
+    {
+      "key": "windows.settings.storage.rootSource.default",
+      "table": null,
+      "en": "Local application data default",
+      "zh-Hans": "本地应用数据默认位置"
+    },
+    {
+      "key": "windows.settings.storage.alreadyDefault",
+      "table": null,
+      "en": "The Session root is already the default.",
+      "zh-Hans": "会话根目录已是默认位置。"
+    },
+    {
+      "key": "windows.settings.storage.confirmPolicy",
+      "table": null,
+      "en": "Save a total quota of %1$@, a safety margin of %2$@ and a retention of %3$lld days? The Runtime checks them against the settings it last reported.",
+      "zh-Hans": "保存总配额 %1$@、安全余量 %2$@、保留 %3$lld 天？Runtime 会对照它上次报告的设置检查。"
+    },
+    {
+      "key": "windows.settings.storage.confirmRoot",
+      "table": null,
+      "en": "Store new Sessions under %@? The Runtime checks the folder before it uses it.",
+      "zh-Hans": "将新会话存放在 %@？Runtime 会在使用前检查该文件夹。"
+    },
+    {
+      "key": "windows.settings.storage.confirmReset",
+      "table": null,
+      "en": "Store new Sessions in the default location again?",
+      "zh-Hans": "重新将新会话存放在默认位置？"
+    },
+    {
+      "key": "windows.settings.storage.useFolder",
+      "table": null,
+      "en": "Use this folder",
+      "zh-Hans": "使用此文件夹"
+    },
+    {
+      "key": "windows.settings.storage.refused",
+      "table": null,
+      "en": "The Runtime did not save this",
+      "zh-Hans": "Runtime 未保存此项"
+    },
+    {
+      "key": "windows.settings.storage.superseded",
+      "table": null,
+      "en": "Another writer changed the storage settings first. Nothing was saved; the Runtime's current settings are shown.",
+      "zh-Hans": "其他写入方先修改了存储设置。未保存任何内容；现显示 Runtime 当前的设置。"
+    },
+    {
+      "key": "windows.settings.storage.saved",
+      "table": null,
+      "en": "Saved by the Runtime.",
+      "zh-Hans": "已由 Runtime 保存。"
+    },
+    {
+      "key": "windows.settings.trace.purge",
+      "table": null,
+      "en": "Purge unused entries",
+      "zh-Hans": "清除未使用的条目"
+    },
+    {
+      "key": "windows.settings.trace.purgeConfirm",
+      "table": null,
+      "en": "Remove %lld inactive derived Trace databases? Entries in use and original Trace files are never removed.",
+      "zh-Hans": "移除 %lld 个未在使用的派生 Trace 数据库？正在使用的条目和原始 Trace 文件不会被移除。"
+    },
+    {
+      "key": "windows.settings.trace.purgeDone",
+      "table": null,
+      "en": "Removed %lld unused entries.",
+      "zh-Hans": "已移除 %lld 个未使用的条目。"
+    },
+    {
+      "key": "windows.settings.trace.purgeFailed",
+      "table": null,
+      "en": "The Runtime did not purge the cache",
+      "zh-Hans": "Runtime 未清除缓存"
+    },
+    {
+      "key": "windows.settings.trace.purgeNote",
+      "table": null,
+      "en": "Only inactive derived databases are purged. Original Trace files are never cache targets.",
+      "zh-Hans": "只清除未在使用的派生数据库。原始 Trace 文件从不是缓存对象。"
     }
   ]
 }
