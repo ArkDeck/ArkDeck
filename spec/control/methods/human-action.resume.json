@@ -1265,6 +1265,9 @@
             },
             "resumeReference": {
               "type": "string"
+            },
+            "retryAfter": {
+              "type": "string"
             }
           },
           "required": [

@@ -375,11 +375,7 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["signing", "update", "support-bundl
 /// answer (`check-readonly.py` `signed_windows_matrix`, `tests/
 /// windows_signed_runtime.rs`, and the owners' `arkdeck-agentd/tests/
 /// windows_*_process.rs` signed-CLI tests, each of which checks that what it
-/// measured is `implemented` here; TASK-XPA-018). `device candidates` is not
-/// one: without a registered Windows HDC tuple its method answers a
-/// structured refusal, not the live candidates its target contract names,
-/// and the entry for that method reaches `device wait` and `device list`,
-/// which no Windows run has measured.
+/// measured is `implemented` here; TASK-XPA-018).
 const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "doctor",
     "runtime.health",
@@ -437,9 +433,8 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "session.export.apply",
     "session.cleanup.preview",
     "session.cleanup.apply",
-    // The Target store (TASK-XPA-004): its reads and display names. Not
-    // `target availability` (presence stays unresolved without a registered
-    // HDC); `target adopt` is measured below, over the registered HDC.
+    // The Target store (TASK-XPA-004): its reads and display names.
+    // `target adopt` and `target availability` are measured below.
     "target.list",
     "target.show",
     "target.display-name.set",
@@ -454,6 +449,17 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // 2026-10-04 through the real CLI and daemon (the same process test).
     "device.candidates",
     "target.adopt",
+    // GJ-1's device reads (TASK-XPA-005): the Swift Target adoption oracle
+    // replayed through the real CLI against the signed test daemon, over the
+    // shared fake HDC and a synthetic census plugging each exchange's boards
+    // (`tests/spawning/gj1_device_reads.rs`): every observation, adoption and
+    // `target availability` answers as Swift's daemon answered it, and the
+    // fake's calls, Target document and display names are Swift's. Then
+    // `device wait` proves the adopted board's exact observation (or stops at
+    // its own deadline), and `device list` answers the Target list.
+    "device.wait",
+    "device.list",
+    "target.availability",
     // GJ-1's device leaves (TASK-XPA-005): `target observe`
     // (`observe.device@1`) and `diagnostics capture` (`capture.diagnostics@1`)
     // run end to end through the real signed CLI against a signed test
@@ -569,10 +575,23 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "artifact.import.release",
     "artifact.import.abort",
     // The cleanup debt ledger over Swift's recorded debug HAP debts
-    // (`windows_cleanup_debt_process.rs`). Not `recovery cleanup continue`:
-    // without a registered HDC a debt is refused before its readback.
+    // (`windows_cleanup_debt_process.rs`), and its continuation: every debt
+    // the Swift debug HAP and native library oracles continued, through both
+    // spellings, by the real CLI against the signed test daemon over the
+    // shared fake HDC, answered and left as Swift answered and left it
+    // (`tests/spawning/gj23_replay.rs`, TASK-XPA-009).
     "recovery.cleanup.list",
     "cleanup-debt.list",
+    "recovery.cleanup.continue",
+    "cleanup-debt.continue",
+    // GJ-2/GJ-3's domain leaves (TASK-XPA-009): `debug hap` and `debug native
+    // deploy` observe the board the synthetic census names, submit and run
+    // the oracle's first Job, and read its evidence and Artifacts, by the
+    // real CLI against the same signed test daemon; the fake HDC receives,
+    // after the leaf's observation reads, exactly the oracle Job's calls
+    // (`tests/spawning/gj23_replay.rs`).
+    "debug.hap",
+    "debug.native.deploy",
     // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
     // a release-candidate package tree registered, inspected, listed and
     // retired as a daemon Bundle, and a DevEco toolchain's inspection,
@@ -1350,14 +1369,14 @@ mod tests {
             ("session.cleanup.apply", "implemented"),
             // Measured over the registered Windows HDC (CHG-2026-078).
             ("target.adopt", "implemented"),
-            // Refused by the Windows daemon without an HDC or a Job owner.
-            ("target.availability", "partial"),
+            // Measured over the Swift Target adoption oracle (TASK-XPA-005).
+            ("target.availability", "implemented"),
             ("workspace.project.update", "implemented"),
             ("workspace.preset.register", "implemented"),
             ("trace.cache.purge", "implemented"),
             ("diagnostics.export", "implemented"),
             ("trace.inspect", "partial"),
-            ("device.observations", "partial"),
+            ("device.observations", "implemented"),
             ("job.submit", "partial"),
             ("agent.run", "partial"),
             ("agent.resume", "partial"),

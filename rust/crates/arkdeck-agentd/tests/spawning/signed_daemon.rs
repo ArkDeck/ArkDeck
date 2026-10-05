@@ -59,6 +59,16 @@ pub(crate) const HELPER: &str = "ARKDECK_TEST_SIGNED_DAEMON_HELPER";
 /// observation of the fake's device is proved the adopted Target's, as a
 /// registered HDC's composition proves it over the Runtime's own census.
 pub(crate) const BOARD: &str = "ARKDECK_TEST_SIGNED_DAEMON_BOARD";
+/// A file naming the boards the synthetic USB census lists, which a replay
+/// rewrites before an exchange that plugs others: `{"epoch": n, "relations":
+/// [...], "after": {"reads": k, "relations": [...]}}`, each relation spelled
+/// as `UsbRelation::to_value` spells it (`after` optional). The census lists
+/// each board in its HDC-normal personality, its location as its topology
+/// and its attachment as its registry entry ID; a new epoch counts its reads
+/// afresh, and past `reads` reads of one epoch the census lists `after`'s
+/// boards (an exchange whose board is replugged mid-adoption). In place of
+/// [`BOARD`].
+pub(crate) const CENSUS: &str = "ARKDECK_TEST_SIGNED_DAEMON_CENSUS";
 /// The child's test, by its full name.
 const CHILD: &str = "signed_daemon::the_signed_test_daemon";
 /// As `arkdeck-agentd`'s (`src/main.rs`).
@@ -148,8 +158,48 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
     );
     // The board the fake's device is, in its HDC-normal personality on one
     // port with one attachment, as the census reads a present DAYU200.
-    let host = match std::env::var(BOARD) {
-        Ok(serial) => host.with_usb_registry_relations(
+    let host = match (std::env::var_os(CENSUS), std::env::var(BOARD)) {
+        (Some(path), _) => {
+            let path = PathBuf::from(path);
+            let reads = std::sync::Mutex::new((None::<u64>, 0_u64));
+            host.with_usb_registry_relations(arkdeck_provider_hdc::UsbRegistryRelations::new(
+                move || {
+                    let plugged: Value =
+                        serde_json::from_slice(&std::fs::read(&path).expect("the census file"))
+                            .expect("the census document");
+                    let mut reads = reads.lock().unwrap();
+                    let epoch = plugged["epoch"].as_u64();
+                    if reads.0 != epoch {
+                        *reads = (epoch, 0);
+                    }
+                    reads.1 += 1;
+                    let listed = match plugged.get("after") {
+                        Some(after) if reads.1 > after["reads"].as_u64().unwrap() => {
+                            &after["relations"]
+                        }
+                        _ => &plugged["relations"],
+                    };
+                    Ok(listed
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|relation| {
+                            let relation = arkdeck_provider_hdc::UsbRelation::from_value(relation)
+                                .expect("a relation");
+                            arkdeck_platform::UsbHostDevice {
+                                serial: relation.serial,
+                                vendor_id: relation.vendor_id,
+                                product_id: relation.product_id,
+                                topology: relation.location,
+                                product_name: Some("HDC Device".into()),
+                                registry_entry_id: Some(relation.attachment_id),
+                            }
+                        })
+                        .collect())
+                },
+            ))
+        }
+        (None, Ok(serial)) => host.with_usb_registry_relations(
             arkdeck_provider_hdc::UsbRegistryRelations::new(move || {
                 Ok(vec![arkdeck_platform::UsbHostDevice {
                     serial: serial.clone(),
@@ -161,7 +211,7 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
                 }])
             }),
         ),
-        Err(_) => host,
+        (None, Err(_)) => host,
     };
     if let Some(recovered) = host.recover_active_jobs()? {
         for (job, reason) in recovered.quarantined.iter().chain(&recovered.refused) {
@@ -280,9 +330,10 @@ fn pwsh() -> PathBuf {
 }
 
 /// The signed test daemon, running over a development root, its stdout read
-/// line by line as it comes and its stderr kept in `daemon-stderr.log`
-/// beside the root.
+/// line by line as it comes and its stderr kept in `daemon-stderr-<pid>.log`
+/// beside the root, removed when the daemon is dropped unless a test failed.
 pub(crate) struct SignedDaemon {
+    stderr_log: PathBuf,
     executable: PathBuf,
     pin: String,
     root: PathBuf,
@@ -343,12 +394,11 @@ impl SignedDaemon {
                 command.env_remove(key);
             }
         }
-        let stderr = std::fs::File::create(
-            root.parent()
-                .unwrap()
-                .join(format!("daemon-stderr-{}.log", std::process::id())),
-        )
-        .unwrap();
+        let stderr_log = root
+            .parent()
+            .unwrap()
+            .join(format!("daemon-stderr-{}.log", std::process::id()));
+        let stderr = std::fs::File::create(&stderr_log).unwrap();
         let mut child = command
             .args(["--exact", CHILD, "--nocapture", "--test-threads=1"])
             .env("ARKDECK_DEVELOPMENT_STATE_ROOT", root)
@@ -371,6 +421,7 @@ impl SignedDaemon {
             }
         });
         let mut daemon = Self {
+            stderr_log,
             executable: executable.to_owned(),
             pin: pin.to_owned(),
             root: root.to_owned(),
@@ -476,6 +527,11 @@ impl Drop for SignedDaemon {
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
             let _ = child.wait();
+        }
+        // Kept for a failed test to read; otherwise nothing is left beside
+        // the root, which may be the temporary directory itself.
+        if !std::thread::panicking() {
+            let _ = std::fs::remove_file(&self.stderr_log);
         }
     }
 }

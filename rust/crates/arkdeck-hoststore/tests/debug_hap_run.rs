@@ -355,7 +355,7 @@ impl HdcDispatch for FaultedUninstall<'_> {
 /// caller keeps while it reads, the owners, the Job, its status and its
 /// timeline from the start's failure on.
 struct Faulted {
-    _lock: fs::File,
+    _lock: debug_hap::Exclusive,
     owners: Owners,
     job: String,
     status: Value,
