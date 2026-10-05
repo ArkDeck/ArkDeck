@@ -12,12 +12,17 @@ namespace ArkDeck.App.UITests;
 internal static class KeyInput
 {
     private const int WmKeyDown = 0x0100, WmKeyUp = 0x0101;
-    public const int Tab = 0x09, Shift = 0x10, Escape = 0x1B;
+    public const int Tab = 0x09, Shift = 0x10, Control = 0x11, Escape = 0x1B, F5 = 0x74;
 
-    public static void Press(IntPtr window, int key, bool shift = false)
+    public static void Press(IntPtr window, int key, bool shift = false) => Press(window, key, shift, control: false);
+
+    /// <summary>A stroke with Ctrl (and Shift) held in the App thread's shared input state.</summary>
+    public static void PressControl(IntPtr window, int key, bool shift = false) => Press(window, key, shift, control: true);
+
+    private static void Press(IntPtr window, int key, bool shift, bool control)
     {
         var site = InputSite(window);
-        if (!shift)
+        if (!shift && !control)
         {
             Post(site, WmKeyDown, key);
             Post(site, WmKeyUp, key);
@@ -34,7 +39,8 @@ internal static class KeyInput
             var state = new byte[256];
             GetKeyboardState(state);
             var held = (byte[])state.Clone();
-            held[Shift] = 0x80;
+            if (shift) held[Shift] = 0x80;
+            if (control) held[Control] = 0x80;
             SetKeyboardState(held);
             Post(site, WmKeyDown, key);
             Post(site, WmKeyUp, key);

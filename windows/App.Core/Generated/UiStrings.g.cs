@@ -1638,6 +1638,7 @@ public static class UiStrings
     public const string WindowsSettingsDiagnosticsMetadataDetail = "windows.settings.diagnostics.metadataDetail";
     public const string WindowsSettingsDiagnosticsFailed = "windows.settings.diagnostics.failed";
     public const string WindowsSettingsDiagnosticsReveal = "windows.settings.diagnostics.reveal";
+    public const string WindowsTraceViewerNothingToReload = "windows.traceViewer.nothingToReload";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3272,5 +3273,6 @@ public static class UiStrings
         WindowsSettingsDiagnosticsMetadataDetail,
         WindowsSettingsDiagnosticsFailed,
         WindowsSettingsDiagnosticsReveal,
+        WindowsTraceViewerNothingToReload,
     ];
 }

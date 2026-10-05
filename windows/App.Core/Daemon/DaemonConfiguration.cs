@@ -30,8 +30,13 @@ namespace ArkDeck.App.Core.Daemon;
 /// </list>
 /// </summary>
 public sealed record LaunchOptions(string? Language, string? StartPage, string? TestTransport, double TextScale = 1.0, bool HighContrastTokens = false, string? FocusWalkFile = null,
-    string? CacheRootOption = null, string? RemoteSourcesRoot = null, string? PreferencesRoot = null, string? PickedFolder = null)
+    string? CacheRootOption = null, string? RemoteSourcesRoot = null, string? PreferencesRoot = null, string? PickedFolder = null,
+    string? TraceFile = null)
 {
+    /// <summary>The Trace files the App opens when Windows hands it one (macOS
+    /// <c>CFBundleDocumentTypes</c>: htrace, ftrace, systrace, trace).</summary>
+    public static readonly IReadOnlyList<string> TraceExtensions = [".htrace", ".ftrace", ".systrace", ".trace"];
+
     public string CacheRoot => CacheRootOption ?? Path.Combine(Path.GetTempPath(), "ArkDeck");
 
     public static LaunchOptions Parse(IReadOnlyList<string> args)
@@ -44,6 +49,7 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
         string? remoteSources = null;
         string? preferences = null;
         string? picked = null;
+        string? traceFile = null;
         for (var i = 0; i < args.Count; i++)
         {
             switch (args[i])
@@ -57,6 +63,11 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
                 case "--remote-sources-root" when i + 1 < args.Count: remoteSources = Path.GetFullPath(args[++i]); break;
                 case "--preferences-root" when i + 1 < args.Count: preferences = Path.GetFullPath(args[++i]); break;
                 case "--pick-folder" when i + 1 < args.Count: picked = Path.GetFullPath(args[++i]); break;
+                // "Open with ArkDeck" on an unpackaged copy: the file's path as the argument.
+                case var path when !path.StartsWith("--", StringComparison.Ordinal) && traceFile is null
+                                   && TraceExtensions.Contains(Path.GetExtension(path).ToLowerInvariant()):
+                    traceFile = Path.GetFullPath(path);
+                    break;
                 case "--text-scale" when i + 1 < args.Count:
                     if (double.TryParse(args[++i], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var factor)
                         && factor is >= 1.0 and <= 2.25)
@@ -70,7 +81,7 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
         return new LaunchOptions(language, page, transport, transport is null ? 1.0 : scale, transport is not null && highContrast,
             transport is null ? null : focusWalk, cacheRoot, remoteSources, preferences,
             // A folder the pickers answer without a dialog: the scripted transport's tests only.
-            transport is null ? null : picked);
+            transport is null ? null : picked, traceFile);
     }
 }
 

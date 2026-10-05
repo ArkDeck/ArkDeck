@@ -27,24 +27,48 @@ public sealed class AppPreferences(string directory)
 
     public AppIconChoice Icon
     {
-        get
-        {
-            try
-            {
-                var o = (JsonObject)StrictJson.Parse(File.ReadAllBytes(FilePath));
-                return o.TryGetValue("appIcon", out var v) && v is JsonString s ? Parse(s.Value) ?? DefaultIcon : DefaultIcon;
-            }
-            catch (Exception error) when (error is IOException or UnauthorizedAccessException or MalformedJsonException or InvalidCastException or FormatException)
-            {
-                return DefaultIcon;
-            }
-        }
+        get => Text("appIcon") is { } name ? Parse(name) ?? DefaultIcon : DefaultIcon;
+        set => Write("appIcon", Name(value));
+    }
+
+    /// <summary>The navigation item shown last (macOS <c>storedSelection</c>), restored at launch.</summary>
+    public string? LastPage
+    {
+        get => Text("lastPage");
         set
         {
+            if (value is not null && value != LastPage) Write("lastPage", value);
+        }
+    }
+
+    private JsonObject Read()
+    {
+        try
+        {
+            return StrictJson.Parse(File.ReadAllBytes(FilePath)) as JsonObject ?? new JsonObject();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or MalformedJsonException or FormatException)
+        {
+            return new JsonObject();
+        }
+    }
+
+    private string? Text(string key) => Read().TryGetValue(key, out var v) && v is JsonString s ? s.Value : null;
+
+    /// <summary>One value written, the others kept, the file replaced whole.</summary>
+    private void Write(string key, string value)
+    {
+        try
+        {
             Directory.CreateDirectory(directory);
+            var members = Read().Members.Where(m => m.Key != key).Append(new(key, new JsonString(value)));
             var staging = FilePath + ".staging";
-            File.WriteAllBytes(staging, Encoding.UTF8.GetBytes(new JsonObject([new("appIcon", new JsonString(Name(value)))]).ToString() + "\n"));
+            File.WriteAllBytes(staging, Encoding.UTF8.GetBytes(new JsonObject(members).ToString() + "\n"));
             File.Move(staging, FilePath, overwrite: true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // A preference that cannot be kept is not an error the person can act on.
         }
     }
 

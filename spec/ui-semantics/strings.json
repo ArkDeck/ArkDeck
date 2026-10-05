@@ -9785,6 +9785,12 @@
       "table": null,
       "en": "Show in File Explorer",
       "zh-Hans": "在文件资源管理器中显示"
+    },
+    {
+      "key": "windows.traceViewer.nothingToReload",
+      "table": null,
+      "en": "No Trace is open to reload.",
+      "zh-Hans": "没有打开的 Trace 可重新载入。"
     }
   ]
 }

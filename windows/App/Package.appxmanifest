@@ -52,6 +52,20 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
+      <Extensions>
+        <!-- macOS CFBundleDocumentTypes "OpenHarmony Trace" (Viewer): opened in the Trace viewer. -->
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="openharmonytrace">
+            <uap:DisplayName>OpenHarmony Trace</uap:DisplayName>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.htrace</uap:FileType>
+              <uap:FileType>.ftrace</uap:FileType>
+              <uap:FileType>.systrace</uap:FileType>
+              <uap:FileType>.trace</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

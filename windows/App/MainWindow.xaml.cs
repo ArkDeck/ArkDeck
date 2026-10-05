@@ -74,7 +74,12 @@ public sealed partial class MainWindow : Window
 
         Inspector = new JobInspector();
         InspectorHost.Child = Inspector;
-        Root.Loaded += (_, _) => Select(App.Options.StartPage ?? "overview");
+        InstallCommands();
+        Root.Loaded += async (_, _) =>
+        {
+            Select(App.Options.StartPage ?? App.Preferences.LastPage ?? "overview");
+            if (App.TraceFile is { } trace) await OpenTraceFileAsync(trace);
+        };
     }
 
     public static MainWindow Instance { get; private set; } = null!;
@@ -178,6 +183,81 @@ public sealed partial class MainWindow : Window
         var show = _continuation is { } card && tag == Tag(card.Draft.Kind);
         ContinuationHost.Content = show ? _continuation : null;
         ContinuationHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// The macOS keyboard commands (<c>WorkspaceKeyboardCommands</c> and the Trace menu):
+    /// Ctrl+F finds the current page's search field, Ctrl+R (and F5) re-reads the page, Ctrl+N
+    /// opens Trace to capture, Ctrl+Shift+O opens a Trace file, Ctrl+Shift+R reloads it.
+    /// </summary>
+    private void InstallCommands()
+    {
+        void Add(Windows.System.VirtualKey key, Windows.System.VirtualKeyModifiers modifiers, Func<Task> run)
+        {
+            var accelerator = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = key, Modifiers = modifiers };
+            accelerator.Invoked += async (_, args) =>
+            {
+                args.Handled = true;
+                await run();
+            };
+            Root.KeyboardAccelerators.Add(accelerator);
+        }
+        const Windows.System.VirtualKeyModifiers ctrl = Windows.System.VirtualKeyModifiers.Control;
+        const Windows.System.VirtualKeyModifiers ctrlShift = Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift;
+        Add(Windows.System.VirtualKey.F, ctrl, () =>
+        {
+            FocusSearch();
+            return Task.CompletedTask;
+        });
+        Add(Windows.System.VirtualKey.R, ctrl, RefreshPageAsync);
+        Add(Windows.System.VirtualKey.F5, Windows.System.VirtualKeyModifiers.None, RefreshPageAsync);
+        Add(Windows.System.VirtualKey.N, ctrl, () =>
+        {
+            Select("trace");
+            return Task.CompletedTask;
+        });
+        Add(Windows.System.VirtualKey.O, ctrlShift, async () => await TraceViewer().ChooseTraceAsync());
+        Add(Windows.System.VirtualKey.R, ctrlShift, async () =>
+        {
+            Select("traceViewer");
+            await TraceViewer().ReloadTraceAsync();
+        });
+    }
+
+    private async Task RefreshPageAsync()
+    {
+        if (PageHost.Content is IRefreshable page) await page.RefreshAsync();
+    }
+
+    /// <summary>Focus moves to the current page's search field (an element whose id ends in
+    /// <c>.search</c>), if it has one.</summary>
+    private void FocusSearch()
+    {
+        static Control? Find(DependencyObject node)
+        {
+            for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(node); i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(node, i);
+                if (child is TextBox box && AutomationProperties.GetAutomationId(box).EndsWith(".search", StringComparison.Ordinal)) return box;
+                if (Find(child) is { } found) return found;
+            }
+            return null;
+        }
+        if (PageHost.Content is DependencyObject page && Find(page) is { } search) search.Focus(FocusState.Keyboard);
+    }
+
+    private TraceViewerPage TraceViewer()
+    {
+        if (!_pages.TryGetValue("traceViewer", out var page)) _pages["traceViewer"] = page = new TraceViewerPage();
+        return (TraceViewerPage)page;
+    }
+
+    /// <summary>A Trace file Windows handed the App, shown in the Trace viewer.</summary>
+    public async Task OpenTraceFileAsync(string path)
+    {
+        var viewer = TraceViewer();
+        if (!ReferenceEquals(PageHost.Content, viewer)) Select("traceViewer");
+        await viewer.OpenFileAsync(path);
     }
 
     /// <summary>Settings, on one of its tabs (the remote browser's Open Server Settings).</summary>
@@ -303,6 +383,7 @@ public sealed partial class MainWindow : Window
             _pages[tag] = page;
         }
         PageHost.Content = page;
+        App.Preferences.LastPage = tag;
         ShowContinuation(tag);
         if (page is TraceViewerPage viewer && _pendingTrace is { } pending)
         {

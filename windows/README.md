@@ -251,7 +251,10 @@ first, `ControlResult` back.
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
-  empty Tab stop.
+  empty Tab stop. The macOS commands: Ctrl+F (the page's search), Ctrl+R or F5 (re-read the
+  page), Ctrl+N (Trace), Ctrl+Shift+O and Ctrl+Shift+R (open or reload a Trace file),
+  Ctrl+Shift+J (Job Inspector), Ctrl+Shift+D (Overview environment). The last page comes back at
+  launch; `.htrace`, `.ftrace`, `.systrace` and `.trace` files open in the Trace viewer.
 
 ## Build and test
 

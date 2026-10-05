@@ -6534,4 +6534,8 @@ SHA-256: %4$@</value>
     <value>Show in File Explorer</value>
     <comment>windows.settings.diagnostics.reveal (Windows only)</comment>
   </data>
+  <data name="windows_traceViewer_nothingToReload" xml:space="preserve">
+    <value>No Trace is open to reload.</value>
+    <comment>windows.traceViewer.nothingToReload (Windows only)</comment>
+  </data>
 </root>
