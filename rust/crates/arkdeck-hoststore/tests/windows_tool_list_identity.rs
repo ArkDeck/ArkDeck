@@ -27,13 +27,15 @@ fn the_tool_list_names_the_stores_registered_identity() {
         .canonicalize()
         .unwrap();
     let base = base.to_str().unwrap();
-    let scratch = Scratch(
+    let mut scratch = Scratch(
         PathBuf::from(base.strip_prefix(r"\\?\").unwrap_or(base)).join(format!(
             "arkdeck-test-tool-list-identity-{:032x}",
             u128::from_le_bytes(arkdeck_platform::random_bytes().unwrap())
         )),
     );
     arkdeck_platform::create_private_directory(&scratch.0).unwrap();
+    // Resolve after creation: a packaged parent may virtualize this child.
+    scratch.0 = arkdeck_platform::host_resolved_path(&scratch.0).unwrap();
     let sdk = scratch.0.join("sdk");
     arkdeck_platform::create_private_directory(&sdk).unwrap();
     let bytes = std::fs::read(

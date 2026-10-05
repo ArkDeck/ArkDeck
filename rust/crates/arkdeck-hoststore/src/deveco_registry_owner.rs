@@ -635,7 +635,7 @@ mod registration_tests {
 }
 
 /// The Windows registration (TASK-XPA-011) over a fixture DevEco Studio
-/// directory under the account's local application data: the launcher and
+/// directory under the account's profile: the launcher and
 /// node are copies of system executables signed with the host's development
 /// signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`), the fixture's stand-in for the
 /// DevEco publisher and the OpenJS Foundation; the signed cases are skipped,
@@ -656,8 +656,7 @@ mod windows_registration_tests {
     struct Scratch(PathBuf);
     impl Scratch {
         fn new(label: &str) -> Self {
-            let base = arkdeck_platform::application_support_directory()
-                .unwrap()
+            let base = PathBuf::from(arkdeck_platform::runtime_home().unwrap())
                 .canonicalize()
                 .unwrap();
             let base = base.to_str().unwrap();
@@ -666,7 +665,9 @@ mod windows_registration_tests {
                 u128::from_le_bytes(arkdeck_platform::random_bytes().unwrap())
             ));
             create_private_directory(&path).unwrap();
-            Self(path)
+            // The profile avoids packaged LocalAppData container ancestry;
+            // the registry still requires the actual spelling on disk.
+            Self(arkdeck_platform::host_resolved_path(&path).unwrap())
         }
         fn directories(&self, relative: &str) -> PathBuf {
             let mut path = self.0.clone();

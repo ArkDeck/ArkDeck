@@ -50,7 +50,9 @@ impl Scratch {
             u128::from_le_bytes(random_bytes().unwrap())
         ));
         create_private_directory(&path).unwrap();
-        Self(path)
+        // A packaged parent may virtualize a newly created LocalAppData
+        // child. Use its physical spelling, as the signing validator does.
+        Self(arkdeck_platform::host_resolved_path(&path).unwrap())
     }
 
     fn file(&self, name: &str, bytes: &[u8]) -> String {
