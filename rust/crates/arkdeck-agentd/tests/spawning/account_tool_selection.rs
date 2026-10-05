@@ -12,9 +12,9 @@
 //! [`the_signed_account_daemon`]. The child takes the account's root as
 //! `arkdeck-agentd` does (`windows_lifecycle::start`), over a fake profile
 //! (`USERPROFILE`), with `ARKDECK_HDC_PATH` naming a stand-in compiled here;
-//! the only thing it does that production cannot is admit that stand-in's
-//! digest through a fixture tuple (`Authority::with_tuples`, compiled into
-//! test builds alone). It composes the registered HDC from the Bootstrap
+//! it admits that stand-in's digest through a fixture tuple
+//! (`Authority::with_tuples`, compiled into test builds alone). It composes
+//! the registered HDC from the Bootstrap
 //! selection exactly as production does: the stand-in is adopted as the
 //! first selection, its retained copy is started as the managed server on
 //! the tuple's endpoint, and the tool-selection owner is composed beside it.
@@ -33,13 +33,18 @@
 //! so the leaf is counted in `WINDOWS_MEASURED_LEAVES`. Selecting that
 //! candidate still drifts: an awaiting-approval answer needs a healthy server
 //! proof from the HDC lifecycle owner, which only a registered tuple's server
-//! gives (#2501), so `runtime tool select` is not counted here. Every account
-//! daemon starter is held off
+//! gives (#2501). A second test uses the existing owner-test impact port to
+//! supply fixture health while preserving real kernel process identity,
+//! managed lifecycle dispatch, durable audit and startup settlement. The
+//! signed CLI selects the second tool and reads the settled generation after
+//! restart. The production tuple table and health families stay unchanged.
+//! Every account daemon starter is held off
 //! for the whole run (`StarterLock`), as the account-location tests hold
 //! them. Nothing installed, no `hdc` and no device is involved.
 use crate::host::Host;
 use crate::signed_daemon::signed_copy;
 use crate::windows_lifecycle;
+use arkdeck_contract::{CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION};
 use arkdeck_control::Control;
 use arkdeck_platform::{InstanceScope, StarterLock};
 use serde_json::Value;
@@ -57,18 +62,31 @@ mod loopback_ports {
 
 /// The fixture tuple's digest, set only for the child.
 const TUPLE: &str = "ARKDECK_TEST_ACCOUNT_DAEMON_TUPLE";
+const HEALTH: &str = "ARKDECK_TEST_ACCOUNT_DAEMON_HEALTH";
+const APPROVE: &str = "ARKDECK_TEST_ACCOUNT_DAEMON_APPROVE";
 const CHILD: &str = "account_tool_selection::the_signed_account_daemon";
 const DRAIN_DEADLINE: Duration = Duration::from_secs(20);
 const CONNECTION_IDLE: Duration = Duration::from_secs(20);
 const DEADLINE: Duration = Duration::from_secs(120);
 
+/// The current implementation compiled against check-contracts' immutable
+/// merge-base inputs, which may predate the tool-selection resume result.
+fn published_view() -> bool {
+    let inputs: Value = serde_json::from_str(CONTRACT_INPUTS).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
 /// A stand-in HDC compiled at test time: `-s <endpoint> -m` listens on the
 /// endpoint until it is ended; `-s <endpoint> checkserver` answers agreeing
-/// versions; `list targets -v` answers the registered UART-only listing;
+/// versions; `kill -r` replaces only its own token-protected listener;
+/// `list targets -v` answers the registered UART-only listing;
 /// anything else is unregistered (status 64). No real HDC runs.
 const STAND_IN: &str = r#"
 fn main() {
+    use std::io::{Read, Write};
     let arguments: Vec<String> = std::env::args().collect();
+    let mut calls = std::fs::OpenOptions::new().create(true).append(true).open(CALLS).unwrap();
+    writeln!(calls, "{}", arguments[1..].join(" ")).unwrap();
     if arguments[1..] == ["list", "targets", "-v"] {
         print!("COM1\t\tUART\tReady\tunknown...\thdc\r\n");
         return;
@@ -77,11 +95,33 @@ fn main() {
         Some("-m") => {
             let listener = std::net::TcpListener::bind(&arguments[2]).unwrap();
             for connection in listener.incoming() {
-                drop(connection);
+                if let Ok(mut connection) = connection {
+                    connection.set_read_timeout(Some(std::time::Duration::from_millis(100))).unwrap();
+                    let mut token = vec![0; SHUTDOWN_TOKEN.len()];
+                    if connection.read_exact(&mut token).is_ok() && token == SHUTDOWN_TOKEN.as_bytes() {
+                        return;
+                    }
+                }
             }
         }
         Some("checkserver") => {
             println!("Client version:Ver: 3.2.0d, server version:Ver: 3.2.0d");
+        }
+        Some("kill") if arguments.get(4).map(String::as_str) == Some("-r") => {
+            // Only this fixture's own listener accepts its private token.
+            std::net::TcpStream::connect(&arguments[2]).unwrap()
+                .write_all(SHUTDOWN_TOKEN.as_bytes()).unwrap();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while std::net::TcpStream::connect(&arguments[2]).is_ok() {
+                assert!(std::time::Instant::now() < deadline);
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["-s", &arguments[2], "-m"])
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn().unwrap();
         }
         _ => std::process::exit(64),
     }
@@ -138,9 +178,18 @@ fn serve(sha256: String) -> Result<(), Box<dyn std::error::Error>> {
     let authority = authority
         .ok_or("the account's root composes an authority")?
         .with_tuples(tuples);
-    let (host, arkforge, managed) = authority.compose(Host::from_environment())?;
+    let (mut host, arkforge, managed) = authority.compose(Host::from_environment())?;
     let managed = managed.ok_or("the account daemon composed no managed HDC server")?;
+    if std::env::var_os(HEALTH).is_some() {
+        host.test_hdc_impact = Some(Box::new(FixtureHealth(Arc::clone(managed.server()))));
+    }
     let control = Arc::new(Control::new(host)?);
+    let approval_cancelled = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let approval = std::env::var_os(APPROVE).map(|path| {
+        let control = Arc::clone(&control);
+        let cancelled = Arc::clone(&approval_cancelled);
+        std::thread::spawn(move || approve_fixture_action(&control, Path::new(&path), &cancelled))
+    });
     println!(
         "arkdeck-agentd listening on {}",
         authority.endpoint.as_path().display()
@@ -153,6 +202,12 @@ fn serve(sha256: String) -> Result<(), Box<dyn std::error::Error>> {
         CONNECTION_IDLE,
         DRAIN_DEADLINE,
     )?;
+    // A failure before the parent requests approval must still drain this
+    // fixture's managed server; an approval already in progress completes.
+    approval_cancelled.store(true, std::sync::atomic::Ordering::Release);
+    if let Some(approval) = approval {
+        approval.join().expect("the fixture approval completed");
+    }
     drop(drain.listener_lock);
     arkforge.stop();
     if let Some(stopped) = managed.stop() {
@@ -166,6 +221,135 @@ fn serve(sha256: String) -> Result<(), Box<dyn std::error::Error>> {
     println!("arkdeck-agentd stopped");
     let _ = std::io::Write::flush(&mut std::io::stdout());
     Ok(())
+}
+
+/// Only this signed test binary supplies fixture health. The executable,
+/// listener, process birth and supervisor generation must still match the
+/// managed child; production's registered HDC families are never changed.
+struct FixtureHealth(Arc<crate::managed_hdc::ManagedHdc>);
+impl arkdeck_hoststore::ImpactSource for FixtureHealth {
+    fn endpoint_reference(&self) -> String {
+        arkdeck_provider_hdc::server_endpoint_ref(self.0.endpoint())
+    }
+
+    fn read_impact(&self) -> Result<arkdeck_hoststore::ImpactReading, String> {
+        use arkdeck_provider_hdc::{ManagedProcessVerifier, SupervisorState};
+        let executable = self.0.executable();
+        let tool = arkdeck_platform::VerifiedTool::open(&executable.path, &executable.sha256)
+            .map_err(|error| error.to_string())?;
+        let endpoint = self
+            .0
+            .endpoint()
+            .parse()
+            .map_err(|error: std::net::AddrParseError| error.to_string())?;
+        let identity = arkdeck_platform::LoopbackServerLease::acquire(&tool, endpoint)
+            .map_err(|error| error.to_string())?;
+        let launch = self
+            .0
+            .active_launch()
+            .ok_or("fixture launch is unavailable")?;
+        let state = self
+            .0
+            .state(self.0.endpoint())
+            .ok_or("fixture supervisor is unavailable")?;
+        if !launch.matches(identity.identity())
+            || !self
+                .0
+                .process_verifier()
+                .verifies(identity.identity(), &launch.arguments)
+            || !state.healthy
+            || !state.ark_deck_managed
+            || arkdeck_provider_hdc::generation(identity.identity())
+                != u64::try_from(state.generation).ok()
+        {
+            return Err("fixture managed identity drifted".into());
+        }
+        identity.revalidate().map_err(|error| error.to_string())?;
+        let impact = serde_json::json!({
+            "serverEndpointRef":self.endpoint_reference(),"endpoint":self.0.endpoint(),
+            "serverOwnership":"arkDeckManaged","serverGeneration":state.generation.to_string(),
+            "serverHealth":"healthy","serverVersion":"3.2.0d",
+            "tool":{"reference":null,"executablePath":executable.path,"source":"runtimeConfiguration",
+                "sha256":executable.sha256,"signature":null,"version":"3.2.0d","trust":"unverified"},
+            "affectedTargetIds":[],"affectedJobIds":[],"detectedOtherClientIds":[],
+            "otherClientsMayExist":true,"affectedDeviceObservations":[],
+            "criticalJobGate":{"state":"clear","blocking":[],"reasonCode":null},
+            "interruption":{"kind":"hdcEndpointUnavailable","affectsAllParticipants":true},
+            "recovery":{"kind":"statusThenReconcile","replayAllowed":false}
+        });
+        Ok(arkdeck_hoststore::ImpactReading {
+            impact: arkdeck_hoststore::Impact::new(impact.as_object().unwrap().clone())
+                .map_err(|error| error.message)?,
+            relations: vec![],
+            blocker: None,
+        })
+    }
+}
+
+/// The owner-test's foreground-console approval, available only in this
+/// fixture child. The real CLI has already obtained the immutable action.
+fn approve_fixture_action(
+    control: &Control<Host>,
+    path: &Path,
+    cancelled: &std::sync::atomic::AtomicBool,
+) {
+    let deadline = Instant::now() + DEADLINE;
+    let params = loop {
+        match std::fs::read(path) {
+            Ok(bytes) => break serde_json::from_slice::<Value>(&bytes).unwrap(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if cancelled.load(std::sync::atomic::Ordering::Acquire) {
+                    return;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "fixture approval was not requested"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => panic!("fixture approval request: {error}"),
+        }
+    };
+    let send = |params: &Value| -> Value {
+        let frame = serde_json::to_vec(&serde_json::json!({
+            "protocolVersion":PROTOCOL_VERSION,"contractIdentity":CONTRACT_IDENTITY,
+            "id":"fixture-selection-approval","method":"human-action.resume","params":params
+        }))
+        .unwrap();
+        serde_json::from_slice(
+            control
+                .handle_frame_with_console(&frame, true)
+                .trim_ascii_end(),
+        )
+        .unwrap()
+    };
+    let challenge = send(&params);
+    if challenge["ok"] != true {
+        println!("arkdeck-fixture selection approval {challenge}");
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        return;
+    }
+    // The generator's added alternative stays closed, and the real CLI's
+    // console reviewer verifies the immutable selection preview and digest.
+    let mut unknown_field = challenge["result"].clone();
+    unknown_field["controlAction"]["preview"]["unregisteredFact"] = Value::Bool(true);
+    assert!(
+        arkdeck_contract::validate_method_value("human-action.resume", "result", &unknown_field)
+            .is_err()
+    );
+    let input = format!("{}\n", challenge["result"]["challenge"].as_str().unwrap());
+    let response = arkdeck_cli::read_console_challenge(
+        &challenge["result"],
+        true,
+        &mut std::io::Cursor::new(input),
+        &mut Vec::new(),
+    )
+    .unwrap();
+    let mut approved = params;
+    approved["challengeResponse"] = Value::String(response);
+    let result = send(&approved);
+    println!("arkdeck-fixture selection approval {result}");
+    let _ = std::io::Write::flush(&mut std::io::stdout());
 }
 
 /// A fresh directory below `TEMP`, in its plain canonical spelling.
@@ -188,8 +372,9 @@ fn stand_in(directory: &Path, variant: &str) -> Vec<u8> {
     std::fs::write(
         directory.join("hdc.rs"),
         format!(
-            "{STAND_IN}\n#[used]\nstatic VARIANT: [u8; {}] = *b\"{variant}\";\n",
-            variant.len()
+            "{STAND_IN}\n#[used]\nstatic VARIANT: [u8; {}] = *b\"{variant}\";\nstatic SHUTDOWN_TOKEN: &str = {:?};\nstatic CALLS: &str = {:?};\n",
+            variant.len(), directory.parent().unwrap().display().to_string(),
+            directory.parent().unwrap().join("stand-in-calls").display().to_string()
         ),
     )
     .unwrap();
@@ -203,6 +388,250 @@ fn stand_in(directory: &Path, variant: &str) -> Vec<u8> {
         .unwrap();
     assert!(output.status.success(), "{output:?}");
     std::fs::read(directory.join("hdc.exe")).unwrap()
+}
+
+/// The selected path, with test-only registered identity/health facts and
+/// the production Bootstrap, tool-selection and managed lifecycle owners.
+/// Every observable select/list request is made by the real CLI, which still
+/// verifies the signed daemon's Authenticode identity and signer pin.
+#[test]
+fn the_signed_cli_selects_a_candidate_and_reads_the_settled_selection_after_restart() {
+    let _turn = crate::turn();
+    let _starters = StarterLock::acquire(&InstanceScope::account().unwrap(), DEADLINE * 5)
+        .unwrap()
+        .expect("another process held the account's daemon starters' turn");
+    let scratch = temporary("ArkDeck-fixture-tool-select");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let profile = scratch.join("profile");
+    std::fs::create_dir_all(profile.join("AppData").join("Local")).unwrap();
+    let sdk = profile.join("sdk");
+    arkdeck_platform::create_private_directory(&sdk).unwrap();
+    let paths = [sdk.join("hdc.exe"), sdk.join("hdc-b.exe")];
+    let hashes: Vec<String> = ["a", "b"]
+        .into_iter()
+        .enumerate()
+        .map(|(index, variant)| {
+            let bytes = stand_in(&scratch.join(format!("stand-in-{variant}")), variant);
+            std::io::Write::write_all(
+                &mut arkdeck_platform::create_private_file(&paths[index]).unwrap(),
+                &bytes,
+            )
+            .unwrap();
+            arkdeck_contract::sha256_hex(&bytes)
+        })
+        .collect();
+    assert_ne!(hashes[0], hashes[1]);
+    let port = loopback_ports::free_port();
+    let approve = profile.join("approve-fixture-action.json");
+    let variables = [
+        (TUPLE, hashes.join(",")),
+        (HEALTH, "fixture".into()),
+        (arkdeck_provider_hdc::SERVER_PORT_VARIABLE, port.to_string()),
+    ];
+    let mut startup = variables.to_vec();
+    startup.push(("ARKDECK_HDC_PATH", paths[0].display().to_string()));
+    startup.push((APPROVE, approve.display().to_string()));
+    let mut daemon = AccountDaemon::start(&executable, &pin, &profile, &startup);
+    let (status, registered) = daemon.cli(&[
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "hdc",
+        "--file",
+        paths[1].to_str().unwrap(),
+    ]);
+    assert_eq!(status, Some(0), "{registered}");
+    let candidate = registered["result"]["toolRef"].as_str().unwrap().to_owned();
+    let select = [
+        "runtime",
+        "tool",
+        "select",
+        "--tool",
+        &candidate,
+        "--expected-active-generation",
+        "1",
+        "--action-request-id",
+        "fixture-selected-path",
+    ];
+    let (status, waiting) = daemon.cli(&select);
+    assert_eq!(status, Some(0), "{waiting}");
+    assert_eq!(
+        waiting["result"]["state"], "awaitingImpactApproval",
+        "{waiting}"
+    );
+    assert_eq!(waiting["result"]["dispatchCount"], 0, "{waiting}");
+    assert_eq!(
+        waiting["result"]["preview"]["newTool"]["toolRef"], candidate,
+        "{waiting}"
+    );
+    assert_eq!(
+        waiting["result"]["preview"]["serverHealth"], "healthy",
+        "{waiting}"
+    );
+    // Dedupe before approval preserves the immutable preview and dispatches nothing.
+    let (status, repeated) = daemon.cli(&select);
+    assert_eq!(status, Some(0), "{repeated}");
+    assert_eq!(repeated["result"], waiting["result"], "{repeated}");
+    let approval = serde_json::json!({
+        "humanAction":waiting["result"]["humanAction"]["actionId"],
+        "resumeReference":waiting["result"]["humanAction"]["resumeReference"]
+    });
+    std::io::Write::write_all(
+        &mut arkdeck_platform::create_private_file(&approve).unwrap(),
+        &serde_json::to_vec(&approval).unwrap(),
+    )
+    .unwrap();
+    let response = daemon.line_starting("arkdeck-fixture selection approval ");
+    let approved: Value =
+        serde_json::from_str(response.trim_start_matches("arkdeck-fixture selection approval "))
+            .unwrap();
+    if published_view() && approved["ok"] == false {
+        // The owner persisted a challenge, but Control refuses the result
+        // under an old schema before the CLI reviewer or consumption runs.
+        assert_eq!(
+            approved,
+            serde_json::json!({
+                "id":"fixture-selection-approval","ok":false,
+                "error":{"code":"internalError", "message":"the result does not conform to the current contract"}
+            })
+        );
+        let (status, unchanged) = daemon.cli(&select);
+        assert_eq!(status, Some(0), "{unchanged}");
+        assert_eq!(unchanged["result"]["state"], "awaitingImpactApproval");
+        assert_eq!(unchanged["result"]["dispatchCount"], 0);
+        let generation = |result: &Value| {
+            result["generation"]
+                .as_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        };
+        assert_eq!(
+            generation(&unchanged["result"]),
+            generation(&waiting["result"]) + 1
+        );
+        assert!(
+            unchanged["result"]["lastObservedAt"].as_str().unwrap()
+                >= waiting["result"]["lastObservedAt"].as_str().unwrap()
+        );
+        let mut immutable = unchanged["result"].clone();
+        // Challenge issuance advances only these two bookkeeping fields.
+        immutable["generation"] = waiting["result"]["generation"].clone();
+        immutable["lastObservedAt"] = waiting["result"]["lastObservedAt"].clone();
+        assert_eq!(immutable, waiting["result"], "{unchanged}");
+        let (status, repeated) = daemon.cli(&select);
+        assert_eq!(status, Some(0), "{repeated}");
+        assert_eq!(repeated["result"], unchanged["result"], "{repeated}");
+        let (status, listed) = daemon.cli(&["runtime", "tool", "list"]);
+        assert_eq!(status, Some(0), "{listed}");
+        let rows = listed["result"]["items"].as_array().unwrap();
+        assert_eq!(rows.len(), 2, "{listed}");
+        let active: Vec<_> = rows.iter().filter(|row| row["selected"] == true).collect();
+        assert_eq!(active.len(), 1, "{listed}");
+        assert_eq!(
+            active[0]["toolRef"],
+            waiting["result"]["preview"]["oldTool"]["toolRef"]
+        );
+        assert_eq!(active[0]["executableSHA256"], hashes[0]);
+        assert_eq!(active[0]["activeSelectionGeneration"], "1");
+        let candidate = rows.iter().find(|row| row["toolRef"] == candidate).unwrap();
+        assert_eq!(candidate["selected"], false, "{listed}");
+        daemon.stop();
+        let calls = std::fs::read_to_string(scratch.join("stand-in-calls")).unwrap();
+        assert_eq!(
+            calls
+                .lines()
+                .filter(|line| line.ends_with("kill -r"))
+                .count(),
+            0,
+            "{calls}"
+        );
+        assert!(
+            calls
+                .lines()
+                .all(|line| line.starts_with("-s ") || line == "list targets -v"),
+            "{calls}"
+        );
+        let _ = std::fs::remove_dir_all(&scratch);
+        return;
+    }
+    assert_eq!(approved["ok"], true, "{approved}");
+    assert_eq!(approved["result"]["state"], "outcomeUnknown", "{approved}");
+    assert_eq!(approved["result"]["dispatchCount"], 1, "{approved}");
+    // The old provider graph drains. Startup publishes the exact pending
+    // selection after a new managed launch; a status read settles its durable
+    // action from that registry outcome. The selection intent is not replayed.
+    daemon.wait_stopped();
+    let mut restart = variables.to_vec();
+    // Composition is opt-in; an absent configured file proves startup uses
+    // the durable selection rather than adopting the configured executable.
+    restart.push((
+        "ARKDECK_HDC_PATH",
+        profile.join("absent-hdc.exe").display().to_string(),
+    ));
+    let daemon = AccountDaemon::start(&executable, &pin, &profile, &restart);
+    let (status, settled) = daemon.cli(&[
+        "control-action",
+        "show",
+        "--control-action",
+        waiting["result"]["controlActionId"].as_str().unwrap(),
+    ]);
+    assert_eq!(status, Some(0), "{settled}");
+    assert_eq!(settled["result"]["state"], "succeeded", "{settled}");
+    let (status, selected) = daemon.cli(&select);
+    assert_eq!(status, Some(0), "{selected}");
+    assert_eq!(selected["result"]["state"], "succeeded", "{selected}");
+    assert_eq!(selected["result"]["dispatchCount"], 1, "{selected}");
+    assert_eq!(
+        selected["result"]["controlActionId"], waiting["result"]["controlActionId"],
+        "{selected}"
+    );
+    let (status, reconciled) = daemon.cli(&[
+        "control-action",
+        "reconcile",
+        "--control-action",
+        selected["result"]["controlActionId"].as_str().unwrap(),
+    ]);
+    assert_eq!(status, Some(0), "{reconciled}");
+    assert_eq!(reconciled["result"], selected["result"], "{reconciled}");
+    let (status, actions) = daemon.cli(&["control-action", "list"]);
+    assert_eq!(status, Some(0), "{actions}");
+    assert_eq!(
+        actions["result"]["items"],
+        serde_json::json!([selected["result"]]),
+        "{actions}"
+    );
+    let (status, listed) = daemon.cli(&["runtime", "tool", "list"]);
+    assert_eq!(status, Some(0), "{listed}");
+    let rows = listed["result"]["items"].as_array().unwrap();
+    let active: Vec<&Value> = rows.iter().filter(|row| row["selected"] == true).collect();
+    assert_eq!(active.len(), 1, "{listed}");
+    assert_eq!(active[0]["toolRef"], candidate, "{listed}");
+    assert_eq!(active[0]["executableSHA256"], hashes[1], "{listed}");
+    assert_eq!(active[0]["activeSelectionGeneration"], "2", "{listed}");
+    let (status, repeated) = daemon.cli(&select);
+    assert_eq!(status, Some(0), "{repeated}");
+    assert_eq!(repeated["result"], selected["result"], "{repeated}");
+    daemon.stop();
+    let calls = std::fs::read_to_string(scratch.join("stand-in-calls")).unwrap();
+    assert_eq!(
+        calls
+            .lines()
+            .filter(|line| line.ends_with("kill -r"))
+            .count(),
+        1,
+        "{calls}"
+    );
+    assert!(
+        calls
+            .lines()
+            .all(|line| line.starts_with("-s ") || line == "list targets -v"),
+        "{calls}"
+    );
+    let _ = std::fs::remove_dir_all(&scratch);
 }
 
 /// The signed account daemon, its stdout read line by line.
@@ -320,11 +749,15 @@ impl AccountDaemon {
 
     /// Asks it to stop through the account's scope and waits for its drained
     /// end.
-    fn stop(mut self) {
+    fn stop(self) {
         InstanceScope::account()
             .unwrap()
             .request_stop(self.child.as_ref().unwrap().id())
             .unwrap();
+        self.wait_stopped();
+    }
+
+    fn wait_stopped(mut self) {
         self.line_starting("arkdeck-agentd stopped");
         let mut child = self.child.take().unwrap();
         let deadline = Instant::now() + DEADLINE;
@@ -345,6 +778,16 @@ impl AccountDaemon {
 impl Drop for AccountDaemon {
     fn drop(&mut self) {
         if let Some(mut child) = self.child.take() {
+            // A failed assertion must still drain this fixture's managed HDC.
+            if InstanceScope::account().is_ok_and(|scope| scope.request_stop(child.id()).is_ok()) {
+                let deadline = Instant::now() + DRAIN_DEADLINE;
+                while Instant::now() < deadline {
+                    if child.try_wait().is_ok_and(|status| status.is_some()) {
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
             let _ = child.kill();
             let _ = child.wait();
         }
@@ -550,8 +993,8 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
 
     // Selecting the registered candidate still drifts: the selection's
     // impact reads the managed server's health through the HDC lifecycle
-    // owner, which no Windows composition proves healthy yet (#2501), so
-    // `runtime tool select` is not counted. Nothing is dispatched.
+    // owner; this stand-in has no published health proof without the
+    // test-only health port. Nothing is dispatched.
     let (status, selection) = daemon.cli(&[
         "runtime",
         "tool",
@@ -590,5 +1033,5 @@ fn the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner(
             .clone()
     };
     assert_eq!(windows("runtime.tool.register"), "implemented");
-    assert_eq!(windows("runtime.tool.select"), "partial");
+    assert_eq!(windows("runtime.tool.select"), "implemented");
 }

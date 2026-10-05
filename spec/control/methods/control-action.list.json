@@ -55,90 +55,168 @@
         },
         "items": {
           "items": {
-            "additionalProperties": false,
-            "properties": {
-              "action": {
-                "type": "string"
-              },
-              "actionRequestId": {
-                "type": "string"
-              },
-              "blockerReasonCode": {
-                "type": [
-                  "null",
-                  "string"
-                ]
-              },
-              "catalogDigest": {
-                "type": "string"
-              },
-              "controlActionId": {
-                "type": "string"
-              },
-              "createdAt": {
-                "type": "string"
-              },
-              "dispatchCount": {
-                "type": "integer"
-              },
-              "expiresAt": {
-                "type": "string"
-              },
-              "fingerprintAlgorithm": {
-                "type": "string"
-              },
-              "generation": {
-                "type": "string"
-              },
-              "humanAction": {
-                "anyOf": [
-                  {
-                    "additionalProperties": false,
-                    "properties": {
-                      "actionId": {
-                        "type": "string"
-                      },
-                      "binding": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "type": "string"
+                  },
+                  "actionRequestId": {
+                    "type": "string"
+                  },
+                  "blockerReasonCode": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "catalogDigest": {
+                    "type": "string"
+                  },
+                  "controlActionId": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "dispatchCount": {
+                    "type": "integer"
+                  },
+                  "expiresAt": {
+                    "type": "string"
+                  },
+                  "fingerprintAlgorithm": {
+                    "type": "string"
+                  },
+                  "generation": {
+                    "type": "string"
+                  },
+                  "humanAction": {
+                    "anyOf": [
+                      {
                         "additionalProperties": false,
                         "properties": {
-                          "controlActionId": {
+                          "actionId": {
                             "type": "string"
                           },
-                          "generation": {
+                          "binding": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "controlActionId": {
+                                "type": "string"
+                              },
+                              "generation": {
+                                "type": "string"
+                              },
+                              "previewDigest": {
+                                "type": "string"
+                              },
+                              "previewId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "controlActionId",
+                              "generation",
+                              "previewDigest",
+                              "previewId"
+                            ],
+                            "type": "object"
+                          },
+                          "category": {
                             "type": "string"
                           },
-                          "previewDigest": {
+                          "choices": {
+                            "type": "array"
+                          },
+                          "createdAt": {
                             "type": "string"
                           },
-                          "previewId": {
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "minimumAction": {
+                            "type": "string"
+                          },
+                          "newDispatchCount": {
+                            "type": "integer"
+                          },
+                          "owner": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          "prohibitedAutomation": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "reasonCode": {
+                            "type": "string"
+                          },
+                          "resumeReference": {
+                            "type": "string"
+                          },
+                          "schemaVersion": {
+                            "type": "string"
+                          },
+                          "selectionSchema": {
+                            "type": "null"
+                          },
+                          "status": {
                             "type": "string"
                           }
                         },
                         "required": [
-                          "controlActionId",
-                          "generation",
-                          "previewDigest",
-                          "previewId"
+                          "actionId",
+                          "binding",
+                          "category",
+                          "choices",
+                          "createdAt",
+                          "expiresAt",
+                          "minimumAction",
+                          "newDispatchCount",
+                          "owner",
+                          "prohibitedAutomation",
+                          "reasonCode",
+                          "resumeReference",
+                          "schemaVersion",
+                          "selectionSchema",
+                          "status"
                         ],
                         "type": "object"
                       },
-                      "category": {
+                      {
+                        "type": [
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "lastObservedAt": {
+                    "type": "string"
+                  },
+                  "nextAction": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
                         "type": "string"
-                      },
-                      "choices": {
-                        "type": "array"
-                      },
-                      "createdAt": {
-                        "type": "string"
-                      },
-                      "expiresAt": {
-                        "type": "string"
-                      },
-                      "minimumAction": {
-                        "type": "string"
-                      },
-                      "newDispatchCount": {
-                        "type": "integer"
                       },
                       "owner": {
                         "additionalProperties": false,
@@ -156,65 +234,33 @@
                         ],
                         "type": "object"
                       },
-                      "prohibitedAutomation": {
-                        "items": {
-                          "type": "string"
-                        },
-                        "type": "array"
-                      },
                       "reasonCode": {
                         "type": "string"
                       },
-                      "resumeReference": {
-                        "type": "string"
-                      },
-                      "schemaVersion": {
-                        "type": "string"
-                      },
-                      "selectionSchema": {
-                        "type": "null"
-                      },
-                      "status": {
-                        "type": "string"
+                      "resource": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind"
+                        ],
+                        "type": "object"
                       }
                     },
                     "required": [
-                      "actionId",
-                      "binding",
-                      "category",
-                      "choices",
-                      "createdAt",
-                      "expiresAt",
-                      "minimumAction",
-                      "newDispatchCount",
+                      "kind",
                       "owner",
-                      "prohibitedAutomation",
                       "reasonCode",
-                      "resumeReference",
-                      "schemaVersion",
-                      "selectionSchema",
-                      "status"
+                      "resource"
                     ],
                     "type": "object"
-                  },
-                  {
-                    "type": [
-                      "null"
-                    ]
-                  }
-                ]
-              },
-              "kind": {
-                "type": "string"
-              },
-              "lastObservedAt": {
-                "type": "string"
-              },
-              "nextAction": {
-                "additionalProperties": false,
-                "properties": {
-                  "kind": {
-                    "type": "string"
                   },
                   "owner": {
                     "additionalProperties": false,
@@ -232,135 +278,466 @@
                     ],
                     "type": "object"
                   },
-                  "reasonCode": {
-                    "type": "string"
-                  },
-                  "resource": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "kind": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "kind"
-                    ],
-                    "type": "object"
-                  }
-                },
-                "required": [
-                  "kind",
-                  "owner",
-                  "reasonCode",
-                  "resource"
-                ],
-                "type": "object"
-              },
-              "owner": {
-                "additionalProperties": false,
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "kind": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "kind"
-                ],
-                "type": "object"
-              },
-              "preview": {
-                "anyOf": [
-                  {
-                    "additionalProperties": false,
-                    "properties": {
-                      "action": {
-                        "type": "string"
-                      },
-                      "affectedDeviceObservations": {
-                        "type": "array"
-                      },
-                      "affectedJobIds": {
-                        "type": "array"
-                      },
-                      "affectedTargetIds": {
-                        "type": "array"
-                      },
-                      "confirmationRequired": {
-                        "type": "boolean"
-                      },
-                      "controlActionId": {
-                        "type": "string"
-                      },
-                      "createdAt": {
-                        "type": "string"
-                      },
-                      "criticalJobGate": {
+                  "preview": {
+                    "anyOf": [
+                      {
                         "additionalProperties": false,
                         "properties": {
-                          "blocking": {
+                          "action": {
+                            "type": "string"
+                          },
+                          "affectedDeviceObservations": {
                             "type": "array"
                           },
-                          "reasonCode": {
+                          "affectedJobIds": {
+                            "type": "array"
+                          },
+                          "affectedTargetIds": {
+                            "type": "array"
+                          },
+                          "confirmationRequired": {
+                            "type": "boolean"
+                          },
+                          "controlActionId": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "criticalJobGate": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "blocking": {
+                                "type": "array"
+                              },
+                              "reasonCode": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              },
+                              "state": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "blocking",
+                              "reasonCode",
+                              "state"
+                            ],
+                            "type": "object"
+                          },
+                          "detectedOtherClientIds": {
+                            "type": "array"
+                          },
+                          "digestAlgorithm": {
+                            "type": "string"
+                          },
+                          "dispatchCount": {
+                            "type": "integer"
+                          },
+                          "endpoint": {
+                            "type": "string"
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "interruption": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "affectsAllParticipants": {
+                                "type": "boolean"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "affectsAllParticipants",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "otherClientsMayExist": {
+                            "type": "boolean"
+                          },
+                          "owner": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          "previewDigest": {
+                            "type": "string"
+                          },
+                          "previewId": {
+                            "type": "string"
+                          },
+                          "recovery": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "replayAllowed": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "replayAllowed"
+                            ],
+                            "type": "object"
+                          },
+                          "schemaVersion": {
+                            "type": "string"
+                          },
+                          "serverEndpointRef": {
+                            "type": "string"
+                          },
+                          "serverGeneration": {
                             "type": [
                               "null",
                               "string"
                             ]
                           },
-                          "state": {
+                          "serverHealth": {
                             "type": "string"
+                          },
+                          "serverOwnership": {
+                            "type": "string"
+                          },
+                          "serverVersion": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "tool": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "executablePath": {
+                                "type": "string"
+                              },
+                              "reference": {
+                                "type": "null"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              },
+                              "signature": {
+                                "anyOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "executionAssessment": {
+                                        "type": "string"
+                                      },
+                                      "identifier": {
+                                        "type": [
+                                          "null",
+                                          "string"
+                                        ]
+                                      },
+                                      "platformTrust": {
+                                        "type": "string"
+                                      },
+                                      "state": {
+                                        "type": "string"
+                                      },
+                                      "teamIdentifier": {
+                                        "type": [
+                                          "null",
+                                          "string"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "executionAssessment",
+                                      "identifier",
+                                      "platformTrust",
+                                      "state",
+                                      "teamIdentifier"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "type": [
+                                      "null"
+                                    ]
+                                  }
+                                ]
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "trust": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "executablePath",
+                              "reference",
+                              "sha256",
+                              "signature",
+                              "source",
+                              "trust",
+                              "version"
+                            ],
+                            "type": "object"
                           }
                         },
                         "required": [
-                          "blocking",
-                          "reasonCode",
-                          "state"
+                          "action",
+                          "affectedDeviceObservations",
+                          "affectedJobIds",
+                          "affectedTargetIds",
+                          "confirmationRequired",
+                          "controlActionId",
+                          "createdAt",
+                          "criticalJobGate",
+                          "detectedOtherClientIds",
+                          "digestAlgorithm",
+                          "dispatchCount",
+                          "endpoint",
+                          "expiresAt",
+                          "interruption",
+                          "kind",
+                          "otherClientsMayExist",
+                          "owner",
+                          "previewDigest",
+                          "previewId",
+                          "recovery",
+                          "schemaVersion",
+                          "serverEndpointRef",
+                          "serverGeneration",
+                          "serverHealth",
+                          "serverOwnership",
+                          "serverVersion",
+                          "tool"
                         ],
                         "type": "object"
                       },
-                      "detectedOtherClientIds": {
-                        "type": "array"
-                      },
-                      "digestAlgorithm": {
-                        "type": "string"
-                      },
-                      "dispatchCount": {
-                        "type": "integer"
-                      },
-                      "endpoint": {
-                        "type": "string"
-                      },
-                      "expiresAt": {
-                        "type": "string"
-                      },
-                      "interruption": {
+                      {
+                        "type": [
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "requestFingerprint": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action",
+                  "actionRequestId",
+                  "blockerReasonCode",
+                  "catalogDigest",
+                  "controlActionId",
+                  "createdAt",
+                  "dispatchCount",
+                  "expiresAt",
+                  "fingerprintAlgorithm",
+                  "generation",
+                  "humanAction",
+                  "kind",
+                  "lastObservedAt",
+                  "nextAction",
+                  "owner",
+                  "preview",
+                  "requestFingerprint",
+                  "schemaVersion",
+                  "state"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "type": "string"
+                  },
+                  "actionRequestId": {
+                    "type": "string"
+                  },
+                  "blockerReasonCode": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "catalogDigest": {
+                    "type": "string"
+                  },
+                  "controlActionId": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "string"
+                  },
+                  "dispatchCount": {
+                    "type": "integer"
+                  },
+                  "expiresAt": {
+                    "type": "string"
+                  },
+                  "fingerprintAlgorithm": {
+                    "type": "string"
+                  },
+                  "generation": {
+                    "type": "string"
+                  },
+                  "humanAction": {
+                    "anyOf": [
+                      {
                         "additionalProperties": false,
                         "properties": {
-                          "affectsAllParticipants": {
-                            "type": "boolean"
+                          "actionId": {
+                            "type": "string"
                           },
-                          "kind": {
+                          "binding": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "controlActionId": {
+                                "type": "string"
+                              },
+                              "generation": {
+                                "type": "string"
+                              },
+                              "previewDigest": {
+                                "type": "string"
+                              },
+                              "previewId": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "controlActionId",
+                              "generation",
+                              "previewDigest",
+                              "previewId"
+                            ],
+                            "type": "object"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "choices": {
+                            "type": "array"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "minimumAction": {
+                            "type": "string"
+                          },
+                          "newDispatchCount": {
+                            "type": "integer"
+                          },
+                          "owner": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          "prohibitedAutomation": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "reasonCode": {
+                            "type": "string"
+                          },
+                          "resumeReference": {
+                            "type": "string"
+                          },
+                          "schemaVersion": {
+                            "type": "string"
+                          },
+                          "selectionSchema": {
+                            "type": "null"
+                          },
+                          "status": {
                             "type": "string"
                           }
                         },
                         "required": [
-                          "affectsAllParticipants",
-                          "kind"
+                          "actionId",
+                          "binding",
+                          "category",
+                          "choices",
+                          "createdAt",
+                          "expiresAt",
+                          "minimumAction",
+                          "newDispatchCount",
+                          "owner",
+                          "prohibitedAutomation",
+                          "reasonCode",
+                          "resumeReference",
+                          "schemaVersion",
+                          "selectionSchema",
+                          "status"
                         ],
                         "type": "object"
                       },
+                      {
+                        "type": [
+                          "null"
+                        ]
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "lastObservedAt": {
+                    "type": "string"
+                  },
+                  "nextAction": {
+                    "additionalProperties": false,
+                    "properties": {
                       "kind": {
                         "type": "string"
-                      },
-                      "otherClientsMayExist": {
-                        "type": "boolean"
                       },
                       "owner": {
                         "additionalProperties": false,
@@ -378,80 +755,226 @@
                         ],
                         "type": "object"
                       },
-                      "previewDigest": {
+                      "reasonCode": {
                         "type": "string"
                       },
-                      "previewId": {
-                        "type": "string"
-                      },
-                      "recovery": {
+                      "resource": {
                         "additionalProperties": false,
                         "properties": {
-                          "kind": {
+                          "id": {
                             "type": "string"
                           },
-                          "replayAllowed": {
-                            "type": "boolean"
+                          "kind": {
+                            "type": "string"
                           }
                         },
                         "required": [
-                          "kind",
-                          "replayAllowed"
+                          "id",
+                          "kind"
                         ],
                         "type": "object"
-                      },
-                      "schemaVersion": {
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "owner",
+                      "reasonCode",
+                      "resource"
+                    ],
+                    "type": "object"
+                  },
+                  "owner": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
                         "type": "string"
                       },
-                      "serverEndpointRef": {
+                      "kind": {
                         "type": "string"
-                      },
-                      "serverGeneration": {
-                        "type": [
-                          "null",
-                          "string"
-                        ]
-                      },
-                      "serverHealth": {
-                        "type": "string"
-                      },
-                      "serverOwnership": {
-                        "type": "string"
-                      },
-                      "serverVersion": {
-                        "type": [
-                          "null",
-                          "string"
-                        ]
-                      },
-                      "tool": {
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  "preview": {
+                    "anyOf": [
+                      {
                         "additionalProperties": false,
                         "properties": {
-                          "executablePath": {
+                          "action": {
                             "type": "string"
                           },
-                          "reference": {
-                            "type": "null"
+                          "affectedDeviceObservations": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "authorization": {
+                                  "type": "string"
+                                },
+                                "generation": {
+                                  "type": "string"
+                                },
+                                "health": {
+                                  "type": "string"
+                                },
+                                "observationId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "authorization",
+                                "generation",
+                                "health",
+                                "observationId"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
                           },
-                          "sha256": {
+                          "affectedJobIds": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "affectedTargetIds": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "confirmationRequired": {
+                            "type": "boolean"
+                          },
+                          "controlActionId": {
                             "type": "string"
                           },
-                          "signature": {
-                            "anyOf": [
-                              {
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "criticalJobGate": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "blocking": {
+                                "items": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "jobId": {
+                                      "type": "string"
+                                    },
+                                    "recovery": {
+                                      "type": "string"
+                                    },
+                                    "safeBoundary": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string"
+                                    },
+                                    "stepId": {
+                                      "type": [
+                                        "null",
+                                        "string"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "jobId",
+                                    "recovery",
+                                    "safeBoundary",
+                                    "state",
+                                    "stepId"
+                                  ],
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "reasonCode": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              },
+                              "state": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "blocking",
+                              "reasonCode",
+                              "state"
+                            ],
+                            "type": "object"
+                          },
+                          "detectedOtherClientIds": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "digestAlgorithm": {
+                            "type": "string"
+                          },
+                          "dispatchCount": {
+                            "type": "integer"
+                          },
+                          "endpoint": {
+                            "type": "string"
+                          },
+                          "expectedActiveGeneration": {
+                            "type": "string"
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "interruption": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "affectsAllParticipants": {
+                                "type": "boolean"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "affectsAllParticipants",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "newTool": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "contentSHA256": {
+                                "type": "string"
+                              },
+                              "executableSHA256": {
+                                "type": "string"
+                              },
+                              "recordGeneration": {
+                                "type": "string"
+                              },
+                              "signature": {
                                 "additionalProperties": false,
                                 "properties": {
-                                  "executionAssessment": {
-                                    "type": "string"
+                                  "codeDirectoryIdentitySHA256": {
+                                    "type": [
+                                      "null",
+                                      "string"
+                                    ]
                                   },
                                   "identifier": {
                                     "type": [
                                       "null",
                                       "string"
                                     ]
-                                  },
-                                  "platformTrust": {
-                                    "type": "string"
                                   },
                                   "state": {
                                     "type": "string"
@@ -464,116 +987,318 @@
                                   }
                                 },
                                 "required": [
-                                  "executionAssessment",
+                                  "codeDirectoryIdentitySHA256",
                                   "identifier",
-                                  "platformTrust",
                                   "state",
                                   "teamIdentifier"
                                 ],
                                 "type": "object"
                               },
-                              {
-                                "type": [
-                                  "null"
-                                ]
+                              "toolRef": {
+                                "type": "string"
+                              },
+                              "trust": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "executionAssessment": {
+                                    "type": "string"
+                                  },
+                                  "platformTrust": {
+                                    "type": "string"
+                                  },
+                                  "policy": {
+                                    "type": "string"
+                                  },
+                                  "profileReferences": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "registeredIdentity": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "executionAssessment",
+                                  "platformTrust",
+                                  "policy",
+                                  "profileReferences",
+                                  "registeredIdentity"
+                                ],
+                                "type": "object"
+                              },
+                              "version": {
+                                "type": "string"
                               }
-                            ]
+                            },
+                            "required": [
+                              "contentSHA256",
+                              "executableSHA256",
+                              "recordGeneration",
+                              "signature",
+                              "toolRef",
+                              "trust",
+                              "version"
+                            ],
+                            "type": "object"
                           },
-                          "source": {
+                          "oldTool": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "contentSHA256": {
+                                "type": "string"
+                              },
+                              "executableSHA256": {
+                                "type": "string"
+                              },
+                              "recordGeneration": {
+                                "type": "string"
+                              },
+                              "signature": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "codeDirectoryIdentitySHA256": {
+                                    "type": "null"
+                                  },
+                                  "identifier": {
+                                    "type": "null"
+                                  },
+                                  "state": {
+                                    "type": "string"
+                                  },
+                                  "teamIdentifier": {
+                                    "type": "null"
+                                  }
+                                },
+                                "required": [
+                                  "codeDirectoryIdentitySHA256",
+                                  "identifier",
+                                  "state",
+                                  "teamIdentifier"
+                                ],
+                                "type": "object"
+                              },
+                              "toolRef": {
+                                "type": "string"
+                              },
+                              "trust": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "executionAssessment": {
+                                    "type": "string"
+                                  },
+                                  "platformTrust": {
+                                    "type": "string"
+                                  },
+                                  "policy": {
+                                    "type": "string"
+                                  },
+                                  "profileReferences": {
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "type": "array"
+                                  },
+                                  "registeredIdentity": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "executionAssessment",
+                                  "platformTrust",
+                                  "policy",
+                                  "profileReferences",
+                                  "registeredIdentity"
+                                ],
+                                "type": "object"
+                              },
+                              "version": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "contentSHA256",
+                              "executableSHA256",
+                              "recordGeneration",
+                              "signature",
+                              "toolRef",
+                              "trust",
+                              "version"
+                            ],
+                            "type": "object"
+                          },
+                          "otherClientsMayExist": {
+                            "type": "boolean"
+                          },
+                          "owner": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "kind"
+                            ],
+                            "type": "object"
+                          },
+                          "previewDigest": {
                             "type": "string"
                           },
-                          "trust": {
+                          "previewId": {
                             "type": "string"
                           },
-                          "version": {
-                            "type": [
-                              "null",
-                              "string"
-                            ]
+                          "recovery": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "replayAllowed": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "replayAllowed"
+                            ],
+                            "type": "object"
+                          },
+                          "schemaVersion": {
+                            "type": "string"
+                          },
+                          "serverEndpointRef": {
+                            "type": "string"
+                          },
+                          "serverGeneration": {
+                            "type": "string"
+                          },
+                          "serverHealth": {
+                            "type": "string"
+                          },
+                          "serverOwnership": {
+                            "type": "string"
+                          },
+                          "serverVersion": {
+                            "type": "string"
+                          },
+                          "tool": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "executablePath": {
+                                "type": "string"
+                              },
+                              "reference": {
+                                "type": "null"
+                              },
+                              "sha256": {
+                                "type": "string"
+                              },
+                              "signature": {
+                                "type": "null"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "trust": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "executablePath",
+                              "reference",
+                              "sha256",
+                              "signature",
+                              "source",
+                              "trust",
+                              "version"
+                            ],
+                            "type": "object"
                           }
                         },
                         "required": [
-                          "executablePath",
-                          "reference",
-                          "sha256",
-                          "signature",
-                          "source",
-                          "trust",
-                          "version"
+                          "action",
+                          "affectedDeviceObservations",
+                          "affectedJobIds",
+                          "affectedTargetIds",
+                          "confirmationRequired",
+                          "controlActionId",
+                          "createdAt",
+                          "criticalJobGate",
+                          "detectedOtherClientIds",
+                          "digestAlgorithm",
+                          "dispatchCount",
+                          "endpoint",
+                          "expectedActiveGeneration",
+                          "expiresAt",
+                          "interruption",
+                          "kind",
+                          "newTool",
+                          "oldTool",
+                          "otherClientsMayExist",
+                          "owner",
+                          "previewDigest",
+                          "previewId",
+                          "recovery",
+                          "schemaVersion",
+                          "serverEndpointRef",
+                          "serverGeneration",
+                          "serverHealth",
+                          "serverOwnership",
+                          "serverVersion",
+                          "tool"
                         ],
                         "type": "object"
+                      },
+                      {
+                        "type": [
+                          "null"
+                        ]
                       }
-                    },
-                    "required": [
-                      "action",
-                      "affectedDeviceObservations",
-                      "affectedJobIds",
-                      "affectedTargetIds",
-                      "confirmationRequired",
-                      "controlActionId",
-                      "createdAt",
-                      "criticalJobGate",
-                      "detectedOtherClientIds",
-                      "digestAlgorithm",
-                      "dispatchCount",
-                      "endpoint",
-                      "expiresAt",
-                      "interruption",
-                      "kind",
-                      "otherClientsMayExist",
-                      "owner",
-                      "previewDigest",
-                      "previewId",
-                      "recovery",
-                      "schemaVersion",
-                      "serverEndpointRef",
-                      "serverGeneration",
-                      "serverHealth",
-                      "serverOwnership",
-                      "serverVersion",
-                      "tool"
-                    ],
-                    "type": "object"
-                  },
-                  {
-                    "type": [
-                      "null"
                     ]
+                  },
+                  "requestFingerprint": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
                   }
-                ]
-              },
-              "requestFingerprint": {
-                "type": "string"
-              },
-              "schemaVersion": {
-                "type": "string"
-              },
-              "state": {
-                "type": "string"
+                },
+                "required": [
+                  "action",
+                  "actionRequestId",
+                  "blockerReasonCode",
+                  "catalogDigest",
+                  "controlActionId",
+                  "createdAt",
+                  "dispatchCount",
+                  "expiresAt",
+                  "fingerprintAlgorithm",
+                  "generation",
+                  "humanAction",
+                  "kind",
+                  "lastObservedAt",
+                  "nextAction",
+                  "owner",
+                  "preview",
+                  "requestFingerprint",
+                  "schemaVersion",
+                  "state"
+                ],
+                "type": "object"
               }
-            },
-            "required": [
-              "action",
-              "actionRequestId",
-              "blockerReasonCode",
-              "catalogDigest",
-              "controlActionId",
-              "createdAt",
-              "dispatchCount",
-              "expiresAt",
-              "fingerprintAlgorithm",
-              "generation",
-              "humanAction",
-              "kind",
-              "lastObservedAt",
-              "nextAction",
-              "owner",
-              "preview",
-              "requestFingerprint",
-              "schemaVersion",
-              "state"
-            ],
-            "type": "object"
+            ]
           },
           "type": "array"
         },

@@ -658,10 +658,10 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // over the account daemon's composition, an hdc.exe a tuple names
     // registered beside its selection and one no tuple names refused
     // (TASK-XPA-012; `arkdeck-agentd/tests/spawning/account_tool_selection.rs`).
-    // Not `runtime tool select`: its impact reads the managed server's health
-    // through the HDC lifecycle owner, which no Windows composition proves
-    // healthy yet (#2501), so it answers only a drifted action.
     "runtime.tool.register",
+    // Selection approval, replacement and restart settlement through the
+    // signed CLI, with tuple/impact fixtures compiled only into the test.
+    "runtime.tool.select",
     // A diagnostics capture's Artifacts the macOS Runtime recorded, exported
     // (`windows_diagnostics_export_process.rs`).
     "diagnostics.export",
