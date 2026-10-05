@@ -791,6 +791,30 @@ impl<H: HostServices> Control<H> {
 
     /// The same fresh projection feeds discovery and descriptor views. Keep
     /// metadata cached, but never cache provider or executable availability.
+    /// Swift `registeredProviderIDs`, which its `health` and `doctor`
+    /// answered: the providers this Runtime composes, sorted. A provider is
+    /// registered when the host answers any of its operations at all
+    /// (otherwise `provider_not_registered`), so each host lists exactly what
+    /// it composes.
+    fn registered_providers(&self) -> Vec<String> {
+        let operations = self.operations.as_array().expect("Catalog operations");
+        operations
+            .iter()
+            .zip(&self.providers)
+            .filter(|(base, provider)| {
+                self.host
+                    .operation_availability(
+                        base["reference"].as_str().expect("Catalog reference"),
+                        provider,
+                    )
+                    .is_some()
+            })
+            .map(|(_, provider)| provider.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
     pub fn operation_availability(&self) -> Value {
         let items: Vec<_> = self
             .operations
@@ -899,7 +923,8 @@ impl<H: HostServices> Control<H> {
                 &request.id,
                 json!({
                 "status":"ok","protocolVersion":PROTOCOL_VERSION,"contractIdentity":CONTRACT_IDENTITY,
-                "catalogDigest":CATALOG_DIGEST,"providers":[],"publishedMethods":METHODS}),
+                "catalogDigest":CATALOG_DIGEST,"providers":self.registered_providers(),
+                "publishedMethods":METHODS}),
             ),
             "health" => {
                 Response::failure(&request.id, "invalidParams", "health accepts no parameters")
@@ -1637,22 +1662,19 @@ impl<H: HostServices> Control<H> {
             );
         }
 
-        // Swift `engine.operationAvailability()` and `providerIDs`: an
-        // operation is available when the host answers it with no reason, and
-        // a provider is registered when the host answers any of its
-        // operations at all (otherwise `provider_not_registered`).
+        // Swift `engine.operationAvailability()`: an operation is available
+        // when the host answers it with no reason.
         let mut available = 0_usize;
-        let mut registered = std::collections::BTreeSet::new();
         let operations = self.operations.as_array().expect("Catalog operations");
         for (base, provider) in operations.iter().zip(&self.providers) {
             if let Some(reasons) = self.host.operation_availability(
                 base["reference"].as_str().expect("Catalog reference"),
                 provider,
             ) {
-                registered.insert(provider.clone());
                 available += usize::from(reasons.is_empty());
             }
         }
+        let registered = self.registered_providers();
         let unavailable = operations.len() - available;
         if available == 0 {
             add(

@@ -147,6 +147,8 @@ mod support;
 mod target_observation_control;
 #[cfg(target_os = "macos")]
 mod trace_probe_control;
+#[cfg(windows)]
+mod workspace_continuation_cli;
 
 /// A module compiled here from the daemon's sources keeps no test beside it:
 /// one would run in this binary as well, outside [`turn`], besides the

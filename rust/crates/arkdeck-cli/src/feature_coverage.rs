@@ -640,6 +640,16 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // preset, reaching the project's `ohpm` dependencies through the in-tree
     // junctions the copy recreates (the same live test).
     "workspace.test",
+    // GJ-5's continuation (TASK-XPA-005): a completed `target observe`
+    // continued through `workspace continuation submit` and `run`, by the
+    // real CLI against the signed test daemon over the shared fake HDC, each
+    // answer Swift's draft of the Runtime's reads (the
+    // `workspace-continuation` oracle), the run sending exactly the
+    // `observe-device` oracle Job's calls
+    // (`arkdeck-agentd/tests/spawning/workspace_continuation_cli.rs`). The
+    // Runtime's `health` lists the providers it composes, as Swift's did.
+    "workspace.continuation.submit",
+    "workspace.continuation.run",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test
