@@ -9515,6 +9515,276 @@
       "table": null,
       "en": "Only inactive derived databases are purged. Original Trace files are never cache targets.",
       "zh-Hans": "只清除未在使用的派生数据库。原始 Trace 文件从不是缓存对象。"
+    },
+    {
+      "key": "settings.general.appIcon",
+      "table": "SettingsLocalizable",
+      "en": "App icon",
+      "zh-Hans": "应用图标"
+    },
+    {
+      "key": "settings.general.appIcon.keycap",
+      "table": "SettingsLocalizable",
+      "en": "Terminal",
+      "zh-Hans": "终端"
+    },
+    {
+      "key": "settings.general.appIcon.waveform",
+      "table": "SettingsLocalizable",
+      "en": "Diagnostics",
+      "zh-Hans": "诊断"
+    },
+    {
+      "key": "settings.tab.updates",
+      "table": "SettingsLocalizable",
+      "en": "Updates",
+      "zh-Hans": "更新"
+    },
+    {
+      "key": "settings.tab.diagnostics",
+      "table": "SettingsLocalizable",
+      "en": "Diagnostics",
+      "zh-Hans": "诊断"
+    },
+    {
+      "key": "settings.diagnostics.subtitle",
+      "table": "SettingsLocalizable",
+      "en": "Preview a bounded, local diagnostic bundle before explicitly exporting it.",
+      "zh-Hans": "先预览范围受限的本地诊断包，再显式导出。"
+    },
+    {
+      "key": "settings.diagnostics.defaultScope",
+      "table": "SettingsLocalizable",
+      "en": "Default scope",
+      "zh-Hans": "默认范围"
+    },
+    {
+      "key": "settings.diagnostics.metadata",
+      "table": "SettingsLocalizable",
+      "en": "Application and platform metadata",
+      "zh-Hans": "应用与平台元数据"
+    },
+    {
+      "key": "settings.diagnostics.redactedHDC",
+      "table": "SettingsLocalizable",
+      "en": "Redacted HDC state",
+      "zh-Hans": "已脱敏的 HDC 状态"
+    },
+    {
+      "key": "settings.diagnostics.redactedHDC.detail",
+      "table": "SettingsLocalizable",
+      "en": "Tool path and server endpoint are represented only by redacted or unverified states.",
+      "zh-Hans": "工具路径与服务端点只以“已脱敏”或“未验证”状态表示。"
+    },
+    {
+      "key": "settings.diagnostics.rawExcluded",
+      "table": "SettingsLocalizable",
+      "en": "Device raw excluded",
+      "zh-Hans": "排除设备原始数据"
+    },
+    {
+      "key": "settings.diagnostics.rawExcluded.detail",
+      "table": "SettingsLocalizable",
+      "en": "UI Dump, Trace, hilog, device identifiers, and Session artifact bytes are not included by default.",
+      "zh-Hans": "默认不包含 UI Dump、Trace、hilog、设备标识符和 Session 产物字节。"
+    },
+    {
+      "key": "settings.diagnostics.export",
+      "table": "SettingsLocalizable",
+      "en": "Export diagnostic bundle",
+      "zh-Hans": "导出诊断包"
+    },
+    {
+      "key": "settings.diagnostics.previewFirst",
+      "table": "SettingsLocalizable",
+      "en": "Choose a new destination to calculate the exact entries, size, and scope hash. Previewing does not write a bundle.",
+      "zh-Hans": "选择一个新位置以计算精确条目、大小和范围哈希；预览不会写入诊断包。"
+    },
+    {
+      "key": "settings.diagnostics.chooseAndPreview",
+      "table": "SettingsLocalizable",
+      "en": "Choose destination and preview…",
+      "zh-Hans": "选择位置并预览…"
+    },
+    {
+      "key": "settings.diagnostics.destination",
+      "table": "SettingsLocalizable",
+      "en": "Destination",
+      "zh-Hans": "导出位置"
+    },
+    {
+      "key": "settings.diagnostics.size",
+      "table": "SettingsLocalizable",
+      "en": "Estimated size",
+      "zh-Hans": "预计大小"
+    },
+    {
+      "key": "settings.diagnostics.scopeHash",
+      "table": "SettingsLocalizable",
+      "en": "Scope SHA-256",
+      "zh-Hans": "范围 SHA-256"
+    },
+    {
+      "key": "settings.diagnostics.deviceRaw",
+      "table": "SettingsLocalizable",
+      "en": "Device raw",
+      "zh-Hans": "设备原始数据"
+    },
+    {
+      "key": "settings.diagnostics.excluded",
+      "table": "SettingsLocalizable",
+      "en": "Excluded",
+      "zh-Hans": "已排除"
+    },
+    {
+      "key": "settings.diagnostics.notExcluded",
+      "table": "SettingsLocalizable",
+      "en": "Not excluded — do not export",
+      "zh-Hans": "未排除——请勿导出"
+    },
+    {
+      "key": "settings.diagnostics.entries",
+      "table": "SettingsLocalizable",
+      "en": "Included entries",
+      "zh-Hans": "包含条目"
+    },
+    {
+      "key": "settings.diagnostics.warning",
+      "table": "SettingsLocalizable",
+      "en": "Review the preview before sharing. Even a redacted bundle may reveal build and platform details.",
+      "zh-Hans": "分享前请检查预览；即使经过脱敏，诊断包仍可能披露构建与平台信息。"
+    },
+    {
+      "key": "settings.diagnostics.exportNow",
+      "table": "SettingsLocalizable",
+      "en": "Export approved preview",
+      "zh-Hans": "导出已确认的预览"
+    },
+    {
+      "key": "settings.diagnostics.exported",
+      "table": "SettingsLocalizable",
+      "en": "The approved diagnostic bundle was exported locally.",
+      "zh-Hans": "已将确认过的诊断包导出到本地。"
+    },
+    {
+      "key": "settings.diagnostics.noAutomaticUpload",
+      "table": "SettingsLocalizable",
+      "en": "ArkDeck never uploads this bundle automatically. Export is available only after this preview and your explicit button press.",
+      "zh-Hans": "ArkDeck 绝不会自动上传此诊断包；只有完成预览并由你显式点击后才会导出。"
+    },
+    {
+      "key": "update.title",
+      "table": "Localizable",
+      "en": "Software Update",
+      "zh-Hans": "软件更新"
+    },
+    {
+      "key": "update.checkNow",
+      "table": "Localizable",
+      "en": "Check Now",
+      "zh-Hans": "立即检查"
+    },
+    {
+      "key": "update.status.idle",
+      "table": "Localizable",
+      "en": "Ready to check for updates.",
+      "zh-Hans": "可以检查更新。"
+    },
+    {
+      "key": "update.status.checking",
+      "table": "Localizable",
+      "en": "Checking for updates…",
+      "zh-Hans": "正在检查更新……"
+    },
+    {
+      "key": "update.status.available",
+      "table": "Localizable",
+      "en": "An update is available. Download requires your action.",
+      "zh-Hans": "有可用更新，需要你手动开始下载。"
+    },
+    {
+      "key": "update.status.current",
+      "table": "Localizable",
+      "en": "No newer verified update is available.",
+      "zh-Hans": "当前没有已验证的较新版本。"
+    },
+    {
+      "key": "update.status.failed",
+      "table": "Localizable",
+      "en": "Update verification failed. Nothing was installed or replaced.",
+      "zh-Hans": "更新验证失败，未安装或替换任何内容。"
+    },
+    {
+      "key": "windows.settings.general.appIcon.detail",
+      "table": null,
+      "en": "Choose the icon of ArkDeck's window and title bar. Changes apply immediately; the Start menu and taskbar tiles of the installed package keep its icon.",
+      "zh-Hans": "选择 ArkDeck 窗口和标题栏使用的图标。更改立即生效；已安装包的开始菜单和任务栏磁贴保留其图标。"
+    },
+    {
+      "key": "windows.update.privacy",
+      "table": null,
+      "en": "Windows App Installer checks ArkDeck's update feed and asks before installing. ArkDeck adds no device or user identifier, telemetry or credential to the check.",
+      "zh-Hans": "Windows 应用安装程序检查 ArkDeck 的更新源，并在安装前询问。ArkDeck 不在检查中附加任何设备或用户标识、遥测或凭据。"
+    },
+    {
+      "key": "windows.update.notPackaged",
+      "table": null,
+      "en": "This copy was not installed as an MSIX package, so it has no update channel. To upgrade, install a newer copy.",
+      "zh-Hans": "此副本不是以 MSIX 包安装的，因此没有更新通道。要升级，请安装更新的副本。"
+    },
+    {
+      "key": "windows.update.channel",
+      "table": null,
+      "en": "Update feed",
+      "zh-Hans": "更新源"
+    },
+    {
+      "key": "windows.update.noFeed",
+      "table": null,
+      "en": "This package was not installed from an App Installer feed, so Windows offers no update for it.",
+      "zh-Hans": "此包不是从应用安装程序更新源安装的，因此 Windows 不会为其提供更新。"
+    },
+    {
+      "key": "windows.update.install",
+      "table": null,
+      "en": "Install with App Installer",
+      "zh-Hans": "使用应用安装程序安装"
+    },
+    {
+      "key": "windows.update.installUnavailable",
+      "table": null,
+      "en": "No update is available to install. Check first.",
+      "zh-Hans": "没有可安装的更新。请先检查。"
+    },
+    {
+      "key": "windows.update.handedOff",
+      "table": null,
+      "en": "App Installer is open. Continue there; ArkDeck neither downloads nor replaces itself.",
+      "zh-Hans": "应用安装程序已打开。请在其中继续；ArkDeck 自己不下载、不替换自身。"
+    },
+    {
+      "key": "windows.update.manual",
+      "table": null,
+      "en": "Windows App Installer downloads the package, verifies its signature and installs it after your confirmation.",
+      "zh-Hans": "Windows 应用安装程序下载包、校验其签名，并在你确认后安装。"
+    },
+    {
+      "key": "windows.settings.diagnostics.metadataDetail",
+      "table": null,
+      "en": "Includes ArkDeck version, build, Windows version, and architecture.",
+      "zh-Hans": "包括 ArkDeck 版本、构建号、Windows 版本和架构。"
+    },
+    {
+      "key": "windows.settings.diagnostics.failed",
+      "table": null,
+      "en": "The diagnostic bundle was not written",
+      "zh-Hans": "诊断包未写入"
+    },
+    {
+      "key": "windows.settings.diagnostics.reveal",
+      "table": null,
+      "en": "Show in File Explorer",
+      "zh-Hans": "在文件资源管理器中显示"
     }
   ]
 }

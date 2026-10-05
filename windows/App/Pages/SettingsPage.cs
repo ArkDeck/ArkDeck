@@ -31,6 +31,8 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
         ("remoteSources", UiStrings.SettingsTabRemoteSources),
         ("storage", UiStrings.SettingsTabStorage),
         ("trace", UiStrings.SettingsTabTrace),
+        ("updates", UiStrings.SettingsTabUpdates),
+        ("diagnostics", UiStrings.SettingsTabDiagnostics),
         ("workspace", UiStrings.WindowsSettingsTabWorkspace),
     ];
 
@@ -98,6 +100,8 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
             case "storage": Storage(state); break;
             case "trace": Trace(state); break;
             case "workspace": Workspace(state); break;
+            case "updates": Updates(); break;
+            case "diagnostics": Diagnostics(); break;
             default: General(); break;
         }
     }
@@ -114,6 +118,7 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
     private void General()
     {
         Subtitle(UiStrings.SettingsGeneralSubtitle);
+        AppIcon();
         var build = Section("settings.general.build", UiStrings.SettingsGeneralBuild);
         var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
                       ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "—";

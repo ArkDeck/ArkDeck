@@ -29,7 +29,8 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        // The window icon the person chose (macOS applyStoredSelection), the waveform by default.
+        AppWindow.SetIcon(AppPreferences.IconAsset(App.Preferences.Icon));
         AppWindow.Resize(new Windows.Graphics.SizeInt32(1280, 900));
 
         Title = S.Text(UiStrings.AppShellTitle);

@@ -2,7 +2,6 @@ using ArkDeck.App.Controls;
 using ArkDeck.App.Core.Presentation;
 using ArkDeck.App.Core.Strings;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.Windows.Storage.Pickers;
 
 namespace ArkDeck.App.Pages;
 
@@ -76,11 +75,10 @@ public sealed partial class SettingsPage
 
     private async Task ChooseRootAsync(TextBlock status)
     {
-        var picker = new FolderPicker(MainWindow.Instance.AppWindow.Id) { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
         string? path;
         try
         {
-            path = (await picker.PickSingleFolderAsync())?.Path;
+            path = await PickFolderAsync();
         }
         catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException)
         {

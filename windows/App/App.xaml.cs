@@ -20,6 +20,9 @@ public partial class App : Application
     /// answers the SSH client's prompts in its askpass mode (Program).</summary>
     public static ArkDeck.App.Core.RemoteSources.RemoteBuildSourceProvider RemoteSources { get; private set; } = null!;
 
+    /// <summary>The App's own preferences (the window icon).</summary>
+    public static AppPreferences Preferences { get; private set; } = null!;
+
     private Window? _window;
 
     public App()
@@ -34,6 +37,7 @@ public partial class App : Application
 
         Loader = new SurfaceLoader(DaemonConfiguration.Create(Options, Environment.GetEnvironmentVariable, AppContext.BaseDirectory));
         RemoteSources = ArkDeck.App.Core.RemoteSources.RemoteBuildSourceProvider.Create(Environment.ProcessPath!, Options.RemoteSourcesRoot);
+        Preferences = new AppPreferences(Options.PreferencesRoot ?? AppPreferences.DefaultDirectory);
         InitializeComponent();
 
     }

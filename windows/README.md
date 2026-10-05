@@ -109,7 +109,10 @@ first, `ControlResult` back.
   (`workspace.project.list|show`, `workspace.preset.list`). Read-only except, as on macOS, the
   Session root and retention policy (`runtime.storage.root|policy`, bound to the generation read,
   another writer's publication read back) and the purge of inactive derived Trace databases
-  (`trace.cache.purge`), each confirmed first; the Runtime validates and answers.
+  (`trace.cache.purge`), each confirmed first; the Runtime validates and answers. App-local, as
+  on macOS: the window icon (General), Updates (the MSIX App Installer feed: check, then hand
+  the install to App Installer) and Diagnostics (a local bundle of App metadata and a redacted
+  HDC placeholder, previewed with its scope digest and exported only for that preview).
 - **Sessions and Job actions (TASK-XPA-020).** A Sessions page lists the Session catalog
   (`session.list|show`), pins and unpins by generation, and exports and cleans up through the
   Runtime's preview-then-apply (`session.export.preview|apply`, `session.cleanup.preview|apply`):
