@@ -43,6 +43,8 @@ def parse_generated(text: str) -> tuple[str, tuple[str, ...]]:
         raise CatalogError(f"{GENERATED_RUST}: the canonical JSON does not hash to its digest")
     operations = []
     for document in json.loads(body):
+        if document.get("aliasFor") is not None:
+            continue
         reference = document["id"]
         if "version" in document:
             reference = f"{reference}@{document['version']}"
