@@ -518,6 +518,34 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "diagnostics.session.status",
     "diagnostics.session.mark",
     "diagnostics.session.stop",
+    // GJ-1's pointer inputs (TASK-XPA-005): `input tap`, `input long-press`
+    // and `input swipe` over the same daemon with the Swift pointer-input
+    // oracle's fake, every case the oracle recorded sent in its order: each
+    // Job ends in the oracle's state after exactly the oracle's calls, each
+    // refusal is the oracle's, and the standing capabilities left are the
+    // oracle's (`arkdeck-agentd/tests/spawning/gj1_inputs.rs`).
+    "input.tap",
+    "input.long-press",
+    "input.swipe",
+    // `screen record` (`capture.screen-sequence@1`), the same way over the
+    // Swift screen-sequence oracle's fake: the frames written, archived,
+    // read back, received and removed under the Runtime's mutation
+    // authority, each Job's calls the oracle's (its owned paths named by
+    // this run's Job) (`gj1_inputs.rs`).
+    "screen.record",
+    // `port-forward create` and `port-forward remove`, the same way over the
+    // Swift port-forward oracle's fake: forward and reverse rules created,
+    // read back and removed, each Job's calls the oracle's
+    // (`gj1_inputs.rs`).
+    "port-forward.create",
+    "port-forward.remove",
+    // `input keyboard` (`input.keyboard@1`), after `artifact import
+    // keyboard-input`, over the same daemon. No Swift oracle records it: it
+    // is measured against the macOS Rust owner test's answers
+    // (`arkdeck-hoststore/tests/keyboard_input_run.rs`), each reply ending as
+    // there, the private text never persisted (`gj1_inputs.rs`).
+    "artifact.import.keyboard-input",
+    "input.keyboard",
     // Not `agent resume` (nor `human-action resume`), although
     // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
     // oracle's `connect` scenario: once its action resolves, a resume

@@ -25,13 +25,13 @@ use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
 /// The oracles' connect key, which the board's serial equals.
-const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+pub(crate) const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 /// The Target the oracles adopted.
-const TARGET: &str = "TGT-3ba3f5f43b92";
+pub(crate) const TARGET: &str = "TGT-3ba3f5f43b92";
 
 /// A development root holding the oracle's adopted Target, and the fake's
 /// own root, below `scratch`.
-fn roots(scratch: &Path, fixture: &Path) -> (PathBuf, PathBuf) {
+pub(crate) fn roots(scratch: &Path, fixture: &Path) -> (PathBuf, PathBuf) {
     let (root, fake_root) = (scratch.join("state"), scratch.join("fake"));
     HostDirectory::open_or_create_private(&root.join("targets-state")).unwrap();
     HostDirectory::open(&root.join("targets-state"))
@@ -47,7 +47,7 @@ fn roots(scratch: &Path, fixture: &Path) -> (PathBuf, PathBuf) {
 
 /// The calls a fake (or the oracle's driver) logged in `root`, each its
 /// arguments joined by spaces.
-fn calls(root: &Path) -> Vec<String> {
+pub(crate) fn calls(root: &Path) -> Vec<String> {
     std::fs::read_to_string(root.join("hdc-invocations.log"))
         .unwrap_or_default()
         .lines()
