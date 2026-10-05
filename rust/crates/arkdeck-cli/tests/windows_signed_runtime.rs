@@ -1430,10 +1430,13 @@ mod windows {
             "workspace preset is not registered for this project",
         );
         stop(server, &root);
-        // What this measured is what the coverage manifest counts.
+        // The development root's refusal is what this measures; the signing
+        // itself is measured over a test build's fixture signing
+        // (`arkdeck-agentd/tests/spawning/workspace_sign_leaf.rs`), so the
+        // coverage manifest counts the operation.
         assert_eq!(
             windows_statuses("workspace.sign-openharmony-hap@1"),
-            ["partial"]
+            ["implemented"]
         );
     }
 
