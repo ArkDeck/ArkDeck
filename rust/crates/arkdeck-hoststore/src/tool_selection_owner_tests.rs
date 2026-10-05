@@ -138,6 +138,15 @@ struct Fixture {
     source: Source,
     clock: Arc<AtomicU64>,
     jobs: crate::JobStore,
+    /// Dropped last, once the owner and the Job store above have closed
+    /// their files: on Windows nothing open can be removed.
+    _removed: Removed,
+}
+struct Removed(PathBuf);
+impl Drop for Removed {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 impl Fixture {
     fn new() -> Self {
@@ -196,6 +205,7 @@ impl Fixture {
                 .unwrap();
         let jobs = crate::JobStore::open_owner(&root.join("jobs")).unwrap();
         Self {
+            _removed: Removed(root.clone()),
             root,
             owner,
             registry,
@@ -235,11 +245,6 @@ impl Fixture {
     ) -> Result<Value, WireError> {
         self.owner
             .consume_interactive_challenge(&t.0, &t.1, &t.2, &self.jobs, &self.source, driver)
-    }
-}
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
     }
 }
 struct Never;

@@ -300,3 +300,34 @@ public sealed class ControlActionSignatureTests
         Assert.IsTrue(decoded >= 2, "the recorded challenge and consumed action");
     }
 }
+
+/// <summary>
+/// An agent execution's <c>nextAction</c> while its Job still runs names a <c>retryAfter</c>,
+/// which <c>agent.resume</c> publishes. <c>human-action.resume</c> answers the same projection
+/// and now admits the same <c>nextAction</c>: each recorded <c>agent.resume</c> answer of a running
+/// Job decodes as a <c>human-action.resume</c> answer (TASK-XPA-005).
+/// </summary>
+[TestClass]
+public sealed class AgentExecutionNextActionTests
+{
+    [TestMethod]
+    public void ARunningResumeDecodesAsAHumanActionResumeAnswer()
+    {
+        var decoded = 0;
+        foreach (var (method, index, line) in Corpus.Rows())
+        {
+            if (method != "agent.resume") continue;
+            var text = Encoding.UTF8.GetString(line);
+            if (!text.Contains("\"retryAfter\"", StringComparison.Ordinal)) continue;
+            var row = (JsonObject)StrictJson.Parse(Encoding.UTF8.GetBytes(text));
+            if (row["ok"] != JsonBool.True) continue;
+            var id = $"corpus-{index}";
+            var wire = new JsonObject([new("id", new JsonString(id)), new("ok", JsonBool.True), new("result", row["result"])]);
+            var response = Wire.DecodeResponse(Wire.EncodeFrame(wire, ControlContract.MaxResponseBytes).AsSpan()[..^1], id, "human-action.resume");
+            Assert.IsTrue(response.Ok, $"row {index}");
+            Assert.AreEqual(row["result"], response.Result);
+            decoded++;
+        }
+        Assert.IsTrue(decoded >= 1, "a recorded resume of a running Job");
+    }
+}

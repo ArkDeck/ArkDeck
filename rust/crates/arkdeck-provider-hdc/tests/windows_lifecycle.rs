@@ -247,6 +247,22 @@ mod windows {
         /// Every endpoint a server of this fake was started on, each asked
         /// to end when the fake is dropped, on a panic as well.
         endpoints: std::cell::RefCell<Vec<SocketAddrV4>>,
+        /// Dropped last, once the tool's handle on the copy has closed:
+        /// NTFS removes no directory holding a file still open.
+        _removed: Removed,
+    }
+
+    /// The fake's scratch directory, removed when dropped: retried while a
+    /// server that was asked to end still holds its image open.
+    struct Removed(PathBuf);
+
+    impl Drop for Removed {
+        fn drop(&mut self) {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while fs::remove_dir_all(&self.0).is_err() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        }
     }
 
     impl FakeHdc {
@@ -270,6 +286,7 @@ mod windows {
             let digest = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
             let tool = VerifiedTool::open(&path, &digest).unwrap();
             Self {
+                _removed: Removed(directory.clone()),
                 directory,
                 tool,
                 endpoints: std::cell::RefCell::default(),
@@ -323,10 +340,7 @@ mod windows {
                     stop_server(&self.directory, *endpoint);
                 }
             }
-            let deadline = Instant::now() + Duration::from_secs(10);
-            while fs::remove_dir_all(&self.directory).is_err() && Instant::now() < deadline {
-                std::thread::sleep(Duration::from_millis(50));
-            }
+            // The directory goes with `_removed`, after the tool's handle.
         }
     }
 

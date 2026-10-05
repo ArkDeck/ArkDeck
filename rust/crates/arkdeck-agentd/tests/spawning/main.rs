@@ -125,6 +125,8 @@ mod flash_socket_control;
 #[cfg(windows)]
 mod gj1_device_leaves;
 #[cfg(windows)]
+mod gj1_device_reads;
+#[cfg(windows)]
 mod gj1_inputs;
 #[cfg(windows)]
 mod gj23_replay;

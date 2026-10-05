@@ -41,6 +41,7 @@ pub enum Answers {
     DebugProbe,
     PointerInput,
     ScreenSequence,
+    TargetAdoption,
 }
 
 impl Answers {
@@ -74,6 +75,9 @@ impl Answers {
                 Self::PointerInput
             }
             line if line.starts_with("# capture.screen-sequence@1 answers") => Self::ScreenSequence,
+            line if line.starts_with("# Target adoption: the device list in the state") => {
+                Self::TargetAdoption
+            }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
     }
@@ -277,6 +281,12 @@ impl OracleFake {
         const HELPER: &str = "86497e1a8f9b586169218df912895785c1c0f2d8bb3f87b2b700f6f86264f5c1";
         let target = format!("{DIRECTORY}/libexample.so");
         let all = argv.join(" ");
+        // The Swift oracle's Jobs never listed the device; the CLI's domain
+        // leaf observes it first (`debug native deploy`), as `debug hap`
+        // does over the debug HAP table: the fixture's one target.
+        if all == "list targets -v" {
+            return Self::fixture_device(&all, mode).unwrap();
+        }
         let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
         let running = self.root.join("device-running");
         let published = self.root.join("device-published");
@@ -842,6 +852,28 @@ impl OracleFake {
     /// execution waits on (the device list offline, unauthorized or with two
     /// devices, and a Job held at its server check until `released` exists
     /// below the root), then `capture.diagnostics@1`'s table.
+    /// `target-adoption/hdc-answers.sh`: the device list in the state the
+    /// mode names (the one device unauthorized, or 1001 connected rows), else
+    /// the `capture.diagnostics@1` table it continues with.
+    fn target_adoption(argv: &[String], mode: &str) -> Answer {
+        if argv.join(" ") == "list targets -v" {
+            match mode {
+                "unauthorized" => {
+                    return Answer::out(format!("{KEY}\t\tUSB\tUnauthorized\tlocalhost\n"));
+                }
+                "tooMany" => {
+                    return Answer::out(
+                        (0..1001)
+                            .map(|row| format!("k{row:04}\t\tUSB\tConnected\tlocalhost\n"))
+                            .collect::<String>(),
+                    );
+                }
+                _ => {}
+            }
+        }
+        Self::capture_diagnostics(argv, mode)
+    }
+
     fn human_action(&self, argv: &[String], mode: &str) -> Answer {
         let all = argv.join(" ");
         if all == "list targets -v" {
@@ -1254,6 +1286,7 @@ impl HdcDispatch for OracleFake {
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
             Answers::PointerInput => Self::pointer_input(&plan.arguments, &mode),
             Answers::ScreenSequence => self.screen_sequence(&plan.arguments, &mode),
+            Answers::TargetAdoption => Self::target_adoption(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));
