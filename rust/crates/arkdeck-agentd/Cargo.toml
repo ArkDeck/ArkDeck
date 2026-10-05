@@ -33,6 +33,9 @@ arkforge-platform.workspace = true
 [target.'cfg(windows)'.dev-dependencies]
 arkdeck-cli = { path = "../arkdeck-cli" }
 arkdeck-client.workspace = true
+# The signing oracle's preset receipt, credential reference and secret
+# envelope, which the CLI's signing measurement installs as a fixture.
+arkdeck-provider-workspace.workspace = true
 
 # The daemon launches this test binary as its lane's stand-in `arkforged`,
 # which must take the daemon role before any test framework reads the
@@ -46,6 +49,12 @@ harness = false
 # the arguments.
 [[test]]
 name = "windows_workspace_provider_process"
+harness = false
+
+# The signing oracle's stand-in signer, which the signed test daemon's
+# fixture signing preset runs as its Java launcher.
+[[test]]
+name = "windows_sign_stand_in"
 harness = false
 
 [lints]

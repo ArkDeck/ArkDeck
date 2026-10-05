@@ -25,6 +25,10 @@ public partial class App : Application
 
     private Window? _window;
 
+    /// <summary>A Trace file to open at launch: the packaged App's file activation, else the
+    /// command line's (an unpackaged "Open with").</summary>
+    public static string? TraceFile { get; private set; }
+
     public App()
     {
         Options = LaunchOptions.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray());
@@ -40,6 +44,25 @@ public partial class App : Application
         Preferences = new AppPreferences(Options.PreferencesRoot ?? AppPreferences.DefaultDirectory);
         InitializeComponent();
 
+    }
+
+    private static string? ActivatedTraceFile()
+    {
+        try
+        {
+            var activated = Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs();
+            if (activated.Kind == Microsoft.Windows.AppLifecycle.ExtendedActivationKind.File
+                && activated.Data is Windows.ApplicationModel.Activation.IFileActivatedEventArgs files
+                && files.Files.Count > 0 && files.Files[0] is Windows.Storage.IStorageItem item
+                && LaunchOptions.TraceExtensions.Contains(Path.GetExtension(item.Path).ToLowerInvariant()))
+            {
+                return item.Path;
+            }
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+        }
+        return null;
     }
 
     /// <summary>Test runs only (<c>--high-contrast-tokens</c>): every ArkDeck token takes its
@@ -63,6 +86,7 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         if (Options.HighContrastTokens) UseHighContrastTokens();
+        TraceFile = ActivatedTraceFile() ?? Options.TraceFile;
         _window = new MainWindow();
         _window.Activate();
     }

@@ -53,6 +53,8 @@ pub use crash_symbolizer::{SymbolizeError, symbolize_crash};
 mod workspace_signing;
 #[cfg(any(target_os = "macos", windows))]
 pub use workspace_signing::SigningSetup;
+#[cfg(windows)]
+pub use workspace_signing::fixture_signing;
 #[cfg(any(target_os = "macos", windows))]
 pub use workspace_signing::{credential_pinning, keychain_credential_pinning};
 #[cfg(any(target_os = "macos", windows))]

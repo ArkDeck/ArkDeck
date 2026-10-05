@@ -74,7 +74,13 @@ public sealed partial class MainWindow : Window
 
         Inspector = new JobInspector();
         InspectorHost.Child = Inspector;
-        Root.Loaded += (_, _) => Select(App.Options.StartPage ?? "overview");
+        InstallCommands();
+        StartLiveObservation();
+        Root.Loaded += async (_, _) =>
+        {
+            Select(App.Options.StartPage ?? App.Preferences.LastPage ?? "overview");
+            if (App.TraceFile is { } trace) await OpenTraceFileAsync(trace);
+        };
     }
 
     public static MainWindow Instance { get; private set; } = null!;
@@ -180,6 +186,163 @@ public sealed partial class MainWindow : Window
         ContinuationHost.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    // ---- the Device section's rows (macOS deviceRows) and the live observation ----
+
+    private readonly List<NavigationViewItem> _deviceRows = [];
+    private bool _observing;
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _liveObservation;
+
+    /// <summary>
+    /// One sidebar row per device the latest observation lists, under Device (macOS
+    /// <c>deviceRows</c>): its name and state; choosing it opens that device's detail. A row is a
+    /// navigation destination, never an implicit Target scope. An unreadable list keeps no rows.
+    /// </summary>
+    public void ShowDevices(Loaded<IReadOnlyList<DeviceCandidate>> devices)
+    {
+        var candidates = devices.Value ?? [];
+        var aliases = App.Preferences.DeviceAliases;
+        var keys = candidates.Select(c => "device:" + c.CandidateKey).ToArray();
+        foreach (var row in _deviceRows.Where(r => !keys.Contains((string)r.Tag)).ToArray())
+        {
+            if (ReferenceEquals(NavView.SelectedItem, row)) NavView.SelectedItem = NavDevice;
+            NavView.MenuItems.Remove(row);
+            _deviceRows.Remove(row);
+        }
+        var index = NavView.MenuItems.IndexOf(NavDevice);
+        foreach (var candidate in candidates)
+        {
+            var tag = "device:" + candidate.CandidateKey;
+            var state = candidate.StateKey is { } key ? S.Text(key) : candidate.AuthorizationState;
+            var title = DeviceTrust.Title(candidate, aliases);
+            var row = _deviceRows.FirstOrDefault(r => (string)r.Tag == tag);
+            if (row is null)
+            {
+                row = new NavigationViewItem { Tag = tag, Icon = new FontIcon { Glyph = "\uE8EA" } };
+                AutomationProperties.SetAutomationId(row, "app.navigation.device." + candidate.CandidateKey);
+                _deviceRows.Add(row);
+            }
+            row.Content = $"{title} · {state}";
+            AutomationProperties.SetName(row, $"{title}, {state}");
+            var at = ++index;
+            if (!NavView.MenuItems.Contains(row)) NavView.MenuItems.Insert(at, row);
+            else if (NavView.MenuItems.IndexOf(row) != at)
+            {
+                NavView.MenuItems.Remove(row);
+                NavView.MenuItems.Insert(at, row);
+            }
+        }
+    }
+
+    /// <summary>
+    /// macOS <c>startLiveObservation</c>: the device observation read again every ten seconds
+    /// while the App runs, so a device that goes away leaves the sidebar (and the Device page, if
+    /// shown) at once. A slow read delays the next tick instead of stacking requests. Scripted
+    /// test runs observe only when they ask (<c>--live-observation-ms</c>).
+    /// </summary>
+    private void StartLiveObservation()
+    {
+        var interval = App.Options.LiveObservationMilliseconds ?? (App.Options.TestTransport is null ? 10_000 : (int?)null);
+        if (interval is not { } milliseconds) return;
+        // Held in a field: an unreferenced timer is collected and stops ticking.
+        var timer = _liveObservation = DispatcherQueue.CreateTimer();
+        timer.Interval = TimeSpan.FromMilliseconds(milliseconds);
+        timer.Tick += async (_, _) =>
+        {
+            if (_observing) return;
+            _observing = true;
+            try
+            {
+                if (PageHost.Content is DevicePage device)
+                {
+                    await device.RefreshAsync();
+                    return;
+                }
+                var devices = await Task.Run(() => App.Loader.DeviceCandidatesAsync());
+                ShowDevices(devices);
+            }
+            finally
+            {
+                _observing = false;
+            }
+        };
+        timer.Start();
+    }
+
+    /// <summary>
+    /// The macOS keyboard commands (<c>WorkspaceKeyboardCommands</c> and the Trace menu):
+    /// Ctrl+F finds the current page's search field, Ctrl+R (and F5) re-reads the page, Ctrl+N
+    /// opens Trace to capture, Ctrl+Shift+O opens a Trace file, Ctrl+Shift+R reloads it.
+    /// </summary>
+    private void InstallCommands()
+    {
+        void Add(Windows.System.VirtualKey key, Windows.System.VirtualKeyModifiers modifiers, Func<Task> run)
+        {
+            var accelerator = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = key, Modifiers = modifiers };
+            accelerator.Invoked += async (_, args) =>
+            {
+                args.Handled = true;
+                await run();
+            };
+            Root.KeyboardAccelerators.Add(accelerator);
+        }
+        const Windows.System.VirtualKeyModifiers ctrl = Windows.System.VirtualKeyModifiers.Control;
+        const Windows.System.VirtualKeyModifiers ctrlShift = Windows.System.VirtualKeyModifiers.Control | Windows.System.VirtualKeyModifiers.Shift;
+        Add(Windows.System.VirtualKey.F, ctrl, () =>
+        {
+            FocusSearch();
+            return Task.CompletedTask;
+        });
+        Add(Windows.System.VirtualKey.R, ctrl, RefreshPageAsync);
+        Add(Windows.System.VirtualKey.F5, Windows.System.VirtualKeyModifiers.None, RefreshPageAsync);
+        Add(Windows.System.VirtualKey.N, ctrl, () =>
+        {
+            Select("trace");
+            return Task.CompletedTask;
+        });
+        Add(Windows.System.VirtualKey.O, ctrlShift, async () => await TraceViewer().ChooseTraceAsync());
+        Add(Windows.System.VirtualKey.R, ctrlShift, async () =>
+        {
+            Select("traceViewer");
+            await TraceViewer().ReloadTraceAsync();
+        });
+    }
+
+    private async Task RefreshPageAsync()
+    {
+        if (PageHost.Content is IRefreshable page) await page.RefreshAsync();
+    }
+
+    /// <summary>Focus moves to the current page's search field (an element whose id ends in
+    /// <c>.search</c>), if it has one.</summary>
+    private void FocusSearch()
+    {
+        static Control? Find(DependencyObject node)
+        {
+            for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(node); i++)
+            {
+                var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(node, i);
+                if (child is TextBox box && AutomationProperties.GetAutomationId(box).EndsWith(".search", StringComparison.Ordinal)) return box;
+                if (Find(child) is { } found) return found;
+            }
+            return null;
+        }
+        if (PageHost.Content is DependencyObject page && Find(page) is { } search) search.Focus(FocusState.Keyboard);
+    }
+
+    private TraceViewerPage TraceViewer()
+    {
+        if (!_pages.TryGetValue("traceViewer", out var page)) _pages["traceViewer"] = page = new TraceViewerPage();
+        return (TraceViewerPage)page;
+    }
+
+    /// <summary>A Trace file Windows handed the App, shown in the Trace viewer.</summary>
+    public async Task OpenTraceFileAsync(string path)
+    {
+        var viewer = TraceViewer();
+        if (!ReferenceEquals(PageHost.Content, viewer)) Select("traceViewer");
+        await viewer.OpenFileAsync(path);
+    }
+
     /// <summary>Settings, on one of its tabs (the remote browser's Open Server Settings).</summary>
     public void OpenSettings(string tab)
     {
@@ -191,6 +354,11 @@ public sealed partial class MainWindow : Window
 
     public void Select(string tag)
     {
+        if (tag.StartsWith("device:", StringComparison.Ordinal) && _deviceRows.FirstOrDefault(r => (string)r.Tag == tag) is { } row)
+        {
+            NavView.SelectedItem = row;
+            return;
+        }
         foreach (var item in NavView.MenuItems.Concat(NavView.FooterMenuItems).OfType<NavigationViewItem>())
         {
             if ((string)item.Tag == tag)
@@ -297,6 +465,15 @@ public sealed partial class MainWindow : Window
     {
         if (args.SelectedItem is not NavigationViewItem item) return;
         var tag = (string)item.Tag;
+        App.Preferences.LastPage = tag;
+        // A device row opens the Device page on that device's detail.
+        var deviceKey = tag.StartsWith("device:", StringComparison.Ordinal) ? tag["device:".Length..] : null;
+        if (deviceKey is not null || tag == "device")
+        {
+            if (!_pages.TryGetValue("device", out var devicePage)) _pages["device"] = devicePage = CreatePage("device");
+            ((DevicePage)devicePage).ShowCandidate(deviceKey);
+            tag = "device";
+        }
         if (!_pages.TryGetValue(tag, out var page))
         {
             page = CreatePage(tag);

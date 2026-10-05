@@ -6534,4 +6534,104 @@ SHA-256：%4$@</value>
     <value>在文件资源管理器中显示</value>
     <comment>windows.settings.diagnostics.reveal (Windows only)</comment>
   </data>
+  <data name="windows_traceViewer_nothingToReload" xml:space="preserve">
+    <value>没有打开的 Trace 可重新载入。</value>
+    <comment>windows.traceViewer.nothingToReload (Windows only)</comment>
+  </data>
+  <data name="app_devices_gone" xml:space="preserve">
+    <value>设备已不在候选列表</value>
+    <comment>app.devices.gone (Localizable.xcstrings)</comment>
+  </data>
+  <data name="app_devices_goneDetail" xml:space="preserve">
+    <value>该设备已离开候选列表——可能已拔出。可从其他行重新检测，或重新连接设备。</value>
+    <comment>app.devices.goneDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_action_beginWait" xml:space="preserve">
+    <value>开始等待授权</value>
+    <comment>device.action.beginWait (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_action_retryWait" xml:space="preserve">
+    <value>重试：开始等待授权</value>
+    <comment>device.action.retryWait (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_factsTitle" xml:space="preserve">
+    <value>Runtime 事实</value>
+    <comment>device.detail.factsTitle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_recheckNote" xml:space="preserve">
+    <value>等待与重新检测会刷新带时间的最新 HDC 观测；不向设备发送任何内容，可随时重复。</value>
+    <comment>device.detail.recheckNote (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_statusTitle" xml:space="preserve">
+    <value>当前状态与操作</value>
+    <comment>device.detail.statusTitle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_title" xml:space="preserve">
+    <value>设备授权 — %@</value>
+    <comment>device.detail.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_fact_liveProvenance" xml:space="preserve">
+    <value>设备信息由 HDC 直接读取；无法读取的字段使用最近一次成功的 observe.device@1 结果。此读取不会更改目标绑定。</value>
+    <comment>device.fact.liveProvenance (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_fact_state" xml:space="preserve">
+    <value>报告状态</value>
+    <comment>device.fact.state (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_authorizedUnadopted" xml:space="preserve">
+    <value>已授权。该设备尚未被接管为持久目标。</value>
+    <comment>device.trust.authorizedUnadopted (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_offline" xml:space="preserve">
+    <value>设备报告离线。请检查 USB 连接后重新检测。</value>
+    <comment>device.trust.offline (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_ready" xml:space="preserve">
+    <value>已授权且已接管——设备就绪。</value>
+    <comment>device.trust.ready (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_step1" xml:space="preserve">
+    <value>解锁设备屏幕；</value>
+    <comment>device.trust.step1 (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_step2" xml:space="preserve">
+    <value>在设备弹出的「是否信任此计算机？」中选择 信任 或 始终信任；</value>
+    <comment>device.trust.step2 (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_step3" xml:space="preserve">
+    <value>ArkDeck 将自动检测授权结果：有界等待重复读取设备状态，不反复弹通知。</value>
+    <comment>device.trust.step3 (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_stepsTitle" xml:space="preserve">
+    <value>在设备上</value>
+    <comment>device.trust.stepsTitle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_unknownState" xml:space="preserve">
+    <value>工具报告了未识别的状态：%@。按原文展示，不做解读。</value>
+    <comment>device.trust.unknownState (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_waiting" xml:space="preserve">
+    <value>设备报告未授权：尚未信任本机。</value>
+    <comment>device.trust.waiting (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_wait_polling" xml:space="preserve">
+    <value>等待设备端确认…</value>
+    <comment>device.wait.polling (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_wait_timedOut" xml:space="preserve">
+    <value>设备授权已超时。请检查设备的 USB 调试开关后重试。若重试无效，重启共享 HDC server 是独立且需显式确认的一步——会影响 DevEco 与所有已连接设备。</value>
+    <comment>device.wait.timedOut (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_wait_unavailable" xml:space="preserve">
+    <value>无法检查设备授权。%@</value>
+    <comment>device.wait.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_device_alias_clear" xml:space="preserve">
+    <value>使用设备自己的名称</value>
+    <comment>windows.device.alias.clear (Windows only)</comment>
+  </data>
+  <data name="windows_device_wait_until" xml:space="preserve">
+    <value>（至 %@）</value>
+    <comment>windows.device.wait.until (Windows only)</comment>
+  </data>
 </root>

@@ -400,6 +400,13 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "job.wait",
     "job.cancel",
     "job.reconcile",
+    // The Job archive (#2468): a quiescent Job previewed, a stale review
+    // refused, archived with its Session published and the publication
+    // finished again, against the macOS Rust Runtime's recorded answers (no
+    // Swift oracle records it), through the real CLI and the signed test
+    // daemon (`arkdeck-agentd/tests/spawning/job_archive_cli.rs`).
+    "job.archive.preview",
+    "job.archive.apply",
     // The agent execution and human-action owners over Swift's
     // physical-assistance records (TASK-XPA-005). Not `agent run`, `agent
     // resume` or `human-action resume`; `agent abandon` is counted. See the
@@ -464,6 +471,11 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // through the real CLI against the same signed test daemon, every answer
     // and the fake's reads Swift's (`gj1_device_reads.rs`).
     "trace.probe",
+    // A candidate's display name, set and cleared in the composed Target
+    // observation owner's current observation (TASK-XPA-005), by the real
+    // CLI against the same signed test daemon (`gj1_device_reads.rs`).
+    "device.display-name.set",
+    "device.display-name.clear",
     // The registered Windows HDC's lifecycle (CHG-2026-078, TASK-XPA-005):
     // its status, a restart's impact preview, the restart's approval request
     // and, approved at a real console, the restart itself, then its control
@@ -511,6 +523,34 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "diagnostics.session.status",
     "diagnostics.session.mark",
     "diagnostics.session.stop",
+    // GJ-1's pointer inputs (TASK-XPA-005): `input tap`, `input long-press`
+    // and `input swipe` over the same daemon with the Swift pointer-input
+    // oracle's fake, every case the oracle recorded sent in its order: each
+    // Job ends in the oracle's state after exactly the oracle's calls, each
+    // refusal is the oracle's, and the standing capabilities left are the
+    // oracle's (`arkdeck-agentd/tests/spawning/gj1_inputs.rs`).
+    "input.tap",
+    "input.long-press",
+    "input.swipe",
+    // `screen record` (`capture.screen-sequence@1`), the same way over the
+    // Swift screen-sequence oracle's fake: the frames written, archived,
+    // read back, received and removed under the Runtime's mutation
+    // authority, each Job's calls the oracle's (its owned paths named by
+    // this run's Job) (`gj1_inputs.rs`).
+    "screen.record",
+    // `port-forward create` and `port-forward remove`, the same way over the
+    // Swift port-forward oracle's fake: forward and reverse rules created,
+    // read back and removed, each Job's calls the oracle's
+    // (`gj1_inputs.rs`).
+    "port-forward.create",
+    "port-forward.remove",
+    // `input keyboard` (`input.keyboard@1`), after `artifact import
+    // keyboard-input`, over the same daemon. No Swift oracle records it: it
+    // is measured against the macOS Rust owner test's answers
+    // (`arkdeck-hoststore/tests/keyboard_input_run.rs`), each reply ending as
+    // there, the private text never persisted (`gj1_inputs.rs`).
+    "artifact.import.keyboard-input",
+    "input.keyboard",
     // Not `agent resume` (nor `human-action resume`), although
     // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
     // oracle's `connect` scenario: once its action resolves, a resume
@@ -598,9 +638,7 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
     // a release-candidate package tree registered, inspected, listed and
     // retired as a daemon Bundle, and a DevEco toolchain's inspection,
-    // listing and retirement. Not `runtime tool register` (an HDC is not
-    // registered until a Windows HDC tuple is, CHG-2026-078) nor `runtime
-    // tool select`, which has nothing to select.
+    // listing and retirement. `runtime tool register` is measured below.
     "runtime.bundle.register",
     "runtime.bundle.inspect",
     "runtime.bundle.list",
@@ -608,6 +646,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "runtime.tool.list",
     "runtime.tool.inspect",
     "runtime.tool.remove",
+    // `runtime tool register`: the DevEco kind as above, and the HDC kind
+    // over the account daemon's composition, an hdc.exe a tuple names
+    // registered beside its selection and one no tuple names refused
+    // (TASK-XPA-012; `arkdeck-agentd/tests/spawning/account_tool_selection.rs`).
+    // Not `runtime tool select`: its impact reads the managed server's health
+    // through the HDC lifecycle owner, which no Windows composition proves
+    // healthy yet (#2501), so it answers only a drifted action.
+    "runtime.tool.register",
     // A diagnostics capture's Artifacts the macOS Runtime recorded, exported
     // (`windows_diagnostics_export_process.rs`).
     "diagnostics.export",
@@ -647,6 +693,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // preset, reaching the project's `ohpm` dependencies through the in-tree
     // junctions the copy recreates (the same live test).
     "workspace.test",
+    // The signing of a HAP through a registered signing preset pinning the
+    // host's registered DevEco Studio (TASK-XPA-011), through the real CLI
+    // against the signed test daemon over a fixture's signing (its preset
+    // store and Credential Manager's `ArkDeck-fixture/` scope, a test build's
+    // input alone) and the Swift oracle's stand-in signer
+    // (`tests/spawning/workspace_sign_leaf.rs`, run with
+    // `ARKDECK_LIVE_DEVECO_ROOT`).
+    "workspace.sign",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test

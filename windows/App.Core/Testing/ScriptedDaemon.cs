@@ -58,6 +58,10 @@ public static partial class ScriptedDaemon
 
     public const string OlderCursor = "c-older-1";
 
+    /// <summary><see cref="Jobs"/>, with the unauthorized candidate (<c>fixture-serial-2</c>)
+    /// trusting this computer at the fourth <c>device.observations</c> read.</summary>
+    public const string Trust = "trust";
+
     /// <summary>A Flash of <see cref="Recovery"/> whose outcome stays unknown, superseded by a
     /// later confirmed recovery epoch (so it needs no one now).</summary>
     public const string SupersededJobId = "job-0000000000000000000000000000a0f4";
@@ -82,7 +86,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue, Trust];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -183,6 +187,7 @@ public static partial class ScriptedDaemon
                 Recovery => Jobs,
                 History => Jobs,
                 Continue => Jobs,
+                Trust => Jobs,
                 Outage => connection <= 7 ? Foundation : Unavailable,
                 _ => scenario,
             };
@@ -242,7 +247,7 @@ public static partial class ScriptedDaemon
                 _ => (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
-                    "device.observations" => Success(request, Parse(Observations)),
+                    "device.observations" => Success(request, Parse(ObservationsNow())),
                     "job.list" => Success(request, Parse(JobPage([.. DebugJobRows(), .. JobsNow().Select(j => JobJson(j, list: true))]))),
                     "job.status" => JobStatus(request),
                     "job.events" => JobEvents(request),
@@ -266,6 +271,18 @@ public static partial class ScriptedDaemon
                     _ => Failure(request, "rejected", "not scripted"),
                 },
             };
+        }
+
+        private int _observationReads;
+
+        /// <summary><see cref="Trust"/>: the unauthorized candidate trusts this computer at the
+        /// fourth read of the observation.</summary>
+        private string ObservationsNow()
+        {
+            _observationReads++;
+            return scenario == Trust && _observationReads > 3
+                ? Observations.Replace("\"authorizationState\":\"Unauthorized\"", "\"authorizationState\":\"Connected\"", StringComparison.Ordinal)
+                : Observations;
         }
 
         private (string Id, string Operation, string State, string Created)[] JobsNow() => scenario == Continue ? [.. ContinueJobs, .. _continued] :

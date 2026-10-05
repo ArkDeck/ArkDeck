@@ -83,6 +83,32 @@ fn conflict(message: impl Into<String>) -> WireError {
 
 /// [`credential_pinning`] over the installed daemon's secret source: the
 /// Data Protection Keychain bound to `daemon_executable`'s code identity.
+/// Signing over a fixture scope of Credential Manager
+/// (`KeychainItems::fixture_namespace`: target names under
+/// `ArkDeck-fixture/<namespace>/`, apart from every production name), bound
+/// to no daemon identity: the preset store at `store_root` and the attempts
+/// below `attempts_root`, releasing the pins no preset carries at start-up.
+/// A Windows test build's composition only; the production daemon composes
+/// [`SigningSetup::keychain`].
+#[cfg(windows)]
+pub fn fixture_signing(
+    store_root: PathBuf,
+    attempts_root: PathBuf,
+    namespace: &str,
+) -> Result<(SigningSetup, WorkspaceCredentialPinning), String> {
+    let secrets = || {
+        arkdeck_platform::KeychainItems::fixture_namespace(
+            arkdeck_provider_workspace::signing_preset::KEYCHAIN_SERVICE,
+            namespace,
+        )
+        .map(KeychainSigningSecrets::over)
+        .map_err(|error| error.to_string())
+    };
+    let setup = SigningSetup::with_secrets(store_root.clone(), attempts_root, Box::new(secrets()?))
+        .releasing_orphaned_owners();
+    Ok((setup, credential_pinning(store_root, Box::new(secrets()?))))
+}
+
 pub fn keychain_credential_pinning(
     store_root: PathBuf,
     daemon_executable: PathBuf,

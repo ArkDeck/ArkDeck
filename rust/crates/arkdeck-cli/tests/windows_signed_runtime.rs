@@ -1277,9 +1277,11 @@ mod windows {
     /// no signing. `operation list` reports the operation unavailable with
     /// its reason, `workspace preset register --kind signing` is refused
     /// before anything is written, and the leaf itself is refused before
-    /// admission with nothing dispatched. The leaf stays Windows `partial`:
-    /// only an installed daemon signs, over the account's own preset root
-    /// and Credential Manager, which no test here touches.
+    /// admission with nothing dispatched. The leaf's signing itself is
+    /// measured over a test build's fixture signing
+    /// (`arkdeck-agentd/tests/spawning/workspace_sign_leaf.rs`); only an
+    /// installed daemon signs over the account's own preset root and
+    /// Credential Manager, which no test touches.
     fn workspace_sign_is_unavailable_on_a_development_root(thumbprint: &str) {
         let directory = Directory::new();
         let (daemon, pin) = signed_copy(
@@ -1428,10 +1430,13 @@ mod windows {
             "workspace preset is not registered for this project",
         );
         stop(server, &root);
-        // What this measured is what the coverage manifest counts.
+        // The development root's refusal is what this measures; the signing
+        // itself is measured over a test build's fixture signing
+        // (`arkdeck-agentd/tests/spawning/workspace_sign_leaf.rs`), so the
+        // coverage manifest counts the operation.
         assert_eq!(
             windows_statuses("workspace.sign-openharmony-hap@1"),
-            ["partial"]
+            ["implemented"]
         );
     }
 

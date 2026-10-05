@@ -69,6 +69,28 @@ public sealed class SettingsLocalTests
     }
 
     [TestMethod]
+    public void ATraceFileOnTheCommandLineIsOpenedAndThePageIsRemembered()
+    {
+        Assert.AreEqual(@"C:\t\a.htrace", LaunchOptions.Parse([@"C:\t\a.htrace"]).TraceFile);
+        Assert.AreEqual(@"C:\t\b.SYSTRACE", LaunchOptions.Parse(["--language", "en-US", @"C:\t\b.SYSTRACE"]).TraceFile);
+        Assert.IsNull(LaunchOptions.Parse([@"C:\t\notes.txt"]).TraceFile);
+        Assert.IsNull(LaunchOptions.Parse(["--cache-root", @"C:\t\x.trace"]).TraceFile, "an option's value is not a file to open");
+
+        var root = Directory.CreateTempSubdirectory("arkdeck-preferences-").FullName;
+        try
+        {
+            var preferences = new AppPreferences(root) { Icon = AppIconChoice.Keycap };
+            Assert.IsNull(preferences.LastPage);
+            preferences.LastPage = "history";
+            Assert.AreEqual(("history", AppIconChoice.Keycap), (new AppPreferences(root).LastPage, new AppPreferences(root).Icon), "each value keeps the other");
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [TestMethod]
     public void OnlyATestTransportRunAnswersAPickerWithoutADialog()
     {
         Assert.IsNull(LaunchOptions.Parse(["--pick-folder", @"C:\x"]).PickedFolder);

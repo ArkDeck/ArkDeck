@@ -49,6 +49,7 @@ dependencies = [
  "arkdeck-platform",
  "arkdeck-provider-arkforge",
  "arkdeck-provider-hdc",
+ "arkdeck-provider-workspace",
  "arkforge-ipc",
  "arkforge-platform",
  "serde",

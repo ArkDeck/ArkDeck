@@ -1638,6 +1638,31 @@ public static class UiStrings
     public const string WindowsSettingsDiagnosticsMetadataDetail = "windows.settings.diagnostics.metadataDetail";
     public const string WindowsSettingsDiagnosticsFailed = "windows.settings.diagnostics.failed";
     public const string WindowsSettingsDiagnosticsReveal = "windows.settings.diagnostics.reveal";
+    public const string WindowsTraceViewerNothingToReload = "windows.traceViewer.nothingToReload";
+    public const string AppDevicesGone = "app.devices.gone";
+    public const string AppDevicesGoneDetail = "app.devices.goneDetail";
+    public const string DeviceActionBeginWait = "device.action.beginWait";
+    public const string DeviceActionRetryWait = "device.action.retryWait";
+    public const string DeviceDetailFactsTitle = "device.detail.factsTitle";
+    public const string DeviceDetailRecheckNote = "device.detail.recheckNote";
+    public const string DeviceDetailStatusTitle = "device.detail.statusTitle";
+    public const string DeviceDetailTitle = "device.detail.title";
+    public const string DeviceFactLiveProvenance = "device.fact.liveProvenance";
+    public const string DeviceFactState = "device.fact.state";
+    public const string DeviceTrustAuthorizedUnadopted = "device.trust.authorizedUnadopted";
+    public const string DeviceTrustOffline = "device.trust.offline";
+    public const string DeviceTrustReady = "device.trust.ready";
+    public const string DeviceTrustStep1 = "device.trust.step1";
+    public const string DeviceTrustStep2 = "device.trust.step2";
+    public const string DeviceTrustStep3 = "device.trust.step3";
+    public const string DeviceTrustStepsTitle = "device.trust.stepsTitle";
+    public const string DeviceTrustUnknownState = "device.trust.unknownState";
+    public const string DeviceTrustWaiting = "device.trust.waiting";
+    public const string DeviceWaitPolling = "device.wait.polling";
+    public const string DeviceWaitTimedOut = "device.wait.timedOut";
+    public const string DeviceWaitUnavailable = "device.wait.unavailable";
+    public const string WindowsDeviceAliasClear = "windows.device.alias.clear";
+    public const string WindowsDeviceWaitUntil = "windows.device.wait.until";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3272,5 +3297,30 @@ public static class UiStrings
         WindowsSettingsDiagnosticsMetadataDetail,
         WindowsSettingsDiagnosticsFailed,
         WindowsSettingsDiagnosticsReveal,
+        WindowsTraceViewerNothingToReload,
+        AppDevicesGone,
+        AppDevicesGoneDetail,
+        DeviceActionBeginWait,
+        DeviceActionRetryWait,
+        DeviceDetailFactsTitle,
+        DeviceDetailRecheckNote,
+        DeviceDetailStatusTitle,
+        DeviceDetailTitle,
+        DeviceFactLiveProvenance,
+        DeviceFactState,
+        DeviceTrustAuthorizedUnadopted,
+        DeviceTrustOffline,
+        DeviceTrustReady,
+        DeviceTrustStep1,
+        DeviceTrustStep2,
+        DeviceTrustStep3,
+        DeviceTrustStepsTitle,
+        DeviceTrustUnknownState,
+        DeviceTrustWaiting,
+        DeviceWaitPolling,
+        DeviceWaitTimedOut,
+        DeviceWaitUnavailable,
+        WindowsDeviceAliasClear,
+        WindowsDeviceWaitUntil,
     ];
 }

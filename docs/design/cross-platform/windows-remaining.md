@@ -6,7 +6,12 @@ Source: `openspec/contracts/cli-feature-coverage.json` on `main` after #2541, #2
 `deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves);
 `device.observations`, `target.availability` and `trace.probe` (TASK-XPA-005 device reads);
 `runtime.hdc.status`, `.impact-preview`, `.restart` and `control-action.list`, `.show`,
-`.reconcile` (TASK-XPA-005, live with the registered `hdc.exe`). A feature is `implemented` on Windows only
+`.reconcile` (TASK-XPA-005, live with the registered `hdc.exe`);
+`device.display-name.set` and `.clear` (TASK-XPA-005: a defect fixed by the lead's delegated
+decision of 2026-10-05, pending the next rulings batch: the Host's candidate name owner now names a
+candidate in the composed Target observation owner's current observation);
+`workspace.sign-openharmony-hap@1` (TASK-XPA-011, live with the host's DevEco Studio, over a test
+build's fixture signing and the Swift oracle's stand-in signer). A feature is `implemented` on Windows only
 when each CLI leaf it reaches is in `WINDOWS_MEASURED_LEAVES` (a signed-CLI process test on
 Windows); a generic leaf (`agent run`, `agent resume`, `human-action resume`, `job plan|submit|run`)
 is counted only once every operation it reaches answers on Windows as Swift does (lead's ruling of
@@ -26,16 +31,13 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 
 | Feature (CLI leaf) | GJ | Class | Blocker, and the oracle that would measure it |
 | --- | --- | --- | --- |
-| `device.display-name.set`, `.clear` | 1 | ruling | No Swift oracle records them. Through the composed Target observation owner (Windows' registered tuple, macOS' development HDC alike) the Host's candidate name owner reads only the legacy provider's snapshot, which that path never retains, so both refuse with `resourceConflict` "No current observation snapshot exists" (seen through the signed CLI, `gj1_device_reads.rs`). Fixing it changes shared Host behaviour without an oracle to hold it to |
-| `input.tap@1`, `input.swipe@1`, `input.long-press@1` | 1 | now | `pointer-input` oracle; needs fake answers for it |
-| `input.keyboard@1` | 1 | now | No Swift oracle (keyboard input lands with #2473 on macOS); measure against the macOS Rust answers once it merges |
-| `capture.screen-sequence@1` (`screen record`) | 1 | now | `screen-sequence` oracle; needs fake answers |
-| `port-forward.create@1`, `.remove@1` | 1 | now | `port-forward` oracle; needs fake answers |
+| `input.tap@1`, `input.swipe@1`, `input.long-press@1` | 1 | done | Measured: every `pointer-input` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`); Windows `implemented` |
+| `input.keyboard@1` | 1 | done | Measured: `artifact import keyboard-input` and `input keyboard` through the real CLI against the macOS Rust owner test's answers (`keyboard_input_run.rs`, #2473), ported into the shared fake (`gj1_inputs.rs`); no Swift oracle exists; Windows `implemented` |
+| `capture.screen-sequence@1` (`screen record`) | 1 | done | Measured: every `screen-sequence` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`), capability names relabelled as in the GJ-2/3 replays; Windows `implemented` |
+| `port-forward.create@1`, `.remove@1` | 1 | done | Measured: every `port-forward` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`); Windows `implemented` |
 | `capture.diagnostic-session@1` | 1 | ruling | Reached through `job submit` alone (a generic leaf). Its live control `diagnostic.session.mark|status|stop` is measured over the `diagnostic-session` oracle through the real CLI (`tests/spawning/diagnostic_session_cli.rs`, TASK-XPA-005) |
-| `job.archive`, `job.archive.preview` | — | now | Composed on Windows (#2468); no Swift oracle (Swift retired), measure against the macOS Rust answers |
-| `runtime.tool.register` (`--kind hdc`), `runtime.tool.select` | 1 | now | Tuple registered (#2472), selection composed (#2524, #2541); `tool-selection-registry` oracle |
-| `workspace.continuation.run`, `.submit` | 5 | now | `workspace-continuation` oracle |
-| `workspace.sign-openharmony-hap@1` (`workspace sign`) | 5 | now | The owner replays `workspace-sign-oracle` (#2508), but the leaf is measured only as the development root's refusal: a development root composes no signing credential owner. Counting it needs the signed CLI against a dev-signed installed-mode daemon with a registered signing preset, as `workspace build` is (`windows_workspace_hvigor_live_process.rs`) |
+| `runtime.tool.select` | 1 | ruling | `runtime.tool.register` is measured (`--kind hdc` over the account composition, `tests/spawning/account_tool_selection.rs`, TASK-XPA-012). After #2501 a selection still drifts (`tool.selectionFactsUnavailable`): the server's health is proved only by the commandless identity of a registered published version (`status.rs`, `hdc.identityFamilyUnavailable` for a fixture tuple's stand-in), CHG-2026-078 registers one Windows tuple, so no second tool can be a candidate on a real host, and the approval takes a real console (#2521). Reaching `selected` needs a second registered tuple or a test identity seam |
+| `workspace.continuation.run`, `.submit` | 5 | now | `workspace-continuation` oracle. Measured on its own layer (#2577: the CLI draft needs the source Job's provider in `health`, which answered `providers: []`), but held back from the integration PR: listing the composed providers through `operation_availability` initializes host owners on the first `health`, and macOS's `check-session-resources.py` then finds its later-seeded Sessions unaccounted (candidate contract-parity lane, #2578). `health` needs the providers without that side effect |
 | `workspace.symbolize-crash@1` (`workspace symbolize`) | 5 | now | The daemon's `--symbolize-crash` mode answers the `crash-symbolizer-oracle` on Windows (#2549); the leaf reads a crash dump that a device capture published, and no Windows run publishes one yet. Measuring it needs that Artifact on the signed test daemon (a capture over the shared fake, or the `workspace-test-symbolize-oracle` root) |
 | `flash.reconcile-alias` | 4 | now | Reconciler reached by the CLI; `post-flash-alias` / `flash-host-reads` oracles, needs a fake lineage |
 | `debug.template@1`, `debug.template.run` | 2 | ruling | No Swift oracle records the `debug.template@1` Job's HDC answers; measuring needs a ruling on the reference |

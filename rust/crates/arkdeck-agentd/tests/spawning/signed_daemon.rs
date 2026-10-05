@@ -74,6 +74,12 @@ pub(crate) const CENSUS: &str = "ARKDECK_TEST_SIGNED_DAEMON_CENSUS";
 /// ring lifecycle vocabulary the oracle's producer adapted them to
 /// ([`RingVocabulary`]).
 pub(crate) const RING_VOCABULARY: &str = "ARKDECK_TEST_SIGNED_DAEMON_RING_VOCABULARY";
+/// A fixture's signing, `<preset store>|<namespace>`: the development root
+/// composes the workspace provider's signing over that preset store and the
+/// `ArkDeck-fixture/<namespace>/` scope of Credential Manager
+/// (`windows_lifecycle::TEST_SIGNING`), where the production daemon composes
+/// signing for the installed daemon only, over the account's.
+pub(crate) const SIGNING: &str = "ARKDECK_TEST_SIGNED_DAEMON_SIGNING";
 /// The child's test, by its full name.
 const CHILD: &str = "signed_daemon::the_signed_test_daemon";
 /// As `arkdeck-agentd`'s (`src/main.rs`).
@@ -105,6 +111,17 @@ fn the_signed_test_daemon() {
 fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let development = std::env::var_os("ARKDECK_DEVELOPMENT_STATE_ROOT")
         .ok_or("the signed test daemon serves a development root only")?;
+    if let Some(signing) = std::env::var_os(SIGNING) {
+        let signing = signing
+            .into_string()
+            .map_err(|_| "the fixture signing is not text")?;
+        let (store, namespace) = signing
+            .split_once('|')
+            .ok_or("the fixture signing is <preset store>|<namespace>")?;
+        windows_lifecycle::TEST_SIGNING
+            .set((PathBuf::from(store), namespace.to_owned()))
+            .map_err(|_| "the fixture signing is taken once")?;
+    }
     let windows_lifecycle::Serving {
         stop,
         listener,

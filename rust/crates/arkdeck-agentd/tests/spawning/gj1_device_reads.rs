@@ -483,3 +483,131 @@ fn the_real_cli_probes_trace_as_the_swift_oracle() {
     let _ = fs::remove_dir_all(&scratch);
     assert_windows_status(&["trace.probe"], "implemented");
 }
+
+/// `device display-name set|clear` through the composed Target observation
+/// owner, by the real CLI against the signed test daemon over the Target
+/// adoption oracle's board: a candidate is named in the current snapshot's
+/// exact observation, which advances the snapshot to the generation the name
+/// was written at; the next observation reads it back; a stale generation
+/// is refused; a clear removes it; an adopted candidate is named only
+/// through its durable Target. No Swift oracle records these leaves: the
+/// semantics are the Runtime's candidate name owner's
+/// (`TargetStore::mutate_candidate`), as the Host's provider snapshot path
+/// answers them (`host_tests.rs`).
+#[test]
+fn the_real_cli_names_and_clears_a_candidate_in_the_current_observation() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-device-names");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let fixture = fixtures("target-adoption");
+    let (root, fake_root, census) = roots(&scratch);
+    let cases: Value =
+        serde_json::from_slice(&fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+    plug(&census, 1, &cases["exchanges"][0]);
+    let daemon = SignedDaemon::start_with(
+        &executable,
+        &pin,
+        &root,
+        &fixture,
+        &fake_root,
+        &[(signed_daemon::CENSUS, census.to_str().unwrap().to_owned())],
+    );
+    let candidate = || -> (String, String, Value) {
+        let (status, candidates) = daemon.cli(&["device", "candidates"]);
+        assert_eq!(status, Some(0), "{candidates}");
+        let result = &candidates["result"];
+        let rows = result["observations"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "{candidates}");
+        (
+            rows[0]["observationId"].as_str().unwrap().to_owned(),
+            result["snapshotGeneration"].as_str().unwrap().to_owned(),
+            rows[0].clone(),
+        )
+    };
+    let name = |observation: &str, generation: &str, text: Option<&str>| {
+        let mut arguments = vec![
+            "device",
+            "display-name",
+            if text.is_some() { "set" } else { "clear" },
+            "--candidate",
+            KEY,
+            "--observation",
+            observation,
+            "--observation-generation",
+            generation,
+        ];
+        if let Some(text) = text {
+            arguments.extend(["--name", text]);
+        }
+        daemon.cli(&arguments)
+    };
+    let (observation, generation, row) = candidate();
+    assert_eq!(row["displayName"], Value::Null, "{row}");
+    assert_eq!(row["adoptedTargetId"], Value::Null, "{row}");
+    let first: u64 = generation.parse().unwrap();
+
+    // Named in the exact observation: the name is written at the next
+    // generation, which the next observation keeps and reads back.
+    let (status, named) = name(&observation, &generation, Some("Bench DAYU200"));
+    assert_eq!(status, Some(0), "{named}");
+    let answer = &named["result"];
+    assert_eq!(answer["schemaVersion"], "arkdeck.candidate-display-name/1");
+    assert_eq!(answer["candidateKey"], KEY);
+    assert_eq!(answer["observationId"], observation.as_str());
+    assert_eq!(answer["generation"], (first + 1).to_string(), "{named}");
+    assert_eq!(answer["name"], "Bench DAYU200");
+    let (again, generation, row) = candidate();
+    assert_eq!(again, observation, "the same physical observation");
+    assert_eq!(generation, (first + 1).to_string(), "{row}");
+    assert_eq!(row["displayName"], "Bench DAYU200", "{row}");
+    assert_eq!(row["displayNameGeneration"], generation.as_str());
+
+    // A stale generation names nothing.
+    let (status, stale) = name(&observation, &first.to_string(), Some("Other"));
+    assert_eq!(status, Some(65), "{stale}");
+    assert_eq!(stale["error"]["code"], "resourceConflict", "{stale}");
+    assert_eq!(
+        stale["error"]["details"]["phase"],
+        "candidateDisplayNameOwner"
+    );
+    assert_eq!(stale["error"]["details"]["newDispatchCount"], 0);
+    assert_eq!(candidate().2["displayName"], "Bench DAYU200");
+
+    // Cleared in the current observation.
+    let (status, cleared) = name(&observation, &generation, None);
+    assert_eq!(status, Some(0), "{cleared}");
+    assert_eq!(cleared["result"]["name"], Value::Null, "{cleared}");
+    let (_, generation, row) = candidate();
+    assert_eq!(generation, (first + 2).to_string(), "{row}");
+    assert_eq!(row["displayName"], Value::Null, "{row}");
+
+    // Adopted, the candidate is named only through its Target.
+    let (status, adopted) = daemon.cli(&[
+        "target",
+        "adopt",
+        "--candidate",
+        KEY,
+        "--observation",
+        &observation,
+        "--observation-generation",
+        &generation,
+    ]);
+    assert_eq!(status, Some(0), "{adopted}");
+    let (_, generation, row) = candidate();
+    assert_eq!(row["adoptedTargetId"], TARGET, "{row}");
+    let (status, refused) = name(&observation, &generation, Some("Bench DAYU200"));
+    assert_eq!(status, Some(65), "{refused}");
+    assert_eq!(refused["error"]["code"], "resourceConflict", "{refused}");
+    assert_eq!(
+        refused["error"]["message"],
+        "Candidate is already adopted; use its durable target"
+    );
+    daemon.stop();
+    let _ = fs::remove_dir_all(&scratch);
+    assert_windows_status(
+        &["device.display-name.set", "device.display-name.clear"],
+        "implemented",
+    );
+}

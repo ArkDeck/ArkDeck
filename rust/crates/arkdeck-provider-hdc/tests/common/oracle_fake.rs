@@ -5,8 +5,13 @@
 //! oracle's own (`flash-host-facts/hdc-answers.sh`), and `observe.device@1`'s
 //! and `capture.diagnostics@1`'s (`ArkDeckFakeHDCFixture`'s tables, and the
 //! read, file and Trace legs' fragments), the Debug probe oracle's
-//! (`debug-probe/hdc-answers.sh`), the Target adoption oracle's and the Trace
-//! probe oracle's are ported here, case for case and in
+//! (`debug-probe/hdc-answers.sh`), the Target adoption oracle's, the Trace
+//! probe oracle's, the GJ-1 pointer inputs'
+//! (`pointer-input/hdc-answers.sh`), screen record's
+//! (`screen-sequence/hdc-answers.sh`) and the port forwards'
+//! (`port-forward/hdc-answers.sh`) are ported here, with the keyboard
+//! input's synthetic answers of the macOS Rust owner test, which no Swift
+//! oracle records, case for case and in
 //! their order, over the same root: the call log the driver
 //! appends to (`hdc-invocations.log`, U+001F after every argument), the mode
 //! file it reads (`hdc-mode`), and the device state it keeps as marker files.
@@ -38,6 +43,10 @@ pub enum Answers {
     TraceLegs,
     HumanAction,
     DebugProbe,
+    PointerInput,
+    ScreenSequence,
+    PortForward,
+    KeyboardInput,
     TargetAdoption,
     TraceProbe,
 }
@@ -69,6 +78,14 @@ impl Answers {
             line if line.starts_with("# debug.probe and debug.template.run answers") => {
                 Self::DebugProbe
             }
+            line if line.starts_with("# input.tap@1, input.long-press@1 and input.swipe@1") => {
+                Self::PointerInput
+            }
+            line if line.starts_with("# capture.screen-sequence@1 answers") => Self::ScreenSequence,
+            line if line.starts_with("# port-forward.create@1 and port-forward.remove@1") => {
+                Self::PortForward
+            }
+            line if line.starts_with("# input.keyboard@1 answers") => Self::KeyboardInput,
             line if line.starts_with("# Target adoption: the device list in the state") => {
                 Self::TargetAdoption
             }
@@ -93,6 +110,9 @@ struct Answer {
     stdout: Vec<u8>,
     stderr: Vec<u8>,
     unobservable: Option<String>,
+    /// A plan the dispatch refuses before any child runs
+    /// (`DispatchFailure::Refused`).
+    declined: Option<String>,
 }
 
 impl Answer {
@@ -105,6 +125,7 @@ impl Answer {
             stdout,
             stderr: Vec::new(),
             unobservable: None,
+            declined: None,
         }
     }
     fn exit(status: i32) -> Self {
@@ -113,6 +134,7 @@ impl Answer {
             stdout: Vec::new(),
             stderr: Vec::new(),
             unobservable: None,
+            declined: None,
         }
     }
     /// Exits `status` after printing `stdout`.
@@ -129,6 +151,14 @@ impl Answer {
             stdout: Vec::new(),
             stderr: stderr.into().into_bytes(),
             unobservable: None,
+            declined: None,
+        }
+    }
+    /// The dispatch's refusal of the plan: no child ran.
+    fn declined(reason: impl Into<String>) -> Self {
+        Self {
+            declined: Some(reason.into()),
+            ..Self::exit(0)
         }
     }
     fn unregistered() -> Self {
@@ -1260,6 +1290,295 @@ impl OracleFake {
     }
 }
 
+impl OracleFake {
+    /// `pointer-input/hdc-answers.sh`: the fixture's device and the pointer
+    /// gestures `uinput` injects, by mode: a tap's click, a long press's touch
+    /// down and up, a swipe's move, each followed by `uinput`'s boundary
+    /// hint; a refusal (`rejected`), nothing (`silent`) or another gesture's
+    /// echo (`otherGesture`) in place of any of them.
+    fn pointer_input(argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        if !all.starts_with(&format!("-t {KEY} shell uinput ")) {
+            return Answer::unregistered();
+        }
+        match mode {
+            "rejected" => return Answer::out("parameter error, unable to run\n"),
+            "silent" => return Answer::exit(0),
+            "otherGesture" => {
+                return Answer::out("startX:100, startY:2200, endX:100, endY:1200\n");
+            }
+            _ => {}
+        }
+        // `shift 4`, and `shift 2` past a display (`-D <id>`): `$1` is then
+        // `-T`, `$2` the gesture.
+        let mut rest = &argv[4..];
+        if rest.first().map(String::as_str) == Some("-D") {
+            rest = rest.get(2..).unwrap_or_default();
+        }
+        let arg = |n: usize| rest.get(n - 1).map(String::as_str).unwrap_or_default();
+        let gesture = match arg(2) {
+            "-c" => format!(
+                "   click coordinate: ({}, {})\nclick interval time: 100ms\n",
+                arg(3),
+                arg(4)
+            ),
+            "-d" => format!(
+                "touch down {} {}\ntouch up {} {}\n",
+                arg(3),
+                arg(4),
+                arg(8),
+                arg(9)
+            ),
+            "-m" => format!(
+                "startX:{}, startY:{}, endX:{}, endY:{}\n",
+                arg(3),
+                arg(4),
+                arg(5),
+                arg(6)
+            ),
+            _ => String::new(),
+        };
+        Answer::out(
+            gesture
+                + "If the command does not work as expected, check whether the specified \
+                   coordinates exceed the screen boundary\n",
+        )
+    }
+}
+
+impl OracleFake {
+    /// `screen-sequence/hdc-answers.sh`: the fixture's device, the free space
+    /// under `/data/local/tmp` (`lowStorage` short of it), and a sequence's
+    /// frame directory, stills, archive, readback, receive and cleanup, kept
+    /// in the fake's `device-tmp`, by mode: a frame directory left with a
+    /// stray file (`residue`), a second still that fails (`gap`), an archive
+    /// that cannot be written (`missingArchive`) or is empty
+    /// (`emptyArchive`).
+    fn screen_sequence(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        let shell = format!("-t {KEY} shell ");
+        let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        if all == format!("{shell}df -k /data/local/tmp") {
+            let available = if mode == "lowStorage" {
+                "16"
+            } else {
+                "1047552"
+            };
+            return Answer::out(format!(
+                "Filesystem 1K-blocks Used Available Use% Mounted on\n\
+                 /dev/block/data 1048576 1024 {available} 1% /data\n"
+            ));
+        }
+        let owned =
+            |verb: &str| all.starts_with(&format!("{shell}{verb} /data/local/tmp/arkdeck-"));
+        if owned("mkdir -p") {
+            let directory = self.device(arg(6));
+            fs::create_dir_all(&directory).unwrap();
+            if mode == "residue" {
+                fs::write(directory.join(".nomedia"), b"").unwrap();
+            }
+            return Answer::exit(0);
+        }
+        if all.starts_with(&format!("{shell}snapshot_display ")) {
+            let (mut image, mut width, mut height, mut frame) = ("jpeg", "720", "1280", "");
+            let mut rest = &argv[4..];
+            while rest.len() > 1 {
+                match rest[0].as_str() {
+                    "-t" => image = &rest[1],
+                    "-w" => width = &rest[1],
+                    "-h" => height = &rest[1],
+                    "-f" => frame = &rest[1],
+                    _ => {}
+                }
+                rest = &rest[2..];
+            }
+            let name = frame.rsplit('/').next().unwrap_or_default();
+            if mode == "gap" && name == format!("0002.{image}") {
+                return Answer::failing(1, "error: snapshot display failed\n");
+            }
+            fs::write(self.device(frame), format!("{name} {width}x{height}\n")).unwrap();
+            return Answer::out(format!(
+                "file type: {image}, width: {width}, height: {height}\n"
+            ));
+        }
+        if owned("tar -c -f") {
+            let archive = self.device(arg(7));
+            match mode {
+                "missingArchive" => {
+                    return Answer::failing(
+                        1,
+                        format!("tar: {}: No space left on device\n", arg(7)),
+                    );
+                }
+                "emptyArchive" => fs::write(&archive, b"").unwrap(),
+                _ => {
+                    // `"$(device "$9")"/*`: the stills in name order, dot files
+                    // aside.
+                    let mut stills: Vec<PathBuf> = fs::read_dir(self.device(arg(9)))
+                        .map(|entries| {
+                            entries
+                                .map(|entry| entry.unwrap().path())
+                                .filter(|path| {
+                                    !path.file_name().unwrap().to_string_lossy().starts_with('.')
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    stills.sort();
+                    let mut bytes = Vec::new();
+                    for still in stills {
+                        bytes.extend(fs::read(still).unwrap());
+                    }
+                    fs::write(&archive, bytes).unwrap();
+                }
+            }
+            return Answer::exit(0);
+        }
+        if let Some(answer) = self.owned_file(&all, &shell, KEY, argv, mode) {
+            return answer;
+        }
+        if owned("rm -f") {
+            for path in &argv[5..] {
+                let _ = fs::remove_file(self.device(path));
+            }
+            return Answer::exit(0);
+        }
+        if owned("rmdir") {
+            if fs::remove_dir(self.device(arg(5))).is_err() {
+                return Answer::failing(1, format!("rmdir: {}: Directory not empty\n", arg(5)));
+            }
+            return Answer::exit(0);
+        }
+        if owned("ls -ld") {
+            let path = arg(6);
+            return Answer::out(if self.device(path).is_dir() {
+                format!("drwxrwxrwx 2 shell shell 3452 2026-09-14 00:00 {path}\n")
+            } else {
+                format!("ls: {path}: No such file or directory\n")
+            });
+        }
+        Answer::unregistered()
+    }
+}
+
+impl OracleFake {
+    /// `marker "$@"` of the port-forward fragment: a rule's state file below
+    /// the root, its words joined by `_` in place of `:` and spaces.
+    fn rule(&self, from: &str, to: &str) -> PathBuf {
+        self.root.join(format!(
+            "device-rule-{}",
+            format!("{from} {to}").replace([':', ' '], "_")
+        ))
+    }
+
+    /// `port-forward/hdc-answers.sh`: the fixture's device and its port rules,
+    /// kept as marker files below the root, by mode: a forward the device
+    /// refuses (`createRefused`), a rule list that is not answered
+    /// (`readbackUnanswered`) or that omits every rule (`ruleUnlisted`).
+    fn port_forward(&self, argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        if all == format!("-t {KEY} fport ls") {
+            match mode {
+                "readbackUnanswered" => return Answer::exit(1),
+                "ruleUnlisted" => return Answer::exit(0),
+                _ => {}
+            }
+            let mut rules: Vec<PathBuf> = fs::read_dir(&self.root)
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|path| {
+                    path.file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .starts_with("device-rule-")
+                })
+                .collect();
+            rules.sort();
+            let mut listed = String::new();
+            for rule in rules {
+                let text = fs::read_to_string(rule).unwrap();
+                let row = text.lines().next().unwrap_or_default();
+                listed.push_str(&format!("{KEY}    {row}\n"));
+            }
+            return Answer::out(listed);
+        }
+        if all.starts_with(&format!("-t {KEY} fport rm ")) {
+            let rule = self.rule(arg(5), arg(6));
+            if !rule.exists() {
+                return Answer::failing(
+                    1,
+                    "[Fail]Remove forward ruler failed, ruler is not exist\n",
+                );
+            }
+            fs::remove_file(rule).unwrap();
+            return Answer::out(format!(
+                "Remove forward ruler success, ruler:{} {}\n",
+                arg(5),
+                arg(6)
+            ));
+        }
+        if all.starts_with(&format!("-t {KEY} fport tcp:")) {
+            if mode == "createRefused" {
+                return Answer::failing(1, "[Fail]Forwardport result failed\n");
+            }
+            fs::write(
+                self.rule(arg(4), arg(5)),
+                format!("{} {}    [Forward]\n", arg(4), arg(5)),
+            )
+            .unwrap();
+            return Answer::out("Forwardport result:OK\n");
+        }
+        if all.starts_with(&format!("-t {KEY} rport tcp:")) {
+            fs::write(
+                self.rule(arg(4), arg(5)),
+                format!("{} {}    [Reverse]\n", arg(4), arg(5)),
+            )
+            .unwrap();
+            return Answer::out("Forwardport result:OK\n");
+        }
+        Answer::unregistered()
+    }
+}
+
+impl OracleFake {
+    /// `input.keyboard@1`, which no Swift oracle records: the macOS Rust
+    /// owner test's synthetic transport (`arkdeck-hoststore/tests/
+    /// keyboard_input_run.rs`, `Fake`), by mode. The fixture's device, and one
+    /// UiTest text action acknowledged (`No Error`), echoed without its
+    /// acknowledgement (`missingAck`), left unobserved (`unobservable`) or
+    /// refused (`refused`); the last two carry the private text, as the
+    /// macOS test's do, to prove nothing persists it.
+    fn keyboard_input(argv: &[String], mode: &str) -> Answer {
+        let all = argv.join(" ");
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
+        let words: Vec<&str> = argv.iter().map(String::as_str).collect();
+        let ["-t", KEY, "shell", "uitest", "uiInput", "text", text] = words.as_slice() else {
+            return Answer::declined("unregistered synthetic transport action");
+        };
+        match mode {
+            "missingAck" => Answer::out(format!("unobserved {text}")),
+            "unobservable" => Answer {
+                unobservable: Some((*text).to_owned()),
+                ..Answer::exit(0)
+            },
+            "refused" => Answer::declined(*text),
+            _ => Answer::out("No Error\n"),
+        }
+    }
+}
+
 impl HdcDispatch for OracleFake {
     fn mutation_identity_current(&self) -> bool {
         true
@@ -1292,11 +1611,18 @@ impl HdcDispatch for OracleFake {
             Answers::TraceLegs => self.trace_legs(&plan.arguments, &mode),
             Answers::HumanAction => self.human_action(&plan.arguments, &mode),
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
+            Answers::PointerInput => Self::pointer_input(&plan.arguments, &mode),
+            Answers::ScreenSequence => self.screen_sequence(&plan.arguments, &mode),
+            Answers::PortForward => self.port_forward(&plan.arguments, &mode),
+            Answers::KeyboardInput => Self::keyboard_input(&plan.arguments, &mode),
             Answers::TargetAdoption => Self::target_adoption(&plan.arguments, &mode),
             Answers::TraceProbe => self.trace_probe(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));
+        }
+        if let Some(reason) = answer.declined {
+            return Err(DispatchFailure::Refused(reason));
         }
         // The runner keeps each stream's first `capture_bytes` bytes and says
         // whether either went past them (`tool_process::capture`).

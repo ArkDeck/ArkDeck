@@ -67,7 +67,10 @@ first, `ControlResult` back.
 - **Surfaces (TASK-XPA-020).** Device lists the adopted Targets (the Target store answers
   without an HDC), shows a Target's `target.show` and `target.availability`, and renames or
   clears its display name in a Fluent dialog (the macOS rename rule: whitespace collapsed,
-  1–64 characters). History shows the selected Job's detail and Artifacts; a published
+  1–64 characters). Each observed device is a sidebar row under Device, kept current by a
+  10-second live observation; its detail shows the state, for an unauthorized device the trust
+  steps and a bounded wait (180 s, re-reading the observation only) for its confirmation, and an
+  App-local name for a device not adopted yet. History shows the selected Job's detail and Artifacts; a published
   Artifact is exported as on macOS (preview, a save location the person picks, bounded
   `artifact.read` chunks each checked against the metadata, SHA-256 verified before a staging
   file replaces the destination; a sensitive one needs its own confirmation), and a Job's raw
@@ -251,7 +254,10 @@ first, `ControlResult` back.
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
   have access keys (Alt+O, D, H, N, A, I, B, F, T, R, V, G, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
-  empty Tab stop.
+  empty Tab stop. The macOS commands: Ctrl+F (the page's search), Ctrl+R or F5 (re-read the
+  page), Ctrl+N (Trace), Ctrl+Shift+O and Ctrl+Shift+R (open or reload a Trace file),
+  Ctrl+Shift+J (Job Inspector), Ctrl+Shift+D (Overview environment). The last page comes back at
+  launch; `.htrace`, `.ftrace`, `.systrace` and `.trace` files open in the Trace viewer.
 
 ## Build and test
 
