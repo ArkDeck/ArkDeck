@@ -24,6 +24,7 @@ public sealed class ControlClient : IDisposable
     private readonly Stream _stream;
     private readonly FrameReader _reader;
     private readonly long _deadline;
+    private readonly Func<long> _now;
     private bool _verified;
     private bool _unusable;
 
@@ -35,10 +36,19 @@ public sealed class ControlClient : IDisposable
     {
     }
 
-    private ControlClient(Stream authenticated, long deadline)
+    /// <summary>Tests: the client reads the time from <paramref name="now"/> (Stopwatch
+    /// timestamps), so its budget runs out at a step the test chooses instead of after an amount
+    /// of wall-clock time a loaded runner may already have spent.</summary>
+    internal ControlClient(Stream authenticated, TimeSpan budget, Func<long> now)
+        : this(authenticated, now() + Ticks(budget), now)
+    {
+    }
+
+    private ControlClient(Stream authenticated, long deadline, Func<long>? now = null)
     {
         _stream = authenticated;
         _deadline = deadline;
+        _now = now ?? Stopwatch.GetTimestamp;
         _reader = new FrameReader(ReadSomeAsync);
     }
 
@@ -180,9 +190,9 @@ public sealed class ControlClient : IDisposable
         return count;
     }
 
-    private CancellationTokenSource Budget() => new(Remaining(_deadline));
+    private CancellationTokenSource Budget() => new(Remaining(_deadline, _now()));
 
-    private void CheckDeadline() => Remaining(_deadline);
+    private void CheckDeadline() => Remaining(_deadline, _now());
 
     private static void RequireBudget(long deadline)
     {
@@ -196,9 +206,11 @@ public sealed class ControlClient : IDisposable
         }
     }
 
-    private static TimeSpan Remaining(long deadline)
+    private static TimeSpan Remaining(long deadline) => Remaining(deadline, Stopwatch.GetTimestamp());
+
+    private static TimeSpan Remaining(long deadline, long now)
     {
-        var left = Stopwatch.GetElapsedTime(Stopwatch.GetTimestamp(), deadline);
+        var left = Stopwatch.GetElapsedTime(now, deadline);
         if (left <= TimeSpan.Zero) throw new TransportException(TransportErrorKind.TimedOut, "control deadline exceeded");
         return left;
     }
