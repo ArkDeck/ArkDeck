@@ -4367,6 +4367,8 @@ pub(crate) fn timestamp(seconds: u64) -> String {
     )
 }
 
-#[cfg(all(test, any(target_os = "macos", windows)))]
-#[path = "doctor_owner_tests.rs"]
-mod doctor_owner_tests;
+daemon_unit_tests! {
+    #[cfg(any(target_os = "macos", windows))]
+    #[path = "doctor_owner_tests.rs"]
+    mod doctor_owner_tests;
+}

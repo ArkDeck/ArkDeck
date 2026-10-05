@@ -84,6 +84,25 @@ unnecessary.
 
 ## CI
 
-Not run for this local owned commit; integration owns the PR and CI record. Live acceptance
+PR #2589 at `68c5e0f093310476b1d019ad1d8628c6af5b1f02` passed guard run
+`37282491191`, the Ubuntu workspace lane and all three contract-parity lanes in
+Swift CI run `37282491290`. Its macOS workspace lane failed the existing
+`the_daemon_modules_compiled_here_keep_no_tests_beside_them` guard: the newly
+declared owner test module was also compiled into the spawning test binary.
+This is a change-related failure, not an invalid run. The owner tests now use
+the existing final `daemon_unit_tests!` block, which compiles them only into
+the daemon unit-test binary. No guard or behavioral assertion changed.
+
+Local targeted checks of the repair use the integration worktree target
+`D:/cargo-target/lead-symbolize`: owner unit tests, the exact failing spawning
+guard, and agentd all-target clippy passed with exit 0 in
+`doctor-macro-owner-unit.log`, `doctor-macro-spawning-guard.log` and
+`doctor-macro-clippy.log`. Full fmt exceeded Windows argument-length limits
+in the integration path (`doctor-macro-fmt.log`, exit 1); the identical Rust
+tree passed full fmt in the short `D:/src/ArkDeck-wt/f` worktree
+(`doctor-macro-fmt-short.log`, exit 0). The original CI and local failure logs
+are preserved. The repaired head requires a fresh CI run before merge.
+
+Live acceptance
 must use the rebuilt protected-main RC after review, CI and merge, then repeat doctor through
 the published CLI. This run does not turn the failed installed-doctor window into a pass.
