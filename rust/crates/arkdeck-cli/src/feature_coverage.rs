@@ -471,6 +471,11 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // through the real CLI against the same signed test daemon, every answer
     // and the fake's reads Swift's (`gj1_device_reads.rs`).
     "trace.probe",
+    // A candidate's display name, set and cleared in the composed Target
+    // observation owner's current observation (TASK-XPA-005), by the real
+    // CLI against the same signed test daemon (`gj1_device_reads.rs`).
+    "device.display-name.set",
+    "device.display-name.clear",
     // The registered Windows HDC's lifecycle (CHG-2026-078, TASK-XPA-005):
     // its status, a restart's impact preview, the restart's approval request
     // and, approved at a real console, the restart itself, then its control

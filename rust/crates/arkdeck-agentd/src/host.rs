@@ -2003,6 +2003,24 @@ impl HostServices for Host {
             observation_id: params["observationId"].as_str().unwrap().into(),
             generation,
         };
+        // With the development HDC (on Windows, the registered tuple), the
+        // Target observation owner observes, so its current snapshot is the
+        // one a candidate is named in.
+        if let Some(named) = self.observe(|sources| {
+            self.target_observations.name_candidate(
+                sources.targets,
+                &reference,
+                params.get("name").and_then(serde_json::Value::as_str),
+                &utc_now(),
+            )
+        }) {
+            return named.unwrap_or_else(|| {
+                Err(fail(
+                    "resourceConflict",
+                    "No current observation snapshot exists",
+                ))
+            });
+        }
         let mut state = self
             .observations
             .lock()
