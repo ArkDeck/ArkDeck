@@ -80,8 +80,26 @@ impl HdcDispatch for NoDispatch {
     }
 }
 
+/// The fixed root's lock, held for one test. On Windows the root this test
+/// rebuilt is removed when the test lets go of it, before the lock is
+/// released, so nothing is left in the temporary directory; the lock file
+/// itself stays, as the cross-process lock. On macOS the root stays where
+/// the Swift oracle's producers expect it.
+pub struct Exclusive(#[allow(dead_code)] File);
+
+#[cfg(windows)]
+impl Drop for Exclusive {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(root());
+    }
+}
+
 /// Serializes every user of the fixed root, Swift producers included.
-pub fn exclusive() -> File {
+pub fn exclusive() -> Exclusive {
+    Exclusive(lock_file())
+}
+
+fn lock_file() -> File {
     let lock = OpenOptions::new()
         .read(true)
         .write(true)

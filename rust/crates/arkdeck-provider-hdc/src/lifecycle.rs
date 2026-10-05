@@ -159,10 +159,24 @@ impl<'a> PreparedLifecycle<'a> {
     /// Swift `executePrepared` and the executor's classification: the one
     /// launch of this preparation, then the post-dispatch re-observation.
     pub fn launch(self, budget: &LifecycleBudget) -> LifecycleReceipt {
-        let environment = [(
+        #[cfg_attr(not(windows), allow(unused_mut))]
+        let mut environment = vec![(
             OsString::from(SERVER_PORT_VARIABLE),
             OsString::from(self.command.endpoint.port().to_string()),
         )];
+        // The Windows client finds the server it ends through the server's
+        // own files in the temporary directory, and `kill -r` starts the
+        // replacement with the client's environment: both are named this
+        // daemon's temporary directory, as the managed server is
+        // (`ManagedHdcServer::start`). Without it 3.2.0g's `kill -r` ends
+        // nothing and its replacement cannot bind (measured 2026-10-04,
+        // CHG-2026-078 c2).
+        #[cfg(windows)]
+        {
+            let temporary = std::env::temp_dir().into_os_string();
+            environment.push((OsString::from("TEMP"), temporary.clone()));
+            environment.push((OsString::from("TMP"), temporary));
+        }
         let arguments: Vec<OsString> = self.command.arguments.iter().map(OsString::from).collect();
         let request = ToolRequest {
             arguments: &arguments,

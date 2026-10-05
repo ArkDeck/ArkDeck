@@ -117,7 +117,8 @@ public sealed record StorageStatus(
     string PinnedSessionCount,
     string PinnedBytes,
     string UnaccountedSessionCount,
-    bool MeasurementIncomplete)
+    bool MeasurementIncomplete,
+    string Generation = "0")
 {
     public static StorageStatus Parse(JsonValue value)
     {
@@ -131,9 +132,69 @@ public sealed record StorageStatus(
             S(session, "rootKind"), S(session, "rootPath"),
             S(policy, "totalQuotaBytes"), S(policy, "safetyMarginBytes"), S(policy, "retentionDays"),
             S(usage, "usedBytes"), S(usage, "sessionCount"), S(usage, "pinnedSessionCount"), S(usage, "pinnedBytes"),
-            S(usage, "unaccountedSessionCount"), TypedJson.Required(usage, "measurementIncomplete", TypedJson.Bool));
+            S(usage, "unaccountedSessionCount"), TypedJson.Required(usage, "measurementIncomplete", TypedJson.Bool),
+            S(session, "generation"));
+    }
+
+    public const ulong Gibibyte = 1UL << 30;
+
+    /// <summary>macOS <c>savePolicy</c>'s check of the drafts (GiB, GiB, days): whole numbers, the
+    /// quota above the margin, both positive, and no overflow in bytes; null otherwise. The
+    /// Runtime still decides whether it accepts them.</summary>
+    public static (ulong QuotaBytes, ulong MarginBytes, ulong RetentionDays)? Draft(string quotaGiB, string marginGiB, string retentionDays)
+    {
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        const System.Globalization.NumberStyles digits = System.Globalization.NumberStyles.None;
+        if (!ulong.TryParse(quotaGiB.Trim(), digits, invariant, out var quota) || !ulong.TryParse(marginGiB.Trim(), digits, invariant, out var margin)
+            || !ulong.TryParse(retentionDays.Trim(), digits, invariant, out var retention)
+            || quota <= margin || margin == 0 || retention == 0 || quota > ulong.MaxValue / Gibibyte)
+        {
+            return null;
+        }
+        return (quota * Gibibyte, margin * Gibibyte, retention);
+    }
+
+    /// <summary>A byte figure as whole GiB, for the policy drafts.</summary>
+    public static string GiB(string bytes) =>
+        ulong.TryParse(bytes, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var b)
+            ? (b / Gibibyte).ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
+}
+
+/// <summary>What a generation-bound storage write left: the Runtime's storage as it now stands,
+/// and whether another writer published first (macOS <c>publish</c> reads the owner's state back
+/// on <c>resourceConflict</c> and never re-sends).</summary>
+public sealed record StorageWrite(StorageStatus Status, bool Superseded);
+
+/// <summary><c>trace.cache.purge</c>: what the Runtime removed (inactive derived databases only;
+/// never an original Trace), checked as macOS <c>RuntimeTraceCacheResponseDecoding.purge</c>.</summary>
+public sealed record TraceCachePurge(long RemovedEntryCount, long SkippedActiveEntryCount, long EntriesBefore, long EntriesAfter, string BytesAfter)
+{
+    public static TraceCachePurge Parse(JsonValue value)
+    {
+        var o = Json.Object(value, "a Trace cache purge");
+        string[] keys = ["schemaVersion", "before", "after", "recoveredPrivateDirectoryCount", "removedOrphanOwnerMarkerCount", "removedEntryCount",
+            "skippedActiveEntryCount", "purgeScope", "originalTraceArtifactRemovalCount"];
+        if (!o.Members.Select(m => m.Key).ToHashSet().SetEquals(keys)
+            || TypedJson.Required(o, "schemaVersion", TypedJson.String) != "arkdeck.trace-cache-purge/1"
+            || TypedJson.Required(o, "purgeScope", TypedJson.String) != "inactiveDerivedDatabases"
+            || TypedJson.Required(o, "originalTraceArtifactRemovalCount", TypedJson.Int64) != 0)
+        {
+            throw new ContractException(ContractErrorKind.SchemaMismatch, "ArkDeck Runtime returned an invalid Trace cache purge report");
+        }
+        var before = TypedJson.Required(o, "before", v => Json.Object(v, "before"));
+        var after = TypedJson.Required(o, "after", v => Json.Object(v, "after"));
+        long Count(JsonObject from, string key)
+        {
+            var n = TypedJson.Required(from, key, TypedJson.Int64);
+            return n >= 0 ? n : throw new ContractException(ContractErrorKind.SchemaMismatch, "a negative Trace cache count");
+        }
+        Count(o, "recoveredPrivateDirectoryCount");
+        Count(o, "removedOrphanOwnerMarkerCount");
+        return new(Count(o, "removedEntryCount"), Count(o, "skippedActiveEntryCount"), Count(before, "entryCount"), Count(after, "entryCount"),
+            TypedJson.Required(after, "totalByteCount", TypedJson.String));
     }
 }
+
 
 /// <summary><c>trace.cache.status</c>: the derived Trace cache's entries and bytes.</summary>
 public sealed record TraceCacheStatus(long EntryCount, long ActiveEntryCount, long InactiveEntryCount, string TotalByteCount, string PurgeScope)
@@ -244,6 +305,42 @@ public sealed partial class SurfaceLoader
     /// <summary>The Settings tabs: the Runtime's <c>health</c> and <c>doctor</c>, the HDC and
     /// tool registry, storage, the Trace cache and the workspace projects, each as it came.
     /// Everything here is read; changing a setting is the CLI's (the tabs name the command).</summary>
+    /// <summary>The storage policy, bound to the generation just read (macOS
+    /// <c>updateStoragePolicy</c>): the Runtime validates and publishes it; another writer's
+    /// earlier publication is read back, not overwritten.</summary>
+    public Task<SessionActionState<StorageWrite>> SaveStoragePolicyAsync(ulong quotaBytes, ulong marginBytes, ulong retentionDays) =>
+        StorageWriteAsync("runtime.storage.policy", generation => Params(("expectedGeneration", new JsonString(generation)),
+            ("retentionDays", new JsonString(retentionDays.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            ("safetyMarginBytes", new JsonString(marginBytes.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            ("totalQuotaBytes", new JsonString(quotaBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)))),
+            CliCommands.RuntimeStoragePolicy);
+
+    /// <summary>The Session output root (macOS <c>selectStorageRoot</c>), or the default again
+    /// (<c>resetStorageRoot</c>) when <paramref name="rootPath"/> is null: the Runtime checks the
+    /// folder.</summary>
+    public Task<SessionActionState<StorageWrite>> SetStorageRootAsync(string? rootPath) =>
+        StorageWriteAsync("runtime.storage.root", generation => rootPath is null
+            ? Params(("expectedGeneration", new JsonString(generation)), ("resetToDefault", JsonBool.True))
+            : Params(("expectedGeneration", new JsonString(generation)), ("rootPath", new JsonString(rootPath))),
+            CliCommands.RuntimeStorageRoot);
+
+    private async Task<SessionActionState<StorageWrite>> StorageWriteAsync(string method, Func<string, JsonObject> parameters, string cli)
+    {
+        var run = new Run(channel);
+        var current = await run.Load(c => c.RequestAsync("runtime.storage.status"), StorageStatus.Parse, CliCommands.RuntimeStorageStatus);
+        if (current.Unavailable is { } unread) return new(Loaded<StorageWrite>.Not(unread), run.DaemonFailure, run.Reached);
+        var written = await run.Load(c => c.RequestAsync(method, parameters(current.Value!.Generation)), StorageStatus.Parse, cli);
+        if (written.Value is { } status) return new(Loaded<StorageWrite>.Of(new(status, false)), run.DaemonFailure, run.Reached);
+        if (written.Unavailable!.ReasonCode != "resourceConflict") return new(Loaded<StorageWrite>.Not(written.Unavailable), run.DaemonFailure, run.Reached);
+        var won = await run.Load(c => c.RequestAsync("runtime.storage.status"), StorageStatus.Parse, CliCommands.RuntimeStorageStatus);
+        return new(won.Value is { } now ? Loaded<StorageWrite>.Of(new(now, true)) : Loaded<StorageWrite>.Not(won.Unavailable!), run.DaemonFailure, run.Reached);
+    }
+
+    /// <summary>Removes the inactive derived Trace databases (macOS
+    /// <c>purgeUnusedTraceCache</c>): never an original Trace or an entry in use.</summary>
+    public Task<SessionActionState<TraceCachePurge>> PurgeTraceCacheAsync() =>
+        Action("trace.cache.purge", null, TraceCachePurge.Parse, CliCommands.TraceCachePurge);
+
     public async Task<SettingsState> SettingsAsync()
     {
         var run = new Run(channel);
