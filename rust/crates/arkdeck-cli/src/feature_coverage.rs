@@ -377,6 +377,10 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["signing", "update", "support-bundl
 /// windows_*_process.rs` signed-CLI tests, each of which checks that what it
 /// measured is `implemented` here; TASK-XPA-018).
 const WINDOWS_MEASURED_LEAVES: &[&str] = &[
+    // Workspace rerun drafts and continuation Jobs through the signed CLI
+    // over the workspace-continuation oracle (TASK-XPA-011).
+    "workspace.continuation.submit",
+    "workspace.continuation.run",
     "doctor",
     "runtime.health",
     "operation.list",

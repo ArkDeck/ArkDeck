@@ -19,6 +19,13 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    /// Provider IDs from the ports already assembled into this host. This
+    /// inventory must not query availability, initialize owners, inspect
+    /// durable state or dispatch. Registration does not imply readiness.
+    fn registered_provider_ids(&self) -> Vec<&'static str> {
+        Vec::new()
+    }
+
     /// Fresh host-scoped provider/dispatcher/Artifact availability. None means
     /// no provider is registered; an empty reason list means available on this
     /// host, never target admission. Implementations must not dispatch.
@@ -895,12 +902,17 @@ impl<H: HostServices> Control<H> {
         };
         let params = request.params.unwrap_or_default();
         let response = match request.method.as_str() {
-            "health" if params.is_empty() => Response::success(
-                &request.id,
-                json!({
-                "status":"ok","protocolVersion":PROTOCOL_VERSION,"contractIdentity":CONTRACT_IDENTITY,
-                "catalogDigest":CATALOG_DIGEST,"providers":[],"publishedMethods":METHODS}),
-            ),
+            "health" if params.is_empty() => {
+                let mut providers = self.host.registered_provider_ids();
+                providers.sort_unstable();
+                providers.dedup();
+                Response::success(
+                    &request.id,
+                    json!({
+                    "status":"ok","protocolVersion":PROTOCOL_VERSION,"contractIdentity":CONTRACT_IDENTITY,
+                    "catalogDigest":CATALOG_DIGEST,"providers":providers,"publishedMethods":METHODS}),
+                )
+            }
             "health" => {
                 Response::failure(&request.id, "invalidParams", "health accepts no parameters")
             }

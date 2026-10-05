@@ -1838,6 +1838,31 @@ fn windows_runner<'a>(
 }
 
 impl HostServices for Host {
+    fn registered_provider_ids(&self) -> Vec<&'static str> {
+        let mut providers = Vec::new();
+        let hdc = self.provider.is_some();
+        #[cfg(any(target_os = "macos", windows))]
+        let hdc = hdc || self.hdc.is_some();
+        #[cfg(all(windows, test))]
+        let hdc = hdc || self.test_hdc.is_some();
+        if hdc {
+            providers.push("hdc");
+        }
+        #[cfg(any(target_os = "macos", windows))]
+        {
+            if self.planning.is_some() {
+                providers.push("analyzer");
+            }
+            if self.workspace.is_some() {
+                providers.push("workspace");
+            }
+            if self.flash_planning.is_some() {
+                providers.push("arkforge");
+            }
+        }
+        providers
+    }
+
     /// `operation.list`: the availability of each operation over this
     /// composition's owners, its HDC included (on Windows only a registered
     /// tuple's managed server).

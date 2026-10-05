@@ -76,6 +76,8 @@ use support::oracle_fake;
 #[allow(dead_code)]
 #[path = "../../src/tool_selection_startup.rs"]
 mod tool_selection_startup;
+#[cfg(windows)]
+mod workspace_continuation_cli;
 // The Windows development root's lifecycle and composition, which the
 // signed test daemon serves through (`signed_daemon.rs`), with every module
 // it names.
