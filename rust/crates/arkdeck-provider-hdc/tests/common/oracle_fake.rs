@@ -39,6 +39,7 @@ pub enum Answers {
     HumanAction,
     DebugProbe,
     PointerInput,
+    TargetAdoption,
 }
 
 impl Answers {
@@ -70,6 +71,9 @@ impl Answers {
             }
             line if line.starts_with("# input.tap@1, input.long-press@1 and input.swipe@1") => {
                 Self::PointerInput
+            }
+            line if line.starts_with("# Target adoption: the device list in the state") => {
+                Self::TargetAdoption
             }
             other => panic!("no in-process port of the fake's answers {other:?}"),
         }
@@ -845,6 +849,28 @@ impl OracleFake {
     /// execution waits on (the device list offline, unauthorized or with two
     /// devices, and a Job held at its server check until `released` exists
     /// below the root), then `capture.diagnostics@1`'s table.
+    /// `target-adoption/hdc-answers.sh`: the device list in the state the
+    /// mode names (the one device unauthorized, or 1001 connected rows), else
+    /// the `capture.diagnostics@1` table it continues with.
+    fn target_adoption(argv: &[String], mode: &str) -> Answer {
+        if argv.join(" ") == "list targets -v" {
+            match mode {
+                "unauthorized" => {
+                    return Answer::out(format!("{KEY}\t\tUSB\tUnauthorized\tlocalhost\n"));
+                }
+                "tooMany" => {
+                    return Answer::out(
+                        (0..1001)
+                            .map(|row| format!("k{row:04}\t\tUSB\tConnected\tlocalhost\n"))
+                            .collect::<String>(),
+                    );
+                }
+                _ => {}
+            }
+        }
+        Self::capture_diagnostics(argv, mode)
+    }
+
     fn human_action(&self, argv: &[String], mode: &str) -> Answer {
         let all = argv.join(" ");
         if all == "list targets -v" {
@@ -1138,6 +1164,7 @@ impl HdcDispatch for OracleFake {
             Answers::HumanAction => self.human_action(&plan.arguments, &mode),
             Answers::DebugProbe => self.debug_probe(&plan.arguments, &mode),
             Answers::PointerInput => Self::pointer_input(&plan.arguments, &mode),
+            Answers::TargetAdoption => Self::target_adoption(&plan.arguments, &mode),
         };
         if let Some(reason) = answer.unobservable {
             return Err(DispatchFailure::Unobservable(reason));

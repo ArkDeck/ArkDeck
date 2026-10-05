@@ -2343,7 +2343,7 @@
       "feature": "device.observations",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "observation snapshot read by `device wait` and `device list`",
@@ -4164,7 +4164,7 @@
       "feature": "target.availability",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

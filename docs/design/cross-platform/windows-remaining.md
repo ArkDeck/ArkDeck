@@ -3,7 +3,8 @@
 Source: `openspec/contracts/cli-feature-coverage.json` on `main` after #2541, #2543, #2547, #2549,
 #2550/#2553 and #2552. Of the features the Windows CLI must serve, 114 are `implemented`, 46
 `partial` and 2 `notImplemented`; 101 are macOS-only. Measured since: `debug.hap@1`,
-`deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves). A feature is `implemented` on Windows only
+`deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves);
+`device.observations` and `target.availability` (TASK-XPA-005 device reads). A feature is `implemented` on Windows only
 when each CLI leaf it reaches is in `WINDOWS_MEASURED_LEAVES` (a signed-CLI process test on
 Windows); a generic leaf (`agent run`, `agent resume`, `human-action resume`, `job plan|submit|run`)
 is counted only once every operation it reaches answers on Windows as Swift does (lead's ruling of
@@ -25,9 +26,7 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 | --- | --- | --- | --- |
 | `runtime.hdc.status`, `runtime.hdc.impact-preview`, `runtime.hdc.restart` | 1 | now | Confirmed restart measured live with the registered c2 `hdc.exe` (#2501, #2521, in review); needs the signed-CLI leaf test and the leaves counted |
 | `control-action.list`, `.show`, `.reconcile` | 1 | now | Same composition (#2461 owner, #2501); signed-CLI test over the restart's control action |
-| `target.availability` | 1 | now | Presence through the registered tuple's listing (#2486); `target-adoption` / `hdc-status` oracles |
-| `device.observations` (`device wait`, `device list`) | 1 | now | Composed; `observe-device` oracle via the shared fake, as `gj1_device_leaves.rs` |
-| `device.display-name.set`, `.clear` | 1 | now | Local leaves over a device observation; same fake |
+| `device.display-name.set`, `.clear` | 1 | ruling | No Swift oracle records them. Through the composed Target observation owner (Windows' registered tuple, macOS' development HDC alike) the Host's candidate name owner reads only the legacy provider's snapshot, which that path never retains, so both refuse with `resourceConflict` "No current observation snapshot exists" (seen through the signed CLI, `gj1_device_reads.rs`). Fixing it changes shared Host behaviour without an oracle to hold it to |
 | `trace.probe` | 1 | now | `trace-probe` oracle, already replayed at Control level (`trace_probe_control.rs`); no signed-CLI test |
 | `input.tap@1`, `input.swipe@1`, `input.long-press@1` | 1 | done | Measured: every `pointer-input` oracle case through the real CLI over the shared fake's ported answers (`gj1_inputs.rs`); Windows `implemented` |
 | `input.keyboard@1` | 1 | now | No Swift oracle (keyboard input lands with #2473 on macOS); measure against the macOS Rust answers once it merges |
@@ -54,6 +53,6 @@ board-only).
 
 By Golden Journey leaves unblocked: GJ-2/GJ-3 domain leaves (`debug hap`, `debug native deploy`,
 `recovery cleanup continue`; done); GJ-1 restart and control actions (after #2501/#2521); GJ-1 device
-reads (`device wait|list`, display names, `target availability`, `trace probe`); GJ-1 inputs,
+reads (`device wait|list` and `target availability` done; `trace probe`); GJ-1 inputs,
 screen record and port forwards (new fake answers); diagnostic sessions; tool register/select;
 GJ-5 continuation; Job archive.
