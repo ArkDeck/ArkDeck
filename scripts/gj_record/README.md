@@ -54,8 +54,12 @@ Executions are found by the IDs the runbook gives them. `<d>` is the record date
 ### Reads the criteria need
 
 - `job result` for every Job.
-- `artifact read` for every Artifact, until `eof`. The tool joins the chunks and checks them
-  against the published digest.
+- `artifact read` for every **published** Artifact, until `eof`. The tool joins the chunks and
+  checks them against that inventory row's digest and byte count. Declared `missing` products
+  remain in the raw inventory without a byte read only when `byteCount == "0"`, `sha256 == ""`
+  and `bytesVerified == false`, with no successful read contradicting that declaration.
+  Required names must be published; truncated, unknown and inconsistent rows fail. Job blockers,
+  missing-required products and capture completeness still determine failure.
 - `job show` for timeline criteria, or every `job timeline` page.
 - The HAR's `agent status`, `human-action show`, `agent resume`, and `human-action show` again
   after the resume.

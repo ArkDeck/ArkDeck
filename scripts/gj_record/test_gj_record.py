@@ -194,7 +194,8 @@ class Journal:
             "schemaVersion": "arkdeck.job-evidence/1", "jobId": job, "operationReference": operation,
             "catalogDigest": self.digest, "targetId": TARGET, "bindingRevision": 1, "executionMode": "execute",
             "terminalState": terminal, "outcomeUnknown": False, "blockers": [],
-            "status": "verified" if terminal == "succeeded" else "blocked", "missingRequiredArtifacts": [],
+            "status": "verified" if terminal == "succeeded" else "blocked", "inventoryAvailable": True,
+            "missingRequiredArtifacts": [],
             "actualEffect": "readOnly", "actualStepKinds": kinds or ["probeDevice"],
             "startedAtUtc": "2026-10-05T01:00:00Z", "finishedAtUtc": "2026-10-05T01:00:02Z",
             "observation": {"toolSha256": HDC, "targetId": TARGET, "bindingRevision": 1, **observation},
@@ -219,7 +220,7 @@ class Journal:
             self.artifacts += 1
             identifier = f"ART-{self.artifacts:04d}"
             rows.append({"artifactId": identifier, "name": name, "sha256": sha(data), "bytesVerified": True,
-                         "byteCount": str(len(data))})
+                         "byteCount": str(len(data)), "status": "published"})
         self.ok("job.result", ["job", "result", "--job", job], {
             "job": {"jobId": job, "outstandingResidueCount": 0, "executionMode": "execute", "state": terminal},
             "evidence": evidence, "artifacts": rows})
