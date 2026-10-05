@@ -118,12 +118,12 @@ fn restart_refuses_a_service_that_is_not_ready_and_an_option_out_of_range() {
 }
 
 #[test]
-fn the_launch_agent_leaves_and_verify_s_job_options_stay_macos_only() {
+fn launch_agent_leaves_and_fresh_verify_options_stay_macos_only() {
     let root = Root::new();
     for arguments in [
         &["--output", "json", "runtime", "service", "update"][..],
         &[
-            "--output", "json", "runtime", "service", "verify", "--job", "job-1",
+            "--output", "json", "runtime", "service", "verify", "--target", "TGT-1",
         ][..],
     ] {
         let output = arkdeck(&root, arguments);
@@ -133,6 +133,63 @@ fn the_launch_agent_leaves_and_verify_s_job_options_stay_macos_only() {
             "{arguments:?}: {answer}"
         );
         assert_eq!(output.status.code(), Some(69), "{arguments:?}");
+    }
+}
+
+#[test]
+fn job_verify_refuses_an_unready_service_without_starting_it() {
+    let root = Root::new();
+    let output = arkdeck(
+        &root,
+        &[
+            "--output", "json", "runtime", "service", "verify", "--job", "job-1",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(69), "{output:?}");
+    let answer = document(&output);
+    assert_eq!(answer["result"]["runtimeVerified"], false, "{answer}");
+    assert_eq!(answer["result"]["runtime"], Value::Null);
+    assert!(!root.0.join("instance.json").exists());
+}
+
+#[test]
+fn job_verify_cannot_be_combined_with_execution_options() {
+    let root = Root::new();
+    for extra in [
+        &["--target", "TGT-1"][..],
+        &["--execution-id", "exec-1"][..],
+        &["--maximum-wait-seconds", "30"][..],
+    ] {
+        let mut args = vec!["runtime", "service", "verify", "--job", "job-1"];
+        args.extend(extra);
+        let output = arkdeck(&root, &args);
+        assert_eq!(output.status.code(), Some(64), "{output:?}");
+        assert!(output.stdout.is_empty());
+        let diagnostic = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            diagnostic.contains("accepts only one of")
+                && diagnostic.contains("--job")
+                && diagnostic.contains(extra[0]),
+            "{output:?}"
+        );
+        assert!(!root.0.join("instance.json").exists());
+    }
+    let target = arkdeck_cli::runtime_service_windows::ServiceTarget::new(
+        None,
+        Some(root.0.clone().into_os_string()),
+        arkdeck_platform::ServerIdentity::new(env!("CARGO_BIN_EXE_arkdeck")),
+    )
+    .unwrap();
+    for key in ["targetId", "executionId", "maximumWaitSeconds"] {
+        let options = serde_json::Map::from_iter([
+            ("jobId".into(), serde_json::json!("job-1")),
+            (key.into(), serde_json::json!("value")),
+        ]);
+        let answer =
+            arkdeck_cli::runtime_service_windows::verify_leaf(&target, "verify-options", &options);
+        assert!(answer.document.is_none());
+        assert_eq!(answer.failure.unwrap().exit_code, 64);
+        assert!(!root.0.join("instance.json").exists());
     }
 }
 

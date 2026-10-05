@@ -359,10 +359,22 @@ A blocked or drifted `runtime tool select` is currently answered as `outcomeUnkn
      decision 11, ruling 78). The first CLI call starts the daemon.
    - The headless runbook's §1 update path (`runtime bundle register` → `runtime service update`)
      is replaced by reinstalling the RC.
+   - **Replacing an RC in another directory:** before changing the daemon path or signer
+     environment, use the **old verified RC's** CLI and identity to run
+     `arkdeck runtime service uninstall --output json`. On Windows this is a typed stop:
+     it verifies the serving daemon, refuses active or unclosed Jobs, awaits its guard,
+     preserves the state directory and removes no installed files. Do not stop an unknown
+     daemon or bypass these checks. A new-directory RC cannot authenticate the old daemon
+     for `restart`: the pipe's actual image path and file identity must equal the configured
+     daemon. Keep those checks and the signer checks intact.
 2. **Configure.** Set the environment **in the PowerShell session that will start the daemon**.
-   The client-started daemon inherits that environment (minus `ARKDECK_ENDPOINT`). If a daemon is
-   already running, stop it first with `arkdeck runtime service restart` from this session, then
-   check `runtime service status`.
+   The client-started daemon inherits that environment (minus `ARKDECK_ENDPOINT`). After the
+   old verified daemon has stopped, configure the new verified RC below. Its first Runtime
+   CLI call starts the new daemon; then read `runtime service status` and
+   `runtime service verify` without `--job`. Confirm the serving process's actual image path
+   and SHA-256 match the new RC's verified daemon path and manifest hash, and that status and
+   identity verification name that process. `runtime service restart` remains the typed,
+   same-directory configuration-preserving restart used for GJ-1's durable readback phase.
 
    ```powershell
    $rc = 'D:\ArkDeck-rc-<date>'

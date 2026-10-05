@@ -12,6 +12,8 @@
 //!   and its signer certificate or package family) and the state root
 //!   (`%LOCALAPPDATA%\ArkDeck\Agentd` from the Known Folder API, owner-only),
 //!   and, when a daemon runs, its identity and `health`; nothing is started.
+//!   With `--job`, it reopens that persisted Job through the shared macOS
+//!   closure verifier's daemon-owned status, evidence and Artifact reads.
 //! * `runtime service restart`: the running daemon's stop is asked for through
 //!   its own stop event, its single-instance guard is awaited (bounded), and
 //!   the successor is started as a client starts it and proved to be a new
@@ -43,7 +45,7 @@
 //! for a restart refused by current Jobs). `install` and `update` stay
 //! macOS-only (`unsupportedOnPlatform`), as do the retired `agentd`
 //! spellings.
-use crate::{CliError, Invocation};
+use crate::{CliError, Invocation, runtime_service_verify};
 use arkdeck_client::start::{StartFailure, StartTarget, Started, connect_verified, ensure_running};
 use arkdeck_client::{Client, ClientError};
 use arkdeck_platform::{
@@ -495,13 +497,25 @@ pub fn status_leaf(target: &ServiceTarget, id: &str) -> ServiceAnswer {
 
 /// `runtime service verify`: the installed identity and the state root and,
 /// when a daemon runs, that it proves the installed identity and answers
-/// `health`. Nothing is started; `runtime` is `null` when no daemon runs.
+/// `health`. With `--job`, the shared closure verifier reopens that Job.
+/// Nothing is started; a missing daemon cannot verify a persisted Job.
 pub fn verify_leaf(
     target: &ServiceTarget,
     id: &str,
     options: &Map<String, Value>,
 ) -> ServiceAnswer {
-    if let Some(option) = ["jobId", "targetId", "executionId", "maximumWaitSeconds"]
+    let job = options.get("jobId").and_then(Value::as_str);
+    if job.is_some()
+        && ["targetId", "executionId", "maximumWaitSeconds"]
+            .iter()
+            .any(|key| options.contains_key(*key))
+    {
+        return ServiceAnswer::fail(PlainFailure::new(
+            64,
+            "runtime service verify --job cannot be combined with execution options",
+        ));
+    }
+    if let Some(option) = ["targetId", "executionId", "maximumWaitSeconds"]
         .into_iter()
         .find(|key| options.contains_key(*key))
     {
@@ -512,7 +526,6 @@ pub fn verify_leaf(
                     "runtime service verify {} is not served on Windows yet: it verifies the \
                      installed daemon and its state root",
                     match option {
-                        "jobId" => "--job",
                         "targetId" => "--target",
                         "executionId" => "--execution-id",
                         _ => "--maximum-wait-seconds",
@@ -537,9 +550,51 @@ pub fn verify_leaf(
         );
     }
     if !status.socket_present {
+        if job.is_some() {
+            return ServiceAnswer::emit_then_fail(
+                json!({"daemonService": status.document, "runtime": null,
+                    "runtimeVerified": false}),
+                PlainFailure::new(
+                    69,
+                    "no daemon is running to inspect the persisted Runtime Job",
+                ),
+            );
+        }
         return ServiceAnswer::emit(
             json!({"daemonService": status.document, "runtime": null, "runtimeVerified": true}),
         );
+    }
+    if let Some(job) = job {
+        let client = match connect(target) {
+            Ok((client, _)) => std::cell::RefCell::new(client),
+            Err(detail) => {
+                return ServiceAnswer::emit_then_fail(
+                    json!({"daemonService": status.document, "runtime": null,
+                        "runtimeVerified": false}),
+                    PlainFailure::new(69, detail),
+                );
+            }
+        };
+        let request = |method: &str, params: Option<Map<String, Value>>| {
+            client
+                .borrow_mut()
+                .request(id, method, params)
+                .map_err(|error| error.to_string())
+        };
+        return match runtime_service_verify::verify_persisted_job(job, &request) {
+            Err(message) => ServiceAnswer::fail(PlainFailure::new(1, message)),
+            Ok(runtime_service_verify::ReopenOutcome::Verified(report)) => {
+                ServiceAnswer::emit(json!({"daemonService": status.document,
+                    "runtime": report, "runtimeVerified": true}))
+            }
+            Ok(runtime_service_verify::ReopenOutcome::Failed { reason, report }) => {
+                ServiceAnswer::emit_then_fail(
+                    json!({"daemonService": status.document,
+                        "runtime": report, "runtimeVerified": false}),
+                    PlainFailure::new(1, reason),
+                )
+            }
+        };
     }
     let proved = connect(target).and_then(|(mut client, pid)| {
         client

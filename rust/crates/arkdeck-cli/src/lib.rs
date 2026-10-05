@@ -91,7 +91,7 @@ pub use operation_validation::{
 pub mod runtime_service;
 #[cfg(target_os = "macos")]
 pub mod runtime_service_install;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod runtime_service_verify;
 #[cfg(windows)]
 pub mod runtime_service_windows;

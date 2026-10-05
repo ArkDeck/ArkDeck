@@ -593,22 +593,26 @@ fn pwsh() -> PathBuf {
     alias
 }
 
-fn cli(daemon: &Path, pin: &str, pipe: &str, arguments: &[&str]) -> (Option<i32>, Value) {
+fn cli_output(
+    root: &Root,
+    daemon: &Path,
+    pin: &str,
+    pipe: &str,
+    arguments: &[&str],
+) -> std::process::Output {
     let cli = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")).with_file_name("arkdeck.exe");
     let mut command = Command::new(&cli);
     for (key, _) in std::env::vars_os() {
-        if key
-            .to_string_lossy()
-            .to_ascii_uppercase()
-            .starts_with("ARKDECK_")
-        {
+        let upper = key.to_string_lossy().to_ascii_uppercase();
+        if upper.starts_with("ARKDECK_") || upper.starts_with("OHOS_HDC_") {
             command.env_remove(key);
         }
     }
-    let output = command
+    command
         .args(arguments)
         .args(["--output", "json"])
         .env("ARKDECK_ENDPOINT", pipe)
+        .env("ARKDECK_DEVELOPMENT_STATE_ROOT", &root.0)
         .env("ARKDECK_DAEMON_PATH", daemon)
         .env("ARKDECK_DAEMON_SIGNER_SHA256", pin)
         .stdin(Stdio::null())
@@ -619,7 +623,17 @@ fn cli(daemon: &Path, pin: &str, pipe: &str, arguments: &[&str]) -> (Option<i32>
                  `cargo build -p arkdeck-cli` before testing this crate alone",
                 cli.display()
             )
-        });
+        })
+}
+
+fn cli(
+    root: &Root,
+    daemon: &Path,
+    pin: &str,
+    pipe: &str,
+    arguments: &[&str],
+) -> (Option<i32>, Value) {
+    let output = cli_output(root, daemon, pin, pipe, arguments);
     let envelope = serde_json::from_slice(&output.stdout)
         .unwrap_or_else(|_| panic!("{arguments:?}: {output:?}"));
     (output.status.code(), envelope)
@@ -666,9 +680,45 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     let quota = expected_quota(&root);
     let mut running = Daemon::start(&daemon, &root.0);
     let pipe = running.serving();
-    let (status, envelope) = cli(&daemon, &pin, &pipe, &["artifact", "quota"]);
+    let (status, envelope) = cli(&root, &daemon, &pin, &pipe, &["artifact", "quota"]);
     assert_eq!(status, Some(0), "{envelope}");
     assert_eq!(envelope["result"], quota, "{envelope}");
+    let record_path = root
+        .0
+        .join("jobs-state/jobs")
+        .join(JOB)
+        .join("job-record.json");
+    let journal_path = root
+        .0
+        .join("jobs-state/jobs")
+        .join(JOB)
+        .join("journal.jsonl");
+    let record_before = std::fs::read(&record_path).unwrap();
+    let journal_before = std::fs::read(&journal_path).unwrap();
+    let (status, verified) = cli(
+        &root,
+        &daemon,
+        &pin,
+        &pipe,
+        &["runtime", "service", "verify", "--job", JOB],
+    );
+    assert_eq!(status, Some(0), "{verified}");
+    assert_eq!(verified["result"]["runtimeVerified"], true, "{verified}");
+    let reopened = &verified["result"]["runtime"];
+    assert_eq!(
+        reopened["schemaVersion"],
+        "arkdeck-headless-runtime-reopen/v1"
+    );
+    assert_eq!(reopened["classification"], "persistedRuntimeReceipt");
+    assert_eq!(reopened["status"]["jobId"], JOB);
+    assert_eq!(reopened["blockers"], json!([]));
+    assert_eq!(reopened["artifactInventory"].as_array().unwrap().len(), 3);
+    assert_eq!(
+        reopened["checks"],
+        json!({"udsHealthVerified": true,
+        "terminalStatusVerified": true, "trustedEvidenceVerified": true,
+        "artifactsVerified": true, "runtimePostflightVerified": true})
+    );
     for (method, params, answer) in &expected {
         let mut arguments = vec![
             "artifact".to_owned(),
@@ -683,7 +733,7 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
             arguments.push("--allow-sensitive".to_owned());
         }
         let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
-        let (status, envelope) = cli(&daemon, &pin, &pipe, &arguments);
+        let (status, envelope) = cli(&root, &daemon, &pin, &pipe, &arguments);
         assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
         assert_eq!(
             &labelled(envelope["result"].clone()),
@@ -693,6 +743,7 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     }
     let exports_text = exports.to_str().unwrap().to_owned();
     let (status, envelope) = cli(
+        &root,
         &daemon,
         &pin,
         &pipe,
@@ -719,6 +770,98 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
         std::fs::read(recorded().join(artifact())).unwrap()
     );
     running.stop(&root.0);
+    assert_eq!(Root::tree(&root.artifacts().join(JOB)), job_artifacts);
+
+    // The same persisted receipt is verified after restart without submitting
+    // or running a Job. The actual record, Journal and immutable payloads stay
+    // as they were; only bounded read snapshots may be published.
+    let mut running = Daemon::start(&daemon, &root.0);
+    let pipe = running.serving();
+    let (status, retained) = cli(
+        &root,
+        &daemon,
+        &pin,
+        &pipe,
+        &["runtime", "service", "verify", "--job", JOB],
+    );
+    assert_eq!(status, Some(0), "{retained}");
+    assert_eq!(retained["result"]["runtime"], *reopened);
+    assert_eq!(std::fs::read(&record_path).unwrap(), record_before);
+    assert_eq!(std::fs::read(&journal_path).unwrap(), journal_before);
+    assert_eq!(Root::tree(&root.artifacts().join(JOB)), job_artifacts);
+
+    let absent = cli_output(
+        &root,
+        &daemon,
+        &pin,
+        &pipe,
+        &["runtime", "service", "verify", "--job", ABSENT],
+    );
+    assert_eq!(absent.status.code(), Some(1), "{absent:?}");
+    assert!(
+        absent.stdout.is_empty(),
+        "a missing fact cannot produce a verified report"
+    );
+    assert!(
+        String::from_utf8_lossy(&absent.stderr).contains("does not exist"),
+        "{absent:?}"
+    );
+
+    let untrusted = cli_output(
+        &root,
+        &daemon,
+        &"0".repeat(64),
+        &pipe,
+        &["runtime", "service", "verify", "--job", JOB],
+    );
+    assert_eq!(untrusted.status.code(), Some(69), "{untrusted:?}");
+    let refused: Value = serde_json::from_slice(&untrusted.stdout).unwrap();
+    assert_eq!(refused["result"]["runtimeVerified"], false);
+
+    // Damage only this private copy's Artifact index. Closure failure retains
+    // a truthful report and exit 1, never a successful verification or repair.
+    let index = root.artifacts().join(JOB).join("index.json");
+    let index_before = std::fs::read(&index).unwrap();
+    std::fs::write(&index, b"{").unwrap();
+    let (status, damaged) = cli(
+        &root,
+        &daemon,
+        &pin,
+        &pipe,
+        &["runtime", "service", "verify", "--job", JOB],
+    );
+    assert_eq!(status, Some(1), "{damaged}");
+    assert_eq!(damaged["result"]["runtimeVerified"], false);
+    assert_eq!(damaged["result"]["runtime"]["runtimeVerified"], false);
+    assert!(
+        damaged["result"]["runtime"]["blockers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|blocker| blocker
+                .as_str()
+                .is_some_and(|text| text.starts_with("artifactInventory:")))
+    );
+    assert_eq!(std::fs::read(&index).unwrap(), b"{");
+    std::fs::write(&index, &index_before).unwrap();
+    assert_eq!(std::fs::read(&record_path).unwrap(), record_before);
+    assert_eq!(std::fs::read(&journal_path).unwrap(), journal_before);
+    running.stop(&root.0);
+
+    let (status, absent_daemon) = cli(
+        &root,
+        &daemon,
+        &pin,
+        &pipe,
+        &["runtime", "service", "verify", "--job", JOB],
+    );
+    assert_eq!(status, Some(69), "{absent_daemon}");
+    assert_eq!(absent_daemon["result"]["runtimeVerified"], false);
+    assert_eq!(absent_daemon["result"]["runtime"], Value::Null);
+    assert_eq!(
+        absent_daemon["result"]["daemonService"]["socketPresent"],
+        false
+    );
     assert_eq!(Root::tree(&root.artifacts().join(JOB)), job_artifacts);
     assert_measured(&[
         "artifact.list",
