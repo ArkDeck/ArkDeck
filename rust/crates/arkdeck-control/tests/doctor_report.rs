@@ -141,7 +141,8 @@ impl HostServices for Recorded {
                     });
                     found.pop().unwrap_or((0, Vec::new()))
                 })
-                .filter(|(total, _)| *total > 0),
+                .filter(|(total, _)| *total > 0)
+                .map(Ok),
             // Swift stages no Session: no recorded report names one.
             staged_sessions_kept: Vec::new(),
         }
@@ -359,6 +360,77 @@ fn a_quarantined_job_record_is_a_blocker_before_the_catalog_findings() {
         assert_eq!(report["ready"], false, "{report}");
         assert_eq!(report["findingCounts"]["blocker"], 1);
     }
+}
+
+/// `Managed`, with the exact result of the owner's deep Job index read.
+struct JobIndex(Managed, Result<(u64, Vec<String>), WireError>);
+impl HostServices for JobIndex {
+    fn observed_at(&self) -> String {
+        self.0.observed_at()
+    }
+    fn hdc_status(&self, deep: bool) -> HdcStatus {
+        self.0.hdc_status(deep)
+    }
+    fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+        unreachable!("doctor observes no device")
+    }
+    fn operation_availability(
+        &self,
+        reference: &str,
+        provider: &str,
+    ) -> Option<Vec<(&'static str, String)>> {
+        self.0.operation_availability(reference, provider)
+    }
+    fn doctor_facts(&self, deep: bool) -> DoctorFacts {
+        DoctorFacts {
+            unreadable_records: deep.then(|| self.1.clone()),
+            ..self.0.doctor_facts(deep)
+        }
+    }
+}
+
+#[test]
+fn an_unreadable_job_index_blocks_an_otherwise_ready_deep_report_without_a_count() {
+    let managed = || {
+        Managed(
+            "available",
+            "arkDeckManaged",
+            "hdc.identityObserved",
+            Vec::new(),
+        )
+    };
+    let clean = Control::new(JobIndex(managed(), Ok((0, Vec::new())))).unwrap();
+    let failed = Control::new(JobIndex(
+        managed(),
+        Err(WireError {
+            code: "recordUnreadable".into(),
+            message: "The Runtime Job snapshot is unreadable or unsupported".into(),
+            details: None,
+        }),
+    ))
+    .unwrap();
+
+    let standard = call(&failed, None).outcome.unwrap();
+    assert_eq!(standard, call(&clean, None).outcome.unwrap());
+    assert_eq!(standard["ready"], true);
+    let baseline = call(&clean, Some(json!({"deep": true}))).outcome.unwrap();
+    assert_eq!(baseline["ready"], true);
+    let report = call(&failed, Some(json!({"deep": true}))).outcome.unwrap();
+    validate_method_value("doctor", "result", &report).unwrap();
+    assert_eq!(report["ready"], false);
+    assert_eq!(report["overall"], "blocked");
+    assert_eq!(report["findingCounts"]["blocker"], 1);
+    assert_eq!(report["checks"], baseline["checks"]);
+    assert_eq!(report["checks"]["recovery"]["outstandingCleanupCount"], 0);
+    let findings = report["findings"].as_array().unwrap();
+    assert_eq!(
+        findings[1],
+        json!({"code": "runtime.durableRecordsUnreadable", "severity": "blocker",
+            "scope": "runtime", "summary": "the Runtime could not inspect its durable Job records; the record count is unavailable"})
+    );
+    let mut without = findings.clone();
+    without.remove(1);
+    assert_eq!(&without, baseline["findings"].as_array().unwrap());
 }
 
 /// `Managed`, with the staged Session entries the Runtime's start kept.

@@ -671,7 +671,7 @@ pub trait HostServices: Send + Sync {
 /// `DeviceBootstrapMachine`), and the outstanding cleanup debt (read in deep
 /// mode; `None` when it cannot be read, as for an engine without an Artifact
 /// store).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct DoctorFacts {
     pub artifacts: ArtifactStoreFacts,
     pub targets: TargetStoreFacts,
@@ -683,8 +683,9 @@ pub struct DoctorFacts {
     /// Every durable Job record in the store this build cannot decode, and a
     /// bounded sample of their identities in the index's order (Swift
     /// `engine.unreadableDurableRecords()`, whose sample stops at 16). Read
-    /// only for a deep report, so absent otherwise.
-    pub unreadable_records: Option<(u64, Vec<String>)>,
+    /// only for a deep report, so absent otherwise. A failed index read is
+    /// retained as a refusal, never treated as an empty or absent census.
+    pub unreadable_records: Option<Result<(u64, Vec<String>), WireError>>,
     /// The staged Session entries the daemon's start kept in the active
     /// Sessions root's `.staging`, in its order, each with the reason: nothing
     /// proved them this Runtime's, or they could not be removed. Swift stages
@@ -1629,7 +1630,7 @@ impl<H: HostServices> Control<H> {
         // Recovery's query excludes terminal states, so the findings above
         // name only still-active Jobs. A deep report counts the whole ledger
         // and names a bounded sample, as one finding rather than one per row.
-        if let Some((total, sample)) = &facts.unreadable_records
+        if let Some(Ok((total, sample))) = &facts.unreadable_records
             && *total > 0
         {
             let named = sample.join(", ");
@@ -1645,6 +1646,15 @@ impl<H: HostServices> Control<H> {
                         format!(", among them {named}")
                     }
                 ),
+                None,
+            );
+        }
+        if let Some(Err(_)) = &facts.unreadable_records {
+            add(
+                "runtime.durableRecordsUnreadable",
+                "blocker",
+                "runtime",
+                "the Runtime could not inspect its durable Job records; the record count is unavailable",
                 None,
             );
         }

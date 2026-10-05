@@ -22,7 +22,7 @@
 //! ended by this test if it outlives a failed assertion.
 #![cfg(windows)]
 
-use arkdeck_platform::{HostDirectory, StateRoot};
+use arkdeck_platform::{HostDirectory, HostSqlite, StateRoot};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
@@ -566,6 +566,121 @@ fn gj1_target_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     assert_eq!(status, Some(0), "{envelope}");
     assert!(envelope["result"][0]["displayName"].is_null(), "{envelope}");
     assert_eq!(envelope["result"][0]["displayNameGeneration"], "3");
+
+    // Doctor reads the same Windows owners as the signed CLI's resource
+    // calls. This isolated composition has no HDC: discovery remains a
+    // real blocker, while configured storage and the empty cleanup ledger
+    // must not be replaced with platform-default missing-owner facts.
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["doctor"]);
+    assert_eq!(status, Some(0), "{envelope}");
+    let report = &envelope["result"];
+    arkdeck_contract::validate_method_value("doctor", "result", report).unwrap();
+    let storage = &report["checks"]["storage"]["runtimeArtifacts"];
+    assert_eq!(storage["configured"], true, "{report}");
+    assert_eq!(storage["checked"], false, "{report}");
+    assert!(storage["totalBytes"].is_null());
+    assert_eq!(
+        report["checks"]["recovery"],
+        json!({"checked": false, "outstandingCleanupCount": null})
+    );
+
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["doctor", "--deep"]);
+    assert_eq!(status, Some(0), "{envelope}");
+    let report = &envelope["result"];
+    arkdeck_contract::validate_method_value("doctor", "result", report).unwrap();
+    let storage = &report["checks"]["storage"]["runtimeArtifacts"];
+    assert_eq!(storage["configured"], true, "{report}");
+    assert_eq!(storage["checked"], true, "{report}");
+    assert!(
+        storage["totalBytes"]
+            .as_u64()
+            .is_some_and(|total| total > 0)
+    );
+    assert_eq!(storage["usedBytes"], 0, "{report}");
+    assert_eq!(storage["remainingBytes"], storage["totalBytes"]);
+    assert_eq!(
+        report["checks"]["recovery"],
+        json!({"checked": true, "outstandingCleanupCount": 0})
+    );
+    assert_eq!(report["checks"]["target"]["adoptedTargetCount"], 1);
+    assert_eq!(report["checks"]["target"]["bootstrapConfigured"], false);
+    assert_eq!(report["ready"], false, "no HDC was composed");
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &["doctor", "--deep", "--require-healthy"],
+    );
+    assert_eq!(status, Some(69), "{envelope}");
+    assert_eq!(envelope["error"]["code"], "healthRequirementFailed");
+
+    // An index read refusal is not an empty census. Introduce an unsupported
+    // layout only in this test's private store after the daemon has started.
+    let index = root.0.join("jobs-state/runtime-jobs.sqlite3");
+    let mut database = HostSqlite::open(&index, false, false).unwrap();
+    database.execute("PRAGMA user_version=2", &[]).unwrap();
+    database
+        .query("PRAGMA wal_checkpoint(TRUNCATE)", &[], 1024)
+        .unwrap();
+    drop(database);
+    let before_index = std::fs::read(&index).unwrap();
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["doctor"]);
+    assert_eq!(status, Some(0), "{envelope}");
+    assert!(
+        envelope["result"]["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|finding| finding["code"] != "runtime.durableRecordsUnreadable")
+    );
+    for _ in 0..2 {
+        let (status, envelope) = cli(&daemon, &pin, &pipe, &["doctor", "--deep"]);
+        assert_eq!(status, Some(0), "{envelope}");
+        let report = &envelope["result"];
+        arkdeck_contract::validate_method_value("doctor", "result", report).unwrap();
+        assert_eq!(report["checks"]["recovery"]["outstandingCleanupCount"], 0);
+        let finding = report["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|finding| finding["code"] == "runtime.durableRecordsUnreadable")
+            .unwrap();
+        assert_eq!(finding["severity"], "blocker");
+        assert_eq!(
+            finding["summary"],
+            "the Runtime could not inspect its durable Job records; the record count is unavailable"
+        );
+        assert!(finding.get("details").is_none(), "no count is fabricated");
+        assert_eq!(report["ready"], false);
+        assert_eq!(std::fs::read(&index).unwrap(), before_index);
+    }
+
+    // A malformed ledger stays unreadable; the report neither claims zero
+    // debt nor repairs the original bytes to make readiness pass.
+    let ledger = b"{";
+    HostDirectory::open(&root.0.join("artifacts"))
+        .unwrap()
+        .create_document("cleanup-debt.json", ledger)
+        .unwrap();
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["doctor", "--deep"]);
+    assert_eq!(status, Some(0), "{envelope}");
+    let report = &envelope["result"];
+    assert!(report["checks"]["recovery"]["outstandingCleanupCount"].is_null());
+    assert!(
+        report["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|finding| {
+                finding["code"] == "recovery.cleanupDebtUnreadable"
+                    && finding["severity"] == "blocker"
+            })
+    );
+    assert_eq!(report["ready"], false);
+    assert_eq!(
+        std::fs::read(root.0.join("artifacts/cleanup-debt.json")).unwrap(),
+        ledger
+    );
     third.stop(&root.0);
     assert_eq!(root.targets(), before);
 }

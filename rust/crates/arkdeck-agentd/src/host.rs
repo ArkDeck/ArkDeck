@@ -3896,7 +3896,7 @@ impl HostServices for Host {
     /// Swift `doctorReport`'s owner inputs, read from this composition's
     /// owners as they are now.
     fn doctor_facts(&self, deep: bool) -> arkdeck_control::DoctorFacts {
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         {
             use arkdeck_control::ArtifactStoreFacts;
             // Swift `totalBytesUsed()` and `quotaTotalBytes`, read in deep mode.
@@ -3941,17 +3941,15 @@ impl HostServices for Host {
                 // Swift reads the whole ledger only for a deep report, and
                 // names at most sixteen of what it finds.
                 unreadable_records: match (&self.jobs, deep) {
-                    (Some(jobs), true) => jobs.unreadable_records(16).ok(),
+                    (Some(jobs), true) => Some(jobs.unreadable_records(16)),
                     _ => None,
                 },
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(not(any(target_os = "macos", windows)))]
         {
             let _ = deep;
             arkdeck_control::DoctorFacts {
-                #[cfg(windows)]
-                targets: self.target_store_facts(),
                 discovery: self.provider.is_some(),
                 ..arkdeck_control::DoctorFacts::default()
             }
@@ -4367,4 +4365,10 @@ pub(crate) fn timestamp(seconds: u64) -> String {
         time / 60 % 60,
         time % 60
     )
+}
+
+daemon_unit_tests! {
+    #[cfg(any(target_os = "macos", windows))]
+    #[path = "doctor_owner_tests.rs"]
+    mod doctor_owner_tests;
 }
