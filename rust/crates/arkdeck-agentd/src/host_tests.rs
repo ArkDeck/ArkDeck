@@ -5,6 +5,102 @@
 #[cfg(test)]
 mod tests {
     use crate::host::*;
+    /// Health is used as a readiness probe before the Session resource lane
+    /// seeds its fixtures. It must leave the retention catalog uninitialized
+    /// so the first Session read can discover those fixtures.
+    #[cfg(any(target_os = "macos", windows))]
+    #[test]
+    fn health_inventory_does_not_initialize_session_or_mutation_state() {
+        use arkdeck_contract::{Request, decode_response, encode_frame};
+        use arkdeck_control::HostServices;
+        use arkdeck_hoststore::{
+            ArtifactUsage, CapabilityStore, FlashPlanning, JobStore, SessionStore,
+            WorkspaceProjectStore,
+        };
+        use arkdeck_platform::HostDirectory;
+        use std::{collections::BTreeMap, fs, path::Path};
+
+        fn tree(path: &Path) -> BTreeMap<std::path::PathBuf, Option<Vec<u8>>> {
+            let mut entries = BTreeMap::new();
+            for child in fs::read_dir(path).unwrap() {
+                let path = child.unwrap().path();
+                if path.is_dir() {
+                    entries.insert(path.clone(), None);
+                    entries.extend(tree(&path));
+                } else {
+                    entries.insert(path.clone(), Some(fs::read(path).unwrap()));
+                }
+            }
+            entries
+        }
+        let temporary = fs::canonicalize(std::env::temp_dir()).unwrap();
+        #[cfg(windows)]
+        let temporary = temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .map_or(temporary.clone(), std::path::PathBuf::from);
+        let root = temporary.join(format!("health-inventory-{}", fresh_id().unwrap()));
+        for child in [
+            "jobs-state",
+            "session-state",
+            "sessions",
+            "artifacts",
+            "workspace-projects",
+            "bootstrap",
+        ] {
+            HostDirectory::open_or_create_private(&root.join(child)).unwrap();
+        }
+        let jobs = root.join("jobs-state");
+        let mut host = Host::from_environment();
+        host.provider = None;
+        assert!(host.registered_provider_ids().is_empty());
+        let host = host
+            .with_workspace_projects(
+                WorkspaceProjectStore::open(&root.join("workspace-projects")).unwrap(),
+            )
+            .with_workspace_operations(&root, &root.join("bootstrap"), None, None, None)
+            .unwrap();
+        assert_eq!(host.registered_provider_ids(), ["workspace"]);
+        let host = host
+            .with_planning(&root, None)
+            .with_flash_planning(FlashPlanning::new(
+                Some("fixture provider unavailable".into()),
+                || panic!("health must not probe the ArkForge dispatcher"),
+                None,
+            ))
+            .with_jobs(JobStore::open_owner(&jobs).unwrap())
+            .with_capabilities(CapabilityStore::open(&jobs.join("capabilities")).unwrap())
+            .with_mutation_root(jobs)
+            .with_storage(
+                SessionStore::open(&root.join("session-state"), &root.join("sessions")).unwrap(),
+                ArtifactUsage::open(&root.join("artifacts"), ARTIFACT_QUOTA).unwrap(),
+            );
+        assert!(host.authority().is_some());
+        let control = arkdeck_control::Control::new(host).unwrap();
+        let before = tree(&root);
+        assert!(
+            !root
+                .join("sessions/.arkdeck-retention-catalog.json")
+                .exists()
+        );
+        for _ in 0..2 {
+            let request = Request::new("health-state", "health", None);
+            let frame = encode_frame(&request, arkdeck_contract::MAX_REQUEST_BYTES).unwrap();
+            let bytes = control.handle_frame(frame.trim_ascii_end());
+            let answer = decode_response(bytes.trim_ascii_end(), "health-state", "health")
+                .unwrap()
+                .outcome
+                .unwrap();
+            assert_eq!(
+                answer["providers"],
+                serde_json::json!(["analyzer", "arkforge", "workspace"])
+            );
+            assert_eq!(tree(&root), before, "health changed durable owner state");
+        }
+        drop(control);
+        fs::remove_dir_all(root).unwrap();
+    }
+
     /// The development authority moves the root a device mutation proves its
     /// state continuity against, and changes nothing else about that proof.
     #[cfg(target_os = "macos")]
