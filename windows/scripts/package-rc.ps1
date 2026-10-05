@@ -556,6 +556,82 @@ function Get-TreeListing([string]$Path) {
     return @(Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { "$($_.FullName)|$(if ($_.PSIsContainer) { 0 } else { $_.Length })|$($_.LastWriteTimeUtc.Ticks)" } | Sort-Object)
 }
 
+# Windows package virtualization can give a logical path to the same owned file.
+# Ask the opened file, then bind process ownership to both its physical path and ID.
+function Initialize-RcSmokeFileIdentity {
+    if ('ArkDeckRcSmoke.FileIdentity' -as [type]) { return }
+    Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Text;
+using Microsoft.Win32.SafeHandles;
+
+namespace ArkDeckRcSmoke {
+    public sealed class FileIdentity {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Information {
+            public uint Attributes;
+            public System.Runtime.InteropServices.ComTypes.FILETIME Creation, Access, Write;
+            public uint Volume, SizeHigh, SizeLow, Links, IndexHigh, IndexLow;
+        }
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern SafeFileHandle CreateFileW(string name, uint access, uint share,
+            IntPtr security, uint creation, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool GetFileInformationByHandle(SafeFileHandle file, out Information info);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetFinalPathNameByHandleW(SafeFileHandle file, StringBuilder path,
+            uint capacity, uint flags);
+        public string Path { get; private set; }
+        public uint Volume { get; private set; }
+        public ulong Index { get; private set; }
+        public bool SameFile(FileIdentity other) {
+            return other != null && Volume == other.Volume && Index == other.Index
+                && String.Equals(Path, other.Path, StringComparison.OrdinalIgnoreCase);
+        }
+        public static FileIdentity Read(string path) {
+            // READ_ATTRIBUTES, share read/write/delete, OPEN_EXISTING, BACKUP_SEMANTICS:
+            // reads files and directories without changing either or their ACLs.
+            using (var file = CreateFileW(path, 0x80, 7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero)) {
+                if (file.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+                Information info;
+                if (!GetFileInformationByHandle(file, out info))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+                var buffer = new StringBuilder(512);
+                uint length = GetFinalPathNameByHandleW(file, buffer, (uint)buffer.Capacity, 0);
+                if (length == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+                if (length >= buffer.Capacity) {
+                    buffer = new StringBuilder(checked((int)length + 1));
+                    length = GetFinalPathNameByHandleW(file, buffer, (uint)buffer.Capacity, 0);
+                    if (length == 0 || length >= buffer.Capacity)
+                        throw new Win32Exception(Marshal.GetLastWin32Error());
+                }
+                string final = buffer.ToString();
+                if (final.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase))
+                    final = @"\\" + final.Substring(8);
+                else if (final.StartsWith(@"\\?\", StringComparison.Ordinal)) final = final.Substring(4);
+                return new FileIdentity { Path = final, Volume = info.Volume,
+                    Index = ((ulong)info.IndexHigh << 32) | info.IndexLow };
+            }
+        }
+    }
+}
+'@
+}
+
+function Get-RcSmokeFileIdentity([string]$Path) {
+    Initialize-RcSmokeFileIdentity
+    return [ArkDeckRcSmoke.FileIdentity]::Read($Path)
+}
+
+function Test-RcSmokeDaemonImage($Process, [string]$InstalledImage) {
+    if (-not $Process -or -not $Process.Path) { return $false }
+    $installed = Get-RcSmokeFileIdentity $InstalledImage
+    $running = Get-RcSmokeFileIdentity $Process.Path
+    return $installed.SameFile($running)
+}
+
 function Invoke-RcSmoke($Built) {
     $localAppData = [Environment]::GetFolderPath('LocalApplicationData')
     $productRoot = Join-Path $localAppData 'ArkDeck'
@@ -571,8 +647,13 @@ function Invoke-RcSmoke($Built) {
         steps         = [System.Collections.Generic.List[object]]::new()
     }
     $daemon = $null
+    $daemonOwned = $false
     $result = 'FAIL'
     try {
+        # The fresh directory's handle resolves LocalAppData virtualization before
+        # deriving any install/state/UIA/uninstall/cleanup paths from it.
+        $work = (Get-RcSmokeFileIdentity $work).Path
+        $workPrefix = $work.TrimEnd('\') + '\'
         # Install: the zip into the private root, every file checked against the manifest.
         [System.IO.Compression.ZipFile]::ExtractToDirectory($Built.Zip, (Join-Path $work 'install'))
         $packages = @(Get-ChildItem -LiteralPath (Join-Path $work 'install') -Directory)
@@ -626,7 +707,8 @@ function Invoke-RcSmoke($Built) {
         if (-not (Test-Path -LiteralPath $instancePath)) { throw "doctor started no daemon: $($doctor.stdout) $($doctor.stderr)" }
         $instance = Get-Content -LiteralPath $instancePath -Raw | ConvertFrom-Json
         $daemon = Get-Process -Id ([int]$instance.pid)
-        if ($daemon.Path -ne (Join-Path $install $DaemonName)) { throw "The started daemon $($instance.pid) runs $($daemon.Path), not the installed image." }
+        if (-not (Test-RcSmokeDaemonImage $daemon (Join-Path $install $DaemonName))) { throw "The started daemon $($instance.pid) does not run the installed file." }
+        $daemonOwned = $true
         $doctorJson = Get-Json $doctor.stdout
         if ($doctor.exitCode -ne 0 -or $doctorJson.ok -ne $true) { throw "doctor exited $($doctor.exitCode): $($doctor.stdout) $($doctor.stderr)" }
         $record.daemonPid = [int]$instance.pid
@@ -684,22 +766,25 @@ function Invoke-RcSmoke($Built) {
     } catch {
         $record.error = $_.Exception.Message
     } finally {
-        if ($daemon -and -not $daemon.HasExited) {
+        if ($daemonOwned -and $daemon -and -not $daemon.HasExited) {
             # Only the daemon this smoke proved it started (the installed image).
             $daemon.Kill($true)
             [void]$daemon.WaitForExit($DaemonDeadlineMs)
             $record.daemonKilled = $true
         }
         # Uninstall: the directory goes; nothing of it may run or remain.
-        $running = @(Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($work, [StringComparison]::OrdinalIgnoreCase) })
+        $workPrefix = $work.TrimEnd('\') + '\'
+        $running = @(Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($workPrefix, [StringComparison]::OrdinalIgnoreCase) })
         $record.processesLeftBeforeUninstall = $running.Count
-        Remove-Item -LiteralPath $work -Recurse -Force
+        # A mismatching or unreadable image is never ours to stop. Retain the
+        # private directory if such a process still runs from it, and fail closed.
+        if ($running.Count -eq 0) { Remove-Item -LiteralPath $work -Recurse -Force }
         $after = @(Get-ChildItem -LiteralPath $localAppData -Force | ForEach-Object { $_.Name } | Sort-Object)
         $record.uninstall = [ordered]@{
             directoryRemoved          = -not (Test-Path -LiteralPath $work)
             newLocalAppDataEntries    = @($after | Where-Object { $before -notcontains $_ })
             productRootUnchanged      = ((Get-TreeListing $productRoot) -join "`n") -eq ($productBefore -join "`n")
-            processesRunningFromIt    = @(Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($work, [StringComparison]::OrdinalIgnoreCase) }).Count
+            processesRunningFromIt    = @(Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith($workPrefix, [StringComparison]::OrdinalIgnoreCase) }).Count
         }
         if ($result -eq 'PASS' -and ($running.Count -ne 0 -or -not $record.uninstall.directoryRemoved -or $record.uninstall.newLocalAppDataEntries.Count -ne 0 -or -not $record.uninstall.productRootUnchanged -or $record.uninstall.processesRunningFromIt -ne 0)) {
             $result = 'FAIL'
