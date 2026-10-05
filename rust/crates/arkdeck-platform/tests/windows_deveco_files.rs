@@ -6,8 +6,8 @@
 #![cfg(windows)]
 
 use arkdeck_platform::{
-    DevEcoRole, DevEcoRoot, HostFileMeasureError, application_support_directory,
-    host_resolved_path, measure_host_file, random_bytes,
+    DevEcoRole, DevEcoRoot, HostFileMeasureError, host_resolved_path, measure_host_file,
+    random_bytes,
 };
 use sha2::{Digest, Sha256};
 use std::ffi::OsStr;
@@ -19,23 +19,22 @@ use std::path::{Path, PathBuf};
 const PRODUCT: &str = r#"{"name":"DevEco Studio","version":"9.8.7.6","buildNumber":"DS-999.1.2","productCode":"DS","productVendor":"Huawei","launch":[{"os":"Windows","arch":"amd64","launcherPath":"bin/devecostudio64.exe"}]}"#;
 const SDK: &str = r#"{"meta":{"version":"1.0.0"},"data":{"apiVersion":"99","platformVersion":"9.9.9","version":"9.9.9.1"}}"#;
 
-/// A scratch base under the account's local application data directory,
+/// A private scratch base under the account's profile directory,
 /// whose chain from the drive root is owned and written by the user and the
 /// system alone (the temporary directory may grant other principals write,
 /// which the reader rightly refuses).
 struct Scratch(PathBuf);
 impl Scratch {
     fn new(label: &str) -> Self {
-        let base = application_support_directory()
-            .unwrap()
+        let base = PathBuf::from(arkdeck_platform::runtime_home().unwrap())
             .canonicalize()
             .unwrap();
         let path = base.join(format!(
             "arkdeck-test-{label}-{:032x}",
             u128::from_le_bytes(random_bytes().unwrap())
         ));
-        std::fs::create_dir(&path).unwrap();
-        Self(path)
+        arkdeck_platform::create_private_directory(&path).unwrap();
+        Self(host_resolved_path(&path).unwrap())
     }
     fn deveco(&self, name: &str) -> PathBuf {
         deveco(&self.0, name)

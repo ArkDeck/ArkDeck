@@ -18,6 +18,7 @@ import unittest
 from unittest.mock import patch
 
 import jsonschema
+from test_manifest_preconsume import PreconsumeManifestSchemaTests
 
 SCRIPT = Path(__file__).resolve().with_name("check-contracts.py")
 SPEC = importlib.util.spec_from_file_location("arkdeck_dual_contract_checks", SCRIPT)

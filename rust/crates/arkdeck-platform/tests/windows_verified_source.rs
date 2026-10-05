@@ -30,7 +30,7 @@ impl Scratch {
             u128::from_le_bytes(random_bytes().unwrap())
         ));
         create_private_directory(&path).unwrap();
-        Self(path)
+        Self(arkdeck_platform::host_resolved_path(&path).unwrap())
     }
 }
 impl Drop for Scratch {

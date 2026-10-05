@@ -231,6 +231,64 @@ pub struct CapabilityStore {
 }
 
 impl CapabilityStore {
+    /// A null publication audit must prove this Job consumed no use, including
+    /// an append whose durable bytes survived an error before Job persistence.
+    /// Read only the existing state owner's store under its existing lock;
+    /// unlike ordinary ledger reads, a torn tail cannot prove absence.
+    pub(crate) fn proves_unconsumed_job(
+        job_directory: &Path,
+        job_id: &str,
+    ) -> Result<bool, CapabilityStoreError> {
+        let refused =
+            || CapabilityStoreError::Corrupted("pre-consume capability history is unproved".into());
+        let jobs = job_directory.parent().ok_or_else(refused)?;
+        if job_directory.file_name().and_then(|name| name.to_str()) != Some(job_id)
+            || jobs.file_name().and_then(|name| name.to_str()) != Some("jobs")
+        {
+            return Err(refused());
+        }
+        let state =
+            HostDirectory::open(jobs.parent().ok_or_else(refused)?).map_err(|_| refused())?;
+        // No `open`/`new` owner constructor: missing evidence is never created.
+        let directory = state.child("capabilities").map_err(|_| refused())?;
+        let _lock = directory
+            .try_lock_existing_strict(LOCK)
+            .map_err(|_| refused())?
+            .ok_or_else(refused)?;
+        let bytes = directory
+            .read_without_repair(CHECKPOINT, 16 * 1024 * 1024)
+            .map_err(|_| refused())?;
+        strict_json::validate(&bytes).map_err(|_| refused())?;
+        let mut document =
+            decode_durable(&bytes, Document::decode, Document::value).map_err(|_| refused())?;
+        validate(&document)?;
+        let ledger = match directory.read_without_repair(LEDGER, 64 * 1024 * 1024) {
+            Ok(bytes) => bytes,
+            // The existing owner's first-use representation: a valid
+            // checkpoint with no post-checkpoint events yet has no ledger.
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
+            Err(_) => return Err(refused()),
+        };
+        if !ledger.is_empty() && ledger.last() != Some(&b'\n') {
+            return Err(refused());
+        }
+        for line in ledger
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+        {
+            strict_json::validate(line).map_err(|_| refused())?;
+            let event = decode_durable(line, Event::decode, Event::value).map_err(|_| refused())?;
+            apply(&event, &mut document)?;
+        }
+        validate(&document)?;
+        Ok(document.records.iter().all(|record| {
+            record
+                .consumptions
+                .iter()
+                .all(|use_| !same_text(&use_.job, job_id))
+        }))
+    }
+
     /// Swift `RuntimeCapabilityStore.init`: the directory, created private
     /// when absent. Nothing in it is read or written until a call.
     pub fn open(directory: &Path) -> io::Result<Self> {

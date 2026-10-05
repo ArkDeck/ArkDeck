@@ -64,7 +64,7 @@
       "items": { "$ref": "#/$defs/binding" }
     },
     "toolchain": { "$ref": "#/$defs/toolchain" },
-    "runtimeAuthority": { "$ref": "#/$defs/runtimeAuthority" },
+    "runtimeAuthority": { "oneOf": [{ "$ref": "#/$defs/runtimeAuthority" }, { "type": "null" }] },
     "workflow": { "$ref": "#/$defs/workflow" },
     "steps": {
       "type": "array",
@@ -487,7 +487,7 @@
         "properties": {"executionMode": {"const": "execute"}},
         "allOf": [
           {
-            "if": {"properties": {"runtimeAuthority": {"properties": {"kind": {"const": "defaultReadOnlyPolicy"}}}}},
+            "if": {"properties": {"runtimeAuthority": {"type": "object", "properties": {"kind": {"const": "defaultReadOnlyPolicy"}}}}},
             "then": {
               "properties": {
                 "steps": {"items": {"properties": {"effect": {"not": {"enum": ["deviceMutation", "destructive"]}}}}},
@@ -498,6 +498,20 @@
                     }
                   }
                 }
+              }
+            }
+          },
+          {
+            "if": {"properties": {"runtimeAuthority": {"type": "null"}}},
+            "then": {
+              "properties": {
+                "status": {"enum": ["failed", "cancelled"]},
+                "outcomeCertainty": {"const": "confirmed"},
+                "steps": {"items": {"properties": {
+                  "effect": {"enum": ["hostOnly", "readOnly"]},
+                  "compensationDescriptors": {"maxItems": 0}
+                }}},
+                "compensations": {"maxItems": 0}
               }
             }
           }
@@ -559,7 +573,7 @@
     "consumedRuntimeAuthority": {
       "properties": {
         "toolchain": {"properties": {"kind": {"const": "runtimeProvider"}}, "required": ["kind"]},
-        "runtimeAuthority": {"properties": {"kind": {"const": "runtimeCapability"}}, "required": ["kind"]}
+        "runtimeAuthority": {"type": "object", "properties": {"kind": {"const": "runtimeCapability"}}, "required": ["kind"]}
       },
       "required": ["toolchain", "runtimeAuthority"]
     },

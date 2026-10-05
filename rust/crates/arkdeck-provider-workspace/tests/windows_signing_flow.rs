@@ -344,7 +344,9 @@ mod windows {
                 u128::from_le_bytes(random_bytes().unwrap())
             ));
             create_private_directory(&root).unwrap();
-            let scratch = Self { root };
+            let scratch = Self {
+                root: arkdeck_platform::host_resolved_path(&root).unwrap(),
+            };
             private_directories(scratch.java().parent().unwrap());
             let mut java = create_private_file(&scratch.java()).unwrap();
             std::io::copy(

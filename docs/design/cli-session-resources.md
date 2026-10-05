@@ -43,6 +43,11 @@ capability consumption correlation. Existing Runtime Step labels
 `runtimeE2Admission` (ArkForge flash) and `runtime-capability-admission` (HDC
 remote mutation) resolve only through that audit, not an invented UI confirmation.
 
+The approved pre-consume failed/cancelled execute exception records explicit
+`runtimeAuthority: null` only when the current durable Job, original Journal and
+complete capability-owner history prove no consumption, mutation/destructive
+intent or compensation; no policy audit or consumption tuple is synthesized.
+
 `arkdeck job reconcile` may retry a confirmed `sourceIntegrityFailed` Session
 publication only when the certain terminal Job already owns an entirely
 unbound pre-seal marker and its original Journal is complete. This retry

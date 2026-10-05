@@ -908,7 +908,7 @@ mod tests {
                 u128::from_le_bytes(crate::random_bytes().unwrap())
             ));
             crate::create_private_directory(&path).unwrap();
-            Self(path)
+            Self(crate::host_resolved_path(&path).unwrap())
         }
         fn file(&self, relative: &str, bytes: &[u8]) {
             let path = self.0.join(relative);
