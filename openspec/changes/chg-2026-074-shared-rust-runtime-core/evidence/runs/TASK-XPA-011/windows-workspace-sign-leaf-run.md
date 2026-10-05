@@ -90,6 +90,18 @@ census drops its row.
 signing itself is live-only. CI still runs the seam-absence check, the oracle replay and the
 development root's refusal (`windows_signed_runtime.rs`).
 
+## Leftover fixture credentials on this host
+
+Before this run, Credential Manager held 22 `ArkDeck-fixture/race-11176/svc/…` items (`kept-*`,
+`keep-*`, `churn-*`). No committed test writes that namespace:
+- `windows_credential_store.rs` names its namespaces `test-<pid>-<token>` and deletes them on
+  drop;
+- `race-` appears in no revision of any ArkDeck ref.
+
+They came from an uncommitted race-reproduction build, so there is no leak in the tree to fix.
+They were removed, and nothing outside `ArkDeck-fixture/` was touched. This run's own namespace
+(`sign-<nonce>`) is removed by the test, which checks that it is gone.
+
 ## Local targeted checks
 
 Rust 1.99.0, `CARGO_BUILD_JOBS=2`, `CARGO_TARGET_DIR=D:/cargo-target/s1-sign`, with
