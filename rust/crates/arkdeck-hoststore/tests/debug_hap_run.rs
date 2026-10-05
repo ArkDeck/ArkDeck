@@ -592,4 +592,507 @@ fn no_hap_is_sent_without_the_mutation_authority() {
     assert!(!calls.contains("file\u{1f}send"), "{calls}");
     assert!(!store.join("runtime-capabilities.ledger").exists());
     assert_eq!(uses(&owners), 0);
+    assert_eq!(
+        status["sessionPublication"]["state"], "published",
+        "{status}"
+    );
+    let manifest: Value = serde_json::from_slice(
+        &fs::read(
+            owners
+                .root
+                .join("Sessions/2026/09")
+                .join(format!("session-{job}"))
+                .join("manifest.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(manifest["status"], "failed");
+    assert_eq!(manifest["executionAuthority"], "standardAgent");
+    assert_eq!(manifest["toolchain"]["kind"], "runtimeProvider");
+    assert_eq!(manifest.get("runtimeAuthority"), Some(&Value::Null));
+    assert!(manifest["compensations"].as_array().unwrap().is_empty());
+    assert_eq!(manifest["steps"].as_array().unwrap().len(), 3);
+}
+
+/// Reproduce the previously deployed producer's retained pre-consume failure
+/// entirely in the isolated oracle store. The original Job remains failed;
+/// only its proved unbound publication is retried, never the provider.
+fn retained_preconsume_failure(owners: &Owners, cases: &Value) -> String {
+    let hdc = owners.hdc(&owners.dispatch);
+    let publisher = owners.publisher();
+    let job = admitted(owners, &hdc, cases, "normal");
+    let mut runner = owners.runner(&hdc, &publisher, false);
+    runner.sessions = None;
+    assert_eq!(
+        runner
+            .handle(json!({"jobId": job}).as_object().unwrap())
+            .unwrap()["state"],
+        "failed"
+    );
+    let mut record = owners.record(&job);
+    record["sessionPublicationRecord"] = json!({
+        "sessionID": format!("session-{job}"), "catalogDigest": arkdeck_contract::CATALOG_DIGEST,
+        "policyGeneration": "0", "root": {"path": "", "device": "0", "inode": "0", "volumeIdentity": ""},
+        "relativeSessionPath": "", "claims": [], "phase": "awaitingStorage",
+        "failure": {"code": "sourceIntegrityFailed", "certainty": "confirmed", "detail": "isolated pre-consume fixture"},
+    });
+    owners
+        .jobs
+        .persist(
+            &JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap(),
+            &fixed_now().unwrap(),
+        )
+        .unwrap();
+    job
+}
+
+fn publication_reconcile(owners: &Owners, job: &str) -> Result<Value, arkdeck_contract::WireError> {
+    let publisher = owners.publisher();
+    arkdeck_hoststore::JobReconciler {
+        jobs: &owners.jobs,
+        artifacts: &owners.artifacts,
+        imports: None,
+        now: fixed_now,
+        sessions: Some(&publisher),
+        hdc: None,
+        capabilities: None,
+        runner: None,
+    }
+    .handle(json!({"jobId": job}).as_object().unwrap())
+}
+
+#[test]
+fn retained_preconsume_hap_failure_republishes_without_provider_or_authority_writes() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let job = retained_preconsume_failure(&owners, &cases);
+    let imports =
+        arkdeck_hoststore::ImportUploadStore::open(&owners.root.join("artifacts")).unwrap();
+    let target =
+        support::document(&fixture.join("targets-state"), "targets.json")["targets"][0].clone();
+    let receipt = debug_hap::import_package(
+        &imports,
+        &owners.artifacts,
+        "independent",
+        target["targetID"].as_str().unwrap(),
+        1,
+        target["stablePhysicalIdentitySHA256"].as_str().unwrap(),
+        &fixed_now().unwrap(),
+    );
+    let inspection = || {
+        imports.lifecycle_resource(
+            &owners.artifacts,
+            &owners.jobs,
+            "artifact.import.inspection",
+            json!({"importId": receipt["importId"]})
+                .as_object()
+                .unwrap(),
+            &fixed_now().unwrap(),
+        )
+    };
+    assert_eq!(inspection().unwrap_err().code, "recordUnreadable");
+    let journal_before = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+    let record_before = owners.record(&job);
+    let calls_before = owners.calls();
+    let capabilities_before = debug_hap::tree_bytes(&owners.default_root.join("capabilities"));
+    let status = publication_reconcile(&owners, &job).unwrap();
+    assert_eq!(status["state"], "failed");
+    assert_eq!(
+        status["sessionPublication"]["state"], "published",
+        "{status}"
+    );
+    let after = owners.record(&job);
+    for key in [
+        "request",
+        "admissionEvidence",
+        "operationFailure",
+        "outcomeUnknown",
+        "residues",
+        "evidenceObservation",
+    ] {
+        assert_eq!(after[key], record_before[key], "{key}");
+    }
+    let journal_after = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+    assert!(journal_after.starts_with(&journal_before));
+    let appended = &journal_after[journal_before.len()..];
+    let finalized: Value = serde_json::from_slice(appended.strip_suffix(b"\n").unwrap()).unwrap();
+    assert_eq!(finalized["kind"], "finalized");
+    assert_eq!(finalized["payload"]["terminalStatus"], "failed");
+    assert_eq!(inspection().unwrap()["references"]["state"], "clear");
+    let persisted = fs::read(owners.job_file(&job, "job-record.json")).unwrap();
+    assert_eq!(publication_reconcile(&owners, &job).unwrap(), status);
+    assert_eq!(
+        fs::read(owners.job_file(&job, "journal.jsonl")).unwrap(),
+        journal_after
+    );
+    assert_eq!(
+        fs::read(owners.job_file(&job, "job-record.json")).unwrap(),
+        persisted
+    );
+    assert_eq!(owners.calls(), calls_before);
+    assert_eq!(
+        debug_hap::tree_bytes(&owners.default_root.join("capabilities")),
+        capabilities_before
+    );
+    assert_eq!(uses(&owners), 0);
+}
+
+#[test]
+fn retained_preconsume_publication_refuses_changed_owners_and_unproved_journals() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    for scenario in [
+        "diskDrift",
+        "keptJobRecord",
+        "torn",
+        "foreign",
+        "mutation",
+        "partialPreflight",
+        "failedPreflight",
+        "observation",
+        "toolDrift",
+        "observationTime",
+        "confirmedTime",
+        "recovery",
+        "proposal",
+        "receipt",
+    ] {
+        let owners = Owners::open(&fixture);
+        let job = retained_preconsume_failure(&owners, &cases);
+        let mut record = owners.record(&job);
+        let path = owners.job_file(&job, "journal.jsonl");
+        let mut events: Vec<Value> = fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        match scenario {
+            "diskDrift" => {
+                record["timeline"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!("contradictory disk owner"));
+                fs::write(
+                    owners.job_file(&job, "job-record.json"),
+                    serde_json::to_vec(&record).unwrap(),
+                )
+                .unwrap();
+            }
+            "keptJobRecord" => {
+                fs::hard_link(
+                    owners.job_file(&job, "job-record.json"),
+                    owners.job_file(&job, ".job-record.json.replaced"),
+                )
+                .unwrap();
+            }
+            "torn" => {
+                use std::io::Write;
+                fs::OpenOptions::new()
+                    .append(true)
+                    .open(&path)
+                    .unwrap()
+                    .write_all(b"{torn")
+                    .unwrap();
+            }
+            "foreign" => {
+                for event in &mut events {
+                    event["jobId"] = json!("job-foreign");
+                    event["sessionId"] = json!("session-job-foreign");
+                }
+            }
+            "mutation" => {
+                events[3]["payload"]["step"]["effect"] = json!("deviceMutation");
+            }
+            "partialPreflight" => {
+                events.drain(5..9);
+            }
+            "failedPreflight" => {
+                events[6]["payload"]["result"] = json!("failed");
+            }
+            "observation" => {
+                record["evidenceObservation"]["toolSHA256"] = json!("not-a-digest");
+            }
+            "toolDrift" => {
+                record["evidenceObservation"]["toolSHA256"] = json!("a".repeat(64));
+            }
+            "observationTime" => {
+                record["evidenceObservation"]["preflightSteps"][0]["outcomeAtUTC"] =
+                    json!("2026-09-14T00:00:01Z");
+            }
+            "confirmedTime" => {
+                record["evidenceObservation"]["confirmedAtUTC"] = json!("2026-09-14T00:00:01Z");
+            }
+            "recovery" => {
+                record["recoveryStepID"] = json!("confirm-evidence-target");
+            }
+            "proposal" => {
+                fs::write(
+                    owners.job_file(&job, "session-manifest.proposal.json"),
+                    b"{}",
+                )
+                .unwrap();
+            }
+            "receipt" => {
+                record["sessionPublicationRecord"]["receipt"] = json!({"manifestSHA256": "a".repeat(64), "catalogGeneration": "1", "publishedAtUTC": fixed_now().unwrap()});
+            }
+            _ => unreachable!(),
+        }
+        if ["foreign", "mutation", "partialPreflight", "failedPreflight"].contains(&scenario) {
+            for (sequence, event) in events.iter_mut().enumerate() {
+                event["sequence"] = json!(sequence);
+            }
+            fs::write(
+                &path,
+                events
+                    .iter()
+                    .map(|event| format!("{}\n", serde_json::to_string(event).unwrap()))
+                    .collect::<String>(),
+            )
+            .unwrap();
+        }
+        if [
+            "observation",
+            "toolDrift",
+            "observationTime",
+            "confirmedTime",
+            "recovery",
+            "receipt",
+        ]
+        .contains(&scenario)
+        {
+            owners
+                .jobs
+                .persist(
+                    &JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap(),
+                    &fixed_now().unwrap(),
+                )
+                .unwrap();
+        }
+        let record_before = fs::read(owners.job_file(&job, "job-record.json")).unwrap();
+        let journal_before = fs::read(&path).unwrap();
+        let job_tree_before =
+            debug_hap::tree_bytes(owners.job_file(&job, "job-record.json").parent().unwrap());
+        let calls_before = owners.calls();
+        let capabilities_before = debug_hap::tree_bytes(&owners.default_root.join("capabilities"));
+        let answer = publication_reconcile(&owners, &job);
+        assert!(
+            match &answer {
+                Err(_) => true,
+                Ok(status) =>
+                    status["sessionPublication"]["state"] != "published" || scenario == "receipt",
+            },
+            "{scenario}: {answer:?}"
+        );
+        assert_eq!(
+            fs::read(owners.job_file(&job, "job-record.json")).unwrap(),
+            record_before,
+            "{scenario}"
+        );
+        assert_eq!(fs::read(&path).unwrap(), journal_before, "{scenario}");
+        assert_eq!(
+            debug_hap::tree_bytes(owners.job_file(&job, "job-record.json").parent().unwrap()),
+            job_tree_before,
+            "{scenario}"
+        );
+        assert_eq!(owners.calls(), calls_before, "{scenario}");
+        assert_eq!(
+            debug_hap::tree_bytes(&owners.default_root.join("capabilities")),
+            capabilities_before,
+            "{scenario}"
+        );
+        assert!(
+            !owners
+                .root
+                .join("Sessions/2026/09")
+                .join(format!("session-{job}"))
+                .exists(),
+            "{scenario}"
+        );
+    }
+}
+
+#[test]
+fn retained_preconsume_publication_requires_whole_unconsumed_capability_history() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    for scenario in [
+        "pending",
+        "settled",
+        "torn",
+        "malformed",
+        "missingCheckpoint",
+        "missingLock",
+        "keptCheckpoint",
+        "keptLedger",
+    ] {
+        let owners = Owners::open(&fixture);
+        let job = retained_preconsume_failure(&owners, &cases);
+        let store = owners.default_root.join("capabilities");
+        if ["pending", "settled"].contains(&scenario) {
+            let record = owners.record(&job);
+            assert!(record["admissionEvidence"].is_null());
+            let checkpoint: Value =
+                serde_json::from_slice(&fs::read(store.join("runtime-capabilities.json")).unwrap())
+                    .unwrap();
+            let capability = &checkpoint["records"][0]["capability"];
+            let query = arkdeck_hoststore::CapabilityQuery {
+                operation_id: "debug.hap".into(),
+                operation_version: Some(1),
+                effect: arkdeck_hoststore::WorkflowEffect::DeviceMutation,
+                target_stable_identity_sha256:
+                    record["evidenceObservation"]["stableIdentitySHA256"]
+                        .as_str()
+                        .map(str::to_owned),
+                target_binding_revision: Some(1),
+                plan_digest: record["materializedPlanDigest"].as_str().map(str::to_owned),
+                inputs: capability["exactInputs"].as_object().unwrap().clone(),
+                artifact_facts: capability["exactArtifactFacts"]
+                    .as_object()
+                    .map(|facts| {
+                        facts
+                            .iter()
+                            .map(|(name, value)| (name.clone(), value.as_str().unwrap().to_owned()))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                workspace_identity_sha256: None,
+                workspace_revision: None,
+                workspace_file_scopes_digest: None,
+            };
+            let consumed = owners
+                .capabilities
+                .consume(
+                    capability["capabilityID"].as_str().unwrap(),
+                    record["request"]["idempotencyKey"].as_str().unwrap(),
+                    Some(&job),
+                    &query,
+                    &fixed_now().unwrap(),
+                )
+                .unwrap();
+            if scenario == "settled" {
+                owners
+                    .capabilities
+                    .record_outcome(
+                        &consumed.capability_id,
+                        &consumed.reservation_id,
+                        &job,
+                        arkdeck_hoststore::CapabilityUseOutcome::SafeToReflash,
+                        "failed",
+                        &fixed_now().unwrap(),
+                    )
+                    .unwrap();
+            }
+        } else {
+            match scenario {
+                "torn" => fs::write(store.join("runtime-capabilities.ledger"), b"{torn").unwrap(),
+                "malformed" => {
+                    fs::write(store.join("runtime-capabilities.ledger"), b"{}\n").unwrap()
+                }
+                "missingCheckpoint" => {
+                    fs::remove_file(store.join("runtime-capabilities.json")).unwrap()
+                }
+                "missingLock" => fs::remove_file(store.join(".runtime-capabilities.lock")).unwrap(),
+                "keptCheckpoint" => {
+                    fs::hard_link(
+                        store.join("runtime-capabilities.json"),
+                        store.join(".runtime-capabilities.json.replaced"),
+                    )
+                    .unwrap();
+                }
+                "keptLedger" => {
+                    fs::write(store.join("runtime-capabilities.ledger"), b"").unwrap();
+                    fs::hard_link(
+                        store.join("runtime-capabilities.ledger"),
+                        store.join(".runtime-capabilities.ledger.replaced"),
+                    )
+                    .unwrap();
+                }
+                _ => unreachable!(),
+            }
+        }
+        let record_before = fs::read(owners.job_file(&job, "job-record.json")).unwrap();
+        let journal_before = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+        let calls_before = owners.calls();
+        let capability_before = debug_hap::tree_bytes(&store);
+        assert!(publication_reconcile(&owners, &job).is_err(), "{scenario}");
+        assert_eq!(
+            fs::read(owners.job_file(&job, "job-record.json")).unwrap(),
+            record_before,
+            "{scenario}"
+        );
+        assert_eq!(
+            fs::read(owners.job_file(&job, "journal.jsonl")).unwrap(),
+            journal_before,
+            "{scenario}"
+        );
+        assert_eq!(owners.calls(), calls_before, "{scenario}");
+        assert_eq!(
+            debug_hap::tree_bytes(&store),
+            capability_before,
+            "{scenario}"
+        );
+    }
+}
+
+#[test]
+fn concurrent_preconsume_retries_keep_one_receipt_and_restart_does_not_republish() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let job = retained_preconsume_failure(&owners, &cases);
+    let calls_before = owners.calls();
+    let barrier = std::sync::Barrier::new(2);
+    let (left, right) = std::thread::scope(|scope| {
+        let run = || {
+            barrier.wait();
+            publication_reconcile(&owners, &job).unwrap()
+        };
+        let left = scope.spawn(run);
+        let right = scope.spawn(run);
+        (left.join().unwrap(), right.join().unwrap())
+    });
+    assert_eq!(left, right);
+    assert_eq!(left["sessionPublication"]["state"], "published");
+    let before = debug_hap::tree_bytes(&owners.root.join("Sessions"));
+    let journal = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&journal)
+            .matches("\"kind\":\"finalized\"")
+            .count(),
+        1
+    );
+    assert_eq!(owners.calls(), calls_before);
+    let root = owners.root.clone();
+    let state = owners.default_root.clone();
+    drop(owners);
+    let jobs = arkdeck_hoststore::JobStore::open_owner(&state).unwrap();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+    let answer = arkdeck_hoststore::JobReconciler {
+        jobs: &jobs,
+        artifacts: &artifacts,
+        imports: None,
+        now: fixed_now,
+        sessions: None,
+        hdc: None,
+        capabilities: None,
+        runner: None,
+    }
+    .handle(json!({"jobId": job}).as_object().unwrap())
+    .unwrap();
+    assert_eq!(answer, left);
+    assert_eq!(debug_hap::tree_bytes(&root.join("Sessions")), before);
+    assert_eq!(
+        fs::read(state.join("jobs").join(&job).join("journal.jsonl")).unwrap(),
+        journal
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("hdc-invocations.log")).unwrap(),
+        calls_before
+    );
 }

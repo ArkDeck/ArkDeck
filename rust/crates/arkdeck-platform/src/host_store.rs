@@ -962,6 +962,11 @@ impl HostDirectory {
         self.read_identified(name, maximum).map(|(bytes, _)| bytes)
     }
 
+    /// Unix reads already refuse multiply linked documents without recovery.
+    pub fn read_without_repair(&self, name: &str, maximum: usize) -> io::Result<Vec<u8>> {
+        self.read(name, maximum)
+    }
+
     /// [`Self::read`], and the identity of the file whose bytes these are:
     /// `read` requires it unchanged from before the read to after it, and
     /// still linked at `name`.

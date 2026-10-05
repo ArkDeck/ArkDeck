@@ -501,6 +501,14 @@ impl JobReconciler<'_> {
             return Err(refused("invalidParams", "jobId is required"));
         };
         let record = self.read(id)?;
+        if record.operation() == HAP
+            && terminal(&record.state)
+            && record
+                .session_publication()
+                .is_some_and(unbound_source_failure)
+        {
+            return self.preconsume_hap_publication(record);
+        }
         if !reconciled(record.operation(), &record.state) {
             return unported(record);
         }
@@ -653,6 +661,69 @@ impl JobReconciler<'_> {
 
     fn clock(&self) -> Result<String, WireError> {
         (self.now)().ok_or_else(|| other("the Runtime clock is unavailable"))
+    }
+
+    /// A retained pre-consume HAP failure can retry only its confirmed unbound
+    /// Session publication. It cannot repair capability lineage or dispatch
+    /// any provider action, and a settled publication is answered unchanged.
+    fn preconsume_hap_publication(&self, record: JobRecord) -> Result<Value, WireError> {
+        let _retry = self.jobs.publication_retry_guard()?;
+        let record = self.read(&record.job_id)?;
+        if !record
+            .session_publication()
+            .is_some_and(unbound_source_failure)
+        {
+            return unported(record);
+        }
+        self.jobs.verify_publication_snapshot(&record)?;
+        let directory = self
+            .jobs
+            .job_directory(&record.job_id)
+            .map_err(|error| other(format!("{error:?}")))?;
+        let journal = JournalWriter::open_without_repair(&directory)
+            .map_err(|error| other(format!("{error}")))?;
+        let events = journal_events(self.jobs, &record.job_id)?;
+        if !crate::session_publication::preconsume_hap_failure(&record, &events, &journal.facts()) {
+            return unported(record);
+        }
+        if !CapabilityStore::proves_unconsumed_job(&directory, &record.job_id)
+            .map_err(|error| other(error.swift()))?
+        {
+            return Err(refused(
+                "rejected",
+                "a durable capability consumption requires its original admission audit; nothing was dispatched or written",
+            ));
+        }
+        if !record.session_publication().is_some_and(|marker| {
+            unbound_source_failure(marker)
+                && marker["sessionID"] == format!("session-{}", record.job_id)
+                && marker["catalogDigest"] == record.catalog_digest()
+        }) {
+            return unported(record);
+        }
+        if journal.facts().finalized
+            || journal.facts().requires_recovery
+            || !matches!(std::fs::symlink_metadata(directory.join(PROPOSAL)), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+        {
+            return Ok(record.status());
+        }
+        let sequence = journal
+            .facts()
+            .last_durable_sequence
+            .map_or(0, |last| last + 1);
+        Held {
+            stored: record.clone(),
+            run: Run {
+                record,
+                journal,
+                sequence,
+                now: self.now,
+                consumed: None,
+            },
+            directory,
+            ahead: false,
+        }
+        .release(self.jobs, self.sessions)
     }
 
     /// Swift's non-resident branch of `reconcileOwned`: a terminal Job. A

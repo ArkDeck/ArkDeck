@@ -242,6 +242,18 @@ impl SessionPublisher<'_> {
         let journal_bytes =
             std::fs::read(&journal_path).map_err(|e| write_failed(&journal_path, &e))?;
         let replayed = events_of(&journal_bytes)?;
+        if preconsume_hap_failure(record, &replayed, &journal.facts())
+            && !crate::capability_store::CapabilityStore::proves_unconsumed_job(
+                job_directory,
+                &record.job_id,
+            )
+            .map_err(|error| stop("sourceIntegrityFailed", error.swift()))?
+        {
+            return Err(stop(
+                "sourceIntegrityFailed",
+                "device Session: this Job has a durable capability consumption but no admission audit",
+            ));
+        }
         let metadata = (journal_bytes.len() as u64).max(1) + 64 * 1024;
         let claim = format!("session-publication-{}", record.job_id);
         let admission = uuid().map_err(|e| write_failed(&root_path, &e))?;
@@ -783,7 +795,7 @@ fn compose(
     };
     let steps = manifest_steps(events)?;
     let compensations = manifest_compensations(events)?;
-    let device = device_context(record, events, mode)?;
+    let device = device_context(record, events, replay, mode)?;
     let mut bindings = manifest_bindings(events);
     if let Some(device) = &device
         && bindings.is_empty()
@@ -1125,6 +1137,7 @@ fn lowercase_sha256(value: &str) -> bool {
 fn device_context(
     record: &JobRecord,
     events: &[Value],
+    replay: &ReplayFacts,
     mode: &str,
 ) -> Result<Option<DeviceContext>, Stop> {
     fn declaration(event: &Value) -> Option<&Value> {
@@ -1252,80 +1265,86 @@ fn device_context(
         ));
     };
     let unaudited = || refused("missing admission audit or unsupported recovery provenance");
-    let admission = record.admission().ok_or_else(unaudited)?;
-    let member = |key: &str| admission.get(key).cloned().unwrap_or(Value::Null);
-    let admitted = seconds(admission["admittedAtUTC"].as_str());
-    if !admission["reference"]
-        .as_str()
-        .is_some_and(|reference| !reference.is_empty())
-        || !admitted.is_some_and(|admitted| admitted <= confirmed_at)
-        || !member("completeOverwriteRecovery").is_null()
-    {
-        return Err(unaudited());
-    }
-    let mut authority = json!({
-        "kind": member("kind"), "reference": member("reference"),
-        "admittedAtUtc": member("admittedAtUTC"), "validUntilUtc": member("validUntilUTC"),
-        "consumptionFingerprintSha256": member("consumptionFingerprintSHA256"),
-        "reservationId": null, "useOrdinal": null, "planDigest": null,
-        "stepSetDigest": null, "targetBindingDigest": null, "artifactDigest": null,
-    });
-    match admission["kind"].as_str() {
-        Some("defaultReadOnlyPolicy") => {
-            if mutation
-                || !member("validUntilUTC").is_null()
-                || !member("consumptionFingerprintSHA256").is_null()
-                || !member("runtimeCapabilityCorrelation").is_null()
-            {
-                return Err(refused("read-only policy cannot substantiate a mutation"));
-            }
+    let authority = if let Some(admission) = record.admission() {
+        let member = |key: &str| admission.get(key).cloned().unwrap_or(Value::Null);
+        let admitted = seconds(admission["admittedAtUTC"].as_str());
+        if !admission["reference"]
+            .as_str()
+            .is_some_and(|reference| !reference.is_empty())
+            || !admitted.is_some_and(|admitted| admitted <= confirmed_at)
+            || !member("completeOverwriteRecovery").is_null()
+        {
+            return Err(unaudited());
         }
-        Some("runtimeCapability") => {
-            let correlation = &admission["runtimeCapabilityCorrelation"];
-            if !correlation["reservationID"]
-                .as_str()
-                .is_some_and(|s| !s.is_empty())
-                || !correlation["useOrdinal"].as_u64().is_some_and(|n| n > 0)
-                || !admission["consumptionFingerprintSHA256"]
+        let mut authority = json!({
+            "kind": member("kind"), "reference": member("reference"),
+            "admittedAtUtc": member("admittedAtUTC"), "validUntilUtc": member("validUntilUTC"),
+            "consumptionFingerprintSha256": member("consumptionFingerprintSHA256"),
+            "reservationId": null, "useOrdinal": null, "planDigest": null,
+            "stepSetDigest": null, "targetBindingDigest": null, "artifactDigest": null,
+        });
+        match admission["kind"].as_str() {
+            Some("defaultReadOnlyPolicy") => {
+                if mutation
+                    || !member("validUntilUTC").is_null()
+                    || !member("consumptionFingerprintSHA256").is_null()
+                    || !member("runtimeCapabilityCorrelation").is_null()
+                {
+                    return Err(refused("read-only policy cannot substantiate a mutation"));
+                }
+            }
+            Some("runtimeCapability") => {
+                let correlation = &admission["runtimeCapabilityCorrelation"];
+                if !correlation["reservationID"]
                     .as_str()
-                    .is_some_and(lowercase_sha256)
-                || !seconds(admission["validUntilUTC"].as_str())
-                    .zip(admitted)
-                    .is_some_and(|(expiry, start)| start < expiry)
-                || correlation["planDigestSHA256"].as_str() != record.materialized_plan()
-                || ![
-                    "planDigestSHA256",
-                    "stepSetDigestSHA256",
-                    "targetBindingDigestSHA256",
-                ]
-                .iter()
-                .all(|key| correlation[*key].as_str().is_some_and(lowercase_sha256))
-                || (!correlation["artifactSHA256"].is_null()
-                    && !correlation["artifactSHA256"]
+                    .is_some_and(|s| !s.is_empty())
+                    || !correlation["useOrdinal"].as_u64().is_some_and(|n| n > 0)
+                    || !admission["consumptionFingerprintSHA256"]
                         .as_str()
-                        .is_some_and(lowercase_sha256))
-            {
+                        .is_some_and(lowercase_sha256)
+                    || !seconds(admission["validUntilUTC"].as_str())
+                        .zip(admitted)
+                        .is_some_and(|(expiry, start)| start < expiry)
+                    || correlation["planDigestSHA256"].as_str() != record.materialized_plan()
+                    || ![
+                        "planDigestSHA256",
+                        "stepSetDigestSHA256",
+                        "targetBindingDigestSHA256",
+                    ]
+                    .iter()
+                    .all(|key| correlation[*key].as_str().is_some_and(lowercase_sha256))
+                    || (!correlation["artifactSHA256"].is_null()
+                        && !correlation["artifactSHA256"]
+                            .as_str()
+                            .is_some_and(lowercase_sha256))
+                {
+                    return Err(refused(
+                        "missing or inconsistent consumed Runtime capability audit",
+                    ));
+                }
+                for (destination, source) in [
+                    ("reservationId", "reservationID"),
+                    ("useOrdinal", "useOrdinal"),
+                    ("planDigest", "planDigestSHA256"),
+                    ("stepSetDigest", "stepSetDigestSHA256"),
+                    ("targetBindingDigest", "targetBindingDigestSHA256"),
+                    ("artifactDigest", "artifactSHA256"),
+                ] {
+                    authority[destination] = correlation[source].clone();
+                }
+            }
+            _ => {
                 return Err(refused(
                     "missing or inconsistent consumed Runtime capability audit",
                 ));
             }
-            for (destination, source) in [
-                ("reservationId", "reservationID"),
-                ("useOrdinal", "useOrdinal"),
-                ("planDigest", "planDigestSHA256"),
-                ("stepSetDigest", "stepSetDigestSHA256"),
-                ("targetBindingDigest", "targetBindingDigestSHA256"),
-                ("artifactDigest", "artifactSHA256"),
-            ] {
-                authority[destination] = correlation[source].clone();
-            }
         }
-        _ => {
-            return Err(refused(
-                "missing or inconsistent consumed Runtime capability audit",
-            ));
-        }
-    }
+        authority
+    } else if preconsume_hap_journal(record, events, replay) {
+        Value::Null
+    } else {
+        return Err(unaudited());
+    };
     let snapshot = json!({"targetId": target_id, "stableIdentitySHA256": identity,
         "model": model, "firmware": firmware});
     Ok(Some(DeviceContext {
@@ -1345,6 +1364,123 @@ fn device_context(
             "sha256": tool_sha256}),
         authority,
     }))
+}
+
+/// The approved pre-consume failure branch, proved from original declarations,
+/// never from a synthesized admission or a Manifest's disposition labels.
+/// This implementation supports only the current HAP's bounded read-only
+/// preflight; no mutation, compensation, recovery, or foreign Journal is eligible.
+pub(crate) fn preconsume_hap_failure(
+    record: &JobRecord,
+    events: &[Value],
+    replay: &ReplayFacts,
+) -> bool {
+    preconsume_hap_journal(record, events, replay)
+        && device_context(record, events, replay, "execute")
+            .is_ok_and(|context| context.is_some_and(|context| context.authority.is_null()))
+}
+
+fn preconsume_hap_journal(record: &JobRecord, events: &[Value], replay: &ReplayFacts) -> bool {
+    if record.operation() != "debug.hap@1"
+        || record.provider() != "hdc"
+        || record.catalog_digest() != arkdeck_contract::CATALOG_DIGEST
+        || !["failed", "cancelled"].contains(&record.state.as_str())
+        || record.outcome_unknown()
+        || record.residues() != Some(0)
+        || record.admission().is_some()
+        || record.recovery_step().is_some()
+        || record.recovery_intent().is_some()
+        || record.recovery_action().is_some()
+        || replay.has_torn_tail
+        || replay.current_state.as_deref() != Some(&record.state)
+        || !replay.outstanding_intents.is_empty()
+        || !replay.unknown_outcomes.is_empty()
+        || replay.requires_unknown_finalized_outcome
+        || !events.first().is_some_and(|event| {
+            event["kind"] == "jobCreated" && event["payload"]["executionMode"] == "execute"
+        })
+        || events.iter().any(|event| {
+            event["jobId"] != record.job_id
+                || event["sessionId"] != format!("session-{}", record.job_id)
+                || !matches!(
+                    event["kind"].as_str(),
+                    Some(
+                        "jobCreated"
+                            | "stateTransition"
+                            | "stepIntent"
+                            | "stepOutcome"
+                            | "finalized"
+                    )
+                )
+        })
+    {
+        return false;
+    }
+    let Some(operation) = crate::operation_catalog::CatalogOperation::lookup("debug.hap", Some(1))
+    else {
+        return false;
+    };
+    let preflight: Vec<_> = operation
+        .steps
+        .iter()
+        .filter(|step| crate::device_steps::evidence_preflight_step(step))
+        .collect();
+    let intents: Vec<_> = events
+        .iter()
+        .filter(|event| event["kind"] == "stepIntent")
+        .collect();
+    if preflight.len() != 3 || intents.len() != preflight.len() {
+        return false;
+    }
+    let observations: Vec<_> = intents.iter().map(|intent| {
+        let outcome = events.iter().find(|event| event["kind"] == "stepOutcome"
+            && event["payload"]["correlatesToIntentEventId"] == intent["eventId"]);
+        json!({"stepID": intent["payload"]["step"]["id"], "stepKind": intent["payload"]["step"]["kind"],
+            "outcomeAtUTC": outcome.map(|outcome| outcome["timestamp"].clone())})
+    }).collect();
+    let Some(mut original_observation) = record.evidence_preflight().cloned() else {
+        return false;
+    };
+    let Some(fields) = original_observation.as_object_mut() else {
+        return false;
+    };
+    let Some(steps) = fields.remove("steps") else {
+        return false;
+    };
+    fields.insert("preflightSteps".into(), steps);
+    fields.insert("confirmationMethod".into(), json!("machineReadback"));
+    if record.evidence_observation() != Some(&original_observation) {
+        return false;
+    }
+    if !record.evidence_observation().is_some_and(|observation| {
+        observation["preflightSteps"] == json!(observations)
+            && observation["confirmedAtUTC"] == observations[2]["outcomeAtUTC"]
+    }) {
+        return false;
+    }
+    intents.iter().zip(preflight).all(|(intent, step)| {
+        let arguments = match step.kind.as_str() {
+            "probeDevice" => json!({"evidencePolicy": "coreMinimum"}),
+            "runApprovedRemoteRead" => {
+                let Some((catalog, action)) = &step.action else { return false; };
+                json!({"catalogId": catalog, "actionId": action, "parameters": {}, "artifactId": format!("artifact-{}", step.step_id)})
+            }
+            _ => return false,
+        };
+        step.effect == "readOnly"
+            && step.binding == "confirmedDevice"
+            && intent["payload"]["step"] == json!({
+                "id": step.step_id, "kind": step.kind, "effect": step.effect,
+                "cancellation": step.cancellation, "bindingRequirement": step.binding,
+                "compensationDescriptors": [], "arguments": arguments,
+            })
+            && events.iter().any(|outcome| {
+                outcome["kind"] == "stepOutcome"
+                    && outcome["payload"]["correlatesToIntentEventId"] == intent["eventId"]
+                    && outcome["payload"]["outcomeCertainty"] == "confirmed"
+                    && outcome["payload"]["result"] == "succeeded"
+            })
+    })
 }
 
 /// Whether any intent can touch a device, which is what makes Swift build a

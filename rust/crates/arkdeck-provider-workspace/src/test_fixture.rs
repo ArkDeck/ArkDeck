@@ -36,7 +36,7 @@ pub(crate) fn directory(label: &str) -> PathBuf {
     let path = PathBuf::from(base.strip_prefix(r"\\?\").unwrap_or(base))
         .join(format!("arkdeck-test-{label}-{}", token()));
     arkdeck_platform::create_private_directory(&path).unwrap();
-    path
+    arkdeck_platform::host_resolved_path(&path).unwrap()
 }
 
 /// `path` and every missing ancestor, private.

@@ -76,6 +76,7 @@ fn choice<'a>(value: &'a Object, key: &str, choices: &[&str]) -> Result<&'a str>
 fn nonempty(value: &Object, key: &str) -> Result<()> {
     require(!text(value, key)?.is_empty())
 }
+
 fn timestamp(value: &Object, key: &str) -> Result<f64> {
     session_timestamp(text(value, key)?).ok_or(ManifestError::Invalid)
 }
@@ -322,8 +323,24 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
     }
     if kind == "runtimeProvider" {
         require(mode == "execute" && !host)?;
-        let audit = object(doc.get("runtimeAuthority").ok_or(ManifestError::Invalid)?)?;
-        validate_runtime_audit(audit)?;
+        let authority = doc.get("runtimeAuthority").ok_or(ManifestError::Invalid)?;
+        let audit = if authority.is_null() {
+            // Approved pre-consume failure/cancellation: the producer must
+            // prove the original Journal contains no mutation or compensation.
+            // Null records absent authority; it never supplies a policy audit.
+            require(["failed", "cancelled"].contains(&status) && certainty == "confirmed")?;
+            require(array(doc, "compensations")?.is_empty())?;
+            for value in array(doc, "steps")? {
+                let step = object(value)?;
+                require(["hostOnly", "readOnly"].contains(&text(step, "effect")?))?;
+                require(array(step, "compensationDescriptors")?.is_empty())?;
+            }
+            None
+        } else {
+            let audit = object(authority)?;
+            validate_runtime_audit(audit)?;
+            Some(audit)
+        };
         for key in ["steps", "compensations"] {
             for value in array(doc, key)? {
                 let row = object(value)?;
@@ -333,7 +350,9 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
                     row
                 };
                 if ["deviceMutation", "destructive"].contains(&text(declaration, "effect")?) {
-                    require(text(audit, "kind")? == "runtimeCapability")?;
+                    require(audit.is_some_and(|audit| {
+                        text(audit, "kind").ok() == Some("runtimeCapability")
+                    }))?;
                 }
             }
         }
@@ -761,4 +780,67 @@ fn validate_parameters(values: &[Value], status: &str) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod preconsume_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn manifest() -> Value {
+        let mut manifest: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/debug-hap/sessions/2026/09/session-job-e79d1b4e261f4a13d0bfb58a97fbf163/manifest.json"
+        )).unwrap();
+        manifest["steps"].as_array_mut().unwrap().retain(|step| {
+            [
+                "confirm-evidence-target",
+                "read-evidence-model",
+                "read-evidence-firmware",
+            ]
+            .contains(&step["id"].as_str().unwrap())
+        });
+        assert_eq!(manifest["steps"].as_array().unwrap().len(), 3);
+        manifest["compensations"] = json!([]);
+        manifest["runtimeAuthority"] = Value::Null;
+        manifest["status"] = json!("failed");
+        manifest["failure"] = json!({"stage": "execution", "code": "executionFailed", "summary": "isolated pre-consume fixture"});
+        manifest
+    }
+
+    fn valid(value: &Value) -> bool {
+        decode_manifest(&crate::session_json::encode(value).unwrap()).is_ok()
+    }
+
+    #[test]
+    fn explicit_absent_runtime_authority_is_only_a_confirmed_preconsume_failure() {
+        let original = manifest();
+        assert_eq!(original["executionAuthority"], "standardAgent");
+        assert!(valid(&original));
+        let mut cancelled = original.clone();
+        cancelled["status"] = json!("cancelled");
+        cancelled["failure"] = Value::Null;
+        assert!(valid(&cancelled));
+        for (pointer, value) in [
+            ("/status", json!("succeeded")),
+            ("/status", json!("interrupted")),
+            ("/executionMode", json!("planOnly")),
+            ("/outcomeCertainty", json!("outcomeUnknown")),
+            ("/steps/0/effect", json!("deviceMutation")),
+            ("/steps/0/effect", json!("destructive")),
+            ("/steps/0/compensationDescriptors", json!([{}])),
+            ("/compensations", json!([{}])),
+            ("/toolchain", json!({"kind": "none"})),
+            (
+                "/runtimeAuthority",
+                json!({"kind": "defaultReadOnlyPolicy"}),
+            ),
+        ] {
+            let mut changed = original.clone();
+            *changed.pointer_mut(pointer).unwrap() = value;
+            assert!(!valid(&changed), "{pointer}: {changed}");
+        }
+        let mut missing = original;
+        missing.as_object_mut().unwrap().remove("runtimeAuthority");
+        assert!(!valid(&missing));
+    }
 }

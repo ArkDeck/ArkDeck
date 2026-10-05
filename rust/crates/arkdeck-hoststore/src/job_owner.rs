@@ -63,6 +63,9 @@ pub struct JobStore {
     path: PathBuf,
     root: HostDirectory,
     activity: std::sync::Mutex<()>,
+    /// Serializes explicit unbound publication retries across their fresh read,
+    /// proposal and marker persistence. Separate from `activity` (persist locks it).
+    publication_retry: std::sync::Mutex<()>,
     /// Readers cover final admission; a lifecycle exclusively freezes the
     /// participant inventory. Acquisition never waits behind a lifecycle.
     hdc_lifecycle: std::sync::RwLock<()>,
@@ -244,6 +247,7 @@ impl JobStore {
             path: path.into(),
             root,
             activity: std::sync::Mutex::new(()),
+            publication_retry: std::sync::Mutex::new(()),
             hdc_lifecycle: std::sync::RwLock::new(()),
             hdc_recomposition: std::sync::atomic::AtomicBool::new(false),
             resident: Default::default(),
@@ -662,6 +666,44 @@ impl JobStore {
                     )
                 })
             })
+    }
+
+    /// Before retrying an unbound terminal publication, its resident snapshot
+    /// must still equal both durable owners and the original submission hash.
+    /// This does not repair either owner or relax the full import census.
+    pub(crate) fn verify_publication_snapshot(&self, record: &JobRecord) -> Result<(), WireError> {
+        let _guard = self.activity.lock().map_err(unreadable)?;
+        self.root.validate_path(&self.path).map_err(unreadable)?;
+        let rows = self
+            .repository
+            .rows(Some(&record.job_id))
+            .map_err(unreadable)?;
+        let row = rows
+            .first()
+            .filter(|_| rows.len() == 1)
+            .ok_or_else(|| unreadable(()))?;
+        let indexed = JobRecord::from_row(row)?;
+        let bytes = self
+            .root
+            .child("jobs")
+            .map_err(unreadable)?
+            .child(&record.job_id)
+            .map_err(unreadable)?
+            .read_without_repair("job-record.json", RECORD_BOUND)
+            .map_err(unreadable)?;
+        if !indexed.verifies_submission(&row.request_hash)
+            || indexed.value()? != record.value()?
+            || JobRecord::decode(&bytes)?.value()? != indexed.value()?
+        {
+            return Err(unreadable(()));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn publication_retry_guard(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, ()>, WireError> {
+        self.publication_retry.lock().map_err(unreadable)
     }
 
     /// Swift `evidenceSnapshot`'s read of the superseding recovery epochs,

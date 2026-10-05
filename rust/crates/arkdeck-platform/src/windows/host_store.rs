@@ -896,6 +896,32 @@ impl HostDirectory {
         self.read_identified(name, maximum).map(|(bytes, _)| bytes)
     }
 
+    /// A historical proof must not recover a kept replacement link while
+    /// reading. The same ownership, no-follow, bound and whole-file identity
+    /// checks as `read`, with a multiply linked document refused untouched.
+    pub fn read_without_repair(&self, name: &str, maximum: usize) -> io::Result<Vec<u8>> {
+        let file = self.open_at_access(name, READ)?;
+        owned(&file, false, self.1)?;
+        let before = Stat::of(&file)?;
+        if before.size > maximum as u64 {
+            return Err(fail());
+        }
+        let mut bytes = Vec::new();
+        (&file).take(maximum as u64 + 1).read_to_end(&mut bytes)?;
+        let after = Stat::of(&file)?;
+        let linked = host_fs::inspect_relative(&self.0, &segment(name)?)?;
+        if !read_whole(
+            &before,
+            &after,
+            &Stat::of(&linked)?,
+            bytes.len() as u64,
+            maximum,
+        ) {
+            return Err(fail());
+        }
+        Ok(bytes)
+    }
+
     /// [`Self::read`], and the identity of the file whose bytes these are:
     /// `read` requires it unchanged from before the read to after it, and
     /// still linked at `name`.
