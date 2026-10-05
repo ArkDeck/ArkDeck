@@ -102,3 +102,22 @@ https://github.com/ArkDeck/ArkDeck/pull/2584; that layer's four predecessor PRs
 are green at their recorded heads, while #2584's full parity is still running.
 The later delivery slice will record this layer's actual PR/run result without
 amending an already-green head. This record makes no acceptance or approval claim.
+
+### Import-audit CI follow-up
+
+The #2585 Ubuntu harness lane rejected the native Windows standard-library imports in
+`observations.py`. The closed allowlist now includes only `ctypes`, `msvcrt` and `_winapi`;
+an AST regression still rejects external imports through aliases, `from` and nested forms.
+
+Local targeted checks: `python -m unittest bench.test_harness.StaticImportAudit` passed all
+5 tests on Windows (exit 0, `soak-owner-import-audit.log`). The complete CI command,
+`python3 -m unittest discover -s bench -t .` from `scripts`, passed in the existing Ubuntu
+24.04 WSL distribution: 270 tests (269 plus the regression), 11 existing platform/optional
+fixture skips, exit 0 (`soak-owner-harness-linux.log`). An initial native Windows discovery
+ran all 270 but failed existing Unix assumptions (`os.uname`, `AF_UNIX`, `/usr/bin/true` and
+Swift defaults); it is recorded in `soak-owner-harness-lane.log`, not treated as Linux-lane
+validation. Temporary baseline documents emitted by mocked unit tests are not measurements.
+`sh scripts/check-sdd.sh` passed (exit 0, `soak-owner-import-audit-sdd.log`).
+
+CI: the original #2585 import-audit failure is identified; a rerun of the follow-up head is
+pending integration. No runtime behavior, resource threshold or acceptance claim changed.
