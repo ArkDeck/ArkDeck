@@ -72,8 +72,13 @@ def sync_tree(source: Path, destination: Path, *, preserve: tuple[tuple[str, ...
             sync_file(entry, target)
 
 
+def git_environment() -> dict[str, str]:
+    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+
+
 def git(root: Path, *arguments: str) -> str:
-    return subprocess.check_output(["git", "-C", str(root), *arguments], text=True).strip()
+    return subprocess.check_output(["git", "-C", str(root), *arguments],
+                                   env=git_environment(), text=True).strip()
 
 
 def cache_root(value: str, source: Path = ROOT) -> Path:
@@ -115,7 +120,7 @@ def prepare(source: Path, root: Path) -> Path:
     mirror.mkdir(exist_ok=True)
     listed = subprocess.check_output([
         "git", "-C", str(source), "ls-files", "--cached", "--others", "--exclude-standard", "-z",
-    ]).decode().split("\0")
+    ], env=git_environment()).decode().split("\0")
     paths = {name for name in listed if name and ((source / name).exists() or (source / name).is_symlink())}
     tree = {}
     for name in paths:

@@ -125,6 +125,36 @@ python3 scripts/ci/plan.py \
   --run-local
 ```
 
+Rust checks use one persistent cache per chat, following ArkTrace's owner-based
+cache reuse. From the repository root:
+
+```bash
+python3 rust/scripts/run-cargo.py clippy -p arkdeck-contract --all-targets -- -D warnings
+python3 rust/scripts/run-cargo.py test -p arkdeck-contract
+```
+
+The owner defaults to `CODEX_THREAD_ID` (or `local` in a regular terminal), with
+`ARKDECK_CARGO_OWNER` as an explicit override. Three concurrent chats each retain
+their own source mirror, lock and `workspace/rust/target` under
+`~/Library/Caches/com.arkdeck.ArkDeck/Cargo/Owners/<owner>` on macOS. Switching
+tasks, branches, worktrees or `ARKDECK_CARGO_SOURCE_ROOT` updates the same mirror
+without replacing the target. Identical sources retain their mtimes; changed and
+deleted files are synchronized before Cargo runs. Cargo runs with the workspace's
+toolchain, `--locked` and two build jobs; successful formatting and lockfile edits
+are returned to the source checkout.
+
+Set `ARKDECK_CARGO_CACHE_ROOT` to a fixed absolute path outside the checkout when
+the default root is unavailable. Keep that path for the lifetime of the chat;
+another owner cannot claim it. To run a Rust check script with the same cache:
+
+```bash
+python3 rust/scripts/run-cargo.py exec -- python3 rust/scripts/check-contracts.py
+```
+
+The local CI runner also uses this entry point. Published/candidate contract
+checks retain separate stable view targets within the owner's cache across
+snapshots. Existing caches are not deleted or copied by this change.
+
 ArkDeckKit and Xcode builds use checksum-synchronized source mirrors at stable
 paths outside individual worktrees. Identical files retain their cache identity
 when switching worktrees; only changed targets/files are recompiled. To run the
