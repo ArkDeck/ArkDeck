@@ -1,7 +1,7 @@
 # Windows: what remains (census as of `main` 2026-10-05)
 
-Source: `openspec/contracts/cli-feature-coverage.json` on `main` after #2541, #2543, #2547, #2549,
-#2550/#2553 and #2552. Of the features the Windows CLI must serve, 114 are `implemented`, 46
+Source: `openspec/contracts/cli-feature-coverage.json` after #2578 and the symbolize increment.
+Of the 162 features the Windows CLI must serve, 143 are `implemented`, 17
 `partial` and 2 `notImplemented`; 101 are macOS-only. Measured since: `debug.hap@1`,
 `deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves);
 `device.observations`, `target.availability` and `trace.probe` (TASK-XPA-005 device reads);
@@ -40,7 +40,7 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 | `capture.diagnostic-session@1` | 1 | ruling | Reached through `job submit` alone (a generic leaf). Its live control `diagnostic.session.mark|status|stop` is measured over the `diagnostic-session` oracle through the real CLI (`tests/spawning/diagnostic_session_cli.rs`, TASK-XPA-005) |
 | `runtime.tool.select` | 1 | ruling | `runtime.tool.register` is measured (`--kind hdc` over the account composition, `tests/spawning/account_tool_selection.rs`, TASK-XPA-012). After #2501 a selection still drifts (`tool.selectionFactsUnavailable`): the server's health is proved only by the commandless identity of a registered published version (`status.rs`, `hdc.identityFamilyUnavailable` for a fixture tuple's stand-in), CHG-2026-078 registers one Windows tuple, so no second tool can be a candidate on a real host, and the approval takes a real console (#2521). Reaching `selected` needs a second registered tuple or a test identity seam |
 | `workspace.continuation.run`, `.submit` | 5 | now | `workspace-continuation` oracle. Measured on its own layer (#2577: the CLI draft needs the source Job's provider in `health`, which answered `providers: []`), but held back from the integration PR: listing the composed providers through `operation_availability` initializes host owners on the first `health`, and macOS's `check-session-resources.py` then finds its later-seeded Sessions unaccounted (candidate contract-parity lane, #2578). `health` needs the providers without that side effect |
-| `capture.diagnostics@1` crash logs (`diagnostics capture` with `crashLogs`) | 1, 5 | now | Over the shared fake's read-leg answers (`capture-diagnostics-read-legs`), a Windows capture with `crashLogs: true` publishes `crash-log.txt` as `missing` (no bytes, no lease). The operation stays `implemented` (its other legs are measured), but "symbolize the daemon's own capture" stays open: `workspace symbolize` is measured over the crash the Swift oracle's capture published, laid into the store. Root cause not yet found |
+| `workspace.symbolize-crash@1` and named crash capture | 1, 5 | done | Measured by the signed CLI (`workspace_symbolize_leaf.rs`): the Swift oracle's crash resolves to its ArkTS source, and a named crash captured by the Windows daemon is symbolized through its lease. `crashLogs: true` alone selects the index; `crashLogName` selects the dump. The former's `missing` dump row is expected, not a Windows defect |
 | `flash.reconcile-alias` | 4 | now | Reconciler reached by the CLI; `post-flash-alias` / `flash-host-reads` oracles, needs a fake lineage |
 | `debug.template@1`, `debug.template.run` | 2 | ruling | No Swift oracle records the `debug.template@1` Job's HDC answers; measuring needs a ruling on the reference |
 | `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | ruling | No ArkTrace distribution (`trace_streamer`) on Windows; `ARKDECK_ARKTRACE_DESCRIPTOR` refused |

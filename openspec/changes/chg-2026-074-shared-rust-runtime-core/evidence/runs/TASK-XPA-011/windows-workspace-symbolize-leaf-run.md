@@ -2,7 +2,8 @@
 
 Change: CHG-2026-074-shared-rust-runtime-core. Milestone WM3 (GJ-5).
 
-Base: the integration branch `agent/xpa-005-windows-integration-20261005` at `6116bcaad` (#2578).
+Base: protected `main` `7133461b6` (#2578). The handed-over `fc22d2a86` was cherry-picked
+onto a fresh main-based branch; no squashed integration history is replayed.
 
 Host: the Windows 11 x64 reference host, non-elevated. No device, HDC or board was used, no `hdc`
 was run, nothing listened on `127.0.0.1:8710` because of this run, and nothing installed was read
@@ -36,29 +37,50 @@ exactly as a user drives it, and its answer depends only on a published device c
 on how that Artifact was captured. `arkdeck maintainer contracts export` regenerated the coverage:
 `workspace.symbolize-crash@1` moves to `implemented` on Windows, and nothing else changes.
 
-## Left open: symbolizing the daemon's own capture
+## Named capture and the handover's missing-log finding
 
-Over the shared fake's read-leg answers (`capture-diagnostics-read-legs`), a Windows
-`diagnostics capture` with `crashLogs: true` publishes `crash-log.txt` as `missing`: no bytes and
-no lease. So a crash this Windows daemon captured itself cannot yet be symbolized here. The root
-cause was not found in this slice. The census (`docs/design/cross-platform/windows-remaining.md`)
-records it as its own row and drops the `workspace symbolize` row.
+The production Catalog selects `capture-crash-log` only when `crashLogName` is present.
+`crashLogs: true` selects `capture-crash-index`; its declared dump row stays `missing`, with
+zero bytes and no lease. The signed-CLI regression confirms no dump read is dispatched in that
+case. With the typed `jscrash-com.example.demo-20010039-20260913235959` name, the same daemon
+publishes `crash-log.txt`, with a lease and digest, and `artifact read --allow-sensitive` returns
+exactly the Swift read-leg oracle's bytes. This resolves the handover finding without changing
+production code or the Catalog.
+
+The symbolize test also captures that named entry and passes the daemon's own lease to
+`workspace symbolize`. The read-leg oracle's text contains no Stacktrace block, so its report
+truthfully has no frames; the separate Swift crash oracle proves actual source-map resolution.
+Both captures are fixture tests, never device acceptance.
 
 ## Local targeted checks
 
-Rust 1.99.0, `CARGO_BUILD_JOBS=2`, `CARGO_TARGET_DIR=D:/cargo-target/s1-trace`, with
+Rust 1.99.0, `CARGO_BUILD_JOBS=2`, `CARGO_TARGET_DIR=D:/cargo-target/lead-symbolize`, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set; heavy commands through the host's gate slot, `arkdeck-cli`
 built first.
 
 | command | result |
 | --- | --- |
-| `cargo fmt --all --check` | GATES_FMT |
-| `cargo clippy --workspace --all-targets -- -D warnings` | GATES_CLIPPY |
-| `cargo test -p arkdeck-cli -p arkdeck-agentd -p arkdeck-hoststore --no-fail-fast` | GATES_TEST |
-| the same with `TEMP`/`TMP` on an 8.3 short path on C: | GATES_SHORT |
-| `PYTHONUTF8=1 sh scripts/check-sdd.sh` | GATES_SDD |
-| `git diff --check origin/main...HEAD` | GATES_DIFF |
-| `arkdeck maintainer contracts check` | GATES_CONTRACTS |
+| `cargo build --manifest-path rust/Cargo.toml -p arkdeck-cli` | exit 0; `symbolize-build.log` |
+| `cargo fmt --all --check --manifest-path rust/Cargo.toml` | exit 0; `symbolize-fmt-check.log` |
+| `cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-cli -p arkdeck-agentd -p arkdeck-hoststore --all-targets -- -D warnings` | exit 0; `symbolize-clippy-ready.log` |
+| `cargo test --manifest-path rust/Cargo.toml -p arkdeck-cli -p arkdeck-agentd -p arkdeck-hoststore --no-fail-fast`, with verified C: 8.3 `TEMP`/`TMP` | initial exit 101: 965 passed, 10 failed, 10 ignored; `symbolize-short-tests.log` |
+| `cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd --test spawning workspace_symbolize_leaf -- --nocapture`, with the same short-path environment | exit 0: 2 passed, no skipped paths; `symbolize-crash-tests.log` |
+| `cargo test --manifest-path rust/Cargo.toml -p arkdeck-cli --test windows_signing_leaves -- --nocapture`, short-path environment | exit 0: 8 passed; `symbolize-path-tests.log` |
+| `cargo test --manifest-path rust/Cargo.toml -p arkdeck-hoststore --test windows_tool_list_identity -- --nocapture`, short-path environment | exit 0: 1 passed; `symbolize-tool-list-tests.log` |
+| `cargo test --manifest-path rust/Cargo.toml -p arkdeck-hoststore --lib windows_registration_tests -- --nocapture`, short-path environment | exit 0: 6 passed, 1 opt-in live test ignored; `symbolize-deveco-profile-tests.log` |
+| `PYTHONUTF8=1 sh scripts/check-sdd.sh` | exit 0; `symbolize-sdd-final.log` |
+| `git diff --check origin/main` | exit 0 |
+| `arkdeck maintainer contracts check --contracts-directory openspec/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI` | exit 0, 242 checked, clean; `symbolize-contracts.log` |
+
+Logs are retained locally under `D:/src/ArkDeck-wt/tools/logs/`; they are not committed because
+native signing diagnostics include account paths. The full short-path run exposed fixture
+assumptions about the packaged parent's LocalAppData virtualization. Signing and tool-list
+fixtures now resolve their newly created private directory to its physical path. The DevEco
+fixture uses the token's profile to avoid container ancestry and still resolves its created
+directory. These edits are test-only; production path spelling, ancestor ACL and Authenticode
+checks are unchanged. All ten initially failed cases pass in the targeted reruns above; the
+full suite was not repeated after those fixture fixes. Ignored live tests remain opt-in; no
+fixture result is a hardware verdict.
 
 ## CI
 
