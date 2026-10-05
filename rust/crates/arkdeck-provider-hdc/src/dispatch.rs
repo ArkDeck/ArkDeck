@@ -82,7 +82,7 @@ impl HdcDispatch for ProcessDispatch {
         }
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn mutation_identity_current(&self) -> bool {
         self.tool_identity_current()
     }

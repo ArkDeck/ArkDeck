@@ -166,8 +166,16 @@ mod windows {
             a_listener_of_another_process_never_binds_the_launch,
         ),
         (
-            "a_dispatch_runs_the_plan_argv_with_the_server_port_and_grants_no_mutation",
-            a_dispatch_runs_the_plan_argv_with_the_server_port_and_grants_no_mutation,
+            "a_dispatch_runs_the_plan_argv_with_the_server_port_and_proves_its_tool",
+            a_dispatch_runs_the_plan_argv_with_the_server_port_and_proves_its_tool,
+        ),
+        (
+            "mutation_identity_revalidates_the_retained_windows_file_without_dispatch",
+            mutation_identity_revalidates_the_retained_windows_file_without_dispatch,
+        ),
+        (
+            "an_unknown_dispatcher_cannot_prove_mutation_identity",
+            an_unknown_dispatcher_cannot_prove_mutation_identity,
         ),
         (
             "a_device_plan_reaches_the_child_with_its_connect_key_first",
@@ -543,16 +551,16 @@ mod windows {
         drop(listener);
     }
 
-    fn a_dispatch_runs_the_plan_argv_with_the_server_port_and_grants_no_mutation() {
+    fn a_dispatch_runs_the_plan_argv_with_the_server_port_and_proves_its_tool() {
         let fake = FakeHdc::new("hdc");
         let tool = {
             let digest = fake.tool.sha256().to_owned();
             VerifiedTool::open(fake.tool.path(), &digest).unwrap()
         };
         let dispatch = ProcessDispatch::new(tool, Some("8711"));
-        // No launch identity is published on Windows yet: a mutation is
-        // never granted, whatever the plan.
-        assert!(!dispatch.mutation_identity_current());
+        // This proves only the retained tool; mutation admission still
+        // belongs to the Runtime, and its managed owner checks the server.
+        assert!(dispatch.mutation_identity_current());
         let plan = ProcessPlan {
             arguments: ["-s", "127.0.0.1:8711", "echo", "a b", "&|$x", ""]
                 .map(str::to_owned)
@@ -584,6 +592,52 @@ mod windows {
             fallback.dispatch(&plan).unwrap().stdout,
             b"port= args=a b|&|$x|\n"
         );
+    }
+
+    /// A retained file is re-proved at the mutation boundary without running
+    /// any plan. Windows denies data/name replacement while it is held; a
+    /// permitted metadata change still makes the retained proof stale.
+    fn mutation_identity_revalidates_the_retained_windows_file_without_dispatch() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let fake = FakeHdc::new("hdc");
+        let path = fake.tool.path();
+        let digest = fake.tool.sha256();
+        let dispatch = ProcessDispatch::new(VerifiedTool::open(path, digest).unwrap(), None);
+        assert!(dispatch.mutation_identity_current());
+        assert!(fake.calls().is_empty());
+        assert!(fs::write(path, b"replaced tool").is_err());
+        assert!(fs::rename(path, path.with_file_name("replaced.exe")).is_err());
+        assert!(dispatch.mutation_identity_current());
+
+        // Attribute access is shared even though data writes/deletion are
+        // denied, as in the Windows HDC-status identity-drift regression.
+        const FILE_WRITE_ATTRIBUTES: u32 = 0x0100;
+        let file = fs::OpenOptions::new()
+            .access_mode(FILE_WRITE_ATTRIBUTES)
+            .share_mode(0x7)
+            .open(path)
+            .unwrap();
+        let modified = fs::metadata(path).unwrap().modified().unwrap();
+        file.set_modified(modified + Duration::from_secs(2))
+            .unwrap();
+        assert!(!dispatch.tool_identity_current());
+        assert!(!dispatch.mutation_identity_current());
+        assert!(fake.calls().is_empty());
+    }
+
+    fn an_unknown_dispatcher_cannot_prove_mutation_identity() {
+        struct Unknown;
+        impl HdcDispatch for Unknown {
+            fn dispatch(
+                &self,
+                _: &ProcessPlan,
+            ) -> Result<arkdeck_provider_hdc::Receipt, arkdeck_provider_hdc::DispatchFailure>
+            {
+                panic!("the identity query must not dispatch");
+            }
+        }
+        assert!(!Unknown.mutation_identity_current());
     }
 
     /// XPA-AC-2 on Windows: the fake process face receives the real argv of a
