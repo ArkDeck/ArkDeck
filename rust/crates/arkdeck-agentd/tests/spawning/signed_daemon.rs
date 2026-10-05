@@ -239,6 +239,7 @@ fn serve(fixture: &Path, fake_root: &Path) -> Result<(), Box<dyn std::error::Err
         ),
         (None, Err(_)) => host,
     };
+    let host = crate::flash_alias_cli::compose(host, Path::new(&development));
     if let Some(recovered) = host.recover_active_jobs()? {
         for (job, reason) in recovered.quarantined.iter().chain(&recovered.refused) {
             eprintln!("arkdeck-agentd: job {job} was not recovered: {reason}");

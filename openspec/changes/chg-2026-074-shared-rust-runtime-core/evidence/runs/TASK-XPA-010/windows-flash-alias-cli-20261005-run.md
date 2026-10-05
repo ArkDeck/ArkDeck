@@ -40,7 +40,7 @@ signed test daemon's alias reconciler its own synthetic census in the test
 binary, because the Target observation census seam does not replace the alias
 reconciler's separately composed census.
 
-The lead owns the accompanying shared integration: register `flash_alias_cli`
+The lead includes the accompanying shared integration: register `flash_alias_cli`
 in the spawning binary, call its test composition adapter before recovery, add
 `flash.reconcile-alias` to `WINDOWS_MEASURED_LEAVES`, regenerate coverage with
 `maintainer contracts export`, and update the Windows census. This commit owns
@@ -84,9 +84,20 @@ the final run above passes. The initial sandbox build could not write the
 required target directory and was repeated with controlled filesystem
 escalation. No source or safety rule was changed for either issue.
 
+After integration directly above #2580 (health/continuation), the CLI was
+rebuilt and coverage exported. Final checks all exit 0: both signed alias
+tests with verified 8.3 `TEMP`/`TMP` (2 passed, no skipped paths),
+`cargo test -p arkdeck-cli` (264 reported passes), CLI/Agentd all-target clippy
+with warnings denied, full fmt check, SDD, diff check and contracts check
+(242 clean). Cargo commands use `--manifest-path rust/Cargo.toml`; local logs
+are `D:/src/ArkDeck-wt/tools/logs/flash-layer-{build,export,short-tests,cli-tests,clippy,fmt,sdd}.log`.
+
 ## CI
 
 No PR or CI run is created by this subagent. The lead will integrate this owned
 commit and its shared additions as one layer in the linear Windows PR stack.
 Unified CI, macOS/Linux cross-checks and hardware acceptance are not claimed
 by this local Windows fake-host measurement.
+The preceding #2579 and #2580 heads have no failed checks at preparation time;
+their native macOS/Windows workspace lanes are still running. Results will be
+recorded after CI completes.

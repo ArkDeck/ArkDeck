@@ -1,7 +1,7 @@
 # Windows: what remains (census as of `main` 2026-10-05)
 
-Source: `openspec/contracts/cli-feature-coverage.json` after #2578, symbolize and continuation increments.
-Of the 162 features the Windows CLI must serve, 145 are `implemented`, 15
+Source: `openspec/contracts/cli-feature-coverage.json` after #2578, symbolize, continuation and alias increments.
+Of the 162 features the Windows CLI must serve, 146 are `implemented`, 14
 `partial` and 2 `notImplemented`; 101 are macOS-only. Measured since: `debug.hap@1`,
 `deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves);
 `device.observations`, `target.availability` and `trace.probe` (TASK-XPA-005 device reads);
@@ -41,7 +41,7 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 | `runtime.tool.select` | 1 | ruling | `runtime.tool.register` is measured (`--kind hdc` over the account composition, `tests/spawning/account_tool_selection.rs`, TASK-XPA-012). After #2501 a selection still drifts (`tool.selectionFactsUnavailable`): the server's health is proved only by the commandless identity of a registered published version (`status.rs`, `hdc.identityFamilyUnavailable` for a fixture tuple's stand-in), CHG-2026-078 registers one Windows tuple, so no second tool can be a candidate on a real host, and the approval takes a real console (#2521). Reaching `selected` needs a second registered tuple or a test identity seam |
 | `workspace.continuation.run`, `.submit` | 5 | done | Signed CLI over the `workspace-continuation` oracle verifies submit, run, retained bytes and refusal/repeat paths (`workspace_continuation_cli.rs`). `health` lists assembled provider ports without consulting availability or initializing durable owners; cross-platform regression checks unchanged Session owner bytes |
 | `workspace.symbolize-crash@1` and named crash capture | 1, 5 | done | Measured by the signed CLI (`workspace_symbolize_leaf.rs`): the Swift oracle's crash resolves to its ArkTS source, and a named crash captured by the Windows daemon is symbolized through its lease. `crashLogs: true` alone selects the index; `crashLogName` selects the dump. The former's `missing` dump row is expected, not a Windows defect |
-| `flash.reconcile-alias` | 4 | now | Reconciler reached by the CLI; `post-flash-alias` / `flash-host-reads` oracles, needs a fake lineage |
+| `flash.reconcile-alias` | 4 | done | Signed CLI checks 21 `flash-host-reads` alias exchanges and the `post-flash-alias` reissued lineage, exact private/archive bytes, restart durability and zero HDC dispatch (`flash_alias_cli.rs`) |
 | `debug.template@1`, `debug.template.run` | 2 | ruling | No Swift oracle records the `debug.template@1` Job's HDC answers; measuring needs a ruling on the reference |
 | `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | ruling | No ArkTrace distribution (`trace_streamer`) on Windows; `ARKDECK_ARKTRACE_DESCRIPTOR` refused |
 | `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | ruling | Generic leaves; counted only when every operation they reach answers as Swift does, which `flash.dayu200` (external) and the ArkTrace analyses (ruling) prevent |
