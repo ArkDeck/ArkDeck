@@ -259,6 +259,7 @@ impl FlashRunner<'_> {
             sequence: facts.last_durable_sequence.map_or(0, |last| last + 1),
             now: self.runner.now,
             consumed: None,
+            workspace_publication_plan: None,
         };
         // A resumed Flash continues under the use its first run consumed,
         // never a new one.
@@ -268,7 +269,7 @@ impl FlashRunner<'_> {
                 .map_err(|message| proven("rejected", message, Some(id)))?;
         }
         let established = self.run(&mut run, &flash, descriptor, arkforge)?;
-        run.release(jobs, self.runner.sessions, &directory)?;
+        run.release(jobs, self.runner.sessions, &directory, None)?;
         let mut status = run.record.status();
         if let Some(epoch) = established {
             status["recoveryEpochId"] = json!(epoch);

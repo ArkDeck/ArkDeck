@@ -60,7 +60,6 @@
     "originalTarget": { "$ref": "#/$defs/target" },
     "bindingHistory": {
       "type": "array",
-      "minItems": 1,
       "items": { "$ref": "#/$defs/binding" }
     },
     "toolchain": { "$ref": "#/$defs/toolchain" },
@@ -215,6 +214,7 @@
             ]
           },
           "bindingHistory": {
+            "minItems": 1,
             "items": {
               "allOf": [
                 { "$ref": "#/$defs/binding" },
@@ -250,6 +250,19 @@
         }
       },
       "else": {
+        "if": {"properties": {"originalTarget": {"properties": {"kind": {"const": "host"}}, "required": ["kind"]}}},
+        "then": {
+          "properties": {
+            "originalTarget": {"properties": {"connectKey": {"type": "null"}, "transport": {"const": "host"}}},
+            "bindingHistory": {"maxItems": 0},
+            "toolchain": {"properties": {"kind": {"enum": ["none", "hostTool"]}}}
+          },
+          "anyOf": [
+            {"properties": {"runtimeAuthority": false, "steps": {"items": {"properties": {"effect": {"const": "hostOnly"}, "bindingRequirement": {"const": "none"}}}}}},
+            {"$ref": "#/$defs/hostWorkspaceMutation"}
+          ]
+        },
+        "else": {
         "properties": {
           "originalTarget": {
             "allOf": [
@@ -264,6 +277,7 @@
             ]
           },
           "bindingHistory": {
+            "minItems": 1,
             "items": {
               "allOf": [
                 { "$ref": "#/$defs/binding" },
@@ -284,6 +298,7 @@
               { "properties": { "kind": { "enum": ["hdc", "runtimeProvider"] } } }
             ]
           }
+        }
         }
       }
     },
@@ -517,10 +532,365 @@
           }
         ]
       },
-      "else": {"properties": {"runtimeAuthority": false}}
+      "else": {
+        "if": {"required": ["runtimeAuthority"]},
+        "then": {"$ref": "#/$defs/hostWorkspaceMutation"}
+      }
     }
   ],
   "$defs": {
+    "hostWorkspaceMutation": {
+      "required": [
+        "runtimeAuthority"
+      ],
+      "properties": {
+        "executionMode": {
+          "const": "execute"
+        },
+        "status": {
+          "enum": [
+            "succeeded",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "outcomeCertainty": {
+          "const": "confirmed"
+        },
+        "originalTarget": {
+          "properties": {
+            "kind": {
+              "const": "host"
+            },
+            "connectKey": {
+              "type": "null"
+            },
+            "transport": {
+              "const": "host"
+            },
+            "identitySnapshot": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "workspaceScope",
+                "projectRef",
+                "providerId",
+                "catalogDigest"
+              ],
+              "properties": {
+                "workspaceScope": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "projectRef": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "providerId": {
+                  "const": "workspace"
+                },
+                "catalogDigest": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            }
+          }
+        },
+        "bindingHistory": {
+          "maxItems": 0
+        },
+        "toolchain": {
+          "properties": {
+            "kind": {
+              "const": "hostTool"
+            },
+            "providerIdentity": {
+              "const": "workspace"
+            }
+          }
+        },
+        "runtimeAuthority": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "runtimeCapability"
+            },
+            "targetBindingDigest": {
+              "const": "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025"
+            }
+          }
+        },
+        "workflow": {
+          "properties": {
+            "providerIdentity": {
+              "const": "workspace"
+            }
+          }
+        },
+        "steps": {
+          "minItems": 1,
+          "maxItems": 1,
+          "items": {
+            "properties": {
+              "effect": {
+                "const": "deviceMutation"
+              },
+              "bindingRequirement": {
+                "const": "none"
+              },
+              "bindingRevision": {
+                "type": "null"
+              },
+              "sourceStepId": {
+                "type": "null"
+              },
+              "compensationTrigger": {
+                "type": "null"
+              },
+              "compensationDescriptors": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        "compensations": {
+          "maxItems": 0
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "workflow": {
+              "properties": {
+                "kind": {
+                  "const": "workspace.apply-patch@1"
+                }
+              }
+            },
+            "toolchain": {
+              "properties": {
+                "profileIdentifier": {
+                  "const": "workspace.apply-patch@1"
+                }
+              }
+            },
+            "steps": {
+              "items": {
+                "properties": {
+                  "id": {
+                    "const": "apply-patch"
+                  },
+                  "kind": {
+                    "const": "applyWorkspacePatch"
+                  },
+                  "cancellation": {
+                    "const": "atSafeBoundary"
+                  },
+                  "arguments": {
+                    "required": [
+                      "projectRef",
+                      "patchArtifactId",
+                      "patchSha256",
+                      "allowedFileGlobs",
+                      "patchAttemptRef"
+                    ],
+                    "properties": {
+                      "patchSha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "runtimeAuthority": {
+              "properties": {
+                "stepSetDigest": {
+                  "const": "6886b49a4248c695ee8a3d0ddfdd9ed6ed3e450cb818f3ff4cb9e1d90b97ff75"
+                },
+                "artifactDigest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "workflow": {
+              "properties": {
+                "kind": {
+                  "const": "workspace.revert-patch@1"
+                }
+              }
+            },
+            "toolchain": {
+              "properties": {
+                "profileIdentifier": {
+                  "const": "workspace.revert-patch@1"
+                }
+              }
+            },
+            "runtimeAuthority": {
+              "properties": {
+                "artifactDigest": {
+                  "type": "null"
+                },
+                "stepSetDigest": {
+                  "const": "2eed7741a92130d3306a399a2720f0ac7e937e7e34b7dfb9784740eb5b3de181"
+                }
+              }
+            },
+            "steps": {
+              "items": {
+                "properties": {
+                  "id": {
+                    "const": "revert-patch"
+                  },
+                  "kind": {
+                    "const": "revertWorkspacePatch"
+                  },
+                  "cancellation": {
+                    "const": "atSafeBoundary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "workflow": {
+              "properties": {
+                "kind": {
+                  "const": "workspace.build-openharmony@1"
+                }
+              }
+            },
+            "toolchain": {
+              "properties": {
+                "profileIdentifier": {
+                  "const": "workspace.build-openharmony@1"
+                }
+              }
+            },
+            "runtimeAuthority": {
+              "properties": {
+                "artifactDigest": {
+                  "type": "null"
+                },
+                "stepSetDigest": {
+                  "const": "bbc856fb281f21642645b7d0fa0b62486e1e0e5c540bcfacf1d868808fc5a3ad"
+                }
+              }
+            },
+            "steps": {
+              "items": {
+                "properties": {
+                  "id": {
+                    "const": "build-project"
+                  },
+                  "kind": {
+                    "const": "buildWorkspaceOpenHarmony"
+                  },
+                  "cancellation": {
+                    "const": "immediate"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "workflow": {
+              "properties": {
+                "kind": {
+                  "const": "workspace.create-checkpoint@1"
+                }
+              }
+            },
+            "toolchain": {
+              "properties": {
+                "profileIdentifier": {
+                  "const": "workspace.create-checkpoint@1"
+                }
+              }
+            },
+            "runtimeAuthority": {
+              "properties": {
+                "artifactDigest": {
+                  "type": "null"
+                },
+                "stepSetDigest": {
+                  "const": "78d0982a8f4e4aa69f2c7e411abcf3fb2938c3ecb6da43d97893df3339961843"
+                }
+              }
+            },
+            "steps": {
+              "items": {
+                "properties": {
+                  "id": {
+                    "const": "create-checkpoint"
+                  },
+                  "kind": {
+                    "const": "createWorkspaceCheckpoint"
+                  },
+                  "cancellation": {
+                    "const": "atSafeBoundary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "workflow": {
+              "properties": {
+                "kind": {
+                  "const": "workspace.run-tests@1"
+                }
+              }
+            },
+            "toolchain": {
+              "properties": {
+                "profileIdentifier": {
+                  "const": "workspace.run-tests@1"
+                }
+              }
+            },
+            "runtimeAuthority": {
+              "properties": {
+                "artifactDigest": {
+                  "type": "null"
+                },
+                "stepSetDigest": {
+                  "const": "f0e8781789b7dc6742baa1b32ea206f77640432fc48133c79e3bf2f3fa0c8ebe"
+                }
+              }
+            },
+            "steps": {
+              "items": {
+                "properties": {
+                  "id": {
+                    "const": "run-tests"
+                  },
+                  "kind": {
+                    "const": "runWorkspaceTests"
+                  },
+                  "cancellation": {
+                    "const": "immediate"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
     "id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
@@ -540,9 +910,9 @@
       "additionalProperties": false,
       "required": ["kind", "connectKey", "transport", "identitySnapshot"],
       "properties": {
-        "kind": { "enum": ["real", "synthetic"] },
+        "kind": { "enum": ["real", "synthetic", "host"] },
         "connectKey": { "type": ["string", "null"] },
-        "transport": { "enum": ["usb", "tcp", "uart", "synthetic"] },
+        "transport": { "enum": ["usb", "tcp", "uart", "synthetic", "host"] },
         "identitySnapshot": {
           "type": "object",
           "minProperties": 1
@@ -571,11 +941,16 @@
       }
     },
     "consumedRuntimeAuthority": {
+      "anyOf": [
+      {
       "properties": {
         "toolchain": {"properties": {"kind": {"const": "runtimeProvider"}}, "required": ["kind"]},
         "runtimeAuthority": {"type": "object", "properties": {"kind": {"const": "runtimeCapability"}}, "required": ["kind"]}
       },
       "required": ["toolchain", "runtimeAuthority"]
+      },
+      {"$ref": "#/$defs/hostWorkspaceMutation"}
+      ]
     },
     "runtimeAuthority": {
       "oneOf": [
@@ -697,6 +1072,18 @@
           "properties": {
             "kind": {"const": "runtimeProvider"},
             "providerIdentity": {"enum": ["hdc", "arkforge"]},
+            "profileIdentifier": {"type": "string", "minLength": 1},
+            "reportedVersion": {"type": "string", "minLength": 1},
+            "sha256": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "providerIdentity", "profileIdentifier", "reportedVersion", "sha256"],
+          "properties": {
+            "kind": {"const": "hostTool"},
+            "providerIdentity": {"type": "string", "minLength": 1},
             "profileIdentifier": {"type": "string", "minLength": 1},
             "reportedVersion": {"type": "string", "minLength": 1},
             "sha256": {"$ref": "#/$defs/sha256"}

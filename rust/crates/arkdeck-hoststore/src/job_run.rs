@@ -56,6 +56,8 @@ use crate::job_journal_events::{self as events, Envelope};
 use crate::job_journal_writer::JournalWriter;
 use crate::job_owner::JobStore;
 use crate::job_record::{JobRecord, terminal};
+use crate::operation_catalog::CatalogOperation;
+use crate::operation_request::OperationRequest;
 use crate::session_publication::SessionPublisher;
 use arkdeck_contract::CATALOG_DIGEST;
 #[cfg(any(target_os = "macos", windows))]
@@ -239,6 +241,7 @@ pub(crate) struct Run {
     /// over. A later mutation of the same run continues under that use;
     /// other evidence on the record is never continued.
     pub(crate) consumed: Option<Value>,
+    pub(crate) workspace_publication_plan: Option<crate::job_plan::WorkspaceMaterialization>,
 }
 
 impl Run {
@@ -337,13 +340,26 @@ impl Run {
         jobs: &JobStore,
         sessions: Option<&SessionPublisher<'_>>,
         directory: &Path,
+        workspace: Option<crate::session_publication::WorkspaceSessionContext<'_>>,
     ) -> Result<(), RunRefusal> {
         if let Some(sessions) = sessions
             && terminal(&self.record.state)
             && !self.record.outcome_unknown()
         {
             let now = self.clock()?;
-            let marker = sessions.publish(&self.record, &mut self.journal, directory, &now);
+            let marker = match workspace {
+                Some(context) => sessions.publish_with_workspace(
+                    &self.record,
+                    &mut self.journal,
+                    directory,
+                    &now,
+                    Some(crate::session_publication::WorkspaceSessionContext {
+                        planner: context.planner,
+                        materialization: self.workspace_publication_plan.as_ref(),
+                    }),
+                ),
+                None => sessions.publish(&self.record, &mut self.journal, directory, &now),
+            };
             self.record.set_session_publication(marker);
             if self.persist(jobs).is_err() {
                 // The Session, if any, is durable; only the marker was lost,
@@ -358,6 +374,21 @@ impl Run {
 }
 
 impl JobRunner<'_> {
+    pub(crate) fn workspace_session_context(
+        &self,
+    ) -> Option<crate::session_publication::WorkspaceSessionContext<'_>> {
+        Some(crate::session_publication::WorkspaceSessionContext {
+            planner: crate::JobPlanner {
+                artifacts: Some(self.artifacts),
+                imports: self.imports,
+                analyzer: None,
+                state_root: self.mutation?.state_root,
+                hdc: None,
+                workspace: Some(self.workspace?),
+            },
+            materialization: None,
+        })
+    }
     /// The terminal (or parked) Job's `arkdeck.job-status/1`, which Swift's
     /// `job.run` answers once its driver returns.
     pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, RunRefusal> {
@@ -480,7 +511,21 @@ impl JobRunner<'_> {
             sequence: facts.last_durable_sequence.map_or(0, |last| last + 1),
             now: self.now,
             consumed: None,
+            workspace_publication_plan: None,
         };
+        if self.sessions.is_some()
+            && crate::session_publication::workspace_mutation(run.record.operation()).is_some()
+            && let Some(context) = self.workspace_session_context()
+            && let Ok(bytes) = crate::session_json::encode(&run.record.request)
+            && let Ok(request) = OperationRequest::decode(&bytes)
+            && let Some(descriptor) =
+                CatalogOperation::lookup(&request.operation_id, request.operation_version)
+        {
+            run.workspace_publication_plan = context
+                .planner
+                .workspace_materialization(&request, descriptor)
+                .ok();
+        }
         // A resumed Job continues under the use it holds, never a new one.
         if state != "preflight" {
             self.take_over_held_use(&mut run)
@@ -527,7 +572,12 @@ impl JobRunner<'_> {
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
         }
-        run.release(self.jobs, self.sessions, &directory)?;
+        run.release(
+            self.jobs,
+            self.sessions,
+            &directory,
+            self.workspace_session_context(),
+        )?;
         Ok(run.record.status())
     }
 
