@@ -57,14 +57,17 @@ alone ignored it. It now reads `clock_now`, and macOS is unchanged.
 regenerated with `arkdeck maintainer contracts export` (two entries `partial` → `implemented` on
 Windows), and `oracle.json` is not re-pinned.
 
-## Found, fixed in the next layer: `workspace continuation submit|run`
+## Found, still open: `workspace continuation submit|run`
 
 Run through the real CLI against the signed test daemon, with a completed `target observe` as the
 source Job, `workspace continuation inspect|submit|run` each refused before anything was submitted
 (`operationUnavailable`, "the source Job provider is not published by the current Runtime"): the
 Rust control layer answered `health` with `providers: []` on every host. The lead decided it is a
-parity defect (Swift's daemon and the `workspace-continuation` oracle list the providers); the
-next layer of this stack fixes it and measures the leaves.
+parity defect (Swift's daemon and the `workspace-continuation` oracle list the providers). The
+fix and the leaves' measurement (#2577) were held back from the integration PR (#2578): listing
+the providers through `operation_availability` initialized host owners on the first `health`, and
+macOS's `check-session-resources.py` then found its later-seeded Sessions unaccounted. See the
+`workspace.continuation` row of `docs/design/cross-platform/windows-remaining.md`.
 
 ## Local targeted checks
 

@@ -150,8 +150,6 @@ mod target_observation_control;
 #[cfg(target_os = "macos")]
 mod trace_probe_control;
 #[cfg(windows)]
-mod workspace_continuation_cli;
-#[cfg(windows)]
 mod workspace_sign_leaf;
 
 /// A module compiled here from the daemon's sources keeps no test beside it:

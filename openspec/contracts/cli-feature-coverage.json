@@ -4396,7 +4396,7 @@
       "feature": "workspace.continuation.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "implemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
@@ -4414,7 +4414,7 @@
       "feature": "workspace.continuation.submit",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "implemented"
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
