@@ -1247,6 +1247,9 @@ impl OracleFake {
             .unwrap()
             .write_all(format!("{all}\n").as_bytes())
             .unwrap();
+        if let Some(answer) = Self::fixture_device(&all, "normal") {
+            return answer;
+        }
         let key = KEY;
         match all.as_str() {
             command if command == format!("-t {key} shell bm dump -a") => match mode {
@@ -1280,6 +1283,7 @@ impl OracleFake {
                 Answer::out("WindowManagerService\n----------\nfocus window: com.example.alpha\n")
             }
             command if command == format!("-t {key} shell uptime") => match mode {
+                "templateOffline" => Answer::out("[Fail] target offline"),
                 "templateFailure" => Answer::refusing(7, "uptime: cannot read /proc/uptime\n"),
                 // `kill -9 $$`.
                 "templateKilled" => Answer::killed(),

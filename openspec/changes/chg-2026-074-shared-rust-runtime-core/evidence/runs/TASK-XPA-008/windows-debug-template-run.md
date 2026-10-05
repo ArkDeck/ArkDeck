@@ -86,7 +86,20 @@ The unchanged full agentd suite had just passed in the preceding integration wor
 repeated. No contract input changed, so the full local unified gate and contract-input checks
 were not run. The shared coverage generation belongs to the integration layer.
 
+Final integration directly above #2582 (flash alias): CLI build/export,
+`cargo test -p arkdeck-cli` (264 reported passes), three signed Debug spawning
+regressions with verified 8.3 `TEMP`/`TMP`, `cargo test -p arkdeck-provider-hdc`
+(182 reported passes), CLI/Agentd/Provider-HDC/Hoststore all-target clippy with
+warnings denied, full fmt check, SDD, diff check and contracts check (242 clean)
+all exit 0. Cargo commands use `--manifest-path rust/Cargo.toml`.
+Logs: `D:/src/ArkDeck-wt/tools/logs/debug-layer-{build,export,cli-tests,short-tests,provider-tests,clippy,fmt-final,sdd}.log`.
+The first integration fmt check requested module sorting; formatting was applied
+and the final check passed. No behavioral change followed the passing tests.
+
 ## CI
 
 PR and run IDs are recorded by the integration layer after push. CI remains the full diff-based
 verification gate, including macOS parity. No CI result or maintainer approval is claimed here.
+The preceding health increment #2580 has passed `Rust contract parity (xcode-27)`,
+including the Session resource check that rejected its earlier availability-based
+implementation. Its Windows workspace lane is still running at preparation time.
