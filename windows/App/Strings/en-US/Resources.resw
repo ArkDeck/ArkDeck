@@ -6538,4 +6538,100 @@ SHA-256: %4$@</value>
     <value>No Trace is open to reload.</value>
     <comment>windows.traceViewer.nothingToReload (Windows only)</comment>
   </data>
+  <data name="app_devices_gone" xml:space="preserve">
+    <value>Device No Longer Listed</value>
+    <comment>app.devices.gone (Localizable.xcstrings)</comment>
+  </data>
+  <data name="app_devices_goneDetail" xml:space="preserve">
+    <value>This device left the candidate list — it may be unplugged. Re-check from another row, or reconnect it.</value>
+    <comment>app.devices.goneDetail (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_action_beginWait" xml:space="preserve">
+    <value>Start waiting for authorization</value>
+    <comment>device.action.beginWait (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_action_retryWait" xml:space="preserve">
+    <value>Retry: start waiting for authorization</value>
+    <comment>device.action.retryWait (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_factsTitle" xml:space="preserve">
+    <value>Runtime facts</value>
+    <comment>device.detail.factsTitle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_recheckNote" xml:space="preserve">
+    <value>Waiting and re-checking refresh the latest timestamped HDC observation. They send nothing to the device and can be repeated freely.</value>
+    <comment>device.detail.recheckNote (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_statusTitle" xml:space="preserve">
+    <value>Status and actions</value>
+    <comment>device.detail.statusTitle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_detail_title" xml:space="preserve">
+    <value>Device authorization — %@</value>
+    <comment>device.detail.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_fact_liveProvenance" xml:space="preserve">
+    <value>Device information was read directly over HDC. Unavailable fields use the latest successful observe.device@1 result. This does not change target binding.</value>
+    <comment>device.fact.liveProvenance (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_fact_state" xml:space="preserve">
+    <value>Reported state</value>
+    <comment>device.fact.state (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_authorizedUnadopted" xml:space="preserve">
+    <value>Authorized. The device is not adopted as a durable target yet.</value>
+    <comment>device.trust.authorizedUnadopted (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_offline" xml:space="preserve">
+    <value>The device reports Offline. Check the USB connection, then re-check.</value>
+    <comment>device.trust.offline (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_ready" xml:space="preserve">
+    <value>Authorized and adopted — this device is ready.</value>
+    <comment>device.trust.ready (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_step1" xml:space="preserve">
+    <value>Unlock the device screen.</value>
+    <comment>device.trust.step1 (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_step2" xml:space="preserve">
+    <value>In the device's "Trust this computer?" prompt, choose Trust or Always Trust.</value>
+    <comment>device.trust.step2 (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_step3" xml:space="preserve">
+    <value>ArkDeck detects the authorization result automatically: a bounded wait re-reads the device state, with no repeated notifications.</value>
+    <comment>device.trust.step3 (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_stepsTitle" xml:space="preserve">
+    <value>On the device</value>
+    <comment>device.trust.stepsTitle (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_unknownState" xml:space="preserve">
+    <value>The tool reports an unrecognized state: %@. Shown as-is, not interpreted.</value>
+    <comment>device.trust.unknownState (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_trust_waiting" xml:space="preserve">
+    <value>The device reports Unauthorized: it has not trusted this computer yet.</value>
+    <comment>device.trust.waiting (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_wait_polling" xml:space="preserve">
+    <value>Waiting for on-device confirmation…</value>
+    <comment>device.wait.polling (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_wait_timedOut" xml:space="preserve">
+    <value>Authorization timed out. Check the device's USB debugging switch, then retry. If retrying does not help, restarting the shared HDC server is a separate, explicitly confirmed step — it affects DevEco and every connected device.</value>
+    <comment>device.wait.timedOut (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_wait_unavailable" xml:space="preserve">
+    <value>Unable to check authorization. %@</value>
+    <comment>device.wait.unavailable (Localizable.xcstrings)</comment>
+  </data>
+  <data name="windows_device_alias_clear" xml:space="preserve">
+    <value>Use the device's own name</value>
+    <comment>windows.device.alias.clear (Windows only)</comment>
+  </data>
+  <data name="windows_device_wait_until" xml:space="preserve">
+    <value>(until %@)</value>
+    <comment>windows.device.wait.until (Windows only)</comment>
+  </data>
 </root>

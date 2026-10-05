@@ -9791,6 +9791,150 @@
       "table": null,
       "en": "No Trace is open to reload.",
       "zh-Hans": "没有打开的 Trace 可重新载入。"
+    },
+    {
+      "key": "app.devices.gone",
+      "table": "Localizable",
+      "en": "Device No Longer Listed",
+      "zh-Hans": "设备已不在候选列表"
+    },
+    {
+      "key": "app.devices.goneDetail",
+      "table": "Localizable",
+      "en": "This device left the candidate list — it may be unplugged. Re-check from another row, or reconnect it.",
+      "zh-Hans": "该设备已离开候选列表——可能已拔出。可从其他行重新检测，或重新连接设备。"
+    },
+    {
+      "key": "device.action.beginWait",
+      "table": "Localizable",
+      "en": "Start waiting for authorization",
+      "zh-Hans": "开始等待授权"
+    },
+    {
+      "key": "device.action.retryWait",
+      "table": "Localizable",
+      "en": "Retry: start waiting for authorization",
+      "zh-Hans": "重试：开始等待授权"
+    },
+    {
+      "key": "device.detail.factsTitle",
+      "table": "Localizable",
+      "en": "Runtime facts",
+      "zh-Hans": "Runtime 事实"
+    },
+    {
+      "key": "device.detail.recheckNote",
+      "table": "Localizable",
+      "en": "Waiting and re-checking refresh the latest timestamped HDC observation. They send nothing to the device and can be repeated freely.",
+      "zh-Hans": "等待与重新检测会刷新带时间的最新 HDC 观测；不向设备发送任何内容，可随时重复。"
+    },
+    {
+      "key": "device.detail.statusTitle",
+      "table": "Localizable",
+      "en": "Status and actions",
+      "zh-Hans": "当前状态与操作"
+    },
+    {
+      "key": "device.detail.title",
+      "table": "Localizable",
+      "en": "Device authorization — %@",
+      "zh-Hans": "设备授权 — %@"
+    },
+    {
+      "key": "device.fact.liveProvenance",
+      "table": "Localizable",
+      "en": "Device information was read directly over HDC. Unavailable fields use the latest successful observe.device@1 result. This does not change target binding.",
+      "zh-Hans": "设备信息由 HDC 直接读取；无法读取的字段使用最近一次成功的 observe.device@1 结果。此读取不会更改目标绑定。"
+    },
+    {
+      "key": "device.fact.state",
+      "table": "Localizable",
+      "en": "Reported state",
+      "zh-Hans": "报告状态"
+    },
+    {
+      "key": "device.trust.authorizedUnadopted",
+      "table": "Localizable",
+      "en": "Authorized. The device is not adopted as a durable target yet.",
+      "zh-Hans": "已授权。该设备尚未被接管为持久目标。"
+    },
+    {
+      "key": "device.trust.offline",
+      "table": "Localizable",
+      "en": "The device reports Offline. Check the USB connection, then re-check.",
+      "zh-Hans": "设备报告离线。请检查 USB 连接后重新检测。"
+    },
+    {
+      "key": "device.trust.ready",
+      "table": "Localizable",
+      "en": "Authorized and adopted — this device is ready.",
+      "zh-Hans": "已授权且已接管——设备就绪。"
+    },
+    {
+      "key": "device.trust.step1",
+      "table": "Localizable",
+      "en": "Unlock the device screen.",
+      "zh-Hans": "解锁设备屏幕；"
+    },
+    {
+      "key": "device.trust.step2",
+      "table": "Localizable",
+      "en": "In the device's \"Trust this computer?\" prompt, choose Trust or Always Trust.",
+      "zh-Hans": "在设备弹出的「是否信任此计算机？」中选择 信任 或 始终信任；"
+    },
+    {
+      "key": "device.trust.step3",
+      "table": "Localizable",
+      "en": "ArkDeck detects the authorization result automatically: a bounded wait re-reads the device state, with no repeated notifications.",
+      "zh-Hans": "ArkDeck 将自动检测授权结果：有界等待重复读取设备状态，不反复弹通知。"
+    },
+    {
+      "key": "device.trust.stepsTitle",
+      "table": "Localizable",
+      "en": "On the device",
+      "zh-Hans": "在设备上"
+    },
+    {
+      "key": "device.trust.unknownState",
+      "table": "Localizable",
+      "en": "The tool reports an unrecognized state: %@. Shown as-is, not interpreted.",
+      "zh-Hans": "工具报告了未识别的状态：%@。按原文展示，不做解读。"
+    },
+    {
+      "key": "device.trust.waiting",
+      "table": "Localizable",
+      "en": "The device reports Unauthorized: it has not trusted this computer yet.",
+      "zh-Hans": "设备报告未授权：尚未信任本机。"
+    },
+    {
+      "key": "device.wait.polling",
+      "table": "Localizable",
+      "en": "Waiting for on-device confirmation…",
+      "zh-Hans": "等待设备端确认…"
+    },
+    {
+      "key": "device.wait.timedOut",
+      "table": "Localizable",
+      "en": "Authorization timed out. Check the device's USB debugging switch, then retry. If retrying does not help, restarting the shared HDC server is a separate, explicitly confirmed step — it affects DevEco and every connected device.",
+      "zh-Hans": "设备授权已超时。请检查设备的 USB 调试开关后重试。若重试无效，重启共享 HDC server 是独立且需显式确认的一步——会影响 DevEco 与所有已连接设备。"
+    },
+    {
+      "key": "device.wait.unavailable",
+      "table": "Localizable",
+      "en": "Unable to check authorization. %@",
+      "zh-Hans": "无法检查设备授权。%@"
+    },
+    {
+      "key": "windows.device.alias.clear",
+      "table": null,
+      "en": "Use the device's own name",
+      "zh-Hans": "使用设备自己的名称"
+    },
+    {
+      "key": "windows.device.wait.until",
+      "table": null,
+      "en": "(until %@)",
+      "zh-Hans": "（至 %@）"
     }
   ]
 }

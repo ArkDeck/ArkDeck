@@ -29,6 +29,7 @@ public sealed partial class OverviewPage() : SurfacePage<OverviewState>(
     {
         // macOS order: what is in scope, what deserves attention next, what just happened; then
         // the Runtime's own diagnosis.
+        if (state.Devices is { } devices) MainWindow.Instance.ShowDevices(devices);
         body.Children.Add(Ui.Card(Scope(state), "overview.record.scope"));
         Button? focus = null;
         if (_resumingJobId is { } resuming && state.Recent.Value?.FirstOrDefault(j => j.JobId == resuming) is { } run)

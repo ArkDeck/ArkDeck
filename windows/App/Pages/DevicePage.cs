@@ -51,6 +51,9 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
                 await RefreshAsync();
             }));
         }
+        EndVerdictIfTheDeviceMoved(state.Candidates);
+        MainWindow.Instance.ShowDevices(state.Candidates);
+        if (CandidateDetail(state) is { } detail) body.Children.Add(detail);
         if (state.Candidates.Unavailable is { } why)
         {
             var notice = Ui.UnavailableNotice("app.devices.unavailable", UiStrings.AppDevicesUnavailable, why);
@@ -64,11 +67,13 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
         else
         {
             var list = Ui.List("app.devices.list", S.Text(UiStrings.AppNavigationDevice));
+            var aliases = App.Preferences.DeviceAliases;
             foreach (var candidate in state.Candidates.Value!)
             {
+                var title = DeviceTrust.Title(candidate, aliases);
                 var stateText = candidate.StateKey is { } key ? S.Text(key) : candidate.AuthorizationState;
                 var facts = Ui.Stack(2,
-                    Ui.Text($"device.row.{candidate.CandidateKey}.title", candidate.Title, "ArkDeckSectionTitleStyle"),
+                    Ui.Text($"device.row.{candidate.CandidateKey}.title", title, "ArkDeckSectionTitleStyle"),
                     Ui.Text($"device.row.{candidate.CandidateKey}.state", stateText));
                 foreach (var (fact, labelKey, value) in new (string, string, string?)[]
                          {
@@ -83,7 +88,7 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
                     if (value is null) continue;
                     facts.Children.Add(Ui.Fact($"device.row.{candidate.CandidateKey}.{fact}", S.Text(labelKey), value));
                 }
-                list.Items.Add(Ui.Item("device.row." + candidate.CandidateKey, $"{candidate.Title}, {stateText}", facts));
+                list.Items.Add(Ui.Item("device.row." + candidate.CandidateKey, $"{title}, {stateText}", facts));
             }
             body.Children.Add(Ui.Card(list));
         }
