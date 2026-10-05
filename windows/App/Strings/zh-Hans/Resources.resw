@@ -6534,4 +6534,8 @@ SHA-256：%4$@</value>
     <value>在文件资源管理器中显示</value>
     <comment>windows.settings.diagnostics.reveal (Windows only)</comment>
   </data>
+  <data name="windows_traceViewer_nothingToReload" xml:space="preserve">
+    <value>没有打开的 Trace 可重新载入。</value>
+    <comment>windows.traceViewer.nothingToReload (Windows only)</comment>
+  </data>
 </root>

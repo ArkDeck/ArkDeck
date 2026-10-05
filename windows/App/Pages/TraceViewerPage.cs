@@ -164,6 +164,19 @@ public sealed partial class TraceViewerPage() : SurfacePage<TraceViewerState>(
 
     // ---- opening ----
 
+    /// <summary>The Trace menu's Open Trace… (Ctrl+Shift+O).</summary>
+    public Task ChooseTraceAsync() => ChooseAsync();
+
+    /// <summary>The Trace menu's Reload Trace (Ctrl+Shift+R): the open file read again.</summary>
+    public async Task ReloadTraceAsync()
+    {
+        if (_document is { } document) await OpenAsync(document.Path);
+        else Ui.Say(_status, S.Text(UiStrings.WindowsTraceViewerNothingToReload));
+    }
+
+    /// <summary>A Trace file Windows handed the App (Open with, or a file association).</summary>
+    public Task OpenFileAsync(string path) => OpenAsync(path);
+
     private async Task ChooseAsync()
     {
         var picker = new FileOpenPicker(MainWindow.Instance.AppWindow.Id) { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
