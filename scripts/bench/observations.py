@@ -59,12 +59,54 @@ def unique_object(pairs):
     return result
 
 
+def _metrics_source(path: pathlib.Path):
+    """Hold a regular, no-follow metrics file through the bounded read."""
+    if os.name != "nt":
+        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        return os.fdopen(descriptor, "rb")
+
+    import _winapi
+    import ctypes
+    from ctypes import wintypes
+    import msvcrt
+
+    class FileInformation(ctypes.Structure):
+        _fields_ = [("attributes", wintypes.DWORD),
+                    ("created", wintypes.FILETIME), ("accessed", wintypes.FILETIME),
+                    ("written", wintypes.FILETIME), ("volume", wintypes.DWORD),
+                    ("size_high", wintypes.DWORD), ("size_low", wintypes.DWORD),
+                    ("links", wintypes.DWORD), ("id_high", wintypes.DWORD),
+                    ("id_low", wintypes.DWORD)]
+
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    inspect = kernel.GetFileInformationByHandle
+    inspect.argtypes = [wintypes.HANDLE, ctypes.POINTER(FileInformation)]
+    inspect.restype = wintypes.BOOL
+    share_read = 0x1
+    open_reparse_point, backup_semantics = 0x00200000, 0x02000000
+    handle = _winapi.CreateFile(
+        str(path), _winapi.GENERIC_READ, share_read, _winapi.NULL,
+        _winapi.OPEN_EXISTING, open_reparse_point | backup_semantics, _winapi.NULL)
+    try:
+        facts = FileInformation()
+        if not inspect(handle, ctypes.byref(facts)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        # OPEN_REPARSE_POINT makes the link itself visible; it is never followed.
+        if facts.attributes & (0x10 | 0x400) or facts.links != 1:
+            raise ValueError("seed metrics must be a regular, single-link file")
+        descriptor = msvcrt.open_osfhandle(handle, os.O_RDONLY | os.O_BINARY)
+        handle = None  # Ownership moves to the CRT descriptor and fdopen.
+        return os.fdopen(descriptor, "rb")
+    finally:
+        if handle is not None:
+            _winapi.CloseHandle(handle)
+
+
 def seed_metrics(root: pathlib.Path, record) -> None:
     """Archive the actual Rust owner's completed counts, not seed estimates."""
     try:
         path = root / "runtime-soak-metrics.json"
-        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
-        with os.fdopen(descriptor, "rb") as source:
+        with _metrics_source(path) as source:
             if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
                 raise ValueError("seed metrics must be a regular file")
             raw = source.read(METRICS_LIMIT + 1)

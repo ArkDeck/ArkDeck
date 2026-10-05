@@ -289,6 +289,45 @@ def user_sid() -> str:
         _kernel32.CloseHandle(token)
 
 
+def temporary_private_directory(prefix: str):
+    """Create a fresh token-user-only root; never rewrite an existing ACL."""
+    _require_windows()
+    import pathlib
+    import secrets
+    import tempfile
+
+    if not prefix or any(character in prefix for character in "/\\:\0"):
+        raise ValueError("a single-segment temporary prefix is required")
+
+    class SecurityAttributes(ctypes.Structure):
+        _fields_ = [("length", wintypes.DWORD), ("descriptor", ctypes.c_void_p),
+                    ("inherit", wintypes.BOOL)]
+
+    convert = _advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW
+    convert.argtypes = [wintypes.LPCWSTR, wintypes.DWORD,
+                        ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(wintypes.DWORD)]
+    convert.restype = wintypes.BOOL
+    create = _kernel32.CreateDirectoryW
+    create.argtypes = [wintypes.LPCWSTR, ctypes.POINTER(SecurityAttributes)]
+    create.restype = wintypes.BOOL
+    sid = user_sid()
+    descriptor = ctypes.c_void_p()
+    _check(convert(f"O:{sid}D:P(A;OICI;FA;;;{sid})", 1, ctypes.byref(descriptor), None))
+    try:
+        attributes = SecurityAttributes(ctypes.sizeof(SecurityAttributes), descriptor, False)
+        base = pathlib.Path(tempfile.gettempdir()).resolve()
+        for _ in range(16):
+            path = base / (prefix + secrets.token_hex(8))
+            if create(str(path), ctypes.byref(attributes)):
+                return path.resolve()
+            error = ctypes.get_last_error()
+            if error != 183:  # ERROR_ALREADY_EXISTS: choose another fresh name.
+                raise ctypes.WinError(error)
+        raise FileExistsError("temporary private directory name collision")
+    finally:
+        _kernel32.LocalFree(descriptor)
+
+
 def root_identity(endpoint: str) -> str:
     """The state root's identity a development daemon names its pipe after:
     `<16 hex volume>-<32 hex file id>` (`FileIdentity::text`)."""

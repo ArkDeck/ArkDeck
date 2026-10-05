@@ -129,14 +129,45 @@ impl HostServices for Host {
 /// owners or publishing a marker. Darwin reserves one of sun_path's 104 bytes
 /// for the terminator; caller-selected UTF-8 paths are measured as bytes.
 pub(super) fn validate_root(root: &Path) -> Result<()> {
-    let path = root.join("d/ctl.sock");
-    if path.as_os_str().as_encoded_bytes().len() > 103 {
-        return Err(format!(
-            "soak socket path {} exceeds 103 bytes; choose a shorter --state-directory (for example under /private/tmp)",
-            path.display()
-        ));
+    #[cfg(target_os = "macos")]
+    {
+        let path = root.join("d/ctl.sock");
+        if path.as_os_str().as_encoded_bytes().len() > 103 {
+            return Err(format!(
+                "soak socket path {} exceeds 103 bytes; choose a shorter --state-directory (for example under /private/tmp)",
+                path.display()
+            ));
+        }
     }
+    #[cfg(windows)]
+    let _ = root;
     Ok(())
+}
+
+pub(super) fn server_identity() -> Result<ServerIdentity> {
+    let identity = ServerIdentity::new(std::env::current_exe().map_err(error)?);
+    #[cfg(target_os = "macos")]
+    {
+        Ok(identity)
+    }
+    #[cfg(windows)]
+    {
+        let pin = std::env::var(crate::SIGNER_VARIABLE).unwrap_or_default();
+        if pin.len() != 64
+            || !pin
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        {
+            return Err(format!(
+                "{} must name the lowercase SHA-256 pin of the host-trusted certificate this executable is signed with",
+                crate::SIGNER_VARIABLE
+            ));
+        }
+        Ok(ServerIdentity {
+            authenticode_sha256: Some(pin),
+            ..identity
+        })
+    }
 }
 
 pub(super) struct Cycle {
@@ -147,28 +178,37 @@ pub(super) struct Cycle {
 }
 impl Cycle {
     pub(super) fn start(root: &Path, owners: Arc<Owners>, fake: Arc<SimulatedHdc>) -> Result<Self> {
+        #[cfg(target_os = "macos")]
         let endpoint = LocalEndpoint::new(root.join("d/ctl.sock"));
+        #[cfg(windows)]
+        let endpoint = LocalEndpoint::new(format!(
+            r"\\.\pipe\arkdeck-soak-{}",
+            arkdeck_contract::sha256_hex(root.as_os_str().as_encoded_bytes())
+        ));
         let control = Arc::new(
             Control::new(Host {
                 owners,
                 fake,
                 root: root.to_path_buf(),
-                home: std::env::var("HOME").map_err(error)?,
+                home: home()?,
                 claims: StorageClaims::default(),
             })
             .map_err(error)?,
         );
         // Bind synchronously: no readiness sleep, no other generation can own
         // this private endpoint while it is being served or drained.
+        #[cfg(target_os = "macos")]
         HostDirectory::open(root)
             .map_err(error)?
             .private_child("d")
             .map_err(error)?;
         // Reuse the production kernel directory lease; plain bind has no
         // retained directory lock once the socket name is removed.
+        #[cfg(target_os = "macos")]
         let listener = LocalListener::bind_facade(&endpoint).map_err(error)?;
         let stop = Arc::new(Latch::new().map_err(error)?);
         let accept_stop = Arc::clone(&stop);
+        #[cfg(target_os = "macos")]
         let worker = std::thread::spawn(move || {
             arkdeck_agentd::serve_control(
                 listener,
@@ -178,6 +218,31 @@ impl Cycle {
                 Duration::from_secs(5),
             )
         });
+        #[cfg(windows)]
+        let worker = {
+            // A Windows listener stays on the thread that binds it. Publish
+            // readiness after bind, so clients need no readiness sleeps.
+            let endpoint = endpoint.clone();
+            let (ready, bound) = std::sync::mpsc::sync_channel(1);
+            let worker = std::thread::spawn(move || {
+                let listener = LocalListener::bind(&endpoint);
+                let _ = ready.send(listener.as_ref().map(|_| ()).map_err(|e| e.to_string()));
+                arkdeck_agentd::serve_control(
+                    listener?,
+                    control,
+                    |listener| listener.accept_until_latch(&accept_stop),
+                    Duration::from_secs(5),
+                    Duration::from_secs(5),
+                )
+            });
+            match bound.recv().map_err(error)? {
+                Ok(()) => worker,
+                Err(message) => {
+                    let _ = worker.join();
+                    return Err(message);
+                }
+            }
+        };
         Ok(Self {
             endpoint,
             stop,
@@ -190,7 +255,7 @@ impl Cycle {
         self.next_request += 1;
         // Swift AgentClient.exchange opens one connection per business request,
         // verifies health on that connection and never replays a lost reply.
-        let identity = ServerIdentity::new(std::env::current_exe().map_err(error)?);
+        let identity = server_identity()?;
         let mut client = Client::connect_bounded(&self.endpoint, &identity, Duration::from_secs(5))
             .map_err(error)?;
         client
