@@ -77,7 +77,7 @@ public sealed class SettingsTests
         Assert.AreEqual("1073741824", settings.Storage.Value!.ArtifactUsedBytes);
         Assert.AreEqual("30", settings.Storage.Value.RetentionDays);
         Assert.AreEqual(2, settings.TraceCache.Value!.EntryCount);
-        Assert.AreEqual("inactiveDerivedEntries", settings.TraceCache.Value.PurgeScope);
+        Assert.AreEqual("inactiveDerivedDatabases", settings.TraceCache.Value.PurgeScope);
     }
 
     [TestMethod]

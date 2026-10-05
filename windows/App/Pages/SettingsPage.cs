@@ -18,7 +18,7 @@ namespace ArkDeck.App.Pages;
 /// <c>runtime.storage.status</c>, <c>trace.cache.status</c>, <c>workspace.project.list|show</c>
 /// and <c>workspace.preset.list</c>, each shown as it came or as
 /// <c>unavailable(reasonCode)</c> with its CLI command. Changing a setting — the Runtime
-/// service's verify and restart, signing, storage policy, projects and presets — is the CLI's,
+/// service's verify and restart, signing, projects and presets — is the CLI's (the storage policy and root and the Trace cache purge are the Runtime's writes, confirmed here),
 /// and each tab names the command.
 /// </summary>
 public sealed partial class SettingsPage : SurfacePage<SettingsState>
@@ -270,6 +270,7 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
             return;
         }
         var s = state.Storage.Value!;
+        StorageEditing(s);
         runtime.Children.Add(Ui.Fact("settings.storage.runtime.used", S.Text(UiStrings.SettingsStorageCurrentUsage), S.Format(UiStrings.WindowsBytes, s.ArtifactUsedBytes)));
         runtime.Children.Add(Ui.Fact("settings.storage.runtime.remaining", S.Text(UiStrings.SettingsStorageRemaining), S.Format(UiStrings.WindowsBytes, s.ArtifactRemainingBytes)));
         runtime.Children.Add(Ui.Fact("settings.storage.runtime.total", S.Text(UiStrings.SettingsStorageRuntimeTotal), S.Format(UiStrings.WindowsBytes, s.ArtifactTotalBytes)));
@@ -299,6 +300,7 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
         cache.Children.Add(Ui.Text("settings.trace.entries", S.Format(UiStrings.WindowsSettingsTraceEntries, c.EntryCount, c.ActiveEntryCount, c.InactiveEntryCount)));
         cache.Children.Add(Ui.Fact("settings.trace.bytes", S.Text(UiStrings.SettingsStorageCurrentUsage), S.Format(UiStrings.WindowsBytes, c.TotalByteCount)));
         cache.Children.Add(Ui.Fact("settings.trace.scope", S.Text(UiStrings.WindowsSettingsTraceScope), c.PurgeScope));
+        TracePurge(cache, c);
     }
 
     private void Workspace(SettingsState state)

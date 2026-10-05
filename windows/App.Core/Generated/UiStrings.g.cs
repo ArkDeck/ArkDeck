@@ -1564,6 +1564,35 @@ public static class UiStrings
     public const string OverviewTrustUnavailable = "overview.trust.unavailable";
     public const string OverviewTrustWaiting = "overview.trust.waiting";
     public const string WindowsOverviewHdcCheckHidumper = "windows.overview.hdc.checkHidumper";
+    public const string SettingsStorageChooseRoot = "settings.storage.chooseRoot";
+    public const string SettingsStorageDays = "settings.storage.days";
+    public const string SettingsStorageFutureJobs = "settings.storage.futureJobs";
+    public const string SettingsStorageGib = "settings.storage.gib";
+    public const string SettingsStorageLocation = "settings.storage.location";
+    public const string SettingsStoragePolicy = "settings.storage.policy";
+    public const string SettingsStoragePolicyDetail = "settings.storage.policyDetail";
+    public const string SettingsStorageResetRoot = "settings.storage.resetRoot";
+    public const string SettingsStorageRootSource = "settings.storage.rootSource";
+    public const string SettingsStorageRootSourceCustom = "settings.storage.rootSource.custom";
+    public const string SettingsStorageSave = "settings.storage.save";
+    public const string SettingsStorageSelectionError = "settings.storage.selectionError";
+    public const string SettingsStorageValidationError = "settings.storage.validationError";
+    public const string SettingsCommonSaving = "settings.common.saving";
+    public const string SettingsCommonWorking = "settings.common.working";
+    public const string WindowsSettingsStorageRootSourceDefault = "windows.settings.storage.rootSource.default";
+    public const string WindowsSettingsStorageAlreadyDefault = "windows.settings.storage.alreadyDefault";
+    public const string WindowsSettingsStorageConfirmPolicy = "windows.settings.storage.confirmPolicy";
+    public const string WindowsSettingsStorageConfirmRoot = "windows.settings.storage.confirmRoot";
+    public const string WindowsSettingsStorageConfirmReset = "windows.settings.storage.confirmReset";
+    public const string WindowsSettingsStorageUseFolder = "windows.settings.storage.useFolder";
+    public const string WindowsSettingsStorageRefused = "windows.settings.storage.refused";
+    public const string WindowsSettingsStorageSuperseded = "windows.settings.storage.superseded";
+    public const string WindowsSettingsStorageSaved = "windows.settings.storage.saved";
+    public const string WindowsSettingsTracePurge = "windows.settings.trace.purge";
+    public const string WindowsSettingsTracePurgeConfirm = "windows.settings.trace.purgeConfirm";
+    public const string WindowsSettingsTracePurgeDone = "windows.settings.trace.purgeDone";
+    public const string WindowsSettingsTracePurgeFailed = "windows.settings.trace.purgeFailed";
+    public const string WindowsSettingsTracePurgeNote = "windows.settings.trace.purgeNote";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3124,5 +3153,34 @@ public static class UiStrings
         OverviewTrustUnavailable,
         OverviewTrustWaiting,
         WindowsOverviewHdcCheckHidumper,
+        SettingsStorageChooseRoot,
+        SettingsStorageDays,
+        SettingsStorageFutureJobs,
+        SettingsStorageGib,
+        SettingsStorageLocation,
+        SettingsStoragePolicy,
+        SettingsStoragePolicyDetail,
+        SettingsStorageResetRoot,
+        SettingsStorageRootSource,
+        SettingsStorageRootSourceCustom,
+        SettingsStorageSave,
+        SettingsStorageSelectionError,
+        SettingsStorageValidationError,
+        SettingsCommonSaving,
+        SettingsCommonWorking,
+        WindowsSettingsStorageRootSourceDefault,
+        WindowsSettingsStorageAlreadyDefault,
+        WindowsSettingsStorageConfirmPolicy,
+        WindowsSettingsStorageConfirmRoot,
+        WindowsSettingsStorageConfirmReset,
+        WindowsSettingsStorageUseFolder,
+        WindowsSettingsStorageRefused,
+        WindowsSettingsStorageSuperseded,
+        WindowsSettingsStorageSaved,
+        WindowsSettingsTracePurge,
+        WindowsSettingsTracePurgeConfirm,
+        WindowsSettingsTracePurgeDone,
+        WindowsSettingsTracePurgeFailed,
+        WindowsSettingsTracePurgeNote,
     ];
 }

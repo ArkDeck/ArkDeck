@@ -20,7 +20,7 @@ use super::identity::{ProcessIdentity, Token, file_identity, process_image, proc
 use crate::{ProvedProcessEnd, ServerIdentityReceipt, VerifiedTool, denied, invalid};
 use std::io;
 use std::mem::{offset_of, size_of};
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4};
 use std::ptr::null_mut;
 use windows_sys::Win32::Foundation::{
     ERROR_INSUFFICIENT_BUFFER, ERROR_INVALID_PARAMETER, ERROR_SUCCESS, WAIT_OBJECT_0,
@@ -371,6 +371,119 @@ pub(crate) fn owns_local_listener(pid: u32, endpoint: SocketAddrV4) -> io::Resul
         .any(|row| row.pid == pid && is_loopback_or_wildcard(row.address)))
 }
 
+/// A process's TCP socket on a local port that keeps a server from binding
+/// that port: a listener on any address, or a connection using it as its
+/// local port (an outbound connection's port can be handed out from the
+/// whole dynamic range). Read from the kernel's connection table; nothing is
+/// connected, and the process is named, never signalled.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PortHolder {
+    pub pid: u32,
+    /// The holder's image file name, when this user may read it.
+    pub image: Option<String>,
+    pub local: SocketAddr,
+    pub remote: SocketAddr,
+    /// `listen`, `established`, `synSent`, … (`MIB_TCP_STATE_*`).
+    pub state: &'static str,
+}
+
+impl std::fmt::Display for PortHolder {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "pid {} ({}), {} {} -> {}",
+            self.pid,
+            self.image.as_deref().unwrap_or("image unreadable"),
+            self.state,
+            self.local,
+            self.remote
+        )
+    }
+}
+
+fn state_name(state: u32) -> Option<&'static str> {
+    Some(match state as i32 {
+        MIB_TCP_STATE_LISTEN => "listen",
+        MIB_TCP_STATE_SYN_SENT => "synSent",
+        MIB_TCP_STATE_SYN_RCVD => "synReceived",
+        MIB_TCP_STATE_ESTAB => "established",
+        MIB_TCP_STATE_FIN_WAIT1 => "finWait1",
+        MIB_TCP_STATE_FIN_WAIT2 => "finWait2",
+        MIB_TCP_STATE_CLOSE_WAIT => "closeWait",
+        MIB_TCP_STATE_CLOSING => "closing",
+        MIB_TCP_STATE_LAST_ACK => "lastAck",
+        // Closed, TIME_WAIT (owned by no process) and deleted rows hold
+        // nothing a new listener could not bind past.
+        _ => return None,
+    })
+}
+
+fn image_name(pid: u32) -> Option<String> {
+    // SAFETY: query-only access; the handle is taken into RAII ownership.
+    let process =
+        Handle::new(unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) }).ok()?;
+    process_image(process.raw())
+        .ok()?
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+}
+
+/// Every process's TCP socket that holds local `port` (see [`PortHolder`]),
+/// IPv4 and IPv6.
+pub fn port_holders(port: u16) -> io::Result<Vec<PortHolder>> {
+    let mut found = Vec::new();
+    let (storage, length) = tcp_table(AF_INET, TCP_TABLE_OWNER_PID_ALL)?;
+    for row in table_rows::<MIB_TCPROW_OWNER_PID>(
+        &storage,
+        length,
+        offset_of!(MIB_TCPTABLE_OWNER_PID, table),
+    )? {
+        if u16::from_be(row.dwLocalPort as u16) != port || row.dwOwningPid == 0 {
+            continue;
+        }
+        let Some(state) = state_name(row.dwState) else {
+            continue;
+        };
+        found.push(PortHolder {
+            pid: row.dwOwningPid,
+            image: image_name(row.dwOwningPid),
+            local: SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::from(row.dwLocalAddr.to_ne_bytes())),
+                port,
+            ),
+            remote: SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::from(row.dwRemoteAddr.to_ne_bytes())),
+                u16::from_be(row.dwRemotePort as u16),
+            ),
+            state,
+        });
+    }
+    let (storage, length) = tcp_table(AF_INET6, TCP_TABLE_OWNER_PID_ALL)?;
+    for row in table_rows::<MIB_TCP6ROW_OWNER_PID>(
+        &storage,
+        length,
+        offset_of!(MIB_TCP6TABLE_OWNER_PID, table),
+    )? {
+        if u16::from_be(row.dwLocalPort as u16) != port || row.dwOwningPid == 0 {
+            continue;
+        }
+        let Some(state) = state_name(row.dwState) else {
+            continue;
+        };
+        found.push(PortHolder {
+            pid: row.dwOwningPid,
+            image: image_name(row.dwOwningPid),
+            local: SocketAddr::new(IpAddr::V6(Ipv6Addr::from(row.ucLocalAddr)), port),
+            remote: SocketAddr::new(
+                IpAddr::V6(Ipv6Addr::from(row.ucRemoteAddr)),
+                u16::from_be(row.dwRemotePort as u16),
+            ),
+            state,
+        });
+    }
+    Ok(found)
+}
+
 /// Every TCP listener on `port`, IPv4 and IPv6, with its owning PID.
 pub(crate) fn listeners(port: u16) -> io::Result<Vec<Listener>> {
     let mut found = Vec::new();
@@ -414,21 +527,19 @@ pub(crate) fn listeners(port: u16) -> io::Result<Vec<Listener>> {
 /// The kernel's listener table of one address family, as DWORD-aligned
 /// storage and the byte length the kernel wrote.
 fn listener_table(family: u16) -> io::Result<(Vec<u32>, usize)> {
+    tcp_table(family, TCP_TABLE_OWNER_PID_LISTENER)
+}
+
+/// One of the kernel's TCP tables of one address family (`class`), as
+/// DWORD-aligned storage and the byte length the kernel wrote.
+fn tcp_table(family: u16, class: TCP_TABLE_CLASS) -> io::Result<(Vec<u32>, usize)> {
     // Table contents may grow between size query and read. Retry only the
     // commandless size/read operation; never retry an HDC observation here.
     for _ in 0..3 {
         let mut length = 0;
         // SAFETY: documented size query, no output allocation.
-        let query = unsafe {
-            GetExtendedTcpTable(
-                null_mut(),
-                &mut length,
-                0,
-                u32::from(family),
-                TCP_TABLE_OWNER_PID_LISTENER,
-                0,
-            )
-        };
+        let query =
+            unsafe { GetExtendedTcpTable(null_mut(), &mut length, 0, u32::from(family), class, 0) };
         if query != ERROR_INSUFFICIENT_BUFFER || length == 0 || length > 16 * 1024 * 1024 {
             return Err(denied("TCP listener table identity unavailable"));
         }
@@ -441,7 +552,7 @@ fn listener_table(family: u16) -> io::Result<(Vec<u32>, usize)> {
                 &mut length,
                 0,
                 u32::from(family),
-                TCP_TABLE_OWNER_PID_LISTENER,
+                class,
                 0,
             )
         };

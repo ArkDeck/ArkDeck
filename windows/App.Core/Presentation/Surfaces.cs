@@ -32,6 +32,9 @@ public static class CliCommands
     public const string RuntimeToolList = "arkdeck runtime tool list";             // runtime.tool.list, app.settings.toolchains
     public const string RuntimeStorageStatus = "arkdeck runtime storage status";   // runtime.storage.status, app.settings.storage
     public const string TraceCacheStatus = "arkdeck trace cache status";           // trace.cache.status, app.settings.traceCache
+    public const string TraceCachePurge = "arkdeck trace cache purge";             // trace.cache.purge, app.settings.traceCache
+    public const string RuntimeStoragePolicy = "arkdeck runtime storage policy ..."; // runtime.storage.policy, app.settings.storage
+    public const string RuntimeStorageRoot = "arkdeck runtime storage root ...";   // runtime.storage.root, app.settings.storage
     public const string WorkspaceProjectList = "arkdeck workspace project list";   // workspace.project.list
     public const string WorkspaceProjectRegister = "arkdeck workspace project register --registration-request-id <id> --kind <arkdeck|openharmony> --root <absolute-path>"; // workspace.project.register
     public const string WorkspaceProjectShow = "arkdeck workspace project show --project <project-ref>"; // workspace.project.show

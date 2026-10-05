@@ -57,20 +57,14 @@ alone ignored it. It now reads `clock_now`, and macOS is unchanged.
 regenerated with `arkdeck maintainer contracts export` (two entries `partial` → `implemented` on
 Windows), and `oracle.json` is not re-pinned.
 
-## Left out: `workspace continuation submit|run` (needs a ruling)
+## Found, fixed in the next layer: `workspace continuation submit|run`
 
-The Rust control layer answers `health` with `providers: []` on every host (`arkdeck-control`'s
-`health` arm). Swift's daemon listed its providers, and the `workspace-continuation` oracle's
-health names `hdc` and `workspace`. The continuation draft requires the source Job's provider in
-that list (`CLIWorkspaceContinuationDraft.prepare`).
-
-This was run through the real CLI against the signed test daemon. The source Job was a completed
-`target observe` (`observe.device@1`, provider `hdc`). Each of `workspace continuation inspect`,
-`submit` and `run` was refused before anything was submitted (`operationUnavailable`, "the source
-Job provider is not published by the current Runtime").
-
-Publishing the registered providers in `health` would change the macOS daemon's `health` answer
-and its recorded frame too. So this leaf stops here for a ruling, and the census row says so.
+Run through the real CLI against the signed test daemon, with a completed `target observe` as the
+source Job, `workspace continuation inspect|submit|run` each refused before anything was submitted
+(`operationUnavailable`, "the source Job provider is not published by the current Runtime"): the
+Rust control layer answered `health` with `providers: []` on every host. The lead decided it is a
+parity defect (Swift's daemon and the `workspace-continuation` oracle list the providers); the
+next layer of this stack fixes it and measures the leaves.
 
 ## Local targeted checks
 

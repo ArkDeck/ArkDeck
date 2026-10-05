@@ -49,7 +49,10 @@ pub fn owner_only(path: &Path) {
 
 /// Replaces the bytes of a sealed (owner read-only) payload, keeping it
 /// sealed: 0600, write, 0400 on macOS; on Windows the sealed file is moved
-/// aside and a new one created and sealed by the store in its place.
+/// aside and a new one created and sealed by the store in its place, and the
+/// one moved aside is then removed (its read-only DACL grants no write, but
+/// the temporary directory lets its owner delete it), so nothing is left in
+/// the temporary directory.
 pub fn rewrite_sealed(path: &Path, bytes: &[u8]) {
     #[cfg(unix)]
     {
@@ -63,7 +66,9 @@ pub fn rewrite_sealed(path: &Path, bytes: &[u8]) {
         let parent = path.parent().unwrap();
         let name = path.file_name().unwrap().to_str().unwrap();
         let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
-        std::fs::rename(path, temporary_root().join(format!("sealed-{nonce:032x}"))).unwrap();
+        let aside = temporary_root().join(format!("sealed-{nonce:032x}"));
+        std::fs::rename(path, &aside).unwrap();
+        std::fs::remove_file(&aside).unwrap();
         let directory = arkdeck_platform::HostDirectory::open(parent).unwrap();
         directory.create_document(name, bytes).unwrap();
         directory.seal_document(name).unwrap();
