@@ -774,10 +774,10 @@ Never:
   5. verify;
   6. the zero-dispatch negative case, with the full Job-set comparison.
 
-  `workspace symbolize` is the one workspace leaf still `partial` on Windows: a symbolization
-  needs a device-captured crash. GJ-5's own repro provides one (the crash-index entry and its
-  fault log), so a symbolize run against it may be recorded as an extra step. It is not one of
-  §6's criteria.
+  `workspace symbolize` is measured `implemented` on Windows through the signed CLI,
+  including a named crash captured by the Windows daemon. GJ-5's actual crash-index entry
+  and fault log may be used for an additional symbolization step; it remains outside §6's
+  required criteria.
 - **Authority:** the repro and verify `debug.hap@1` steps are `deviceMutation`. The workspace
   mutations need the account daemon's authority.
 - **Destructive:** none.
@@ -789,6 +789,16 @@ Never:
   - `workspace build` and `workspace test` run end to end on Windows with the real DevEco (#2549):
     `ohpm install`, `workspace isolate`, `workspace build` and `workspace test` were run on the
     repository's WaterFlow demo through the CLI. Both are measured `implemented`.
+  - #2597 repairs host workspace Session publication with the original complete consumed
+    authority. The 2026-10-06 independent host patch/build/test chain published generations
+    7/8/9 and passed whole-product readback/fixed-input checks within one round, three
+    mutations, 40 minutes and 512 MiB (1007.746156 seconds and 2,750,419 declared Job
+    Artifact bytes). A separate independent `debug.hap` smoke succeeded once, with
+    whole hash-checked `debug-hilog.txt`, `install-readback.json` and
+    `process-readback.json`; no UI, device-info or screenshot result is claimed.
+    Signing/device verification of the repaired WaterFlow HAP remains blocked on
+    board-trusted signing inputs. Neither result establishes the formal signed
+    crash repro/verify loop or hardware PASS.
   - The daemon's `--symbolize-crash` mode replays the Swift oracle on Windows.
 - **Blocking gaps:**
   - G1 is closed.

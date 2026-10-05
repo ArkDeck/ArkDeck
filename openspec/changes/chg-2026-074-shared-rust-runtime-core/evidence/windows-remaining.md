@@ -1,6 +1,50 @@
 # Remaining Windows work
 
-Updated 2026-10-04 against protected main `955cf537` (#2469). Phase S is the software; phase A is
+## Current milestone (2026-10-06)
+
+Protected main `d238a55c7b693adc7edbf6314699e920f0ee1e08` includes #2597's host
+workspace Session publication repair. Closed host mutations keep their original
+complete consumed Runtime authority and require matching durable Job, Journal,
+plan and same-SHA tool provenance. Windows reads external-tool fixed PE
+FileVersion from the retained executable without a version child. The Runtime's
+own compiled package version requires its exact executable path, native identity
+and SHA. The existing typed Job reconcile
+can settle publication without replaying the operation, changing its outcome or
+renewing authority; unknown or incomplete proof still refuses.
+
+Root-verified independent host patch/build/test publications succeeded at
+generations 7/8/9. Build HAP/log and test-log bytes were read whole, and the
+fixed-input checks exited 0. The three host dispatches used 1007.746156 seconds
+and 2,750,419 declared Job Artifact bytes within the unchanged one-round,
+40-minute/512-MiB independent budget. Historical build/test publications at
+generations 5/6 keep their original outcomes and authority. A separate independent
+`debug.hap` smoke succeeded once with publication generation 10 and whole,
+hash-checked `debug-hilog.txt`, `install-readback.json` and
+`process-readback.json`. Its software checks passed without a UI, device-info,
+screenshot or formal/hardware PASS claim. Typed stop then preserved state and
+reported a complete drain with no socket. Exact Job/Manifest facts are in
+`runs/TASK-XPA-011/windows-workspace-publication-delivery-20261006-run.md`.
+
+The current CLI census is **149 implemented, 11 partial and 2 notImplemented**
+of 162 Windows-required features, plus **101 macOS-only** entries. The repair
+adds no CLI leaf and changes no count. The current owner/leaf census is
+`docs/design/cross-platform/windows-remaining.md`; the older operation/method
+totals below are historical measurements, not current availability assertions.
+
+GJ-1 is user-skipped/incomplete. Independently named real smoke and host
+preparation were executed under the user's delegation, without changing formal
+Scenario predicates or marking any Journey/hardware PASS. The original paired
+GJ-2 HAP, GJ-3 signed ARM32 library and pinned rollback fixture remain missing.
+Signing and device verification of the repaired WaterFlow HAP remain blocked
+on board-trusted debug signing material and preset. The separate smoke does not
+replace GJ-5's remaining crash-probe inputs or prove its signed device loop.
+AF-W1, the trusted Windows ArkTrace distribution, quiet-host
+performance/baseline work and the existing closed service install/update ruling
+remain as listed in the current census and phase A runbook.
+
+## Historical milestone (2026-10-04)
+
+Recorded against protected main `955cf537` (#2469). Phase S is the software; phase A is
 the maintainer's real-host and DAYU200 acceptance (proposal r12, r13: Windows 11 x64 only),
 written out in order in `docs/design/cross-platform/windows-phase-a-runbook.md`. The table is
 refreshed once per milestone, in its own docs commit, not in every slice.

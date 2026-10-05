@@ -44,8 +44,8 @@ consumption; patch Artifact digests must be real matching lowercase SHA-256.
 
 Windows external versions come from bounded embedded PE fixed FileVersion
 resources read through the retained, revalidated executable handle. The
-Runtime's compiled workspace package version applies only to the exact native
-identity and SHA of its current executable. A copied executable cannot borrow
+Runtime's compiled workspace package version applies only to the exact path,
+native identity and SHA of its current executable. A copied executable cannot borrow
 that version. No version child is launched.
 
 Live execution retains its pre-write canonical materialization and compares
@@ -112,12 +112,19 @@ of 162 Windows-required features, plus 101 macOS-only features.
 
 ## CI
 
-Not pushed at the time of this local record. The preceding PR #2596 passed
-SDD Guard run 37341657944 and Swift aggregate run 37341657960 at head
-`64370a4916f5d8c4bdc73e90b1c0f36ba26d18c4`; those runs do not validate this
-increment. Main's required checks were independently read back as `guard`
-and `swift`. This increment's exact PR/head/run conclusions will be recorded
-in the subsequent delivery evidence after CI, without amending a green head.
+[PR #2597](https://github.com/ArkDeck/ArkDeck/pull/2597) validated this increment at
+exact head `48d2dc6a29edaa3c6dacaef6d56715c8f7addbde`: SDD Guard run
+[37361252068](https://github.com/ArkDeck/ArkDeck/actions/runs/37361252068) and Swift
+aggregate run
+[37361252550](https://github.com/ArkDeck/ArkDeck/actions/runs/37361252550)
+concluded SUCCESS; all 16 checks concluded SUCCESS/SKIPPED. It merged at
+19:39:27 UTC into protected main `d238a55c7b693adc7edbf6314699e920f0ee1e08`.
+Main's required checks were independently read back as `guard` and `swift`.
+These post-CI facts are added in the subsequent docs-only delivery increment,
+without amending the green implementation head. Actual retained-publication,
+independent-host and successful separate HAP smoke results, including the final
+typed stopped state, are recorded in
+[the delivery run](windows-workspace-publication-delivery-20261006-run.md).
 
 GJ-1 is skipped at the user's request and remains incomplete. Independent
 observations and host continuation checks are separate from formal GJ-2/3/5
