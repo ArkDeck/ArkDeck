@@ -703,6 +703,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // Runtime's `health` lists the providers it composes, as Swift's did.
     "workspace.continuation.submit",
     "workspace.continuation.run",
+    // The signing of a HAP through a registered signing preset pinning the
+    // host's registered DevEco Studio (TASK-XPA-011), through the real CLI
+    // against the signed test daemon over a fixture's signing (its preset
+    // store and Credential Manager's `ArkDeck-fixture/` scope, a test build's
+    // input alone) and the Swift oracle's stand-in signer
+    // (`tests/spawning/workspace_sign_leaf.rs`, run with
+    // `ARKDECK_LIVE_DEVECO_ROOT`).
+    "workspace.sign",
     // GJ-4 Flash (TASK-XPA-010): `flash.full-restore@1` run to a terminal
     // state through `flash run`, and the Flash host reads over the same
     // composition, by the real CLI against a signed copy of the daemon's test

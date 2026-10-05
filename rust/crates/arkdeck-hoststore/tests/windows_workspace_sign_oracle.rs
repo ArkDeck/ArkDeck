@@ -49,6 +49,10 @@ fn main() {
 mod support;
 
 #[cfg(windows)]
+#[path = "sign_stand_in/mod.rs"]
+mod sign_stand_in;
+
+#[cfg(windows)]
 mod windows {
     use super::support;
     use super::support::fixture_fs::{private_dir, temporary_root};
@@ -86,8 +90,6 @@ mod windows {
     /// The recording's fake passwords: nothing they unlock exists anywhere.
     const KEYSTORE_SECRET: &str = "oracle-keystore-password-7f3a";
     const KEY_SECRET: &str = "oracle-key-password-2c9e";
-    const KEYSTORE_PROMPT: &str = "please input KeystorePwd (timeout 30 seconds):";
-    const KEY_PROMPT: &str = "please input KeyPwd (timeout 30 seconds):";
 
     fn oracle_now() -> Option<String> {
         Some(TIMESTAMP.into())
@@ -99,131 +101,16 @@ mod windows {
 
     // ---- the stand-in signer ---------------------------------------------
 
-    fn option(arguments: &[String], name: &str) -> String {
-        arguments
-            .iter()
-            .position(|argument| argument == name)
-            .and_then(|index| arguments.get(index + 1))
-            .cloned()
-            .unwrap_or_default()
-    }
-
-    fn say(text: &str) {
-        let mut stdout = std::io::stdout().lock();
-        stdout.write_all(text.as_bytes()).unwrap();
-        stdout.flush().unwrap();
-    }
-
-    /// `IFS= read -r` after a prompt, from the console, echo cleared.
-    fn ask(prompt: &str) -> Option<Secret> {
-        arkdeck_platform::read_terminal_secret(prompt)
-            .ok()
-            .filter(|secret| !secret.as_bytes().is_empty())
-    }
-
-    /// `hap-signer.sh`, statement for statement. `arguments` starts at
-    /// `-jar`.
+    /// `hap-signer.sh` (`sign_stand_in`), run as `<root>\tools\java.exe`:
+    /// the recording's `/tmp/…` names are read below this root.
     pub fn stand_in(arguments: &[String]) -> ! {
-        use std::process::exit;
-        if arguments.len() < 3 || !Path::new(&arguments[1]).is_file() {
-            exit(64);
-        }
-        // `<root>\tools\java.exe`.
         let root = std::env::current_exe()
             .unwrap()
             .ancestors()
             .nth(2)
             .unwrap()
             .to_path_buf();
-        let command = arguments[2].as_str();
-        let rest = &arguments[3..];
-        let input = option(rest, "-inFile");
-        let output = option(rest, "-outFile");
-        let chain = option(rest, "-outCertChain");
-        let profile = option(rest, "-outProfile");
-        let Ok(bytes) = fs::read(&input) else {
-            exit(64)
-        };
-        let mode = String::from_utf8_lossy(&bytes)
-            .lines()
-            .find_map(|line| line.strip_prefix("mode=").map(str::to_owned))
-            .unwrap_or_default();
-        match command {
-            "sign-app" => {
-                if output.is_empty() {
-                    exit(64);
-                }
-                if mode == "unknown-prompt" {
-                    say("Password: ");
-                    std::thread::sleep(std::time::Duration::from_secs(1));
-                    exit(65);
-                }
-                let Some(keystore) = ask(KEYSTORE_PROMPT) else {
-                    exit(66)
-                };
-                if mode == "repeat-prompt" {
-                    say(KEYSTORE_PROMPT);
-                    std::thread::sleep(std::time::Duration::from_secs(1));
-                    exit(67);
-                }
-                let Some(_key) = ask(KEY_PROMPT) else {
-                    exit(68)
-                };
-                match mode.as_str() {
-                    "echo-secret" => {
-                        say(std::str::from_utf8(keystore.as_bytes()).unwrap());
-                        exit(69);
-                    }
-                    "sign-failure" => {
-                        say(
-                            "Incorrect keystore password, please input the correct plaintext \
-                             password.",
-                        );
-                        exit(74);
-                    }
-                    _ => {}
-                }
-                if !input.ends_with(".hap") {
-                    say("Invalid file format.");
-                    exit(75);
-                }
-                if Path::new(&output).exists() {
-                    exit(71);
-                }
-                let mut signed = bytes;
-                signed.extend_from_slice(b"arkdeck-signed-fixture");
-                if fs::write(&output, signed).is_err() {
-                    exit(70);
-                }
-                exit(0)
-            }
-            "verify-app" => {
-                if chain.is_empty() || profile.is_empty() || !bytes.starts_with(b"PK\x03\x04") {
-                    exit(72);
-                }
-                if mode == "verify-failure" {
-                    exit(73);
-                }
-                if let Some(marker) = mode.strip_prefix("verify-once:") {
-                    let relative = marker
-                        .strip_prefix(&format!("{SWIFT_ROOT}/"))
-                        .unwrap_or_else(|| exit(72));
-                    let marker = root.join(relative.replace('/', "\\"));
-                    if !marker.exists() {
-                        fs::write(&marker, b"failed-once").unwrap();
-                        exit(73);
-                    }
-                }
-                if !Path::new(&chain).exists() {
-                    fs::write(&chain, b"fixture-certificate-chain").unwrap();
-                }
-                if !Path::new(&profile).exists() {
-                    fs::write(&profile, b"fixture-profile").unwrap();
-                }
-                exit(0)
-            }
-            _ => exit(64),
-        }
+        super::sign_stand_in::stand_in(arguments, &root)
     }
 
     // ---- the runner ------------------------------------------------------

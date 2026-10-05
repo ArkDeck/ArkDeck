@@ -449,7 +449,9 @@ impl Authority {
                 bootstrap.display()
             )
         })?;
-        let projects = if self.development {
+        let projects = if let Some((_, pinning)) = test_signing(self.root.path())? {
+            projects.with_dependency_pinning(Some(toolchains), Some(pinning))
+        } else if self.development {
             projects.with_dependency_pinning(Some(toolchains), None)
         } else {
             projects.with_dependency_pinning(Some(toolchains), Some(credential_pinning()?))
@@ -1029,6 +1031,9 @@ impl Authority {
     /// releasing at the start the pins no preset record carries, as the macOS
     /// installed daemon does.
     fn signing_setup(&self) -> Result<Option<arkdeck_hoststore::SigningSetup>, String> {
+        if let Some((setup, _)) = test_signing(self.root.path())? {
+            return Ok(Some(setup));
+        }
         if self.development {
             return Ok(None);
         }
@@ -1482,6 +1487,54 @@ fn launch_managed(
 /// root and the Credential Manager secrets bound to this process's own image,
 /// in its canonical `X:\…` spelling (the spelling a receipt's identity is
 /// computed over).
+/// Test builds on Windows only: the fixture signing a process of the signed
+/// test daemon (`tests/spawning/signed_daemon.rs`) takes before it composes
+/// anything — a preset store and a namespace of Credential Manager's
+/// `ArkDeck-fixture/` scope — so a development root signs as the installed
+/// daemon does, over a fixture's material and secrets and never the
+/// account's. The production daemon has no such input: this and its callers
+/// are compiled into test builds alone.
+#[cfg(all(windows, test))]
+pub(crate) static TEST_SIGNING: std::sync::OnceLock<(std::path::PathBuf, String)> =
+    std::sync::OnceLock::new();
+
+/// [`TEST_SIGNING`] composed over `root`'s `workspace-signing-attempts`.
+#[cfg(all(windows, test))]
+fn test_signing(
+    root: &Path,
+) -> Result<
+    Option<(
+        arkdeck_hoststore::SigningSetup,
+        arkdeck_hoststore::WorkspaceCredentialPinning,
+    )>,
+    String,
+> {
+    let Some((store, namespace)) = TEST_SIGNING.get() else {
+        return Ok(None);
+    };
+    arkdeck_hoststore::fixture_signing(
+        store.clone(),
+        root.join("workspace-signing-attempts"),
+        namespace,
+    )
+    .map(Some)
+    .map_err(|error| format!("the test build's fixture signing is unusable: {error}"))
+}
+
+/// Every other build: no fixture signing.
+#[cfg(not(all(windows, test)))]
+fn test_signing(
+    _: &Path,
+) -> Result<
+    Option<(
+        arkdeck_hoststore::SigningSetup,
+        arkdeck_hoststore::WorkspaceCredentialPinning,
+    )>,
+    String,
+> {
+    Ok(None)
+}
+
 fn credential_pinning() -> Result<arkdeck_hoststore::WorkspaceCredentialPinning, String> {
     let (root, image) = signing_store()?;
     arkdeck_hoststore::keychain_credential_pinning(root, image)
