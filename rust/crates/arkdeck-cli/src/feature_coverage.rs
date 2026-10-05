@@ -464,6 +464,22 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // through the real CLI against the same signed test daemon, every answer
     // and the fake's reads Swift's (`gj1_device_reads.rs`).
     "trace.probe",
+    // The registered Windows HDC's lifecycle (CHG-2026-078, TASK-XPA-005):
+    // its status, a restart's impact preview, the restart's approval request
+    // and, approved at a real console, the restart itself, then its control
+    // action shown, reconciled and listed, by the real CLI against a
+    // dev-signed daemon composing the registered DevEco `hdc.exe` as its
+    // managed server (`arkdeck-platform/tests/windows_console_restart.rs`,
+    // live with `ARKDECK_LIVE_WINDOWS_HDC`, which CI cannot run). Without a
+    // live server, CI still runs the union control-action owner over the
+    // Windows daemon's pipe (`windows_lifecycle_process.rs`) and the HDC
+    // control-action owner's own tests (`arkdeck-hoststore`).
+    "runtime.hdc.status",
+    "runtime.hdc.impact-preview",
+    "runtime.hdc.restart",
+    "control-action.show",
+    "control-action.reconcile",
+    "control-action.list",
     // GJ-1's device leaves (TASK-XPA-005): `target observe`
     // (`observe.device@1`) and `diagnostics capture` (`capture.diagnostics@1`)
     // run end to end through the real signed CLI against a signed test

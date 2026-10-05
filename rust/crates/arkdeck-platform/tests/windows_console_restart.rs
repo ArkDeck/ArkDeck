@@ -16,6 +16,10 @@
 //!   a human would, and the restart runs; the control action ends
 //!   `succeeded` with a strictly newer, proved server.
 //! * A wrong answer typed at the console is refused and restarts nothing.
+//! * `control-action reconcile` of the action awaiting its approval proves
+//!   the reviewed impact against a fresh reading and leaves it as it was;
+//!   of the finished action, it reads it. `control-action list` lists each
+//!   by its kind and state.
 //!
 //! It needs `ARKDECK_LIVE_WINDOWS_HDC` (the registered `hdc.exe`) and
 //! `ARKDECK_DEV_SIGNER_THUMBPRINT`; without either it says so and checks
@@ -550,6 +554,34 @@ mod windows {
         shown["result"].clone()
     }
 
+    /// `control-action reconcile` of `action`, through the CLI.
+    fn reconciled(environment: &[(String, String)], action: &Value) -> Value {
+        let (code, reconciled) = cli(
+            environment,
+            &[
+                "control-action",
+                "reconcile",
+                "--control-action",
+                action["controlActionId"].as_str().unwrap(),
+            ],
+        );
+        assert_eq!(code, Some(0), "{reconciled}");
+        reconciled["result"].clone()
+    }
+
+    /// `control-action list` with `filters` (its options and values),
+    /// through the CLI: the listed actions.
+    fn listed(environment: &[(String, String)], filters: &[&str]) -> Vec<Value> {
+        let mut arguments = vec!["control-action", "list"];
+        arguments.extend_from_slice(filters);
+        let (code, listed) = cli(environment, &arguments);
+        assert_eq!(code, Some(0), "{listed}");
+        listed["result"]["items"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{listed}"))
+            .clone()
+    }
+
     fn generation(value: &Value) -> u64 {
         value["generation"].as_str().unwrap().parse().unwrap()
     }
@@ -615,6 +647,27 @@ mod windows {
 
         // 1. A redirected stdin: the challenge is never answered.
         let (before, action) = request_approval(&environment, "console-redirected");
+        // Reconciled while it awaits its approval, a fresh reading of the
+        // unchanged server proves the reviewed impact: the action is as it
+        // was, and `control-action list` lists it so.
+        let awaiting = shown(&environment, &action);
+        assert_eq!(awaiting["state"], "awaitingImpactApproval", "{awaiting}");
+        assert_eq!(reconciled(&environment, &action), awaiting);
+        let pending = listed(
+            &environment,
+            &[
+                "--kind",
+                "hdcLifecycle",
+                "--state",
+                "awaitingImpactApproval",
+            ],
+        );
+        assert!(
+            pending
+                .iter()
+                .any(|row| row["controlActionId"] == action["controlActionId"]),
+            "{pending:?}"
+        );
         let arguments = resume_arguments(&action);
         let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
         let (code, refused) = cli(&environment, &arguments);
@@ -651,6 +704,22 @@ mod windows {
         let finished = shown(&environment, &action);
         assert_eq!(finished["state"], "succeeded", "{finished}");
         assert_eq!(finished["dispatchCount"], 1, "{finished}");
+        // A finished action is only read by its reconciliation, and listed
+        // among the succeeded ones; nothing awaits approval any more.
+        assert_eq!(reconciled(&environment, &action), finished);
+        let succeeded = listed(&environment, &["--state", "succeeded"]);
+        assert!(
+            succeeded
+                .iter()
+                .any(|row| row["controlActionId"] == action["controlActionId"]
+                    && row["state"] == "succeeded"),
+            "{succeeded:?}"
+        );
+        assert!(
+            listed(&environment, &["--state", "awaitingImpactApproval"])
+                .iter()
+                .all(|row| row["controlActionId"] != action["controlActionId"])
+        );
         let (code, after) = cli(&environment, &["runtime", "hdc", "status"]);
         assert_eq!(code, Some(0), "{after}");
         let after = after["result"].clone();
