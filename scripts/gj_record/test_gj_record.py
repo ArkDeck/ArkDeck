@@ -55,6 +55,29 @@ def generated(operations=OPERATIONS) -> tuple[str, str]:
     return digest, text
 
 
+def fixture_inspection(*, abi="armeabi-v7a", digest=record.ROLLBACK_FIXTURE_SHA256):
+    # Start with the real producer's complete current closed projection. Only
+    # this synthetic journal's request/content/binding are substituted; the
+    # committed contract corpus and its pins are never changed.
+    source = Path(__file__).resolve().parents[2] / (
+        "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl")
+    frames = [json.loads(line) for line in source.read_text(encoding="utf-8").splitlines()]
+    value = next(frame["result"] for frame in frames if frame.get("ok") is True
+                 and frame["result"]["import"]["metadata"]["kind"] == "native-library")
+    imported = value["import"]
+    request = f"gj3-{D}-fixture"
+    imported["importRequestId"] = request
+    metadata, receipt = imported["metadata"], imported["receipt"]
+    for fields in (metadata, receipt):
+        fields.update(importRequestId=request, targetId=TARGET, bindingRevision="1",
+                      name="libarkdeck_gj-rollback-ghost.signed.so")
+    metadata["sha256"] = receipt["artifactDigest"] = digest
+    imported["metadataFingerprint"] = sha(json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode())
+    receipt["validation"].update(abi=abi, elfClassBits=32 if abi == "armeabi-v7a" else 64,
+                                machine=40 if abi == "armeabi-v7a" else 183)
+    return value
+
+
 def git(repo: Path, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True
@@ -449,7 +472,7 @@ class LaterJourneyTests(Case):
         self.assertEqual(journey["firstFailingCriterion"]["criterion"], f"gj2-{D}: send-hap verified")
 
     def gj3(self, *, fixture_abi="armeabi-v7a", fixture_sha256=record.ROLLBACK_FIXTURE_SHA256,
-            fixture=True, published=True, lease="lease-fixture"):
+            fixture=True, published=True, lease=None, fixture_transform=None):
         self.journal.facts()
         forward = [
             "verify-elf-locally abi=armeabi-v7a buildId=ab sha256=" + "1" * 64,
@@ -467,13 +490,15 @@ class LaterJourneyTests(Case):
             "verification-report.json": b'{"loaderVerified": "true", "abi": "armeabi-v7a"}'},
             timeline=forward)
         if fixture:
+            inspection = fixture_inspection(abi=fixture_abi, digest=fixture_sha256)
+            if lease is None:
+                lease = inspection["import"]["receipt"]["lease"]
+            if fixture_transform is not None:
+                changed = fixture_transform(inspection)
+                if changed is not None:
+                    inspection = changed
             self.journal.ok("artifact.import.inspect", ["artifact", "import", "inspect", "--import-request-id",
-                                                        f"gj3-{D}-fixture"], {
-                "importRequestId": f"gj3-{D}-fixture", "state": "committed",
-                "metadata": {"sha256": fixture_sha256, "targetId": TARGET, "bindingRevision": "1",
-                             "kind": "native-library", "name": "libarkdeck_gj-rollback-ghost.signed.so"},
-                "receipt": {"lease": "lease-fixture", "validation": {
-                    "kind": "nativeLibrary", "abi": fixture_abi, "buildId": "ba7d", "elfClassBits": 32}}})
+                                                        f"gj3-{D}-fixture"], inspection)
         rollback = [
             'verified atomic-publish ["buildId", "publishedSha256"]',
             "failed start-target: nativeTargetNotRunning: did not start",
@@ -509,6 +534,84 @@ class LaterJourneyTests(Case):
         journey = self.gj3(fixture=False)
         self.assertEqual(journey["state"], INCOMPLETE)
         self.assertEqual(journey["firstFailingCriterion"]["criterion"], f"gj3-{D}-rollback: fixture import")
+
+    def test_g3_bare_malformed_or_another_version_is_not_the_current_inspection(self):
+        for transform in (
+            lambda value: value["import"],
+            lambda value: {**value, "schemaVersion": "arkdeck.import-inspection/2"},
+            lambda value: {**value, "import": None},
+            lambda value: {**value, "import": {**value["import"], "schemaVersion": "arkdeck.import/2"}},
+            lambda value: {**value, "references": []},
+            lambda value: {**value, "import": {**value["import"], "metadata": []}},
+            lambda value: {**value, "import": {**value["import"], "receipt": None}},
+        ):
+            with self.subTest(transform=transform):
+                # Each subcase needs its own synthetic capture; no changed raw
+                # envelope is ever written over an earlier journal entry.
+                self.journal = Journal(self.out / str(self.journal.sequence), self.repo.digest)
+                self.out = self.journal.out
+                journey = self.gj3(fixture_transform=transform)
+                self.assertEqual(journey["state"], DEFECT)
+                self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                                 f"gj3-{D}-rollback: fixture inspection uses the current typed projection")
+
+    def test_g3_receipt_identity_cannot_override_the_requested_import(self):
+        for key, replacement in (
+            ("importId", "imp-other"), ("importRequestId", "gj3-other-fixture"),
+            ("owner", {"kind": "job", "id": "foreign"}), ("lease", "lease-v1:imp-other:ART-other"),
+        ):
+            with self.subTest(key=key):
+                self.journal = Journal(self.out / str(self.journal.sequence), self.repo.digest)
+                self.out = self.journal.out
+                journey = self.gj3(fixture_transform=lambda value: value["import"]["receipt"].update({key: replacement}))
+                self.assertEqual(journey["state"], DEFECT)
+                self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                                 f"gj3-{D}-rollback: fixture import and receipt identities match")
+
+    def test_g3_receipt_content_and_scope_must_match_the_import(self):
+        for key, replacement in (("artifactDigest", "0" * 64), ("targetId", "TGT-other"),
+                                 ("bindingRevision", "2"), ("byteCount", "1"), ("name", "libother.so")):
+            with self.subTest(key=key):
+                self.journal = Journal(self.out / str(self.journal.sequence), self.repo.digest)
+                self.out = self.journal.out
+                journey = self.gj3(fixture_transform=lambda value: value["import"]["receipt"].update({key: replacement}))
+                self.assertEqual(journey["state"], DEFECT)
+                self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                                 f"gj3-{D}-rollback: fixture receipt matches the imported content and binding")
+
+    def test_g3_complete_inspection_for_another_forward_target_or_binding_does_not_apply(self):
+        for key, replacement, criterion in (("targetId", "TGT-other", "fixture imported for this Target"),
+                                             ("bindingRevision", "2", "fixture imported at this binding revision")):
+            with self.subTest(key=key):
+                self.journal = Journal(self.out / str(self.journal.sequence), self.repo.digest)
+                self.out = self.journal.out
+                def transform(value):
+                    for fields in (value["import"]["metadata"], value["import"]["receipt"]):
+                        fields[key] = replacement
+                journey = self.gj3(fixture_transform=transform)
+                self.assertEqual(journey["state"], DEFECT)
+                self.assertEqual(journey["firstFailingCriterion"]["criterion"], f"gj3-{D}-rollback: {criterion}")
+
+    def test_g3_inspection_without_elf_build_id_does_not_apply(self):
+        journey = self.gj3(fixture_transform=lambda value: value["import"]["receipt"]["validation"].update(buildId=""))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"], f"gj3-{D}-rollback: fixture has a build ID")
+
+    def test_g3_a_different_nested_request_does_not_answer_the_captured_inspection(self):
+        def transform(value):
+            imported = value["import"]
+            for fields in (imported, imported["metadata"], imported["receipt"]):
+                fields["importRequestId"] = "gj3-other-fixture"
+        journey = self.gj3(fixture_transform=transform)
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         f"gj3-{D}-rollback: fixture import and receipt identities match")
+
+    def test_g3_a_released_fixture_keeps_its_original_receipt_applicability(self):
+        def transform(value):
+            value["import"].update(state="released", generation="3")
+        journey = self.gj3(fixture_transform=transform)
+        self.assertEqual(journey["state"], PASS, journey.get("firstFailingCriterion"))
 
     def test_g3_a_failure_before_publication_is_not_a_rollback(self):
         failing = self.gj3(published=False)["firstFailingCriterion"]

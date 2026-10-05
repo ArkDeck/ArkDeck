@@ -462,18 +462,56 @@ def rollback_fixture(
     run, judge = context.run, context.judge
     request = context.execution_id("gj3", "fixture")
     inspect = run.last(
-        "artifact.import.inspect", lambda s: s.ok and s.result.get("importRequestId") == request
+        "artifact.import.inspect", lambda s: s.ok and s.option("--import-request-id") == request
     )
     if inspect is None:
         judge.missing(f"{label}: fixture import", f"artifact import inspect --import-request-id {request}")
         return
-    metadata = inspect.result.get("metadata") or {}
-    receipt = inspect.result.get("receipt") or {}
-    validation = receipt.get("validation") or {}
+    # The published CLI returns ArtifactImportInspectionProjection, containing
+    # the Import under `import`; a bare Import is not the current contract.
+    imported = inspect.result.get("import")
+    typed = (
+        inspect.result.get("schemaVersion") == "arkdeck.import-inspection/1"
+        and isinstance(imported, dict)
+        and imported.get("schemaVersion") == "arkdeck.import/1"
+        and isinstance(inspect.result.get("references"), dict)
+        and isinstance(imported.get("metadata"), dict)
+        and imported["metadata"].get("schemaVersion") == "arkdeck.import-intent/1"
+        and isinstance(imported.get("receipt"), dict)
+        and isinstance(imported["receipt"].get("validation"), dict)
+    )
+    judge.that(f"{label}: fixture inspection uses the current typed projection", typed, None, inspect)
+    if not typed:
+        return
+    metadata = imported["metadata"]
+    receipt = imported["receipt"]
+    validation = receipt["validation"]
+    judge.that(
+        f"{label}: fixture import and receipt identities match",
+        isinstance(imported.get("importId"), str) and bool(imported["importId"])
+        and imported.get("importRequestId") == metadata.get("importRequestId")
+        == receipt.get("importRequestId") == request
+        and receipt.get("schemaVersion") == "arkdeck.import-receipt/1"
+        and receipt.get("importId") == imported["importId"]
+        and receipt.get("owner") == {"kind": "import", "id": imported["importId"]}
+        and isinstance(receipt.get("artifactId"), str)
+        and bool(receipt["artifactId"])
+        and receipt.get("lease") == f"lease-v1:{imported['importId']}:{receipt['artifactId']}",
+        None,
+        inspect,
+    )
+    judge.that(
+        f"{label}: fixture receipt matches the imported content and binding",
+        metadata.get("kind") == validation.get("kind") == "native-library"
+        and metadata.get("sha256") == receipt.get("artifactDigest")
+        and all(metadata.get(key) == receipt.get(key) for key in ("targetId", "bindingRevision", "byteCount", "name")),
+        None,
+        inspect,
+    )
     judge.that(
         f"{label}: fixture import committed",
-        inspect.result.get("state") in ("committed", "released"),
-        inspect.result.get("state"),
+        imported.get("state") in ("committed", "released"),
+        imported.get("state"),
         inspect,
     )
     judge.expect(f"{label}: fixture is the pinned rollback fixture", metadata.get("sha256"), fixture_sha256, inspect)
