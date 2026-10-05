@@ -41,7 +41,7 @@ invariant changes.
   submit accepts without dispatch; run sends the oracle Job calls once; a
   repeated run sends nothing; an invalid identity is refused before submit.
 
-The integration layer owns the module registration and measured leaves
+The integration layer includes the module registration and measured leaves
 `workspace.continuation.submit` and `workspace.continuation.run`, together with
 the generated coverage and census. The historical oracle is not re-pinned.
 
@@ -82,6 +82,16 @@ identity bypass. Heavy checks run through the shared gate slot runner.
   before formatting in this checkout; both changed crates were formatted and
   checked separately.
 
+Final integration checks, after layering on #2579, all exit 0:
+`cargo build -p arkdeck-cli`; `cargo test -p arkdeck-cli` (264 reported passes);
+`cargo test -p arkdeck-control` (36 passes); the signed continuation spawning
+test and health inventory unit test with verified 8.3 `TEMP`/`TMP` (one pass each);
+clippy for CLI, Control, Agentd and Soak with all targets and warnings denied;
+`cargo fmt --all --check`; SDD; `git diff --check`; and the CLI contract check
+(242 clean). Commands use `--manifest-path rust/Cargo.toml`. Logs are in
+`D:/src/ArkDeck-wt/tools/logs/health-layer-{build,cli-tests,control-tests,short-tests,inventory-test,clippy,fmt,sdd}.log`.
+The full-workspace fmt check succeeds in the shorter integration checkout.
+
 ## CI
 
 Not run on this unpushed local layer. The integration PR must run the macOS
@@ -89,3 +99,7 @@ Not run on this unpushed local layer. The integration PR must run the macOS
 That script requires macOS Unix sockets, `fcntl` and its development composition
 and cannot run on this Windows host. Native macOS/Linux results remain for CI.
 No task, ruling, platform status or hardware evidence is changed.
+
+This layer depends directly on #2579 (Windows crash symbolization). Its CI
+result will be recorded after completion; the first layer's Swift CI run is
+`37263980574`, in progress when this continuation increment was prepared.
