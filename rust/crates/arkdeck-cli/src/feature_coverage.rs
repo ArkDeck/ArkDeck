@@ -377,6 +377,9 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["signing", "update", "support-bundl
 /// windows_*_process.rs` signed-CLI tests, each of which checks that what it
 /// measured is `implemented` here; TASK-XPA-018).
 const WINDOWS_MEASURED_LEAVES: &[&str] = &[
+    // Alias reconciliation over the Swift flash-host-reads and
+    // post-flash-alias oracles through the signed CLI (TASK-XPA-010).
+    "flash.reconcile-alias",
     // Workspace rerun drafts and continuation Jobs through the signed CLI
     // over the workspace-continuation oracle (TASK-XPA-011).
     "workspace.continuation.submit",
@@ -732,9 +735,7 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // The protected Flash recovery broker over the Flash invocation owner
     // (TASK-XPA-010): an invocation started, its pinned full restore executed
     // to a terminal state, shown and listed (`recovery flash-invocation …`
-    // and `debug …`), by the same CLI against the same signed test daemon. Not `flash reconcile-alias`, whose reconciler the
-    // CLI reaches but whose repair no fake lineage exercises there (the
-    // flash-host-reads oracle replays it through the Windows Host).
+    // and `debug …`), by the same CLI against the same signed test daemon.
     "recovery.flash-invocation.start",
     "recovery.flash-invocation.evaluate",
     "recovery.flash-invocation.status",
