@@ -500,6 +500,17 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "ui-dump.component-detail",
     "debug.logs",
     "trace.capture",
+    // The interactive diagnostic session's live control (TASK-XPA-005):
+    // `capture.diagnostic-session@1` submitted and run through the same CLI
+    // and signed test daemon while `diagnostics session status|mark|stop`
+    // read, mark and stop it, its Job and Artifacts the `diagnostic-session`
+    // oracle's, and an unanchored ring's session interrupted
+    // (`arkdeck-agentd/tests/spawning/diagnostic_session_cli.rs`). The
+    // operation itself is reached through `job submit` alone, a generic
+    // leaf.
+    "diagnostics.session.status",
+    "diagnostics.session.mark",
+    "diagnostics.session.stop",
     // Not `agent resume` (nor `human-action resume`), although
     // `gj1_device_leaves.rs` runs it end to end over the Swift human-action
     // oracle's `connect` scenario: once its action resolves, a resume
