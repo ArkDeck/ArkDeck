@@ -53,10 +53,25 @@ No item is blocked only on the board: each device leaf above replays a Swift ora
 shared fake HDC. The GJ-1/2/3/5 board window confirms them on the DAYU200 (`REAL_DEVICE_PASS` is
 board-only).
 
-## Order of the "now" work
+## Windows owner workload
 
-By Golden Journey leaves unblocked: GJ-2/GJ-3 domain leaves (`debug hap`, `debug native deploy`,
-`recovery cleanup continue`; done); GJ-1 restart and control actions (done); GJ-1 device
-reads (`device wait|list`, `target availability` and `trace probe` done); GJ-1 inputs,
-screen record and port forwards (new fake answers); diagnostic sessions; tool register/select;
-GJ-5 continuation; Job archive.
+TASK-XPA-025's Windows software gap is closed: the Rust soak now runs the same
+bounded simulated-provider Job, journal, recovery and Artifact owners as macOS,
+over signed/PID-verified named-pipe generations. Benchmark consumers seed/read
+those owners; Windows durability names `FlushFileBuffers`. Fresh private roots,
+installed-state refusal, unknown-intent refusal and the 32 MiB/16-handle growth
+limits remain enforced (`windows-owner-soak-20261005-run.md`). This port does not
+change CLI feature counts or TASK-XPA-024's optional Viewer FFI boundary.
+
+The software checks use tiny correctness workloads. Quiet-host Windows reference
+capture, long soak, performance spread checks and baseline adoption remain Phase A
+acceptance work; no fixture result is hardware evidence or performance approval.
+
+## Remaining acceptance and dependencies
+
+The presently actionable CLI increments above are measured. Remaining generic
+leaves depend on AF-W1 and a trusted Windows ArkTrace distribution; service
+install/update keep their existing closed decision. The DAYU200 GJ-1/2/3/5
+window still requires the maintainer's physical setup and unplug/replug actions
+under the Windows runbook §4.0.4/§4.1. GJ-4 additionally requires AF-W1 and the
+destructive HardwareCampaign gate.

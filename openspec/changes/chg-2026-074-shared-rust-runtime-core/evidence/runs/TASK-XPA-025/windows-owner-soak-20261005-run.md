@@ -71,7 +71,34 @@ resource thresholds, task/status/ruling records and provider coverage declaratio
 unchanged. macOS checks await CI on a macOS runner; no device execution or hardware evidence
 was produced.
 
+## Final integration targeted checks
+
+The integration layer directly follows tool-selection PR #2584 at
+`3d8c4be57fd97383c77c62f1b932539984599770`. It preserves all lower-layer source,
+schema and generated coverage increments. Target: `D:/cargo-target/lead-symbolize`,
+two Cargo build jobs, heavy Cargo checks through `gate_slot.py`. Logs remain
+local under `D:/src/ArkDeck-wt/tools/logs/`.
+
+| Command/check | Exit | Log |
+| --- | --- | --- |
+| Build soak and production daemon bins | 0 | `soak-layer-build.log` |
+| Full soak crate under verified 8.3 TEMP/TMP, including the signed owner leg (six passed, zero ignored) | 0 | `soak-layer-short-tests.log` |
+| The same 39 Python correctness checks with a newly signed copy of the integration daemon and integration soak binary (zero skipped) | 0 | `soak-layer-python.log` |
+| All-target soak clippy, warnings denied | 0 | `soak-layer-clippy.log` |
+| Workspace fmt check | 0 | `soak-layer-fmt.log` |
+| Final SDD and diff checks | 0 | `soak-layer-sdd.log`; diff check returned no output |
+
+No crate directly depends on soak. No contract input, Catalog operation, Runtime
+capability or production Provider declaration changes in this layer. The census
+now records the software gap as closed while keeping the existing quiet-host
+reference, long-soak, performance-spread and baseline adoption requirements.
+Windows CLI coverage remains 149 implemented, 11 partial and two notImplemented
+of 162 required features, with 101 macOS-only features.
+
 ## CI
 
-Not run for this unpushed agent commit. The integration owner will place it in the linear PR
-stack and report that head's CI separately. This record makes no acceptance or approval claim.
+Pending this integration layer's push. It directly depends on
+https://github.com/ArkDeck/ArkDeck/pull/2584; that layer's four predecessor PRs
+are green at their recorded heads, while #2584's full parity is still running.
+The later delivery slice will record this layer's actual PR/run result without
+amending an already-green head. This record makes no acceptance or approval claim.
