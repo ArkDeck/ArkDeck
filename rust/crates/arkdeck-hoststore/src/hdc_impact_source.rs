@@ -5,7 +5,11 @@
 //! One reading pins the configured executable and reads its native
 //! signature; observes the server at the endpoint (for the registered 3.2.0d
 //! executable a `checkserver` between two identity observations proves its
-//! health; any other executable's commandless identity proves none); reads
+//! health; on Windows, for a registered Windows HDC tuple's executable on its
+//! endpoint, two equal commandless identity observations do — CHG-2026-078
+//! `serverIdentityGeneration`, maintainer ruling 2026-10-04 item 3, where
+//! `checkserver` is never run because it can start a server; any other
+//! executable's commandless identity proves none); reads
 //! the current Jobs and the durable Targets, the devices of a fresh Target
 //! observation (`list targets -v` bracketed by the USB relations), then the
 //! Targets and Jobs again; observes the server identity once more; and
@@ -136,6 +140,18 @@ fn blockers(jobs: &[CurrentJob]) -> Vec<Value> {
         .collect()
 }
 
+/// A path in Windows' plain `X:\…` spelling, its verbatim `\\?\` prefix
+/// removed; elsewhere the path as it is. A Windows server receipt names its
+/// image as the platform reads it, which for an image below a directory with
+/// spaces (DevEco Studio's `C:\Program Files\…`, CHG-2026-078 c2) is the
+/// verbatim form; the digest still names the bytes.
+fn plain(path: &Path) -> std::path::PathBuf {
+    match path.to_str().and_then(|text| text.strip_prefix(r"\\?\")) {
+        Some(plain) => std::path::PathBuf::from(plain),
+        None => path.to_path_buf(),
+    }
+}
+
 impl ManagedServerImpact<'_> {
     fn observed_identity(&self) -> Option<ServerIdentityReceipt> {
         match self.identity.observe(&self.executable, &self.endpoint) {
@@ -162,8 +178,38 @@ impl ManagedServerImpact<'_> {
         (before == after && generation(&after).is_some()).then_some((after, version))
     }
 
+    /// The Windows server health of a registered Windows HDC tuple
+    /// (CHG-2026-078 `serverIdentityGeneration`): the commandless identity of
+    /// the tuple's executable on the tuple's endpoint, observed twice, the
+    /// same both times with a representable generation. Nothing is run.
+    #[cfg(windows)]
+    fn registered_windows_health(&self) -> Option<ServerIdentityReceipt> {
+        let before = self.observed_identity()?;
+        let after = self.observed_identity()?;
+        (before == after && generation(&after).is_some()).then_some(after)
+    }
+
     /// Swift `HDCControlServerObserver.observe`.
     fn observe_server(&self) -> ServerObservation {
+        #[cfg(windows)]
+        if let Some(tuple) = arkdeck_provider_hdc::windows_tuple(&self.executable.sha256)
+            .filter(|tuple| tuple.endpoint.to_string() == self.endpoint)
+        {
+            return match self.registered_windows_health() {
+                Some(identity) => ServerObservation {
+                    identity: Some(identity),
+                    health: "healthy",
+                    version: Some(tuple.reported_version.into()),
+                    reason: None,
+                },
+                None => ServerObservation {
+                    identity: None,
+                    health: "unknown",
+                    version: None,
+                    reason: Some("hdc.registeredHealthObservationUnavailable"),
+                },
+            };
+        }
         if self.executable.sha256 == REGISTERED_3_2_0D {
             return match self.registered_health() {
                 Some((identity, version)) => ServerObservation {
@@ -209,7 +255,7 @@ impl ManagedServerImpact<'_> {
     ) -> (Value, &'static str) {
         let Some(receipt) = server.identity.as_ref().filter(|receipt| {
             stable
-                && receipt.executable_path == Path::new(&self.executable.path)
+                && plain(&receipt.executable_path) == plain(Path::new(&self.executable.path))
                 && receipt.executable_sha256 == self.executable.sha256
                 && receipt.endpoint.to_string() == self.endpoint
         }) else {

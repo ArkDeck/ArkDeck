@@ -92,7 +92,18 @@ fn precise_now() -> Option<String> {
     Some("2026-09-25T00:00:00.000Z".into())
 }
 
-fn exclusive() -> File {
+/// The fixed root's lock, held for one test; the root it laid down is
+/// removed when the test lets go of it, before the lock is released. The
+/// lock file itself stays: it is the cross-process lock.
+struct Exclusive(#[allow(dead_code)] File);
+
+impl Drop for Exclusive {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(root_path());
+    }
+}
+
+fn exclusive() -> Exclusive {
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
@@ -101,7 +112,7 @@ fn exclusive() -> File {
         .open(lock_path())
         .unwrap();
     lock.lock().unwrap();
-    lock
+    Exclusive(lock)
 }
 
 /// The root as every story finds it: the inputs laid down with their modes,

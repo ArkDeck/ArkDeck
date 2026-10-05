@@ -107,7 +107,7 @@ impl HdcDispatch for Faulted<'_> {
 /// the caller keeps while it reads, the owners, the Job, its status and its
 /// timeline from the loader's failure on.
 struct Run {
-    _lock: fs::File,
+    _lock: debug_hap::Exclusive,
     owners: Owners,
     job: String,
     status: Value,
