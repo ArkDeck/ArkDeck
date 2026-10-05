@@ -504,6 +504,32 @@ def derive_method_schemas(source):
             projections = json.loads(oracle.read_text())
             schema["$defs"]["result"] = infer(projections + results, closed=True, path="result", maps=maps)
             schema["x-arkdeck-sampleCounts"]["result"] = len(results) + len(projections)
+        if method in {"human-action.resume", "control-action.show", "control-action.reconcile", "control-action.list"} and results:
+            # The same tool-selection projection is returned both inside its
+            # foreground-console challenge, after that challenge is consumed,
+            # and through the union owner's show/reconcile/list surfaces.
+            # These corpora recorded only HDC/agent actions. Reuse the
+            # Swift store's actual projections and select's actual frames, as
+            # runtime.tool.select does, retaining separate closed alternatives
+            # for every already-recorded resume shape. No producer frame or
+            # approval authority is manufactured here.
+            oracle = repository_root / "rust/tests/fixtures/tool-selection-store/projections.json"
+            selection_frames = load_frames(FRAME_CORPUS_DIRECTORY / "runtime.tool.select.jsonl")
+            projections = json.loads(oracle.read_text())
+            projections += [frame["result"] for frame, _ in selection_frames if frame["ok"]]
+            # Isolate this owner from resume's agent/HDC SHARED_SAMPLES:
+            # its fields must remain exactly runtime.tool.select's shape.
+            selection = infer(projections, closed=True, path="toolSelection", maps={})
+            existing = schema["$defs"]["result"]
+            if method == "human-action.resume":
+                action = existing["properties"]["controlAction"]
+                existing["properties"]["controlAction"] = {"anyOf": [action, selection]}
+                schema["$defs"]["result"] = {"anyOf": [existing, selection]}
+            elif method == "control-action.list":
+                items = existing["properties"]["items"]["items"]
+                existing["properties"]["items"]["items"] = {"anyOf": [items, selection]}
+            else:
+                schema["$defs"]["result"] = {"anyOf": [existing, selection]}
         if method in {"runtime.tool.list", "runtime.tool.remove"} and results:
             # Both leaves return the existing Tool projection. Preserve its
             # native optional trust/dependency/selection fields from actual

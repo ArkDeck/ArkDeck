@@ -32,7 +32,7 @@ impl Scratch {
             u128::from_le_bytes(arkdeck_platform::random_bytes().unwrap())
         ));
         arkdeck_platform::create_private_directory(&path).unwrap();
-        Self(path)
+        Self(arkdeck_platform::host_resolved_path(&path).unwrap())
     }
     fn directory(&self, relative: &str) -> PathBuf {
         let path = self.0.join(relative);

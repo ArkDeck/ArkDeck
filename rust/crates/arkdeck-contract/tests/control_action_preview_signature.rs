@@ -49,6 +49,15 @@ fn published_view() -> bool {
 fn tool_signatures(value: &Value, found: &mut Vec<Value>) {
     match value {
         Value::Object(map) => {
+            // A tool-selection preview carries a distinct raw HDC impact
+            // projection beside oldTool/newTool; its signature may be null.
+            // tool_selection_resume holds that entire schema to select's.
+            if let Some(properties) = map.get("properties").and_then(Value::as_object)
+                && properties.contains_key("oldTool")
+                && properties.contains_key("newTool")
+            {
+                return;
+            }
             if let Some(properties) = map.get("properties").and_then(Value::as_object)
                 && properties.contains_key("executablePath")
                 && properties.contains_key("sha256")

@@ -65,138 +65,1338 @@
       "type": "object"
     },
     "result": {
-      "additionalProperties": false,
-      "properties": {
-        "action": {
-          "type": "string"
-        },
-        "actionId": {
-          "type": "string"
-        },
-        "actionRequestId": {
-          "type": "string"
-        },
-        "artifacts": {
-          "items": {
-            "additionalProperties": false,
-            "properties": {
-              "bindingRevision": {
-                "type": [
-                  "integer",
-                  "null"
-                ]
-              },
-              "byteCount": {
-                "type": "integer"
-              },
-              "bytesVerified": {
-                "type": "boolean"
-              },
-              "jobId": {
-                "type": "string"
-              },
-              "providerId": {
-                "type": "string"
-              },
-              "reference": {
-                "type": "string"
-              },
-              "sha256": {
-                "type": "string"
-              },
-              "stableIdentitySha256": {
-                "type": [
-                  "null",
-                  "string"
-                ]
-              },
-              "targetId": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "bindingRevision",
-              "byteCount",
-              "bytesVerified",
-              "jobId",
-              "providerId",
-              "reference",
-              "sha256",
-              "stableIdentitySha256",
-              "targetId"
-            ],
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "binding": {
-          "additionalProperties": false,
-          "properties": {
-            "controlActionId": {
-              "type": "string"
-            },
-            "generation": {
-              "type": "string"
-            },
-            "humanActionId": {
-              "type": "string"
-            },
-            "previewDigest": {
-              "type": "string"
-            },
-            "previewId": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "controlActionId",
-            "generation",
-            "previewDigest",
-            "previewId"
-          ],
-          "type": "object"
-        },
-        "bindingRevision": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "blockerReasonCode": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "catalogDigest": {
-          "type": "string"
-        },
-        "category": {
-          "type": "string"
-        },
-        "challenge": {
-          "type": "string"
-        },
-        "challengeId": {
-          "type": "string"
-        },
-        "choices": {
-          "type": "array"
-        },
-        "controlAction": {
+      "anyOf": [
+        {
           "additionalProperties": false,
           "properties": {
             "action": {
               "type": "string"
             },
+            "actionId": {
+              "type": "string"
+            },
             "actionRequestId": {
               "type": "string"
             },
+            "artifacts": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "bindingRevision": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "byteCount": {
+                    "type": "integer"
+                  },
+                  "bytesVerified": {
+                    "type": "boolean"
+                  },
+                  "jobId": {
+                    "type": "string"
+                  },
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "stableIdentitySha256": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "targetId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "bindingRevision",
+                  "byteCount",
+                  "bytesVerified",
+                  "jobId",
+                  "providerId",
+                  "reference",
+                  "sha256",
+                  "stableIdentitySha256",
+                  "targetId"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "binding": {
+              "additionalProperties": false,
+              "properties": {
+                "controlActionId": {
+                  "type": "string"
+                },
+                "generation": {
+                  "type": "string"
+                },
+                "humanActionId": {
+                  "type": "string"
+                },
+                "previewDigest": {
+                  "type": "string"
+                },
+                "previewId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "controlActionId",
+                "generation",
+                "previewDigest",
+                "previewId"
+              ],
+              "type": "object"
+            },
+            "bindingRevision": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
             "blockerReasonCode": {
-              "type": "null"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "catalogDigest": {
               "type": "string"
+            },
+            "category": {
+              "type": "string"
+            },
+            "challenge": {
+              "type": "string"
+            },
+            "challengeId": {
+              "type": "string"
+            },
+            "choices": {
+              "type": "array"
+            },
+            "controlAction": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "actionRequestId": {
+                      "type": "string"
+                    },
+                    "blockerReasonCode": {
+                      "type": "null"
+                    },
+                    "catalogDigest": {
+                      "type": "string"
+                    },
+                    "controlActionId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "dispatchCount": {
+                      "type": "integer"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "fingerprintAlgorithm": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "string"
+                    },
+                    "humanAction": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "actionId": {
+                          "type": "string"
+                        },
+                        "binding": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "controlActionId": {
+                              "type": "string"
+                            },
+                            "generation": {
+                              "type": "string"
+                            },
+                            "previewDigest": {
+                              "type": "string"
+                            },
+                            "previewId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "controlActionId",
+                            "generation",
+                            "previewDigest",
+                            "previewId"
+                          ],
+                          "type": "object"
+                        },
+                        "category": {
+                          "type": "string"
+                        },
+                        "choices": {
+                          "type": "array"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        },
+                        "minimumAction": {
+                          "type": "string"
+                        },
+                        "newDispatchCount": {
+                          "type": "integer"
+                        },
+                        "owner": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind"
+                          ],
+                          "type": "object"
+                        },
+                        "prohibitedAutomation": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "reasonCode": {
+                          "type": "string"
+                        },
+                        "resumeReference": {
+                          "type": "string"
+                        },
+                        "schemaVersion": {
+                          "type": "string"
+                        },
+                        "selectionSchema": {
+                          "type": "null"
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "actionId",
+                        "binding",
+                        "category",
+                        "choices",
+                        "createdAt",
+                        "expiresAt",
+                        "minimumAction",
+                        "newDispatchCount",
+                        "owner",
+                        "prohibitedAutomation",
+                        "reasonCode",
+                        "resumeReference",
+                        "schemaVersion",
+                        "selectionSchema",
+                        "status"
+                      ],
+                      "type": "object"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "lastObservedAt": {
+                      "type": "string"
+                    },
+                    "nextAction": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "owner": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind"
+                          ],
+                          "type": "object"
+                        },
+                        "reasonCode": {
+                          "type": "string"
+                        },
+                        "resource": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "owner",
+                        "reasonCode",
+                        "resource"
+                      ],
+                      "type": "object"
+                    },
+                    "owner": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind"
+                      ],
+                      "type": "object"
+                    },
+                    "preview": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "action": {
+                          "type": "string"
+                        },
+                        "affectedDeviceObservations": {
+                          "type": "array"
+                        },
+                        "affectedJobIds": {
+                          "type": "array"
+                        },
+                        "affectedTargetIds": {
+                          "type": "array"
+                        },
+                        "confirmationRequired": {
+                          "type": "boolean"
+                        },
+                        "controlActionId": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        },
+                        "criticalJobGate": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "blocking": {
+                              "type": "array"
+                            },
+                            "reasonCode": {
+                              "type": "null"
+                            },
+                            "state": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "blocking",
+                            "reasonCode",
+                            "state"
+                          ],
+                          "type": "object"
+                        },
+                        "detectedOtherClientIds": {
+                          "type": "array"
+                        },
+                        "digestAlgorithm": {
+                          "type": "string"
+                        },
+                        "dispatchCount": {
+                          "type": "integer"
+                        },
+                        "endpoint": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        },
+                        "interruption": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "affectsAllParticipants": {
+                              "type": "boolean"
+                            },
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "affectsAllParticipants",
+                            "kind"
+                          ],
+                          "type": "object"
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "otherClientsMayExist": {
+                          "type": "boolean"
+                        },
+                        "owner": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind"
+                          ],
+                          "type": "object"
+                        },
+                        "previewDigest": {
+                          "type": "string"
+                        },
+                        "previewId": {
+                          "type": "string"
+                        },
+                        "recovery": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "type": "string"
+                            },
+                            "replayAllowed": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "replayAllowed"
+                          ],
+                          "type": "object"
+                        },
+                        "schemaVersion": {
+                          "type": "string"
+                        },
+                        "serverEndpointRef": {
+                          "type": "string"
+                        },
+                        "serverGeneration": {
+                          "type": "string"
+                        },
+                        "serverHealth": {
+                          "type": "string"
+                        },
+                        "serverOwnership": {
+                          "type": "string"
+                        },
+                        "serverVersion": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "executablePath": {
+                              "type": "string"
+                            },
+                            "reference": {
+                              "type": "null"
+                            },
+                            "sha256": {
+                              "type": "string"
+                            },
+                            "signature": {
+                              "anyOf": [
+                                {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "executionAssessment": {
+                                      "type": "string"
+                                    },
+                                    "identifier": {
+                                      "type": [
+                                        "null",
+                                        "string"
+                                      ]
+                                    },
+                                    "platformTrust": {
+                                      "type": "string"
+                                    },
+                                    "state": {
+                                      "type": "string"
+                                    },
+                                    "teamIdentifier": {
+                                      "type": [
+                                        "null",
+                                        "string"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "executionAssessment",
+                                    "identifier",
+                                    "platformTrust",
+                                    "state",
+                                    "teamIdentifier"
+                                  ],
+                                  "type": "object"
+                                },
+                                {
+                                  "type": [
+                                    "null"
+                                  ]
+                                }
+                              ]
+                            },
+                            "source": {
+                              "type": "string"
+                            },
+                            "trust": {
+                              "type": "string"
+                            },
+                            "version": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "executablePath",
+                            "reference",
+                            "sha256",
+                            "signature",
+                            "source",
+                            "trust",
+                            "version"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "action",
+                        "affectedDeviceObservations",
+                        "affectedJobIds",
+                        "affectedTargetIds",
+                        "confirmationRequired",
+                        "controlActionId",
+                        "createdAt",
+                        "criticalJobGate",
+                        "detectedOtherClientIds",
+                        "digestAlgorithm",
+                        "dispatchCount",
+                        "endpoint",
+                        "expiresAt",
+                        "interruption",
+                        "kind",
+                        "otherClientsMayExist",
+                        "owner",
+                        "previewDigest",
+                        "previewId",
+                        "recovery",
+                        "schemaVersion",
+                        "serverEndpointRef",
+                        "serverGeneration",
+                        "serverHealth",
+                        "serverOwnership",
+                        "serverVersion",
+                        "tool"
+                      ],
+                      "type": "object"
+                    },
+                    "requestFingerprint": {
+                      "type": "string"
+                    },
+                    "schemaVersion": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "actionRequestId",
+                    "blockerReasonCode",
+                    "catalogDigest",
+                    "controlActionId",
+                    "createdAt",
+                    "dispatchCount",
+                    "expiresAt",
+                    "fingerprintAlgorithm",
+                    "generation",
+                    "humanAction",
+                    "kind",
+                    "lastObservedAt",
+                    "nextAction",
+                    "owner",
+                    "preview",
+                    "requestFingerprint",
+                    "schemaVersion",
+                    "state"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "actionRequestId": {
+                      "type": "string"
+                    },
+                    "blockerReasonCode": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "catalogDigest": {
+                      "type": "string"
+                    },
+                    "controlActionId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "dispatchCount": {
+                      "type": "integer"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "fingerprintAlgorithm": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "string"
+                    },
+                    "humanAction": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "actionId": {
+                              "type": "string"
+                            },
+                            "binding": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "controlActionId": {
+                                  "type": "string"
+                                },
+                                "generation": {
+                                  "type": "string"
+                                },
+                                "previewDigest": {
+                                  "type": "string"
+                                },
+                                "previewId": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "controlActionId",
+                                "generation",
+                                "previewDigest",
+                                "previewId"
+                              ],
+                              "type": "object"
+                            },
+                            "category": {
+                              "type": "string"
+                            },
+                            "choices": {
+                              "type": "array"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "expiresAt": {
+                              "type": "string"
+                            },
+                            "minimumAction": {
+                              "type": "string"
+                            },
+                            "newDispatchCount": {
+                              "type": "integer"
+                            },
+                            "owner": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "kind"
+                              ],
+                              "type": "object"
+                            },
+                            "prohibitedAutomation": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "reasonCode": {
+                              "type": "string"
+                            },
+                            "resumeReference": {
+                              "type": "string"
+                            },
+                            "schemaVersion": {
+                              "type": "string"
+                            },
+                            "selectionSchema": {
+                              "type": "null"
+                            },
+                            "status": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "actionId",
+                            "binding",
+                            "category",
+                            "choices",
+                            "createdAt",
+                            "expiresAt",
+                            "minimumAction",
+                            "newDispatchCount",
+                            "owner",
+                            "prohibitedAutomation",
+                            "reasonCode",
+                            "resumeReference",
+                            "schemaVersion",
+                            "selectionSchema",
+                            "status"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": [
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "lastObservedAt": {
+                      "type": "string"
+                    },
+                    "nextAction": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "owner": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind"
+                          ],
+                          "type": "object"
+                        },
+                        "reasonCode": {
+                          "type": "string"
+                        },
+                        "resource": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "kind"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "owner",
+                        "reasonCode",
+                        "resource"
+                      ],
+                      "type": "object"
+                    },
+                    "owner": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind"
+                      ],
+                      "type": "object"
+                    },
+                    "preview": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "action": {
+                              "type": "string"
+                            },
+                            "affectedDeviceObservations": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "authorization": {
+                                    "type": "string"
+                                  },
+                                  "generation": {
+                                    "type": "string"
+                                  },
+                                  "health": {
+                                    "type": "string"
+                                  },
+                                  "observationId": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "authorization",
+                                  "generation",
+                                  "health",
+                                  "observationId"
+                                ],
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "affectedJobIds": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "affectedTargetIds": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "confirmationRequired": {
+                              "type": "boolean"
+                            },
+                            "controlActionId": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "type": "string"
+                            },
+                            "criticalJobGate": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "blocking": {
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "jobId": {
+                                        "type": "string"
+                                      },
+                                      "recovery": {
+                                        "type": "string"
+                                      },
+                                      "safeBoundary": {
+                                        "type": "string"
+                                      },
+                                      "state": {
+                                        "type": "string"
+                                      },
+                                      "stepId": {
+                                        "type": [
+                                          "null",
+                                          "string"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "jobId",
+                                      "recovery",
+                                      "safeBoundary",
+                                      "state",
+                                      "stepId"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  "type": "array"
+                                },
+                                "reasonCode": {
+                                  "type": [
+                                    "null",
+                                    "string"
+                                  ]
+                                },
+                                "state": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "blocking",
+                                "reasonCode",
+                                "state"
+                              ],
+                              "type": "object"
+                            },
+                            "detectedOtherClientIds": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "digestAlgorithm": {
+                              "type": "string"
+                            },
+                            "dispatchCount": {
+                              "type": "integer"
+                            },
+                            "endpoint": {
+                              "type": "string"
+                            },
+                            "expectedActiveGeneration": {
+                              "type": "string"
+                            },
+                            "expiresAt": {
+                              "type": "string"
+                            },
+                            "interruption": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "affectsAllParticipants": {
+                                  "type": "boolean"
+                                },
+                                "kind": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "affectsAllParticipants",
+                                "kind"
+                              ],
+                              "type": "object"
+                            },
+                            "kind": {
+                              "type": "string"
+                            },
+                            "newTool": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "contentSHA256": {
+                                  "type": "string"
+                                },
+                                "executableSHA256": {
+                                  "type": "string"
+                                },
+                                "recordGeneration": {
+                                  "type": "string"
+                                },
+                                "signature": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "codeDirectoryIdentitySHA256": {
+                                      "type": [
+                                        "null",
+                                        "string"
+                                      ]
+                                    },
+                                    "identifier": {
+                                      "type": [
+                                        "null",
+                                        "string"
+                                      ]
+                                    },
+                                    "state": {
+                                      "type": "string"
+                                    },
+                                    "teamIdentifier": {
+                                      "type": [
+                                        "null",
+                                        "string"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "codeDirectoryIdentitySHA256",
+                                    "identifier",
+                                    "state",
+                                    "teamIdentifier"
+                                  ],
+                                  "type": "object"
+                                },
+                                "toolRef": {
+                                  "type": "string"
+                                },
+                                "trust": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "executionAssessment": {
+                                      "type": "string"
+                                    },
+                                    "platformTrust": {
+                                      "type": "string"
+                                    },
+                                    "policy": {
+                                      "type": "string"
+                                    },
+                                    "profileReferences": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "registeredIdentity": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "executionAssessment",
+                                    "platformTrust",
+                                    "policy",
+                                    "profileReferences",
+                                    "registeredIdentity"
+                                  ],
+                                  "type": "object"
+                                },
+                                "version": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "contentSHA256",
+                                "executableSHA256",
+                                "recordGeneration",
+                                "signature",
+                                "toolRef",
+                                "trust",
+                                "version"
+                              ],
+                              "type": "object"
+                            },
+                            "oldTool": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "contentSHA256": {
+                                  "type": "string"
+                                },
+                                "executableSHA256": {
+                                  "type": "string"
+                                },
+                                "recordGeneration": {
+                                  "type": "string"
+                                },
+                                "signature": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "codeDirectoryIdentitySHA256": {
+                                      "type": "null"
+                                    },
+                                    "identifier": {
+                                      "type": "null"
+                                    },
+                                    "state": {
+                                      "type": "string"
+                                    },
+                                    "teamIdentifier": {
+                                      "type": "null"
+                                    }
+                                  },
+                                  "required": [
+                                    "codeDirectoryIdentitySHA256",
+                                    "identifier",
+                                    "state",
+                                    "teamIdentifier"
+                                  ],
+                                  "type": "object"
+                                },
+                                "toolRef": {
+                                  "type": "string"
+                                },
+                                "trust": {
+                                  "additionalProperties": false,
+                                  "properties": {
+                                    "executionAssessment": {
+                                      "type": "string"
+                                    },
+                                    "platformTrust": {
+                                      "type": "string"
+                                    },
+                                    "policy": {
+                                      "type": "string"
+                                    },
+                                    "profileReferences": {
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "type": "array"
+                                    },
+                                    "registeredIdentity": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "executionAssessment",
+                                    "platformTrust",
+                                    "policy",
+                                    "profileReferences",
+                                    "registeredIdentity"
+                                  ],
+                                  "type": "object"
+                                },
+                                "version": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "contentSHA256",
+                                "executableSHA256",
+                                "recordGeneration",
+                                "signature",
+                                "toolRef",
+                                "trust",
+                                "version"
+                              ],
+                              "type": "object"
+                            },
+                            "otherClientsMayExist": {
+                              "type": "boolean"
+                            },
+                            "owner": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "kind"
+                              ],
+                              "type": "object"
+                            },
+                            "previewDigest": {
+                              "type": "string"
+                            },
+                            "previewId": {
+                              "type": "string"
+                            },
+                            "recovery": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "kind": {
+                                  "type": "string"
+                                },
+                                "replayAllowed": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "replayAllowed"
+                              ],
+                              "type": "object"
+                            },
+                            "schemaVersion": {
+                              "type": "string"
+                            },
+                            "serverEndpointRef": {
+                              "type": "string"
+                            },
+                            "serverGeneration": {
+                              "type": "string"
+                            },
+                            "serverHealth": {
+                              "type": "string"
+                            },
+                            "serverOwnership": {
+                              "type": "string"
+                            },
+                            "serverVersion": {
+                              "type": "string"
+                            },
+                            "tool": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "executablePath": {
+                                  "type": "string"
+                                },
+                                "reference": {
+                                  "type": "null"
+                                },
+                                "sha256": {
+                                  "type": "string"
+                                },
+                                "signature": {
+                                  "type": "null"
+                                },
+                                "source": {
+                                  "type": "string"
+                                },
+                                "trust": {
+                                  "type": "string"
+                                },
+                                "version": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "executablePath",
+                                "reference",
+                                "sha256",
+                                "signature",
+                                "source",
+                                "trust",
+                                "version"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "action",
+                            "affectedDeviceObservations",
+                            "affectedJobIds",
+                            "affectedTargetIds",
+                            "confirmationRequired",
+                            "controlActionId",
+                            "createdAt",
+                            "criticalJobGate",
+                            "detectedOtherClientIds",
+                            "digestAlgorithm",
+                            "dispatchCount",
+                            "endpoint",
+                            "expectedActiveGeneration",
+                            "expiresAt",
+                            "interruption",
+                            "kind",
+                            "newTool",
+                            "oldTool",
+                            "otherClientsMayExist",
+                            "owner",
+                            "previewDigest",
+                            "previewId",
+                            "recovery",
+                            "schemaVersion",
+                            "serverEndpointRef",
+                            "serverGeneration",
+                            "serverHealth",
+                            "serverOwnership",
+                            "serverVersion",
+                            "tool"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": [
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "requestFingerprint": {
+                      "type": "string"
+                    },
+                    "schemaVersion": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "actionRequestId",
+                    "blockerReasonCode",
+                    "catalogDigest",
+                    "controlActionId",
+                    "createdAt",
+                    "dispatchCount",
+                    "expiresAt",
+                    "fingerprintAlgorithm",
+                    "generation",
+                    "humanAction",
+                    "kind",
+                    "lastObservedAt",
+                    "nextAction",
+                    "owner",
+                    "preview",
+                    "requestFingerprint",
+                    "schemaVersion",
+                    "state"
+                  ],
+                  "type": "object"
+                }
+              ]
             },
             "controlActionId": {
               "type": "string"
@@ -204,11 +1404,308 @@
             "createdAt": {
               "type": "string"
             },
+            "deadline": {
+              "type": "string"
+            },
             "dispatchCount": {
               "type": "integer"
             },
+            "evidence": {
+              "additionalProperties": false,
+              "properties": {
+                "actualEffect": {
+                  "type": "string"
+                },
+                "actualStepKinds": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "artifacts": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "bindingRevision": {
+                        "type": [
+                          "integer",
+                          "null"
+                        ]
+                      },
+                      "byteCount": {
+                        "type": "integer"
+                      },
+                      "bytesVerified": {
+                        "type": "boolean"
+                      },
+                      "jobId": {
+                        "type": "string"
+                      },
+                      "providerId": {
+                        "type": "string"
+                      },
+                      "reference": {
+                        "type": "string"
+                      },
+                      "sha256": {
+                        "type": "string"
+                      },
+                      "stableIdentitySha256": {
+                        "type": [
+                          "null",
+                          "string"
+                        ]
+                      },
+                      "targetId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "bindingRevision",
+                      "byteCount",
+                      "bytesVerified",
+                      "jobId",
+                      "providerId",
+                      "reference",
+                      "sha256",
+                      "stableIdentitySha256",
+                      "targetId"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "authority": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "admittedAtUtc": {
+                      "type": "string"
+                    },
+                    "artifactDigest": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "consumptionFingerprintSha256": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "planDigest": {
+                      "type": "string"
+                    },
+                    "recoveryEpoch": {
+                      "type": "null"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "reservationId": {
+                      "type": "string"
+                    },
+                    "stepSetDigest": {
+                      "type": "string"
+                    },
+                    "targetBindingDigest": {
+                      "type": "string"
+                    },
+                    "useOrdinal": {
+                      "type": "integer"
+                    },
+                    "validUntilUtc": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "admittedAtUtc",
+                    "consumptionFingerprintSha256",
+                    "kind",
+                    "recoveryEpoch",
+                    "reference",
+                    "validUntilUtc"
+                  ],
+                  "type": "object"
+                },
+                "bindingRevision": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "blockers": {
+                  "type": "array"
+                },
+                "catalogDigest": {
+                  "type": "string"
+                },
+                "executionMode": {
+                  "type": "string"
+                },
+                "finishedAtUtc": {
+                  "type": "string"
+                },
+                "firstEvidenceStepAtUtc": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "jobId": {
+                  "type": "string"
+                },
+                "observation": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "bindingRevision": {
+                          "type": "integer"
+                        },
+                        "confirmationMethod": {
+                          "type": "string"
+                        },
+                        "confirmedAtUtc": {
+                          "type": "string"
+                        },
+                        "firmware": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "preflightSteps": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "outcomeAtUtc": {
+                                "type": "string"
+                              },
+                              "stepId": {
+                                "type": "string"
+                              },
+                              "stepKind": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "outcomeAtUtc",
+                              "stepId",
+                              "stepKind"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "providerId": {
+                          "type": "string"
+                        },
+                        "stableIdentitySha256": {
+                          "type": "string"
+                        },
+                        "targetId": {
+                          "type": "string"
+                        },
+                        "toolSha256": {
+                          "type": "string"
+                        },
+                        "toolVersion": {
+                          "type": "string"
+                        },
+                        "transport": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "bindingRevision",
+                        "confirmationMethod",
+                        "confirmedAtUtc",
+                        "firmware",
+                        "model",
+                        "preflightSteps",
+                        "providerId",
+                        "stableIdentitySha256",
+                        "targetId",
+                        "toolSha256",
+                        "toolVersion",
+                        "transport"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": [
+                        "null"
+                      ]
+                    }
+                  ]
+                },
+                "operationReference": {
+                  "type": "string"
+                },
+                "outcomeUnknown": {
+                  "type": "boolean"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "recoveryEpoch": {
+                  "type": "null"
+                },
+                "startedAtUtc": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "terminalState": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "actualEffect",
+                "actualStepKinds",
+                "artifacts",
+                "authority",
+                "bindingRevision",
+                "blockers",
+                "catalogDigest",
+                "executionMode",
+                "finishedAtUtc",
+                "firstEvidenceStepAtUtc",
+                "jobId",
+                "observation",
+                "operationReference",
+                "outcomeUnknown",
+                "providerId",
+                "recoveryEpoch",
+                "startedAtUtc",
+                "status",
+                "targetId",
+                "terminalState"
+              ],
+              "type": "object"
+            },
+            "executionId": {
+              "type": "string"
+            },
             "expiresAt": {
               "type": "string"
+            },
+            "failureCode": {
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "fingerprintAlgorithm": {
               "type": "string"
@@ -217,109 +1714,225 @@
               "type": "string"
             },
             "humanAction": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actionId": {
+                      "type": "string"
+                    },
+                    "binding": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "controlActionId": {
+                          "type": "string"
+                        },
+                        "generation": {
+                          "type": "string"
+                        },
+                        "previewDigest": {
+                          "type": "string"
+                        },
+                        "previewId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "controlActionId",
+                        "generation",
+                        "previewDigest",
+                        "previewId"
+                      ],
+                      "type": "object"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "choices": {
+                      "type": "array"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "minimumAction": {
+                      "type": "string"
+                    },
+                    "newDispatchCount": {
+                      "type": "integer"
+                    },
+                    "owner": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind"
+                      ],
+                      "type": "object"
+                    },
+                    "prohibitedAutomation": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "reasonCode": {
+                      "type": "string"
+                    },
+                    "resumeReference": {
+                      "type": "string"
+                    },
+                    "schemaVersion": {
+                      "type": "string"
+                    },
+                    "selectionSchema": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "enum": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "type": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "enum",
+                            "type"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": [
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "actionId",
+                    "category",
+                    "choices",
+                    "createdAt",
+                    "expiresAt",
+                    "minimumAction",
+                    "newDispatchCount",
+                    "owner",
+                    "reasonCode",
+                    "resumeReference",
+                    "schemaVersion",
+                    "selectionSchema",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
+            },
+            "interactionOrigin": {
+              "type": "string"
+            },
+            "job": {
               "additionalProperties": false,
               "properties": {
-                "actionId": {
+                "jobId": {
                   "type": "string"
                 },
-                "binding": {
+                "outcome": {
+                  "type": "string"
+                },
+                "outcomeUnknown": {
+                  "type": "boolean"
+                },
+                "outstandingResidueCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "sessionPublication": {
                   "additionalProperties": false,
                   "properties": {
-                    "controlActionId": {
-                      "type": "string"
+                    "catalogGeneration": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
                     },
-                    "generation": {
-                      "type": "string"
+                    "manifestSha256": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
                     },
-                    "previewDigest": {
-                      "type": "string"
+                    "reasonCode": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
                     },
-                    "previewId": {
+                    "state": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "controlActionId",
-                    "generation",
-                    "previewDigest",
-                    "previewId"
+                    "catalogGeneration",
+                    "manifestSha256",
+                    "reasonCode",
+                    "state"
                   ],
                   "type": "object"
                 },
-                "category": {
+                "state": {
                   "type": "string"
                 },
-                "choices": {
-                  "type": "array"
-                },
-                "createdAt": {
-                  "type": "string"
-                },
-                "expiresAt": {
-                  "type": "string"
-                },
-                "minimumAction": {
-                  "type": "string"
-                },
-                "newDispatchCount": {
-                  "type": "integer"
-                },
-                "owner": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "kind"
-                  ],
-                  "type": "object"
-                },
-                "prohibitedAutomation": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "reasonCode": {
-                  "type": "string"
-                },
-                "resumeReference": {
-                  "type": "string"
-                },
-                "schemaVersion": {
-                  "type": "string"
-                },
-                "selectionSchema": {
-                  "type": "null"
-                },
-                "status": {
-                  "type": "string"
+                "waitingForHuman": {
+                  "type": "boolean"
                 }
               },
               "required": [
-                "actionId",
-                "binding",
-                "category",
-                "choices",
-                "createdAt",
-                "expiresAt",
-                "minimumAction",
-                "newDispatchCount",
-                "owner",
-                "prohibitedAutomation",
-                "reasonCode",
-                "resumeReference",
-                "schemaVersion",
-                "selectionSchema",
-                "status"
+                "jobId",
+                "outcome",
+                "outcomeUnknown",
+                "outstandingResidueCount",
+                "sessionPublication",
+                "state",
+                "waitingForHuman"
               ],
               "type": "object"
+            },
+            "jobId": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "jobState": {
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "kind": {
               "type": "string"
@@ -327,9 +1940,18 @@
             "lastObservedAt": {
               "type": "string"
             },
+            "minimumAction": {
+              "type": "string"
+            },
+            "newDispatchCount": {
+              "type": "integer"
+            },
             "nextAction": {
               "additionalProperties": false,
               "properties": {
+                "expiresAt": {
+                  "type": "string"
+                },
                 "kind": {
                   "type": "string"
                 },
@@ -367,6 +1989,12 @@
                     "kind"
                   ],
                   "type": "object"
+                },
+                "resumeReference": {
+                  "type": "string"
+                },
+                "retryAfter": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -376,6 +2004,12 @@
                 "resource"
               ],
               "type": "object"
+            },
+            "operation": {
+              "type": "string"
+            },
+            "outcomeUnknown": {
+              "type": "boolean"
             },
             "owner": {
               "additionalProperties": false,
@@ -638,6 +2272,758 @@
               ],
               "type": "object"
             },
+            "prohibitedAutomation": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "requestFingerprint": {
+              "type": "string"
+            },
+            "resumeReference": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "type": "string"
+            },
+            "selectionSchema": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "enum": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "enum",
+                    "type"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
+            },
+            "state": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "targetId": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "schemaVersion"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "type": "string"
+            },
+            "actionRequestId": {
+              "type": "string"
+            },
+            "blockerReasonCode": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "catalogDigest": {
+              "type": "string"
+            },
+            "controlActionId": {
+              "type": "string"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "dispatchCount": {
+              "type": "integer"
+            },
+            "expiresAt": {
+              "type": "string"
+            },
+            "fingerprintAlgorithm": {
+              "type": "string"
+            },
+            "generation": {
+              "type": "string"
+            },
+            "humanAction": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "actionId": {
+                      "type": "string"
+                    },
+                    "binding": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "controlActionId": {
+                          "type": "string"
+                        },
+                        "generation": {
+                          "type": "string"
+                        },
+                        "previewDigest": {
+                          "type": "string"
+                        },
+                        "previewId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "controlActionId",
+                        "generation",
+                        "previewDigest",
+                        "previewId"
+                      ],
+                      "type": "object"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "choices": {
+                      "type": "array"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "minimumAction": {
+                      "type": "string"
+                    },
+                    "newDispatchCount": {
+                      "type": "integer"
+                    },
+                    "owner": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind"
+                      ],
+                      "type": "object"
+                    },
+                    "prohibitedAutomation": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "reasonCode": {
+                      "type": "string"
+                    },
+                    "resumeReference": {
+                      "type": "string"
+                    },
+                    "schemaVersion": {
+                      "type": "string"
+                    },
+                    "selectionSchema": {
+                      "type": "null"
+                    },
+                    "status": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "actionId",
+                    "binding",
+                    "category",
+                    "choices",
+                    "createdAt",
+                    "expiresAt",
+                    "minimumAction",
+                    "newDispatchCount",
+                    "owner",
+                    "prohibitedAutomation",
+                    "reasonCode",
+                    "resumeReference",
+                    "schemaVersion",
+                    "selectionSchema",
+                    "status"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
+            },
+            "kind": {
+              "type": "string"
+            },
+            "lastObservedAt": {
+              "type": "string"
+            },
+            "nextAction": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "owner": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "reasonCode": {
+                  "type": "string"
+                },
+                "resource": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "kind",
+                "owner",
+                "reasonCode",
+                "resource"
+              ],
+              "type": "object"
+            },
+            "owner": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "preview": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "affectedDeviceObservations": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "authorization": {
+                            "type": "string"
+                          },
+                          "generation": {
+                            "type": "string"
+                          },
+                          "health": {
+                            "type": "string"
+                          },
+                          "observationId": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "authorization",
+                          "generation",
+                          "health",
+                          "observationId"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "affectedJobIds": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "affectedTargetIds": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "confirmationRequired": {
+                      "type": "boolean"
+                    },
+                    "controlActionId": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "criticalJobGate": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "blocking": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "jobId": {
+                                "type": "string"
+                              },
+                              "recovery": {
+                                "type": "string"
+                              },
+                              "safeBoundary": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string"
+                              },
+                              "stepId": {
+                                "type": [
+                                  "null",
+                                  "string"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "jobId",
+                              "recovery",
+                              "safeBoundary",
+                              "state",
+                              "stepId"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "reasonCode": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "state": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "blocking",
+                        "reasonCode",
+                        "state"
+                      ],
+                      "type": "object"
+                    },
+                    "detectedOtherClientIds": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "digestAlgorithm": {
+                      "type": "string"
+                    },
+                    "dispatchCount": {
+                      "type": "integer"
+                    },
+                    "endpoint": {
+                      "type": "string"
+                    },
+                    "expectedActiveGeneration": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string"
+                    },
+                    "interruption": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "affectsAllParticipants": {
+                          "type": "boolean"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "affectsAllParticipants",
+                        "kind"
+                      ],
+                      "type": "object"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "newTool": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "contentSHA256": {
+                          "type": "string"
+                        },
+                        "executableSHA256": {
+                          "type": "string"
+                        },
+                        "recordGeneration": {
+                          "type": "string"
+                        },
+                        "signature": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "codeDirectoryIdentitySHA256": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            },
+                            "identifier": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "teamIdentifier": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "codeDirectoryIdentitySHA256",
+                            "identifier",
+                            "state",
+                            "teamIdentifier"
+                          ],
+                          "type": "object"
+                        },
+                        "toolRef": {
+                          "type": "string"
+                        },
+                        "trust": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "executionAssessment": {
+                              "type": "string"
+                            },
+                            "platformTrust": {
+                              "type": "string"
+                            },
+                            "policy": {
+                              "type": "string"
+                            },
+                            "profileReferences": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "registeredIdentity": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "executionAssessment",
+                            "platformTrust",
+                            "policy",
+                            "profileReferences",
+                            "registeredIdentity"
+                          ],
+                          "type": "object"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "contentSHA256",
+                        "executableSHA256",
+                        "recordGeneration",
+                        "signature",
+                        "toolRef",
+                        "trust",
+                        "version"
+                      ],
+                      "type": "object"
+                    },
+                    "oldTool": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "contentSHA256": {
+                          "type": "string"
+                        },
+                        "executableSHA256": {
+                          "type": "string"
+                        },
+                        "recordGeneration": {
+                          "type": "string"
+                        },
+                        "signature": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "codeDirectoryIdentitySHA256": {
+                              "type": "null"
+                            },
+                            "identifier": {
+                              "type": "null"
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "teamIdentifier": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "codeDirectoryIdentitySHA256",
+                            "identifier",
+                            "state",
+                            "teamIdentifier"
+                          ],
+                          "type": "object"
+                        },
+                        "toolRef": {
+                          "type": "string"
+                        },
+                        "trust": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "executionAssessment": {
+                              "type": "string"
+                            },
+                            "platformTrust": {
+                              "type": "string"
+                            },
+                            "policy": {
+                              "type": "string"
+                            },
+                            "profileReferences": {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "registeredIdentity": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "executionAssessment",
+                            "platformTrust",
+                            "policy",
+                            "profileReferences",
+                            "registeredIdentity"
+                          ],
+                          "type": "object"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "contentSHA256",
+                        "executableSHA256",
+                        "recordGeneration",
+                        "signature",
+                        "toolRef",
+                        "trust",
+                        "version"
+                      ],
+                      "type": "object"
+                    },
+                    "otherClientsMayExist": {
+                      "type": "boolean"
+                    },
+                    "owner": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind"
+                      ],
+                      "type": "object"
+                    },
+                    "previewDigest": {
+                      "type": "string"
+                    },
+                    "previewId": {
+                      "type": "string"
+                    },
+                    "recovery": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "type": "string"
+                        },
+                        "replayAllowed": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "replayAllowed"
+                      ],
+                      "type": "object"
+                    },
+                    "schemaVersion": {
+                      "type": "string"
+                    },
+                    "serverEndpointRef": {
+                      "type": "string"
+                    },
+                    "serverGeneration": {
+                      "type": "string"
+                    },
+                    "serverHealth": {
+                      "type": "string"
+                    },
+                    "serverOwnership": {
+                      "type": "string"
+                    },
+                    "serverVersion": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "executablePath": {
+                          "type": "string"
+                        },
+                        "reference": {
+                          "type": "null"
+                        },
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "signature": {
+                          "type": "null"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "trust": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "executablePath",
+                        "reference",
+                        "sha256",
+                        "signature",
+                        "source",
+                        "trust",
+                        "version"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "affectedDeviceObservations",
+                    "affectedJobIds",
+                    "affectedTargetIds",
+                    "confirmationRequired",
+                    "controlActionId",
+                    "createdAt",
+                    "criticalJobGate",
+                    "detectedOtherClientIds",
+                    "digestAlgorithm",
+                    "dispatchCount",
+                    "endpoint",
+                    "expectedActiveGeneration",
+                    "expiresAt",
+                    "interruption",
+                    "kind",
+                    "newTool",
+                    "oldTool",
+                    "otherClientsMayExist",
+                    "owner",
+                    "previewDigest",
+                    "previewId",
+                    "recovery",
+                    "schemaVersion",
+                    "serverEndpointRef",
+                    "serverGeneration",
+                    "serverHealth",
+                    "serverOwnership",
+                    "serverVersion",
+                    "tool"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
+            },
             "requestFingerprint": {
               "type": "string"
             },
@@ -670,944 +3056,8 @@
             "state"
           ],
           "type": "object"
-        },
-        "controlActionId": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string"
-        },
-        "deadline": {
-          "type": "string"
-        },
-        "dispatchCount": {
-          "type": "integer"
-        },
-        "evidence": {
-          "additionalProperties": false,
-          "properties": {
-            "actualEffect": {
-              "type": "string"
-            },
-            "actualStepKinds": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "artifacts": {
-              "items": {
-                "additionalProperties": false,
-                "properties": {
-                  "bindingRevision": {
-                    "type": [
-                      "integer",
-                      "null"
-                    ]
-                  },
-                  "byteCount": {
-                    "type": "integer"
-                  },
-                  "bytesVerified": {
-                    "type": "boolean"
-                  },
-                  "jobId": {
-                    "type": "string"
-                  },
-                  "providerId": {
-                    "type": "string"
-                  },
-                  "reference": {
-                    "type": "string"
-                  },
-                  "sha256": {
-                    "type": "string"
-                  },
-                  "stableIdentitySha256": {
-                    "type": [
-                      "null",
-                      "string"
-                    ]
-                  },
-                  "targetId": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "bindingRevision",
-                  "byteCount",
-                  "bytesVerified",
-                  "jobId",
-                  "providerId",
-                  "reference",
-                  "sha256",
-                  "stableIdentitySha256",
-                  "targetId"
-                ],
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "authority": {
-              "additionalProperties": false,
-              "properties": {
-                "admittedAtUtc": {
-                  "type": "string"
-                },
-                "artifactDigest": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                },
-                "consumptionFingerprintSha256": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "planDigest": {
-                  "type": "string"
-                },
-                "recoveryEpoch": {
-                  "type": "null"
-                },
-                "reference": {
-                  "type": "string"
-                },
-                "reservationId": {
-                  "type": "string"
-                },
-                "stepSetDigest": {
-                  "type": "string"
-                },
-                "targetBindingDigest": {
-                  "type": "string"
-                },
-                "useOrdinal": {
-                  "type": "integer"
-                },
-                "validUntilUtc": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                }
-              },
-              "required": [
-                "admittedAtUtc",
-                "consumptionFingerprintSha256",
-                "kind",
-                "recoveryEpoch",
-                "reference",
-                "validUntilUtc"
-              ],
-              "type": "object"
-            },
-            "bindingRevision": {
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "blockers": {
-              "type": "array"
-            },
-            "catalogDigest": {
-              "type": "string"
-            },
-            "executionMode": {
-              "type": "string"
-            },
-            "finishedAtUtc": {
-              "type": "string"
-            },
-            "firstEvidenceStepAtUtc": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "jobId": {
-              "type": "string"
-            },
-            "observation": {
-              "anyOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "bindingRevision": {
-                      "type": "integer"
-                    },
-                    "confirmationMethod": {
-                      "type": "string"
-                    },
-                    "confirmedAtUtc": {
-                      "type": "string"
-                    },
-                    "firmware": {
-                      "type": "string"
-                    },
-                    "model": {
-                      "type": "string"
-                    },
-                    "preflightSteps": {
-                      "items": {
-                        "additionalProperties": false,
-                        "properties": {
-                          "outcomeAtUtc": {
-                            "type": "string"
-                          },
-                          "stepId": {
-                            "type": "string"
-                          },
-                          "stepKind": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "outcomeAtUtc",
-                          "stepId",
-                          "stepKind"
-                        ],
-                        "type": "object"
-                      },
-                      "type": "array"
-                    },
-                    "providerId": {
-                      "type": "string"
-                    },
-                    "stableIdentitySha256": {
-                      "type": "string"
-                    },
-                    "targetId": {
-                      "type": "string"
-                    },
-                    "toolSha256": {
-                      "type": "string"
-                    },
-                    "toolVersion": {
-                      "type": "string"
-                    },
-                    "transport": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "bindingRevision",
-                    "confirmationMethod",
-                    "confirmedAtUtc",
-                    "firmware",
-                    "model",
-                    "preflightSteps",
-                    "providerId",
-                    "stableIdentitySha256",
-                    "targetId",
-                    "toolSha256",
-                    "toolVersion",
-                    "transport"
-                  ],
-                  "type": "object"
-                },
-                {
-                  "type": [
-                    "null"
-                  ]
-                }
-              ]
-            },
-            "operationReference": {
-              "type": "string"
-            },
-            "outcomeUnknown": {
-              "type": "boolean"
-            },
-            "providerId": {
-              "type": "string"
-            },
-            "recoveryEpoch": {
-              "type": "null"
-            },
-            "startedAtUtc": {
-              "type": "string"
-            },
-            "status": {
-              "type": "string"
-            },
-            "targetId": {
-              "type": "string"
-            },
-            "terminalState": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "actualEffect",
-            "actualStepKinds",
-            "artifacts",
-            "authority",
-            "bindingRevision",
-            "blockers",
-            "catalogDigest",
-            "executionMode",
-            "finishedAtUtc",
-            "firstEvidenceStepAtUtc",
-            "jobId",
-            "observation",
-            "operationReference",
-            "outcomeUnknown",
-            "providerId",
-            "recoveryEpoch",
-            "startedAtUtc",
-            "status",
-            "targetId",
-            "terminalState"
-          ],
-          "type": "object"
-        },
-        "executionId": {
-          "type": "string"
-        },
-        "expiresAt": {
-          "type": "string"
-        },
-        "failureCode": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "fingerprintAlgorithm": {
-          "type": "string"
-        },
-        "generation": {
-          "type": "string"
-        },
-        "humanAction": {
-          "anyOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "actionId": {
-                  "type": "string"
-                },
-                "binding": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "controlActionId": {
-                      "type": "string"
-                    },
-                    "generation": {
-                      "type": "string"
-                    },
-                    "previewDigest": {
-                      "type": "string"
-                    },
-                    "previewId": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "controlActionId",
-                    "generation",
-                    "previewDigest",
-                    "previewId"
-                  ],
-                  "type": "object"
-                },
-                "category": {
-                  "type": "string"
-                },
-                "choices": {
-                  "type": "array"
-                },
-                "createdAt": {
-                  "type": "string"
-                },
-                "expiresAt": {
-                  "type": "string"
-                },
-                "minimumAction": {
-                  "type": "string"
-                },
-                "newDispatchCount": {
-                  "type": "integer"
-                },
-                "owner": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "kind"
-                  ],
-                  "type": "object"
-                },
-                "prohibitedAutomation": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "reasonCode": {
-                  "type": "string"
-                },
-                "resumeReference": {
-                  "type": "string"
-                },
-                "schemaVersion": {
-                  "type": "string"
-                },
-                "selectionSchema": {
-                  "anyOf": [
-                    {
-                      "additionalProperties": false,
-                      "properties": {
-                        "enum": {
-                          "items": {
-                            "type": "string"
-                          },
-                          "type": "array"
-                        },
-                        "type": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "enum",
-                        "type"
-                      ],
-                      "type": "object"
-                    },
-                    {
-                      "type": [
-                        "null"
-                      ]
-                    }
-                  ]
-                },
-                "status": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "actionId",
-                "category",
-                "choices",
-                "createdAt",
-                "expiresAt",
-                "minimumAction",
-                "newDispatchCount",
-                "owner",
-                "reasonCode",
-                "resumeReference",
-                "schemaVersion",
-                "selectionSchema",
-                "status"
-              ],
-              "type": "object"
-            },
-            {
-              "type": [
-                "null"
-              ]
-            }
-          ]
-        },
-        "interactionOrigin": {
-          "type": "string"
-        },
-        "job": {
-          "additionalProperties": false,
-          "properties": {
-            "jobId": {
-              "type": "string"
-            },
-            "outcome": {
-              "type": "string"
-            },
-            "outcomeUnknown": {
-              "type": "boolean"
-            },
-            "outstandingResidueCount": {
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "sessionPublication": {
-              "additionalProperties": false,
-              "properties": {
-                "catalogGeneration": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                },
-                "manifestSha256": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                },
-                "reasonCode": {
-                  "type": [
-                    "null",
-                    "string"
-                  ]
-                },
-                "state": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "catalogGeneration",
-                "manifestSha256",
-                "reasonCode",
-                "state"
-              ],
-              "type": "object"
-            },
-            "state": {
-              "type": "string"
-            },
-            "waitingForHuman": {
-              "type": "boolean"
-            }
-          },
-          "required": [
-            "jobId",
-            "outcome",
-            "outcomeUnknown",
-            "outstandingResidueCount",
-            "sessionPublication",
-            "state",
-            "waitingForHuman"
-          ],
-          "type": "object"
-        },
-        "jobId": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "jobState": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "kind": {
-          "type": "string"
-        },
-        "lastObservedAt": {
-          "type": "string"
-        },
-        "minimumAction": {
-          "type": "string"
-        },
-        "newDispatchCount": {
-          "type": "integer"
-        },
-        "nextAction": {
-          "additionalProperties": false,
-          "properties": {
-            "expiresAt": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string"
-            },
-            "owner": {
-              "additionalProperties": false,
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "reasonCode": {
-              "type": "string"
-            },
-            "resource": {
-              "additionalProperties": false,
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "resumeReference": {
-              "type": "string"
-            },
-            "retryAfter": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "owner",
-            "reasonCode",
-            "resource"
-          ],
-          "type": "object"
-        },
-        "operation": {
-          "type": "string"
-        },
-        "outcomeUnknown": {
-          "type": "boolean"
-        },
-        "owner": {
-          "additionalProperties": false,
-          "properties": {
-            "id": {
-              "type": "string"
-            },
-            "kind": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "id",
-            "kind"
-          ],
-          "type": "object"
-        },
-        "preview": {
-          "additionalProperties": false,
-          "properties": {
-            "action": {
-              "type": "string"
-            },
-            "affectedDeviceObservations": {
-              "type": "array"
-            },
-            "affectedJobIds": {
-              "type": "array"
-            },
-            "affectedTargetIds": {
-              "type": "array"
-            },
-            "confirmationRequired": {
-              "type": "boolean"
-            },
-            "controlActionId": {
-              "type": "string"
-            },
-            "createdAt": {
-              "type": "string"
-            },
-            "criticalJobGate": {
-              "additionalProperties": false,
-              "properties": {
-                "blocking": {
-                  "type": "array"
-                },
-                "reasonCode": {
-                  "type": "null"
-                },
-                "state": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "blocking",
-                "reasonCode",
-                "state"
-              ],
-              "type": "object"
-            },
-            "detectedOtherClientIds": {
-              "type": "array"
-            },
-            "digestAlgorithm": {
-              "type": "string"
-            },
-            "dispatchCount": {
-              "type": "integer"
-            },
-            "endpoint": {
-              "type": "string"
-            },
-            "expiresAt": {
-              "type": "string"
-            },
-            "interruption": {
-              "additionalProperties": false,
-              "properties": {
-                "affectsAllParticipants": {
-                  "type": "boolean"
-                },
-                "kind": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "affectsAllParticipants",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "kind": {
-              "type": "string"
-            },
-            "otherClientsMayExist": {
-              "type": "boolean"
-            },
-            "owner": {
-              "additionalProperties": false,
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "previewDigest": {
-              "type": "string"
-            },
-            "previewId": {
-              "type": "string"
-            },
-            "recovery": {
-              "additionalProperties": false,
-              "properties": {
-                "kind": {
-                  "type": "string"
-                },
-                "replayAllowed": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "kind",
-                "replayAllowed"
-              ],
-              "type": "object"
-            },
-            "schemaVersion": {
-              "type": "string"
-            },
-            "serverEndpointRef": {
-              "type": "string"
-            },
-            "serverGeneration": {
-              "type": "string"
-            },
-            "serverHealth": {
-              "type": "string"
-            },
-            "serverOwnership": {
-              "type": "string"
-            },
-            "serverVersion": {
-              "type": "string"
-            },
-            "tool": {
-              "additionalProperties": false,
-              "properties": {
-                "executablePath": {
-                  "type": "string"
-                },
-                "reference": {
-                  "type": "null"
-                },
-                "sha256": {
-                  "type": "string"
-                },
-                "signature": {
-                  "anyOf": [
-                    {
-                      "additionalProperties": false,
-                      "properties": {
-                        "executionAssessment": {
-                          "type": "string"
-                        },
-                        "identifier": {
-                          "type": [
-                            "null",
-                            "string"
-                          ]
-                        },
-                        "platformTrust": {
-                          "type": "string"
-                        },
-                        "state": {
-                          "type": "string"
-                        },
-                        "teamIdentifier": {
-                          "type": [
-                            "null",
-                            "string"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "executionAssessment",
-                        "identifier",
-                        "platformTrust",
-                        "state",
-                        "teamIdentifier"
-                      ],
-                      "type": "object"
-                    },
-                    {
-                      "type": [
-                        "null"
-                      ]
-                    }
-                  ]
-                },
-                "source": {
-                  "type": "string"
-                },
-                "trust": {
-                  "type": "string"
-                },
-                "version": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "executablePath",
-                "reference",
-                "sha256",
-                "signature",
-                "source",
-                "trust",
-                "version"
-              ],
-              "type": "object"
-            }
-          },
-          "required": [
-            "action",
-            "affectedDeviceObservations",
-            "affectedJobIds",
-            "affectedTargetIds",
-            "confirmationRequired",
-            "controlActionId",
-            "createdAt",
-            "criticalJobGate",
-            "detectedOtherClientIds",
-            "digestAlgorithm",
-            "dispatchCount",
-            "endpoint",
-            "expiresAt",
-            "interruption",
-            "kind",
-            "otherClientsMayExist",
-            "owner",
-            "previewDigest",
-            "previewId",
-            "recovery",
-            "schemaVersion",
-            "serverEndpointRef",
-            "serverGeneration",
-            "serverHealth",
-            "serverOwnership",
-            "serverVersion",
-            "tool"
-          ],
-          "type": "object"
-        },
-        "prohibitedAutomation": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "reasonCode": {
-          "type": "string"
-        },
-        "requestFingerprint": {
-          "type": "string"
-        },
-        "resumeReference": {
-          "type": "string"
-        },
-        "schemaVersion": {
-          "type": "string"
-        },
-        "selectionSchema": {
-          "anyOf": [
-            {
-              "additionalProperties": false,
-              "properties": {
-                "enum": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "type": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "enum",
-                "type"
-              ],
-              "type": "object"
-            },
-            {
-              "type": [
-                "null"
-              ]
-            }
-          ]
-        },
-        "state": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string"
-        },
-        "targetId": {
-          "type": [
-            "null",
-            "string"
-          ]
         }
-      },
-      "required": [
-        "schemaVersion"
-      ],
-      "type": "object"
+      ]
     }
   },
   "$id": "https://arkdeck.dev/schemas/control/methods/human-action.resume.json",

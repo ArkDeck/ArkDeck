@@ -237,7 +237,7 @@ mod windows_tests {
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
         arkdeck_platform::create_private_directory(&root).unwrap();
-        root
+        arkdeck_platform::host_resolved_path(&root).unwrap()
     }
     fn copy(from: &Path, to: &Path) {
         let bytes = fs::read(from).unwrap();

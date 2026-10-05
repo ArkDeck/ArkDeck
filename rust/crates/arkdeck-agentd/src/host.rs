@@ -255,7 +255,7 @@ pub struct Host {
     /// and ArkForge's Loader observation.
     #[cfg(any(target_os = "macos", windows))]
     loader_binding: Option<arkdeck_hoststore::LoaderBinding>,
-    #[cfg(all(test, target_os = "macos"))]
+    #[cfg(all(test, any(target_os = "macos", windows)))]
     pub(crate) test_hdc_impact: Option<Box<dyn arkdeck_hoststore::ImpactSource + Send + Sync>>,
 }
 
@@ -535,7 +535,7 @@ impl Host {
         &self,
         run: impl FnOnce(Option<&dyn arkdeck_hoststore::ImpactSource>) -> R,
     ) -> R {
-        #[cfg(all(test, target_os = "macos"))]
+        #[cfg(all(test, any(target_os = "macos", windows)))]
         if let Some(source) = &self.test_hdc_impact {
             return run(Some(&**source));
         }
@@ -1716,7 +1716,7 @@ impl Host {
             lane_plan_preview: None,
             #[cfg(any(target_os = "macos", windows))]
             loader_binding: None,
-            #[cfg(all(test, target_os = "macos"))]
+            #[cfg(all(test, any(target_os = "macos", windows)))]
             test_hdc_impact: None,
         }
     }

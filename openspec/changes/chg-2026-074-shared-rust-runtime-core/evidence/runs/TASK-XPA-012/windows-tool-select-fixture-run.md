@@ -126,8 +126,60 @@ Full daemon/CLI crate suites and Swift/WinUI/hardware acceptance suites were not
 the checks target the affected process path and contract consumers. Integration
 owns final generated feature coverage and census updates.
 
+## Final integration targeted checks
+
+The linear integration tree also contains the preceding symbolize, static
+provider inventory/continuation, flash-alias and debug-template increments.
+Target: `D:/cargo-target/lead-symbolize`; two Cargo build jobs; heavy commands
+used the host-wide `gate_slot.py`. Logs remain local under
+`D:/src/ArkDeck-wt/tools/logs/`.
+
+The initial eleven-crate test command completed the daemon checks, then stopped
+at a Bootstrap fixture's `host snapshot refused` error (188 reported passes,
+one failure, three ignored tests; `tool-layer-tests.log`, exit 101). Subsequent
+Bootstrap checks exposed the same issue in bundle and tool registration roots.
+All three fixture constructors now resolve the physical path after native
+private creation. Production snapshot, canonical-path, identity and trust
+checks are unchanged. The final Bootstrap crate passes all 13 tests.
+
+| Final command/check | Exit | Local log |
+| --- | --- | --- |
+| CLI build, then `maintainer contracts export` | 0 | `tool-layer-build-final.log`, `tool-layer-export.log` |
+| `cargo test -p arkdeck-bootstrap` | 0 | `tool-layer-bootstrap-ready.log` |
+| Tests for contract, CLI, control, soak, rockchip-binding, provider-arkforge, client, hoststore and provider-hdc (1191 passes, eight existing ignores) | 0 | `tool-layer-remaining-tests.log` |
+| Signed account suite on immutable protected-main schemas (three passes, no restart dispatch) | 0 | `tool-layer-published-account-tests.log` |
+| Final signed account suite with verified 8.3 TEMP/TMP (three passes) | 0 | `tool-layer-short-accounts.log` |
+| Bootstrap crate with verified 8.3 TEMP/TMP (13 passes) | 0 | `tool-layer-short-bootstrap.log` |
+| All-target clippy for the eleven affected/direct-consumer crates, warnings denied | 0 | `tool-layer-clippy-final.log` |
+| Workspace fmt check | 0 | `tool-layer-fmt-final.log` |
+| Rust and ClientKit generator checks | 0 | `tool-layer-generators.log`, `tool-layer-clientkit.log` |
+| CLI `maintainer contracts check` (242 contract fixtures) | 0 | `tool-layer-contracts-cli.log` |
+| SDD check and `git diff --check` | 0 | `tool-layer-sdd-final.log`; diff check returned no output |
+
+The initial integration build had a comment newline error, corrected before
+the successful final build (`tool-layer-build.log`, exit 101). An accidental
+full `check-contracts.py` invocation was stopped during published-view clippy;
+it has no local pass claim (`tool-layer-contract-check.log`). The targeted
+published account check above used that task-owned view, verified all four
+method-schema bytes against `origin/main`, updated only current test sources
+and built its own CLI. Full dual-view/macOS parity remains CI work. Existing
+ignored live prerequisites do not count as device or installed-host acceptance.
+
+Windows CLI coverage exported by the final CLI is 149 implemented, 11 partial
+and two notImplemented of 162 required features; 101 features are macOS-only.
+Only `runtime.tool.select` changes status in this layer. ArkTrace remains an
+external trusted-distribution dependency; service install/update remain closed
+under rulings 42/78; generic leaves retain their all-reachable-operation gate.
+
 ## CI
 
-Not run for this subtask: no push or PR was created. The integration layer must
-record the actual PR/run result separately; local fixture passes do not grant
-maintainer approval.
+This layer's CI is pending its push; the result will be recorded in a later
+slice without amending a green head. Preceding adjacent layers are green at the
+exact heads listed below (both required checks passed); CI alone is not approval.
+
+| PR | Head | SDD guard run | Swift aggregate run | Result |
+| --- | --- | --- | --- | --- |
+| #2579 | `cf13e6e1d5b9` | `37263980331` | `37263980574` | PASS |
+| #2580 | `9ff969911316` | `37264532417` | `37264532739` | PASS |
+| #2582 | `f5cff0e0e8ff` | `37265058050` | `37265058218` | PASS |
+| #2583 | `e773ce5ee09c` | `37265636576` | `37265636814` | PASS |

@@ -564,7 +564,7 @@
     "Catalog/profiles": "b385e1efc8f3a3af52770c02d8885340e2cf4b206e84ad6fe3f7903f10cebd80",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "a0a16fc2f4d7d0c46f9efeee79d9c779ac084bb64858ed82d7c1786d1f40b52c",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "8e67de7305c186990c3adb85383f4b6e9d532719552add2d470675a06826c0d6"
+    "spec/control/methods": "3f2b201b5ef9f1485b504dfc247db8e5359c69c35d2077d6bf0ff3700690d601"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1448,16 +1448,16 @@
       "sha256": "57224cca07fca1a57e472137e416e3c25c7e5f49368edeafd95dca8a592db4b2"
     },
     "spec/control/methods/control-action.list.json": {
-      "blob": "bc07fca772cee05ab3800ad237d80800103bd70c",
-      "sha256": "a738bc78fcd72a78edcfcd9b558bbd00994706a67063a9774229f13cf24423e9"
+      "blob": "5d5abe803ff2c7209a32e9625cd27f7fac6e804e",
+      "sha256": "2e0688962d2b2075a890c8203a2900a2797d772c6311ce58d53350bc90c67d76"
     },
     "spec/control/methods/control-action.reconcile.json": {
-      "blob": "cc2df7385db7429cdaec9b221ddf19344ba823a3",
-      "sha256": "3c0424b81c85905d1d001f8a7bf49de29b61da1d2bf896ace105a025f78a221c"
+      "blob": "b2b1df4e1d9dee0a1f1c065c99c0f75ad41e5114",
+      "sha256": "32603375d6f96d702ceedb239c731eb22ac9162534512cec08f30dc64ccfbdb3"
     },
     "spec/control/methods/control-action.show.json": {
-      "blob": "090d30d9ff32314f470c340fda7df94e99854821",
-      "sha256": "e1e9f5a40975bd4a85ab1b156ee0e033044e8d0fc22718d75853f515f6e20de3"
+      "blob": "5570899da806b0a9599c35b0f16753843b243171",
+      "sha256": "7a0f2d8a27029cdd838ed4e142b865d8d1df79fee4f8d11228052d4df981874f"
     },
     "spec/control/methods/debug.evaluate.json": {
       "blob": "c1905e340ceec979c78b7a162125fbcd5f73bf9d",
@@ -1552,8 +1552,8 @@
       "sha256": "b994974bb907a57c3622cb21afbf6751222ce897d3792657cbdc00b65b880ae5"
     },
     "spec/control/methods/human-action.resume.json": {
-      "blob": "442b5b4b109284bb28801680fd42ee7de52b709e",
-      "sha256": "ed9b93bd0cd184eb27fdd3c2406abb5050273de7f11a489bc46464e296125805"
+      "blob": "63757910e984b63ca81c43de03db7ac4d1acc504",
+      "sha256": "46e78af0bfb81a0ceef5fab55ea4be27585a92371587e5b17430e9f21d3f4e23"
     },
     "spec/control/methods/human-action.show.json": {
       "blob": "b33d654d4f6c2ebfd520adb29d31393c6ea41492",
@@ -1800,7 +1800,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "bcacbaa3077d74fd256f5fbc80970123df9a9f5fe0f32cbb2ade1978d2ac544b",
+  "inputDigest": "199117e5d2cc9927710da52eaa3c9718ce10d396eadb1c49c813e440b9b0594b",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

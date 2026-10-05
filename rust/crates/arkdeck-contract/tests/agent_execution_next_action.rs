@@ -43,7 +43,27 @@ fn published_view() -> bool {
 }
 
 fn next_action(method: &str) -> Value {
-    schema(method)["$defs"]["result"]["properties"]["nextAction"].clone()
+    let method_schema = schema(method);
+    let result = &method_schema["$defs"]["result"];
+    // A human-action resume can also answer a tool-selection action. Find
+    // the agent-execution alternative by its published executionId member.
+    let execution = result
+        .get("anyOf")
+        .and_then(Value::as_array)
+        .map(|alternatives| {
+            let executions: Vec<_> = alternatives
+                .iter()
+                .filter(|alternative| alternative["properties"]["executionId"].is_object())
+                .collect();
+            assert_eq!(
+                executions.len(),
+                1,
+                "one agent-execution result alternative"
+            );
+            executions[0]
+        })
+        .unwrap_or(result);
+    execution["properties"]["nextAction"].clone()
 }
 
 #[test]
