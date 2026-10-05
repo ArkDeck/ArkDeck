@@ -3628,8 +3628,10 @@ impl HostServices for Host {
             .debug_read(target_id, template_id)
     }
     /// Swift's daemon composes its Trace Runtime probe beside the Debug one,
-    /// over the same selected HDC executable and Target owner.
-    #[cfg(target_os = "macos")]
+    /// over the same selected HDC executable and Target owner (on Windows,
+    /// the registered tuple's managed server, or a test build's fake, as the
+    /// Debug probe's; TASK-XPA-005).
+    #[cfg(any(target_os = "macos", windows))]
     fn trace_probe(&self, target_id: &str) -> Result<serde_json::Value, WireError> {
         self.hdc()
             .ok_or_else(|| WireError {

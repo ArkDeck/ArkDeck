@@ -405,3 +405,81 @@ fn the_real_cli_observes_adopts_and_reads_availability_as_the_swift_oracle() {
         "implemented",
     );
 }
+
+/// The Swift Trace probe oracle (`rust/tests/fixtures/trace-probe`) through
+/// `trace probe`: every probe the CLI can spell answers as Swift's daemon
+/// answered it, and the fake received Swift's reads, each exchange's
+/// concurrent reads sorted as the oracle records them
+/// (`trace_probe_control.rs` replays the same through `Control` on macOS).
+#[test]
+fn the_real_cli_probes_trace_as_the_swift_oracle() {
+    let _turn = crate::turn();
+    let scratch = temporary("gj1-trace-probe");
+    let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
+        return;
+    };
+    let fixture = fixtures("trace-probe");
+    let (root, fake_root) = (scratch.join("state"), scratch.join("fake"));
+    HostDirectory::open_or_create_private(&root.join("targets-state")).unwrap();
+    HostDirectory::open(&root.join("targets-state"))
+        .unwrap()
+        .create_document(
+            "targets.json",
+            &fs::read(fixture.join("targets-state/targets.json")).unwrap(),
+        )
+        .unwrap();
+    fs::create_dir_all(fake_root.join("resources")).unwrap();
+    for entry in fs::read_dir(fixture.join("resources")).unwrap() {
+        let entry = entry.unwrap();
+        fs::copy(
+            entry.path(),
+            fake_root.join("resources").join(entry.file_name()),
+        )
+        .unwrap();
+    }
+    let daemon = SignedDaemon::start(&executable, &pin, &root, &fixture, &fake_root);
+    let cases: Value =
+        serde_json::from_slice(&fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+    let mut calls = String::new();
+    let mut unspelled = Vec::new();
+    for exchange in cases["exchanges"].as_array().unwrap() {
+        let name = exchange["name"].as_str().unwrap();
+        if let Some(mode) = exchange["mode"].as_str() {
+            fs::write(fake_root.join("hdc-mode"), format!("{mode}\n")).unwrap();
+        }
+        let Some(target) = exchange["params"]["targetId"]
+            .as_str()
+            .filter(|target| !target.is_empty())
+        else {
+            unspelled.push(name.to_owned());
+            continue;
+        };
+        let (_, envelope) = daemon.cli(&["trace", "probe", "--target", target]);
+        assert_eq!(wire(&envelope), exchange["answer"], "{name}: {envelope}");
+        let log = fake_root.join("hdc-calls.log");
+        let mut read: Vec<String> = fs::read_to_string(&log)
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        fs::write(&log, "").unwrap();
+        read.sort_unstable();
+        for line in read {
+            calls.push_str(&line);
+            calls.push('\n');
+        }
+    }
+    daemon.stop();
+    assert_eq!(
+        unspelled,
+        ["probe.emptyTarget", "probe.noParameters"],
+        "the requests only a direct client sends"
+    );
+    assert_eq!(
+        calls,
+        fs::read_to_string(fixture.join("hdc-calls.log")).unwrap(),
+        "the fake's reads"
+    );
+    let _ = fs::remove_dir_all(&scratch);
+    assert_windows_status(&["trace.probe"], "implemented");
+}

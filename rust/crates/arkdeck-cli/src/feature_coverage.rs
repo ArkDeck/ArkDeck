@@ -460,6 +460,10 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "device.wait",
     "device.list",
     "target.availability",
+    // `trace probe` (TASK-XPA-005): the Swift Trace probe oracle replayed
+    // through the real CLI against the same signed test daemon, every answer
+    // and the fake's reads Swift's (`gj1_device_reads.rs`).
+    "trace.probe",
     // GJ-1's device leaves (TASK-XPA-005): `target observe`
     // (`observe.device@1`) and `diagnostics capture` (`capture.diagnostics@1`)
     // run end to end through the real signed CLI against a signed test
