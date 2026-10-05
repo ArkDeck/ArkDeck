@@ -85,6 +85,14 @@ This branch requires both published-view metadata and an actual refused reply;
 checkout/candidate views retain every selected/restart assertion above, and a
 published view that already represents the challenge runs that full path too.
 
+The macOS agent-run CLI test now inspects the unique result alternative bearing
+`executionId` before its existing `artifactDigest` nullability assertion. Its
+shared test helper is exercised by a cross-platform contract regression against
+all four agent methods, both union orders and nullable/non-nullable authority.
+The original process assertions and published-view behavior remain unchanged;
+related result-schema consumers already traverse their own semantic alternatives
+or inspect methods whose results remain direct objects.
+
 ## Local targeted checks
 
 Environment: `CARGO_TARGET_DIR=D:/cargo-target/tool-select`,
@@ -113,6 +121,15 @@ spawning-target clippy with `-D warnings` (exit zero;
 `tool-select-published-followup-fmt.log`). The integration owner runs the same
 source in the task-owned published input view; this subtask did not run the full
 parity lane or claim a published-view pass.
+
+The macOS introspection repair passed `cargo test --manifest-path rust/Cargo.toml
+-p arkdeck-contract --test agent_execution_capability_schema` (two tests, exit
+zero; `tool-select-capability-schema-regression.log`), targeted clippy with
+`-D warnings` (exit zero; `tool-select-capability-schema-clippy.log`) and formatting
+(exit zero; `tool-select-capability-schema-fmt.log`). The run-note check also passed
+`sh scripts/check-sdd.sh` (exit zero; `tool-select-capability-schema-sdd.log`).
+Windows cannot execute the
+macOS-only `agent_run_cli_process` test; its native process validation requires CI.
 
 Generation used `generate-control-contract.py --derive-method-schemas` with the
 committed ControlFrames directory, `rust/scripts/generate-contract.py --write`,
@@ -183,3 +200,7 @@ exact heads listed below (both required checks passed); CI alone is not approval
 | #2580 | `9ff969911316` | `37264532417` | `37264532739` | PASS |
 | #2582 | `f5cff0e0e8ff` | `37265058050` | `37265058218` | PASS |
 | #2583 | `e773ce5ee09c` | `37265636576` | `37265636814` | PASS |
+Integration PRs #2584 and #2585 failed the macOS workspace test at the unchanged
+capability assertion because `human-action.resume` now has a closed result union
+(`tool-layer-ci-macos-job-raw.log`). The test-only repair above needs an integration
+CI retry; no native macOS pass is claimed here.
