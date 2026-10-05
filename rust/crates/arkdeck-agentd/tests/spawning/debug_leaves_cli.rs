@@ -7,10 +7,10 @@
 //! `targetId`), each in its recorded mode, and its answer must be Swift's.
 //!
 //! What this measured is what the coverage manifest counts: `debug.probe`
-//! is Windows `implemented`. `debug template run` stays `partial`: it runs
-//! the `debug.template@1` Job, whose admission observes the Target, and no
-//! Swift oracle records that Job's HDC answers. Host tests only: nothing
-//! reaches a device or an installed Runtime.
+//! is Windows `implemented`. The `debug.template@1` Job path is measured
+//! separately by `debug_template_cli.rs`, against the macOS Rust owner test
+//! and the Swift closed-template payloads. Host tests only: nothing reaches
+//! a device or an installed Runtime.
 use crate::signed_daemon::{self, SignedDaemon};
 use crate::support;
 use serde_json::{Value, json};

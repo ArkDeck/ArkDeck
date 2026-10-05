@@ -577,11 +577,12 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "agent.abandon",
     // The Debug probe over the Target store and the HDC (TASK-XPA-008;
     // `arkdeck-agentd/tests/spawning/debug_leaves_cli.rs`, the real CLI
-    // against the signed test daemon over the Swift oracle's answers). Not
-    // `debug template run`: it runs the `debug.template@1` Job, whose
-    // admission observes the Target, and no Swift oracle records that Job's
-    // HDC answers.
+    // against the signed test daemon over the Swift oracle's answers).
     "debug.probe",
+    // The closed template Job and its retained output, failure and unknown
+    // outcome behavior, compared with the macOS Rust owner tests
+    // (`debug_template_cli.rs`).
+    "debug.template.run",
     // The workspace registration owner (TASK-XPA-015): registration, the
     // reads, and the updates and removals the Job owner's workspace census
     // admits (`windows_workspace_projects_process.rs`), and the preset

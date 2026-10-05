@@ -2250,7 +2250,7 @@
       "feature": "debug.template.run",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "deprecated",
       "note": "App direct path; the CLI reaches the same closed template set through Catalog operation debug.template@1",
@@ -2269,7 +2269,7 @@
       "feature": "debug.template@1",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
