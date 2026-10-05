@@ -56,6 +56,8 @@ pub(crate) use flash_plan::{
     PARTITIONS as DAYU200_PARTITIONS, admission_blocker, canonical_inputs, delegated_arguments,
     is_flash, plan_completion_arguments,
 };
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) use workspace_plan::WorkspaceMaterialization;
 // The native deployment runner reads it (macOS only yet).
 #[cfg_attr(windows, allow(unused_imports))]
 pub(crate) use native_library_plan::read_library;

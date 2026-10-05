@@ -211,7 +211,7 @@ fn equal(a: &Value, b: &Value) -> Result<bool> {
     })
 }
 
-pub(super) fn validate(doc: &Object, host: bool) -> Result<()> {
+pub(super) fn validate(doc: &Object, host: bool, host_workspace: bool) -> Result<()> {
     let mode = text(doc, "executionMode")?;
     let status = text(doc, "status")?;
     let standard = text(doc, "executionAuthority")? == "standardAgent";
@@ -242,7 +242,15 @@ pub(super) fn validate(doc: &Object, host: bool) -> Result<()> {
         }
         let effect = text(row, "effect")?;
         if host {
-            require(effect == "hostOnly" && text(row, "bindingRequirement")? == "none")?;
+            require(
+                effect
+                    == if host_workspace {
+                        "deviceMutation"
+                    } else {
+                        "hostOnly"
+                    }
+                    && text(row, "bindingRequirement")? == "none",
+            )?;
         }
         let disposition = text(row, "disposition")?;
         let result = text(row, "semanticResult")?;

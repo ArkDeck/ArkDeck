@@ -321,10 +321,15 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         }
         _ => return Err(ManifestError::Unsupported),
     }
-    if kind == "runtimeProvider" {
-        require(mode == "execute" && !host)?;
+    let host_workspace = host && kind == "hostTool" && doc.contains_key("runtimeAuthority");
+    if host_workspace {
+        validate_host_workspace(doc)?;
+    }
+    if kind == "runtimeProvider" || host_workspace {
+        require(mode == "execute" && (host_workspace || !host))?;
         let authority = doc.get("runtimeAuthority").ok_or(ManifestError::Invalid)?;
         let audit = if authority.is_null() {
+            require(!host_workspace)?;
             // Approved pre-consume failure/cancellation: the producer must
             // prove the original Journal contains no mutation or compensation.
             // Null records absent authority; it never supplies a policy audit.
@@ -339,6 +344,9 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         } else {
             let audit = object(authority)?;
             validate_runtime_audit(audit)?;
+            if host_workspace {
+                require(text(audit, "kind")? == "runtimeCapability")?;
+            }
             Some(audit)
         };
         for key in ["steps", "compensations"] {
@@ -378,7 +386,7 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
             require(value.is_some_and(|s| !s.is_empty()))?;
         }
     }
-    steps::validate(doc, host)?;
+    steps::validate(doc, host, host_workspace)?;
     validate_confirmations(array(doc, "confirmations")?, array(doc, "steps")?)?;
     validate_parameters(array(doc, "parameters")?, status)?;
     validate_artifacts(array(doc, "artifacts")?)?;
@@ -653,6 +661,112 @@ fn validate_confirmations(values: &[Value], steps: &[Value]) -> Result<()> {
             let id = related.as_str().ok_or(ManifestError::Invalid)?;
             require(identifier(id) && step_ids.contains(id))?;
         }
+    }
+    Ok(())
+}
+
+/// The approved honest-host workspace projection is a closed operation/step
+/// set, not a general permission to relabel device mutations as host work.
+fn validate_host_workspace(doc: &Object) -> Result<()> {
+    let workflow = object(&doc["workflow"])?;
+    let operation = text(workflow, "kind")?;
+    let (id, kind, cancellation) =
+        crate::session_publication::workspace_mutation(operation).ok_or(ManifestError::Invalid)?;
+    let tool = object(&doc["toolchain"])?;
+    require(
+        text(tool, "providerIdentity")? == "workspace"
+            && text(tool, "profileIdentifier")? == operation
+            && text(workflow, "providerIdentity")? == "workspace"
+            && text(doc, "executionMode")? == "execute"
+            && ["succeeded", "failed", "cancelled"].contains(&text(doc, "status")?)
+            && text(doc, "outcomeCertainty")? == "confirmed"
+            && array(doc, "compensations")?.is_empty(),
+    )?;
+    let target = object(&doc["originalTarget"])?;
+    let snapshot = object(&target["identitySnapshot"])?;
+    keys(
+        snapshot,
+        &[
+            "workspaceScope",
+            "projectRef",
+            "providerId",
+            "catalogDigest",
+        ],
+        &[],
+    )?;
+    nonempty(snapshot, "workspaceScope")?;
+    nonempty(snapshot, "projectRef")?;
+    require(
+        text(snapshot, "providerId")? == "workspace"
+            && hash(text(snapshot, "catalogDigest")?)
+            && snapshot["catalogDigest"] == workflow["profileVersion"],
+    )?;
+    let rows = array(doc, "steps")?;
+    require(rows.len() == 1)?;
+    let step = object(&rows[0])?;
+    let arguments = object(&step["arguments"])?;
+    let argument_keys: &[&str] = match operation {
+        "workspace.apply-patch@1" => &[
+            "projectRef",
+            "patchArtifactId",
+            "patchSha256",
+            "allowedFileGlobs",
+            "patchAttemptRef",
+        ],
+        "workspace.revert-patch@1" => &["projectRef", "patchAttemptRef"],
+        "workspace.build-openharmony@1" => &["projectRef", "buildPresetRef"],
+        "workspace.create-checkpoint@1" => &["projectRef", "artifactId"],
+        "workspace.run-tests@1" => &["projectRef", "testPresetRef"],
+        _ => return Err(ManifestError::Invalid),
+    };
+    keys(arguments, argument_keys, &[])?;
+    for key in argument_keys
+        .iter()
+        .filter(|key| **key != "allowedFileGlobs")
+    {
+        nonempty(arguments, key)?;
+    }
+    if operation == "workspace.apply-patch@1" {
+        let globs = array(arguments, "allowedFileGlobs")?;
+        require(
+            !globs.is_empty()
+                && globs
+                    .iter()
+                    .all(|value| value.as_str().is_some_and(|text| !text.is_empty())),
+        )?;
+    }
+    require(
+        text(step, "id")? == id
+            && text(step, "kind")? == kind
+            && text(step, "effect")? == "deviceMutation"
+            && text(step, "cancellation")? == cancellation
+            && text(step, "bindingRequirement")? == "none"
+            && step["bindingRevision"].is_null()
+            && step["sourceStepId"].is_null()
+            && step["compensationTrigger"].is_null()
+            && array(step, "compensationDescriptors")?.is_empty()
+            && step["arguments"]["projectRef"] == snapshot["projectRef"],
+    )?;
+    let audit = object(&doc["runtimeAuthority"])?;
+    let step_set = arkdeck_contract::sha256_hex(
+        format!("{id}|{kind}|deviceMutation|{cancellation}|none").as_bytes(),
+    );
+    require(
+        text(audit, "kind")? == "runtimeCapability"
+            && audit["stepSetDigest"] == step_set
+            && audit["targetBindingDigest"] == arkdeck_contract::sha256_hex(b"-\n-"),
+    )?;
+    if operation == "workspace.apply-patch@1" {
+        let digest = text(audit, "artifactDigest")?;
+        require(
+            digest.len() == 64
+                && digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                && audit["artifactDigest"] == arguments["patchSha256"],
+        )?;
+    } else {
+        require(audit["artifactDigest"].is_null())?;
     }
     Ok(())
 }

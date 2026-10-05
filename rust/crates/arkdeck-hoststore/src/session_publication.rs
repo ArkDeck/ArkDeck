@@ -37,6 +37,11 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::Mutex;
 
+#[path = "session_workspace_publication.rs"]
+mod workspace_publication;
+use workspace_publication::workspace_context;
+pub(crate) use workspace_publication::workspace_mutation;
+
 const APP_VERSION: &str = "ArkDeckKit-M1-006";
 /// The platform profile a Session is published under: the one this Runtime
 /// runs on.
@@ -145,7 +150,17 @@ pub struct SessionPublisher<'a> {
     pub probe: &'a dyn StorageProbe,
 }
 
+/// Read-only workspace provenance from the same Runtime composition that ran
+/// the Job. A live run retains its original materialization across its writes;
+/// a retained publication retry must rematerialize it without dispatch.
+#[derive(Clone, Copy)]
+pub(crate) struct WorkspaceSessionContext<'a> {
+    pub(crate) planner: crate::JobPlanner<'a>,
+    pub(crate) materialization: Option<&'a crate::job_plan::WorkspaceMaterialization>,
+}
+
 /// Why a publication stopped short of its receipt.
+#[derive(Debug)]
 struct Stop {
     reason: &'static str,
     detail: String,
@@ -189,13 +204,24 @@ impl SessionPublisher<'_> {
         job_directory: &Path,
         now: &str,
     ) -> Value {
+        self.publish_with_workspace(record, journal, job_directory, now, None)
+    }
+
+    pub(crate) fn publish_with_workspace(
+        &self,
+        record: &JobRecord,
+        journal: &mut JournalWriter,
+        job_directory: &Path,
+        now: &str,
+        workspace: Option<WorkspaceSessionContext<'_>>,
+    ) -> Value {
         if let Some(existing) = record
             .session_publication()
             .filter(|marker| marker.get("receipt").is_some())
         {
             return existing.clone();
         }
-        self.attempt(record, journal, job_directory, now)
+        self.attempt(record, journal, job_directory, now, workspace)
             .unwrap_or_else(|stopped| refused(record, &stopped))
     }
 
@@ -207,6 +233,7 @@ impl SessionPublisher<'_> {
         journal: &mut JournalWriter,
         job_directory: &Path,
         now: &str,
+        workspace: Option<WorkspaceSessionContext<'_>>,
     ) -> Result<Value, Stop> {
         let (root_path, policy_generation, _) =
             self.under_storage_lock(|held| held.publication_status().map_err(storage))?;
@@ -282,13 +309,14 @@ impl SessionPublisher<'_> {
         //    creates a Session directory at all.
         let completed = record.finished_at().unwrap_or(now).to_owned();
         let replay = journal.facts();
-        let manifest = match compose(record, &replayed, &replay, &completed) {
-            Ok(manifest) => manifest,
-            Err(refusal) => {
-                self.claims.release(&claim);
-                return Err(refusal);
-            }
-        };
+        let manifest =
+            match compose_with_workspace(record, &replayed, &replay, &completed, workspace) {
+                Ok(manifest) => manifest,
+                Err(refusal) => {
+                    self.claims.release(&claim);
+                    return Err(refusal);
+                }
+            };
         let digest = sha256_hex(&manifest);
 
         // 3. The checkpoint of the record and Journal the proposal came from.
@@ -759,11 +787,12 @@ fn refused(record: &JobRecord, stopped: &Stop) -> Value {
 /// Swift `RuntimeSessionManifestComposer.compose`: this Job's canonical
 /// Manifest, rendered only from its record and Journal, or the refusal
 /// naming the fact it lacks.
-fn compose(
+fn compose_with_workspace(
     record: &JobRecord,
     events: &[Value],
     replay: &ReplayFacts,
     completed: &str,
+    workspace: Option<WorkspaceSessionContext<'_>>,
 ) -> Result<Vec<u8>, Stop> {
     let status = record.state.as_str();
     if !["succeeded", "failed", "cancelled", "interrupted"].contains(&status) {
@@ -795,7 +824,12 @@ fn compose(
     };
     let steps = manifest_steps(events)?;
     let compensations = manifest_compensations(events)?;
-    let device = device_context(record, events, replay, mode)?;
+    let host_workspace = workspace_context(record, events, replay, mode, workspace)?;
+    let device = if host_workspace.is_some() {
+        None
+    } else {
+        device_context(record, events, replay, mode)?
+    };
     let mut bindings = manifest_bindings(events);
     if let Some(device) = &device
         && bindings.is_empty()
@@ -804,6 +838,10 @@ fn compose(
     }
     let (target, toolchain) = match &device {
         Some(device) => (device.target.clone(), device.toolchain.clone()),
+        None if host_workspace.is_some() && bindings.is_empty() => (
+            host_workspace.as_ref().unwrap().target.clone(),
+            host_workspace.as_ref().unwrap().toolchain.clone(),
+        ),
         // An honest host branch: no device is named, not even the target the
         // request carried.
         None if !touches_device(events) && bindings.is_empty() => (
@@ -924,6 +962,8 @@ fn compose(
     }
     if let Some(device) = device {
         manifest["runtimeAuthority"] = device.authority;
+    } else if let Some(workspace) = host_workspace {
+        manifest["runtimeAuthority"] = workspace.authority;
     }
     manifest["failure"] = if status == "failed" {
         let Some(failure) = record.operation_failure() else {

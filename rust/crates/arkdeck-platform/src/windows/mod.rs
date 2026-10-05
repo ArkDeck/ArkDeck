@@ -841,3 +841,4 @@ mod extended_length_tests {
         }
     }
 }
+mod tool_version;

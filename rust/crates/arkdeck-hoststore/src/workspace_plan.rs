@@ -47,6 +47,22 @@ use crate::workspace_patch::PatchAction;
 /// Swift `authorizationPlanJobID`.
 pub(crate) const AUTHORIZATION_PLAN_JOB: &str = "job-authorization-envelope";
 
+/// The unchanged canonical materialization and the actual executable it resolved.
+/// The path is source provenance, not a new member of the authorized document.
+pub(crate) struct WorkspaceMaterialization {
+    pub(crate) document: Value,
+    pub(crate) artifact_facts: BTreeMap<String, String>,
+    pub(crate) executable_path: Option<String>,
+}
+
+impl WorkspaceMaterialization {
+    pub(crate) fn digest(&self) -> Result<String, ()> {
+        session_json::encode(&self.document)
+            .map(|bytes| sha256_hex(&bytes))
+            .map_err(|_| ())
+    }
+}
+
 /// The facts a leased Artifact names, as Swift's materialization records
 /// them for the capability.
 fn artifact_facts(leased: &LeasedInput) -> BTreeMap<String, String> {
@@ -109,6 +125,18 @@ impl JobPlanner<'_> {
         request: &OperationRequest,
         descriptor: &CatalogOperation,
     ) -> Result<(String, BTreeMap<String, String>), PlanRefusal> {
+        let materialized = self.workspace_materialization(request, descriptor)?;
+        Ok((
+            materialized.digest().map_err(|_| internal_failure())?,
+            materialized.artifact_facts,
+        ))
+    }
+
+    pub(crate) fn workspace_materialization(
+        &self,
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<WorkspaceMaterialization, PlanRefusal> {
         let reference = descriptor.reference();
         let Some(workspace) = self.workspace else {
             return Err(refusal(
@@ -178,6 +206,7 @@ impl JobPlanner<'_> {
             )
         };
         let mut steps = Vec::new();
+        let mut executable_path = None;
         for step in descriptor
             .steps
             .iter()
@@ -247,6 +276,7 @@ impl JobPlanner<'_> {
                         }),
                     };
                     let invocation = action.invocation();
+                    executable_path = Some(invocation.executable_path.clone());
                     let mut process = json!({
                         "journalArguments": journal,
                         "processKind": "process",
@@ -283,6 +313,7 @@ impl JobPlanner<'_> {
                         .lower_checkpoint(&action, AUTHORIZATION_PLAN_JOB)
                         .map_err(preflight)?;
                     let invocation = action.invocation();
+                    executable_path = Some(invocation.executable_path.clone());
                     let mut process = json!({
                         "journalArguments": action.journal_arguments(),
                         "processKind": "process",
@@ -331,6 +362,7 @@ impl JobPlanner<'_> {
                         .as_ref()
                         .map(|leased| (leased.artifact_id.as_str(), leased.sha256.as_str()));
                     let invocation = action.invocation();
+                    executable_path = Some(invocation.executable_path.clone());
                     let mut process = json!({
                         "journalArguments": action.journal_arguments(&request.inputs, dump),
                         "processKind": "process",
@@ -350,6 +382,7 @@ impl JobPlanner<'_> {
                         .map_err(preflight)?;
                     workspace.lower_build(&action).map_err(preflight)?;
                     let invocation = &action.invocation;
+                    executable_path = Some(invocation.executable_path.clone());
                     let mut process = json!({
                         "journalArguments": crate::workspace_build::BuildAction::journal_arguments(
                             &request.inputs,
@@ -385,7 +418,6 @@ impl JobPlanner<'_> {
             "providerID": descriptor.provider,
             "steps": steps,
         });
-        let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         // Only a mutation's plan binds its input's facts, which its
         // capability is matched against.
         let facts = if reference == "workspace.apply-patch@1" {
@@ -393,6 +425,10 @@ impl JobPlanner<'_> {
         } else {
             BTreeMap::new()
         };
-        Ok((sha256_hex(&bytes), facts))
+        Ok(WorkspaceMaterialization {
+            document,
+            artifact_facts: facts,
+            executable_path,
+        })
     }
 }

@@ -77,7 +77,7 @@ use crate::job_owner::import_references::ImportReference;
 use crate::job_record::{JobRecord, STATES, terminal};
 use crate::job_run::{JobRunner, Run, RunRefusal, binding_refusal, failure};
 use crate::operation_catalog::CatalogOperation;
-use crate::session_publication::SessionPublisher;
+use crate::session_publication::{SessionPublisher, WorkspaceSessionContext};
 use arkdeck_contract::WireError;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
@@ -358,6 +358,7 @@ impl Held {
                 sequence,
                 now,
                 consumed: None,
+                workspace_publication_plan: None,
             },
             directory,
             ahead: false,
@@ -411,9 +412,10 @@ impl Held {
         mut self,
         jobs: &JobStore,
         sessions: Option<&SessionPublisher<'_>>,
+        workspace: Option<WorkspaceSessionContext<'_>>,
     ) -> Result<Value, WireError> {
         self.run
-            .release(jobs, sessions, &self.directory)
+            .release(jobs, sessions, &self.directory, workspace)
             .map_err(from_run)?;
         Ok(self.run.record.status())
     }
@@ -719,11 +721,16 @@ impl JobReconciler<'_> {
                 sequence,
                 now: self.now,
                 consumed: None,
+                workspace_publication_plan: None,
             },
             directory,
             ahead: false,
         }
-        .release(self.jobs, self.sessions)
+        .release(
+            self.jobs,
+            self.sessions,
+            self.runner.and_then(JobRunner::workspace_session_context),
+        )
     }
 
     /// Swift's non-resident branch of `reconcileOwned`: a terminal Job. A
@@ -753,23 +760,105 @@ impl JobReconciler<'_> {
             lineage::repair_cancelled(self.capabilities, &record, self.now).map_err(from_repair)?;
             return Ok(record.status());
         }
+        self.terminal_publication_retry(record)
+    }
+
+    /// Retry publication of the same proved terminal source, never its
+    /// execution or authority. The interlock spans the fresh owners and the
+    /// persisted receipt so a concurrent retry cannot overwrite that receipt.
+    fn terminal_publication_retry(&self, original: JobRecord) -> Result<Value, WireError> {
+        let _retry = self.jobs.publication_retry_guard()?;
+        let record = self.read(&original.job_id)?;
+        self.jobs.verify_publication_snapshot(&record)?;
+        let source = |record: &JobRecord| -> Result<Value, WireError> {
+            let mut value = record.value()?;
+            value
+                .as_object_mut()
+                .expect("a decoded Job record is an object")
+                .remove("sessionPublicationRecord");
+            Ok(value)
+        };
+        if !terminal(&record.state)
+            || record.outcome_unknown()
+            || source(&record)? != source(&original)?
+        {
+            return Err(refused(
+                "rejected",
+                "the original terminal publication source changed; nothing was dispatched or written",
+            ));
+        }
+        let id = record.job_id.clone();
+        if !record.session_publication().is_some_and(|marker| {
+            unbound_source_failure(marker)
+                && marker["sessionID"] == format!("session-{id}")
+                && marker["catalogDigest"] == record.catalog_digest()
+        }) {
+            // A preceding retry's settled receipt is answered as it stands.
+            // This path does not settle or repair a capability use.
+            return Ok(record.status());
+        }
         let directory = self
             .jobs
             .job_directory(&id)
             .map_err(|error| other(format!("{error:?}")))?;
-        let replay = inspect_journal(&directory).map_err(|error| other(format!("{error}")))?;
+        let journal = JournalWriter::open_without_repair(&directory)
+            .map_err(|error| other(format!("{error}")))?;
+        let bytes = arkdeck_platform::HostDirectory::open(&directory)
+            .and_then(|directory| directory.read_without_repair("journal.jsonl", 64 * 1024 * 1024))
+            .map_err(|error| other(format!("{error}")))?;
+        let events = bytes
+            .split(|byte| *byte == b'\n')
+            .filter(|line| !line.is_empty())
+            .map(|line| {
+                crate::job_journal::JournalEvent::decode(line)
+                    .map(|event| event.value().clone())
+                    .map_err(|error| other(format!("{error:?}")))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if events
+            .iter()
+            .any(|event| event["jobId"] != id || event["sessionId"] != format!("session-{id}"))
+        {
+            return Err(refused(
+                "rejected",
+                "the original publication Journal names another owner; nothing was dispatched or written",
+            ));
+        }
+        let replay = journal.facts();
         let proposal_absent = matches!(
             std::fs::symlink_metadata(directory.join(PROPOSAL)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound
         );
         if replay.requires_recovery
+            || replay.has_torn_tail
+            || !replay.outstanding_intents.is_empty()
+            || !replay.unknown_outcomes.is_empty()
+            || replay.requires_unknown_finalized_outcome
             || replay.finalized
             || replay.current_state.as_deref() != Some(record.state.as_str())
             || !proposal_absent
         {
             return Ok(record.status());
         }
-        Held::open(record, directory, self.now)?.release(self.jobs, self.sessions)
+        let sequence = replay.last_durable_sequence.map_or(0, |last| last + 1);
+        Held {
+            stored: record.clone(),
+            run: Run {
+                record,
+                journal,
+                sequence,
+                now: self.now,
+                consumed: None,
+                workspace_publication_plan: None,
+            },
+            directory,
+            ahead: false,
+        }
+        .release(
+            self.jobs,
+            self.sessions,
+            self.runner.and_then(JobRunner::workspace_session_context),
+        )
     }
 
     /// Swift's resident branch of `reconcileOwned` for a Job that is not
@@ -785,7 +874,11 @@ impl JobReconciler<'_> {
                 .map_err(|error| other(format!("{error:?}")))?;
             let mut held = Held::open(record, directory, self.now)?;
             self.finalize_hap_failure(&mut held)?;
-            return held.release(self.jobs, self.sessions);
+            return held.release(
+                self.jobs,
+                self.sessions,
+                self.runner.and_then(JobRunner::workspace_session_context),
+            );
         }
         let settles = matches!(
             record.state.as_str(),
@@ -806,7 +899,11 @@ impl JobReconciler<'_> {
         };
         match result {
             Ok(Some(status)) => Ok(status),
-            Ok(None) => held.release(self.jobs, self.sessions),
+            Ok(None) => held.release(
+                self.jobs,
+                self.sessions,
+                self.runner.and_then(JobRunner::workspace_session_context),
+            ),
             Err(error) => {
                 if held.ahead {
                     self.jobs.hold_resident(held.stored);
