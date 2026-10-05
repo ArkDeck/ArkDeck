@@ -38,6 +38,8 @@ status`, each with `--output json`.
 
 `runtime health` is the Runtime's Catalog digest. The Rust `operation list` answers a bare array
 with no digest.
+The canonical operation comparison excludes descriptors with `aliasFor`, while the
+Catalog digest continues to cover every descriptor, including aliases.
 
 ### Execution IDs
 
