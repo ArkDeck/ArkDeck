@@ -48,6 +48,10 @@ mod loopback_ports {
 }
 use loopback_ports::free_port;
 
+mod capability_schema {
+    include!("../../../tests/support/agent_execution_capability_schema.rs");
+}
+
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures")
@@ -320,16 +324,7 @@ fn publishes_capability_without_artifact(method: &str) -> bool {
         .find(|(name, _)| *name == method)
         .unwrap();
     let schema: Value = serde_json::from_str(schema).unwrap();
-    let authority = &schema["$defs"]["result"]["properties"]["evidence"]["properties"]["authority"];
-    let branches = match authority["anyOf"].as_array() {
-        Some(branches) => branches.clone(),
-        None => vec![authority.clone()],
-    };
-    branches.iter().any(|branch| {
-        branch["properties"]["artifactDigest"]["type"]
-            .as_array()
-            .is_some_and(|types| types.contains(&json!("null")))
-    })
+    capability_schema::publishes_capability_without_artifact(&schema)
 }
 
 /// The daemon's refusal of its own answer, as the CLI prints it.
