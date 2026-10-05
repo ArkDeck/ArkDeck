@@ -21,6 +21,7 @@ round composed it. A criterion is never dropped for that.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 
@@ -100,8 +101,9 @@ class Context:
         count: int | None = None,
     ) -> tuple[Step | None, dict[str, bytes]]:
         """`job result` for the Job: its terminal state, no unknown, no
-        blocker, no residue, and every Artifact read back whole and matching
-        its published digest."""
+        blocker, no residue, and every published Artifact read back whole and
+        matching its inventory digest and byte count. Intentionally omitted
+        declarations remain in the inventory without pretending to hold bytes."""
         judge = self.judge
         step = self.run.job_result(job)
         if step is None:
@@ -112,6 +114,9 @@ class Context:
         judge.expect(f"{label}: terminalState", evidence.get("terminalState"), terminal, step)
         judge.expect(f"{label}: outcomeUnknown", evidence.get("outcomeUnknown"), False, step)
         if terminal == "succeeded":
+            judge.expect(f"{label}: evidence status", evidence.get("status"), "verified", step)
+            judge.that(f"{label}: inventory available", evidence.get("inventoryAvailable") is True,
+                       evidence.get("inventoryAvailable"), step)
             judge.expect(f"{label}: blockers", evidence.get("blockers"), [], step)
             judge.expect(
                 f"{label}: missingRequiredArtifacts", evidence.get("missingRequiredArtifacts"), [], step
@@ -120,21 +125,44 @@ class Context:
         artifacts = step.result.get("artifacts") or []
         if count is not None:
             judge.expect(f"{label}: Artifact count", len(artifacts), count, step)
-        names = [a.get("name") for a in artifacts]
+        reads = self.run.of("artifact.read", lambda s: s.option("--job") == job)
+        published = []
+        for artifact in artifacts:
+            name = artifact.get("name")
+            state = artifact.get("status")
+            if state == "published":
+                published.append(artifact)
+            elif state == "missing":
+                judge.that(
+                    f"{label}: {name} missing declaration has no bytes",
+                    artifact.get("byteCount") == "0" and artifact.get("sha256") == ""
+                    and artifact.get("bytesVerified") is False
+                    and not any(s.ok and s.result.get("artifactId") == artifact.get("artifactId") for s in reads),
+                    {key: artifact.get(key) for key in ("status", "byteCount", "sha256", "bytesVerified")},
+                    step,
+                )
+            else:
+                judge.that(f"{label}: {name} publication status", False, state, step)
+        names = [a.get("name") for a in published]
         for name in required:
             judge.that(f"{label}: Artifact {name} published", name in names, sorted(map(str, names)), step)
         contents: dict[str, bytes] = {}
-        reads = self.run.of("artifact.read", lambda s: s.option("--job") == job)
-        for artifact in artifacts:
+        for artifact in published:
             name = artifact.get("name")
             identifier = artifact.get("artifactId")
-            judge.expect(f"{label}: {name} bytesVerified", artifact.get("bytesVerified"), True, step)
+            judge.that(f"{label}: {name} bytesVerified", artifact.get("bytesVerified") is True,
+                       artifact.get("bytesVerified"), step)
             data = self.run.artifact_bytes(identifier) if isinstance(identifier, str) else None
             if data is None and not any(s.result.get("artifactId") == identifier for s in reads):
                 judge.missing(f"{label}: {name} read", f"artifact read --job {job} --artifact {identifier}")
                 continue
-            judge.that(f"{label}: {name} read whole and digest-checked", data is not None, None, *reads)
-            if data is not None:
+            matches = data is not None and (
+                artifact.get("bytesVerified") is True
+                and artifact.get("byteCount") == str(len(data))
+                and artifact.get("sha256") == hashlib.sha256(data).hexdigest()
+            )
+            judge.that(f"{label}: {name} read whole and digest-checked", matches, None, *reads)
+            if matches:
                 contents[name] = data
         for name in non_empty:
             if name in contents:
