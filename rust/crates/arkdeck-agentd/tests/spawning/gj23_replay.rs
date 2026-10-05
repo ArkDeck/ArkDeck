@@ -95,7 +95,7 @@ fn set_mode(root: &Path, mode: &str) {
 /// The Runtime's answer behind the CLI's envelope: the result, or the
 /// Runtime's refusal (its wire code, words and details, without the method
 /// and wire code the CLI adds).
-fn wire(envelope: &Value) -> Value {
+pub(crate) fn wire(envelope: &Value) -> Value {
     if envelope["ok"] == true {
         return json!({"ok": true, "result": envelope["result"]});
     }
