@@ -74,6 +74,17 @@ methods and 1080 recorded shapes; no producer frame was fabricated and no oracle
 was re-pinned. Existing agent next-action and HDC signature equality assertions
 remain intact, with semantic traversal of their own result alternatives.
 
+`check-contracts.py` also compiles current test sources against immutable
+merge-base schemas. If that published view rejects the newly issued selection
+challenge, the signed fixture asserts the exact `internalError` conformance
+reply before console review or consumption. The waiting action's immutable
+projection stays identical; only challenge issuance's generation and observation
+time advance. A further select repeat is fully identical, dispatch remains zero,
+the original tool stays selected at generation one and no `kill -r` occurs.
+This branch requires both published-view metadata and an actual refused reply;
+checkout/candidate views retain every selected/restart assertion above, and a
+published view that already represents the challenge runs that full path too.
+
 ## Local targeted checks
 
 Environment: `CARGO_TARGET_DIR=D:/cargo-target/tool-select`,
@@ -94,6 +105,14 @@ under `D:/src/ArkDeck-wt/tools/logs/` and remain local.
 | `sh scripts/check-sdd.sh` through the installed Git shell | 0 | `tool-select-sdd-check.log` |
 
 `git diff --check` also passed (exit zero).
+
+The published-view assertion follow-up reran only the candidate signed account
+suite (three tests, exit zero; `tool-select-account-published-followup-candidate.log`),
+spawning-target clippy with `-D warnings` (exit zero;
+`tool-select-published-followup-clippy.log`) and formatting (exit zero;
+`tool-select-published-followup-fmt.log`). The integration owner runs the same
+source in the task-owned published input view; this subtask did not run the full
+parity lane or claim a published-view pass.
 
 Generation used `generate-control-contract.py --derive-method-schemas` with the
 committed ControlFrames directory, `rust/scripts/generate-contract.py --write`,

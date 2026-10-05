@@ -44,7 +44,7 @@
 use crate::host::Host;
 use crate::signed_daemon::signed_copy;
 use crate::windows_lifecycle;
-use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION};
+use arkdeck_contract::{CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION};
 use arkdeck_control::Control;
 use arkdeck_platform::{InstanceScope, StarterLock};
 use serde_json::Value;
@@ -68,6 +68,13 @@ const CHILD: &str = "account_tool_selection::the_signed_account_daemon";
 const DRAIN_DEADLINE: Duration = Duration::from_secs(20);
 const CONNECTION_IDLE: Duration = Duration::from_secs(20);
 const DEADLINE: Duration = Duration::from_secs(120);
+
+/// The current implementation compiled against check-contracts' immutable
+/// merge-base inputs, which may predate the tool-selection resume result.
+fn published_view() -> bool {
+    let inputs: Value = serde_json::from_str(CONTRACT_INPUTS).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
 
 /// A stand-in HDC compiled at test time: `-s <endpoint> -m` listens on the
 /// endpoint until it is ended; `-s <endpoint> checkserver` answers agreeing
@@ -481,6 +488,76 @@ fn the_signed_cli_selects_a_candidate_and_reads_the_settled_selection_after_rest
     let approved: Value =
         serde_json::from_str(response.trim_start_matches("arkdeck-fixture selection approval "))
             .unwrap();
+    if published_view() && approved["ok"] == false {
+        // The owner persisted a challenge, but Control refuses the result
+        // under an old schema before the CLI reviewer or consumption runs.
+        assert_eq!(
+            approved,
+            serde_json::json!({
+                "id":"fixture-selection-approval","ok":false,
+                "error":{"code":"internalError", "message":"the result does not conform to the current contract"}
+            })
+        );
+        let (status, unchanged) = daemon.cli(&select);
+        assert_eq!(status, Some(0), "{unchanged}");
+        assert_eq!(unchanged["result"]["state"], "awaitingImpactApproval");
+        assert_eq!(unchanged["result"]["dispatchCount"], 0);
+        let generation = |result: &Value| {
+            result["generation"]
+                .as_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap()
+        };
+        assert_eq!(
+            generation(&unchanged["result"]),
+            generation(&waiting["result"]) + 1
+        );
+        assert!(
+            unchanged["result"]["lastObservedAt"].as_str().unwrap()
+                >= waiting["result"]["lastObservedAt"].as_str().unwrap()
+        );
+        let mut immutable = unchanged["result"].clone();
+        // Challenge issuance advances only these two bookkeeping fields.
+        immutable["generation"] = waiting["result"]["generation"].clone();
+        immutable["lastObservedAt"] = waiting["result"]["lastObservedAt"].clone();
+        assert_eq!(immutable, waiting["result"], "{unchanged}");
+        let (status, repeated) = daemon.cli(&select);
+        assert_eq!(status, Some(0), "{repeated}");
+        assert_eq!(repeated["result"], unchanged["result"], "{repeated}");
+        let (status, listed) = daemon.cli(&["runtime", "tool", "list"]);
+        assert_eq!(status, Some(0), "{listed}");
+        let rows = listed["result"]["items"].as_array().unwrap();
+        assert_eq!(rows.len(), 2, "{listed}");
+        let active: Vec<_> = rows.iter().filter(|row| row["selected"] == true).collect();
+        assert_eq!(active.len(), 1, "{listed}");
+        assert_eq!(
+            active[0]["toolRef"],
+            waiting["result"]["preview"]["oldTool"]["toolRef"]
+        );
+        assert_eq!(active[0]["executableSHA256"], hashes[0]);
+        assert_eq!(active[0]["activeSelectionGeneration"], "1");
+        let candidate = rows.iter().find(|row| row["toolRef"] == candidate).unwrap();
+        assert_eq!(candidate["selected"], false, "{listed}");
+        daemon.stop();
+        let calls = std::fs::read_to_string(scratch.join("stand-in-calls")).unwrap();
+        assert_eq!(
+            calls
+                .lines()
+                .filter(|line| line.ends_with("kill -r"))
+                .count(),
+            0,
+            "{calls}"
+        );
+        assert!(
+            calls
+                .lines()
+                .all(|line| line.starts_with("-s ") || line == "list targets -v"),
+            "{calls}"
+        );
+        let _ = std::fs::remove_dir_all(&scratch);
+        return;
+    }
     assert_eq!(approved["ok"], true, "{approved}");
     assert_eq!(approved["result"]["state"], "outcomeUnknown", "{approved}");
     assert_eq!(approved["result"]["dispatchCount"], 1, "{approved}");
