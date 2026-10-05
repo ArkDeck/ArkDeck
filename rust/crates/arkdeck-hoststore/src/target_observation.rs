@@ -349,6 +349,59 @@ impl TargetObservations {
         Ok(adopted)
     }
 
+    /// `device.display-name.set` (`name`) and `.clear` (`None`) over this
+    /// owner's current snapshot, as the Host's provider snapshot answers
+    /// them: the reference must be an exact observation of the snapshot's
+    /// own generation, every observation of which is the name owner's active
+    /// set (`TargetStore::mutate_candidate` refuses anything else, an adopted
+    /// candidate included), and a name written advances the snapshot to the
+    /// generation it was written at, its names read again. `None` when there
+    /// is no current snapshot; an unknown outcome discards the snapshot, so
+    /// the next reading mints new identities.
+    pub fn name_candidate(
+        &self,
+        targets: &TargetStore,
+        reference: &ObservationReference,
+        name: Option<&str>,
+        now: &str,
+    ) -> Option<Result<Value, WireError>> {
+        let mut state = match self.lock() {
+            Ok(state) => state,
+            Err(error) => return Some(Err(error.wire())),
+        };
+        let latest = state.latest.clone()?;
+        let active: Vec<ObservationReference> = latest
+            .observations
+            .iter()
+            .map(|observation| observation.reference(latest.generation))
+            .collect();
+        let value = match targets.mutate_candidate(reference, &active, name, now) {
+            Ok(value) => value,
+            Err(error) => {
+                if error.code == "outcomeUnknown" {
+                    state.latest = None;
+                }
+                return Some(Err(error));
+            }
+        };
+        // The store wrote every active name at the next generation.
+        let next = latest.generation + 1;
+        let names = match Self::names(targets, &latest.observations, next) {
+            Ok(names) => names,
+            Err(error) => {
+                state.latest = None;
+                return Some(Err(error.wire()));
+            }
+        };
+        state.latest = Some(Snapshot {
+            generation: next,
+            names,
+            ..latest
+        });
+        state.last_generation = next;
+        Some(Ok(value))
+    }
+
     fn lock(&self) -> Result<std::sync::MutexGuard<'_, State>, ObservationError> {
         self.state
             .lock()

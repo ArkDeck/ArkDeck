@@ -6,7 +6,10 @@ Source: `openspec/contracts/cli-feature-coverage.json` on `main` after #2541, #2
 `deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves);
 `device.observations`, `target.availability` and `trace.probe` (TASK-XPA-005 device reads);
 `runtime.hdc.status`, `.impact-preview`, `.restart` and `control-action.list`, `.show`,
-`.reconcile` (TASK-XPA-005, live with the registered `hdc.exe`). A feature is `implemented` on Windows only
+`.reconcile` (TASK-XPA-005, live with the registered `hdc.exe`);
+`device.display-name.set` and `.clear` (TASK-XPA-005: a defect fixed by the lead's delegated
+decision of 2026-10-05, pending the next rulings batch: the Host's candidate name owner now names a
+candidate in the composed Target observation owner's current observation). A feature is `implemented` on Windows only
 when each CLI leaf it reaches is in `WINDOWS_MEASURED_LEAVES` (a signed-CLI process test on
 Windows); a generic leaf (`agent run`, `agent resume`, `human-action resume`, `job plan|submit|run`)
 is counted only once every operation it reaches answers on Windows as Swift does (lead's ruling of
@@ -26,7 +29,6 @@ board window), **now** (Swift-oracle parity work we can do now), **ruling** (nee
 
 | Feature (CLI leaf) | GJ | Class | Blocker, and the oracle that would measure it |
 | --- | --- | --- | --- |
-| `device.display-name.set`, `.clear` | 1 | ruling | No Swift oracle records them. Through the composed Target observation owner (Windows' registered tuple, macOS' development HDC alike) the Host's candidate name owner reads only the legacy provider's snapshot, which that path never retains, so both refuse with `resourceConflict` "No current observation snapshot exists" (seen through the signed CLI, `gj1_device_reads.rs`). Fixing it changes shared Host behaviour without an oracle to hold it to |
 | `input.tap@1`, `input.swipe@1`, `input.long-press@1` | 1 | now | `pointer-input` oracle; needs fake answers for it |
 | `input.keyboard@1` | 1 | now | No Swift oracle (keyboard input lands with #2473 on macOS); measure against the macOS Rust answers once it merges |
 | `capture.screen-sequence@1` (`screen record`) | 1 | now | `screen-sequence` oracle; needs fake answers |
