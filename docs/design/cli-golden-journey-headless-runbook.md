@@ -92,8 +92,11 @@ LaunchAgent 注入，不是当前 Runtime-owned workspace 注册。用当前拼�
 - GJ-2：已签名单入口 HAP（08-28 记录用的同一包可复用），`bundleName`/`abilityName`；
 - GJ-3：已签名 `armeabi-v7a` `.so`（见 `arkdeck-gj3` 记录）、`targetBundle`、
   `libraryLogicalName`；
-- GJ-4：`OpenHarmony-7.0.0.37` 归档，SHA-256
-  `4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674`（730 783 514 字节）；
+- GJ-4：已发布 DAYU200 profile 支持的 OpenHarmony 镜像归档，保留所选归档的 SHA-256、
+  字节数与 Runtime import receipt；版本由该归档内 `system.img` 的声明得到，不以文件名、
+  caller 输入或设备当前版本代替。原 `OpenHarmony-7.0.0.37`、SHA-256
+  `4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674`（730 783 514 字节）
+  是历史 macOS 输入，不是单一版本准入 pin。
   实际 import lease、设备身份、binding 与 full-restore plan 由 Runtime 准入时核对，
   归档存在或人工同意本身均不授权刷机；
 - GJ-5：已注册的 `openharmony` 项目与 build/signing preset（`workspace project list`、
@@ -262,9 +265,9 @@ arkdeck flash bootloader-status --output json
 arkdeck flash prerequisites --target <TGT> --device-profile dayu200 --output json
 arkdeck flash install-binding --output json
 arkdeck artifact import flash-bundle --import-request-id gj4-<date> --target <TGT> \
-  --file inputs/OpenHarmony-7.0.0.37.tar.gz --device-profile dayu200 --output json
+  --file inputs/<selected-image>.tar.gz --device-profile dayu200 --output json
 arkdeck flash lane-preview --target <TGT> --device-profile dayu200 \
-  --archive-sha256 4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674 --output json
+  --archive-sha256 <selected-archive-sha256> --output json
 arkdeck flash bind-loader --target <TGT> --expected-binding-revision <n> --output json
 ```
 
@@ -324,8 +327,16 @@ arkdeck job evidence --job <job-id> --output json
 `--arkforge-campaign`，读回 `campaign: ""`；两项都省略会保留旧值，字符串 `none` 也不是清除值。
 
 判据：当前 Job evidence 的 `actualStepKinds` 含 `waitForReconnect`/`probeDevice`/`flashPartition`/`verifyRemoteState`/
-`rebootDevice`/`captureRemoteStdout`；machine readback 为 `OpenHarmony-7.0.0.37`；
+`rebootDevice`/`captureRemoteStdout`；machine readback、`post-flash-facts.json` 与独立
+postflight observe 的版本必须精确等于实际 consumed archive 内的声明版本；
 `outcomeUnknown == false`、`humanActions == []`、`outstandingResidueCount == 0`。
+通过 `gj_record capture` 留存 `artifact import inspect --import <consumed-import-id>`，
+以及 `artifact read --import <consumed-import-id> --artifact <receipt-artifact-id>
+--offset <nextOffset> --max-bytes 4194304 --output json` 的全部范围直至 `eof`。
+Recorder 将 whole SHA/字节数、lease、原 target/binding 与完整消费 audit 绑定后，
+从镜像内派生版本；声明缺失、矛盾或字节证明不完整时不产生 PASS。
+这只修正 GJ-4 的版本来源，不改变 profile、AF-W1、已验证 Windows bundle、显式
+HardwareCampaign、fresh facts、完整 plan 或 RuntimeCapability 门，也不声明本轮硬件已通过。
 随后完成 §6 的「重新发现并接管设备 → 恢复正常 Debug Runtime」：
 
 ```text

@@ -660,14 +660,20 @@ Never:
     `ARKDECK_ARKFORGE_PROFILE_PATH` are refused at the start.
   - Without a campaign, the lane is assessment-only (`hardwareGated`) and nothing flashes.
   - To end the staging, clear `ARKDECK_ARKFORGE_CAMPAIGN`, restart, and read back.
-- **Input (maintainer supplies):** `OpenHarmony-7.0.0.37` archive, SHA-256
-  `4fd35765…c674` (730 783 514 bytes).
+- **Input:** one archive supported by the published DAYU200 profile. Record the
+  selected file's complete SHA-256 and byte count for this window; OpenHarmony
+  `7.0.0.37` is the historical fixture, not a version restriction. The selected
+  version must come from `system.img` in whole SHA/count-checked Runtime reads
+  of the committed import consumed by the flash Job. Missing or conflicting
+  image declarations stop acceptance; a filename or caller-supplied version
+  cannot substitute. AF-W1, the validated Windows bundle and the maintainer's
+  HardwareCampaign authorization remain required before destructive dispatch.
 - **Agent:** headless runbook §5:
   1. `flash device-access`, `flash bootloader-status`, `flash prerequisites --target <TGT>
      --device-profile dayu200`.
   2. **`flash install-binding`: see G4.**
   3. `artifact import flash-bundle … --device-profile dayu200`.
-  4. `flash lane-preview … --archive-sha256 4fd35765…c674`.
+  4. `flash lane-preview … --archive-sha256 <selected-archive-sha256>`.
   5. `flash bind-loader --target <TGT> --expected-binding-revision <n>`.
   6. `gj4.json`, then `agent run --operation flash.full-restore@1 --target <TGT> --inputs-file
      gj4.json --execution-id gj4-<date> --maximum-wait 30m`. **Destructive**: the Runtime
@@ -675,6 +681,9 @@ Never:
   7. `job wait`, `job evidence`.
   8. Postflight: `device candidates`, `target show` (record the new binding revision),
      `agent run --operation observe.device@1`.
+     Flash machine readback, `post-flash-facts.json` and this independent observation
+     must all report the exact version declared by the consumed image. Preserve
+     their complete Runtime products and the imported archive reads for the recorder.
 - **Maintainer during the run:**
   - Board physical actions only when the Runtime publishes a human action. Each is consumed with
     `agent resume`.

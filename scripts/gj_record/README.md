@@ -67,6 +67,11 @@ Executions are found by the IDs the runbook gives them. `<d>` is the record date
   after the resume.
 - `runtime service restart`, then `job show` and `job result` for both GJ-1 Jobs.
 - `target show` before and after the replug.
+- GJ-4's `artifact import inspect --import <consumed-import-id>` and every
+  `artifact read --import <consumed-import-id> --artifact <receipt-artifact-id>
+  --offset <nextOffset> --max-bytes 4194304` range through `eof`. These captured
+  Runtime bytes must match the original flash Job's consumed lease, target,
+  binding, authority Artifact digest and the receipt's whole SHA/count.
 - GJ-5's negative case: every `job list --page-size 1000` page directly before and directly after
   it.
 
@@ -134,6 +139,24 @@ publish, the criterion reads the execution that does. The criterion itself is ne
   composed them.
 - **GJ-5.** Liveness and the crash index come from `-repro-capture` and `-verify-capture`.
   "Exactly one new crash-index entry" is counted against `-baseline`.
+- **GJ-4.** No firmware version is hard-pinned. The version witness is the unique
+  `const.ohos.fullname=` declaration in `system.img` inside the consumed archive's
+  whole captured Runtime bytes. Machine readback, both `firmware` and
+  `const.ohos.fullname` in `post-flash-facts.json`, and the
+  independent postflight observe must equal it. Missing proof stays incomplete;
+  inconsistent receipt/consumption/bytes or malformed/ambiguous declarations fail.
+  Filenames, caller values and the device's existing version are never witnesses.
+  The flash import cap is 8 GiB, each decoded chunk is at most 4 MiB, and gzip/tar
+  scanning is bounded by 64 GiB expanded bytes and 1,024 plain regular members.
+  No archive is extracted or run. Identical refreshed ranges are accepted; any
+  changed duplicate or refused read fails. Existing journal loading retains the
+  captured JSON replies in memory; this reader does not join their decoded image
+  bytes. The public `flashImage` holds only derived profile, archive SHA/count and
+  version. Runtime profile, AF-W1, validated bundle, HardwareCampaign and destructive
+  admission gates remain prerequisites.
+  The exact ArkForge flash observation uses its declared provider/tool provenance;
+  its tool SHA is not compared with HDC. Every HDC observation still requires the
+  registered HDC SHA; a wrong flash operation/provider/tool/target/binding refuses.
 - **GJ-3 rollback fixture (G3).** The fixture applies to the current Target only when all of
   these hold:
   - its import is the pinned digest (`ROLLBACK_FIXTURE_SHA256`);

@@ -619,13 +619,10 @@ class LaterJourneyTests(Case):
         self.assertEqual(failing["criterion"], f"gj3-{D}-rollback: atomic-publish verified")
 
     def test_gj4_reads_the_step_kinds_and_the_machine_readback(self):
+        from gj_record.test_flash_image import append_journey
+
         self.journal.facts()
-        facts = json.dumps({"firmware": record.GJ4_FIRMWARE}).encode()
-        report = json.dumps({"completeness": "complete", "missingRequired": []}).encode()
-        self.journal.job(f"gj4-{D}", "flash.full-restore@1", {"flash-report.json": report, "post-flash-facts.json": facts},
-                         kinds=list(journeys.FLASH_STEP_KINDS),
-                         observation={"firmware": record.GJ4_FIRMWARE, "confirmationMethod": "machineReadback"})
-        self.journal.job(f"gj4-{D}-postflight", "observe.device@1", {})
+        append_journey(self.journal)
         journey = self.journey(self.assemble(names=("GJ-4",)), "GJ-4")
         self.assertEqual(journey["state"], PASS, journey.get("firstFailingCriterion"))
 
