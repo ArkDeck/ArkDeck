@@ -564,7 +564,7 @@
     "Catalog/profiles": "b385e1efc8f3a3af52770c02d8885340e2cf4b206e84ad6fe3f7903f10cebd80",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "a0a16fc2f4d7d0c46f9efeee79d9c779ac084bb64858ed82d7c1786d1f40b52c",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "3f2b201b5ef9f1485b504dfc247db8e5359c69c35d2077d6bf0ff3700690d601"
+    "spec/control/methods": "79e91ff30ccd5fbcaf53074a7717249bcfb47cbaf3f45da7a385f8a447fd0fc6"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1760,24 +1760,24 @@
       "sha256": "4e55e422ba93f05edb9a28267ba12740fca42c3326d3e99d038aa17b2ce46e73"
     },
     "spec/control/methods/workspace.preset.list.json": {
-      "blob": "e5827c728c8901b3864a7c5465ee48fa793576e4",
-      "sha256": "c35ad6bc35cbe908ae5888bade29327af55626fb2c0b9978a7f09a56f8863714"
+      "blob": "658c8cb590fb0cab8952630d07dbab16e11336c0",
+      "sha256": "85ed2de1f20f459d10778383e97c4cb0d38c2ac4c4c1b48af449af17d55b6310"
     },
     "spec/control/methods/workspace.preset.register.json": {
       "blob": "34e311b0d380537cc96823346bc379af04b96f44",
       "sha256": "af5a55773a8f53574da0cb3ab80cfc06513c2864437c98db68062187cdac6753"
     },
     "spec/control/methods/workspace.preset.remove.json": {
-      "blob": "830fa2632f9607935b183087e00bdbdc2a3ca8f3",
-      "sha256": "7cad86c03e975af3e3b92f850cc205ca700e046ee44b91ea20b6aba5417de998"
+      "blob": "e19ec61a0183fa4fb00d2550e83c07f5cd23f8b7",
+      "sha256": "3ab86d978bfe14d076c995c886131d99f46aa40a07d6dda8ee274e4e0886c597"
     },
     "spec/control/methods/workspace.preset.show.json": {
-      "blob": "a903db34057feead56a790af1150ca63791fda46",
-      "sha256": "4e471b3f1badb8acc26d521b70ae3357c94e53a52d2bc956a5a4f5edea9ccb9b"
+      "blob": "ac3f35238cac179c4e39637bf1de7cb000aca2d6",
+      "sha256": "8917476240d2e216a92f5fb4d50f0ee2c0430be59f84d8fbcc000874a150f1d7"
     },
     "spec/control/methods/workspace.preset.update.json": {
-      "blob": "590bf42ce8bdc20d51afafdd7c70121ae0f2fd9d",
-      "sha256": "aeae54512f64bae7acf537743077680788d5e7f727449692d4a14d458d94c1d9"
+      "blob": "4ae3116bb2831c9c8c71cd8781bf9cce6eb179d5",
+      "sha256": "de547416d361c70703f04b3fb2b152215273edd5866d2bad6fccd1e87473557c"
     },
     "spec/control/methods/workspace.project.list.json": {
       "blob": "19d177a17a245dae526723af90906d9218f2a6b1",
@@ -1800,7 +1800,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "199117e5d2cc9927710da52eaa3c9718ce10d396eadb1c49c813e440b9b0594b",
+  "inputDigest": "8417a3a15d06897be78ed4653b35b87b92708af86a74677317892fad377f1b9f",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

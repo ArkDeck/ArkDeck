@@ -76,7 +76,10 @@
                 "type": "object"
               },
               "credentialRef": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "generation": {
                 "type": "string"
