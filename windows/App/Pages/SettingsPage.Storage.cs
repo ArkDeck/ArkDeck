@@ -126,6 +126,7 @@ public sealed partial class SettingsPage
             var dialog = Ui.Dialog(XamlRoot, "settings.trace.confirm", S.Text(UiStrings.WindowsSettingsTracePurge),
                 Ui.Text("settings.trace.confirm.message", S.Format(UiStrings.WindowsSettingsTracePurgeConfirm, c.InactiveEntryCount)),
                 S.Text(UiStrings.WindowsSettingsTracePurge), S.Text(UiStrings.SettingsCommonCancel));
+            dialog.DefaultButton = ContentDialogButton.Close;
             if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
             Ui.Say(status, S.Text(UiStrings.SettingsCommonWorking));
             var purged = await Task.Run(() => App.Loader.PurgeTraceCacheAsync());

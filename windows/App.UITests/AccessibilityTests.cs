@@ -36,6 +36,8 @@ public sealed class AccessibilityTests
     [
         ["overview", "jobs", Array.Empty<string>()],
         ["device", "targets", new[] { "device.target.TGT-3ba3f5f43b92" }],
+        ["device", "device-screen", new[] { "device.screen.capture" }],
+        ["device", "device-screen", new[] { "device.screen.capture", "device.keyboard.sendKey" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a003" }],
         ["settings", "targets", new[] { "settings.tab.workspace", "settings.workspace.project.project-04dfc9a54d0e77e090fbb537" }],
         ["settings", "jobs", new[] { "settings.tab.remoteSources" }],
@@ -52,6 +54,8 @@ public sealed class AccessibilityTests
         ["traceViewer", "viewer", Array.Empty<string>()],
         ["viewer", "viewer", new[] { "viewer.recapture" }],
         ["diagnostics", "jobs", Array.Empty<string>()],
+        ["diagnostics", "diagnostic-capture", new[] { "diagnostics.capture.arm" }],
+        ["diagnostics", "diagnostic-capture", new[] { "diagnostics.capture.arm", "diagnostics.capture.stop" }],
         ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics" }],
         ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openWorkspace" }],
         ["overview", "jobs", new[] { "jobInspector.row.job-0000000000000000000000000000a004" }],
@@ -69,12 +73,7 @@ public sealed class AccessibilityTests
             var start = StartPage(page, selections);
             using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", start, "--focus-walk", file]);
             app.Find(Refresh(start));
-            foreach (var id in selections.Where(s => !s.StartsWith('@')))
-            {
-                var element = app.Find(id);
-                if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
-                else element.Patterns.Invoke.Pattern.Invoke();
-            }
+            PrepareState(app, selections);
             Thread.Sleep(800);
 
             // The actions a keyboard user must reach: every button of the page.
@@ -258,6 +257,8 @@ public sealed class AccessibilityTests
         ["overview", "unavailable", Array.Empty<string>()],
         ["device", "jobs", Array.Empty<string>()],
         ["device", "targets", new[] { "device.target.TGT-3ba3f5f43b92" }],
+        ["device", "device-screen", new[] { "device.screen.capture" }],
+        ["device", "device-screen", new[] { "device.screen.capture", "device.keyboard.sendKey" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a003", "history.artifact.inspectTrace.ART-00000000000000000000000000000c01" }],
         ["history", "foundation", Array.Empty<string>()],
         ["settings", "jobs", Array.Empty<string>()],
@@ -287,6 +288,8 @@ public sealed class AccessibilityTests
         ["viewer", "viewer", new[] { "viewer.recapture" }],
         ["viewer", "targets", Array.Empty<string>()],
         ["diagnostics", "jobs", Array.Empty<string>()],
+        ["diagnostics", "diagnostic-capture", new[] { "diagnostics.capture.arm" }],
+        ["diagnostics", "diagnostic-capture", new[] { "diagnostics.capture.arm", "diagnostics.capture.stop" }],
         ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-6c545eb6042a9ea99e700467bbb77d06", "history.openDiagnostics", "diagnostics.artifact.read.hilog.txt" }],
         ["diagnostics", "diagnostics", new[] { "@history", "history.row.job-ce57f7b014978fe39492cf64043a8fc9", "history.openWorkspace" }],
         ["history", "jobs", new[] { "history.row.job-0000000000000000000000000000a002" }],
@@ -301,12 +304,7 @@ public sealed class AccessibilityTests
         var start = StartPage(page, steps);
         using var app = AppSession.Launch(exe, ["--test-transport", scenario, "--language", "en-US", "--page", start, "--text-scale", "2.25"]);
         app.Find(Refresh(start));
-        foreach (var id in steps.Where(s => !s.StartsWith('@')))
-        {
-            var element = app.Find(id);
-            if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
-            else element.Patterns.Invoke.Pattern.Invoke();
-        }
+        PrepareState(app, steps);
         Thread.Sleep(1500);
         var root = app.Find(page + ".page");
         var viewport = root.BoundingRectangle;
@@ -371,6 +369,35 @@ public sealed class AccessibilityTests
             KeyInput.Press(app.Handle, KeyInput.Escape);
         }
         SemanticSnapshotTests.WaitUntil(() => app.TryFind(dialog, TimeSpan.FromMilliseconds(200)) is null, what);
+    }
+
+    /// <summary>The new live states settle before a following action or a layout/focus walk.
+    /// Other existing selection steps retain their native SelectionItem/Invoke behavior.</summary>
+    private static void PrepareState(AppSession app, string[] steps)
+    {
+        var strings = Catalogue.Load("en-US");
+        foreach (var id in steps.Where(s => !s.StartsWith('@')))
+        {
+            var element = app.Find(id);
+            if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
+            else element.Patterns.Invoke.Pattern.Invoke();
+            switch (id)
+            {
+                case "device.screen.capture":
+                    app.WaitForName("device.screen.liveness", n => n == strings["windows.device.screen.current"]);
+                    break;
+                case "device.keyboard.sendKey":
+                    app.WaitForName("device.screen.liveness", n => n == strings["device.stale.badge"]);
+                    break;
+                case "diagnostics.capture.arm":
+                    app.WaitForName("diagnostics.capture.state", n => n == strings["diagnostics.capture.state.recording"]);
+                    break;
+                case "diagnostics.capture.stop":
+                    app.WaitForName("diagnostics.capture.state", n => n == strings["diagnostics.capture.state.closed"]);
+                    app.Find("diagnostics.session.job");
+                    break;
+            }
+        }
     }
 
     private static string Refresh(string page) => page switch
