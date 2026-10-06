@@ -26,6 +26,9 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
     private DiagnosticJobContext? _context;
     private DiagnosticsState? _state;
     private TextBlock _status = Ui.Status("diagnostics.status");
+    private readonly TextBlock _captureState = Ui.Status("diagnostics.capture.state");
+    private Panel? _captureStateOwner;
+    private string? _announcedCaptureState;
     private readonly StackPanel _preview = new() { Spacing = 6 };
     private DiagnosticReaderSelection? _selection;
     private bool _previewLoading;
@@ -199,15 +202,27 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
         if (_capture.JobId is { } jobId) panel.Children.Add(Ui.Text("diagnostics.capture.job", jobId, "ArkDeckMonoStyle"));
         if (_capture.Snapshot is { } snapshot)
         {
-            panel.Children.Add(Ui.Row(Ui.Text("diagnostics.capture.state", S.Text("diagnostics.capture.state." + snapshot.State), "ArkDeckCaptionStyle"),
-                Ui.Text("diagnostics.capture.elapsed", $"{snapshot.ElapsedMs / 1000} / {snapshot.MaximumSeconds} s", "ArkDeckMonoStyle"),
-                Ui.Text("diagnostics.capture.markCount", $"{S.Text(UiStrings.DiagnosticsCaptureMarks)}: {snapshot.Markers.Count} / {snapshot.MaximumMarkers}", "ArkDeckCaptionStyle")));
+            var row = new FlowPanel();
+            AddCaptureState(row, _capture.Phase == DiagnosticCapturePhase.Uncertain
+                ? S.Text("diagnostics.capture.phase.uncertain") : S.Text("diagnostics.capture.state." + snapshot.State));
+            row.Children.Add(Ui.Text("diagnostics.capture.elapsed", $"{snapshot.ElapsedMs / 1000} / {snapshot.MaximumSeconds} s", "ArkDeckMonoStyle"));
+            row.Children.Add(Ui.Text("diagnostics.capture.markCount", $"{S.Text(UiStrings.DiagnosticsCaptureMarks)}: {snapshot.Markers.Count} / {snapshot.MaximumMarkers}", "ArkDeckCaptionStyle"));
+            panel.Children.Add(row);
         }
-        else if (_capture.Phase != DiagnosticCapturePhase.Idle) panel.Children.Add(Ui.Text("diagnostics.capture.state", S.Text("diagnostics.capture.phase." + _capture.Phase.ToString().ToLowerInvariant()), "ArkDeckCaptionStyle"));
+        else if (_capture.Phase != DiagnosticCapturePhase.Idle) AddCaptureState(panel, S.Text("diagnostics.capture.phase." + _capture.Phase.ToString().ToLowerInvariant()));
         if (_capture.Phase == DiagnosticCapturePhase.Uncertain) panel.Children.Add(Ui.Text("diagnostics.capture.uncertain", S.Text(UiStrings.DiagnosticsCaptureUncertain), "ArkDeckCaptionStyle"));
         if (_capture.Failure is { } reason) panel.Children.Add(Ui.Text("diagnostics.capture.reasonCode", reason, "ArkDeckMonoStyle"));
         panel.Children.Add(Ui.Text("diagnostics.capture.boundary", S.Text(UiStrings.DiagnosticsCaptureBoundary), "ArkDeckCaptionStyle"));
         return panel;
+    }
+
+    private void AddCaptureState(Panel destination, string text)
+    {
+        // Parent can be null after the whole body is detached; retain the actual collection.
+        _captureStateOwner?.Children.Remove(_captureState);
+        Ui.SetText(_captureState, text);
+        destination.Children.Add(_captureState);
+        _captureStateOwner = destination;
     }
 
     private void SubscribeCapture()
@@ -224,6 +239,12 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
         // A live controller can finish in the background, but cannot replace a historical view.
         if (_history is not null) return;
         Rerender();
+        var announcement = (_capture.JobId ?? "") + ":" + _captureState.Text;
+        if (_capture.Phase != DiagnosticCapturePhase.Idle && _captureStateOwner is not null && _announcedCaptureState != announcement)
+        {
+            _announcedCaptureState = announcement;
+            Ui.Say(_captureState, _captureState.Text);
+        }
         if (_capture.CompletedContext is { } context && _completedJobOpened != context.JobId)
         {
             _completedJobOpened = context.JobId;

@@ -733,7 +733,7 @@
         {"automationId": "diagnostics.capture.arm", "origin": "macos", "role": "button", "name": ["@diagnostics.capture.arm"]},
         {"automationId": "diagnostics.capture.mark", "origin": "macos", "role": "button", "name": ["@windows.diagnostics.capture.mark"]},
         {"automationId": "diagnostics.capture.stop", "origin": "macos", "role": "button", "name": ["@diagnostics.capture.stop"]},
-        {"automationId": "diagnostics.capture.state", "origin": "windows", "role": "text", "name": ["@diagnostics.capture.state.recording"]},
+        {"automationId": "diagnostics.capture.state", "origin": "windows", "role": "text", "name": ["@diagnostics.capture.state.recording"], "live": "polite"},
         {"automationId": "diagnostics.capture.job", "origin": "windows", "role": "text", "name": ["job-859b86ab3981a6c5194e9a6c77ac9667"]},
         {"automationId": "diagnostics.capture.markCount", "origin": "windows", "role": "text", "name": ["@diagnostics.capture.marks", ": 0 / 50"]},
         {"automationId": "diagnostics.capture.boundary", "origin": "windows", "role": "text", "name": ["@diagnostics.capture.boundary"]}

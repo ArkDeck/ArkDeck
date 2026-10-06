@@ -88,7 +88,46 @@ Artifact strings were not changed. The original/final formatting hashes are reta
 executable passed (`diagnostics-sdd-20261007-direct.log`) and the closed-note check above also
 passed. No full workspace gate or hardware/Narrator acceptance was run.
 
+The first Windows CI run exposed two missing static App ownership mappings, rather than a
+Runtime admission failure. `ShellContractTests` now names only the actual fixed
+`DiagnosticCapture.cs` facade and its `ScriptedDaemon.DiagnosticCapture.cs` fixture, and adds
+the existing macOS `DiagnosticCaptureFacade` operation `capture.diagnostic-session` to its
+literal published-operation set. The forbidden-write list and all other ownership and
+literal-operation assertions remain intact. All ten `ShellContractTests` passed (exit 0,
+zero skipped; `diagnostics-shell-contract-ci-repair-20261007.log`).
+
+The live capture phase now uses one polite UIA status region and announces only changed
+Job/state pairs; elapsed and marker-count refreshes do not repeatedly announce. Uncertain
+state takes precedence over an earlier recording snapshot, and a historical context returns
+before live announcements. The exact old child collection is retained and detached before
+reattachment: after `SurfacePage` clears the body, `FrameworkElement.Parent` cannot reliably
+identify that collection. The recording semantic row explicitly requires `live=polite`.
+
+The first local notification rerun selected the previous `bin/Release` App while the affected
+project build produced `bin/x64/Release` (`diagnostics-live-state-ui-20261007.log`, three
+failures). With the current App explicitly pinned, the initial Parent-based implementation
+then failed the Recording transition and both semantic rows
+(`diagnostics-live-state-ui-current-app-20261007.log`, three failures). These logs remain;
+the checks and deadlines were not weakened. The corrected collection-owner implementation
+passed the native App build with zero warnings/errors
+(`diagnostics-live-state-owner-build-20261007.log`), the one interactive UIA flow with actual
+Recording and Closed `LiveRegionChanged` events and retained navigation/History assertions
+(`diagnostics-live-state-owner-flow-20261007.log`, one passed, zero skipped), and both
+English/Chinese recording semantic rows
+(`diagnostics-live-state-owner-semantics-20261007.log`, two passed, zero skipped). Each command
+uses `--no-restore`; the UIA reruns use `--no-build` and explicitly select the current
+`windows/App/bin/x64/Release/net10.0-windows10.0.26100.0/win-x64/ArkDeck.exe`. Local records
+retain source/output hashes. This measures native software events, not Narrator by ear or
+hardware acceptance.
+
 ## CI
 
-This dependent increment has not been published and its CI has not run. Parent checks belong
-to the parent source and do not establish validation of this increment.
+PR #2618 initial head `2d5b8d969fd971a62f07e88464fa419fd6175612` passed SDD Guard
+(37506227906 / 37506465734). Swift CI 37506228265 failed in `windows-clientkit`:
+`TheAppHoldsNoRuntimeSemantics` lacked the new facade's exact ownership mapping, and
+`TheAppSubmitsOnlyTheMacOsWorkspaceOperations` lacked the existing capture operation.
+The App test result was 226 passed, two failed, zero skipped; the full failed job log is kept
+locally as `diagnostics-ci-first-windows-job-112415615109.log`. This is a code failure, not an
+invalid load run. The mappings and live-state defect above are repaired. CI for the corrected
+head is pending; parent checks do not establish validation of this increment. Human
+maintainer review and protected-main publication remain required.
