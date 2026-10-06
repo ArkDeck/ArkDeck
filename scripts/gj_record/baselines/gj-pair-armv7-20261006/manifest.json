@@ -1,0 +1,204 @@
+{
+  "schemaVersion": "arkdeck.gj-paired-baseline/1",
+  "baselineId": "gj-pair-armv7-20261006",
+  "classification": "exactFixtureAdoptionProposal",
+  "runtimeSourceRevision": "19097bde14cb7170dc187dd99e9a01bdbf864da6",
+  "catalogDigestAtPreparation": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+  "application": {
+    "bundleName": "com.example.scrollablecomponentstatic",
+    "abilityName": "EntryAbility",
+    "apiDeclaration": {
+      "apiReleaseType": "Beta2",
+      "compileSdkType": "OpenHarmony",
+      "compileSdkVersion": "26.0.0.35",
+      "minAPIVersion": 23,
+      "minMinorAPIVersion": 0,
+      "minPatchAPIVersion": 0,
+      "targetAPIVersion": 23,
+      "targetMinorAPIVersion": 0,
+      "targetPatchAPIVersion": 0
+    }
+  },
+  "materials": {
+    "signedHap": {
+      "sha256": "ec5ce24958a16047c784a4af0f2197db86009abe1a3fbb193363a8bdd825e4bf",
+      "byteCount": 130336
+    },
+    "packagedNative": {
+      "member": "libs/armeabi-v7a/libarkdeck_gj.so",
+      "sha256": "907780120312af191be7cd268953c01d5daf5b5d488aa71e6403594d46ef0c59",
+      "byteCount": 11372,
+      "buildId": "190ff6e600ab47b61df382ecf32da3cdcabf588c",
+      "codeSign": null,
+      "originalElfPrefixUnchanged": true
+    },
+    "candidate": {
+      "sha256": "078b569e5cf94ac9c58d505b47f0ccece056c08c80ed8d67bb473f2ec8861f2a",
+      "byteCount": 26401,
+      "abi": "armeabi-v7a",
+      "elfClassBits": 32,
+      "machine": 40,
+      "buildId": "ff436a89ce4019608245dd99dfc5ada3836abfd7",
+      "sdkElfSignatureVerified": true,
+      "sourceSha256": "3e9f744e374856c1ec66cb474589f830441f6fb48ff8f1aad26c1e9617c03c29",
+      "sourceByteCount": 11388
+    },
+    "ghost-proposal": {
+      "sha256": "01d4e785ceec23a3873f67b4ec5035c0bfa469139596f88bfb96dd91dae840ae",
+      "byteCount": 26401,
+      "abi": "armeabi-v7a",
+      "elfClassBits": 32,
+      "machine": 40,
+      "buildId": "22bc90108a70bb0f3c3ac1791225702349b94e20",
+      "sdkElfSignatureVerified": true,
+      "sourceSha256": "9c51fef8fcdcd0efb228a6c9594cd0a4d83f690894c5ae8d2aeb804f7cac70eb",
+      "sourceByteCount": 11412
+    }
+  },
+  "signatureProvenance": {
+    "signedProfile": "b816e3e1f8c150c2aa1ac7043733aee8efc609c899f5c2c8d4896faebea9c897",
+    "appCertificate": "b5c1d6254faa91eab645a32fc3ce136128c94d88a739a0e956e6a49b331387e5",
+    "javaExecutable": "c89e9f37bc9d3756da01d19e26fde006e78d921a114c8aa0247a9b5ea8f4e189",
+    "signerJAR": "9cee965bb292080a0d29fb48450091f5dcc9d010bb18da39175f581ffed7c4f4"
+  },
+  "provenanceMatchesAcrossThreeMaterials": true,
+  "profileAppIdentifierPresent": false,
+  "unsignedHapSource": {
+    "sha256": "732968841655e160d1c2bb3c81e4e625be43921e427f55ee1bae18fd0d5cff84",
+    "byteCount": 91033,
+    "sourceInventorySha256": "872436088f11245ccb008bb87bcc1d7d50b3279374dbfe0d6fab9b4a6bbef591"
+  },
+  "sourceFiles": [
+    {
+      "repositoryRelativePath": "source/paired-hap/AppScope/app.json5",
+      "byteCount": 258,
+      "sha256": "15bc184fc7be2da3afea2dabae572d79b2ac1ec2347150276746017c98ea92ca"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/AppScope/resources/base/element/string.json",
+      "byteCount": 80,
+      "sha256": "4dcf6dea30ce8249239e6ab347f521d46f06056cc1fb21dec5185991d7386d70"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/AppScope/resources/base/media/app_icon.svg",
+      "byteCount": 204,
+      "sha256": "7d754d1f40691fa45c7a6cd741bc9c6337f6ed439d4b01992526503d87e51250"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/build-profile.json5",
+      "byteCount": 410,
+      "sha256": "3baacc5ffce2cda0c50aac36025e92d00daa23db8d8a507904aa6774a250c45a"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/build-profile.json5",
+      "byteCount": 223,
+      "sha256": "a94a817dabeb99ccd20dd2241e78efde09e975b346a5c42947de1550333b4f9c"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/hvigorfile.ts",
+      "byteCount": 104,
+      "sha256": "ac6e20686b93c3aedcb0a9d99c76f87f4552c3a6a94d9f0d7ffe5103dea89864"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/oh-package.json5",
+      "byteCount": 210,
+      "sha256": "01bac7c933003bc5c7620c49942f83ad6223176a48dc2a2339bf144c7dea4be9"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/ets/entryability/EntryAbility.ets",
+      "byteCount": 900,
+      "sha256": "4d81dc81adf41a46ef666032b04e9f90838e83a644c244a5aa6309c16b71a178"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/ets/pages/Index.ets",
+      "byteCount": 1404,
+      "sha256": "33f8953e26e2cc51834c180a024e37f7fcfca382abbcf53a32caea64551ba569"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/module.json5",
+      "byteCount": 826,
+      "sha256": "0454d1edfee6b933ce27be0666e17fa7ab313f58b9188fc12390105d797f985b"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/native-types/libarkdeck_gj/Index.d.ts",
+      "byteCount": 94,
+      "sha256": "f894b3802cba4d4dbfe9cc17d55db6a0df974b0177ca1b59a631be34eac78824"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/native-types/libarkdeck_gj/oh-package.json5",
+      "byteCount": 147,
+      "sha256": "53b2c008a2fa3714bb25ee3966905d32e02d0e00c01b9caf7608ffb4bb195e99"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/resources/base/element/color.json",
+      "byteCount": 73,
+      "sha256": "be1421e24517330ecd6cf45ac9efd1d3906882000e00e03ed53535864128a3e2"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/resources/base/element/string.json",
+      "byteCount": 191,
+      "sha256": "3842986d36ece1b55543a8b8450d5540be34030a22f0370e5d61c20b85240fb9"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/entry/src/main/resources/base/profile/main_pages.json",
+      "byteCount": 27,
+      "sha256": "4ca3fb089a34d7f463b3af626b3d472b4ae5b2021c64606d272c926535fe0814"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/hvigor/hvigor-config.json5",
+      "byteCount": 164,
+      "sha256": "f684d5a3ebc5e6cb0986090e94df087b9a0840f3ef331633cb22d23a723020a2"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/hvigorfile.ts",
+      "byteCount": 104,
+      "sha256": "1065d54a286b68cdeab133b484547bacf1313724babf19836051fd680b3db2b8"
+    },
+    {
+      "repositoryRelativePath": "source/paired-hap/oh-package.json5",
+      "byteCount": 154,
+      "sha256": "3723cfe1f2973cf49c1761c6ed8591acfb625ebdfc9a4575d9fbf92e72658931"
+    },
+    {
+      "repositoryRelativePath": "source/native/arkdeck_gj.cpp",
+      "byteCount": 1944,
+      "sha256": "3e8337c0db5fa521daea1986bddca2cd679a3ffa529932b0aefa2e4eff7a2f00"
+    },
+    {
+      "repositoryRelativePath": "source/native/ghost_stub.c",
+      "byteCount": 133,
+      "sha256": "0c4233fcc4c7c5947ad6936c7b848d9cae486686e7a2c18d4c957dd3e64b29bf"
+    }
+  ],
+  "historicalInputs": {
+    "pairedHap": "a538712da8611e8857cd2c46368924ed7c1b11c150adc47626293aff92157f78",
+    "forwardComparisonOnly": "c20fcd9b29b46ae06a312aa2db6f053672fef82d80f7b482f0f90d154c80f2d3",
+    "rollbackFixture": "260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a"
+  },
+  "requiredAcceptance": [
+    "sameExactSignedBytesOnMacOSAndWindows",
+    "actualBoardPackageTrustAndInstalledArmv7Process",
+    "actualStartupNativeLoad",
+    "forwardAtomicPublishAndHashProcessAndMaps",
+    "ghostPostPublishKnownLoaderFailureAndAutomaticRollbackOnEachHost",
+    "restorePreviousWholeLibraryAndProcessWithZeroOutstandingResidue"
+  ],
+  "hardwareEvidence": false,
+  "boardTrustProved": false,
+  "macOSPairedRunComplete": false,
+  "formalAcceptance": false,
+  "publicResults": [
+    {
+      "name": "gj2-signed-pair-results-19097bde14cb.json",
+      "sha256": "d2fec490f463ea9577465b35fb076ce5c07028604750d1b41e0319112a0176f1",
+      "sourceSha256": "d935a269159b6565c2f0308fb207a8b91594d97dde3cf918eb771e88712b7557",
+      "derivation": "LF-normalized public metadata; original result retained"
+    },
+    {
+      "name": "gj3-signed-native-results-19097bde14cb.json",
+      "sha256": "484bb33c5f6cbb2d77f5683e39603e72e15a0f70e2f3606be76ab3ae7fc5a8c9",
+      "sourceSha256": "a22b76964d485cd388a55a27e4afa77736c4c46f4a2c03c3c093cf72629c0c53",
+      "derivation": "LF-normalized public metadata; original result retained"
+    }
+  ]
+}

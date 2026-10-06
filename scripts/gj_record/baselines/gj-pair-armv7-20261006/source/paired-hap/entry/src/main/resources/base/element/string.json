@@ -1,0 +1,6 @@
+{
+  "string": [
+    { "name": "module_desc", "value": "Unadopted ARMv7 native pair proposal" },
+    { "name": "ability_desc", "value": "EntryAbility loads and checks the NAPI marker" }
+  ]
+}

@@ -527,6 +527,16 @@ class LaterJourneyTests(Case):
         failing = self.gj3(fixture_sha256="0" * 64)["firstFailingCriterion"]
         self.assertEqual(failing["criterion"], f"gj3-{D}-rollback: fixture is the pinned rollback fixture")
 
+    def test_g3_replacement_ghost_has_the_same_complete_rollback_requirements(self):
+        journey = self.gj3(fixture_sha256="01d4e785ceec23a3873f67b4ec5035c0bfa469139596f88bfb96dd91dae840ae")
+        self.assertEqual(journey["state"], PASS, journey.get("firstFailingCriterion"))
+
+    def test_g3_historical_bytes_are_not_the_replacement_fixture(self):
+        journey = self.gj3(fixture_sha256="260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a")
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         f"gj3-{D}-rollback: fixture is the pinned rollback fixture")
+
     def test_g3_a_rollback_that_did_not_consume_the_fixture_does_not_count(self):
         failing = self.gj3(lease="lease-other")["firstFailingCriterion"]
         self.assertEqual(failing["criterion"], f"gj3-{D}-rollback: the rollback Job consumed the fixture's lease")

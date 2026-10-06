@@ -1,0 +1,144 @@
+{
+  "baselineAdopted": false,
+  "classification": "actualSignedPairBaselineCandidate",
+  "completedSignAndExport": {
+    "artifactId": "ART-073566cadbcf49edaf16c0759f4e7119",
+    "boardTrustProved": false,
+    "captureCount": 657,
+    "capturePrefixSha256": "5efe541529910ebfd912109ae7ae360546a7c05fa176fb7e87478f8309566830",
+    "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+    "classification": "localCompletedPairExportOnly",
+    "executionId": "gj2-pair-20261006-canon-19097.sign",
+    "finalPackage": {
+      "abilityName": "EntryAbility",
+      "appApiDeclaration": {
+        "apiReleaseType": "Beta2",
+        "compileSdkType": "OpenHarmony",
+        "compileSdkVersion": "26.0.0.35",
+        "minAPIVersion": 23,
+        "minMinorAPIVersion": 0,
+        "minPatchAPIVersion": 0,
+        "targetAPIVersion": 23,
+        "targetMinorAPIVersion": 0,
+        "targetPatchAPIVersion": 0
+      },
+      "boardTrustProved": false,
+      "bundleName": "com.example.scrollablecomponentstatic",
+      "classification": "signedHapHostStructureOnly",
+      "codeSign": null,
+      "elfBuildId": "190ff6e600ab47b61df382ecf32da3cdcabf588c",
+      "exportReceiptVerified": true,
+      "hapByteCount": 130336,
+      "hapSha256": "ec5ce24958a16047c784a4af0f2197db86009abe1a3fbb193363a8bdd825e4bf",
+      "hardwareEvidence": false,
+      "memberInventory": [
+        {
+          "byteCount": 14936,
+          "name": "ets/modules.abc",
+          "sha256": "15a9b089f4dbbe6c41d876c4f4861c3615166156e4c0851482465fa568eb63f4"
+        },
+        {
+          "byteCount": 11372,
+          "name": "libs/armeabi-v7a/libarkdeck_gj.so",
+          "sha256": "907780120312af191be7cd268953c01d5daf5b5d488aa71e6403594d46ef0c59"
+        },
+        {
+          "byteCount": 8,
+          "name": ".pages.info",
+          "sha256": "abce9009a9cbff70ebfd9d5af92657ac037787b8a7e75f56c8c7c4a13a3dd25c"
+        },
+        {
+          "byteCount": 3359,
+          "name": "ets/sourceMaps.map",
+          "sha256": "cf4319d4f159b4e6531ff8a5bc1c0884ba80e1210d52bc9a323d889299038ee2"
+        },
+        {
+          "byteCount": 1458,
+          "name": "module.json",
+          "sha256": "1b53eca56eb844e0c053d565e0f9258456c833a3b0e1e59bdb7c64f5585ae7af"
+        },
+        {
+          "byteCount": 578,
+          "name": "pack.info",
+          "sha256": "13de6d7ed73623257b5340c4525ca12cffabcac37787138fad49358c53804d0a"
+        },
+        {
+          "byteCount": 134,
+          "name": "pkgSdkInfo.json",
+          "sha256": "d91de5e016cfe5337f3f9f4e951c2b64b20f9846f158f074eafda0021157b541"
+        },
+        {
+          "byteCount": 703,
+          "name": "resources.index",
+          "sha256": "0b14c3bde352de68c3a101da7677e328851e01b01124094a1a28119a051559eb"
+        },
+        {
+          "byteCount": 204,
+          "name": "resources/base/media/app_icon.svg",
+          "sha256": "7d754d1f40691fa45c7a6cd741bc9c6337f6ed439d4b01992526503d87e51250"
+        },
+        {
+          "byteCount": 23,
+          "name": "resources/base/profile/main_pages.json",
+          "sha256": "93846868ae31b5507d3e0675b3a364dab27a9e2ea7edb2a39c9a2bb70846d1f6"
+        },
+        {
+          "byteCount": 57094,
+          "name": "rpcid.sc",
+          "sha256": "3ca0010946f073243f95b928a59c495ed175e6ca9df9423a631ff3895b00853b"
+        }
+      ],
+      "nativeByteCount": 11372,
+      "nativeMember": "libs/armeabi-v7a/libarkdeck_gj.so",
+      "nativeSha256": "907780120312af191be7cd268953c01d5daf5b5d488aa71e6403594d46ef0c59",
+      "originalElfPrefixUnchanged": true,
+      "processABIProved": false,
+      "signedArtifactId": "ART-073566cadbcf49edaf16c0759f4e7119",
+      "signingJobId": "job-244477000dcffedd265b9afa3b8bc784",
+      "signingReportVerified": true
+    },
+    "finalPackageSha256": "4be9ca0f0196a87f480a92de5390f8da26a6794c255b554751b599db02de3bdd",
+    "hardwareEvidence": false,
+    "jobId": "job-244477000dcffedd265b9afa3b8bc784",
+    "originalStopSha256": "42254233888590a0e576648dc5809aafdb800f8ce5192bd5892b12b213b26afe",
+    "pairConfigSha256": "214d1ef5effdf459d9040cc012386f2db981429f4724db25523632578fb36cc2",
+    "replayAllowed": false,
+    "runtimeEvidence": false,
+    "signedHapByteCount": 130336,
+    "signedHapSha256": "ec5ce24958a16047c784a4af0f2197db86009abe1a3fbb193363a8bdd825e4bf"
+  },
+  "formalAcceptance": false,
+  "formalGJ2Pass": false,
+  "hardwareEvidence": false,
+  "macOSPairedRunComplete": false,
+  "publicMaterial": {
+    "appIdentifierPresent": false,
+    "boardTrustProved": false,
+    "certificateValidity": [
+      {
+        "notAfter": "2049-12-31T12:14:18+00:00",
+        "notBefore": "2021-02-02T12:14:18+00:00"
+      },
+      {
+        "notAfter": "2049-12-31T12:15:32+00:00",
+        "notBefore": "2021-02-02T12:15:32+00:00"
+      },
+      {
+        "notAfter": "2049-12-31T12:19:31+00:00",
+        "notBefore": "2021-02-02T12:19:31+00:00"
+      }
+    ],
+    "pins": {
+      "appCertificate": "b5c1d6254faa91eab645a32fc3ce136128c94d88a739a0e956e6a49b331387e5",
+      "javaExecutable": "c89e9f37bc9d3756da01d19e26fde006e78d921a114c8aa0247a9b5ea8f4e189",
+      "keystore": "7a5efc3ea9245596d157f6ccbbdc5b8ae7cd714e7086c3c1645986c9d495d071",
+      "signedProfile": "b816e3e1f8c150c2aa1ac7043733aee8efc609c899f5c2c8d4896faebea9c897",
+      "signerJAR": "9cee965bb292080a0d29fb48450091f5dcc9d010bb18da39175f581ffed7c4f4"
+    },
+    "profileValidity": {
+      "not-after": 1822808016,
+      "not-before": 1791271716
+    }
+  },
+  "sourceRevision": "19097bde14cb7170dc187dd99e9a01bdbf864da6"
+}

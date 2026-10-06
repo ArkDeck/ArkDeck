@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "com.example.scrollablecomponentstatic",
+    "vendor": "ArkDeck local acceptance proposal",
+    "versionCode": 20261006,
+    "versionName": "1.0.0-proposal",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "libarkdeck_gj.so",
+  "version": "1.0.0",
+  "types": "./Index.d.ts",
+  "description": "Types for the genuine arkdeck_gj NAPI module"
+}

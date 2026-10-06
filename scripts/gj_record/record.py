@@ -20,11 +20,11 @@ EVIDENCE_KIND = "redacted-metadata-derived-from-real-runtime"
 RUNBOOK = "docs/design/cli-golden-journey-headless-runbook.md"
 GENERATOR = "scripts/gj_record"
 JOURNEYS = ("GJ-1", "GJ-2", "GJ-3", "GJ-4", "GJ-5")
-# The GJ-3 rollback fixture the macOS rounds published and pinned
-# (`libarkdeck_gj-rollback-ghost.signed.so`, an armeabi-v7a library whose
-# DT_NEEDED cannot resolve; TASK-XPA-003 run.md). Another fixture is a reviewed
-# change here, never a value typed at assembly.
-ROLLBACK_FIXTURE_SHA256 = "260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a"
+# Exact replacement ARMv7 ghost fixture; its source, real SDK signature and
+# unchanged post-publication rollback criteria are reviewed with
+# baselines/gj-pair-armv7-20261006/manifest.json. Historical records retain their
+# original pin. Assembly has no caller-controlled fixture override.
+ROLLBACK_FIXTURE_SHA256 = "01d4e785ceec23a3873f67b4ec5035c0bfa469139596f88bfb96dd91dae840ae"
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _SAFE_RAW = re.compile(r"^[A-Za-z0-9._:@+\- ]{0,120}$")
 
