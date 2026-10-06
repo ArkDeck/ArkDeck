@@ -107,7 +107,10 @@
           "type": "object"
         },
         "credentialRef": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "generation": {
           "type": "string"
@@ -176,8 +179,8 @@
   "x-arkdeck-method": "workspace.preset.update",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 12,
-    "request": 15,
-    "result": 3
+    "error": 11,
+    "request": 13,
+    "result": 2
   }
 }

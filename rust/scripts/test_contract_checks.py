@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import copy
 import importlib.util
 import io
 import json
@@ -828,6 +829,96 @@ class ContractChecksTests(unittest.TestCase):
             self.assertEqual(calls[0][1], "clippy")
             self.assertEqual(calls[1], [sys.executable, str(self.root / label / "rust/scripts/run-workspace-tests.py")])
             self.assertEqual([argv[1] for argv in calls[2:4]], ["run", "build"])
+
+
+class WorkspacePresetListSchemaTests(unittest.TestCase):
+    """List carries the same closed preset resource as the mutation/read leaves."""
+
+    ROOT = Path(__file__).resolve().parents[2]
+    CORPUS = ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
+
+    @classmethod
+    def schema(cls, method):
+        return json.loads((cls.ROOT / f"spec/control/methods/{method}.json").read_bytes())
+
+    @classmethod
+    def results(cls, method):
+        frames = [json.loads(line) for line in (cls.CORPUS / f"{method}.jsonl").read_text().splitlines()]
+        return [frame["result"] for frame in frames if frame["ok"]]
+
+    def list_result(self):
+        signing = next(result for result in self.results("workspace.preset.register")
+                       if result["kind"] == "signing" and isinstance(result["credentialRef"], str))
+        # A validation fixture reuses the actual recorded owner projection;
+        # it does not add a fabricated Runtime frame to the producer corpus.
+        return {"schemaVersion": "arkdeck.workspace-preset-list/1",
+                "projectRef": signing["projectRef"], "presets": [copy.deepcopy(signing)]}
+
+    def test_derivation_preserves_the_published_schema_and_shared_credential_type(self):
+        path = self.ROOT / "Packages/ArkDeckKit/Scripts/generate-control-contract.py"
+        spec = importlib.util.spec_from_file_location("arkdeck_preset_list_generator", path)
+        generator = importlib.util.module_from_spec(spec)
+        with patch.object(sys, "argv", [str(path), "--check"]):
+            spec.loader.exec_module(generator)
+        with tempfile.TemporaryDirectory(prefix="arkdeck-preset-list-schema-") as temporary:
+            root = Path(temporary)
+            frames = root / "frames"
+            frames.mkdir()
+            methods = ("workspace.preset.register", "workspace.preset.list",
+                       "workspace.preset.show", "workspace.preset.update", "workspace.preset.remove")
+            for method in methods:
+                shutil.copyfile(self.CORPUS / f"{method}.jsonl", frames / f"{method}.jsonl")
+            with patch.object(generator, "METHOD_SCHEMA_DIRECTORY", root / "schemas"), \
+                    patch.object(generator, "FRAME_CORPUS_DIRECTORY", root / "corpus"), \
+                    contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                generator.derive_method_schemas(frames)
+            schemas = {method: json.loads((root / f"schemas/{method}.json").read_bytes()) for method in methods}
+        for method in methods[1:]:
+            self.assertEqual(schemas[method], self.schema(method), method)
+        generated = schemas["workspace.preset.list"]
+        credential = generated["$defs"]["result"]["properties"]["presets"]["items"]["properties"]["credentialRef"]
+        self.assertEqual(credential, {"type": ["null", "string"]})
+        for method in methods:
+            if method == "workspace.preset.list":
+                continue
+            self.assertEqual(credential, self.schema(method)["$defs"]["result"]["properties"]["credentialRef"])
+
+    def test_real_recorded_signing_projection_and_existing_null_presets_are_valid(self):
+        validator = jsonschema.Draft202012Validator(self.schema("workspace.preset.list")["$defs"]["result"])
+        result = self.list_result()
+        self.assertEqual(result["presets"][0]["configurationStatus"], "runtimeRestartRequired")
+        validator.validate(result)
+        for method in ("workspace.preset.register", "workspace.preset.show", "workspace.preset.update", "workspace.preset.remove"):
+            jsonschema.Draft202012Validator(self.schema(method)["$defs"]["result"]).validate(result["presets"][0])
+        existing = next(result for result in self.results("workspace.preset.list") if result["presets"])
+        validator.validate(existing)
+        validator.validate({**result, "presets": [*result["presets"], *existing["presets"]]})
+        validator.validate({**result, "presets": []})
+
+    def test_malformed_missing_credentials_and_unknown_fields_still_refuse(self):
+        validator = jsonschema.Draft202012Validator(self.schema("workspace.preset.list")["$defs"]["result"])
+        for credential in (False, 1, [], {}):
+            result = self.list_result()
+            result["presets"][0]["credentialRef"] = credential
+            with self.subTest(credential=credential), self.assertRaises(jsonschema.ValidationError):
+                validator.validate(result)
+        result = self.list_result()
+        del result["presets"][0]["credentialRef"]
+        with self.assertRaises(jsonschema.ValidationError):
+            validator.validate(result)
+        for location in ("list", "preset", "constraints"):
+            result = self.list_result()
+            target = (result if location == "list" else result["presets"][0]
+                      if location == "preset" else result["presets"][0]["constraints"])
+            target["unexpected"] = "not a published member"
+            with self.subTest(location=location), self.assertRaises(jsonschema.ValidationError):
+                validator.validate(result)
+
+    def test_project_list_preset_summary_does_not_publish_credentials(self):
+        schema = self.schema("workspace.project.list")["$defs"]["result"]
+        summary = schema["properties"]["projects"]["items"]["properties"]["presetRefs"]["items"]
+        self.assertEqual(set(summary["properties"]), {"kind", "presetRef", "timeoutSeconds"})
+        self.assertFalse(summary["additionalProperties"])
 
 
 class SchemaVocabularyTests(unittest.TestCase):

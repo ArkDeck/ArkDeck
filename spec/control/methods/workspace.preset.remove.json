@@ -79,7 +79,10 @@
           "type": "object"
         },
         "credentialRef": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "generation": {
           "type": "string"
@@ -148,8 +151,8 @@
   "x-arkdeck-method": "workspace.preset.remove",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 10,
-    "request": 13,
-    "result": 3
+    "error": 9,
+    "request": 11,
+    "result": 2
   }
 }

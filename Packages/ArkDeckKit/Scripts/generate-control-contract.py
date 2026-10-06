@@ -192,7 +192,18 @@ ARTIFACT_EXPORT_OWNER_ERROR_CODES = [
 #   completed), so `human-action.resume` answered a still-running resume with
 #   `internalError`. Its `nextAction` admits exactly `agent.resume`'s
 #   (TASK-XPA-005; delegated 2026-10-05).
+# - a workspace preset's `credentialRef`: register/show/update/remove and list return
+#   the same preset resource projection. Signing presets carry a string
+#   credential reference; build/test/symbol presets carry null. Registration
+#   recorded both, while list/show/update/remove recorded only the latter
+#   (TASK-XPA-011).
 SHARED_MEMBERS = {
+    ("workspace.preset.register", "result.credentialRef"): [
+        ("workspace.preset.list", "result.presets[].credentialRef"),
+        ("workspace.preset.show", "result.credentialRef"),
+        ("workspace.preset.update", "result.credentialRef"),
+        ("workspace.preset.remove", "result.credentialRef"),
+    ],
     ("agent.resume", "result.nextAction"): [
         ("human-action.resume", "result.nextAction"),
     ],
