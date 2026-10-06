@@ -659,6 +659,14 @@ pub fn assert_relabelled(
         }
     }
     let index = super::index(default_root);
+    let index =
+        if fixture.file_name().and_then(|name| name.to_str()) == Some("deploy-native-library") {
+            native_readback::historical_index(&index, |job| {
+                fs::read(default_root.join("jobs").join(job).join("job-record.json")).unwrap()
+            })
+        } else {
+            index
+        };
     labels.learn_keys(
         &spelled_json(&index),
         &document(fixture, "store/index.json"),
@@ -693,7 +701,11 @@ pub fn assert_relabelled(
         })
         .collect();
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    super::assert_leftovers_relabelled(fixture, replayed_root, default_root, |bytes| {
-        labels.swift_bytes(&spelled(bytes))
-    });
+    super::assert_leftovers_relabelled_with_index(
+        fixture,
+        replayed_root,
+        default_root,
+        index,
+        |bytes| labels.swift_bytes(&spelled(bytes)),
+    );
 }
