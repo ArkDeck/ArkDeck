@@ -1,0 +1,1479 @@
+{
+  "capture.diagnostics@1": {
+    "aliasFor": null,
+    "artifacts": [
+      {
+        "mediaType": "text/plain",
+        "name": "hilog.txt",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "application/json",
+        "name": "ui-dump.json",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "text/plain",
+        "name": "advanced-dump.txt",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "application/json",
+        "name": "ui-tree.json",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "image/png",
+        "name": "screenshot.png",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "image/jpeg",
+        "name": "screenshot.jpeg",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "text/plain",
+        "name": "crash-index.txt",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "text/plain",
+        "name": "crash-log.txt",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "application/json",
+        "name": "application-liveness.json",
+        "privacy": "standard",
+        "required": false,
+        "retentionClass": "default",
+        "role": "derived"
+      },
+      {
+        "mediaType": "application/octet-stream",
+        "name": "trace.htrace",
+        "privacy": "sensitive",
+        "required": false,
+        "retentionClass": "default",
+        "role": "raw"
+      },
+      {
+        "mediaType": "text/plain",
+        "name": "capture.log",
+        "privacy": "standard",
+        "required": false,
+        "retentionClass": "default",
+        "role": "log"
+      },
+      {
+        "mediaType": "application/json",
+        "name": "markers.json",
+        "privacy": "standard",
+        "required": false,
+        "retentionClass": "default",
+        "role": "derived"
+      },
+      {
+        "mediaType": "application/json",
+        "name": "artifact-index.json",
+        "privacy": "standard",
+        "required": true,
+        "retentionClass": "default",
+        "role": "derived"
+      },
+      {
+        "mediaType": "application/json",
+        "name": "capture-summary.json",
+        "privacy": "standard",
+        "required": true,
+        "retentionClass": "default",
+        "role": "derived"
+      }
+    ],
+    "authorization": {
+      "deviceMutation": "standingCapability",
+      "readOnly": "defaultReadOnly"
+    },
+    "availability": "available",
+    "availabilityReasonCodes": [],
+    "availabilityReasonOrigins": [],
+    "availabilityReasons": [],
+    "binding": "confirmedDevice",
+    "completeOverwriteRecovery": null,
+    "concurrencyKey": "deviceExclusive",
+    "defaultPolicyIssuanceEnabled": true,
+    "exampleRequest": {
+      "documentType": "runtime-operation-request",
+      "idempotencyKey": "idem-example-0001",
+      "inputs": {
+        "durationSeconds": 1
+      },
+      "operation": {
+        "id": "capture.diagnostics",
+        "version": 1
+      },
+      "requestId": "req-example",
+      "requestedOutputs": [
+        "derivedArtifacts"
+      ],
+      "schemaVersion": "1.0.0",
+      "target": {
+        "expectedBindingRevision": 1,
+        "targetId": "TGT-REPLACE-ME"
+      }
+    },
+    "inputs": [
+      {
+        "description": "Optional ability identity carried into the liveness artifact; never lowered as caller-supplied argv.",
+        "maxLength": 200,
+        "name": "abilityName",
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_.]*$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "default": false,
+        "description": "Capture ArkUI componentDetail output for one selected component. Requires the typed windowId and componentId inputs; absent or false leaves the plan unchanged.",
+        "name": "advancedDump",
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "description": "Optional typed application identity. When present, the same bounded job publishes an application-specific process readback.",
+        "maxLength": 200,
+        "name": "bundleName",
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_]*(?:\\.[a-zA-Z][a-zA-Z0-9_]*)+$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "default": true,
+        "description": "Capture the bounded HiLog artifact. Set false for a typed UI snapshot that needs the component tree and PNG but not diagnostic logs.",
+        "name": "captureHilog",
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "description": "Validated ArkUI accessibility/component identifier used only by the componentDetail recipe.",
+        "maxLength": 20,
+        "name": "componentId",
+        "pattern": "^[0-9]{1,20}$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "description": "One Faultlogger entry to fetch, named exactly as the index lists it. An entry name, never a path.",
+        "maxLength": 200,
+        "name": "crashLogName",
+        "pattern": "^[a-z]+-[A-Za-z0-9._-]{1,180}$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "default": false,
+        "description": "Capture the device's Faultlogger index. Read-only: unlike the trace, tree and screenshot legs this does not raise the effective effect.",
+        "name": "crashLogs",
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "description": "Bounded HiLog capture window.",
+        "maximum": 600,
+        "minimum": 1,
+        "name": "durationSeconds",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Caller-supplied expected digest of the deployment whose liveness is being sampled. Recorded with the observation so a later reader can tell which build was live; it is not trusted as a fact about the device.",
+        "maxLength": 64,
+        "name": "expectedDeployedArtifactDigest",
+        "pattern": "^[0-9a-f]{64}$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "description": "Typed HiLog filter expressions; no shell fragments.",
+        "maxItems": 16,
+        "maxLength": 200,
+        "name": "hilogFilters",
+        "required": false,
+        "type": "stringArray"
+      },
+      {
+        "description": "Host-side marks collected during the captured window, each an RFC 3339 instant with an optional `#label`. They reach no device: a mark is an annotation on host time, and the capture only carries it into `markers.json` so a reader can line it up with what the device recorded.",
+        "maxItems": 200,
+        "maxLength": 96,
+        "name": "markers",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,3})?Z(#[A-Za-z0-9 ._-]{1,64})?$",
+        "required": false,
+        "type": "stringArray"
+      },
+      {
+        "description": "Optional process identity. Defaults to bundleName and is lowered only by the HDC provider.",
+        "maxLength": 200,
+        "name": "processName",
+        "pattern": "^[a-zA-Z][a-zA-Z0-9_.:]*$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "default": "standard",
+        "description": "Redaction applied to published text. This field is retained as a forward-compatible policy dimension, but currently has one executable value: `standard`. Stronger redaction is not published until its implementation exists.",
+        "enum": [
+          "standard"
+        ],
+        "name": "redactionProfile",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "default": false,
+        "description": "Arm the trace ring, let the window pass, then snapshot it, instead of blocking for the window with `-t N`. The snapshot carries everything since the arm, bounded by the buffer, so the decision to keep a trace can be made after the thing worth keeping rather than before it. Only consulted when traceCategories selects the trace leg.",
+        "name": "ringBuffered",
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "default": "png",
+        "description": "Encoding for the screenshot leg. PNG is the evidence format and stays the default; JPEG is measurably cheaper - p50 638 ms against 858 ms and 40,947 bytes against 448,352, over 50 captures each on 2026-08-26 - and is for work that wants a current picture rather than a record. The device validates the file suffix against this, so the type and the owned path are one decision.",
+        "enum": [
+          "png",
+          "jpeg"
+        ],
+        "name": "screenshotImageType",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "default": 134217728,
+        "description": "Ceiling on the total bytes this job may publish across all of its artifacts. Reaching it ends collection rather than silently dropping a product.",
+        "maximum": 536870912,
+        "minimum": 1048576,
+        "name": "totalArtifactByteBudget",
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "default": 8192,
+        "description": "Per-capture trace buffer size in KiB. Only consulted when traceCategories selects the trace leg; ignored otherwise.",
+        "maximum": 65536,
+        "minimum": 1024,
+        "name": "traceBufferKB",
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "description": "Trace categories; presence selects the remote-file trace leg and escalates the effective effect to deviceMutation.",
+        "maxItems": 24,
+        "maxLength": 64,
+        "name": "traceCategories",
+        "required": false,
+        "type": "stringArray"
+      },
+      {
+        "default": false,
+        "description": "Capture the on-screen component tree. Presence selects the file-producing dumpLayout leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged.",
+        "name": "uiComponentTree",
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "default": true,
+        "description": "Capture the accessibility/window dump. Read-only: unlike the trace, screenshot and component-tree legs this does not raise the effective effect.",
+        "name": "uiDump",
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "default": false,
+        "description": "Capture a PNG screenshot of the display. Presence selects the file-producing snapshot_display leg and escalates the effective effect to deviceMutation; absent or false leaves the plan unchanged.",
+        "name": "uiScreenshot",
+        "required": false,
+        "type": "boolean"
+      },
+      {
+        "description": "Validated ArkUI host window identifier used only by the componentDetail recipe.",
+        "maxLength": 20,
+        "name": "windowId",
+        "pattern": "^[0-9]{1,20}$",
+        "required": false,
+        "type": "string"
+      }
+    ],
+    "minimumEffect": "readOnly",
+    "outputByteBudget": 536870912,
+    "outputs": [
+      {
+        "name": "applicationLiveness",
+        "required": false,
+        "type": "artifactReference"
+      },
+      {
+        "name": "artifactIndex",
+        "required": true,
+        "type": "artifactReference"
+      },
+      {
+        "name": "captureSummary",
+        "required": true,
+        "type": "artifactReference"
+      }
+    ],
+    "permittedEffects": [
+      "readOnly",
+      "deviceMutation"
+    ],
+    "preflightAttempts": 2,
+    "profiles": [
+      "openharmony-standard@1",
+      "dayu200"
+    ],
+    "provider": "hdc",
+    "reference": "capture.diagnostics@1",
+    "stepCount": 22,
+    "steps": [
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "preflightHostStorage",
+        "optional": false,
+        "stepId": "preflight-host-storage"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "probeDevice",
+        "optional": false,
+        "stepId": "confirm-evidence-target"
+      },
+      {
+        "action": {
+          "actionId": "deviceModel",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-model"
+      },
+      {
+        "action": {
+          "actionId": "firmwareBuild",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-firmware"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "preflightDeviceStorage",
+        "optional": false,
+        "stepId": "preflight-device-storage"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "verifyRemoteState",
+        "optional": true,
+        "stepId": "observe-application-liveness"
+      },
+      {
+        "action": {
+          "actionId": "boundedHilog",
+          "catalogId": "arkdeck-diagnostics"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "captureRemoteStdout",
+        "optional": true,
+        "stepId": "capture-hilog"
+      },
+      {
+        "action": {
+          "actionId": "windowInventory",
+          "catalogId": "arkdeck-diagnostics"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "captureRemoteStdout",
+        "optional": true,
+        "stepId": "capture-ui-dump"
+      },
+      {
+        "action": {
+          "actionId": "componentDetail",
+          "catalogId": "arkdeck-diagnostics"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "captureRemoteStdout",
+        "optional": true,
+        "stepId": "capture-advanced-ui-dump"
+      },
+      {
+        "action": {
+          "actionId": "crashIndex",
+          "catalogId": "arkdeck-diagnostics"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "captureRemoteStdout",
+        "optional": true,
+        "stepId": "capture-crash-index"
+      },
+      {
+        "action": {
+          "actionId": "crashLog",
+          "catalogId": "arkdeck-diagnostics"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "captureRemoteStdout",
+        "optional": true,
+        "stepId": "capture-crash-log"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "captureRemoteFile",
+        "optional": true,
+        "stepId": "capture-ui-tree"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "receiveFile",
+        "optional": true,
+        "stepId": "receive-ui-tree"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "cleanupOwnedRemotePath",
+        "optional": true,
+        "stepId": "cleanup-ui-tree-temp"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "captureRemoteFile",
+        "optional": true,
+        "stepId": "capture-screenshot"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "receiveFile",
+        "optional": true,
+        "stepId": "receive-screenshot"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "cleanupOwnedRemotePath",
+        "optional": true,
+        "stepId": "cleanup-screenshot-temp"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "captureRemoteFile",
+        "optional": true,
+        "stepId": "capture-trace"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "receiveFile",
+        "optional": true,
+        "stepId": "receive-trace-artifact"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "cleanupOwnedRemotePath",
+        "optional": true,
+        "stepId": "cleanup-remote-temp"
+      },
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "postprocessArtifact",
+        "optional": false,
+        "stepId": "postprocess-index"
+      },
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "finalizeSession",
+        "optional": false,
+        "stepId": "finalize-session"
+      }
+    ],
+    "timeoutSeconds": 900,
+    "title": "Capture bounded HiLog, UI dump and trace with a structured artifact index"
+  },
+  "input.tap@1": {
+    "aliasFor": null,
+    "artifacts": [],
+    "authorization": {
+      "deviceMutation": "standingCapability"
+    },
+    "availability": "available",
+    "availabilityReasonCodes": [],
+    "availabilityReasonOrigins": [],
+    "availabilityReasons": [],
+    "binding": "confirmedDevice",
+    "completeOverwriteRecovery": null,
+    "concurrencyKey": "deviceExclusive",
+    "defaultPolicyIssuanceEnabled": true,
+    "exampleRequest": {
+      "documentType": "runtime-operation-request",
+      "idempotencyKey": "idem-example-0001",
+      "inputs": {
+        "displayHeight": 1,
+        "displayWidth": 1,
+        "x": 0,
+        "y": 0
+      },
+      "operation": {
+        "id": "input.tap",
+        "version": 1
+      },
+      "requestId": "req-example",
+      "requestedOutputs": [
+        "derivedArtifacts"
+      ],
+      "schemaVersion": "1.0.0",
+      "target": {
+        "expectedBindingRevision": 1,
+        "targetId": "TGT-REPLACE-ME"
+      }
+    },
+    "inputs": [
+      {
+        "description": "Height in device pixels of the frame the gesture was computed from. Required for the same reason as displayWidth.",
+        "maximum": 32767,
+        "minimum": 1,
+        "name": "displayHeight",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Target display for multi-display devices. Omitted lowers to the device's default display.",
+        "maximum": 64,
+        "minimum": 0,
+        "name": "displayId",
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "description": "Width in device pixels of the frame the gesture was computed from. Required: the device-side injector does not validate coordinates against the live panel, so a gesture the runtime cannot bound host-side is refused rather than injected. It also joins the authorized subject, so a rotation or resolution change cannot reuse the session's authorization.",
+        "maximum": 32767,
+        "minimum": 1,
+        "name": "displayWidth",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Capture time of the frame the user acted on. The runtime refuses a gesture whose frame is older than its freshness bound at dispatch, so an input that waited behind a queue is discarded rather than landing late on a screen that has moved on.",
+        "maxLength": 32,
+        "name": "screenEpochUtc",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "description": "Device-pixel X of the tap. The caller anchors this at the pointer-down position after content-rect mapping; it is never a raw host coordinate.",
+        "maximum": 32767,
+        "minimum": 0,
+        "name": "x",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Device-pixel Y of the tap, anchored at the pointer-down position.",
+        "maximum": 32767,
+        "minimum": 0,
+        "name": "y",
+        "required": true,
+        "type": "integer"
+      }
+    ],
+    "minimumEffect": "deviceMutation",
+    "outputByteBudget": 1048576,
+    "outputs": [],
+    "permittedEffects": [
+      "deviceMutation"
+    ],
+    "preflightAttempts": 2,
+    "profiles": [
+      "openharmony-standard@1",
+      "dayu200"
+    ],
+    "provider": "hdc",
+    "reference": "input.tap@1",
+    "stepCount": 5,
+    "steps": [
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "probeDevice",
+        "optional": false,
+        "stepId": "confirm-evidence-target"
+      },
+      {
+        "action": {
+          "actionId": "deviceModel",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-model"
+      },
+      {
+        "action": {
+          "actionId": "firmwareBuild",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-firmware"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "deviceMutation",
+        "kind": "injectPointerInput",
+        "optional": false,
+        "stepId": "inject-pointer-input"
+      },
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "finalizeSession",
+        "optional": false,
+        "stepId": "finalize-session"
+      }
+    ],
+    "timeoutSeconds": 60,
+    "title": "Inject one tap at exact device coordinates"
+  },
+  "input.long-press@1": {
+    "aliasFor": null,
+    "artifacts": [],
+    "authorization": {
+      "deviceMutation": "standingCapability"
+    },
+    "availability": "available",
+    "availabilityReasonCodes": [],
+    "availabilityReasonOrigins": [],
+    "availabilityReasons": [],
+    "binding": "confirmedDevice",
+    "completeOverwriteRecovery": null,
+    "concurrencyKey": "deviceExclusive",
+    "defaultPolicyIssuanceEnabled": true,
+    "exampleRequest": {
+      "documentType": "runtime-operation-request",
+      "idempotencyKey": "idem-example-0001",
+      "inputs": {
+        "displayHeight": 1,
+        "displayWidth": 1,
+        "x": 0,
+        "y": 0
+      },
+      "operation": {
+        "id": "input.tap",
+        "version": 1
+      },
+      "requestId": "req-example",
+      "requestedOutputs": [
+        "derivedArtifacts"
+      ],
+      "schemaVersion": "1.0.0",
+      "target": {
+        "expectedBindingRevision": 1,
+        "targetId": "TGT-REPLACE-ME"
+      }
+    },
+    "inputs": [
+      {
+        "name": "x",
+        "type": "integer",
+        "required": true,
+        "minimum": 0,
+        "maximum": 32767,
+        "description": "Device-pixel X of the long-press, anchored at the pointer-down position after content-rect mapping; never a raw host coordinate."
+      },
+      {
+        "name": "y",
+        "type": "integer",
+        "required": true,
+        "minimum": 0,
+        "maximum": 32767,
+        "description": "Device-pixel Y of the long-press, anchored at the pointer-down position."
+      },
+      {
+        "name": "displayId",
+        "type": "integer",
+        "required": false,
+        "minimum": 0,
+        "maximum": 64,
+        "description": "Target display for multi-display devices. Omitted lowers to the device's default display."
+      },
+      {
+        "name": "displayWidth",
+        "type": "integer",
+        "required": true,
+        "minimum": 1,
+        "maximum": 32767,
+        "description": "Width in device pixels of the frame the gesture was computed from. Required: the device-side injector does not validate coordinates against the live panel, so a gesture the runtime cannot bound host-side is refused rather than injected. It also joins the authorized subject, so a rotation or resolution change cannot reuse the session's authorization."
+      },
+      {
+        "name": "displayHeight",
+        "type": "integer",
+        "required": true,
+        "minimum": 1,
+        "maximum": 32767,
+        "description": "Height in device pixels of the frame the gesture was computed from. Required for the same reason as displayWidth."
+      },
+      {
+        "name": "screenEpochUtc",
+        "type": "string",
+        "required": false,
+        "maxLength": 32,
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
+        "description": "Capture time of the frame the user acted on. The runtime refuses a gesture whose frame is older than its freshness bound at dispatch, so an input that waited behind a queue is discarded rather than landing late on a screen that has moved on."
+      },
+      {
+        "name": "durationMs",
+        "type": "integer",
+        "required": false,
+        "minimum": 500,
+        "maximum": 2000,
+        "description": "The caller's real press-and-hold time. The device command takes an explicit hold interval, so this value passes through unchanged; omitted, the runtime uses its own bounded default."
+      }
+    ],
+    "minimumEffect": "deviceMutation",
+    "outputByteBudget": 1048576,
+    "outputs": [],
+    "permittedEffects": [
+      "deviceMutation"
+    ],
+    "preflightAttempts": 2,
+    "profiles": [
+      "openharmony-standard@1",
+      "dayu200"
+    ],
+    "provider": "hdc",
+    "reference": "input.long-press@1",
+    "stepCount": 5,
+    "steps": [
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "probeDevice",
+        "optional": false,
+        "stepId": "confirm-evidence-target"
+      },
+      {
+        "action": {
+          "actionId": "deviceModel",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-model"
+      },
+      {
+        "action": {
+          "actionId": "firmwareBuild",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-firmware"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "deviceMutation",
+        "kind": "injectPointerInput",
+        "optional": false,
+        "stepId": "inject-pointer-input"
+      },
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "finalizeSession",
+        "optional": false,
+        "stepId": "finalize-session"
+      }
+    ],
+    "timeoutSeconds": 60,
+    "title": "Inject one long-press at exact device coordinates"
+  },
+  "input.swipe@1": {
+    "aliasFor": null,
+    "artifacts": [],
+    "authorization": {
+      "deviceMutation": "standingCapability"
+    },
+    "availability": "available",
+    "availabilityReasonCodes": [],
+    "availabilityReasonOrigins": [],
+    "availabilityReasons": [],
+    "binding": "confirmedDevice",
+    "completeOverwriteRecovery": null,
+    "concurrencyKey": "deviceExclusive",
+    "defaultPolicyIssuanceEnabled": true,
+    "exampleRequest": {
+      "documentType": "runtime-operation-request",
+      "idempotencyKey": "idem-example-0001",
+      "inputs": {
+        "displayHeight": 1,
+        "displayWidth": 1,
+        "durationMs": 80,
+        "fromX": 0,
+        "fromY": 0,
+        "toX": 0,
+        "toY": 0
+      },
+      "operation": {
+        "id": "input.swipe",
+        "version": 1
+      },
+      "requestId": "req-example",
+      "requestedOutputs": [
+        "derivedArtifacts"
+      ],
+      "schemaVersion": "1.0.0",
+      "target": {
+        "expectedBindingRevision": 1,
+        "targetId": "TGT-REPLACE-ME"
+      }
+    },
+    "inputs": [
+      {
+        "description": "Height in device pixels of the frame the gesture was computed from. Required for the same reason as displayWidth.",
+        "maximum": 32767,
+        "minimum": 1,
+        "name": "displayHeight",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Target display for multi-display devices. Omitted lowers to the device's default display.",
+        "maximum": 64,
+        "minimum": 0,
+        "name": "displayId",
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "description": "Width in device pixels of the frame the gesture was computed from. Required: the device-side injector does not validate coordinates against the live panel, so a gesture the runtime cannot bound host-side is refused rather than injected. It also joins the authorized subject, so a rotation or resolution change cannot reuse the session's authorization.",
+        "maximum": 32767,
+        "minimum": 1,
+        "name": "displayWidth",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "The caller's real pointer-down-to-up hold time. The device command takes a velocity in px/s, so the provider derives it from this duration and records the conversion in the verified summary; the duration itself is never invented.",
+        "maximum": 2000,
+        "minimum": 80,
+        "name": "durationMs",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Device-pixel X of the pointer-down position after content-rect mapping; never a raw host coordinate.",
+        "maximum": 32767,
+        "minimum": 0,
+        "name": "fromX",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Device-pixel Y of the pointer-down position.",
+        "maximum": 32767,
+        "minimum": 0,
+        "name": "fromY",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Capture time of the frame the user acted on. The runtime refuses a gesture whose frame is older than its freshness bound at dispatch, so an input that waited behind a queue is discarded rather than landing late on a screen that has moved on.",
+        "maxLength": 32,
+        "name": "screenEpochUtc",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "description": "Device-pixel X of the pointer-up position.",
+        "maximum": 32767,
+        "minimum": 0,
+        "name": "toX",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Device-pixel Y of the pointer-up position.",
+        "maximum": 32767,
+        "minimum": 0,
+        "name": "toY",
+        "required": true,
+        "type": "integer"
+      }
+    ],
+    "minimumEffect": "deviceMutation",
+    "outputByteBudget": 1048576,
+    "outputs": [],
+    "permittedEffects": [
+      "deviceMutation"
+    ],
+    "preflightAttempts": 2,
+    "profiles": [
+      "openharmony-standard@1",
+      "dayu200"
+    ],
+    "provider": "hdc",
+    "reference": "input.swipe@1",
+    "stepCount": 5,
+    "steps": [
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "probeDevice",
+        "optional": false,
+        "stepId": "confirm-evidence-target"
+      },
+      {
+        "action": {
+          "actionId": "deviceModel",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-model"
+      },
+      {
+        "action": {
+          "actionId": "firmwareBuild",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-firmware"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "deviceMutation",
+        "kind": "injectPointerInput",
+        "optional": false,
+        "stepId": "inject-pointer-input"
+      },
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "finalizeSession",
+        "optional": false,
+        "stepId": "finalize-session"
+      }
+    ],
+    "timeoutSeconds": 60,
+    "title": "Inject one swipe between exact device coordinates"
+  },
+  "input.keyboard@1": {
+    "aliasFor": null,
+    "artifacts": [],
+    "authorization": {
+      "deviceMutation": "standingCapability"
+    },
+    "availability": "available",
+    "availabilityReasonCodes": [],
+    "availabilityReasonOrigins": [],
+    "availabilityReasons": [],
+    "binding": "confirmedDevice",
+    "completeOverwriteRecovery": null,
+    "concurrencyKey": "deviceExclusive",
+    "defaultPolicyIssuanceEnabled": true,
+    "exampleRequest": {
+      "documentType": "runtime-operation-request",
+      "idempotencyKey": "idem-example-0001",
+      "inputs": {
+        "inputEpochUtc": "REPLACE_ME",
+        "keyboardArtifactLease": "lease-v1:JOB-REPLACE-ME:ART-REPLACE-ME"
+      },
+      "operation": {
+        "id": "input.keyboard",
+        "version": 1
+      },
+      "requestId": "req-example",
+      "requestedOutputs": [
+        "derivedArtifacts"
+      ],
+      "schemaVersion": "1.0.0",
+      "target": {
+        "expectedBindingRevision": 1,
+        "targetId": "TGT-REPLACE-ME"
+      }
+    },
+    "inputs": [
+      {
+        "description": "UTC time of the explicit input decision. Dispatch refuses future, invalid or older-than-ten-second intents; this is not a claim of current application focus or screen capture time.",
+        "maxLength": 32,
+        "name": "inputEpochUtc",
+        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "description": "Immutable sensitive keyboard-input JSON Import; only its lease enters the Job.",
+        "name": "keyboardArtifactLease",
+        "required": true,
+        "type": "artifactLease"
+      }
+    ],
+    "minimumEffect": "deviceMutation",
+    "outputByteBudget": 1048576,
+    "outputs": [],
+    "permittedEffects": [
+      "deviceMutation"
+    ],
+    "preflightAttempts": 2,
+    "profiles": [
+      "openharmony-standard@1",
+      "dayu200"
+    ],
+    "provider": "hdc",
+    "reference": "input.keyboard@1",
+    "stepCount": 5,
+    "steps": [
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "probeDevice",
+        "optional": false,
+        "stepId": "confirm-evidence-target"
+      },
+      {
+        "action": {
+          "actionId": "deviceModel",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-model"
+      },
+      {
+        "action": {
+          "actionId": "firmwareBuild",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-firmware"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "deviceMutation",
+        "kind": "injectKeyboardInput",
+        "optional": false,
+        "stepId": "inject-keyboard-input"
+      },
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "atSafeBoundary",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "finalizeSession",
+        "optional": false,
+        "stepId": "finalize-session"
+      }
+    ],
+    "timeoutSeconds": 60,
+    "title": "Send one private key or UTF-8 text input to the focused default display"
+  },
+  "capture.screen-sequence@1": {
+    "aliasFor": null,
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "name": "sequence.json",
+        "privacy": "standard",
+        "required": true,
+        "retentionClass": "default",
+        "role": "derived"
+      },
+      {
+        "mediaType": "application/x-tar",
+        "name": "frames.tar",
+        "privacy": "sensitive",
+        "required": true,
+        "retentionClass": "default",
+        "role": "raw"
+      }
+    ],
+    "authorization": {
+      "deviceMutation": "standingCapability"
+    },
+    "availability": "available",
+    "availabilityReasonCodes": [],
+    "availabilityReasonOrigins": [],
+    "availabilityReasons": [],
+    "binding": "confirmedDevice",
+    "completeOverwriteRecovery": null,
+    "concurrencyKey": "deviceExclusive",
+    "defaultPolicyIssuanceEnabled": true,
+    "exampleRequest": {
+      "documentType": "runtime-operation-request",
+      "idempotencyKey": "idem-example-0001",
+      "inputs": {
+        "frameCount": 2
+      },
+      "operation": {
+        "id": "capture.screen-sequence",
+        "version": 1
+      },
+      "requestId": "req-example",
+      "requestedOutputs": [
+        "derivedArtifacts"
+      ],
+      "schemaVersion": "1.0.0",
+      "target": {
+        "expectedBindingRevision": 1,
+        "targetId": "TGT-REPLACE-ME"
+      }
+    },
+    "inputs": [
+      {
+        "description": "Target display for multi-display devices. Omitted lowers to the device's default display.",
+        "maximum": 64,
+        "minimum": 0,
+        "name": "displayId",
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "description": "How many stills to take. There is no duration field: the rate is the device's display readback and cannot be asked for, so a caller bounds the run by frames and reads back what it actually achieved.",
+        "maximum": 300,
+        "minimum": 2,
+        "name": "frameCount",
+        "required": true,
+        "type": "integer"
+      },
+      {
+        "description": "Scaled capture height. Requires width: a lone dimension lets the device pick the other one, and frames of differing size compose into nothing.",
+        "maximum": 32767,
+        "minimum": 1,
+        "name": "height",
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "default": "jpeg",
+        "description": "Image type for every frame. The device validates the file suffix against this, so the two are lowered together. jpeg by default because it is the cheaper of the two by 222 ms a frame and a tenth of the bytes.",
+        "enum": [
+          "png",
+          "jpeg"
+        ],
+        "name": "imageType",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "default": 134217728,
+        "description": "Ceiling on the bytes this capture may publish, checked against free device storage before the first frame.",
+        "maximum": 536870912,
+        "minimum": 1048576,
+        "name": "totalArtifactByteBudget",
+        "required": false,
+        "type": "integer"
+      },
+      {
+        "description": "Scaled capture width. Requires height. Measured to save no time at all - the cost is the readback, not the encode - so this is about bytes, not rate.",
+        "maximum": 32767,
+        "minimum": 1,
+        "name": "width",
+        "required": false,
+        "type": "integer"
+      }
+    ],
+    "minimumEffect": "deviceMutation",
+    "outputByteBudget": 536870912,
+    "outputs": [
+      {
+        "name": "artifactIndex",
+        "required": true,
+        "type": "artifactReference"
+      }
+    ],
+    "permittedEffects": [
+      "deviceMutation"
+    ],
+    "preflightAttempts": 2,
+    "profiles": [
+      "openharmony-standard@1",
+      "dayu200"
+    ],
+    "provider": "hdc",
+    "reference": "capture.screen-sequence@1",
+    "stepCount": 9,
+    "steps": [
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "preflightHostStorage",
+        "optional": false,
+        "stepId": "preflight-host-storage"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "probeDevice",
+        "optional": false,
+        "stepId": "confirm-evidence-target"
+      },
+      {
+        "action": {
+          "actionId": "deviceModel",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-model"
+      },
+      {
+        "action": {
+          "actionId": "firmwareBuild",
+          "catalogId": "arkdeck-remote-operations"
+        },
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "runApprovedRemoteRead",
+        "optional": false,
+        "stepId": "read-evidence-firmware"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "preflightDeviceStorage",
+        "optional": false,
+        "stepId": "preflight-device-storage"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "captureRemoteFile",
+        "optional": false,
+        "stepId": "capture-screen-sequence"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "readOnly",
+        "kind": "receiveFile",
+        "optional": false,
+        "stepId": "receive-screen-sequence"
+      },
+      {
+        "action": null,
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "compensation": "bestEffortCleanup",
+        "effect": "deviceMutation",
+        "kind": "cleanupOwnedRemotePath",
+        "optional": false,
+        "stepId": "cleanup-screen-sequence-temp"
+      },
+      {
+        "action": null,
+        "binding": "none",
+        "cancellation": "immediate",
+        "compensation": "none",
+        "effect": "hostOnly",
+        "kind": "postprocessArtifact",
+        "optional": false,
+        "stepId": "postprocess-index"
+      }
+    ],
+    "timeoutSeconds": 900,
+    "title": "Capture a bounded run of stills off one display, collected into one archive"
+  }
+}

@@ -33,12 +33,13 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
 
     private HistoryWorkspaceContext? _history;
 
-    /// <summary>macOS <c>openHistoryContext</c> on Device: the record's Target is selected. The
-    /// macOS Device screen workspace (its historical screenshot) is not part of the Windows App.</summary>
+    /// <summary>Selects the historical record's Target and reads only its same-Job screenshot.</summary>
     public void OpenHistoryContext(HistoryWorkspaceContext context)
     {
         _history = context;
         _selected = context.TargetId;
+        _screen.RequestHistory();
+        _screenBitmap = null;
     }
 
     protected override void Render(DeviceState state, StackPanel body)
@@ -48,9 +49,11 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
             body.Children.Add(HistoryContextBanner.Create(history, async () =>
             {
                 _history = null;
+                _screen.ClearHistory();
                 await RefreshAsync();
             }));
         }
+        body.Children.Add(ScreenWorkspace());
         EndVerdictIfTheDeviceMoved(state.Candidates);
         MainWindow.Instance.ShowDevices(state.Candidates);
         if (CandidateDetail(state) is { } detail) body.Children.Add(detail);
@@ -94,6 +97,14 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
         }
         body.Children.Add(Ui.Card(Targets(state), "device.targets"));
         body.Children.Add(Ui.Text("device.detail.adoptViaCLI", S.Text(UiStrings.DeviceDetailAdoptViaCLI), "ArkDeckCaptionStyle"));
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            if (_screen.HistoryPending && _history is { } context)
+            {
+                await ReadHistoryScreenAsync(context);
+            }
+            else if (_history is null) await RefreshScreenGateAsync(_selected);
+        });
     }
 
     /// <summary>The adopted Targets and the selected one's detail.</summary>
@@ -111,6 +122,7 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
             return panel;
         }
         _targets = state.Targets.Value!;
+        if (_selected is null && _targets.Count == 1) _selected = _targets[0].TargetId;
         if (_targets.Count == 0)
         {
             panel.Children.Add(Ui.Text("device.targets.empty", S.Text(UiStrings.WindowsDeviceTargetsEmpty)));
@@ -150,13 +162,23 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
 
     private async Task ShowTargetAsync(string targetId)
     {
+        var changed = _selected != targetId;
         _selected = targetId;
+        if (changed)
+        {
+            _history = null;
+            _screen.ClearHistory();
+            _screen.Select(null);
+            _screenBitmap = null;
+            RenderScreen();
+        }
         _detail.Children.Clear();
         _detail.Children.Add(Ui.Progress("device.target.loading", S.Text(UiStrings.OverviewStatusRefreshing)));
         var state = await Task.Run(() => App.Loader.TargetAsync(targetId));
         if (_selected != targetId) return;
         RenderTarget(state);
         MainWindow.Instance.Report(state);
+        if (_history is null) await RefreshScreenGateAsync(targetId);
     }
 
     private void RenderTarget(TargetDetailState state)

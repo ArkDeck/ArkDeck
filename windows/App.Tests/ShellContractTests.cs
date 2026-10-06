@@ -70,11 +70,10 @@ public sealed class ShellContractTests
     [TestMethod]
     public void TheAppHoldsNoRuntimeSemantics()
     {
-        // Stop condition: the App reads through ClientKit calls in App.Core and derives no
-        // state. Its one write is the Runtime-owned display name of an adopted Target
-        // (TASK-XPA-020, app.device.rename: host state, generation-guarded, the CLI's
-        // `target display-name set|clear`), named only by the loader; no Job, adoption,
-        // device or other business write is named anywhere in the App or App.Core.
+        // Runtime remains authoritative. Only the named App.Core facades may send their
+        // fixed published requests (including Device screenshot/input/recording); the UI
+        // owns presentation and local liveness, never admission, capabilities or lowering.
+        // Adopted Target display names remain generation-guarded host owner writes.
         var forbidden = new[] { "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "agent.run", "agent.chat", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.tool.select", "runtime.hdc.restart" };
         // TASK-XPA-020 (sessions and Job actions): a Job's cancellation request and the Session
         // catalog's pin, unpin, cleanup and export, each preview-then-apply or generation-guarded.
@@ -105,7 +104,8 @@ public sealed class ShellContractTests
             var text = File.ReadAllText(file);
             foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Settings.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs" or "Flash.cs"
-                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs" or "ScriptedDaemon.Continue.cs" or "ScriptedDaemon.Settings.cs"))
+                or "DeviceOperations.cs" or "DeviceKeyboardUpload.cs" or "ControlChannel.cs"
+                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs" or "ScriptedDaemon.Continue.cs" or "ScriptedDaemon.Settings.cs" or "ScriptedDaemon.DeviceScreen.cs"))
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }
@@ -131,6 +131,9 @@ public sealed class ShellContractTests
         {
             "capture.diagnostics", "debug.hap", "debug.template", "deploy.native-library.app-owned", "port-forward.create", "port-forward.remove",
             "flash.full-restore",
+            // TASK-XPA-020 Device: the six existing DeviceControlFacade references;
+            // request authority and capability reservation remain Runtime-owned.
+            "input.tap", "input.long-press", "input.swipe", "input.keyboard", "capture.screen-sequence",
             // Overview's prepared continuation (macOS RuntimeWorkspaceContinuation): a new
             // read-only Job of one of the two published observation operations.
             "observe.device",

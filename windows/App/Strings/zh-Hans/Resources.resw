@@ -6634,4 +6634,448 @@ SHA-256：%4$@</value>
     <value>（至 %@）</value>
     <comment>windows.device.wait.until (Windows only)</comment>
   </data>
+  <data name="device_screen_picture" xml:space="preserve">
+    <value>设备截图</value>
+    <comment>device.screen.picture (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_frame_age" xml:space="preserve">
+    <value>画面拍摄于</value>
+    <comment>device.frame.age (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_frame_none" xml:space="preserve">
+    <value>尚无画面</value>
+    <comment>device.frame.none (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gesture_longPress" xml:space="preserve">
+    <value>长按</value>
+    <comment>device.gesture.longPress (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gesture_swipe" xml:space="preserve">
+    <value>滑动</value>
+    <comment>device.gesture.swipe (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gesture_tap" xml:space="preserve">
+    <value>点击</value>
+    <comment>device.gesture.tap (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_longPress" xml:space="preserve">
+    <value>按住半秒以上，发送一次长按。</value>
+    <comment>device.gestures.longPress (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_swipe" xml:space="preserve">
+    <value>拖动发送一次滑动；你按住的时长就是滑动时长。</value>
+    <comment>device.gestures.swipe (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_tap" xml:space="preserve">
+    <value>单击画面，在该点发送一次点击。</value>
+    <comment>device.gestures.tap (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_title" xml:space="preserve">
+    <value>操作方式</value>
+    <comment>device.gestures.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_captureFailed" xml:space="preserve">
+    <value>截图失败</value>
+    <comment>device.log.captureFailed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_captured" xml:space="preserve">
+    <value>已获取截图</value>
+    <comment>device.log.captured (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_confirmed" xml:space="preserve">
+    <value>已确认</value>
+    <comment>device.log.confirmed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_empty" xml:space="preserve">
+    <value>尚未发送任何操作。</value>
+    <comment>device.log.empty (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_failed" xml:space="preserve">
+    <value>失败</value>
+    <comment>device.log.failed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_title" xml:space="preserve">
+    <value>操作记录</value>
+    <comment>device.log.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_unknown" xml:space="preserve">
+    <value>结果未知</value>
+    <comment>device.log.unknown (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_capture" xml:space="preserve">
+    <value>获取截图</value>
+    <comment>device.screen.capture (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_capturing" xml:space="preserve">
+    <value>正在获取截图…</value>
+    <comment>device.screen.capturing (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_empty_ready" xml:space="preserve">
+    <value>获取一张截图后即可在其上操作设备。</value>
+    <comment>device.screen.empty.ready (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_empty_title" xml:space="preserve">
+    <value>尚未获取截图</value>
+    <comment>device.screen.empty.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_stale_badge" xml:space="preserve">
+    <value>已过期</value>
+    <comment>device.stale.badge (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_stale_refused" xml:space="preserve">
+    <value>未发送——这张画面已经过期</value>
+    <comment>device.stale.refused (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_stale_refused_detail" xml:space="preserve">
+    <value>上一个手势已经改变了设备。再点之前先取一张新截图——在这张图上选的位置，已经不是它原来指的东西了。</value>
+    <comment>device.stale.refused.detail (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_target_none" xml:space="preserve">
+    <value>无设备</value>
+    <comment>device.target.none (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_target_none_detail" xml:space="preserve">
+    <value>真机操作会写设备，因此不会替你猜是哪一台。</value>
+    <comment>device.target.none.detail (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_title" xml:space="preserve">
+    <value>录屏</value>
+    <comment>device.record.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_start" xml:space="preserve">
+    <value>录制</value>
+    <comment>device.record.start (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_frames" xml:space="preserve">
+    <value>帧</value>
+    <comment>device.record.frames (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_preflighting" xml:space="preserve">
+    <value>检查空间中</value>
+    <comment>device.record.preflighting (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_capturing" xml:space="preserve">
+    <value>采集中</value>
+    <comment>device.record.capturing (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_assembling" xml:space="preserve">
+    <value>合成中</value>
+    <comment>device.record.assembling (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_validating" xml:space="preserve">
+    <value>校验中</value>
+    <comment>device.record.validating (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_ready" xml:space="preserve">
+    <value>录屏已就绪</value>
+    <comment>device.record.ready (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_failed" xml:space="preserve">
+    <value>录屏失败</value>
+    <comment>device.record.failed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_saveAs" xml:space="preserve">
+    <value>另存为…</value>
+    <comment>device.record.saveAs (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_saveFailed" xml:space="preserve">
+    <value>无法保存录屏</value>
+    <comment>device.record.saveFailed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_again" xml:space="preserve">
+    <value>再录一段</value>
+    <comment>device.record.again (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_rate" xml:space="preserve">
+    <value>实测</value>
+    <comment>device.record.rate (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_gap" xml:space="preserve">
+    <value>帧丢失</value>
+    <comment>device.record.gap (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_timeline" xml:space="preserve">
+    <value>各帧按实际拍摄间距排布，不是按平均值。</value>
+    <comment>device.record.timeline (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_noRoom" xml:space="preserve">
+    <value>放不下这段录屏</value>
+    <comment>device.record.noRoom (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_noRoom_detail" xml:space="preserve">
+    <value>制品库会拒绝新录屏，而不是删掉你已有的那一段。</value>
+    <comment>device.record.noRoom.detail (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_wouldFit" xml:space="preserve">
+    <value>放得下</value>
+    <comment>device.record.wouldFit (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_needs" xml:space="preserve">
+    <value>需要</value>
+    <comment>device.record.needs (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_free" xml:space="preserve">
+    <value>剩余</value>
+    <comment>device.record.free (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_headroomUnknown" xml:space="preserve">
+    <value>读不到制品库剩余空间，这次运行没有对它做检查。运行时仍会拒绝一段它存不下的录屏。</value>
+    <comment>device.record.headroomUnknown (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_clipboardConsent" xml:space="preserve">
+    <value>允许这段文字替换设备剪贴板</value>
+    <comment>device.input.clipboardConsent (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_focusHelp" xml:space="preserve">
+    <value>向默认屏幕当前焦点发送一个按键或一段文字。每次输入后请刷新画面。</value>
+    <comment>device.input.focusHelp (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key" xml:space="preserve">
+    <value>按键</value>
+    <comment>device.input.key (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_privacyHelp" xml:space="preserve">
+    <value>文字保存为本地敏感 Artifact。中文等输入会使用设备剪贴板。成功仅表示注入器已接受，请查看设备确认结果。</value>
+    <comment>device.input.privacyHelp (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_sendKey" xml:space="preserve">
+    <value>发送按键</value>
+    <comment>device.input.sendKey (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_sendText" xml:space="preserve">
+    <value>发送文字</value>
+    <comment>device.input.sendText (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_text" xml:space="preserve">
+    <value>文字 · 最多 512 个 UTF-8 字节</value>
+    <comment>device.input.text (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_title" xml:space="preserve">
+    <value>设备键盘</value>
+    <comment>device.input.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowDown" xml:space="preserve">
+    <value>下方向键</value>
+    <comment>device.input.key.arrowDown (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowLeft" xml:space="preserve">
+    <value>左方向键</value>
+    <comment>device.input.key.arrowLeft (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowRight" xml:space="preserve">
+    <value>右方向键</value>
+    <comment>device.input.key.arrowRight (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowUp" xml:space="preserve">
+    <value>上方向键</value>
+    <comment>device.input.key.arrowUp (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_back" xml:space="preserve">
+    <value>设备返回</value>
+    <comment>device.input.key.back (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_backspace" xml:space="preserve">
+    <value>退格</value>
+    <comment>device.input.key.backspace (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_enter" xml:space="preserve">
+    <value>回车</value>
+    <comment>device.input.key.enter (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_escape" xml:space="preserve">
+    <value>Escape</value>
+    <comment>device.input.key.escape (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_home" xml:space="preserve">
+    <value>设备主页</value>
+    <comment>device.input.key.home (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_tab" xml:space="preserve">
+    <value>制表键</value>
+    <comment>device.input.key.tab (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_device_screen_screenTitle" xml:space="preserve">
+    <value>设备画面</value>
+    <comment>windows.device.screen.screenTitle (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_historical" xml:space="preserve">
+    <value>历史截图 · 无法发送输入</value>
+    <comment>windows.device.screen.historical (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_current" xml:space="preserve">
+    <value>当前画面</value>
+    <comment>windows.device.screen.current (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_busy" xml:space="preserve">
+    <value>操作正在进行，请等待结果。</value>
+    <comment>windows.device.screen.busy (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_inputConfirmed" xml:space="preserve">
+    <value>注入器已接受输入。再次输入前请重新截图。</value>
+    <comment>windows.device.screen.inputConfirmed (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_inputUnknown" xml:space="preserve">
+    <value>结果未知。不要重发本次意图，请检查其 Job。</value>
+    <comment>windows.device.screen.inputUnknown (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_inputFailed" xml:space="preserve">
+    <value>输入未获确认。请检查其 Job 或拒绝原因。</value>
+    <comment>windows.device.screen.inputFailed (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_pointerHelp" xml:space="preserve">
+    <value>按 Tab 聚焦画面。方向键移动指针，Shift 加速。回车或空格点击，Alt+回车长按，Shift+回车设置并完成滑动，Esc 清除起点。</value>
+    <comment>windows.device.screen.pointerHelp (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_pointerPosition" xml:space="preserve">
+    <value>指针 %@，%@</value>
+    <comment>windows.device.screen.pointerPosition (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_recordSummary" xml:space="preserve">
+    <value>%@ 帧 · %@ 秒 · 实测 %@ 帧/秒 · 缺失 %@ 帧</value>
+    <comment>windows.device.screen.recordSummary (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieSummary" xml:space="preserve">
+    <value>本地 MP4 · %@ 字节 · %@ × %@ · SHA-256 %@</value>
+    <comment>windows.device.screen.movieSummary (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieLocal" xml:space="preserve">
+    <value>此影片在本地由 Runtime 帧合成，不是 Runtime Artifact 或硬件验收结论。</value>
+    <comment>windows.device.screen.movieLocal (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieUnavailable" xml:space="preserve">
+    <value>原生影片合成不可用。可保存已核验的帧和实测时序。</value>
+    <comment>windows.device.screen.movieUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieReveal" xml:space="preserve">
+    <value>在资源管理器中显示</value>
+    <comment>windows.device.screen.movieReveal (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_saveFrames" xml:space="preserve">
+    <value>保存帧和时序…</value>
+    <comment>windows.device.screen.saveFrames (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_saved" xml:space="preserve">
+    <value>已保存 %@</value>
+    <comment>windows.device.screen.saved (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_decodeFailed" xml:space="preserve">
+    <value>截图无法解码，未启用输入。</value>
+    <comment>windows.device.screen.decodeFailed (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_boundary" xml:space="preserve">
+    <value>每次手势发送一个 typed operation。输入已确认或结果未知时画面会过期，需重新截图。未知意图永不重放。</value>
+    <comment>windows.device.screen.boundary (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_frameSummary" xml:space="preserve">
+    <value>%@ × %@ · Job %@ · Artifact %@</value>
+    <comment>windows.device.screen.frameSummary (Windows only)</comment>
+  </data>
+  <data name="diagnostics_capture_duration" xml:space="preserve">
+    <value>最长录制</value>
+    <comment>diagnostics.capture.duration (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_stop" xml:space="preserve">
+    <value>停止并保存</value>
+    <comment>diagnostics.capture.stop (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_cancelPreparation" xml:space="preserve">
+    <value>取消准备</value>
+    <comment>diagnostics.capture.cancelPreparation (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_refresh" xml:space="preserve">
+    <value>刷新状态</value>
+    <comment>diagnostics.capture.refresh (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_marks" xml:space="preserve">
+    <value>标记</value>
+    <comment>diagnostics.capture.marks (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_chooseTarget" xml:space="preserve">
+    <value>绑定一台设备后开始采集。</value>
+    <comment>diagnostics.capture.chooseTarget (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_uncertain" xml:space="preserve">
+    <value>会话状态不确定。请刷新状态或在 History 查看此 Job，再决定后续操作。</value>
+    <comment>diagnostics.capture.uncertain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_boundary" xml:space="preserve">
+    <value>有界 Trace 采集，标记使用主机时间；日志在录制后读取。标记不含截图，也未与设备时钟校准。关闭页面后，Runtime 仍会按时限停止录制。</value>
+    <comment>diagnostics.capture.boundary (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_preparing" xml:space="preserve">
+    <value>准备中</value>
+    <comment>diagnostics.capture.state.preparing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_recording" xml:space="preserve">
+    <value>录制中</value>
+    <comment>diagnostics.capture.state.recording (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_finalizing" xml:space="preserve">
+    <value>保存中</value>
+    <comment>diagnostics.capture.state.finalizing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_interrupted" xml:space="preserve">
+    <value>已中断 · 请检查结果</value>
+    <comment>diagnostics.capture.state.interrupted (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_closed" xml:space="preserve">
+    <value>会话已结束</value>
+    <comment>diagnostics.capture.state.closed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_checking" xml:space="preserve">
+    <value>检查设备和存储空间</value>
+    <comment>diagnostics.capture.phase.checking (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_submitting" xml:space="preserve">
+    <value>提交采集</value>
+    <comment>diagnostics.capture.phase.submitting (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_active" xml:space="preserve">
+    <value>等待 Runtime</value>
+    <comment>diagnostics.capture.phase.active (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_finished" xml:space="preserve">
+    <value>会话已结束</value>
+    <comment>diagnostics.capture.phase.finished (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_unavailable" xml:space="preserve">
+    <value>无法开始此次采集</value>
+    <comment>diagnostics.capture.phase.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_uncertain" xml:space="preserve">
+    <value>会话状态不确定</value>
+    <comment>diagnostics.capture.phase.uncertain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_title" xml:space="preserve">
+    <value>开源许可证</value>
+    <comment>windows.settings.trace.licenses.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_product" xml:space="preserve">
+    <value>ArkTrace — MIT 许可证</value>
+    <comment>windows.settings.trace.licenses.product (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_notices" xml:space="preserve">
+    <value>第三方声明</value>
+    <comment>windows.settings.trace.licenses.notices (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_unavailable" xml:space="preserve">
+    <value>此构建中无法使用许可证资源。</value>
+    <comment>windows.settings.trace.licenses.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_reveal" xml:space="preserve">
+    <value>在资源管理器中显示许可证文件</value>
+    <comment>windows.settings.trace.licenses.reveal (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_revealFailed" xml:space="preserve">
+    <value>无法安全打开许可证文件。</value>
+    <comment>windows.settings.trace.licenses.revealFailed (Windows only)</comment>
+  </data>
+  <data name="diagnostics_alignment_observedWindow" xml:space="preserve">
+    <value>时钟测量窗口：{milliseconds} ms。跨时钟误差仍待验证。</value>
+    <comment>diagnostics.alignment.observedWindow (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_clockDiscontinuity" xml:space="preserve">
+    <value>测量期间主机时间发生跳变，不能据此对齐轨道。</value>
+    <comment>diagnostics.alignment.clockDiscontinuity (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
 </root>

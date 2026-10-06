@@ -6634,4 +6634,448 @@ SHA-256: %4$@</value>
     <value>(until %@)</value>
     <comment>windows.device.wait.until (Windows only)</comment>
   </data>
+  <data name="device_screen_picture" xml:space="preserve">
+    <value>Device screenshot</value>
+    <comment>device.screen.picture (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_frame_age" xml:space="preserve">
+    <value>Picture taken</value>
+    <comment>device.frame.age (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_frame_none" xml:space="preserve">
+    <value>No picture yet</value>
+    <comment>device.frame.none (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gesture_longPress" xml:space="preserve">
+    <value>Long press</value>
+    <comment>device.gesture.longPress (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gesture_swipe" xml:space="preserve">
+    <value>Swipe</value>
+    <comment>device.gesture.swipe (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gesture_tap" xml:space="preserve">
+    <value>Tap</value>
+    <comment>device.gesture.tap (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_longPress" xml:space="preserve">
+    <value>Hold for half a second to send a long press.</value>
+    <comment>device.gestures.longPress (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_swipe" xml:space="preserve">
+    <value>Drag to send a swipe; the time you held it is the swipe's duration.</value>
+    <comment>device.gestures.swipe (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_tap" xml:space="preserve">
+    <value>Click the picture to send a tap at that point.</value>
+    <comment>device.gestures.tap (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_gestures_title" xml:space="preserve">
+    <value>How input works</value>
+    <comment>device.gestures.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_captureFailed" xml:space="preserve">
+    <value>Screenshot failed</value>
+    <comment>device.log.captureFailed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_captured" xml:space="preserve">
+    <value>Screenshot captured</value>
+    <comment>device.log.captured (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_confirmed" xml:space="preserve">
+    <value>confirmed</value>
+    <comment>device.log.confirmed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_empty" xml:space="preserve">
+    <value>Nothing sent yet.</value>
+    <comment>device.log.empty (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_failed" xml:space="preserve">
+    <value>failed</value>
+    <comment>device.log.failed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_title" xml:space="preserve">
+    <value>Operation log</value>
+    <comment>device.log.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_log_unknown" xml:space="preserve">
+    <value>outcome unknown</value>
+    <comment>device.log.unknown (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_capture" xml:space="preserve">
+    <value>Get screenshot</value>
+    <comment>device.screen.capture (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_capturing" xml:space="preserve">
+    <value>Capturing…</value>
+    <comment>device.screen.capturing (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_empty_ready" xml:space="preserve">
+    <value>Get a screenshot to act on the device.</value>
+    <comment>device.screen.empty.ready (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_screen_empty_title" xml:space="preserve">
+    <value>No screenshot yet</value>
+    <comment>device.screen.empty.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_stale_badge" xml:space="preserve">
+    <value>Out of date</value>
+    <comment>device.stale.badge (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_stale_refused" xml:space="preserve">
+    <value>Not sent — this picture is out of date</value>
+    <comment>device.stale.refused (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_stale_refused_detail" xml:space="preserve">
+    <value>Your last gesture changed the device. Get a new screenshot before pressing again; a point picked on this one no longer means what it did.</value>
+    <comment>device.stale.refused.detail (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_target_none" xml:space="preserve">
+    <value>No device</value>
+    <comment>device.target.none (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_target_none_detail" xml:space="preserve">
+    <value>Device sends device mutations and will not guess which device you meant.</value>
+    <comment>device.target.none.detail (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_title" xml:space="preserve">
+    <value>Recording</value>
+    <comment>device.record.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_start" xml:space="preserve">
+    <value>Record</value>
+    <comment>device.record.start (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_frames" xml:space="preserve">
+    <value>frames</value>
+    <comment>device.record.frames (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_preflighting" xml:space="preserve">
+    <value>Checking storage</value>
+    <comment>device.record.preflighting (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_capturing" xml:space="preserve">
+    <value>Capturing</value>
+    <comment>device.record.capturing (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_assembling" xml:space="preserve">
+    <value>Assembling</value>
+    <comment>device.record.assembling (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_validating" xml:space="preserve">
+    <value>Validating</value>
+    <comment>device.record.validating (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_ready" xml:space="preserve">
+    <value>Recording ready</value>
+    <comment>device.record.ready (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_failed" xml:space="preserve">
+    <value>Recording failed</value>
+    <comment>device.record.failed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_saveAs" xml:space="preserve">
+    <value>Save As…</value>
+    <comment>device.record.saveAs (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_saveFailed" xml:space="preserve">
+    <value>Couldn’t save recording</value>
+    <comment>device.record.saveFailed (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_again" xml:space="preserve">
+    <value>Record again</value>
+    <comment>device.record.again (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_rate" xml:space="preserve">
+    <value>measured</value>
+    <comment>device.record.rate (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_gap" xml:space="preserve">
+    <value>frames were lost</value>
+    <comment>device.record.gap (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_timeline" xml:space="preserve">
+    <value>Frames are laid out at the spacing they were taken at, not at an average.</value>
+    <comment>device.record.timeline (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_noRoom" xml:space="preserve">
+    <value>Not enough room to keep this recording</value>
+    <comment>device.record.noRoom (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_noRoom_detail" xml:space="preserve">
+    <value>The artifact store refuses a new recording rather than deleting one you already have.</value>
+    <comment>device.record.noRoom.detail (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_wouldFit" xml:space="preserve">
+    <value>would fit</value>
+    <comment>device.record.wouldFit (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_needs" xml:space="preserve">
+    <value>needs</value>
+    <comment>device.record.needs (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_free" xml:space="preserve">
+    <value>free</value>
+    <comment>device.record.free (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_record_headroomUnknown" xml:space="preserve">
+    <value>Could not read the artifact store's remaining room, so this run was not checked against it. The runtime still refuses a recording it cannot keep.</value>
+    <comment>device.record.headroomUnknown (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_clipboardConsent" xml:space="preserve">
+    <value>Allow this text to replace the device clipboard</value>
+    <comment>device.input.clipboardConsent (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_focusHelp" xml:space="preserve">
+    <value>Send one key or text to the current focus on the default display. Refresh the picture after each input.</value>
+    <comment>device.input.focusHelp (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key" xml:space="preserve">
+    <value>Key</value>
+    <comment>device.input.key (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_privacyHelp" xml:space="preserve">
+    <value>Text is retained as a sensitive local Artifact. Some input, including Chinese, uses the device clipboard. Success confirms injector acceptance; check the device for the result.</value>
+    <comment>device.input.privacyHelp (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_sendKey" xml:space="preserve">
+    <value>Send key</value>
+    <comment>device.input.sendKey (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_sendText" xml:space="preserve">
+    <value>Send text</value>
+    <comment>device.input.sendText (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_text" xml:space="preserve">
+    <value>Text · up to 512 UTF-8 bytes</value>
+    <comment>device.input.text (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_title" xml:space="preserve">
+    <value>Device keyboard</value>
+    <comment>device.input.title (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowDown" xml:space="preserve">
+    <value>Down arrow</value>
+    <comment>device.input.key.arrowDown (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowLeft" xml:space="preserve">
+    <value>Left arrow</value>
+    <comment>device.input.key.arrowLeft (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowRight" xml:space="preserve">
+    <value>Right arrow</value>
+    <comment>device.input.key.arrowRight (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_arrowUp" xml:space="preserve">
+    <value>Up arrow</value>
+    <comment>device.input.key.arrowUp (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_back" xml:space="preserve">
+    <value>Device Back</value>
+    <comment>device.input.key.back (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_backspace" xml:space="preserve">
+    <value>Backspace</value>
+    <comment>device.input.key.backspace (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_enter" xml:space="preserve">
+    <value>Enter</value>
+    <comment>device.input.key.enter (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_escape" xml:space="preserve">
+    <value>Escape</value>
+    <comment>device.input.key.escape (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_home" xml:space="preserve">
+    <value>Device Home</value>
+    <comment>device.input.key.home (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="device_input_key_tab" xml:space="preserve">
+    <value>Tab</value>
+    <comment>device.input.key.tab (DeviceLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_device_screen_screenTitle" xml:space="preserve">
+    <value>Device screen</value>
+    <comment>windows.device.screen.screenTitle (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_historical" xml:space="preserve">
+    <value>Historical screenshot · input unavailable</value>
+    <comment>windows.device.screen.historical (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_current" xml:space="preserve">
+    <value>Current picture</value>
+    <comment>windows.device.screen.current (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_busy" xml:space="preserve">
+    <value>An operation is in progress. Wait for its outcome.</value>
+    <comment>windows.device.screen.busy (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_inputConfirmed" xml:space="preserve">
+    <value>Injector accepted the input. Capture again before the next input.</value>
+    <comment>windows.device.screen.inputConfirmed (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_inputUnknown" xml:space="preserve">
+    <value>Outcome unknown. Never resend this intent; inspect its Job.</value>
+    <comment>windows.device.screen.inputUnknown (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_inputFailed" xml:space="preserve">
+    <value>Input not confirmed. Inspect its Job or refusal.</value>
+    <comment>windows.device.screen.inputFailed (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_pointerHelp" xml:space="preserve">
+    <value>Tab focuses the picture. Arrows move the pointer; Shift moves faster. Enter or Space taps, Alt+Enter holds, Shift+Enter sets then completes a swipe. Escape clears its start.</value>
+    <comment>windows.device.screen.pointerHelp (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_pointerPosition" xml:space="preserve">
+    <value>Pointer %@, %@</value>
+    <comment>windows.device.screen.pointerPosition (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_recordSummary" xml:space="preserve">
+    <value>%@ frames · %@ seconds · %@ measured frames/s · %@ missing</value>
+    <comment>windows.device.screen.recordSummary (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieSummary" xml:space="preserve">
+    <value>Local MP4 · %@ bytes · %@ × %@ · SHA-256 %@</value>
+    <comment>windows.device.screen.movieSummary (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieLocal" xml:space="preserve">
+    <value>This movie is composed locally from Runtime frames; it is not a Runtime Artifact or hardware verdict.</value>
+    <comment>windows.device.screen.movieLocal (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieUnavailable" xml:space="preserve">
+    <value>Native movie composition is unavailable. Save the verified frames and measured timings instead.</value>
+    <comment>windows.device.screen.movieUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_movieReveal" xml:space="preserve">
+    <value>Show in Explorer</value>
+    <comment>windows.device.screen.movieReveal (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_saveFrames" xml:space="preserve">
+    <value>Save frames and timings…</value>
+    <comment>windows.device.screen.saveFrames (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_saved" xml:space="preserve">
+    <value>Saved %@</value>
+    <comment>windows.device.screen.saved (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_decodeFailed" xml:space="preserve">
+    <value>The screenshot could not be decoded. No input is enabled.</value>
+    <comment>windows.device.screen.decodeFailed (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_boundary" xml:space="preserve">
+    <value>Each gesture sends one typed operation. Confirmed or unknown input makes this picture out of date; capture again. Unknown intent is never replayed.</value>
+    <comment>windows.device.screen.boundary (Windows only)</comment>
+  </data>
+  <data name="windows_device_screen_frameSummary" xml:space="preserve">
+    <value>%@ × %@ · Job %@ · Artifact %@</value>
+    <comment>windows.device.screen.frameSummary (Windows only)</comment>
+  </data>
+  <data name="diagnostics_capture_duration" xml:space="preserve">
+    <value>Maximum recording</value>
+    <comment>diagnostics.capture.duration (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_stop" xml:space="preserve">
+    <value>Stop and save</value>
+    <comment>diagnostics.capture.stop (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_cancelPreparation" xml:space="preserve">
+    <value>Cancel preparation</value>
+    <comment>diagnostics.capture.cancelPreparation (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_refresh" xml:space="preserve">
+    <value>Refresh status</value>
+    <comment>diagnostics.capture.refresh (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_marks" xml:space="preserve">
+    <value>Markers</value>
+    <comment>diagnostics.capture.marks (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_chooseTarget" xml:space="preserve">
+    <value>Adopt one device to start a session.</value>
+    <comment>diagnostics.capture.chooseTarget (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_uncertain" xml:space="preserve">
+    <value>Session state is uncertain. Refresh or inspect this Job in History before starting another capture.</value>
+    <comment>diagnostics.capture.uncertain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_boundary" xml:space="preserve">
+    <value>Bounded trace with host-timed markers; logs drain after capture. Markers have no screenshots or device-clock calibration. Recording stops at its Runtime deadline even if this view closes.</value>
+    <comment>diagnostics.capture.boundary (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_preparing" xml:space="preserve">
+    <value>Preparing</value>
+    <comment>diagnostics.capture.state.preparing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_recording" xml:space="preserve">
+    <value>Recording</value>
+    <comment>diagnostics.capture.state.recording (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_finalizing" xml:space="preserve">
+    <value>Saving</value>
+    <comment>diagnostics.capture.state.finalizing (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_interrupted" xml:space="preserve">
+    <value>Interrupted · outcome needs inspection</value>
+    <comment>diagnostics.capture.state.interrupted (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_state_closed" xml:space="preserve">
+    <value>Session ended</value>
+    <comment>diagnostics.capture.state.closed (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_checking" xml:space="preserve">
+    <value>Checking device and storage</value>
+    <comment>diagnostics.capture.phase.checking (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_submitting" xml:space="preserve">
+    <value>Submitting session</value>
+    <comment>diagnostics.capture.phase.submitting (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_active" xml:space="preserve">
+    <value>Waiting for Runtime</value>
+    <comment>diagnostics.capture.phase.active (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_finished" xml:space="preserve">
+    <value>Session ended</value>
+    <comment>diagnostics.capture.phase.finished (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_unavailable" xml:space="preserve">
+    <value>Unable to start this session</value>
+    <comment>diagnostics.capture.phase.unavailable (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_capture_phase_uncertain" xml:space="preserve">
+    <value>Session state is uncertain</value>
+    <comment>diagnostics.capture.phase.uncertain (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_title" xml:space="preserve">
+    <value>Open Source Licenses</value>
+    <comment>windows.settings.trace.licenses.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_product" xml:space="preserve">
+    <value>ArkTrace — MIT License</value>
+    <comment>windows.settings.trace.licenses.product (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_notices" xml:space="preserve">
+    <value>Third-Party Notices</value>
+    <comment>windows.settings.trace.licenses.notices (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_unavailable" xml:space="preserve">
+    <value>License resources are unavailable in this build.</value>
+    <comment>windows.settings.trace.licenses.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_reveal" xml:space="preserve">
+    <value>Show License Files in Explorer</value>
+    <comment>windows.settings.trace.licenses.reveal (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_licenses_revealFailed" xml:space="preserve">
+    <value>License files could not be opened safely.</value>
+    <comment>windows.settings.trace.licenses.revealFailed (Windows only)</comment>
+  </data>
+  <data name="diagnostics_alignment_observedWindow" xml:space="preserve">
+    <value>Clock observation window: {milliseconds} ms. Cross-clock accuracy still needs validation.</value>
+    <comment>diagnostics.alignment.observedWindow (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="diagnostics_alignment_clockDiscontinuity" xml:space="preserve">
+    <value>The host clock changed during measurement. This observation cannot align the tracks.</value>
+    <comment>diagnostics.alignment.clockDiscontinuity (DiagnosticsLocalizable.xcstrings)</comment>
+  </data>
 </root>
