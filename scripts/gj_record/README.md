@@ -141,7 +141,8 @@ publish, the criterion reads the execution that does. The criterion itself is ne
   "Exactly one new crash-index entry" is counted against `-baseline`.
 - **GJ-4.** No firmware version is hard-pinned. The version witness is the unique
   `const.ohos.fullname=` declaration in `system.img` inside the consumed archive's
-  whole captured Runtime bytes. Machine readback, `post-flash-facts.json` and the
+  whole captured Runtime bytes. Machine readback, both `firmware` and
+  `const.ohos.fullname` in `post-flash-facts.json`, and the
   independent postflight observe must equal it. Missing proof stays incomplete;
   inconsistent receipt/consumption/bytes or malformed/ambiguous declarations fail.
   Filenames, caller values and the device's existing version are never witnesses.

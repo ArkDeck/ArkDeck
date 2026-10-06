@@ -615,6 +615,8 @@ def gj4(context: Context) -> None:
         facts = context.document(contents, "post-flash-facts.json", execution)
         if expected_firmware is not None:
             judge.expect(f"{execution}: post-flash-facts firmware", (facts or {}).get("firmware"), expected_firmware)
+            judge.expect(f"{execution}: post-flash-facts runtime version", (facts or {}).get("const.ohos.fullname"),
+                         expected_firmware)
         report = context.document(contents, "flash-report.json", execution)
         if report is not None:
             judge.expect(f"{execution}: flash-report completeness", report.get("completeness"), "complete")

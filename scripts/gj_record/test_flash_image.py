@@ -92,7 +92,7 @@ def proof(archive=None, *, chunk=256):
 
 
 def append_journey(journal, *, version="OpenHarmony-7.0.0.36", readback=None, postflight=None,
-                   capture_import=True):
+                   capture_import=True, facts_version=None):
     result, inspection, original = fixture()
     archive = original if version == "OpenHarmony-7.0.0.36" else image(version.encode())
     run, flash = proof(archive)
@@ -117,9 +117,28 @@ def append_journey(journal, *, version="OpenHarmony-7.0.0.36", readback=None, po
         if row["name"] == "post-flash-facts.json":
             facts = json.loads(content)
             facts["firmware"] = readback or version
+            facts["const.ohos.fullname"] = facts_version or readback or version
+            facts.update(targetId=TARGET, catalogDigest=journal.digest)
             content = json.dumps(facts).encode()
             row.update(sha256=hashlib.sha256(content).hexdigest(), byteCount=str(len(content)))
         payloads.append((row, content))
+    # Keep every duplicated producer reference honest after the explicitly
+    # synthetic version/scope substitution; negative properties remain hash-
+    # verified contradictory facts, not corrupt bytes.
+    by_name = {row["name"]: row for row, _ in payloads}
+    for index, (row, content) in enumerate(payloads):
+        if row["name"] == "flash-report.json":
+            report = json.loads(content)
+            report.update(targetId=TARGET, catalogDigest=journal.digest)
+            for name, reference in report["artifacts"].items():
+                reference.update(sha256=by_name[name]["sha256"], byteCount=int(by_name[name]["byteCount"]))
+            content = json.dumps(report).encode()
+            row.update(sha256=hashlib.sha256(content).hexdigest(), byteCount=str(len(content)))
+            payloads[index] = row, content
+    by_id = {row["artifactId"]: row for row, _ in payloads}
+    for reference in evidence["artifacts"]:
+        row = by_id[reference["reference"].rsplit("/", 1)[1]]
+        reference.update(targetId=TARGET, sha256=row["sha256"], byteCount=row["byteCount"])
     journal.ok("job.result", ["job", "result", "--job", job["jobId"]], result)
     for row, content in payloads:
         journal.ok("artifact.read", ["artifact", "read", "--job", job["jobId"], "--artifact", row["artifactId"]], {
@@ -346,6 +365,13 @@ class GoldenJourneyFourImageTests(Case):
         journey = self.journey(self.assemble(names=("GJ-4",)), "GJ-4")
         self.assertEqual(journey["state"], DEFECT)
         self.assertIn("restored image firmware", journey["firstFailingCriterion"]["criterion"])
+
+    def test_post_flash_runtime_property_cannot_contradict_its_firmware(self):
+        self.journal.facts()
+        append_journey(self.journal, version="OpenHarmony-7.0.0.43", facts_version="OpenHarmony-7.0.0.36")
+        journey = self.journey(self.assemble(names=("GJ-4",)), "GJ-4")
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertIn("post-flash-facts runtime version", journey["firstFailingCriterion"]["criterion"])
 
     def test_no_caller_or_filename_fallback_when_import_not_captured(self):
         self.journal.facts()
