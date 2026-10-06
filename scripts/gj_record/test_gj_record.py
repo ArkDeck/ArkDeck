@@ -666,7 +666,7 @@ class LaterJourneyTests(Case):
         failing = self.journey(self.assemble(names=("GJ-4",)), "GJ-4")["firstFailingCriterion"]
         self.assertIn("published", failing["criterion"])
 
-    def gj5(self, *, crash_after_fix=1, ledger_changes=False):
+    def gj5(self, *, crash_after_fix=1, ledger_changes=False, signature_change=None):
         j = self.journal
 
         def ledger(entries):
@@ -681,8 +681,20 @@ class LaterJourneyTests(Case):
         j.job(f"gj5-{D}-repro", "debug.hap@1", {"install-readback.json": b"{}"})
         j.job(f"gj5-{D}-repro-capture", "capture.diagnostics@1", {
             "application-liveness.json": liveness("UNHEALTHY", "targetProcessNotRunning"), "crash-index.txt": ledger(1)})
+        answer = {"schemaVersion": "1.0.0", "analyzerRef": "crash-signature@1",
+                  "analyzerVersion": "arkdeck-fault-log-ledger@1", "status": "answered",
+                  "entries": [{"name": "cppcrash-app-1", "kind": "cppcrash", "bundle": "app",
+                               "uid": "1", "timestamp": "20261005010001"}]}
+        analyzer_output = json.dumps(answer, sort_keys=True, separators=(",", ":")).encode()
+        signature = {"schemaVersion": "1.0.0", "analyzerRef": answer["analyzerRef"],
+                     "analyzerVersion": answer["analyzerVersion"],
+                     "sourceArtifactID": f"ART-{j.artifacts:04d}", "sourceSHA256": sha(ledger(1)),
+                     "sourceByteCount": len(ledger(1)), "analyzerOutputSHA256": sha(analyzer_output),
+                     "analyzerOutputByteCount": len(analyzer_output), "result": answer}
+        if signature_change is not None:
+            signature_change(signature)
         j.job(f"gj5-{D}-analyze", "analyzer.extract-crash-signature@1", {
-            "crash-signature.json": json.dumps({"status": "answered", "entries": [{}]}).encode()})
+            "crash-signature.json": json.dumps(signature).encode()})
         j.job(f"gj5-{D}-isolate", "workspace.prepare-isolated-copy@1", {
             "isolated-workspace.json": json.dumps({"workspaceRevision": "r1"}).encode()})
         j.job(f"gj5-{D}-patch", "workspace.apply-patch@1", {
@@ -712,6 +724,72 @@ class LaterJourneyTests(Case):
         journey = self.gj5()
         self.assertEqual(journey["state"], PASS, journey.get("firstFailingCriterion"))
         self.assertEqual(len(journey["zeroDispatchChecks"]), 3)
+
+    def test_gj5_rejects_missing_derived_signature_result(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value.pop("result"))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature derived Artifact wrapper")
+
+    def test_gj5_rejects_an_invented_flat_signature_artifact(self):
+        def flatten(value):
+            value.clear()
+            value.update(status="answered", entries=[])
+        self.journal.facts()
+        journey = self.gj5(signature_change=flatten)
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature derived Artifact wrapper")
+
+    def test_gj5_rejects_invalid_derived_signature_result(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value.update(result=[{"status": "answered"}]))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature derived Artifact wrapper")
+
+    def test_gj5_rejects_wrong_derived_signature_schema(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value["result"].update(schemaVersion="2.0.0"))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature derived Artifact wrapper")
+
+    def test_gj5_rejects_invalid_decoded_crash_entry(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value["result"].update(entries=[{"name": "only-name"}]))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature derived Artifact wrapper")
+
+    def test_gj5_unanswered_derived_signature_keeps_original_status_criterion(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value["result"].update(status="unreadable"))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"], "analyze: crash signature status")
+        self.assertEqual(journey["firstFailingCriterion"]["raw"], "unreadable")
+
+    def test_gj5_rejects_signature_from_another_complete_crash_source(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value.update(sourceArtifactID="ART-OTHER"))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature source provenance")
+
+    def test_gj5_rejects_changed_source_digest(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value.update(sourceSHA256="0" * 64))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature source provenance")
+
+    def test_gj5_rejects_boolean_source_byte_count(self):
+        self.journal.facts()
+        journey = self.gj5(signature_change=lambda value: value.update(sourceByteCount=True))
+        self.assertEqual(journey["state"], DEFECT)
+        self.assertEqual(journey["firstFailingCriterion"]["criterion"],
+                         "analyze: crash signature source provenance")
 
     def test_gj5_with_a_new_crash_after_the_fix_is_a_defect(self):
         self.journal.facts()
