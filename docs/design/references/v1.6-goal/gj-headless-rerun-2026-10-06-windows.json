@@ -1,0 +1,1044 @@
+{
+  "schemaVersion": "arkdeck.gj-headless-rerun/1",
+  "date": "2026-10-06",
+  "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md",
+  "generator": "scripts/gj_record",
+  "host": {
+    "system": "Windows",
+    "osBuild": "10.0.26200"
+  },
+  "journeys": [
+    {
+      "date": "2026-10-06",
+      "goldenJourney": "GJ-1",
+      "state": "REAL_DEVICE_PASS",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+      "runtimeSourceRevision": "d238a55c7b693adc7edbf6314699e920f0ee1e08",
+      "runtimeExecutableSHA256": "0511ee0d7c799ee5608b93a66a8dfe80d11fb0d6debe97e28a47a7912abbdff4",
+      "cliBuildIdentity": "sha256:60530913142cd1f6ab81a454e4e2a6b29d7a08d4f1c3fcefee711c54e65e19d7",
+      "hdcExecutableSHA256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+      "hdcVersion": "3.2.0g",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 1,
+      "executionIDs": [
+        "gj1-20261006",
+        "gj1-20261006-capture",
+        "gj1-20261006-har"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-7534e727fc3902fbfb608d6691531993",
+          "operationReference": "observe.device@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-10-06T01:20:53Z",
+          "finishedAtUTC": "2026-10-06T01:20:54Z",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeHostTool",
+            "probeHDCServer",
+            "probeDevice",
+            "runApprovedRemoteRead"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-e716a2ec4f9a4c86332bddf4e876441b",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 14,
+          "startedAtUTC": "2026-10-06T01:21:11Z",
+          "finishedAtUTC": "2026-10-06T01:21:13Z",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteStdout"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-ba3c8912e033ee9c5605e0bb9e8d75fc",
+          "operationReference": "observe.device@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [
+            {
+              "actionId": "har-cda36473-55c1-4c91-a8db-6800c0bfc8ac",
+              "category": "physicalConnection",
+              "status": "resolvedByFreshProbe"
+            }
+          ],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-10-06T01:27:17Z",
+          "finishedAtUTC": "2026-10-06T01:27:18Z",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeHostTool",
+            "probeHDCServer",
+            "probeDevice",
+            "runApprovedRemoteRead"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        }
+      ],
+      "zeroDispatchChecks": [
+        {
+          "criterion": "gj1-20261006-har: newDispatchCount",
+          "holds": true,
+          "sources": [
+            "0066-gj1.har.json"
+          ]
+        }
+      ],
+      "criteria": [
+        {
+          "criterion": "gj1-20261006: operation",
+          "holds": true,
+          "sources": [
+            "0042-gj1.retained.observe.status.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: execution state",
+          "holds": true,
+          "sources": [
+            "0042-gj1.retained.observe.status.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: terminalState",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: evidence status",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: inventory available",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: blockers",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: Artifact count",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: Artifact device-facts.json published",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: Artifact tool-facts.json published",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: Artifact binding-snapshot.json published",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: binding-snapshot.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: binding-snapshot.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0024-gj1.observe.a1.c1.json",
+            "0025-gj1.observe.a2.c1.json",
+            "0026-gj1.observe.a3.c1.json",
+            "0048-gj1.retained.observe.a1.c1.json",
+            "0049-gj1.retained.observe.a2.c1.json",
+            "0050-gj1.retained.observe.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: device-facts.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: device-facts.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0024-gj1.observe.a1.c1.json",
+            "0025-gj1.observe.a2.c1.json",
+            "0026-gj1.observe.a3.c1.json",
+            "0048-gj1.retained.observe.a1.c1.json",
+            "0049-gj1.retained.observe.a2.c1.json",
+            "0050-gj1.retained.observe.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: tool-facts.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: tool-facts.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0024-gj1.observe.a1.c1.json",
+            "0025-gj1.observe.a2.c1.json",
+            "0026-gj1.observe.a3.c1.json",
+            "0048-gj1.retained.observe.a1.c1.json",
+            "0049-gj1.retained.observe.a2.c1.json",
+            "0050-gj1.retained.observe.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006: runtime service verify reads it back",
+          "holds": true,
+          "sources": [
+            "0027-gj1.verify.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: operation",
+          "holds": true,
+          "sources": [
+            "0051-gj1.retained.capture.status.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: execution state",
+          "holds": true,
+          "sources": [
+            "0051-gj1.retained.capture.status.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: terminalState",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: evidence status",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: inventory available",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: blockers",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: advanced-dump.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: application-liveness.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: crash-index.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: crash-log.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: screenshot.jpeg missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: screenshot.png missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: trace.htrace missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: ui-tree.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: Artifact hilog.txt published",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: Artifact ui-dump.json published",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: Artifact capture-summary.json published",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: artifact-index.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: artifact-index.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0035-gj1.capture.a1.c1.json",
+            "0036-gj1.capture.a2.c1.json",
+            "0037-gj1.capture.a3.c1.json",
+            "0038-gj1.capture.a11.c1.json",
+            "0039-gj1.capture.a12.c1.json",
+            "0040-gj1.capture.a13.c1.json",
+            "0057-gj1.retained.capture.a1.c1.json",
+            "0058-gj1.retained.capture.a2.c1.json",
+            "0059-gj1.retained.capture.a3.c1.json",
+            "0060-gj1.retained.capture.a11.c1.json",
+            "0061-gj1.retained.capture.a12.c1.json",
+            "0062-gj1.retained.capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: capture-summary.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: capture-summary.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0035-gj1.capture.a1.c1.json",
+            "0036-gj1.capture.a2.c1.json",
+            "0037-gj1.capture.a3.c1.json",
+            "0038-gj1.capture.a11.c1.json",
+            "0039-gj1.capture.a12.c1.json",
+            "0040-gj1.capture.a13.c1.json",
+            "0057-gj1.retained.capture.a1.c1.json",
+            "0058-gj1.retained.capture.a2.c1.json",
+            "0059-gj1.retained.capture.a3.c1.json",
+            "0060-gj1.retained.capture.a11.c1.json",
+            "0061-gj1.retained.capture.a12.c1.json",
+            "0062-gj1.retained.capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: capture.log bytesVerified",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: capture.log read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0035-gj1.capture.a1.c1.json",
+            "0036-gj1.capture.a2.c1.json",
+            "0037-gj1.capture.a3.c1.json",
+            "0038-gj1.capture.a11.c1.json",
+            "0039-gj1.capture.a12.c1.json",
+            "0040-gj1.capture.a13.c1.json",
+            "0057-gj1.retained.capture.a1.c1.json",
+            "0058-gj1.retained.capture.a2.c1.json",
+            "0059-gj1.retained.capture.a3.c1.json",
+            "0060-gj1.retained.capture.a11.c1.json",
+            "0061-gj1.retained.capture.a12.c1.json",
+            "0062-gj1.retained.capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0035-gj1.capture.a1.c1.json",
+            "0036-gj1.capture.a2.c1.json",
+            "0037-gj1.capture.a3.c1.json",
+            "0038-gj1.capture.a11.c1.json",
+            "0039-gj1.capture.a12.c1.json",
+            "0040-gj1.capture.a13.c1.json",
+            "0057-gj1.retained.capture.a1.c1.json",
+            "0058-gj1.retained.capture.a2.c1.json",
+            "0059-gj1.retained.capture.a3.c1.json",
+            "0060-gj1.retained.capture.a11.c1.json",
+            "0061-gj1.retained.capture.a12.c1.json",
+            "0062-gj1.retained.capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: markers.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: markers.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0035-gj1.capture.a1.c1.json",
+            "0036-gj1.capture.a2.c1.json",
+            "0037-gj1.capture.a3.c1.json",
+            "0038-gj1.capture.a11.c1.json",
+            "0039-gj1.capture.a12.c1.json",
+            "0040-gj1.capture.a13.c1.json",
+            "0057-gj1.retained.capture.a1.c1.json",
+            "0058-gj1.retained.capture.a2.c1.json",
+            "0059-gj1.retained.capture.a3.c1.json",
+            "0060-gj1.retained.capture.a11.c1.json",
+            "0061-gj1.retained.capture.a12.c1.json",
+            "0062-gj1.retained.capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: ui-dump.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: ui-dump.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0035-gj1.capture.a1.c1.json",
+            "0036-gj1.capture.a2.c1.json",
+            "0037-gj1.capture.a3.c1.json",
+            "0038-gj1.capture.a11.c1.json",
+            "0039-gj1.capture.a12.c1.json",
+            "0040-gj1.capture.a13.c1.json",
+            "0057-gj1.retained.capture.a1.c1.json",
+            "0058-gj1.retained.capture.a2.c1.json",
+            "0059-gj1.retained.capture.a3.c1.json",
+            "0060-gj1.retained.capture.a11.c1.json",
+            "0061-gj1.retained.capture.a12.c1.json",
+            "0062-gj1.retained.capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: hilog.txt not empty",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: ui-dump.json not empty",
+          "holds": true,
+          "sources": [
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-capture: capture completeness",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj1-20261006-capture: capture missingRequired",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "restart: job.show reads job-7534e727fc3902fbfb608d6691531993 after the restart",
+          "holds": true,
+          "sources": [
+            "0041-gj1.restart.json",
+            "0044-gj1.retained.observe.show.json"
+          ]
+        },
+        {
+          "criterion": "restart: job.result reads job-7534e727fc3902fbfb608d6691531993 after the restart",
+          "holds": true,
+          "sources": [
+            "0041-gj1.restart.json",
+            "0045-gj1.retained.observe.result.json"
+          ]
+        },
+        {
+          "criterion": "restart: job.show reads job-e716a2ec4f9a4c86332bddf4e876441b after the restart",
+          "holds": true,
+          "sources": [
+            "0041-gj1.restart.json",
+            "0053-gj1.retained.capture.show.json"
+          ]
+        },
+        {
+          "criterion": "restart: job.result reads job-e716a2ec4f9a4c86332bddf4e876441b after the restart",
+          "holds": true,
+          "sources": [
+            "0041-gj1.restart.json",
+            "0054-gj1.retained.capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: started without --target",
+          "holds": true,
+          "sources": [
+            "0066-gj1.har.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: exit code",
+          "holds": true,
+          "sources": [
+            "0066-gj1.har.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: error code",
+          "holds": true,
+          "sources": [
+            "0066-gj1.har.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: newDispatchCount",
+          "holds": true,
+          "sources": [
+            "0066-gj1.har.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: execution state",
+          "holds": true,
+          "sources": [
+            "0066-gj1.har.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: agent status names the resumeReference",
+          "holds": true,
+          "sources": [
+            "0067-gj1.har.recovered-status.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: human-action show resumeReference",
+          "holds": true,
+          "sources": [
+            "0069-gj1.har.waiting-action.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: first resume consumes it",
+          "holds": true,
+          "sources": [
+            "0072-gj1.har.resume.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: operation",
+          "holds": true,
+          "sources": [
+            "0073-gj1.har.status.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: execution state",
+          "holds": true,
+          "sources": [
+            "0073-gj1.har.status.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: action status after resume",
+          "holds": true,
+          "sources": [
+            "0074-gj1.har.resolved-action.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: terminalState",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: evidence status",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: inventory available",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: blockers",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: binding-snapshot.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: binding-snapshot.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0080-gj1.har.a1.c1.json",
+            "0081-gj1.har.a2.c1.json",
+            "0082-gj1.har.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: device-facts.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: device-facts.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0080-gj1.har.a1.c1.json",
+            "0081-gj1.har.a2.c1.json",
+            "0082-gj1.har.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: tool-facts.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: tool-facts.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0080-gj1.har.a1.c1.json",
+            "0081-gj1.har.a2.c1.json",
+            "0082-gj1.har.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: same Target",
+          "holds": true,
+          "sources": [
+            "0042-gj1.retained.observe.status.json",
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: same binding revision (no rebind on replug)",
+          "holds": true,
+          "sources": [
+            "0042-gj1.retained.observe.status.json",
+            "0077-gj1.har.result.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: stable identity unchanged across the replug",
+          "holds": true,
+          "sources": [
+            "0015-gj1.target.before.json",
+            "0070-gj1.target.replugged.json"
+          ]
+        },
+        {
+          "criterion": "gj1-20261006-har: binding revision unchanged across the replug",
+          "holds": true,
+          "sources": [
+            "0015-gj1.target.before.json",
+            "0070-gj1.target.replugged.json"
+          ]
+        }
+      ],
+      "notes": ""
+    }
+  ],
+  "operationRealDeviceCoverage": {
+    "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+    "canonicalOperationCount": 31,
+    "realDevicePass": 2,
+    "operations": [
+      {
+        "operationReference": "analyzer.analyze-trace@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "analyzer.extract-crash-signature@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "analyzer.summarize-hilog@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "analyzer.summarize-trace@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "capture.diagnostic-session@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "capture.diagnostics@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-e716a2ec4f9a4c86332bddf4e876441b"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "capture.screen-sequence@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "debug.hap@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "debug.template@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "deploy.native-library.app-owned@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "flash.full-restore@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_not_registered"
+        ]
+      },
+      {
+        "operationReference": "input.keyboard@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.long-press@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.swipe@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.tap@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "observe.device@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-7534e727fc3902fbfb608d6691531993",
+          "job-ba3c8912e033ee9c5605e0bb9e8d75fc"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "port-forward.create@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "port-forward.remove@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.apply-patch@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.build-openharmony@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.create-checkpoint@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-diff@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-git-status@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-source@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "workspace.prepare-isolated-copy@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.read-source-range@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.revert-patch@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.run-tests@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.sign-openharmony-hap@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "workspace_preset_unavailable"
+        ]
+      },
+      {
+        "operationReference": "workspace.sweep-isolated-copies@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.symbolize-crash@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "workspace_preset_unavailable"
+        ]
+      }
+    ]
+  }
+}

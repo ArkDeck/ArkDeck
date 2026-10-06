@@ -1,4 +1,4 @@
-# Windows: what remains (census as of `main` 2026-10-05)
+# Windows: what remains (census as of `main` 2026-10-06)
 
 Source: `openspec/contracts/cli-feature-coverage.json` after #2578, symbolize, continuation, alias, template and tool-selection increments.
 Of the 162 features the Windows CLI must serve, 149 are `implemented`, 11
@@ -71,7 +71,52 @@ acceptance work; no fixture result is hardware evidence or performance approval.
 
 The presently actionable CLI increments above are measured. Remaining generic
 leaves depend on AF-W1 and a trusted Windows ArkTrace distribution; service
-install/update keep their existing closed decision. The DAYU200 GJ-1/2/3/5
-window still requires the maintainer's physical setup and unplug/replug actions
-under the Windows runbook §4.0.4/§4.1. GJ-4 additionally requires AF-W1 and the
-destructive HardwareCampaign gate.
+install/update keep their existing closed decision.
+
+The host workspace Session publication repair is released in #2597, protected
+main `d238a55c7b693adc7edbf6314699e920f0ee1e08`. It retains the original complete
+consumed Runtime authority and verifies the original Job, Journal, plan and
+tool provenance before publishing a closed host mutation. Windows external-tool
+versions come from the same-SHA retained executable's fixed PE FileVersion; no
+version child is dispatched. The Runtime's own compiled package version applies
+only to its exact executable path, native identity and SHA. Existing
+`job reconcile --job` can settle a retained
+publication without redispatching the operation or renewing its authority.
+Unknown outcomes and incomplete provenance still refuse. This repair changes
+neither CLI feature counts nor the original Job outcome.
+
+The root's new independent host repair chain has succeeded patch/build/test
+publications at generations 7/8/9, with whole build HAP/log and test-log readback
+and exact fixed-input checks. Its three host dispatches completed in
+1007.746156 seconds with 2,750,419 declared Job Artifact bytes, within one round,
+40 minutes and 512 MiB; the expired original chain is not reset. The retained
+historical build/test publications at generations 5/6 are unchanged. A separate
+independent `debug.hap` smoke succeeded once and published generation 10;
+`debug-hilog.txt`, `install-readback.json` and `process-readback.json` were read
+whole and hash-checked. This establishes the smoke's software checks, with no
+UI, device-info or screenshot claim and no formal device PASS. The Runtime was
+then stopped through its typed operation with state preserved.
+
+The resumed GJ-1 run on 2026-10-06 achieved `REAL_DEVICE_PASS`: all 88 recorder
+criteria hold on source `d238a55c7b693adc7edbf6314699e920f0ee1e08` and Catalog
+`c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036`.
+Observe's three and capture's six published Artifacts were read whole and
+hash-verified before and after restart; capture's eight missing inventory
+declarations remain honestly recorded. Physical unplug produced Runtime HAR
+exit 75 with zero new dispatches; a fresh status/show reference was resumed once
+with exit 0, and all three HAR Artifacts were read whole and hash-verified.
+Typed stop/status (Raw 83/84) exited 0 with a complete drain, absent socket and
+preserved state. The canonical record is
+`docs/design/references/v1.6-goal/gj-headless-rerun-2026-10-06-windows.json`;
+the run note is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj1-2026-10-06-run.md`.
+The earlier user-skipped window remains historical truth.
+
+GJ-2/3/5 remain incomplete. The original paired GJ-2 signed HAP is still missing;
+the separate smoke HAP does not replace it. GJ-3 still needs its signed ARM32
+library and pinned rollback fixture. Signing and device verification of the
+repaired WaterFlow HAP remain blocked on board-trusted debug signing material
+and preset; the successful separate smoke does not establish GJ-5's signed
+crash repro/verify loop. Its remaining crash-probe input gates and the formal
+runbook's durable Artifact/readback requirements remain open. GJ-4 additionally
+requires AF-W1 and the destructive HardwareCampaign gate.

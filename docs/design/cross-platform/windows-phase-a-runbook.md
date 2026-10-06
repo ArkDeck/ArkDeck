@@ -1,6 +1,7 @@
 # Windows phase A runbook (maintainer)
 
-- **Version:** 2026-10-05. §4 brought up to date with protected `main` `a72df529` (#2549): G1, G3,
+- **Version:** 2026-10-06. GJ-1's dated real-device outcome is recorded in §4.1. The 2026-10-05
+  software baseline brought §4 up to date with protected `main` `a72df529` (#2549): G1, G3,
   G4, G6, G7, G8 and G9 are closed. The 2026-10-04 version (`982d4e6d`, #2518) and the first version
   (2026-09-30, `565f8b1d`) are superseded. §2 is done.
 - **Scope:** CHG-2026-074 r12/r13, Windows phase A. This runbook is the maintainer's ordered
@@ -550,9 +551,20 @@ Never:
 - **Software readiness:** `device candidates` and `target adopt` were measured live on a
   development root (2026-10-04). `target observe` and `diagnostics capture` were measured against
   the fake HDC (#2518).
-- **Blocking gaps:** none in software. G2 is a risk: `probeHDCServer` lowers to the commandless
-  observation (#2509), and `observe.device@1` and `capture.diagnostics@1` have not yet run once
-  against the real `hdc.exe`. The first window is that run.
+- **Current outcome (2026-10-06):** `scripts/gj_record` generated `REAL_DEVICE_PASS`, 88/88
+  criteria, on protected source `d238a55c7b693adc7edbf6314699e920f0ee1e08` and Catalog
+  `c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036`.
+  Observe's three and capture's six published products were read whole and hash-verified before
+  and after the same-directory restart; eight missing capture declarations remained explicit.
+  Unplugging produced a current zero-connected observation and exit 75 with waiting HAR and
+  `newDispatchCount: 0`. Same-port replug, recovered status/action show, and one resume completed
+  the HAR Job with all three products read whole. Typed stop/status drained the daemon with
+  state preserved and socket absent. See the
+  [generated record](../references/v1.6-goal/gj-headless-rerun-2026-10-06-windows.json) and
+  [run note](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj1-2026-10-06-run.md).
+  The earlier incomplete window remains historical and does not supply this pass.
+- **Blocking gaps:** none for GJ-1 on this Catalog digest; G2's real-HDC measurement risk is
+  closed by this recorded window. Other Journeys retain their own criteria and input gates.
 
 ### 4.2 GJ-2 HAP Debug (WIN-GJ2-001)
 
@@ -774,10 +786,10 @@ Never:
   5. verify;
   6. the zero-dispatch negative case, with the full Job-set comparison.
 
-  `workspace symbolize` is the one workspace leaf still `partial` on Windows: a symbolization
-  needs a device-captured crash. GJ-5's own repro provides one (the crash-index entry and its
-  fault log), so a symbolize run against it may be recorded as an extra step. It is not one of
-  §6's criteria.
+  `workspace symbolize` is measured `implemented` on Windows through the signed CLI,
+  including a named crash captured by the Windows daemon. GJ-5's actual crash-index entry
+  and fault log may be used for an additional symbolization step; it remains outside §6's
+  required criteria.
 - **Authority:** the repro and verify `debug.hap@1` steps are `deviceMutation`. The workspace
   mutations need the account daemon's authority.
 - **Destructive:** none.
@@ -789,6 +801,16 @@ Never:
   - `workspace build` and `workspace test` run end to end on Windows with the real DevEco (#2549):
     `ohpm install`, `workspace isolate`, `workspace build` and `workspace test` were run on the
     repository's WaterFlow demo through the CLI. Both are measured `implemented`.
+  - #2597 repairs host workspace Session publication with the original complete consumed
+    authority. The 2026-10-06 independent host patch/build/test chain published generations
+    7/8/9 and passed whole-product readback/fixed-input checks within one round, three
+    mutations, 40 minutes and 512 MiB (1007.746156 seconds and 2,750,419 declared Job
+    Artifact bytes). A separate independent `debug.hap` smoke succeeded once, with
+    whole hash-checked `debug-hilog.txt`, `install-readback.json` and
+    `process-readback.json`; no UI, device-info or screenshot result is claimed.
+    Signing/device verification of the repaired WaterFlow HAP remains blocked on
+    board-trusted signing inputs. Neither result establishes the formal signed
+    crash repro/verify loop or hardware PASS.
   - The daemon's `--symbolize-crash` mode replays the Swift oracle on Windows.
 - **Blocking gaps:**
   - G1 is closed.
@@ -802,7 +824,7 @@ Never:
 | Gap | What | Blocks | Owner |
 | --- | --- | --- | --- |
 | G1 | **Closed** (#2524, #2526, #2536; live `c2` run #2530): the account daemon composes the registered HDC from `ARKDECK_HDC_PATH` → its Bootstrap selection and starts it as its managed server. Caveat: the awaiting-approval HDC restart and tool-selection paths need #2501's health proof (in CI); no WIN-GJ step uses them | none | done |
-| G2 | `observe.device@1` and `capture.diagnostics@1` not yet run once against the real `hdc.exe` (fake only; `probeHDCServer` lowered to the commandless observation, #2509) | WIN-GJ1 (risk, not a stop) | the first GJ-1 window |
+| G2 | **Closed** by the 2026-10-06 GJ-1 real-HDC window (§4.1), including full product reads, retained reads after restart and physical HAR | none on the recorded Catalog digest | done |
 | G3 | **Closed** by `scripts/gj_record`: the rollback fixture's pinned digest, Target, binding revision, ABI and lease are checked against the current Target (§4.3 step 3) | none | done |
 | G4 | **Closed** (#2535): `flash install-binding` is served on Windows | none | done |
 | G5 | AF-W1 (ArkForge Windows acceptance) | WIN-GJ4 | external, maintainer |
@@ -811,18 +833,18 @@ Never:
 | G8 | **Closed** (#2532): `runtime signing install --build-profile` and `migrate-deveco` decode DevEco's stored passwords on Windows | none | done |
 | G9 | **Closed** by `scripts/gj_record`: it assembles the redacted `gj-headless-rerun` record from the captured CLI JSON and applies each row's criteria (§4.0.6) | none | done |
 
-### 4.7 Readiness per row (main `a72df529`)
+### 4.7 Readiness per row (software baseline `a72df529`; GJ-1 outcome 2026-10-06)
 
 | Row | Software path on Windows | Real-device blockers | Maintainer gate | Destructive |
 | --- | --- | --- | --- | --- |
-| WIN-GJ1-001 | account daemon composes the `c2` managed HDC (#2524; live start, status and candidates #2530); observe and capture on the fake (#2518, #2528) | none (G2 risk) | board window; unplug and replug | no |
+| WIN-GJ1-001 | account daemon and real registered HDC measured on protected `d238a55c`; generated `REAL_DEVICE_PASS`, 88/88 criteria (§4.1) | none on the recorded Catalog digest | completed 2026-10-06, including unplug/replug HAR | no |
 | WIN-GJ2-001 | full oracle replay end to end (#2505) | none | device window; HAP input | no (device mutation) |
 | WIN-GJ3-001 | full oracle replay end to end (#2505); helper packaged; fixture check (G3) | none | device window; `.so` and rollback fixture | no (device mutation) |
 | WIN-GJ4-001 | lane, plan, run, reconcile on fakes (#2504); broker (#2519); install-binding, device-access, lane-preview, bind-loader (#2531, #2535) | G5 | HardwareCampaign go; ArkForge bundle; image archive | **yes** (`flash.full-restore@1`) |
 | WIN-GJ5-001 | reads, isolate, sweep, patch, checkpoint and revert measured (#2500, #2506); sign replayed and registered signing measured (#2495, #2508); build and test end to end with the real DevEco (#2549) | none | DevEco install; `ohpm install` in the project; signing install from the build profile; inputs | no (device mutation) |
 
-With G1 closed, WIN-GJ1..3 can be run in the next device window. Nothing has run on the board
-yet, so no row is `REAL_DEVICE_PASS`.
+WIN-GJ1-001 is `REAL_DEVICE_PASS` only on the Catalog digest recorded in §4.1. GJ-2, GJ-3 and
+GJ-5 remain incomplete with missing acceptance inputs; this GJ-1 outcome does not complete them.
 
 ## 5. Clean-host smoke
 
@@ -890,14 +912,14 @@ Nothing flips on hosted CI, fixtures or plan-only runs (AGENTS.md "什么不算�
 
 ## 7. Order at a glance
 
-| # | Step | State on `main` `a72df529` | Blocked on |
+| # | Step | Software baseline `a72df529`, with dated GJ-1 outcome | Blocked on |
 | --- | --- | --- | --- |
 | 1 | §1.1 dev signer check | open (maintainer) | — |
 | 2 | §2 HDC and USB samples, WHR-001..003 | **done** | — |
 | 3 | §1.2 dev MSIX publisher, §3 SPK-3 rows 1–5 | open (maintainer) | certificate creation, second account, elevated terminal, second host |
 | 4 | G1: the account daemon selects and starts the registered HDC | **done** (#2524, #2526, #2536; live #2530) | — (awaiting-approval paths: #2501) |
-| 5 | §4.1 GJ-1, §3 row 6 | open (agent + maintainer) | the maintainer's board window |
-| 6 | §4.2 GJ-2, §4.3 GJ-3 | open after step 5 | WIN-GJ1-001 on the same digest |
+| 5 | §4.1 GJ-1, §3 row 6 | GJ-1 `REAL_DEVICE_PASS` (2026-10-06); §3 row 6 remains separate | remaining §3 row 6 distribution checks |
+| 6 | §4.2 GJ-2, §4.3 GJ-3 | incomplete; GJ-1 same-digest gate satisfied by §4.1 | missing paired HAP/native acceptance inputs |
 | 7 | §4.5 GJ-5 | open after step 6 | WIN-GJ2-001 on the same digest; the maintainer's DevEco, project and signing preparation |
 | 8 | §1.3 production signing | open (maintainer) | Artifact Signing account |
 | 9 | §4.4 GJ-4 | blocked | G5 AF-W1, the maintainer's HardwareCampaign go |
