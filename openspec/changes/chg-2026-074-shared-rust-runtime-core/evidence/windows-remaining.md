@@ -31,10 +31,23 @@ adds no CLI leaf and changes no count. The current owner/leaf census is
 `docs/design/cross-platform/windows-remaining.md`; the older operation/method
 totals below are historical measurements, not current availability assertions.
 
-GJ-1 is user-skipped/incomplete. Independently named real smoke and host
-preparation were executed under the user's delegation, without changing formal
-Scenario predicates or marking any Journey/hardware PASS. The original paired
-GJ-2 HAP, GJ-3 signed ARM32 library and pinned rollback fixture remain missing.
+The resumed GJ-1 run on 2026-10-06 achieved `REAL_DEVICE_PASS` with all 88
+recorder criteria holding on source
+`d238a55c7b693adc7edbf6314699e920f0ee1e08` and Catalog
+`c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036`.
+Observe's three and capture's six published Artifacts were read whole and
+hash-verified before and after restart; the eight missing capture declarations
+remain in the inventory. Physical unplug produced Runtime HAR exit 75 and zero
+new dispatches; one resume using the fresh status/show reference exited 0, with
+all three HAR Artifacts read whole and hash-verified. Typed stop/status (Raw
+83/84) exited 0 with complete drain, absent socket and preserved state. The
+canonical record is
+`docs/design/references/v1.6-goal/gj-headless-rerun-2026-10-06-windows.json`;
+the run note is `runs/TASK-XPA-006/windows-gj1-2026-10-06-run.md`.
+The earlier user-skipped window remains historical truth.
+
+GJ-2/3/5 remain incomplete. The original paired GJ-2 HAP, GJ-3 signed ARM32
+library and pinned rollback fixture remain missing.
 Signing and device verification of the repaired WaterFlow HAP remain blocked
 on board-trusted debug signing material and preset. The separate smoke does not
 replace GJ-5's remaining crash-probe inputs or prove its signed device loop.

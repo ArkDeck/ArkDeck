@@ -97,10 +97,22 @@ whole and hash-checked. This establishes the smoke's software checks, with no
 UI, device-info or screenshot claim and no formal device PASS. The Runtime was
 then stopped through its typed operation with state preserved.
 
-GJ-1 is user-skipped and formally incomplete. Independent real smoke and host
-preparation were executed under the user's delegation; the formal Journey predicates
-and recorded acceptance states remain unchanged. No GJ-1/2/3/5 hardware PASS is
-claimed from this work. The original paired GJ-2 signed HAP is still missing;
+The resumed GJ-1 run on 2026-10-06 achieved `REAL_DEVICE_PASS`: all 88 recorder
+criteria hold on source `d238a55c7b693adc7edbf6314699e920f0ee1e08` and Catalog
+`c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036`.
+Observe's three and capture's six published Artifacts were read whole and
+hash-verified before and after restart; capture's eight missing inventory
+declarations remain honestly recorded. Physical unplug produced Runtime HAR
+exit 75 with zero new dispatches; a fresh status/show reference was resumed once
+with exit 0, and all three HAR Artifacts were read whole and hash-verified.
+Typed stop/status (Raw 83/84) exited 0 with a complete drain, absent socket and
+preserved state. The canonical record is
+`docs/design/references/v1.6-goal/gj-headless-rerun-2026-10-06-windows.json`;
+the run note is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj1-2026-10-06-run.md`.
+The earlier user-skipped window remains historical truth.
+
+GJ-2/3/5 remain incomplete. The original paired GJ-2 signed HAP is still missing;
 the separate smoke HAP does not replace it. GJ-3 still needs its signed ARM32
 library and pinned rollback fixture. Signing and device verification of the
 repaired WaterFlow HAP remain blocked on board-trusted debug signing material

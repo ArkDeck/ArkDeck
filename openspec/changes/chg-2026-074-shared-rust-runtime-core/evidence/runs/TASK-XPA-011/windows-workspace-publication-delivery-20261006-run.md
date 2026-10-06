@@ -99,13 +99,24 @@ SUCCESS/SKIPPED conclusions. SDD Guard run
 aggregate run
 [37361252550](https://github.com/ArkDeck/ArkDeck/actions/runs/37361252550)
 both concluded SUCCESS. These validate the released implementation, not this
-subsequent docs-only delivery increment. Delivery PR/head/run results are
-**PENDING** root integration.
+subsequent docs-only delivery increment. The first delivery head
+`1525766eed991e912ad2a44ea69e270c8cf85e49` did not get an automatic PR: Agent PR
+[37370701028](https://github.com/ArkDeck/ArkDeck/actions/runs/37370701028), SDD Guard
+[37370701274](https://github.com/ArkDeck/ArkDeck/actions/runs/37370701274) and Swift
+[37370701823](https://github.com/ArkDeck/ArkDeck/actions/runs/37370701823) failed
+when hosted runners did not acquire the cancelled jobs after multiple attempts,
+before any step. Plan and interaction jobs succeeded. Root is adding the actual
+GJ-1 record and normally pushing that substantive increment; the new delivery
+PR/head/run results remain **PENDING**.
 
 ## Remaining acceptance
 
-GJ-1 is user-skipped/incomplete. Independent product execution was completed
-under that delegation with the formal Scenario/recorder predicates unchanged. The
+GJ-1 was user-skipped/incomplete during the independent publication/smoke window
+above. The maintainer subsequently resumed it: the actual 2026-10-06 run passed
+all 88 unchanged recorder criteria. Its generated record and exact root results
+are in [the GJ-1 run](../TASK-XPA-006/windows-gj1-2026-10-06-run.md).
+Independent product execution above was completed under the earlier delegation
+with the formal Scenario/recorder predicates unchanged. The
 original paired formal GJ-2 HAP and GJ-3 signed ARM32 library/pinned rollback
 fixture remain missing. Signing and device verification of the repaired
 WaterFlow HAP remain blocked on board-trusted debug signing inputs/preset and
