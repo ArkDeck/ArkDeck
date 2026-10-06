@@ -275,7 +275,9 @@ def validate_automatic_check_contract(
             "Agent PR must declare exactly one job, open-pr; the allowed-paths "
             "job was retired by CHG-2026-077"
         )
+    linux_light_runner = "    runs-on: ${{ vars.ARKDECK_LINUX_LIGHT_RUNNER || 'ubuntu-latest' }}\n"
     required_open = (
+        linux_light_runner,
         "    permissions:\n      contents: read\n      pull-requests: write\n",
         "    outputs:\n      pr-number: ${{ steps.validate.outputs.pr-number }}\n",
         "          fetch-depth: 0\n",
@@ -391,6 +393,9 @@ def validate_automatic_check_contract(
     if plan_job.count("        if: steps.paths.outputs.ds == 'true'\n") != 3:
         raise WorkflowContractError("Interaction setup, install and test must use the planner selection")
     guard_job = _job_block(sdd_text, "guard")
+    for job in (plan_job, guard_job, swift_aggregate_job):
+        if linux_light_runner not in job:
+            raise WorkflowContractError("Lightweight checks must share the pool route and hosted default")
     if "run: node docs/design/arkdeck-ds/scripts/check-tokens.mjs" not in guard_job:
         raise WorkflowContractError("Token drift must fail the required guard on its existing runner")
     if "  ds-interactions:\n" in swift_text or "  ds-tokens:\n" in sdd_text:
@@ -413,10 +418,11 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(f"{job_name} must not fetch a moving event ref")
 
     required_plan = (
-        "    runs-on: ubuntu-latest\n",
+        linux_light_runner,
         '"+refs/heads/main:refs/remotes/origin/main"',
         '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
         "python3 scripts/ci/test_plan.py",
+        "python3 scripts/ci/test_linux_runner_pool.py",
         "python3 scripts/ci/test_event_checkout.py",
         "python3 scripts/ci/test_cache_scope.py",
         "python3 scripts/test_agent_pr_workflow.py",

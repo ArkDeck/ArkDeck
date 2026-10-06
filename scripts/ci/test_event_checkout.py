@@ -15,13 +15,16 @@ import unittest
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/swift-ci.yml"
 JOBS = ("plan", "swift-tests", "app-build", "rust-policy", "rust-workspace",
-        "rust-contracts", "sdd-guard")
+        "rust-contracts", "sdd-guard", "linux-pool-smoke")
 
 
 def checkout_script(job: str) -> str:
     workflow = WORKFLOW.with_name("rust-ci.yml") if job.startswith("rust-") else WORKFLOW
     if job.startswith("sdd-"):
         workflow = WORKFLOW.with_name("sdd-guard.yml")
+    if job == "linux-pool-smoke":
+        workflow = WORKFLOW.with_name("linux-runner-pool-smoke.yml")
+        job = "smoke"
     job = job.removeprefix("rust-").removeprefix("sdd-")
     text = workflow.read_text()
     match = re.search(rf"^  {re.escape(job)}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", text, re.M | re.S)
@@ -93,7 +96,7 @@ class EventCheckoutTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(self.git("rev-parse", "HEAD", cwd=work).stdout.strip(), self.event_sha)
                     self.assertEqual((work / "tracked.txt").read_text(), "event contents")
-                    if job == "plan" or job.startswith("rust-"):
+                    if job in ("plan", "linux-pool-smoke") or job.startswith("rust-"):
                         expected_base = self.event_sha if job.startswith("rust-") and "gh-readonly-queue" in ref else self.tip_sha
                         self.assertEqual(self.git("rev-parse", "origin/main", cwd=work).stdout.strip(), expected_base)
 

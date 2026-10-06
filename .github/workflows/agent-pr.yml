@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   open-pr:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.ARKDECK_LINUX_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: read
