@@ -120,6 +120,29 @@ uses `--no-restore`; the UIA reruns use `--no-build` and explicitly select the c
 retain source/output hashes. This measures native software events, not Narrator by ear or
 hardware acceptance.
 
+A later Windows CI run of the dependent License layer exposed a preparation race in
+`CompletedScopeDriftNeverPromotesHistoryOrReplays`. `StartAsync` starts its one run exchange
+without joining it; the first status can correctly report `preparing` with no control
+available. The test disabled monitoring and immediately asked to stop, so the controller
+correctly sent zero stops before the framed run request arrived. The test now awaits the
+actual run reply, reads a fresh `recording` snapshot and checks `CanStop` before its original
+one-stop and rejected-History assertions. It also requires the exact completed-scope refusal.
+A held-run case deterministically proves zero stop dispatch during preparation, then one stop
+after recording is observed. No production code, deadline or assertion was relaxed; there
+is no sleep or mutation replay.
+
+| Command / scope | Result | Log |
+| --- | --- | --- |
+| `dotnet test windows/App.Tests/ArkDeck.App.Tests.csproj -c Release --no-restore -m:2 -p:UseSharedCompilation=false --filter "FullyQualifiedName~DiagnosticCaptureTransportTests\|FullyQualifiedName~DiagnosticCaptureTests"` with fresh TRX output | exit 0; 19 passed, 0 failed/skipped; 12.818 s including build | `diagnostics-preparing-race-20261007/targeted.log`, `diagnostics-preparing-race-20261007/trx/targeted.trx` |
+| `C:/Program Files/Git/usr/bin/sh.exe scripts/check-sdd.sh` with installed Git utility PATH | exit 0; 0 errors/warnings | `diagnostics-preparing-race-20261007/sdd-final.log` |
+| `git diff --check` | exit 0 | `diagnostics-preparing-race-20261007/diff.log` |
+
+The exact controller class is `DiagnosticCaptureTests`. This test-only correction requires
+neither UIA nor an installed Runtime; inherited ArkDeck test/live inputs were removed, and
+cached NuGet was used without restore. The initial light SDD invocation could not find
+`dirname` (exit 127; `diagnostics-preparing-race-20261007/sdd.log`); the installed Git
+utility PATH resolved it, and the final check passed. No full gate was run.
+
 ## CI
 
 PR #2618 initial head `2d5b8d969fd971a62f07e88464fa419fd6175612` passed SDD Guard
@@ -128,6 +151,13 @@ PR #2618 initial head `2d5b8d969fd971a62f07e88464fa419fd6175612` passed SDD Guar
 `TheAppSubmitsOnlyTheMacOsWorkspaceOperations` lacked the existing capture operation.
 The App test result was 226 passed, two failed, zero skipped; the full failed job log is kept
 locally as `diagnostics-ci-first-windows-job-112415615109.log`. This is a code failure, not an
-invalid load run. The mappings and live-state defect above are repaired. CI for the corrected
-head is pending; parent checks do not establish validation of this increment. Human
+invalid load run. The mappings and live-state defect above are repaired. The corrected #2618 head
+`8aa0fa6f3e45986f9ed7e7418d29878398153972` passed its Windows App checks in Swift CI
+37509883491. The dependent #2619 Windows job 112429203686 later failed the inherited
+completed-scope transport test for the `revision` case: expected `(1,1,1)`, actual `(1,1,0)`;
+App.Tests reported 238 passed, one failed, zero skipped. The complete failed log remains
+`trace-licenses-ci-first-windows-job-112429203686.log`. This is a test preparation race,
+not an invalid load run or a failure in License behavior. The preparation synchronization
+and held-run test above address it without changing Runtime behavior. CI for this latest
+test-only correction has not run yet; parent checks do not establish its validation. Human
 maintainer review and protected-main publication remain required.
