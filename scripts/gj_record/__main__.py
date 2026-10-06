@@ -37,6 +37,8 @@ def _parser() -> argparse.ArgumentParser:
     build = commands.add_parser("assemble", help="judge the journal and write the record")
     build.add_argument("--out", required=True, type=Path)
     build.add_argument("--date", required=True)
+    build.add_argument("--attempt", type=int, default=None,
+                       help="select an independent same-day attempt (1..999), never replay an old ID")
     build.add_argument("--runtime-source-revision", required=True)
     build.add_argument("--protected-main", default="origin/main")
     build.add_argument("--record", required=True, type=Path)
@@ -69,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
             protected_main=arguments.protected_main,
             repository=REPOSITORY,
             names=arguments.journey or list(record.JOURNEYS),
+            attempt=arguments.attempt,
         )
         record.write(arguments.record, document)
         for journey in document["journeys"]:
