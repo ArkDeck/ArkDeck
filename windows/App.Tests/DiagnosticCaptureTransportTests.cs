@@ -20,6 +20,7 @@ public sealed class DiagnosticCaptureTransportTests
         var channel = new Channel();
         var session = new DiagnosticCaptureSession(new DiagnosticCaptureProvider(new(channel)), NoMonitor);
         await session.StartAsync(Target, 60);
+        await RecordingAsync(channel, session);
         Assert.IsTrue(session.CanMark, session.Failure);
         Assert.AreEqual(TimeSpan.FromSeconds(660), channel.RunBudget);
         await session.MarkAsync();
@@ -87,11 +88,53 @@ public sealed class DiagnosticCaptureTransportTests
         {
             var channel = new Channel { FinalDrift = mode };
             var session = new DiagnosticCaptureSession(new DiagnosticCaptureProvider(new(channel)), NoMonitor);
-            await session.StartAsync(Target, 60); await session.StopAsync();
+            await session.StartAsync(Target, 60);
+            await RecordingAsync(channel, session);
+            await session.StopAsync();
+            Assert.AreEqual("closed", session.Snapshot?.State, mode);
             Assert.IsNull(session.CompletedContext, mode);
             Assert.IsNotNull(session.Failure, mode);
+            Assert.AreEqual("diagnostics_history_scope_unconfirmed", session.Failure, mode);
             Assert.AreEqual((1, 1, 1), (channel.Submits, channel.Runs, channel.Stops), mode);
         }
+    }
+
+    [TestMethod]
+    public async Task PreparingRunRefusesStopUntilARecordingSnapshotIsRead()
+    {
+        var channel = new Channel { HoldRun = true };
+        var session = new DiagnosticCaptureSession(new DiagnosticCaptureProvider(new(channel)), NoMonitor);
+        try
+        {
+            await session.StartAsync(Target, 60);
+            Assert.AreEqual("preparing", session.Snapshot?.State);
+            Assert.IsFalse(session.CanStop);
+            await session.StopAsync();
+            Assert.AreEqual("diagnostics_session_control_not_ready", session.Failure);
+            Assert.AreEqual((1, 1, 0), (channel.Submits, channel.Runs, channel.Stops));
+            Assert.IsFalse(channel.RunReply.IsCompleted, "The real scripted run dispatch is still held");
+
+            channel.ReleaseRun();
+            await RecordingAsync(channel, session);
+            Assert.IsNull(session.Failure);
+            await session.StopAsync();
+            Assert.AreEqual(DiagnosticCapturePhase.Finished, session.Phase, session.Failure);
+            Assert.IsNotNull(session.CompletedContext, session.Failure);
+            Assert.AreEqual((1, 1, 1), (channel.Submits, channel.Runs, channel.Stops));
+        }
+        finally { channel.ReleaseRun(); }
+    }
+
+    private static async Task RecordingAsync(Channel channel, DiagnosticCaptureSession session)
+    {
+        // StartAsync begins the synchronous run on a separate control connection. Its
+        // first status may truthfully be preparing; wait for the real framed run reply
+        // and then read recording rather than assuming StartAsync joined that work.
+        var reply = await channel.RunReply.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.IsTrue(reply.Succeeded, reply.Failure?.Message);
+        await session.RefreshAsync();
+        Assert.AreEqual("recording", session.Snapshot?.State, session.Failure);
+        Assert.IsTrue(session.CanStop, session.Failure);
     }
 
     [TestMethod]
@@ -113,6 +156,11 @@ public sealed class DiagnosticCaptureTransportTests
         private readonly IControlChannel _inner = ScriptedDaemon.Channel(ScriptedDaemon.DiagnosticCapture);
         public int Submits, Runs, Marks, Stops, Pages;
         private int _targetReads;
+        private readonly TaskCompletionSource<ControlResult> _runReply = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _runRelease = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public bool HoldRun;
+        public Task<ControlResult> RunReply => _runReply.Task;
+        public void ReleaseRun() => _runRelease.TrySetResult();
         public TimeSpan RunBudget;
         public string? AcceptanceDrift, FinalDrift, Paging, FreshTargetDrift;
         public int Mutations => Submits + Runs + Marks + Stops;
@@ -163,7 +211,18 @@ public sealed class DiagnosticCaptureTransportTests
             }
             return ControlResult.Success(o);
         }
-        public Task<ControlResult> RunJobOnceAsync(string jobId, TimeSpan callBudget) { Runs++; RunBudget = callBudget; return ((IRuntimeJobChannel)_inner).RunJobOnceAsync(jobId, callBudget); }
+        public async Task<ControlResult> RunJobOnceAsync(string jobId, TimeSpan callBudget)
+        {
+            Runs++; RunBudget = callBudget;
+            try
+            {
+                if (HoldRun) await _runRelease.Task;
+                var reply = await ((IRuntimeJobChannel)_inner).RunJobOnceAsync(jobId, callBudget);
+                _runReply.TrySetResult(reply);
+                return reply;
+            }
+            catch (Exception error) { _runReply.TrySetException(error); throw; }
+        }
         public Task<ControlResult> StatusAsync(string jobId) => ((IDiagnosticSessionChannel)_inner).StatusAsync(jobId);
         public Task<ControlResult> MarkAsync(string jobId, string markerId) { Marks++; return ((IDiagnosticSessionChannel)_inner).MarkAsync(jobId, markerId); }
         public Task<ControlResult> StopAsync(string jobId) { Stops++; return ((IDiagnosticSessionChannel)_inner).StopAsync(jobId); }
