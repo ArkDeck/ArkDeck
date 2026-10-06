@@ -251,8 +251,21 @@ pub fn index_normalized(path: &Path, normalize: impl Fn(&[u8]) -> Vec<u8>) -> Va
 /// each Job record read machine-independently) against the store at `jobs`,
 /// which may still be open.
 pub fn assert_store(fixture: &Path, prefix: &str, jobs: &Path) {
+    assert_store_relabelled(fixture, prefix, jobs, index(jobs), |bytes| bytes.to_vec());
+}
+
+#[cfg(unix)]
+/// The same complete snapshot comparison with an explicitly verified index
+/// and file projection for an additive, separately asserted oracle field.
+pub fn assert_store_relabelled(
+    fixture: &Path,
+    prefix: &str,
+    jobs: &Path,
+    actual_index: Value,
+    relabel: impl Fn(&[u8]) -> Vec<u8>,
+) {
     assert_eq!(
-        index(jobs),
+        actual_index,
         document(fixture, &format!("{prefix}/index.json")),
         "{prefix}/index.json"
     );
@@ -271,7 +284,7 @@ pub fn assert_store(fixture: &Path, prefix: &str, jobs: &Path) {
     );
     for (path, bytes) in &recorded {
         assert_eq!(
-            String::from_utf8_lossy(&actual[path]),
+            String::from_utf8_lossy(&relabel(&actual[path])),
             String::from_utf8_lossy(bytes),
             "{path}"
         );
@@ -508,9 +521,14 @@ pub fn assert_leftovers_with(
     expected: impl Fn(&str, Vec<u8>) -> Vec<u8>,
     index_before: impl Fn(&mut Value),
 ) {
-    leftovers(fixture, root, jobs, expected, index_before, |bytes| {
-        bytes.to_vec()
-    });
+    leftovers(
+        fixture,
+        root,
+        jobs,
+        expected,
+        index_before,
+        (index(jobs), |bytes: &[u8]| bytes.to_vec()),
+    );
 }
 
 /// As [`assert_leftovers_at`], with every file the replay left and the index
@@ -523,7 +541,26 @@ pub fn assert_leftovers_relabelled(
     jobs: &Path,
     relabel: impl Fn(&[u8]) -> Vec<u8>,
 ) {
-    leftovers(fixture, root, jobs, |_, bytes| bytes, |_| (), relabel);
+    assert_leftovers_relabelled_with_index(fixture, root, jobs, index(jobs), relabel);
+}
+
+/// Preserve the whole tree comparison while supplying a strictly verified
+/// projection of each actual index digest, rather than discarding hashes.
+pub fn assert_leftovers_relabelled_with_index(
+    fixture: &Path,
+    root: &Path,
+    jobs: &Path,
+    actual_index: Value,
+    relabel: impl Fn(&[u8]) -> Vec<u8>,
+) {
+    leftovers(
+        fixture,
+        root,
+        jobs,
+        |_, bytes| bytes,
+        |_| (),
+        (actual_index, relabel),
+    );
 }
 
 fn leftovers(
@@ -532,12 +569,13 @@ fn leftovers(
     jobs: &Path,
     expected: impl Fn(&str, Vec<u8>) -> Vec<u8>,
     index_before: impl Fn(&mut Value),
-    relabel: impl Fn(&[u8]) -> Vec<u8>,
+    projection: (Value, impl Fn(&[u8]) -> Vec<u8>),
 ) {
+    let (actual_index, relabel) = projection;
     let mut recorded_index = document(fixture, "store/index.json");
     index_before(&mut recorded_index);
     let read_index: Value =
-        serde_json::from_slice(&relabel(&serde_json::to_vec(&index(jobs)).unwrap())).unwrap();
+        serde_json::from_slice(&relabel(&serde_json::to_vec(&actual_index).unwrap())).unwrap();
     assert_eq!(read_index, recorded_index);
     let (mut files, mut tree) = (BTreeMap::new(), Vec::new());
     let mut bases = vec![
