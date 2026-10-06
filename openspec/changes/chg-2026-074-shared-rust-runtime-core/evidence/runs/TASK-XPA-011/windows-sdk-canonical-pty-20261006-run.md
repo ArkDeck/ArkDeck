@@ -117,8 +117,30 @@ in `D:/src/ArkDeck-wt/tools/logs/windows-sdk-ci-capacity-checks.log`. The initia
 wrapper stopped at Git's sandbox ownership guard before checks ran; the
 successful invocation trusts only this exact worktree in its child environment,
 without changing global Git configuration.
-No Rust tests or builds are repeated for this workflow/documentation change.
-Its new-head CI has not run yet. Local checks and the host-only probe do not
-constitute current-head CI success, maintainer approval or hardware acceptance.
+The ordinary capacity-update push, exact head
+`5644d25d243e4b98999e34b74f566a0ce8bedcde`, received Swift CI run
+[37419870433](https://github.com/ArkDeck/ArkDeck/actions/runs/37419870433).
+Its plan job `112126610413` failed: the 18 workflow-contract cases reported one
+error because `validate_rust_ci_contract` still required the old workspace
+macOS-50/Linux-and-Windows-30 expression. Native Rust lanes were skipped;
+required `swift` aggregate job `112126666288` failed. This is a workflow-contract
+consistency failure, not a newly observed product-test assertion failure.
+
+The follow-up synchronizes only that expected timeout token with the actual
+macOS-50/Windows-40/Linux-30 configuration. Because both native matrix jobs now
+share it, the existing native-token assertion requires exactly one occurrence
+in each job and exactly two overall; every other drift assertion is unchanged.
+Negative cases reject independently removing the Windows allowance from
+workspace or contracts and changing workspace's allowance to 41 minutes.
+Local targeted check `python -X utf8 scripts/test_agent_pr_workflow.py` passed
+all 18 cases, exit 0, recorded in
+`D:/src/ArkDeck-wt/tools/logs/windows-sdk-ci-contract-sync-checks.log`.
+Final Git Bash `sh scripts/check-sdd.sh` passed with 0 errors/warnings and
+121 acceptance IDs; `git diff --check` passed, both exit 0 in the same log.
+
+No Rust tests or builds are repeated for these workflow/documentation changes.
+The validator follow-up has not received CI yet. Local checks and the host-only
+probe do not constitute current-head CI success, maintainer approval or hardware
+acceptance.
 Protected-main RC rebuild and official SDK/signing verification remain
 coordinator work after publication.
