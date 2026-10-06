@@ -21,6 +21,10 @@ unknown replay。任何一步需要绕过这些面，就是 `BLOCKED_BY_PRODUCT_
   `meta.controlRequestId` 与之对应；`--version` 与本地 `runtime service` 命令不接受此参数，
   保留它们自动生成的 ID。每个新操作有独立 `--execution-id`，后续从该 ID 读取状态，
   人工动作后消费 Runtime 给出的 `resumeReference`。
+- 已知完成的失败经修复后，同日独立尝试使用新 Raw 目录和独立 ID：把下文 ID 的
+  `gjN-<date>` 部分改为 `gjN-<date>-attemptN`（N 为 1..999），组装时传
+  `gj_record assemble --attempt N`。组装只读取本次 ID，判据不变；原记录完整保留。
+  不重用旧 execution ID，不合并 Raw，不通过改日期或重放 unknown 绕过失败。
 - 四态只能是 `NOT_STARTED` / `IMPLEMENTING` / `BLOCKED_BY_PRODUCT_DEFECT` /
   `REAL_DEVICE_PASS`；`REAL_DEVICE_PASS` 只在当前 digest 上成立。
 - `agent run/status` 的 `result.state` 是 execution 状态；operation 结果读取

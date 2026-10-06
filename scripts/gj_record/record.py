@@ -158,9 +158,10 @@ def _job_row(run: Run, job: str, execution: str | None) -> dict | None:
     }
 
 
-def _journey(name: str, run: Run, date: str, facts: dict, revision: str, digest: str) -> dict:
+def _journey(name: str, run: Run, date: str, facts: dict, revision: str, digest: str,
+             *, attempt: int | None = None) -> dict:
     judge = Judge(run)
-    context = journeys.Context(run, judge, date)
+    context = journeys.Context(run, judge, date, attempt=attempt)
     if name == "GJ-1":
         journeys.gj1(context)
     elif name == "GJ-2":
@@ -255,9 +256,12 @@ def assemble(
     protected_main: str,
     repository: Path,
     names: list[str],
+    attempt: int | None = None,
 ) -> dict:
     if not _DATE.match(date):
         raise AssemblyError("--date must be YYYY-MM-DD")
+    if attempt is not None and (type(attempt) is not int or not 1 <= attempt <= 999):
+        raise AssemblyError("--attempt must be an integer between 1 and 999")
     try:
         built = catalog.at_revision(repository, runtime_source_revision)
         if not catalog.on_protected_main(repository, built.revision, protected_main):
@@ -281,7 +285,8 @@ def assemble(
         "runbook": RUNBOOK,
         "generator": GENERATOR,
         "host": {"system": facts["host"].get("system"), "osBuild": facts["host"].get("version")},
-        "journeys": [_journey(name, run, date, facts, built.revision, built.digest) for name in names],
+        "journeys": [_journey(name, run, date, facts, built.revision, built.digest,
+                              attempt=attempt) for name in names],
         "operationRealDeviceCoverage": _coverage(run, facts, built.digest),
     }
     try:

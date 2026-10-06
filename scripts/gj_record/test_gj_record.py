@@ -301,10 +301,10 @@ class Case(unittest.TestCase):
     def tearDown(self):
         self.temporary.cleanup()
 
-    def assemble(self, names=("GJ-1",), revision=None):
+    def assemble(self, names=("GJ-1",), revision=None, attempt=None):
         return record.assemble(
             self.out, date=DATE, runtime_source_revision=revision or self.repo.revision,
-            protected_main="main", repository=self.repo.path, names=list(names))
+            protected_main="main", repository=self.repo.path, names=list(names), attempt=attempt)
 
     def journey(self, document, name="GJ-1"):
         return next(j for j in document["journeys"] if j["goldenJourney"] == name)
@@ -444,7 +444,7 @@ class RefusalTests(Case):
 
 
 class LaterJourneyTests(Case):
-    def test_gj2_reads_the_debug_steps_and_the_app_scoped_capture(self):
+    def complete_gj2(self, execution):
         self.journal.facts()
         timeline = [
             'host-step verify-hap-artifact',
@@ -456,13 +456,36 @@ class LaterJourneyTests(Case):
             'verified stop-ability ["stopped"]',
             'verified cleanup-remote-staging ["cleaned"]',
         ]
-        self.journal.job(f"gj2-{D}", "debug.hap@1", {"install-readback.json": b"{}", "process-readback.json": b"{}"},
+        self.journal.job(execution, "debug.hap@1", {"install-readback.json": b"{}", "process-readback.json": b"{}"},
                          timeline=timeline)
-        self.journal.job(f"gj2-{D}-capture", "capture.diagnostics@1", {
+        self.journal.job(execution + "-capture", "capture.diagnostics@1", {
             "hilog.txt": b"l", "ui-dump.json": b"{}", "trace.htrace": b"t",
             "capture-summary.json": json.dumps({"completeness": "complete", "missingRequired": []}).encode()})
+    def test_gj2_reads_the_debug_steps_and_the_app_scoped_capture(self):
+        self.complete_gj2(f"gj2-{D}")
         journey = self.journey(self.assemble(names=("GJ-2",)), "GJ-2")
         self.assertEqual(journey["state"], PASS, journey.get("firstFailingCriterion"))
+
+    def test_new_attempt_never_uses_an_original_success(self):
+        self.complete_gj2(f"gj2-{D}")
+        journey = self.journey(self.assemble(names=("GJ-2",), attempt=2), "GJ-2")
+        self.assertEqual(journey["state"], NOT_STARTED)
+        self.assertEqual(journey["executionIDs"], [])
+
+    def test_independent_attempt_requires_the_same_whole_artifacts_and_criteria(self):
+        self.complete_gj2(f"gj2-{D}-attempt2")
+        journey = self.journey(self.assemble(names=("GJ-2",), attempt=2), "GJ-2")
+        self.assertEqual(journey["state"], PASS, journey.get("firstFailingCriterion"))
+        self.assertEqual(journey["executionIDs"], [f"gj2-{D}-attempt2", f"gj2-{D}-attempt2-capture"])
+        artifact = next(path for path in self.out.glob("*.json")
+                        if b'"command": "artifact.read"' in path.read_bytes())
+        artifact.write_bytes(artifact.read_bytes() + b" ")
+        self.refused("not the output the journal recorded", names=("GJ-2",), attempt=2)
+
+    def test_invalid_attempt_is_refused_before_reading_a_run(self):
+        for attempt in (0, -1, 1000, True, "2"):
+            with self.subTest(attempt=attempt), self.assertRaisesRegex(record.AssemblyError, "--attempt"):
+                self.assemble(names=("GJ-2",), attempt=attempt)
 
     def test_gj2_without_package_readback_is_a_defect(self):
         self.journal.facts()

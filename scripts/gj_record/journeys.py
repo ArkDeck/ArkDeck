@@ -44,17 +44,23 @@ FLASH_STEP_KINDS = (
 class Context:
     """What a Journey shares with the record: its Jobs and executions."""
 
-    def __init__(self, run: Run, judge: Judge, date: str):
+    def __init__(self, run: Run, judge: Judge, date: str, *, attempt: int | None = None):
+        if attempt is not None and (type(attempt) is not int or not 1 <= attempt <= 999):
+            raise ValueError("attempt must be an integer between 1 and 999")
         self.run = run
         self.judge = judge
         self.compact = date.replace("-", "")
+        self.attempt = attempt
         self.jobs: list[str] = []
         self.job_execution: dict[str, str] = {}
         self.executions: list[str] = []
         self.flash_image: dict | None = None
 
     def execution_id(self, prefix: str, suffix: str = "") -> str:
-        return f"{prefix}-{self.compact}" + (f"-{suffix}" if suffix else "")
+        identity = f"{prefix}-{self.compact}"
+        if self.attempt is not None:
+            identity += f"-attempt{self.attempt}"
+        return identity + (f"-{suffix}" if suffix else "")
 
     # -- executions ---------------------------------------------------------
 

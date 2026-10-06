@@ -5,6 +5,12 @@ stdout, byte for byte, to `<out>/<sequence>-<step>.json`. The journal holds
 what stdout alone cannot: the exit code, the order, the CLI image that ran and
 when. Nothing here interprets the output; `assemble` does.
 
+A CREATE_NEW lock covers sequence allocation, command execution and committed
+output. Only a completed capture removes its own lock. An exception or process
+crash leaves it in place: a later caller refuses before running, without stale
+PID/age recovery. Continue uncertain work in a fresh capture root, retaining the
+original bytes and lock; never replay a command to repair a capture.
+
 The raw outputs carry serials, connect keys and paths. They stay in `<out>`,
 which must lie outside the repository; only the assembled record is redacted
 for committing.
@@ -18,17 +24,54 @@ import json
 import os
 import platform
 import re
+import stat
 import subprocess
 import sys
 from pathlib import Path
 
 JOURNAL = "journal.jsonl"
+LOCK = ".capture.lock"
 ENTRY_SCHEMA = "arkdeck.gj-capture/1"
 _STEP = re.compile(r"^[a-z0-9][a-z0-9.-]{0,63}$")
 
 
 class CaptureError(Exception):
     pass
+
+
+class _CaptureGuard:
+    """Persistent exclusive ownership, never automatically reclaimed on error."""
+
+    def __init__(self, out: Path):
+        self.path = out / LOCK
+        self.bytes = json.dumps({
+            "schemaVersion": "arkdeck.gj-capture-lock/1",
+            "token": os.urandom(32).hex(),
+            "createdAtUtc": utc_now(),
+        }, sort_keys=True).encode("utf-8") + b"\n"
+        try:
+            handle = self.path.open("xb")
+        except FileExistsError as error:
+            raise CaptureError("capture is active or unfinished; no command was run; "
+                               "retain this root and use a fresh root") from error
+        # Even failure while writing the lock retains its exclusive name.
+        with handle:
+            handle.write(self.bytes)
+            handle.flush()
+            os.fsync(handle.fileno())
+            metadata = os.fstat(handle.fileno())
+            self.identity = (metadata.st_dev, metadata.st_ino)
+
+    def release(self):
+        # Never unlink a substituted lock, even after our capture committed.
+        metadata = self.path.lstat()
+        if (not stat.S_ISREG(metadata.st_mode)
+                or getattr(metadata, "st_file_attributes", 0) & 0x400
+                or metadata.st_nlink != 1
+                or (metadata.st_dev, metadata.st_ino) != self.identity
+                or self.path.read_bytes() != self.bytes):
+            raise CaptureError("capture lock changed; retain this root; no lock was removed")
+        self.path.unlink()
 
 
 def utc_now() -> str:
@@ -103,20 +146,31 @@ def capture(
     if not executable.is_file():
         raise CaptureError(f"{command[0]} is not a file; give the arkdeck executable's path")
     out.mkdir(parents=True, exist_ok=True)
+    guard = _CaptureGuard(out)
     sequence = len(read_journal(out)) + 1
     stdout_name = f"{sequence:04d}-{step}.json"
-    started = utc_now()
-    completed = runner(
-        [str(executable), *command[1:]],
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=None,
-        timeout=timeout,
-        check=False,
-    )
-    finished = utc_now()
-    stdout = completed.stdout or b""
-    (out / stdout_name).write_bytes(stdout)
+    try:
+        output = (out / stdout_name).open("xb")
+    except FileExistsError as error:
+        raise CaptureError("capture stdout already exists; no command was run; "
+                           "existing bytes and the lock were retained") from error
+    # Reserve stdout before dispatch, so an old/orphan file cannot be overwritten.
+    # Exceptions close only the handle; they retain both names and never unlock.
+    with output:
+        started = utc_now()
+        completed = runner(
+            [str(executable), *command[1:]],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=None,
+            timeout=timeout,
+            check=False,
+        )
+        finished = utc_now()
+        stdout = completed.stdout or b""
+        output.write(stdout)
+        output.flush()
+        os.fsync(output.fileno())
     entry = {
         "schemaVersion": ENTRY_SCHEMA,
         "sequence": sequence,
@@ -133,6 +187,9 @@ def capture(
     entry.update(_daemon_image(stdout))
     with open(out / JOURNAL, "a", encoding="utf-8", newline="\n") as journal:
         journal.write(json.dumps(entry, sort_keys=True) + "\n")
+        journal.flush()
+        os.fsync(journal.fileno())
+    guard.release()
     if not quiet:
         sys.stdout.buffer.write(stdout)
         sys.stdout.flush()

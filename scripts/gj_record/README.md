@@ -45,6 +45,14 @@ Catalog digest continues to cover every descriptor, including aliases.
 
 Executions are found by the IDs the runbook gives them. `<d>` is the record date without dashes.
 
+For an independent same-day attempt after a known completed failure, use a fresh
+Raw directory and `assemble --attempt N` (1..999). This selects only
+`gj2-<d>-attemptN`, `gj2-<d>-attemptN-capture`, and the corresponding IDs of the
+other selected journeys. It does not fall back to the original IDs, combine Raw
+directories, or change any acceptance criterion. Preserve the failed attempt;
+never resubmit an existing execution ID or replay an unknown outcome. Omit
+`--attempt` when judging the original runbook IDs.
+
 | Journey | Executions |
 | --- | --- |
 | GJ-1 | `gj1-<d>` observe; `gj1-<d>-capture`; `gj1-<d>-har` (no `--target`) |
