@@ -1774,6 +1774,15 @@ public static class UiStrings
     public const string WindowsSettingsTraceLicensesRevealFailed = "windows.settings.trace.licenses.revealFailed";
     public const string DiagnosticsAlignmentObservedWindow = "diagnostics.alignment.observedWindow";
     public const string DiagnosticsAlignmentClockDiscontinuity = "diagnostics.alignment.clockDiscontinuity";
+    public const string WindowsSettingsToolsSelected = "windows.settings.tools.selected";
+    public const string WindowsSettingsBundlesTitle = "windows.settings.bundles.title";
+    public const string WindowsSettingsBundlesEmpty = "windows.settings.bundles.empty";
+    public const string WindowsSettingsBundlesUnavailable = "windows.settings.bundles.unavailable";
+    public const string WindowsSettingsBundlesBytes = "windows.settings.bundles.bytes";
+    public const string WindowsSettingsBundlesEntries = "windows.settings.bundles.entries";
+    public const string WindowsSettingsBundlesRetained = "windows.settings.bundles.retained";
+    public const string WindowsSettingsBundlesReferences = "windows.settings.bundles.references";
+    public const string WindowsSettingsBundlesTrust = "windows.settings.bundles.trust";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3544,5 +3553,14 @@ public static class UiStrings
         WindowsSettingsTraceLicensesRevealFailed,
         DiagnosticsAlignmentObservedWindow,
         DiagnosticsAlignmentClockDiscontinuity,
+        WindowsSettingsToolsSelected,
+        WindowsSettingsBundlesTitle,
+        WindowsSettingsBundlesEmpty,
+        WindowsSettingsBundlesUnavailable,
+        WindowsSettingsBundlesBytes,
+        WindowsSettingsBundlesEntries,
+        WindowsSettingsBundlesRetained,
+        WindowsSettingsBundlesReferences,
+        WindowsSettingsBundlesTrust,
     ];
 }

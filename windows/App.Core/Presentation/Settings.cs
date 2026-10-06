@@ -1,3 +1,4 @@
+using ArkDeck.App.Core.Daemon;
 using ArkDeck.ClientKit;
 using ArkDeck.ClientKit.Contract;
 using ArkDeck.ClientKit.Json;
@@ -96,10 +97,57 @@ public sealed record ToolSummary(string ToolRef, string Kind, string State, stri
                 TypedJson.Required(o, "kind", TypedJson.String),
                 TypedJson.Required(o, "state", TypedJson.String),
                 TypedJson.Required(o, "platform", TypedJson.String),
-                TypedJson.Required(o, "selected", Json.Text));
+                TypedJson.Required(o, "selected", v => TypedJson.Bool(v) ? "true" : "false"));
         }));
     }
 }
+
+/// <summary>One complete published Bootstrap Bundle projection, for display only.</summary>
+public sealed record RuntimeBundle(string BundleRef, string Kind, string Platform, string Version, string State,
+    string ContentDigest, string ByteCount, string EntryCount, string Generation, string RegisteredAtUtc,
+    bool ContentRetained, RuntimeBundleTrust Trust, IReadOnlyList<RuntimeBundleReference> References)
+{
+    private static readonly string[] Keys = ["schemaVersion", "bundleRef", "kind", "platform", "version", "state",
+        "contentDigest", "digestAlgorithm", "contentSchemaVersion", "byteCount", "entryCount", "generation",
+        "registeredAtUTC", "contentRetained", "trust", "references"];
+
+    public static RuntimeBundle Parse(JsonValue value)
+    {
+        var o = Json.Object(value, "a Runtime Bundle");
+        string Text(string key) => TypedJson.Required(o, key, TypedJson.String);
+        if (!o.Members.Select(m => m.Key).ToHashSet(StringComparer.Ordinal).SetEquals(Keys)
+            || Text("schemaVersion") != "arkdeck.runtime-bundle/1" || Text("contentSchemaVersion") != "arkdeck.bundle-content/1"
+            || Text("digestAlgorithm") != "sha256-jcs") throw Invalid();
+        var digest = Text("contentDigest");
+        if (digest.Length != 64 || digest.Any(c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f'))
+            || Text("bundleRef") != "bundle:sha256:" + digest) throw Invalid();
+        string Count(string key)
+        {
+            var text = Text(key);
+            if (!ulong.TryParse(text, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var count)
+                || count.ToString(System.Globalization.CultureInfo.InvariantCulture) != text) throw Invalid();
+            return text;
+        }
+        var trust = Json.Object(o["trust"], "Runtime Bundle trust");
+        if (!trust.Members.Select(m => m.Key).ToHashSet(StringComparer.Ordinal)
+            .SetEquals(["policy", "signature", "teamIdentifier", "executionAssessment"])) throw Invalid();
+        string T(string key) => TypedJson.Required(trust, key, TypedJson.String);
+        var references = TypedJson.Required(o, "references", v => TypedJson.List(v, row =>
+        {
+            var owner = Json.Object(row, "a Bundle reference");
+            if (!owner.Members.Select(m => m.Key).ToHashSet(StringComparer.Ordinal).SetEquals(["kind", "id"])) throw Invalid();
+            return new RuntimeBundleReference(TypedJson.Required(owner, "kind", TypedJson.String), TypedJson.Required(owner, "id", TypedJson.String));
+        }));
+        return new(Text("bundleRef"), Text("kind"), Text("platform"), Text("version"), Text("state"), digest,
+            Count("byteCount"), Count("entryCount"), Count("generation"), Text("registeredAtUTC"),
+            TypedJson.Required(o, "contentRetained", TypedJson.Bool), new(T("policy"), T("signature"), T("teamIdentifier"), T("executionAssessment")), references);
+    }
+
+    internal static ContractException Invalid() => new(ContractErrorKind.SchemaMismatch, "Runtime Bundle inventory is unreadable");
+}
+
+public sealed record RuntimeBundleTrust(string Policy, string Signature, string TeamIdentifier, string ExecutionAssessment);
+public sealed record RuntimeBundleReference(string Kind, string Id);
 
 /// <summary><c>runtime.storage.status</c>: the Runtime's Artifact store and the Session output root.</summary>
 public sealed record StorageStatus(
@@ -290,6 +338,7 @@ public sealed record SettingsState(
     Loaded<DoctorFacts> Doctor,
     Loaded<HdcStatus> Hdc,
     Loaded<IReadOnlyList<ToolSummary>> Tools,
+    Loaded<IReadOnlyList<RuntimeBundle>> Bundles,
     Loaded<StorageStatus> Storage,
     Loaded<TraceCacheStatus> TraceCache,
     Loaded<IReadOnlyList<WorkspaceProject>> Projects,
@@ -302,6 +351,48 @@ public sealed record ProjectState(string ProjectRef, Loaded<WorkspaceProject> Pr
 
 public sealed partial class SurfaceLoader
 {
+    public const string RuntimeBundleListCommand = "arkdeck runtime bundle list";
+    public const int RuntimeBundlePageSize = 250;
+    public const int RuntimeBundlePageLimit = 64;
+
+    // A discovery snapshot is read completely or refused; earlier pages are never
+    // shown as a complete registry when a continuation fails or changes identity.
+    private static async Task<(IReadOnlyList<RuntimeBundle>? Items, ControlFailure? Failure)> BundlePagesAsync(IControlChannel c)
+    {
+        var rows = new List<RuntimeBundle>();
+        var cursors = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null, revision = null, previousReference = null;
+        for (var pageNumber = 0; pageNumber < RuntimeBundlePageLimit; pageNumber++)
+        {
+            var parameters = cursor is null ? Params(("pageSize", JsonNumber.FromInt64(RuntimeBundlePageSize)))
+                : Params(("pageSize", JsonNumber.FromInt64(RuntimeBundlePageSize)), ("cursor", new JsonString(cursor)));
+            var reply = await c.RequestAsync("runtime.bundle.list", parameters).ConfigureAwait(false);
+            if (reply.Failure is { } failure) return (null, failure);
+            var page = Json.Object(reply.Value!, "a Runtime Bundle page");
+            if (!page.Members.Select(m => m.Key).ToHashSet(StringComparer.Ordinal)
+                .SetEquals(["schemaVersion", "pageKind", "order", "snapshotRevision", "items", "hasMore", "nextCursor"])
+                || Json.OptionalString(page, "schemaVersion") != "arkdeck.cli.page/1"
+                || Json.OptionalString(page, "pageKind") != "snapshot" || Json.OptionalString(page, "order") != "bundleRef:asc") throw RuntimeBundle.Invalid();
+            var currentRevision = TypedJson.Required(page, "snapshotRevision", TypedJson.String);
+            var more = TypedJson.Required(page, "hasMore", TypedJson.Bool);
+            var next = Json.NullableString(page, "nextCursor");
+            var items = TypedJson.Required(page, "items", v => TypedJson.List(v, RuntimeBundle.Parse));
+            if (string.IsNullOrEmpty(currentRevision) || (revision is not null && revision != currentRevision)
+                || more != (next is not null) || (more && (items.Count == 0 || string.IsNullOrEmpty(next)))
+                || items.Count > RuntimeBundlePageSize) throw RuntimeBundle.Invalid();
+            revision = currentRevision;
+            foreach (var item in items)
+            {
+                if (previousReference is not null && StringComparer.Ordinal.Compare(previousReference, item.BundleRef) >= 0) throw RuntimeBundle.Invalid();
+                rows.Add(item); previousReference = item.BundleRef;
+            }
+            if (!more) return (rows, null);
+            if (!cursors.Add(next!)) throw RuntimeBundle.Invalid();
+            cursor = next;
+        }
+        throw RuntimeBundle.Invalid();
+    }
+
     /// <summary>The Settings tabs: the Runtime's <c>health</c> and <c>doctor</c>, the HDC and
     /// tool registry, storage, the Trace cache and the workspace projects, each as it came.
     /// Everything here is read; changing a setting is the CLI's (the tabs name the command).</summary>
@@ -350,10 +441,11 @@ public sealed partial class SurfaceLoader
         var doctor = Reparse(doctorReply, DoctorFacts.Parse);
         var hdc = await run.Load(c => c.RequestAsync("runtime.hdc.status"), HdcStatus.Parse, CliCommands.RuntimeHdcStatus);
         var tools = await run.Load(c => c.RequestAsync("runtime.tool.list"), ToolSummary.ParsePage, CliCommands.RuntimeToolList);
+        var bundles = await run.LoadPages(BundlePagesAsync, RuntimeBundleListCommand);
         var storage = await run.Load(c => c.RequestAsync("runtime.storage.status"), StorageStatus.Parse, CliCommands.RuntimeStorageStatus);
         var cache = await run.Load(c => c.RequestAsync("trace.cache.status"), TraceCacheStatus.Parse, CliCommands.TraceCacheStatus);
         var projects = await run.Load(c => c.RequestAsync("workspace.project.list"), WorkspaceProject.ParseList, CliCommands.WorkspaceProjectList);
-        return new(runtime, checks, doctor, hdc, tools, storage, cache, projects, run.DaemonFailure, run.Reached);
+        return new(runtime, checks, doctor, hdc, tools, bundles, storage, cache, projects, run.DaemonFailure, run.Reached);
     }
 
     public async Task<ProjectState> ProjectAsync(string projectRef)
