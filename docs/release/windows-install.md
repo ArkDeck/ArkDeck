@@ -127,8 +127,8 @@ MSIX 形态也按发布者身份钉 daemon（委托的次要决定，待下一�
    使开始菜单启动的 App 能读到；若启动器仍持有旧环境，重新登录后在新终端重跑上述步骤。
    `ARKDECK_DAEMON_PATH` 只为本次 CLI 设置，App 默认取包内兄弟 daemon；不要持久化带版本的包安装路径。
    若配置了可选 `ARKDECK_DAEMON_PACKAGE_FAMILY`，它也必须对应当前包，不能代替签名 pin。
-3. 上述代码检查 `doctor` 退出 0 和 JSON 顶层 `ok: true`，并显示原始 JSON；`result.ready` 和
-   `result.blockers` 仍需查看，`ok` 只表示诊断请求成功。随后从开始菜单打开 ArkDeck。daemon 仍由签名身份校验后的
+3. 上述代码检查 `doctor` 退出 0 和 JSON 顶层 `ok: true`，并显示原始 JSON；`result.ready`、
+   `result.findingCounts.blocker` 和 `result.findings` 仍需查看，`ok` 只表示诊断请求成功。随后从开始菜单打开 ArkDeck。daemon 仍由签名身份校验后的
    CLI 启动（decision 11）；App 只连接已运行的 daemon，不负责启动，也不调用 `runtime service install`。
    daemon 停止后，再打开 App 前先运行包内 CLI 的同一预热步骤。之后的版本由更新源送达；使用新版本的
    清单重新定位包和预热，见 [`windows-update.md`](windows-update.md)。
