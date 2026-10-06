@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   guard:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.ARKDECK_LINUX_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       # Keep the required guard runnable when the Actions service cannot

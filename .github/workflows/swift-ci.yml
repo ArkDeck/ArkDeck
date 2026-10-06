@@ -51,7 +51,7 @@ concurrency:
 
 jobs:
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.ARKDECK_LINUX_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     # actions: read is for the one step that asks which main commit this
     # workflow last passed on; nothing in this job writes.
@@ -87,6 +87,9 @@ jobs:
 
       - name: CI planner contract tests
         run: python3 scripts/ci/test_plan.py
+
+      - name: Linux runner pool activation tests
+        run: python3 scripts/ci/test_linux_runner_pool.py
 
       - name: CI cache scope tests
         run: python3 scripts/ci/test_cache_scope.py
@@ -401,7 +404,7 @@ jobs:
   swift:
     if: always() && (needs.plan.result != 'success' || needs.plan.outputs.compiled != 'false')
     needs: [plan, swift-tests, app-build, rust-checks, windows-clientkit]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.ARKDECK_LINUX_LIGHT_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - name: Require every selected lane

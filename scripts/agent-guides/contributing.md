@@ -75,6 +75,8 @@ CI 的 Linux planner 同时运行被选中的设计系统交互测试，SDD `gua
 token 一致性。验收记录不触发交互测试；原型、设计清单与实际测试输入仍触发。planner 全部
 成功且明确没有编译车道时，required `swift` job 以成功跳过结束，不额外领取 runner。
 planner 失败、取消或缺少输出时仍执行汇总并阻塞合入；有编译车道时继续检查每条车道结果。
+轻量 Linux jobs 可在两个隔离的一次性 runner 就绪后切换到独立池；默认保留 hosted runner。
+部署、实际验证、启用与回退见 [Linux runner pool](linux-runner-pool.md)。
 
 同时推进的平台或功能若触及同一份 `spec/ui-semantics/strings.json`、Catalog、control contract
 或对应生成物，先在已有 PR 链中选一个共享集成层并注明负责 Agent。该层合并双方需要的源输入，

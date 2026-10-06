@@ -657,6 +657,7 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
     python = _sdd_python(repo_root)
     commands: list[tuple[str, ...]] = [
         (python, "scripts/ci/test_plan.py"),
+        (python, "scripts/ci/test_linux_runner_pool.py"),
         (python, "scripts/test_agent_pr_workflow.py"),
         ("sh", "scripts/check-sdd.sh"),
         (
