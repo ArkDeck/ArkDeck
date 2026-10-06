@@ -1,0 +1,6 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "ARMv7-only native pair proposal; no signing configuration",
+  "dependencies": { "libarkdeck_gj.so": "file:./src/main/native-types/libarkdeck_gj" }
+}
