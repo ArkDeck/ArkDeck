@@ -28,7 +28,8 @@ are the only contract outputs changed.
 
 ## Local targeted checks
 
-All commands ran in `D:/src/ArkDeck-wt/rc-smoke-path`. Cargo used jobs 2 and the
+Commands ran in `D:/src/ArkDeck-wt/rc-smoke-path`; the affected .NET follow-up
+ran from its `windows/` directory to select the pinned SDK. Cargo used jobs 2 and the
 exclusively held `D:/cargo-target/windows-mutation-tool-identity` cache. The
 heavy executor acquired a host slot immediately. The Runtime was stopped for
 the Rust checks. These are corpus/native validator tests, not live acceptance.
@@ -55,8 +56,37 @@ accepts actual recorded signing/null projections and refuses malformed/missing
 credentials and unknown fields. Rust retains an explicit old-published-view
 refusal check rather than skipping the new test under the old schema.
 
+The CI follow-up regenerates `windows/ClientKit/Generated/ControlContract.g.cs`
+using its normal generator: exactly the four changed method-schema SHA entries.
+The other C# generated records and all validator assertions remain unchanged.
+The missing C# regeneration was reproduced locally before correction
+(`clientkit-check-reproduction.log`, exit 1).
+
+| Follow-up command | Result | Log |
+| --- | --- | --- |
+| `python windows/scripts/generate-clientkit.py --write`, then `--check` | exit 0 each | `windows-clientkit-write.log`, `windows-clientkit-check-fixed.log` |
+| `dotnet test ClientKit.Tests/ArkDeck.ClientKit.Tests.csproj --filter 'FullyQualifiedName~GeneratorTests\|FullyQualifiedName~WireCorpusTests' '-m:2' --verbosity normal` | exit 0; 7 passed; 0 build warnings/errors | `clientkit-contract-tests-fixed-argv.log` |
+| `python rust/scripts/generate-contract.py --check` | exit 0 | `rust-generator-followup-check.log` |
+| `python Packages/ArkDeckKit/Scripts/generate-control-contract.py --check` | exit 0 | `control-vocabulary-followup-check.log` |
+| `python Packages/ArkDeckKit/Scripts/generate-clientkit-models.py --check` | exit 0 | `swift-client-model-check.log` |
+| Git Bash `sh scripts/check-sdd.sh`; `git diff --check` | exit 0 each | `sdd-followup.log`, `diff-followup.log` |
+
+The first .NET invocation stopped before compilation/test execution because
+PowerShell split an unquoted `-m:2` argument (`clientkit-contract-tests.log`,
+exit 1). The quoted invocation above ran all seven selected cases. No assertion
+was waived and no CI run was classified as invalid.
+
 ## CI
 
-CI has not run for this increment yet. Local checks do not constitute maintainer
-approval, current-head CI success or hardware acceptance. Full contract parity
-and platform lanes remain the existing PR CI responsibility.
+PR [#2602](https://github.com/ArkDeck/ArkDeck/pull/2602), initial head
+`6594493b88364b6a8a21431d0ba0fbd10fec0862`: Swift CI run `37406718944`, Windows
+ClientKit job `112085860934` failed step 4, `ClientKit generated contract
+bindings`, at 2026-10-06T02:58:39Z. The exact error was generated input drift in
+`ControlContract.g.cs`, exit 1. The retained job log is
+`ci-windows-clientkit-raw.log`. This was a code/generation omission in the
+increment, corrected by the C# regeneration above.
+
+CI for the corrective head is pending its normal push; no older-head success is
+claimed for it. Local checks do not constitute maintainer approval, current-head
+CI success or hardware acceptance. Full contract parity and platform lanes
+remain the existing PR CI responsibility.
