@@ -16,11 +16,16 @@
 //!   released after a complete drain and proves a new process with the same
 //!   catalog; a connection the restart ended is not replayed to the
 //!   successor; and concurrent starters produce one daemon.
+//! * A missing analyzer refuses a signed development daemon after it reserves
+//!   its pipe and publishes its instance, before it can start HDC. The client
+//!   never reports success. A separate once-only fixture launch retains the
+//!   native exit and private diagnostic streams; it does not replay that start.
 //!
 //! Every daemon here runs with every `ARKDECK_` and `OHOS_HDC_` input removed
-//! but its development root; nothing installed is read or written. Each
-//! daemon is stopped by its own stop request, and the test waits on its
-//! single-instance guard, never on time; no other process is touched.
+//! but its development root and the missing-analyzer test input; nothing
+//! installed is read or written. Serving daemons are stopped by their own
+//! stop request; initialization failures exit naturally with 69. The test
+//! waits on the single-instance guard, never on time; no other process is touched.
 #![cfg(windows)]
 
 use arkdeck_cli::runtime_service_windows::{self as service, ServiceTarget};
@@ -33,7 +38,9 @@ use arkdeck_platform::{
 use serde_json::{Map, Value};
 use std::ffi::OsString;
 use std::io::{Read, Write};
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
@@ -60,11 +67,10 @@ impl Directory {
 
     /// The instance document once the daemon on `endpoint` serves. A daemon
     /// opens its pipe before it publishes `instance.json` and serves only
-    /// after publishing it, so a client start (which returns once the pipe
-    /// exists and its server's identity was checked) says nothing about the
-    /// document; a `health` answer on the pipe does. The probe is a plain
-    /// pipe handle, as `windows_lifecycle_process.rs` uses: it observes the
-    /// daemon and trusts it with nothing.
+    /// after publishing it. A successful client start now requires health;
+    /// this independent probe also observes fixtures whose identity was refused.
+    /// It is a plain pipe handle, as `windows_lifecycle_process.rs` uses:
+    /// it observes the daemon and trusts it with nothing.
     fn instance_once_serving(&self, endpoint: &LocalEndpoint) -> Value {
         let answer = health_on(endpoint);
         assert_eq!(answer["ok"], true, "{answer}");
@@ -280,6 +286,157 @@ fn signed_daemon(directory: &Path) -> Option<(PathBuf, String)> {
     assert!(output.status.success(), "{output:?}");
     let signed: Value = serde_json::from_slice(&output.stdout).unwrap();
     Some((copy, signed["pin"].as_str().unwrap().to_owned()))
+}
+
+/// An ordinary startup input that fails during composition, after the pipe
+/// and instance exist but before the managed HDC launch. No fault hook or
+/// transport input is injected, and neither the account nor SDK is addressed.
+fn missing_analyzer_target(root: &Path, identity: ServerIdentity) -> StartTarget {
+    let mut target = target(root, identity);
+    let missing = root.join("missing-startup-analyzer.exe");
+    assert!(!missing.exists());
+    let variables = target.environment.as_mut().unwrap();
+    variables.push(("ARKDECK_ANALYZER_PATH".into(), missing.into_os_string()));
+    for (name, _) in variables {
+        let name = name.to_string_lossy().to_ascii_uppercase();
+        assert!(!name.starts_with("OHOS_HDC"));
+        assert!(
+            !name.starts_with("ARKDECK_")
+                || matches!(
+                    name.as_str(),
+                    "ARKDECK_DEVELOPMENT_STATE_ROOT" | "ARKDECK_ANALYZER_PATH"
+                )
+        );
+    }
+    target
+}
+
+fn assert_failed_instance(root: &Directory, target: &StartTarget, pid: u32) {
+    let instance = root.instance();
+    assert_eq!(instance["pid"], pid);
+    assert_eq!(
+        instance["protocolVersion"],
+        arkdeck_contract::PROTOCOL_VERSION
+    );
+    assert_eq!(
+        instance["socketPath"],
+        target.endpoint.as_path().to_string_lossy().as_ref()
+    );
+    // Keep the acquired guard while examining the vanished pipe and original
+    // instance. This waits on the actual native owner, never a sleep/restart.
+    let GuardAcquisition::Owned { guard, .. } = GuardObject::open(&target.scope)
+        .unwrap()
+        .acquire(WAIT)
+        .unwrap()
+    else {
+        panic!("the failed daemon retained its guard");
+    };
+    assert!(!pipe_present(&target.endpoint).unwrap());
+    let state = StateRoot::development(&root.0).unwrap();
+    assert!(state.lock_owner().unwrap().is_some());
+    assert_eq!(
+        root.instance(),
+        instance,
+        "no successor changed the instance"
+    );
+    assert!(root.0.join("workspace-projects").is_dir());
+    assert!(!root.0.join("hdc-control-actions").exists());
+    drop(guard);
+}
+
+#[test]
+fn a_signed_post_reservation_initialization_failure_is_never_reported_ready() {
+    let _turn = turn();
+    let installed = Directory::new("ad-start-failed-image");
+    let Some((image, pin)) = signed_daemon(&installed.0) else {
+        return;
+    };
+    let root = Directory::new("ad-start-failed-root");
+    let target = missing_analyzer_target(
+        &root.0,
+        ServerIdentity {
+            authenticode_sha256: Some(pin),
+            ..ServerIdentity::new(&image)
+        },
+    );
+    assert!(!pipe_present(&target.endpoint).unwrap());
+    assert!(!root.0.join("instance.json").exists());
+    // This is the only call that can launch on this root. Its retained native
+    // child must prove the exit within the original startup deadline, even
+    // when the health connection ends before the process exit is signaled.
+    let failure = ensure_running(&target, WAIT).unwrap_err();
+    assert_eq!(failure.refusal, StartRefusal::DaemonExited(69), "{failure}");
+    let pid = failure.pid.expect("the one process the client launched");
+    assert_failed_instance(&root, &target, pid);
+    // No second ensure_running call, health/business frame or restart follows.
+}
+
+#[test]
+fn a_separate_signed_initialization_failure_retains_native_exit_and_diagnostic() {
+    let _turn = turn();
+    let installed = Directory::new("ad-start-diagnostic-image");
+    let Some((image, pin)) = signed_daemon(&installed.0) else {
+        return;
+    };
+    let root = Directory::new("ad-start-diagnostic-root");
+    let target = missing_analyzer_target(
+        &root.0,
+        ServerIdentity {
+            authenticode_sha256: Some(pin),
+            ..ServerIdentity::new(&image)
+        },
+    );
+    // These are a different once-only start and root, never a retry of the
+    // client's attempt. ensure_running has no stdout/stderr capture API.
+    arkdeck_platform::verify_daemon_image(&target.identity).unwrap();
+    let state = StateRoot::development(&root.0).unwrap();
+    let diagnostic = state.private_child("startup-diagnostic").unwrap();
+    let output = |name| {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(diagnostic.join(name))
+            .unwrap()
+    };
+    let mut child = Command::new(&image)
+        .env_clear()
+        .envs(target.environment.as_ref().unwrap().iter().cloned())
+        .current_dir(image.parent().unwrap())
+        .stdin(Stdio::null())
+        .stdout(output("stdout.bin"))
+        .stderr(output("stderr.bin"))
+        // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW,
+        // as the production detached launcher; no kill-on-close Job is added.
+        .creation_flags(0x0000_0008 | 0x0000_0200 | 0x0800_0000)
+        .spawn()
+        .unwrap();
+    let pid = child.id();
+    let (sent, received) = std::sync::mpsc::sync_channel(1);
+    let waiter = std::thread::spawn(move || sent.send(child.wait()).unwrap());
+    // Child::wait retains the native process handle through its exit. The
+    // channel bounds observation, and neither timeout nor Drop kills it.
+    let status = received.recv_timeout(WAIT).unwrap().unwrap();
+    waiter.join().unwrap();
+    assert_eq!(status.code(), Some(69));
+    assert_failed_instance(&root, &target, pid);
+    let read_complete = |name| {
+        let file = std::fs::File::open(diagnostic.join(name)).unwrap();
+        assert!(file.metadata().unwrap().len() <= 64 * 1024);
+        let mut bytes = Vec::new();
+        file.take(64 * 1024 + 1).read_to_end(&mut bytes).unwrap();
+        assert!(bytes.len() <= 64 * 1024);
+        String::from_utf8(bytes).unwrap()
+    };
+    let stdout = read_complete("stdout.bin");
+    let stderr = read_complete("stderr.bin");
+    assert_eq!(stdout.matches("arkdeck-agentd state root ").count(), 1);
+    assert!(!stdout.contains("already running"));
+    assert!(!stdout.contains("arkdeck-agentd listening on "));
+    assert_eq!(stderr.matches("arkdeck-agentd:").count(), 1);
+    assert!(stderr.contains("ARKDECK_ANALYZER_PATH is unusable:"));
+    assert!(stderr.contains("nothing was started"));
+    // Streams are inspected only after the actual child exit, never printed.
+    // No device command, business frame, retry or account daemon was invoked.
 }
 
 #[test]
