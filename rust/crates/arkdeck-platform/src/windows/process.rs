@@ -501,14 +501,14 @@ pub(crate) fn spawn_attached(
         None,
         Launch {
             breakaway: false,
-            standard_image: false,
+            standard_image: true,
         },
     )
 }
 
 /// How `spawn_with` starts a child beyond its streams: whether its Job lets
 /// the child's own children break away, and whether it is named by the
-/// standard spelling of its image path (tool runner children only).
+/// standard spelling of its image path (tool runner and console children).
 #[derive(Clone, Copy)]
 struct Launch {
     breakaway: bool,
@@ -533,12 +533,12 @@ fn spawn_with(
             "verified Windows tools must be executable images, not shell scripts",
         ));
     }
-    // A tool child is named by the standard spelling of its canonical image
-    // path when that names exactly the same file (TASK-XPA-011: Node hands
-    // its image path to `cmd.exe`, which cannot run a `\\?\` one); every
-    // other child, and a path with no such spelling, keeps the canonical
-    // one. The suspended child's image is proved against the retained file
-    // either way.
+    // A tool or console child uses the standard spelling of its canonical image
+    // path when that names exactly the same file (TASK-XPA-011: Node forwards
+    // its image path to `cmd.exe`; the installed SDK Java resolves its runtime
+    // from the image path). These consumers need ordinary spelling. Other
+    // children and paths with no such spelling keep the canonical one. The
+    // suspended child's image is proved against the retained file either way.
     let image: OsString = match launch
         .standard_image
         .then(|| super::tool::standard_spelling(&tool.path))

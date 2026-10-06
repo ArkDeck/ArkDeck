@@ -716,9 +716,10 @@ RUST_POLICY_TOKENS = (
 )
 # The two host matrices, `workspace` and `contracts`, each carry these once:
 # the same policy gate (and only it, so neither waits for the other), hosts,
-# worker count and cache discipline.
+# whole-job allowance, worker count and cache discipline.
 RUST_NATIVE_JOB_TOKENS = (
     "    needs: policy\n",
+    "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}\n",
     "      fail-fast: false\n",
     "        os: [ubuntu-latest, xcode-27, windows-latest]\n",
     "    runs-on: ${{ matrix.os }}\n",
@@ -733,7 +734,6 @@ RUST_NATIVE_JOB_TOKENS = (
 # Answers that can differ between hosts: each runs exactly once per host, in
 # the `workspace` matrix.
 RUST_WORKSPACE_TOKENS = (
-    "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}\n",
     # Each native job owns its cache root; the root is part of the cache key,
     # so the two jobs never restore, carry or save each other's products.
     'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-workspace" >> "$GITHUB_ENV"',
@@ -753,7 +753,6 @@ RUST_WORKSPACE_TOKENS = (
 # The published and candidate contract views: once per host, in the
 # `contracts` matrix beside `workspace`, since they read none of its products.
 RUST_CONTRACTS_TOKENS = (
-    "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}\n",
     'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"',
     'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-contract-test-timings" >> "$GITHUB_ENV"',
     "        working-directory: .\n"
@@ -1546,9 +1545,14 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "    needs: policy\n", "    needs: [policy, workspace]\n"
             ),
             rust[:rust.index("  contracts:\n")],
-            # Windows parity must cover both isolated views even on a cache
-            # miss; the workspace job keeps its separate, smaller budget.
+            # Both isolated views retain their exact Windows whole-job
+            # allowance, including independent drift in either matrix.
             rust.replace(" || matrix.os == 'windows-latest' && 40", ""),
+            rust.replace(" || matrix.os == 'windows-latest' && 40", "", 1),
+            rust[:rust.index("  contracts:\n")] + rust[rust.index("  contracts:\n"):].replace(
+                " || matrix.os == 'windows-latest' && 40", "", 1
+            ),
+            rust.replace(" || matrix.os == 'windows-latest' && 40", " || matrix.os == 'windows-latest' && 41", 1),
         )
         for mutated in mutations:
             # A mutation that no longer matches the workflow proves nothing.
