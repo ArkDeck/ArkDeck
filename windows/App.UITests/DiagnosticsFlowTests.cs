@@ -5,7 +5,7 @@ namespace ArkDeck.App.UITests;
 /// <c>diagnostics</c> daemon (the diagnostics-inspect oracle's session and job-run-hilog's summary
 /// Job) a record is opened from History and read as macOS reads it: the alignment state, the marks
 /// and their missing pictures, the missing products, a local text preview; the HiLog summary;
-/// and Arm and Mark, which say that session capture is not connected.
+/// with immutable historical controls. The live one-shot capture has its own software flow.
 /// </summary>
 [TestClass]
 public sealed class DiagnosticsFlowTests
@@ -52,11 +52,9 @@ public sealed class DiagnosticsFlowTests
         // The failed Trace was never published, so there is nothing to open in the Trace viewer.
         Assert.IsNull(app.TryFind("diagnostics.artifacts.openTrace", TimeSpan.FromMilliseconds(300)));
 
-        // Session capture is not connected: Arm and Mark say so.
-        app.Invoke("diagnostics.capture.arm");
-        StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["windows.diagnostics.capture.unavailable"]);
-        Assert.AreEqual("diagnostic_session_capture_not_connected", AppSession.Name(app.Find("diagnostics.capture.reasonCode")));
-        Assert.AreEqual(strings["windows.diagnostics.capture.mark"], AppSession.Name(app.Find("diagnostics.capture.mark")));
+        // History cannot acquire the live session's mutation controls.
+        foreach (var control in new[] { "arm", "mark", "stop", "cancelPreparation" })
+            Assert.IsNull(app.TryFind("diagnostics.capture." + control, TimeSpan.FromMilliseconds(300)));
         foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
     }
 
@@ -94,6 +92,6 @@ public sealed class DiagnosticsFlowTests
         Assert.AreEqual(strings["diagnostics.session.none"], app.WaitForName("diagnostics.session.empty", n => n.Length > 0));
         Assert.AreEqual(strings["diagnostics.alignment.cannotAlign"], AppSession.Name(app.Find("diagnostics.alignment")));
         app.Invoke("diagnostics.capture.mark");
-        StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["windows.diagnostics.capture.unavailable"]);
+        Assert.AreEqual("diagnostics_session_control_not_ready", app.WaitForName("diagnostics.status", n => n.Length > 0));
     }
 }

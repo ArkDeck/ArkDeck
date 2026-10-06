@@ -16,9 +16,8 @@ namespace ArkDeck.App.Pages;
 /// <c>capture.diagnostics@1</c> session can and cannot prove — the alignment state, every mark
 /// with its picture or which of the reasons it has none, what nothing looked for, the products
 /// that went missing, its Artifacts with a local text preview — or a verified HiLog summary.
-/// A record is opened from History (Open Diagnostics); reading it starts no Job. No Diagnostic
-/// Session capture provider is composed into the App, so Arm and Mark say so when chosen and the
-/// pane states the reason (macOS shows them disabled; here no action is shown disabled).
+/// A record is opened from History (Open Diagnostics); reading it starts no Job. Live controls
+/// name only the one Job this App accepted; History remains an immutable read-only view.
 /// </summary>
 public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
     "diagnostics", "diagnostics.title", UiStrings.AppNavigationDiagnostics,
@@ -30,6 +29,13 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
     private readonly StackPanel _preview = new() { Spacing = 6 };
     private DiagnosticReaderSelection? _selection;
     private bool _previewLoading;
+    private static DiagnosticCaptureSession? _sharedCapture;
+    private readonly DiagnosticCaptureSession _capture = _sharedCapture ??= new(new DiagnosticCaptureProvider(App.Loader));
+    private DiagnosticCaptureTarget? _captureTarget;
+    private int _captureDuration = 60;
+    private bool _subscribed;
+    private bool _eventsHooked;
+    private string? _completedJobOpened;
 
     private HistoryWorkspaceContext? _history;
 
@@ -42,7 +48,17 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
         _preview.Children.Clear();
     }
 
-    protected override Task<DiagnosticsState> LoadAsync() => App.Loader.DiagnosticsAsync(_context);
+    protected override async Task<DiagnosticsState> LoadAsync()
+    {
+        var state = await App.Loader.DiagnosticsAsync(_context);
+        if (_history is null)
+        {
+            var observations = await App.Loader.DeviceCandidatesAsync();
+            _captureTarget = observations.Value is { } candidates ? DiagnosticCaptureTarget.From(candidates) : null;
+            _capture.SelectionChanged(_captureTarget);
+        }
+        return state;
+    }
 
     protected override void Render(DiagnosticsState state, StackPanel body)
     {
@@ -66,7 +82,7 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
             }));
         }
         body.Children.Add(Toolbar(state, reading));
-        if (!state.IsHilogSummaryContext) body.Children.Add(Ui.Card(CapturePane(), "diagnostics.capture"));
+        if (!state.IsHilogSummaryContext && _history is null) body.Children.Add(Ui.Card(CapturePane(), "diagnostics.capture"));
 
         if (state.LoadError is { } reason)
         {
@@ -136,25 +152,87 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
         return Ui.Text("diagnostics.alignment", title, refusal ? "ArkDeckSectionTitleStyle" : "ArkDeckCaptionStyle");
     }
 
-    // ---- capture: not connected ----
+    // ---- live capture: one accepted Runtime owner, retained across navigation ----
 
     private StackPanel CapturePane()
     {
-        void Unavailable() => Ui.Say(_status, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailable) + ". " + S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
-        var arm = Ui.Button("diagnostics.capture.arm", S.Text(UiStrings.DiagnosticsCaptureArm), (_, _) => Unavailable());
-        ToolTipService.SetToolTip(arm, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
-        AutomationProperties.SetHelpText(arm, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
-        var mark = Ui.Button("diagnostics.capture.mark", S.Text(UiStrings.WindowsDiagnosticsCaptureMark), (_, _) => Unavailable());
+        SubscribeCapture();
+        async Task Action(Func<Task> action)
+        {
+            await Task.Run(action);
+            if (_capture.Failure is { } failure) Ui.Say(_status, failure);
+            Rerender();
+        }
+        var arm = Ui.Button("diagnostics.capture.arm", S.Text(UiStrings.DiagnosticsCaptureArm), async (_, _) =>
+        {
+            if (!_capture.CanStart) { Ui.Say(_status, S.Text(UiStrings.DiagnosticsCaptureUncertain)); return; }
+            if (_captureTarget is not { } target) { Ui.Say(_status, S.Text(UiStrings.DiagnosticsCaptureChooseTarget)); return; }
+            _context = null;
+            _selection = null;
+            _preview.Children.Clear();
+            await RefreshAsync();
+            await Action(() => _capture.StartAsync(target, _captureDuration));
+        });
+        var duration = new ComboBox { Header = S.Text(UiStrings.DiagnosticsCaptureDuration), MinWidth = 180 };
+        AutomationProperties.SetAutomationId(duration, "diagnostics.capture.duration");
+        AutomationProperties.SetName(duration, S.Text(UiStrings.DiagnosticsCaptureDuration));
+        foreach (var seconds in new[] { 30, 60, 120 })
+        {
+            var item = new ComboBoxItem { Content = $"{seconds} s", Tag = seconds };
+            duration.Items.Add(item);
+            if (seconds == _captureDuration) duration.SelectedItem = item;
+        }
+        duration.SelectionChanged += (_, _) =>
+        {
+            if (_capture.CanStart && duration.SelectedItem is ComboBoxItem { Tag: int seconds }) _captureDuration = seconds;
+            else if (duration.SelectedItem is ComboBoxItem { Tag: int attempted } && attempted != _captureDuration) Rerender();
+        };
+        var mark = Ui.Button("diagnostics.capture.mark", S.Text(UiStrings.WindowsDiagnosticsCaptureMark), async (_, _) => await Action(_capture.MarkAsync));
         mark.KeyboardAccelerators.Add(new KeyboardAccelerator { Key = VirtualKey.M, Modifiers = VirtualKeyModifiers.Control });
-        AutomationProperties.SetHelpText(mark, S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail));
-        var code = Ui.Text("diagnostics.capture.reasonCode", DiagnosticsState.CaptureUnavailableReasonCode, "ArkDeckMonoStyle");
-        code.IsTextSelectionEnabled = true;
-        var notice = Ui.Stack(4,
-            Ui.Text("diagnostics.capture.unavailable", S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailable), "ArkDeckSectionTitleStyle"),
-            Ui.Text("diagnostics.capture.unavailable.detail", S.Text(UiStrings.WindowsDiagnosticsCaptureUnavailableDetail), "ArkDeckCaptionStyle"),
-            code);
-        return Ui.Stack(8, Ui.Row(arm, mark), notice);
+        var stop = Ui.Button("diagnostics.capture.stop", S.Text(UiStrings.DiagnosticsCaptureStop), async (_, _) => await Action(_capture.StopAsync));
+        var actions = Ui.Row(mark, stop);
+        if (_capture.CanCancelPreparation) actions.Children.Add(Ui.Button("diagnostics.capture.cancelPreparation", S.Text(UiStrings.DiagnosticsCaptureCancelPreparation), async (_, _) => await Action(_capture.CancelPreparationAsync)));
+        if (_capture.JobId is not null) actions.Children.Add(Ui.Button("diagnostics.capture.refresh", S.Text(UiStrings.DiagnosticsCaptureRefresh), async (_, _) => await Action(() => _capture.RefreshAsync())));
+        var panel = Ui.Stack(8, Ui.Row(arm, duration), actions);
+        var targetShown = _capture.CanStart ? _captureTarget : _capture.Target;
+        panel.Children.Add(Ui.Text("diagnostics.capture.target", targetShown?.Title ?? S.Text(UiStrings.DiagnosticsCaptureChooseTarget), "ArkDeckCaptionStyle"));
+        if (_capture.JobId is { } jobId) panel.Children.Add(Ui.Text("diagnostics.capture.job", jobId, "ArkDeckMonoStyle"));
+        if (_capture.Snapshot is { } snapshot)
+        {
+            panel.Children.Add(Ui.Row(Ui.Text("diagnostics.capture.state", S.Text("diagnostics.capture.state." + snapshot.State), "ArkDeckCaptionStyle"),
+                Ui.Text("diagnostics.capture.elapsed", $"{snapshot.ElapsedMs / 1000} / {snapshot.MaximumSeconds} s", "ArkDeckMonoStyle"),
+                Ui.Text("diagnostics.capture.markCount", $"{S.Text(UiStrings.DiagnosticsCaptureMarks)}: {snapshot.Markers.Count} / {snapshot.MaximumMarkers}", "ArkDeckCaptionStyle")));
+        }
+        else if (_capture.Phase != DiagnosticCapturePhase.Idle) panel.Children.Add(Ui.Text("diagnostics.capture.state", S.Text("diagnostics.capture.phase." + _capture.Phase.ToString().ToLowerInvariant()), "ArkDeckCaptionStyle"));
+        if (_capture.Phase == DiagnosticCapturePhase.Uncertain) panel.Children.Add(Ui.Text("diagnostics.capture.uncertain", S.Text(UiStrings.DiagnosticsCaptureUncertain), "ArkDeckCaptionStyle"));
+        if (_capture.Failure is { } reason) panel.Children.Add(Ui.Text("diagnostics.capture.reasonCode", reason, "ArkDeckMonoStyle"));
+        panel.Children.Add(Ui.Text("diagnostics.capture.boundary", S.Text(UiStrings.DiagnosticsCaptureBoundary), "ArkDeckCaptionStyle"));
+        return panel;
     }
+
+    private void SubscribeCapture()
+    {
+        if (!_subscribed) { _capture.Changed += CaptureChanged; _subscribed = true; }
+        if (_eventsHooked) return;
+        _eventsHooked = true;
+        Unloaded += (_, _) => { _capture.Changed -= CaptureChanged; _subscribed = false; };
+        Loaded += (_, _) => { if (_history is null) { SubscribeCapture(); CaptureChanged(); } };
+    }
+
+    private void CaptureChanged() => DispatcherQueue.TryEnqueue(() =>
+    {
+        // A live controller can finish in the background, but cannot replace a historical view.
+        if (_history is not null) return;
+        Rerender();
+        if (_capture.CompletedContext is { } context && _completedJobOpened != context.JobId)
+        {
+            _completedJobOpened = context.JobId;
+            _context = context.Diagnostics;
+            _selection = null;
+            _preview.Children.Clear();
+            _ = RefreshAsync();
+        }
+    });
 
     // ---- a record that could not be read ----
 
@@ -385,7 +463,11 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
         var row = Ui.Stack(4, Ui.Text("diagnostics.selection", summary, "ArkDeckCaptionStyle"));
         if (reading?.Alignment is DiagnosticAlignment.CannotAlign cannot)
         {
-            var detail = cannot.Reason == "capture artifacts contain no host-to-device calibration"
+            var detail = reading.ClockObservation is { } observation
+                ? observation.Status == "unvalidated"
+                    ? S.Text(UiStrings.DiagnosticsAlignmentObservedWindow).Replace("{milliseconds}", observation.WindowMilliseconds.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+                    : S.Text(UiStrings.DiagnosticsAlignmentClockDiscontinuity)
+                : cannot.Reason == "capture artifacts contain no host-to-device calibration"
                 ? S.Text(UiStrings.DiagnosticsAlignmentExplain)
                 : $"{S.Text(UiStrings.DiagnosticsAlignmentExplain)} ({cannot.Reason})";
             row.Children.Add(Ui.Text("diagnostics.alignment.detail", detail, "ArkDeckCaptionStyle"));

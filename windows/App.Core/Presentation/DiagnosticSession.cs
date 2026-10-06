@@ -167,6 +167,35 @@ public sealed record DiagnosticSessionInspection(
     IReadOnlyList<DiagnosticArtifactMetadata> Inventory)
 {
     public const string CurrentSchemaVersion = "arkdeck.diagnostics-inspection/1";
+    public DiagnosticClockObservation? ClockObservation { get; init; }
+}
+
+/// <summary>The verified host interval around the anchor write. It never establishes cross-clock alignment.</summary>
+public sealed record DiagnosticClockObservation(string StartedAtHostUtc, string FinishedAtHostUtc, long ElapsedNanoseconds, string Status)
+{
+    public long WindowMilliseconds => (ElapsedNanoseconds + 999_999) / 1_000_000;
+
+    public static DiagnosticClockObservation Parse(JsonValue value, string jobId, string? anchor)
+    {
+        static DiagnosticSessionException Invalid() => DiagnosticSessionException.Invalid("diagnostics_invalid_clock_observation");
+        if (value is not JsonObject o || !o.Members.Select(m => m.Key).ToHashSet(StringComparer.Ordinal).SetEquals(
+                ["schemaVersion", "jobId", "anchor", "startedAtHostUTC", "finishedAtHostUTC", "elapsedNanoseconds", "status"])
+            || DiagnosticSessionOfflineInspector.Text(o, "schemaVersion") != "arkdeck.trace-clock-observation/1"
+            || DiagnosticSessionOfflineInspector.Text(o, "jobId") != jobId || string.IsNullOrEmpty(anchor)
+            || DiagnosticSessionOfflineInspector.Text(o, "anchor") != anchor
+            || DiagnosticSessionOfflineInspector.Text(o, "startedAtHostUTC") is not { } start
+            || DiagnosticSessionOfflineInspector.Text(o, "finishedAtHostUTC") is not { } end
+            || !DateTimeOffset.TryParseExact(start, "yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var before)
+            || !DateTimeOffset.TryParseExact(end, "yyyy-MM-dd'T'HH:mm:ss.fff'Z'", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var after)
+            || start.Length != 24 || end.Length != 24
+            || !o.TryGetValue("elapsedNanoseconds", out var elapsed) || elapsed is not JsonNumber n || !n.TryGetInt64(out var nanos) || nanos is < 0 or > 120_000_000_000
+            || DiagnosticSessionOfflineInspector.Text(o, "status") is not ("unvalidated" or "hostClockDiscontinuity")) throw Invalid();
+        var wallNanos = (after.UtcTicks - before.UtcTicks) * 100.0;
+        var consistent = wallNanos >= 0 && Math.Abs(wallNanos - nanos) <= 2_000_000;
+        var status = DiagnosticSessionOfflineInspector.Text(o, "status")!;
+        if (status != (consistent ? "unvalidated" : "hostClockDiscontinuity")) throw Invalid();
+        return new(start, end, nanos, status);
+    }
 }
 
 /// <summary>Swift <c>DiagnosticArtifactOfflinePreview</c>.</summary>
@@ -236,6 +265,8 @@ public static class DiagnosticSessionOfflineInspector
     public const string ParserId = "arkdeck.diagnostics-session-parser";
     public const string ParserVersion = "1.0.0";
     public const string OperationReference = "capture.diagnostics@1";
+    public static readonly IReadOnlySet<string> SupportedOperations = new HashSet<string>(StringComparer.Ordinal)
+        { OperationReference, DiagnosticCaptureProvider.Operation };
     public const string IndexArtifactName = "artifact-index.json";
     public const string SummaryArtifactName = "capture-summary.json";
     public const string MarkersArtifactName = "markers.json";
@@ -253,7 +284,7 @@ public static class DiagnosticSessionOfflineInspector
     /// with.</exception>
     public static DiagnosticSessionInspection Inspect(DiagnosticSessionOfflineInput input)
     {
-        if (input.OperationReference != OperationReference || input.JobId.Length == 0 || DiagnosticArtifactMetadata.Utf8Length(input.JobId) > 512)
+        if (!SupportedOperations.Contains(input.OperationReference) || input.JobId.Length == 0 || DiagnosticArtifactMetadata.Utf8Length(input.JobId) > 512)
         {
             throw DiagnosticSessionException.Invalid("diagnostics_unsupported_operation");
         }
@@ -310,7 +341,9 @@ public static class DiagnosticSessionOfflineInspector
         var missing = new List<DiagnosticMissingProduct>();
         if (input.TypedParameters is { } inputs)
         {
-            var requested = RequestedProducts(inputs);
+            var requested = input.OperationReference == DiagnosticCaptureProvider.Operation
+                ? new HashSet<string>(["hilog.txt", "trace.htrace", "markers.json", "diagnostic-session.json"], StringComparer.Ordinal)
+                : RequestedProducts(inputs);
             if (requested.Contains("screenshot.png") && IsPublished("screenshot.jpeg"))
             {
                 requested.Remove("screenshot.png");
@@ -331,9 +364,17 @@ public static class DiagnosticSessionOfflineInspector
         IReadOnlyList<DiagnosticMark> marks = [];
         IReadOnlyList<string> notDerived = [];
         bool? ringHeldAnchor = null;
+        DiagnosticClockObservation? clockObservation = null;
         if (IsPublished(MarkersArtifactName))
         {
             var document = DecodeMarkers(Document(MarkersArtifactName, input).Bytes.Span, input.JobId);
+            if (document.TryGetValue("clockObservation", out var observed))
+            {
+                if (input.OperationReference != DiagnosticCaptureProvider.Operation) throw DiagnosticSessionException.Invalid("diagnostics_invalid_clock_observation");
+                var clockAnchor = document.TryGetValue("coverage", out var coverageValue) && coverageValue is JsonObject coverageObject
+                    ? Text(coverageObject, "anchor") : null;
+                clockObservation = DiagnosticClockObservation.Parse(observed, input.JobId, clockAnchor);
+            }
             var reading = DiagnosticSessionReading.Make(document);
             marks = reading.Marks;
             notDerived = reading.NotDerived;
@@ -353,8 +394,8 @@ public static class DiagnosticSessionOfflineInspector
             new DiagnosticAlignment.CannotAlign("capture artifacts contain no host-to-device calibration"),
             marks,
             missing,
-            notDerived);
-        return new(DiagnosticSessionInspection.CurrentSchemaVersion, input.JobId, input.OperationReference, provenance, result, ringHeldAnchor, Sorted(inventory));
+            notDerived) { ClockObservation = clockObservation };
+        return new(DiagnosticSessionInspection.CurrentSchemaVersion, input.JobId, input.OperationReference, provenance, result, ringHeldAnchor, Sorted(inventory)) { ClockObservation = clockObservation };
     }
 
     /// <summary>A bounded text preview of one published capture Artifact. A sensitive Artifact
@@ -364,7 +405,7 @@ public static class DiagnosticSessionOfflineInspector
     public static DiagnosticArtifactOfflinePreview Preview(DiagnosticOfflineArtifact artifact, bool contentAccessExplicit, int maximumCharacters = PreviewMaximumCharacters)
     {
         var metadata = artifact.Metadata;
-        if (metadata.SourceOperation != OperationReference || metadata.MediaType is not ("text/plain" or "application/json"))
+        if (!SupportedOperations.Contains(metadata.SourceOperation) || metadata.MediaType is not ("text/plain" or "application/json"))
         {
             throw DiagnosticSessionException.Invalid("diagnostics_artifact_is_not_previewable_text");
         }
@@ -613,6 +654,7 @@ public sealed record DiagnosticSessionReading(
     IReadOnlyList<DiagnosticMissingProduct> MissingProducts,
     IReadOnlyList<string> NotDerived)
 {
+    public DiagnosticClockObservation? ClockObservation { get; init; }
     /// <summary>How far from a mark a screenshot may have been taken and still stand beside it.</summary>
     public const int ScreenshotAppliesWithinMs = 150;
 
@@ -945,6 +987,12 @@ public static class DiagnosticArtifactRoles
             {
                 [DiagnosticHilogSummary.ArtifactName] = "derived",
             },
+            [DiagnosticCaptureProvider.Operation] = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["trace.htrace"] = "raw", ["hilog.txt"] = "raw", ["markers.json"] = "derived",
+                ["artifact-index.json"] = "derived", ["capture-summary.json"] = "derived",
+                ["diagnostic-session.json"] = "derived", ["capture.log"] = "log",
+            },
         };
 
     public static string? Of(string operationReference, string name) =>
@@ -993,7 +1041,7 @@ public static class DiagnosticSessionApplication
 {
     public static async Task<DiagnosticSessionLoad> LoadAsync(DiagnosticJobContext context, DiagnosticJobDetail detail, DiagnosticArtifactReader read)
     {
-        if (context.OperationReference != DiagnosticSessionOfflineInspector.OperationReference)
+        if (!DiagnosticSessionOfflineInspector.SupportedOperations.Contains(context.OperationReference))
         {
             return DiagnosticSessionLoad.Unavailable("diagnostics_unsupported_operation");
         }

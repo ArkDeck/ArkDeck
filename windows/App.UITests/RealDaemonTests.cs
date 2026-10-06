@@ -675,7 +675,7 @@ public sealed class RealDaemonTests
     /// </summary>
     [TestMethod]
     [Timeout(300_000, CooperativeCancellation = true)]
-    public void TheDiagnosticsPageShowsThatSessionCaptureIsNotConnected()
+    public void TheDiagnosticsPageRefusesCaptureWithoutAConfirmedTarget()
     {
         var exe = AppSession.RequireApp();
         var (thumbprint, daemon, pwsh) = Prerequisites();
@@ -697,9 +697,10 @@ public sealed class RealDaemonTests
                 ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
             });
             Assert.AreEqual(strings["diagnostics.session.none"], app.WaitForName("diagnostics.session.empty", n => n.Length > 0));
-            Assert.AreEqual("diagnostic_session_capture_not_connected", AppSession.Name(app.Find("diagnostics.capture.reasonCode")));
             app.Invoke("diagnostics.capture.arm");
-            StringAssert.StartsWith(app.WaitForName("diagnostics.status", n => n.Length > 0), strings["windows.diagnostics.capture.unavailable"]);
+            Assert.AreEqual(strings["diagnostics.capture.chooseTarget"], app.WaitForName("diagnostics.status", n => n.Length > 0));
+            app.Invoke("diagnostics.capture.mark");
+            Assert.AreEqual("diagnostics_session_control_not_ready", app.WaitForName("diagnostics.status", n => n.Length > 0));
             app.Navigate("history");
             Assert.AreEqual(strings["history.empty.title"], app.WaitForName("history.empty.title", n => n.Length > 0));
             Assert.IsNull(app.TryFind("history.openDiagnostics", TimeSpan.FromMilliseconds(300)));

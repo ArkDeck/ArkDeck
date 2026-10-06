@@ -16,10 +16,6 @@ public sealed record DiagnosticsState(
     ControlFailure? DaemonFailure,
     bool Reached) : SurfaceState(DaemonFailure, Reached)
 {
-    /// <summary>No Diagnostic Session capture provider is composed into the App (macOS
-    /// <c>captureUnavailableReasonCode</c>): arm, append-marker and stop are not connected.</summary>
-    public const string CaptureUnavailableReasonCode = "diagnostic_session_capture_not_connected";
-
     public bool IsHilogSummaryContext => Context?.OperationReference == DiagnosticHilogSummary.OperationReference;
 
     /// <summary>The reason the open record could not be read, or null.</summary>
@@ -36,7 +32,7 @@ public sealed record DiagnosticsState(
     /// <c>workspaceKind</c>, else the operations whose reference alone is Diagnostics.</summary>
     public static bool IsDiagnosticsRecord(string operation, string? workspaceKind)
     {
-        if (operation == DiagnosticSessionOfflineInspector.OperationReference) return true;
+        if (DiagnosticSessionOfflineInspector.SupportedOperations.Contains(operation)) return true;
         if (workspaceKind is not null) return workspaceKind == "diagnostics";
         var id = operation.Split('@')[0];
         return id is "analyzer.summarize-hilog" or "analyzer.extract-crash-signature";
