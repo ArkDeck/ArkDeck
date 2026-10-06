@@ -79,16 +79,40 @@ APP_PACKAGE_TARGET_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/",
     "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/",
 )
-# The @arkdeck/ds interaction tests execute the docs/design prototype draft and
-# cross-check it against the audit inventory and the App/Package Swift sources
-# it names, so a change under any of these directories can flip an assertion.
+# The interaction suite reads the prototype, audit and coverage inventory, plus
+# the designInputs listed by that inventory. Acceptance records under
+# docs/design/cross-platform and references do not affect those assertions.
 # PR #1606 merged all-green from ArkDeckApp/ alone while breaking two of them.
 DS_INTERACTION_INPUT_PREFIXES = (
     "ArkDeckApp/",
     "ArkDeckAppUITests/",
     "Packages/",
-    "docs/design/",
+    "docs/design/arkdeck-ds/",
+    ".design-sync/",
+    "Catalog/operations/",
 )
+DS_INTERACTION_INPUT_FILES = frozenset({
+    "docs/design/prototype.html",
+    "docs/design/implementation-coverage.json",
+    "docs/design/implementation-audit-2026-08-27.md",
+    "docs/design/arktrace-migration-spec.md",
+    "docs/design/arktrace-real-device-verification-2026-08-24.md",
+    "docs/design/arktrace-trace-streamer.md",
+    "docs/design/arktrace-user-guide.en.md",
+    "docs/design/arktrace-user-guide.md",
+    "docs/design/design-agent-briefs.md",
+    "docs/design/device-control-design.md",
+    "docs/design/diagnostic-mode-design.md",
+    "docs/design/macos-ux-interaction-spec.md",
+    "docs/design/overview-redesign.html",
+    "docs/design/overview-redesign.md",
+    "docs/design/rockchip-read-domain.md",
+    "docs/design/toolkit-device-control-design.md",
+    "docs/design/viewer-ui-implementation-task.md",
+    "docs/design/references/README.md",
+    "docs/design/session-components.html",
+    "ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+})
 DS_PACKAGE_DIR = "docs/design/arkdeck-ds"
 # The Windows client (TASK-XPA-007): windows/** plus every input its generators
 # (INPUTS of windows/scripts/generate-clientkit.py, generate-ui-strings.py,
@@ -171,6 +195,10 @@ class LaneSelection:
     rust: bool
     windows: bool = False
 
+    @property
+    def compiled(self) -> bool:
+        return self.swift or self.app or self.rust or self.windows
+
 
 @dataclasses.dataclass(frozen=True)
 class CIPlan:
@@ -188,6 +216,7 @@ class CIPlan:
             "ds": self.lanes.ds,
             "rust": self.lanes.rust,
             "windows": self.lanes.windows,
+            "compiled": self.lanes.compiled,
             "baseRevision": self.base_revision,
             "headRevision": self.head_revision,
             "baseKind": self.base_kind,
@@ -244,7 +273,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         ):
             swift = True
 
-        if any(path.startswith(prefix) for prefix in DS_INTERACTION_INPUT_PREFIXES):
+        if path.startswith(DS_INTERACTION_INPUT_PREFIXES) or path in DS_INTERACTION_INPUT_FILES:
             ds = True
 
         # The desktop app links a precise subset of ArkDeckKit production
@@ -586,6 +615,7 @@ def _append_github_output(path: pathlib.Path, plan: CIPlan) -> None:
         "ds": str(plan.lanes.ds).lower(),
         "rust": str(plan.lanes.rust).lower(),
         "windows": str(plan.lanes.windows).lower(),
+        "compiled": str(plan.lanes.compiled).lower(),
         "base": plan.base_revision or "unavailable",
         "head": plan.head_revision,
         "base-kind": plan.base_kind,

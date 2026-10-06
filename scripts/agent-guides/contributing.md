@@ -71,6 +71,11 @@ membership 与顺序。已有不同子层、多个栈交叠或 API 不可用时�
 
 ## 共享文件与重复构建
 
+CI 的 Linux planner 同时运行被选中的设计系统交互测试，SDD `guard` 在自己的 runner 上检查
+token 一致性。验收记录不触发交互测试；原型、设计清单与实际测试输入仍触发。planner 全部
+成功且明确没有编译车道时，required `swift` job 以成功跳过结束，不额外领取 runner。
+planner 失败、取消或缺少输出时仍执行汇总并阻塞合入；有编译车道时继续检查每条车道结果。
+
 同时推进的平台或功能若触及同一份 `spec/ui-semantics/strings.json`、Catalog、control contract
 或对应生成物，先在已有 PR 链中选一个共享集成层并注明负责 Agent。该层合并双方需要的源输入，
 运行生成器并提交配套产物；其他层基于它消费结果。确实需要新增共享字段时先更新该层再向上
