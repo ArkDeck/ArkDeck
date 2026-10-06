@@ -63,6 +63,8 @@ mod windows {
     const SECRET_IN_ARGV_OR_ENVIRONMENT: i32 = 6;
     const READ_AFTER_NEAR_MISS: i32 = 9;
     const NO_CONSOLE: i32 = 10;
+    const WRONG_IMAGE_SPELLING: i32 = 11;
+    const WRONG_DIRECTORY_SPELLING: i32 = 12;
 
     // ---- the fake signer ------------------------------------------------
 
@@ -162,6 +164,19 @@ mod windows {
         let path = arguments.get(1).map(PathBuf::from);
         match role {
             "sign" => sign(),
+            // Consumers such as Java inspect their image and current directory
+            // spellings before they can ask for a password.
+            "standard-paths" => {
+                if std::env::args_os().next().as_ref() != arguments.get(1) {
+                    std::process::exit(WRONG_IMAGE_SPELLING);
+                }
+                if std::env::current_dir().unwrap().as_os_str()
+                    != arguments.get(2).expect("expected directory")
+                {
+                    std::process::exit(WRONG_DIRECTORY_SPELLING);
+                }
+                sign();
+            }
             // The console's own echo left on: the typed secret is rendered.
             "echo" => {
                 console_echo(true);
@@ -241,6 +256,10 @@ mod windows {
         (
             "exact_prompts_are_answered_in_order_and_the_secret_never_comes_back",
             exact_prompts_are_answered_in_order_and_the_secret_never_comes_back,
+        ),
+        (
+            "canonical_inputs_launch_standard_child_paths_without_changing_the_parent",
+            canonical_inputs_launch_standard_child_paths_without_changing_the_parent,
         ),
         (
             "a_wrong_secret_is_classified_from_the_signers_last_diagnostic",
@@ -394,6 +413,65 @@ mod windows {
     }
 
     const TIMEOUT: Duration = Duration::from_secs(30);
+
+    /// These short local fixture paths have an ordinary spelling that names
+    /// exactly the canonical object. Keep the assertions explicit so the test
+    /// exercises lowering rather than the verbatim fallback.
+    fn ordinary_fixture_path(canonical: &Path) -> PathBuf {
+        let text = canonical.to_str().unwrap().strip_prefix(r"\\?\").unwrap();
+        assert!(text.len() < 248 && text.as_bytes().get(1..3) == Some(b":\\"));
+        let ordinary = PathBuf::from(text);
+        assert_eq!(ordinary.canonicalize().unwrap(), canonical);
+        ordinary
+    }
+
+    fn canonical_inputs_launch_standard_child_paths_without_changing_the_parent() {
+        let parent_directory = std::env::current_dir().unwrap();
+        let scratch = Scratch::new("standard-paths");
+        let image = std::env::current_exe().unwrap().canonicalize().unwrap();
+        let ordinary_image = ordinary_fixture_path(&image);
+        let ordinary_directory = ordinary_fixture_path(&scratch.0);
+        let arguments = vec![
+            "--fake-tool".into(),
+            "standard-paths".into(),
+            ordinary_image.into_os_string(),
+            ordinary_directory.clone().into_os_string(),
+        ];
+        let execution = this_tool()
+            .run_pty_exchange(
+                &PtyRequest {
+                    working_directory: Some(&scratch.0),
+                    ..request(&arguments, TIMEOUT)
+                },
+                &both(KEY_SECRET),
+                4096,
+                &|| false,
+            )
+            .unwrap();
+        assert_eq!(execution.termination, ToolTermination::Exited(0));
+        assert_eq!(execution.completed_interactions, 2);
+        assert_eq!(execution.failure_category, PtyFailureCategory::None);
+        assert_carries_no_secret(&execution);
+        assert_eq!(std::env::current_dir().unwrap(), parent_directory);
+
+        // Lowering is child-only: callers must still supply the canonical
+        // directory, and an ordinary input is refused before any child runs.
+        let marker = scratch.0.join("refused-marker");
+        let arguments = args("marker", Some(&marker));
+        assert!(matches!(
+            this_tool().run_pty_exchange(
+                &PtyRequest {
+                    working_directory: Some(&ordinary_directory),
+                    ..request(&arguments, TIMEOUT)
+                },
+                &both(KEY_SECRET),
+                4096,
+                &|| false,
+            ),
+            Err(PtyError::Refused(_))
+        ));
+        assert!(!marker.exists());
+    }
 
     /// Nothing the exchange returns carries a secret.
     fn assert_carries_no_secret(execution: &PtyExecution) {

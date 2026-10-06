@@ -491,7 +491,7 @@ mod working_directory_tests {
             standard_spelling(&temporary).as_deref()
         );
         assert!(!given.starts_with(r"\\?\"), "{given}");
-        // A managed server or a console keeps the canonical spelling.
+        // Caller paths stay canonical; tool/PTY child spellings lower separately.
         let kept = validate_working_directory(&temporary).unwrap();
         assert_eq!(
             String::from_utf16(&kept[..kept.len() - 1]).unwrap(),

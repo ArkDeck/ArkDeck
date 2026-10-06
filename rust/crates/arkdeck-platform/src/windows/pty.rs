@@ -41,7 +41,7 @@
 //!   that tail is read to its end (bounded) and checked like the rest, so a
 //!   failure is classified from the signer's last diagnostic.
 use super::process::{RunningChild, spawn_attached};
-use super::tool::{validate_environment, validate_working_directory};
+use super::tool::{child_working_directory, validate_environment};
 use super::{Handle, bool_result};
 use crate::VerifiedTool;
 use crate::invalid;
@@ -96,7 +96,7 @@ impl VerifiedTool {
         validate_environment(request.environment).map_err(PtyError::Refused)?;
         let directory = request
             .working_directory
-            .map(validate_working_directory)
+            .map(child_working_directory)
             .transpose()
             .map_err(PtyError::Refused)?;
         self.revalidate().map_err(PtyError::Refused)?;
