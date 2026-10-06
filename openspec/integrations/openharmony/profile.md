@@ -1,7 +1,7 @@
 # OpenHarmony Tool Integration Profile
 
 > ID：OPENHARMONY-TOOLS  
-> Version：0.7.1
+> Version：0.8.0
 > Status：in baseline CORE-2.0.0（ratification 状态见 `openspec/baselines/CORE-2.0.0.yaml`） / version-probed at runtime  
 > Core baseline：CORE-2.0.0
 
@@ -59,6 +59,34 @@ capture marker bytes。
 TASK-TR-003；本登记自身不实现 parser，不改变 capability/support/conformance/release
 状态。0.3.0 consumer 不得局部借用本 registry；采用须固定完整 0.4.0 profile、registry
 与 resource hash closure。
+
+### Exact CRLF transport representations (additive descriptor 1.0.0)
+
+`OPENHARMONY-TOOLS@0.8.0` and `INTEGRATION-PROFILES-0.9.0` additionally pin
+`OPENHARMONY-TRACE-REPRESENTATIONS@1.0.0` at
+`openspec/integrations/openharmony/trace-probes/representations/1.0.0/registry.json`
+(SHA-256 `e0fe28bd62f0f725d8c24b3e8acd488ddd42c3f8c61af42c717049fa54ecde62`).
+The existing 1.0.0 registry, resource manifest and all original LF resources and
+hashes above remain immutable.
+
+The descriptor permits only the exact homogeneous CRLF spelling of the same
+hitrace/bytrace help and tag-list families. Complete stdout must match the
+declared raw size and suffix SHA, have no bare CR or bare LF, and after
+temporary CRLF-to-LF conversion match the original exact LF size and suffix
+SHA. Stderr, mixed endings, truncation, extra bytes, wrong tool, changed text or
+unknown family remain unsupported. Original raw receipts and hashes are never
+rewritten. Hitrace still needs its own complete help and tag receipts; bytrace
+remains probe-only. No flags, tags, argv, capture-success, cleanup or Runtime
+authority are added.
+
+Provenance is a 2026-10-06 `repoReadOnlyDiagnostic` on the separately registered
+Windows c2 HDC tuple and DAYU200/OpenHarmony 7.0.0.37. Root verified raw whole
+hashes and byte equality to the original LF suffixes. It is not
+`controlledHumanCapture`, formal acceptance or a hardware-pass declaration.
+The current platform HDC native identity/tuple, endpoint, durable binding and
+all Runtime safety gates remain required; the historical macOS registry's HDC
+identity is never borrowed. This representation delta is reviewed with the
+implementation under CHG-2026-074/TASK-XPA-011.
 
 ## Parameters
 

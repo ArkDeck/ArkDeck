@@ -12,9 +12,10 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
   private static let lock = "INTEGRATION-PROFILES-0.7.0"
   // The profile and lock current today: CHG-2026-078 added the Windows registry in
   // OPENHARMONY-TOOLS@0.7.0 / INTEGRATION-PROFILES-0.8.0, amended by its r3 to @0.7.1 / -0.8.1;
-  // this registry's own pins stay above.
-  private static let currentProfileVersion = "0.7.1"
-  private static let currentLock = "INTEGRATION-PROFILES-0.8.1"
+  // The additive trace representation descriptor advances the current profile
+  // to @0.8.0 / -0.9.0; this registry's own pins stay above.
+  private static let currentProfileVersion = "0.8.0"
+  private static let currentLock = "INTEGRATION-PROFILES-0.9.0"
   private static let toolVersion = "3.2.0f"
   private static let toolSHA256 =
     "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83"
@@ -607,6 +608,55 @@ final class HDCSupervisorObservationRegistryContractTests: XCTestCase {
     ]
     for (path, expected) in pins {
       XCTAssertEqual(digest(try repositoryData(path)), expected, "\(path) drifted")
+    }
+  }
+
+  func testTraceRepresentationsCloseOnTheUnchangedGoldenBytes() throws {
+    let path = "openspec/integrations/openharmony/trace-probes/representations/1.0.0/registry.json"
+    let expectedSHA = "e0fe28bd62f0f725d8c24b3e8acd488ddd42c3f8c61af42c717049fa54ecde62"
+    let data = try repositoryData(path)
+    XCTAssertEqual(digest(data), expectedSHA)
+    let descriptor = try XCTUnwrap(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    XCTAssertEqual(descriptor["registryId"] as? String, "OPENHARMONY-TRACE-REPRESENTATIONS")
+    XCTAssertEqual(descriptor["integrationProfile"] as? String, "OPENHARMONY-TOOLS@0.8.0")
+    let base = try XCTUnwrap(descriptor["baseRegistry"] as? [String: Any])
+    XCTAssertEqual(digest(try repositoryData(try XCTUnwrap(base["path"] as? String))), base["sha256"] as? String)
+    let resourceBytes = try repositoryData(try XCTUnwrap(base["resourcesPath"] as? String))
+    XCTAssertEqual(digest(resourceBytes), base["resourcesSha256"] as? String)
+    let resources = try XCTUnwrap(try JSONSerialization.jsonObject(with: resourceBytes) as? [String: Any])
+    let entries = try XCTUnwrap(resources["resources"] as? [[String: Any]])
+    let rows = try XCTUnwrap(descriptor["representations"] as? [[String: Any]])
+    XCTAssertEqual(rows.count, 4)
+    let tools = ["hitrace", "hitrace", "bytrace", "bytrace"]
+    let kinds = ["help", "tags", "help", "tags"]
+    for (index, row) in rows.enumerated() {
+      XCTAssertEqual(row["tool"] as? String, tools[index])
+      XCTAssertEqual(row["kind"] as? String, kinds[index])
+      XCTAssertEqual(row["selection"] as? String, index < 2 ? "captureEligible" : "probeOnly")
+      let resource = try XCTUnwrap(entries.first { $0["id"] as? String == row["baseResource"] as? String })
+      let resourcePath = "openspec/integrations/openharmony/trace-probes/1.0.0/" + (try XCTUnwrap(resource["path"] as? String))
+      let lf = [UInt8](try repositoryData(resourcePath))
+      XCTAssertEqual(digest(Data(lf)), resource["sha256"] as? String)
+      XCTAssertFalse(lf.contains(13))
+      var crlf: [UInt8] = []
+      for byte in lf {
+        if byte == 10 { crlf.append(13) }
+        crlf.append(byte)
+      }
+      XCTAssertEqual(lf.count, row["lfByteCount"] as? Int)
+      XCTAssertEqual(crlf.count, row["crlfByteCount"] as? Int)
+      XCTAssertEqual(lf.filter { $0 == 10 }.count, row["crlfPairCount"] as? Int)
+      XCTAssertEqual(digest(Data(lf.dropFirst(20))), row["lfSuffixSha256"] as? String)
+      XCTAssertEqual(digest(Data(crlf.dropFirst(20))), row["crlfSuffixSha256"] as? String)
+    }
+    let provenance = try XCTUnwrap(descriptor["provenance"] as? [String: Any])
+    XCTAssertEqual(provenance["evidenceClass"] as? String, "repoReadOnlyDiagnostic")
+    XCTAssertEqual(provenance["formalAcceptance"] as? Bool, false)
+    XCTAssertEqual(provenance["hardwarePass"] as? Bool, false)
+    for reference in ["openspec/integrations/openharmony/profile.md", "openspec/integrations/INTEGRATION-PROFILES.lock.yaml"] {
+      let text = String(decoding: try repositoryData(reference), as: UTF8.self)
+      XCTAssertTrue(text.contains(path))
+      XCTAssertTrue(text.contains(expectedSHA))
     }
   }
 

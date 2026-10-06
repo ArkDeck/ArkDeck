@@ -16,7 +16,7 @@ use crate::{
     SemanticOutputParser, property_value,
 };
 use sha2::{Digest, Sha256};
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 /// Swift `TraceDebugParameterCatalog.definitions`, in catalog order.
 pub const TRACE_PARAMETERS: [&str; 9] = [
@@ -33,12 +33,15 @@ pub const TRACE_PARAMETERS: [&str; 9] = [
 
 /// Swift `TraceProbeAdapterProfile`: the registered help family names, the
 /// exact sizes of the registered help and tag-list outputs, and the SHA-256
-/// of each output after its leading `YYYY/MM/DD HH:MM:SS ` (the only bytes
-/// the registry lets a capture time change).
+/// of each output after its leading `YYYY/MM/DD HH:MM:SS `. The additive
+/// representation registry permits only the byte-exact homogeneous
+/// CRLF spelling of these LF resources; original receipts are never changed.
 pub const HITRACE_HELP_FAMILY: &str = "hitrace.dayu200-oh7.text";
 pub const BYTRACE_HELP_FAMILY: &str = "bytrace.dayu200-oh7.text";
 const HELP_BYTES: usize = 3_382;
 const TAG_LIST_BYTES: usize = 3_604;
+const HELP_CRLF_BYTES: usize = 3_428;
+const TAG_LIST_CRLF_BYTES: usize = 3_687;
 const HITRACE_HELP_SUFFIX_SHA256: &str =
     "b40edec78a823762d64599b21c4fd2c82be4a9071e0457120a6e6526433ed3f8";
 const BYTRACE_HELP_SUFFIX_SHA256: &str =
@@ -47,6 +50,14 @@ const HITRACE_TAG_LIST_SUFFIX_SHA256: &str =
     "9c781ec48cf4b1cc6f3115be75687efb7e8b9078fdee767e1bee150ad2b758d0";
 const BYTRACE_TAG_LIST_SUFFIX_SHA256: &str =
     "d8475c07177f87f8640ef3a52382e0ccaed42115c6a1592ef42c99fffb18204a";
+const HITRACE_HELP_CRLF_SUFFIX_SHA256: &str =
+    "cbba18918a3418167656b3bd68d40d86b187d436d9c690bc912c56e0a94fc51d";
+const HITRACE_TAG_LIST_CRLF_SUFFIX_SHA256: &str =
+    "a65d51430ba81921e06378998a6bd6c8fc03f0ca6bfcf5aa97636ea5ffe3226c";
+const BYTRACE_HELP_CRLF_SUFFIX_SHA256: &str =
+    "1612a06d5fa4afc2294947b73a802f2a4c5c8b626eb01d448e1a2195a5ac6b24";
+const BYTRACE_TAG_LIST_CRLF_SUFFIX_SHA256: &str =
+    "cc9c7ec0d6d897a3b57110b8969a1dbae7406b047685545aa9c01b369ec2cae8";
 
 /// Swift's reads: 15 s each; help and tag lists keep 64 KiB, a parameter
 /// 4 KiB, and a parameter value may be at most 400 bytes.
@@ -82,10 +93,21 @@ pub enum TraceSelection {
 /// Swift `TraceProbeAdapter.evaluateHelp`: only the registered byte family of
 /// the tool, with an empty stderr, selects it.
 pub fn evaluate_help(tool: TraceTool, stdout: &[u8], stderr: &[u8]) -> TraceSelection {
-    if !stderr.is_empty() || stdout.len() != HELP_BYTES {
+    if !stderr.is_empty() {
         return TraceSelection::Unsupported;
     }
-    let Some(suffix) = timestamp_normalized_suffix(stdout) else {
+    let Some(bytes) = registered_representation(
+        stdout,
+        HELP_BYTES,
+        HELP_CRLF_BYTES,
+        match tool {
+            TraceTool::Hitrace => HITRACE_HELP_CRLF_SUFFIX_SHA256,
+            TraceTool::Bytrace => BYTRACE_HELP_CRLF_SUFFIX_SHA256,
+        },
+    ) else {
+        return TraceSelection::Unsupported;
+    };
+    let Some(suffix) = timestamp_normalized_suffix(&bytes) else {
         return TraceSelection::Unsupported;
     };
     match (tool, sha256_hex(suffix).as_str()) {
@@ -108,12 +130,23 @@ pub fn evaluate_tag_list(
     stderr: &[u8],
 ) -> (TraceSelection, Vec<String>) {
     let unsupported = (TraceSelection::Unsupported, Vec::new());
-    if !stderr.is_empty() || stdout.len() != TAG_LIST_BYTES {
+    if !stderr.is_empty() {
         return unsupported;
     }
+    let Some(bytes) = registered_representation(
+        stdout,
+        TAG_LIST_BYTES,
+        TAG_LIST_CRLF_BYTES,
+        match tool {
+            TraceTool::Hitrace => HITRACE_TAG_LIST_CRLF_SUFFIX_SHA256,
+            TraceTool::Bytrace => BYTRACE_TAG_LIST_CRLF_SUFFIX_SHA256,
+        },
+    ) else {
+        return unsupported;
+    };
     let (Some(suffix), Ok(text)) = (
-        timestamp_normalized_suffix(stdout),
-        std::str::from_utf8(stdout),
+        timestamp_normalized_suffix(&bytes),
+        std::str::from_utf8(&bytes),
     ) else {
         return unsupported;
     };
@@ -155,6 +188,45 @@ pub fn evaluate_tag_list(
         return unsupported;
     }
     (selection, tags)
+}
+
+/// A separately registered transport representation, not whitespace repair.
+/// LF keeps the original path. CRLF must have the exact raw suffix fingerprint,
+/// contain neither bare CR nor bare LF, and recover the exact registered size.
+/// The caller still checks the original LF family's suffix SHA before selection.
+fn registered_representation<'a>(
+    bytes: &'a [u8],
+    lf_bytes: usize,
+    crlf_bytes: usize,
+    crlf_suffix_sha256: &str,
+) -> Option<Cow<'a, [u8]>> {
+    if bytes.len() == lf_bytes {
+        return Some(Cow::Borrowed(bytes));
+    }
+    if bytes.len() != crlf_bytes
+        || sha256_hex(timestamp_normalized_suffix(bytes)?) != crlf_suffix_sha256
+    {
+        return None;
+    }
+    let mut lf = Vec::with_capacity(lf_bytes);
+    let mut position = 0;
+    while let Some(&byte) = bytes.get(position) {
+        match byte {
+            b'\r' => {
+                if bytes.get(position + 1) != Some(&b'\n') {
+                    return None;
+                }
+                lf.push(b'\n');
+                position += 2;
+            }
+            b'\n' => return None,
+            _ => {
+                lf.push(byte);
+                position += 1;
+            }
+        }
+    }
+    (lf.len() == lf_bytes).then_some(Cow::Owned(lf))
 }
 
 /// Unicode general category Zs, which Swift's `.whitespaces` holds beside tab.

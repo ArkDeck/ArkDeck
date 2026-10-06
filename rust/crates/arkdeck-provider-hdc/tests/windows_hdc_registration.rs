@@ -149,12 +149,12 @@ fn registry_resources_profile_and_lock_close_on_exact_hashes() {
         assert!(lock.contains(pin.as_str()), "lock lacks {pin}");
     }
     assert_eq!(
-        profile.matches("> Version：0.7.1").count(),
+        profile.matches("> Version：0.8.0").count(),
         1,
-        "the profile is OPENHARMONY-TOOLS@0.7.1"
+        "the current profile is OPENHARMONY-TOOLS@0.8.0"
     );
-    assert!(lock.contains("lock: INTEGRATION-PROFILES-0.8.1"));
-    assert!(lock.contains("  - id: OPENHARMONY-TOOLS\n    version: 0.7.1\n"));
+    assert!(lock.contains("lock: INTEGRATION-PROFILES-0.9.0"));
+    assert!(lock.contains("  - id: OPENHARMONY-TOOLS\n    version: 0.8.0\n"));
 
     // Every manifest entry matches its file, and every file is listed.
     let mut listed = Vec::new();
