@@ -95,6 +95,14 @@ fn replay_from(daemon: &mut Daemon, scenario: &str, first: usize) -> Vec<String>
     for exchange in &cases["exchanges"].as_array().unwrap()[first..] {
         let name = exchange["name"].as_str().unwrap();
         let actual = answer(daemon, exchange);
+        let actual = if scenario == "nativeLibrary" {
+            serde_json::from_slice(&support::hdc_oracle::native_readback::historical_bytes(
+                &serde_json::to_vec(&actual).unwrap(),
+            ))
+            .unwrap()
+        } else {
+            actual
+        };
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{scenario} {name}:\n  swift {}\n  rust  {actual}",

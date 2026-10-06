@@ -431,7 +431,29 @@ impl Daemon {
     /// of the capability store, byte for byte, and, where the oracle kept it,
     /// the calls the fake had received.
     pub fn assert_snapshot(&self, prefix: &str) {
-        assert_store(&self.fixture, prefix, &self.default_root);
+        if self.fixture.file_name().and_then(|name| name.to_str()) == Some("nativeLibrary") {
+            let index = super::hdc_oracle::native_readback::historical_index(
+                &super::index(&self.default_root),
+                |job| {
+                    fs::read(
+                        self.default_root
+                            .join("jobs")
+                            .join(job)
+                            .join("job-record.json"),
+                    )
+                    .unwrap()
+                },
+            );
+            super::assert_store_relabelled(
+                &self.fixture,
+                prefix,
+                &self.default_root,
+                index,
+                super::hdc_oracle::native_readback::historical_bytes,
+            );
+        } else {
+            assert_store(&self.fixture, prefix, &self.default_root);
+        }
         self.assert_capabilities(prefix);
         let calls = self.fixture.join(prefix).join("hdc-invocations.log");
         if calls.exists() {
@@ -489,6 +511,28 @@ impl Daemon {
             fs::read(self.fixture.join("targets-state/targets.json")).unwrap(),
             "the Target document"
         );
-        super::assert_leftovers_at(&self.fixture, &self.root, &self.default_root);
+        if self.fixture.file_name().and_then(|name| name.to_str()) == Some("nativeLibrary") {
+            let index = super::hdc_oracle::native_readback::historical_index(
+                &super::index(&self.default_root),
+                |job| {
+                    fs::read(
+                        self.default_root
+                            .join("jobs")
+                            .join(job)
+                            .join("job-record.json"),
+                    )
+                    .unwrap()
+                },
+            );
+            super::assert_leftovers_relabelled_with_index(
+                &self.fixture,
+                &self.root,
+                &self.default_root,
+                index,
+                super::hdc_oracle::native_readback::historical_bytes,
+            );
+        } else {
+            super::assert_leftovers_at(&self.fixture, &self.root, &self.default_root);
+        }
     }
 }

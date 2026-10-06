@@ -163,6 +163,33 @@ pub fn historical_bytes(bytes: &[u8]) -> Vec<u8> {
     result
 }
 
+/// Verify the complete current record against its actual SQLite digest before
+/// hashing the strictly validated historical projection. No expected digest
+/// is copied, and every other index field (including unchanged rows) survives.
+pub fn historical_index(index: &Value, record: impl Fn(&str) -> Vec<u8>) -> Value {
+    let mut result = index.clone();
+    for row in result["rows"].as_array_mut().expect("complete index rows") {
+        let job = row["jobId"].as_str().expect("index Job ID");
+        let bytes = super::super::machine_independent(&record(job));
+        let value: Value = serde_json::from_slice(&bytes).expect("complete current Job record");
+        assert_eq!(value["jobID"], job, "index/record Job identity");
+        assert_eq!(
+            row["recordSHA256"],
+            sha256_hex(&bytes),
+            "actual index digest must prove the complete unprojected record"
+        );
+        let projected = historical_bytes(&bytes);
+        if projected != bytes {
+            assert_eq!(
+                value["operationReference"], "deploy.native-library.app-owned@1",
+                "only the native operation has this additive proof"
+            );
+            row["recordSHA256"] = json!(sha256_hex(&projected));
+        }
+    }
+    result
+}
+
 fn historical_bytes_single_line(bytes: &[u8]) -> Vec<u8> {
     let Ok(mut value) = serde_json::from_slice::<Value>(bytes) else {
         return bytes.to_vec();
