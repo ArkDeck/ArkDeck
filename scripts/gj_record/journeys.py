@@ -653,7 +653,7 @@ def gj5(context: Context) -> None:
 
     _, baseline = leg("baseline", "capture.diagnostics@1", ("crash-index.txt",))
     leg("repro", "debug.hap@1", ("install-readback.json",))
-    _, repro = leg("repro-capture", "capture.diagnostics@1", ("application-liveness.json", "crash-index.txt"))
+    repro_step, repro = leg("repro-capture", "capture.diagnostics@1", ("application-liveness.json", "crash-index.txt"))
     before = crash_entries(baseline["crash-index.txt"]) if "crash-index.txt" in baseline else None
     after_repro = crash_entries(repro["crash-index.txt"]) if "crash-index.txt" in repro else None
     if before is not None or after_repro is not None:
@@ -669,7 +669,40 @@ def gj5(context: Context) -> None:
     _, analyzed = leg("analyze", "analyzer.extract-crash-signature@1", ("crash-signature.json",))
     signature = context.document(analyzed, "crash-signature.json", "analyze")
     if signature is not None:
-        judge.expect("analyze: crash signature status", signature.get("status"), "answered")
+        # analyzer_output::Verified.envelope publishes the decoded answer in
+        # `result`, beside the original source/output provenance. There is no
+        # flat crash-signature Artifact on the published Runtime surface.
+        answer = signature.get("result")
+        wrapper_fields = {"schemaVersion", "analyzerRef", "analyzerVersion", "sourceArtifactID",
+                          "sourceSHA256", "sourceByteCount", "analyzerOutputSHA256",
+                          "analyzerOutputByteCount", "result"}
+        wrapped = (
+            set(signature) == wrapper_fields and isinstance(answer, dict)
+            and signature.get("schemaVersion") == answer.get("schemaVersion") == "1.0.0"
+            and signature.get("analyzerRef") == answer.get("analyzerRef") == "crash-signature@1"
+            and signature.get("analyzerVersion") == answer.get("analyzerVersion") == "arkdeck-fault-log-ledger@1"
+            and isinstance(answer.get("entries"), list)
+            and all(isinstance(entry, dict)
+                    and all(isinstance(entry.get(key), str) for key in ("name", "kind", "bundle", "uid", "timestamp"))
+                    for entry in answer["entries"])
+            and ("unreadableReason" not in answer or isinstance(answer["unreadableReason"], str))
+            and isinstance(signature.get("analyzerOutputSHA256"), str)
+            and re.fullmatch(r"[0-9a-f]{64}", signature["analyzerOutputSHA256"]) is not None
+            and type(signature.get("analyzerOutputByteCount")) is int and signature["analyzerOutputByteCount"] > 0
+        )
+        judge.that("analyze: crash signature derived Artifact wrapper", wrapped, None)
+        judge.expect("analyze: crash signature status", (answer if isinstance(answer, dict) else {}).get("status"), "answered")
+        source_rows = [a for a in (repro_step.result.get("artifacts") or [])
+                       if a.get("name") == "crash-index.txt"] if repro_step is not None else []
+        source_bytes = repro.get("crash-index.txt")
+        judge.that(
+            "analyze: crash signature source provenance",
+            len(source_rows) == 1 and source_bytes is not None
+            and signature.get("sourceArtifactID") == source_rows[0].get("artifactId")
+            and signature.get("sourceSHA256") == hashlib.sha256(source_bytes).hexdigest()
+            and type(signature.get("sourceByteCount")) is int and signature["sourceByteCount"] == len(source_bytes),
+            None, repro_step,
+        )
 
     _, isolated = leg("isolate", "workspace.prepare-isolated-copy@1", ("isolated-workspace.json",))
     _, patched = leg("patch", "workspace.apply-patch@1", ("applied-patch.json",))
