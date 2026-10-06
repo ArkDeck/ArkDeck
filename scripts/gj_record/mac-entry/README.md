@@ -8,7 +8,7 @@
 
 仓库存在可构建 Mac RC 的 `xcode-27` lane。最近成功 [release-rc run 37075826611](https://github.com/ArkDeck/ArkDeck/actions/runs/37075826611) 源为 `3efba88c18adbc28be7fb9ef0e495195aaec39c0`（2026-10-02）。job metadata 标记 GitHub Actions group / `xcode-27`；这不是现成 USB 设备或 SSH 访问证明，且源早于本次 protected `19097bde…`。repo runners GET 返回零，组织 runners GET 权限不足；未升级权限、修改 SSH 信任或尝试新凭据。
 
-可直接推进的入口是：Root 等本轮 Trace CRLF 产品修复及 Mac RC build 4 的正常 review 合入后，从实际 protected main 的 signed/notarized Mac RC lane 一次获得发布包；使用已经具备本机访问权的 Mac，或建立获授权且主机身份核验过的 Mac 连接。需要的唯一物理动作是将 DAYU200 从已闭合、无在途/unknown/HAR 的 Windows 窗口转至 Mac 的固定 USB 口，并按 GJ-1 提示完成断连/重插。GitHub CI runner 未证明能接触这块板子，不直接在它上面提交设备 operation。
+可直接推进的入口是：Root 等本轮 Trace CRLF 修复、native 回滚实值证据修复、GJ-5 derived-signature 消费修复及 Mac RC build 4 的正常 review 合入后，从实际 protected main 的 signed/notarized Mac RC lane 一次获得发布包；使用已经具备本机访问权的 Mac，或建立获授权且主机身份核验过的 Mac 连接。需要的唯一物理动作是将 DAYU200 从已闭合、无在途/unknown/HAR 的 Windows 窗口转至 Mac 的固定 USB 口，并按 GJ-1 提示完成断连/重插。GitHub CI runner 未证明能接触这块板子，不直接在它上面提交设备 operation。
 
 ## 本机准备命令
 
@@ -41,7 +41,7 @@ python3 -B entry.py verify-materials \
 
 repo HEAD 必须等于 freshly fetched `origin/main`，tracked source clean；RC source 可为 protected-main ancestor，但必须由主仓 validated Catalog reader 证明 RC/current main 的 digest 与 canonical operation set 相同。adapter 核验 Mac 两个实际 image 的 whole SHA 和 native codesign/Team `8AQTYW5FKR`，清除 ambient ARKDECK/OHOS_HDC overrides，仅绑定这对 image。`launchAgent.daemonSHA256` 是已配置文件的摘要，单独不构成 running-image proof；preflight 还需下面的真实 native-instance 证明。不能仅因 source SHA 不同强制重发 RC，也不能把不同 Catalog 当作 compatible。
 
-此次旧 RC 确实不兼容：同一 validated `scripts/gj_record/catalog.py` 从 Git 读取，`3efba88c…` digest 为 `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`，`19097bde…` 为上面的 `c6e92e…`；digest/canonical set equality 都是 false，虽然旧 source 是 main ancestor。因此需要当前 Catalog 的 Mac RC。`release-rc.yml` 的 workflow_dispatch 无 inputs、仅从 protected main 的 `github.sha` 生产；version0.1.0/build3已有 nonexpired `arkdeck-rc-0.1.0-3`，相同 build 的 dispatch 会 green skip。本轮 build 4 的版本增量通过官方 `release_version.py bump-build` 同步 App 和两个 helper 的版本副本；Root 需先合入 Trace CRLF 修复，再合入版本增量，使 push trigger 从包含修复的 protected main 生产一次新 RC。若需明确 dispatch，其精确命令是 `gh workflow run release-rc.yml --ref main --repo ArkDeck/ArkDeck`，不带 `-f`、不指定任意 source。adapter 本身不执行 bump、dispatch 或 publish。
+此次旧 RC 确实不兼容：同一 validated `scripts/gj_record/catalog.py` 从 Git 读取，`3efba88c…` digest 为 `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`，`19097bde…` 为上面的 `c6e92e…`；digest/canonical set equality 都是 false，虽然旧 source 是 main ancestor。因此需要当前 Catalog 的 Mac RC。`release-rc.yml` 的 workflow_dispatch 无 inputs、仅从 protected main 的 `github.sha` 生产；version0.1.0/build3已有 nonexpired `arkdeck-rc-0.1.0-3`，相同 build 的 dispatch 会 green skip。本轮 build 4 的版本增量通过官方 `release_version.py bump-build` 同步 App 和两个 helper 的版本副本；Root 需先合入 Trace CRLF、native 回滚实值证据和 GJ-5 derived-signature 消费修复，再合入版本增量，使 push trigger 从包含三项修复的 protected main 生产一次新 RC。若需明确 dispatch，其精确命令是 `gh workflow run release-rc.yml --ref main --repo ArkDeck/ArkDeck`，不带 `-f`、不指定任意 source。adapter 本身不执行 bump、dispatch 或 publish。
 
 ## Root 单次 preflight 入口
 
@@ -105,4 +105,4 @@ Root 检查实际四态/完整判据，不以 assembler process exit 或 prepara
 
 ## CI
 
-本机独立 source helper 尚未 push/CI；packet 由 Root 集成 normal adoption PR。最近 Mac RC CI 成功仅是环境线索，不能当本轮 GJ pass。
+入口及独占 capture 修复已由维护者合入 [PR #2607](https://github.com/ArkDeck/ArkDeck/pull/2607)，protected main 为 `4d4ee61b7f229dfc7155f646cb73adebba7b58d4`。SDD `guard` 在 [run 37441785353](https://github.com/ArkDeck/ArkDeck/actions/runs/37441785353) 成功；[Swift CI run 37441534142](https://github.com/ArkDeck/ArkDeck/actions/runs/37441534142) 的 planner 成功且未选择编译车道，`swift` 汇总成功跳过。实际 Mac native API、发布包和设备步骤仍未在本轮执行，这些 CI 结果不构成 GJ pass。
