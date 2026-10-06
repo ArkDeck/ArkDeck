@@ -68,7 +68,9 @@ fn rust_runs_every_swift_native_library_deployment_as_swift_does() {
 /// whose outcome is lost.
 #[derive(Clone, Copy)]
 enum Fault {
+    None,
     RollbackIneffective,
+    RollbackUnobserved,
     CleanupIneffective,
     CleanupUnobserved,
 }
@@ -94,6 +96,9 @@ impl HdcDispatch for Faulted<'_> {
         };
         match (self.fault, plan.arguments.get(3).map(String::as_str)) {
             (Fault::RollbackIneffective, Some("mv")) => Ok(receipt(1)),
+            (Fault::RollbackUnobserved, Some("mv")) => Err(DispatchFailure::Unobservable(
+                "dispatch outcome unobservable: the native restore was lost".into(),
+            )),
             (Fault::CleanupIneffective, Some("rmdir")) => Ok(receipt(0)),
             (Fault::CleanupUnobserved, Some("rmdir")) => Err(DispatchFailure::Unobservable(
                 "dispatch outcome unobservable: the staging removal was lost".into(),
@@ -176,6 +181,125 @@ fn settled(owners: &Owners, job: &str) -> (Value, Value) {
     (outcome["outcome"].clone(), outcome["terminalState"].clone())
 }
 
+#[test]
+fn confirmed_native_restore_is_public_and_durable_without_another_dispatch() {
+    let Run {
+        _lock,
+        owners,
+        job,
+        status,
+        ..
+    } = loader_failure_with(Fault::None);
+    assert_eq!(status["state"], "failed");
+    assert_eq!(status["outcomeUnknown"], false);
+    assert_eq!(status["outstandingResidueCount"], 0);
+    let record = owners.record(&job);
+    let proofs =
+        hdc_oracle::native_readback::timeline_proofs(record["timeline"].as_array().unwrap());
+    assert_eq!(proofs.len(), 2);
+    assert_eq!(proofs[0].0, "backup");
+    assert_eq!(proofs[1].0, "rollback");
+    assert_eq!(proofs[0].1["backupSha256"], proofs[1].1["restoredSha256"]);
+    assert_ne!(proofs[1].1["inputSha256"], proofs[1].1["restoredSha256"]);
+    let journal = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+    let rows: Vec<Value> = String::from_utf8(journal.clone())
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    for (step, phase) in [
+        ("backup-current-version", "backup"),
+        ("rollback-native-library", "rollback"),
+    ] {
+        let outcome = rows
+            .iter()
+            .find(|row| row["eventId"] == format!("outcome-{step}"))
+            .unwrap();
+        assert_eq!(outcome["payload"]["result"], "succeeded");
+        assert_eq!(outcome["payload"]["outcomeCertainty"], "confirmed");
+        let summary: Value =
+            serde_json::from_str(outcome["payload"]["summary"].as_str().unwrap()).unwrap();
+        assert_eq!(summary, hdc_oracle::native_readback::expected(phase));
+    }
+    let before_calls = owners.calls();
+    let params = Map::from_iter([
+        ("jobId".into(), json!(job)),
+        ("pageSize".into(), json!(1000)),
+    ]);
+    let page = owners
+        .jobs
+        .handle_resource("job.timeline", &params)
+        .unwrap();
+    assert_eq!(page["hasMore"], false);
+    hdc_oracle::assert_conforms("job.timeline", &json!({"ok":true,"result":page}));
+    let texts: Vec<Value> = page["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| row["text"].clone())
+        .collect();
+    assert_eq!(hdc_oracle::native_readback::timeline_proofs(&texts), proofs);
+    assert_eq!(owners.calls(), before_calls);
+    let root = owners.default_root.clone();
+    let job_file = owners.job_file(&job, "journal.jsonl");
+    drop(owners);
+    let reopened = arkdeck_hoststore::JobStore::open_owner(&root).unwrap();
+    let again = reopened.handle_resource("job.timeline", &params).unwrap();
+    assert_eq!(again["items"], page["items"]);
+    assert_eq!(fs::read(job_file).unwrap(), journal);
+}
+
+#[test]
+fn historical_native_comparison_refuses_missing_duplicate_or_changed_readback_proofs() {
+    let backup = hdc_oracle::native_readback::expected("backup");
+    let rollback = hdc_oracle::native_readback::expected("rollback");
+    let original = json!({"timeline":[
+        "verified backup-current-version [\"backupPath\", \"backupSha256\"]",
+        "verified rollback-native-library [\"processIds\", \"restored\", \"restoredSha256\"]",
+    ]});
+    let mut extended = original.clone();
+    extended["timeline"].as_array_mut().unwrap().extend([
+        json!(format!("native-readback backup-current-version {backup}")),
+        json!(format!(
+            "native-readback rollback-native-library {rollback}"
+        )),
+    ]);
+    let projected: Value = serde_json::from_slice(&hdc_oracle::native_readback::historical_bytes(
+        &serde_json::to_vec(&extended).unwrap(),
+    ))
+    .unwrap();
+    assert_eq!(projected, original);
+    let mut changed = rollback.clone();
+    changed["restoredSha256"] = json!("f".repeat(64));
+    let mut future = rollback;
+    future["unrecognizedProof"] = json!(true);
+    for invalid in [
+        original,
+        json!({"timeline":[
+            "verified rollback-native-library [\"processIds\", \"restored\", \"restoredSha256\"]",
+            format!("native-readback rollback-native-library {changed}"),
+        ]}),
+        json!({"timeline":[
+            "verified rollback-native-library [\"processIds\", \"restored\", \"restoredSha256\"]",
+            format!("native-readback rollback-native-library {future}"),
+        ]}),
+        json!({"timeline":[
+            "verified backup-current-version [\"backupPath\", \"backupSha256\"]",
+            format!("native-readback backup-current-version {backup}"),
+            format!("native-readback backup-current-version {backup}"),
+        ]}),
+        json!({"timeline":[format!("native-readback unknown-step {backup}")]}),
+    ] {
+        assert!(
+            std::panic::catch_unwind(|| hdc_oracle::native_readback::historical_bytes(
+                &serde_json::to_vec(&invalid).unwrap(),
+            ))
+            .is_err(),
+            "invalid proof must never be erased: {invalid}"
+        );
+    }
+}
+
 /// A rollback that does not restore the previous library is the Job's
 /// failure: nothing more is removed, and nothing is owed.
 #[test]
@@ -188,6 +312,19 @@ fn a_rollback_that_fails_fails_its_job_and_removes_nothing_more() {
         tail,
     } = loader_failure_with(Fault::RollbackIneffective);
     assert_eq!(status["state"], "failed");
+    let record = owners.record(&job);
+    assert_eq!(
+        hdc_oracle::native_readback::timeline_proofs(record["timeline"].as_array().unwrap()).len(),
+        1
+    );
+    let journal = fs::read_to_string(owners.job_file(&job, "journal.jsonl")).unwrap();
+    let rollback_outcome: Value = journal
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|row| row["eventId"] == "outcome-rollback-native-library")
+        .unwrap();
+    assert_eq!(rollback_outcome["payload"]["result"], "failed");
+    assert!(rollback_outcome["payload"].get("summary").is_none());
     let rollback = tail
         .iter()
         .find_map(|line| line.strip_prefix("failed rollback-native-library: "))
@@ -218,6 +355,40 @@ fn a_rollback_that_fails_fails_its_job_and_removes_nothing_more() {
         settled(&owners, &job),
         (json!("confirmed"), json!("failed"))
     );
+}
+
+#[test]
+fn an_unobserved_restore_has_no_readback_proof_or_confirmed_outcome() {
+    let Run {
+        _lock,
+        owners,
+        job,
+        status,
+        ..
+    } = loader_failure_with(Fault::RollbackUnobserved);
+    assert_eq!(status["state"], "waitingForRecovery");
+    assert_eq!(status["outcomeUnknown"], true);
+    let record = owners.record(&job);
+    let proofs =
+        hdc_oracle::native_readback::timeline_proofs(record["timeline"].as_array().unwrap());
+    assert_eq!(proofs.len(), 1);
+    assert_eq!(proofs[0].0, "backup");
+    assert_eq!(record["recoveryStepID"], "rollback-native-library");
+    let journal = fs::read_to_string(owners.job_file(&job, "journal.jsonl")).unwrap();
+    let rows: Vec<Value> = journal
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert!(
+        rows.iter()
+            .any(|row| row["eventId"] == "intent-rollback-native-library")
+    );
+    assert!(
+        !rows
+            .iter()
+            .any(|row| row["eventId"] == "outcome-rollback-native-library")
+    );
+    assert!(!owners.calls().contains("rmdir"));
 }
 
 /// A compensation cleanup that leaves the staging is owed in the ledger with

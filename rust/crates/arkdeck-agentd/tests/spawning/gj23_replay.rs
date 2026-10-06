@@ -220,6 +220,15 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
     let daemon = SignedDaemon::start_with(&executable, &pin, &root, &fixture, &root, &variables);
 
     let spelled = |bytes: &[u8]| -> Vec<u8> {
+        // Validate every additive native value before comparing the frozen
+        // pre-proof oracle's original bytes, just as the hoststore replay does.
+        let native;
+        let bytes = if name == "deploy-native-library" {
+            native = hdc_oracle::native_readback::historical_bytes(bytes);
+            native.as_slice()
+        } else {
+            bytes
+        };
         let Ok(text) = String::from_utf8(bytes.to_vec()) else {
             return bytes.to_vec();
         };
