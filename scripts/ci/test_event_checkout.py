@@ -14,8 +14,8 @@ import tempfile
 import unittest
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/swift-ci.yml"
-JOBS = ("plan", "swift-tests", "app-build", "ds-interactions", "rust-policy", "rust-workspace",
-        "rust-contracts", "sdd-guard", "sdd-ds-tokens")
+JOBS = ("plan", "swift-tests", "app-build", "rust-policy", "rust-workspace",
+        "rust-contracts", "sdd-guard")
 
 
 def checkout_script(job: str) -> str:

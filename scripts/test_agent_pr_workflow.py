@@ -366,7 +366,6 @@ def validate_automatic_check_contract(
     plan_job = _job_block(swift_text, "plan")
     swift_tests_job = _job_block(swift_text, "swift-tests")
     app_build_job = _job_block(swift_text, "app-build")
-    ds_job = _job_block(swift_text, "ds-interactions")
     rust_job = _job_block(swift_text, "rust-checks")
     windows_job = _job_block(swift_text, "windows-clientkit")
     swift_aggregate_job = _job_block(swift_text, "swift")
@@ -381,14 +380,26 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(
                 f"{job_name} job-level fields cannot use the step-only runner context"
             )
-    if not swift_aggregate_job.startswith("  swift:\n    if: always()\n"):
-        raise WorkflowContractError("Swift aggregate job must run after every lane result")
+    aggregate_condition = (
+        "  swift:\n"
+        "    if: always() && (needs.plan.result != 'success' || needs.plan.outputs.compiled != 'false')\n"
+    )
+    if not swift_aggregate_job.startswith(aggregate_condition):
+        raise WorkflowContractError("Swift gate may skip only a successful plan with no compiled lanes")
+    if "continue-on-error:" in plan_job:
+        raise WorkflowContractError("Planner and interaction failures must fail the required gate")
+    if plan_job.count("        if: steps.paths.outputs.ds == 'true'\n") != 3:
+        raise WorkflowContractError("Interaction setup, install and test must use the planner selection")
+    guard_job = _job_block(sdd_text, "guard")
+    if "run: node docs/design/arkdeck-ds/scripts/check-tokens.mjs" not in guard_job:
+        raise WorkflowContractError("Token drift must fail the required guard on its existing runner")
+    if "  ds-interactions:\n" in swift_text or "  ds-tokens:\n" in sdd_text:
+        raise WorkflowContractError("Lightweight checks must reuse their parent runner")
     for job_name, job_block in (
         ("plan", plan_job), ("swift-tests", swift_tests_job),
-        ("app-build", app_build_job), ("ds-interactions", ds_job),
+        ("app-build", app_build_job),
         ("windows-clientkit", windows_job),
         ("sdd-guard", _job_block(sdd_text, "guard")),
-        ("sdd-tokens", _job_block(sdd_text, "ds-tokens")),
     ):
         for required in (
             "ARKDECK_CI_SHA: ${{ github.sha }}",
@@ -414,6 +425,7 @@ def validate_automatic_check_contract(
         '--github-output "$GITHUB_OUTPUT"',
         "      rust: ${{ steps.paths.outputs.rust }}\n",
         "      windows: ${{ steps.paths.outputs.windows }}\n",
+        "      compiled: ${{ steps.paths.outputs.compiled }}\n",
         # A main run plans from the newest main commit this workflow passed on.
         # Only a successful run counts: a red or replaced one leaves its
         # changes to the next run. The job may read runs and nothing more.
@@ -486,26 +498,25 @@ def validate_automatic_check_contract(
     # ERR_MODULE_NOT_FOUND while the node:-only files still pass — a
     # misleading partial pass, so the exact install is pinned before the run.
     required_ds = (
-        "    needs: plan\n",
-        "    if: needs.plan.outputs.ds == 'true'\n",
-        "    runs-on: ubuntu-latest\n",
+        "      - name: Install exact @arkdeck/ds dev dependencies\n"
+        "        if: steps.paths.outputs.ds == 'true'\n",
+        '      - name: "@arkdeck/ds interaction tests"\n'
+        "        if: steps.paths.outputs.ds == 'true'\n",
         "        working-directory: docs/design/arkdeck-ds\n"
         "        run: npm ci\n",
         "        working-directory: docs/design/arkdeck-ds\n"
         "        run: npm test\n",
     )
     required_aggregate = (
-        "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks, windows-clientkit]\n",
+        "    needs: [plan, swift-tests, app-build, rust-checks, windows-clientkit]\n",
         "PLAN_RESULT: ${{ needs.plan.result }}",
         "SWIFT_RESULT: ${{ needs.swift-tests.result }}",
         "APP_RESULT: ${{ needs.app-build.result }}",
-        "DS_RESULT: ${{ needs.ds-interactions.result }}",
         "RUST_SELECTED: ${{ needs.plan.outputs.rust }}",
         "RUST_RESULT: ${{ needs.rust-checks.result }}",
         'test "$PLAN_RESULT" = success',
         'test "$SWIFT_RESULT" = success',
         'test "$APP_RESULT" = success',
-        'test "$DS_RESULT" = success',
         '          if [ "$RUST_SELECTED" = true ]; then\n'
         '            test "$RUST_RESULT" = success\n'
         '          else\n'
@@ -578,14 +589,16 @@ def validate_automatic_check_contract(
                 f"App build job missing contract token: {token}"
             )
     for token in required_ds:
-        if token not in ds_job:
+        if token not in plan_job:
             raise WorkflowContractError(
                 f"ds interaction job missing contract token: {token}"
             )
-    if ds_job.index("run: npm ci") > ds_job.index("run: npm test"):
+    if plan_job.index("run: npm ci") > plan_job.index("run: npm test"):
         raise WorkflowContractError(
             "ds interaction job must install exact dependencies before testing"
         )
+    if plan_job.index("        id: paths\n") > plan_job.index("run: npm ci"):
+        raise WorkflowContractError("Planner must select interaction tests before installing them")
     for token in required_rust:
         if token not in rust_job:
             raise WorkflowContractError(f"Rust job missing contract token: {token}")
@@ -1915,9 +1928,27 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "    if: needs.plan.outputs.ds == 'true'\n",
+                    "        if: steps.paths.outputs.ds == 'true'\n",
                     "",
                 ),
+            ),
+            (
+                "lightweight skip ignores failed plan",
+                agent,
+                sdd,
+                swift.replace("needs.plan.result != 'success' || ", ""),
+            ),
+            (
+                "planner swallows interaction failure",
+                agent,
+                sdd,
+                swift.replace("        run: npm test\n", "        continue-on-error: true\n        run: npm test\n"),
+            ),
+            (
+                "required guard drops token drift check",
+                agent,
+                sdd.replace("        run: node docs/design/arkdeck-ds/scripts/check-tokens.mjs\n", ""),
+                swift,
             ),
             (
                 "ds install skipped",
@@ -1929,11 +1960,11 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 ),
             ),
             (
-                "aggregator ignores ds result",
+                "aggregator ignores planner or interaction failure",
                 agent,
                 sdd,
                 swift.replace(
-                    '            test "$DS_RESULT" = success\n',
+                    '          test "$PLAN_RESULT" = success\n',
                     "            true\n",
                 ),
             ),
@@ -1960,8 +1991,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks, windows-clientkit]\n",
-                    "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks]\n",
+                    "    needs: [plan, swift-tests, app-build, rust-checks, windows-clientkit]\n",
+                    "    needs: [plan, swift-tests, app-build, rust-checks]\n",
                 ),
             ),
             (
@@ -2044,8 +2075,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "  swift:\n    if: always()\n",
-                    "  swift:\n    if: success()\n",
+                    "  swift:\n    if: always()",
+                    "  swift:\n    if: success()",
                     1,
                 ),
             ),

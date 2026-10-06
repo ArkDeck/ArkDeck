@@ -3,10 +3,12 @@ name: Swift CI
 # Path-aware merge gate for the two compiled macOS surfaces and the
 # @arkdeck/ds interaction suite that cross-checks them against docs/design.
 #
-# The always-present `swift` aggregator is the stable status check.  A small
-# Linux planner computes the exact diff first, so docs-only pushes do not
-# allocate a macOS runner.  Agent branches compare their cumulative head
-# with the current origin/main merge base; this handles an all-zero first-push
+# The always-present `swift` check is the stable merge gate. A small Linux
+# planner also runs selected interaction tests on its existing runner. When
+# that job succeeds with no compiled lanes, `swift` reports a successful skip
+# without allocating a second runner. Otherwise it aggregates every lane.
+# Docs-only pushes never allocate a macOS runner. Agent branches compare their
+# cumulative head with the current origin/main merge base; this handles an all-zero first-push
 # `before` OID without conservatively compiling unrelated docs.  Main compares
 # with the newest main commit this workflow passed on, so the changes of a run
 # that went red, or that GitHub replaced while it waited, stay selected until
@@ -50,7 +52,7 @@ concurrency:
 jobs:
   plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     # actions: read is for the one step that asks which main commit this
     # workflow last passed on; nothing in this job writes.
     permissions:
@@ -62,6 +64,7 @@ jobs:
       ds: ${{ steps.paths.outputs.ds }}
       rust: ${{ steps.paths.outputs.rust }}
       windows: ${{ steps.paths.outputs.windows }}
+      compiled: ${{ steps.paths.outputs.compiled }}
       base: ${{ steps.paths.outputs.base }}
       reason: ${{ steps.paths.outputs.reason }}
       changed-count: ${{ steps.paths.outputs.changed-count }}
@@ -139,6 +142,22 @@ jobs:
             echo "- Rust workspace and dependency policy: \`${{ steps.paths.outputs.rust }}\`"
             echo "- Windows ClientKit build and tests: \`${{ steps.paths.outputs.windows }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Reuse the planner's checkout and runner for the selected Linux suite.
+      # Failure here fails plan, so it cannot take the successful skip below.
+      - name: Runner Node version
+        if: steps.paths.outputs.ds == 'true'
+        run: node --version
+
+      - name: Install exact @arkdeck/ds dev dependencies
+        if: steps.paths.outputs.ds == 'true'
+        working-directory: docs/design/arkdeck-ds
+        run: npm ci
+
+      - name: "@arkdeck/ds interaction tests"
+        if: steps.paths.outputs.ds == 'true'
+        working-directory: docs/design/arkdeck-ds
+        run: npm test
 
   swift-tests:
     needs: plan
@@ -305,45 +324,6 @@ jobs:
           path: ${{ runner.temp }}/arkdeck-xcode
           key: ${{ steps.cache-scope.outputs.prefix }}-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
 
-  # The @arkdeck/ds interaction tests execute the docs/design prototype draft
-  # and cross-check the audit matrix, implementation-coverage.json and the App
-  # and Package Swift sources it names.  PR #1606 merged all-green while
-  # breaking two of them from ArkDeckApp/ alone, because no gate ran the
-  # suite; this lane closes that gap on every directory the suite reads.
-  #
-  # npm ci is not optional setup: node_modules is not committed and the suite
-  # imports esbuild/react from it.  Without the install, the files with only
-  # node: imports still pass and the rest die on ERR_MODULE_NOT_FOUND, which
-  # reads as a partial pass.  No app build is involved.
-  ds-interactions:
-    needs: plan
-    if: needs.plan.outputs.ds == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout exact revision with runner Git
-        env:
-          ARKDECK_CI_SHA: ${{ github.sha }}
-        run: |
-          set -eu
-          git init .
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --prune --depth=1 origin \
-            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
-          git checkout --detach refs/remotes/origin/ci
-          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
-
-      - name: Runner Node version
-        run: node --version
-
-      - name: Install exact @arkdeck/ds dev dependencies
-        working-directory: docs/design/arkdeck-ds
-        run: npm ci
-
-      - name: "@arkdeck/ds interaction tests"
-        working-directory: docs/design/arkdeck-ds
-        run: npm test
-
   rust-checks:
     needs: plan
     if: needs.plan.outputs.rust == 'true'
@@ -414,12 +394,13 @@ jobs:
       - name: Windows client tests
         run: dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build
 
-  # Stable required-check name.  A job-level skip is a successful no-op;
-  # workflow-level paths filters are intentionally absent because GitHub can
-  # leave a required workflow that never started pending indefinitely.
+  # GitHub accepts a job-level skip for a required check. Only a successful
+  # plan that explicitly selected no compiled lanes can take that path; failed,
+  # cancelled or missing planning facts still run this gate and fail closed.
+  # No workflow-level path filter: it would leave the required check pending.
   swift:
-    if: always()
-    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks, windows-clientkit]
+    if: always() && (needs.plan.result != 'success' || needs.plan.outputs.compiled != 'false')
+    needs: [plan, swift-tests, app-build, rust-checks, windows-clientkit]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -430,8 +411,6 @@ jobs:
           SWIFT_RESULT: ${{ needs.swift-tests.result }}
           APP_SELECTED: ${{ needs.plan.outputs.app }}
           APP_RESULT: ${{ needs.app-build.result }}
-          DS_SELECTED: ${{ needs.plan.outputs.ds }}
-          DS_RESULT: ${{ needs.ds-interactions.result }}
           RUST_SELECTED: ${{ needs.plan.outputs.rust }}
           RUST_RESULT: ${{ needs.rust-checks.result }}
           WINDOWS_SELECTED: ${{ needs.plan.outputs.windows }}
@@ -448,11 +427,6 @@ jobs:
             test "$APP_RESULT" = success
           else
             test "$APP_RESULT" = skipped
-          fi
-          if [ "$DS_SELECTED" = true ]; then
-            test "$DS_RESULT" = success
-          else
-            test "$DS_RESULT" = skipped
           fi
           if [ "$RUST_SELECTED" = true ]; then
             test "$RUST_RESULT" = success
@@ -472,13 +446,13 @@ jobs:
             echo "### Swift CI"
             echo "- ArkDeckKit lane selected: \`${{ needs.plan.outputs.swift }}\`; result: \`${{ needs.swift-tests.result }}\`."
             echo "- ArkDeck App lane selected: \`${{ needs.plan.outputs.app }}\`; result: \`${{ needs.app-build.result }}\`."
-            echo "- @arkdeck/ds interaction lane selected: \`${{ needs.plan.outputs.ds }}\`; result: \`${{ needs.ds-interactions.result }}\`."
+            echo "- @arkdeck/ds interaction lane selected: \`${{ needs.plan.outputs.ds }}\`; checked in plan (result: \`${{ needs.plan.result }}\`)."
             echo "- Rust workspace lane selected: \`${{ needs.plan.outputs.rust }}\`; result: \`${{ needs.rust-checks.result }}\`."
             echo "- Windows ClientKit lane selected: \`${{ needs.plan.outputs.windows }}\`; result: \`${{ needs.windows-clientkit.result }}\`."
             echo "- Rust checks run on Windows, macOS and Linux; hosted runners do not constitute Windows device acceptance."
             echo "- ArkDeckKit changes retain the full test suite; test-only changes do not rebuild the App."
             echo "- App/UI-test/project changes compile with build-for-testing; no simulator or device test is claimed."
-            echo "- Design, App and Package changes run the @arkdeck/ds interaction tests after an exact npm ci."
+            echo "- Interaction-suite inputs run @arkdeck/ds tests in plan after an exact npm ci."
             echo "- Cache restore order is exact inputs, then the newest protected-main entry for the same toolchain (SwiftPM: for the same runner image build first); only protected main writes new entries."
             echo "- A green CI result is validation evidence, not maintainer approval."
           } >> "$GITHUB_STEP_SUMMARY"

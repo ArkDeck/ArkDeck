@@ -5,10 +5,14 @@ from __future__ import annotations
 
 import json
 import importlib.util
+import itertools
+import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from unittest import mock
 
@@ -32,13 +36,39 @@ class PathClassificationTests(unittest.TestCase):
         self.assertEqual(selection.rust, rust)
         self.assertEqual(selection.windows, windows)
 
-    def test_docs_and_previews_outside_design_select_no_lane(self):
+    def test_docs_outside_interaction_inputs_select_no_lane(self):
         self.assert_lanes(
-            ["README.md", "docs/README.md", ".design-sync/previews/Card.tsx"],
+            ["README.md", "docs/README.md"],
             swift=False,
             app=False,
             ds=False,
         )
+
+    def test_pr_2598_acceptance_records_select_no_lane(self):
+        self.assert_lanes([
+            "docs/design/cross-platform/windows-phase-a-runbook.md",
+            "docs/design/cross-platform/windows-remaining.md",
+            "docs/design/references/v1.6-goal/gj-headless-rerun-2026-10-06-windows.json",
+            "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj1-2026-10-06-run.md",
+            "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-publication-delivery-20261006-run.md",
+            "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-workspace-session-publication-20261006-run.md",
+            "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/windows-remaining.md",
+        ], swift=False, app=False, ds=False)
+
+    def test_interaction_inventory_and_direct_design_reads_remain_selected(self):
+        root = SCRIPT.resolve().parents[2]
+        coverage = json.loads((root / "docs/design/implementation-coverage.json").read_text())
+        inputs = coverage["designInputs"] + coverage["previewFiles"]
+        for test in (root / PLAN.DS_PACKAGE_DIR / "scripts").glob("*interactions.test.mjs"):
+            inputs.extend(re.findall(r"read\(['\"](docs/design/[^'\"]+)['\"]\)", test.read_text()))
+        inputs.extend([
+            "docs/design/arkdeck-ds/new-input.tsx",
+            "Catalog/operations/new-operation.json",
+            "ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+        ])
+        for path in inputs:
+            with self.subTest(path=path):
+                self.assertTrue(PLAN.classify_paths([path]).ds)
 
     def test_design_docs_run_ds_lane_without_compiled_lanes(self):
         for path in (
@@ -152,7 +182,10 @@ class PathClassificationTests(unittest.TestCase):
             "scripts/catalog_gen/generate.py",
         ):
             with self.subTest(path=path):
-                self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
+                self.assert_lanes(
+                    [path], swift=False, app=False,
+                    ds=path.startswith("Catalog/operations/"), rust=True,
+                )
 
     def test_every_bundle_contract_selects_rust_and_swift(self):
         # Swift's export can rewrite any of them without touching rust/, the
@@ -327,6 +360,54 @@ class PathClassificationTests(unittest.TestCase):
             for candidate in inputs:
                 with self.subTest(input=path, changed_path=candidate):
                     self.assertTrue(PLAN.classify_paths([candidate]).rust)
+
+
+class LightweightGateTests(unittest.TestCase):
+    def test_compiled_output_covers_every_lane_combination(self):
+        for flags in itertools.product((False, True), repeat=5):
+            with self.subTest(flags=flags), tempfile.TemporaryDirectory() as directory:
+                lanes = PLAN.LaneSelection(*flags)
+                expected = any((lanes.swift, lanes.app, lanes.rust, lanes.windows))
+                plan = PLAN.CIPlan(lanes, "0" * 40, "1" * 40, "test", "test", ())
+                output = pathlib.Path(directory) / "output"
+                PLAN._append_github_output(output, plan)
+                self.assertIs(plan.as_dict()["compiled"], expected)
+                self.assertIn(f"compiled={str(expected).lower()}\n", output.read_text())
+
+    def test_actual_gate_skips_only_successful_lightweight_plan(self):
+        workflow = (SCRIPT.resolve().parents[2] / ".github/workflows/swift-ci.yml").read_text()
+        condition = re.search(r"^  swift:\n    if: (.+)$", workflow, re.M)[1]
+        for result in ("success", "failure", "cancelled", "skipped", ""):
+            for compiled in ("false", "true", "", "unknown"):
+                with self.subTest(result=result, compiled=compiled):
+                    # Evaluate the checked-in predicate with actual needs facts,
+                    # rather than maintaining a second copy of its expression.
+                    expression = condition.replace("needs.plan.result", repr(result))
+                    expression = expression.replace("needs.plan.outputs.compiled", repr(compiled))
+                    expression = expression.replace("always()", "True").replace("&&", "and").replace("||", "or")
+                    runs = eval(expression, {"__builtins__": {}}, {})
+                    self.assertEqual(runs, (result, compiled) != ("success", "false"))
+
+    def test_actual_aggregate_rejects_failed_or_unexpectedly_skipped_lanes(self):
+        workflow = (SCRIPT.resolve().parents[2] / ".github/workflows/swift-ci.yml").read_text()
+        step = workflow.split("      - name: Require every selected lane\n", 1)[1]
+        script = textwrap.dedent(step.split("        run: |\n", 1)[1].split("      - name:", 1)[0])
+        baseline = {"PLAN_RESULT": "success"}
+        for lane in ("SWIFT", "APP", "RUST", "WINDOWS"):
+            baseline[f"{lane}_SELECTED"] = "false"
+            baseline[f"{lane}_RESULT"] = "skipped"
+        cases = [(baseline, True)]
+        for result in ("failure", "cancelled", "skipped", ""):
+            cases.append((baseline | {"PLAN_RESULT": result}, False))
+        for lane in ("SWIFT", "APP", "RUST", "WINDOWS"):
+            for selected in ("true", "false"):
+                for result in ("success", "failure", "cancelled", "skipped"):
+                    facts = baseline | {f"{lane}_SELECTED": selected, f"{lane}_RESULT": result}
+                    cases.append((facts, result == ("success" if selected == "true" else "skipped")))
+        for facts, passes in cases:
+            with self.subTest(facts=facts):
+                result = subprocess.run(["sh", "-c", script], env=os.environ | facts, capture_output=True)
+                self.assertEqual(result.returncode == 0, passes, result.stderr)
 
 
 class GitPlanTests(unittest.TestCase):

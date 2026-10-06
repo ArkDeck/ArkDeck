@@ -81,31 +81,8 @@ jobs:
         working-directory: scripts
         run: python3 -m unittest discover -s gj_record -t .
 
-  # @arkdeck/ds encodes the design language defined by docs/design/*. Nothing
-  # generates it, so the two drift by hand — and once already did, silently: the
-  # library shipped v0.2's palette while main had moved to v0.3, and it surfaced
-  # only because a rebase happened to pull the newer docs in. The check also
-  # runs first in that package's `npm run build`, but a build is not something a
-  # commit has to pass through, so it belongs here too.
-  #
-  # No install step on purpose: the script imports only node: builtins, which
-  # keeps this job dependency-free and a couple of seconds long.
-  ds-tokens:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout exact revision with runner Git
-        env:
-          ARKDECK_CI_SHA: ${{ github.sha }}
-        run: |
-          set -eu
-          git init .
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --prune --depth=1 origin \
-            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
-          git checkout --detach refs/remotes/origin/ci
-          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
-
+      # Token drift is part of the required guard. Reuse its checkout and
+      # runner instead of queueing a separate job for this builtin-only check.
       - name: Runner Node version
         run: node --version
 
