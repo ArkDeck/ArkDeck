@@ -180,15 +180,14 @@ jobs:
       matrix:
         os: [ubuntu-latest, xcode-27, windows-latest]
     runs-on: ${{ matrix.os }}
-    # On macOS the workspace tests take about 8 to 12 minutes, against 1 to
-    # 1.6 on the other hosts (#2311, run 36440456252: 12.2 on macOS). The
-    # 50-minute bound predates moving the contract views to their own job and
-    # stays until cold-cache runs of this job alone have been measured; the
-    # other hosts keep 30, which still stops a hung job early. GitHub names
-    # its macOS images after the Xcode major they carry (xcode-27 runs macOS
-    # 27), so the check is on that prefix and a newer image keeps the longer
-    # bound.
-    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}
+    # Windows baseline run 37407371986 finished this whole job in 22m59s;
+    # run 37415892010 exhausted 30 minutes while suites were still passing,
+    # before reaching the platform PTY/shell tests. Give Windows the same
+    # 40-minute whole-job CI allowance as contract parity. This changes no
+    # individual test, Runtime or operation deadline. Linux keeps 30 minutes.
+    # Keep macOS at 50 minutes; GitHub names those images after their Xcode
+    # major, so a newer xcode-prefixed image retains the same allowance.
+    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}
     defaults:
       run:
         shell: bash

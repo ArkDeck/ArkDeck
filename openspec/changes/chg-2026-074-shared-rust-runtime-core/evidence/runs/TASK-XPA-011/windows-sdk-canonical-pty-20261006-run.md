@@ -77,7 +77,48 @@ Rust implementation increment.
 
 ## CI
 
-Not yet pushed or run for this increment. Local checks and the host-only probe
-do not constitute current-head CI success, maintainer approval or hardware
-acceptance. Protected-main RC rebuild and official SDK/signing verification
-remain coordinator work after publication.
+[PR #2605](https://github.com/ArkDeck/ArkDeck/pull/2605), exact head
+`c73cf6d1588b0ba067a306ce602540e356c97be7`: Swift CI run
+[37415892010](https://github.com/ArkDeck/ArkDeck/actions/runs/37415892010)
+failed. Windows workspace job `112114599087` was cancelled at its 30-minute
+whole-job deadline; required `swift` aggregate job `112122264526` reported
+failure. The full log is local at
+`D:/src/ArkDeck-wt/tools/logs/ci-2605-windows-workspace-37415892010.log`.
+All 150 completed suites reported zero failures. Cancellation was 0.47 seconds
+after `windows_agent_human_action_resume` began, before the changed platform
+PTY/shell test targets were reached; no assertion failure was observed.
+
+The pre-platform baseline, Swift CI run `37407371986`, Windows workspace job
+`112088199872`, passed in 22m59s at
+`d7180f8c9bbb71e76b979863311f751c0c78fa2e`. Its Rust and `rust-ci.yml` bytes match
+the protected-main base above. Both runs used runner image `20260925.250.1`,
+one workspace worker and the development signer. Current/baseline durations
+were 397.83/221.88 seconds for spawning, 249.01/144.77 for hoststore units,
+152.66/134.61 for Job-store corpus, 114.96/58.51 for debug-HAP,
+97.09/53.62 for Journal corpus and 70.64/37.08 for flash. The baseline HAR
+suite passed 7 cases with 1 ignored in 5.57 seconds. The signer-free local
+checks above are lighter than the signed CI fixture path; the two durable
+corpus suites have no signer-dependent branch. These facts establish broad
+slowdown and whole-job exhaustion, but provide no measured CPU/load or port
+contention. All four invalid-run criteria are not proven, and this run is not
+declared invalid or green.
+
+The same PR now raises only Windows workspace's whole-job CI allowance from
+30 to 40 minutes, matching the existing Windows contract-parity allowance.
+macOS remains 50 minutes and Linux 30; worker count, exact test selection,
+assertions, signer fixture and required checks are unchanged. Individual
+test, Runtime and operation deadlines are unchanged. The cancelled run is
+retained; the next ordinary commit/push will receive normal selected CI.
+Targeted follow-up checks: Python YAML/static consistency exit 0, verifying
+that the workspace timeout is the only semantic YAML change and all three
+platform allowances match the expression; Git Bash `sh scripts/check-sdd.sh`
+exit 0 with 0 errors/warnings; `git diff --check` exit 0. Results are recorded
+in `D:/src/ArkDeck-wt/tools/logs/windows-sdk-ci-capacity-checks.log`. The initial
+wrapper stopped at Git's sandbox ownership guard before checks ran; the
+successful invocation trusts only this exact worktree in its child environment,
+without changing global Git configuration.
+No Rust tests or builds are repeated for this workflow/documentation change.
+Its new-head CI has not run yet. Local checks and the host-only probe do not
+constitute current-head CI success, maintainer approval or hardware acceptance.
+Protected-main RC rebuild and official SDK/signing verification remain
+coordinator work after publication.
