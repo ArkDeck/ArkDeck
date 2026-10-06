@@ -1179,7 +1179,19 @@ impl JobRunner<'_> {
                         summary,
                     ))
                 }
-                None => run.step_outcome_at(&step.step_id, &intent_id, result, None, at),
+                None => {
+                    let envelope = run.envelope_at(format!("outcome-{journal_id}"), at.into());
+                    run.append(events::step_outcome(
+                        &envelope,
+                        &step.step_id,
+                        1,
+                        &intent_id,
+                        result,
+                        "confirmed",
+                        None,
+                        summary,
+                    ))
+                }
             };
         let dispatch_failure =
             |reason: &str| compensation.map(|_| format!("failed({})", swift_string(reason)));
@@ -1264,13 +1276,26 @@ impl JobRunner<'_> {
         let verdict = observed.unwrap_or_else(|| action.verify(&receipt, expected, entry));
         match port_readback(descriptor, step, verdict) {
             Outcome::Verified(summary) => {
+                // Only native backup/rollback receipts have this closed public
+                // projection. Keep arbitrary provider facts and raw output out
+                // of the timeline, including private remote/connection paths.
+                let readback = match action {
+                    StepAction::Native(native) => native.verified_readback_evidence(&receipt),
+                    _ => None,
+                }
+                .map(|evidence| evidence.to_string());
                 let outcome_at = run.clock()?;
-                outcome(run, "succeeded", &outcome_at, None)?;
+                outcome(run, "succeeded", &outcome_at, readback.as_deref())?;
                 run.record.timeline.push(format!(
                     "verified {} {}",
                     step.step_id,
                     fact_names(&summary)
                 ));
+                if let Some(readback) = readback {
+                    run.record
+                        .timeline
+                        .push(format!("native-readback {journal_id} {readback}"));
+                }
                 // The timeline names the facts a step verified, not their
                 // values: whether a trace ring held its coverage anchor and
                 // what a run of stills measured are kept on the record.

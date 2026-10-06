@@ -32,6 +32,9 @@ use serde_json::{Map, Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+#[path = "native_readback.rs"]
+pub mod native_readback;
+
 /// The fake's application state, which each oracle clears before every Job
 /// it runs: whether a package is installed, whether the ability runs, and
 /// whether a new native library is published.
@@ -362,6 +365,15 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
     };
     let root = owners.root.clone();
     let spelled = |bytes: &[u8]| -> Vec<u8> {
+        // The additional native proof is asserted in full before projecting
+        // it out of this one frozen pre-proof oracle comparison.
+        let native;
+        let bytes = if name == "deploy-native-library" {
+            native = native_readback::historical_bytes(bytes);
+            native.as_slice()
+        } else {
+            bytes
+        };
         // A payload that is not text names no path.
         let Ok(text) = String::from_utf8(bytes.to_vec()) else {
             return bytes.to_vec();
@@ -647,6 +659,14 @@ pub fn assert_relabelled(
         }
     }
     let index = super::index(default_root);
+    let index =
+        if fixture.file_name().and_then(|name| name.to_str()) == Some("deploy-native-library") {
+            native_readback::historical_index(&index, |job| {
+                fs::read(default_root.join("jobs").join(job).join("job-record.json")).unwrap()
+            })
+        } else {
+            index
+        };
     labels.learn_keys(
         &spelled_json(&index),
         &document(fixture, "store/index.json"),
@@ -681,7 +701,11 @@ pub fn assert_relabelled(
         })
         .collect();
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    super::assert_leftovers_relabelled(fixture, replayed_root, default_root, |bytes| {
-        labels.swift_bytes(&spelled(bytes))
-    });
+    super::assert_leftovers_relabelled_with_index(
+        fixture,
+        replayed_root,
+        default_root,
+        index,
+        |bytes| labels.swift_bytes(&spelled(bytes)),
+    );
 }

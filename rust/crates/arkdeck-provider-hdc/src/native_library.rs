@@ -1469,6 +1469,71 @@ impl NativeAction {
         }
     }
 
+    /// Bounded public facts from a confirmed backup or rollback receipt. The
+    /// input ELF facts describe the replacement, not the previous library;
+    /// only the whole-byte hashes describe the backup and restored bytes.
+    /// Remote paths, command output and the Target's connection identity are
+    /// deliberately absent. This does not change the verification verdict.
+    pub fn verified_readback_evidence(&self, receipt: &FileReceipt) -> Option<Value> {
+        if !matches!(self, Self::Backup(_) | Self::Rollback(_))
+            || !matches!(self.verify(receipt), Outcome::Verified(_))
+        {
+            return None;
+        }
+        let deployment = self.deployment();
+        let processes = &receipt.subprocesses;
+        let facts = &deployment.artifact_facts;
+        let mut evidence = json!({
+            "schemaVersion": "arkdeck.native-library.readback/1",
+            "inputABI": facts.abi.raw(),
+            "inputBuildId": facts.build_id,
+            "inputSha256": facts.sha256,
+        });
+        match self {
+            Self::Backup(_) => {
+                evidence["phase"] = json!("backup");
+                evidence["currentSha256"] = json!(sha256_token(&processes[2])?);
+                evidence["backupSha256"] = json!(sha256_token(&processes[5])?);
+            }
+            Self::Rollback(_) => {
+                let pids = process_ids(&processes[11])?;
+                let maps = &processes[12].stdout;
+                let text = std::str::from_utf8(maps).ok()?;
+                let matches = |line: &str, pid: &u32| {
+                    line.starts_with(&format!("/proc/{pid}/maps:"))
+                        && line.contains(&deployment.loader_visible_path)
+                };
+                let mapped: Vec<u32> = pids
+                    .iter()
+                    .copied()
+                    .filter(|pid| text.lines().any(|line| matches(line, pid)))
+                    .collect();
+                let count = text
+                    .lines()
+                    .filter(|line| pids.iter().any(|pid| matches(line, pid)))
+                    .count();
+                evidence["phase"] = json!("rollback");
+                evidence["backupSha256"] = json!(sha256_token(&processes[0])?);
+                evidence["restoredSha256"] = json!(sha256_token(&processes[8])?);
+                evidence["processIds"] = json!(pids);
+                evidence["mappedProcessIds"] = json!(mapped);
+                evidence["mapsVerified"] = json!(maps_contain(
+                    &processes[12],
+                    &deployment.loader_visible_path,
+                    &pids,
+                ));
+                evidence["mapsSha256"] = json!(arkdeck_contract::sha256_hex(maps));
+                evidence["mapsByteCount"] = json!(maps.len());
+                evidence["matchingMapLineCount"] = json!(count);
+                evidence["loaderPathSha256"] = json!(arkdeck_contract::sha256_hex(
+                    deployment.loader_visible_path.as_bytes(),
+                ));
+            }
+            _ => return None,
+        }
+        Some(evidence)
+    }
+
     /// Swift `reconciliationReadback`: the inspection that concludes this
     /// mutation without resending it; nothing for an inspection.
     pub fn readback(&self) -> Option<Self> {
@@ -3332,6 +3397,108 @@ mod tests {
         assert_eq!(
             NativeAction::Backup(deployment).reconcile(Outcome::Verified(BTreeMap::new())),
             Reconcile::ConfirmedCompleted(BTreeMap::new())
+        );
+    }
+
+    #[test]
+    fn public_backup_and_rollback_evidence_retains_exact_receipt_values_without_paths() {
+        let deployment = deployment();
+        let listing = |mode: &str| sub(&format!("{mode} 1 100 100 256 /private-name\n"), 0);
+        let backup = NativeAction::Backup(deployment.clone());
+        let mut backup_receipt = receipt(vec![
+            listing("drwx------"),
+            listing("-rw-------"),
+            sub(&format!("{REPLACED}  /private-current\n"), 0),
+            sub("", 0),
+            sub("", 0),
+            sub(&format!("{REPLACED}  /private-backup\n"), 0),
+            listing("-rw-------"),
+            sub("", 0),
+        ]);
+        let input = json!({
+            "schemaVersion": "arkdeck.native-library.readback/1",
+            "inputABI": "arm64-v8a",
+            "inputBuildId": deployment.artifact_facts.build_id,
+            "inputSha256": LIBRARY_SHA256,
+        });
+        let mut expected = input.clone();
+        expected["phase"] = json!("backup");
+        expected["currentSha256"] = json!(REPLACED);
+        expected["backupSha256"] = json!(REPLACED);
+        assert_eq!(
+            backup.verified_readback_evidence(&backup_receipt),
+            Some(expected)
+        );
+        backup_receipt.subprocesses[5] = sub(&format!("{LIBRARY_SHA256}  /private-backup\n"), 0);
+        assert_eq!(backup.verified_readback_evidence(&backup_receipt), None);
+        assert!(matches!(
+            backup.verify(&backup_receipt),
+            Outcome::Failed { .. }
+        ));
+
+        let rollback = NativeAction::Rollback(deployment.clone());
+        let mut processes: Vec<Receipt> = (0..13).map(|_| sub("", 0)).collect();
+        processes[0] = sub(&format!("{REPLACED}  /private-backup\n"), 0);
+        processes[4] = sub("", 1);
+        processes[8] = sub(&format!("{REPLACED}  /private-current\n"), 0);
+        processes[11] = sub("4321 7654\n", 0);
+        let maps = format!(
+            "/proc/4321/maps:7f000 {}\n/proc/4321/maps:7f100 {}\n/proc/99/maps:secret-other-path\n",
+            deployment.loader_visible_path, deployment.loader_visible_path,
+        );
+        processes[12] = sub(&maps, 0);
+        let restored = receipt(processes);
+        let mut expected = input;
+        expected["phase"] = json!("rollback");
+        expected["backupSha256"] = json!(REPLACED);
+        expected["restoredSha256"] = json!(REPLACED);
+        expected["processIds"] = json!([4321, 7654]);
+        expected["mappedProcessIds"] = json!([4321]);
+        expected["mapsVerified"] = json!(true);
+        expected["mapsSha256"] = json!(arkdeck_contract::sha256_hex(maps.as_bytes()));
+        expected["mapsByteCount"] = json!(maps.len());
+        expected["matchingMapLineCount"] = json!(2);
+        expected["loaderPathSha256"] = json!(arkdeck_contract::sha256_hex(
+            deployment.loader_visible_path.as_bytes(),
+        ));
+        assert_eq!(
+            rollback.verified_readback_evidence(&restored),
+            Some(expected.clone())
+        );
+        for private in [
+            KEY,
+            "/proc/",
+            "/private-",
+            "secret-other-path",
+            &deployment.loader_visible_path,
+        ] {
+            assert!(!expected.to_string().contains(private), "{private}");
+        }
+        assert_ne!(expected["inputSha256"], expected["restoredSha256"]);
+        for index in [0, 8, 11, 12] {
+            let mut changed = restored.clone();
+            changed.subprocesses[index] = match index {
+                0 | 8 => sub(&format!("{LIBRARY_SHA256}  /wrong\n"), 0),
+                11 => sub("not-a-pid\n", 0),
+                _ => sub("/proc/4321/maps:7f000 /wrong\n", 0),
+            };
+            assert_eq!(
+                rollback.verified_readback_evidence(&changed),
+                None,
+                "{index}"
+            );
+            assert!(!matches!(rollback.verify(&changed), Outcome::Verified(_)));
+        }
+        let mut incomplete = restored.clone();
+        incomplete.subprocesses.pop();
+        assert_eq!(rollback.verified_readback_evidence(&incomplete), None);
+        assert!(matches!(rollback.verify(&incomplete), Outcome::Unknown(_)));
+        let mut truncated = restored;
+        truncated.subprocesses[12].truncated = true;
+        assert_eq!(rollback.verified_readback_evidence(&truncated), None);
+        assert_eq!(
+            NativeAction::Publish(deployment).verified_readback_evidence(&truncated),
+            None
         );
     }
 
