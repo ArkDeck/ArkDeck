@@ -20,8 +20,6 @@ EVIDENCE_KIND = "redacted-metadata-derived-from-real-runtime"
 RUNBOOK = "docs/design/cli-golden-journey-headless-runbook.md"
 GENERATOR = "scripts/gj_record"
 JOURNEYS = ("GJ-1", "GJ-2", "GJ-3", "GJ-4", "GJ-5")
-# The runbook's pinned GJ-4 input, OpenHarmony-7.0.0.37 (SHA-256 4fd35765…c674).
-GJ4_FIRMWARE = "OpenHarmony-7.0.0.37"
 # The GJ-3 rollback fixture the macOS rounds published and pinned
 # (`libarkdeck_gj-rollback-ghost.signed.so`, an armeabi-v7a library whose
 # DT_NEEDED cannot resolve; TASK-XPA-003 run.md). Another fixture is a reviewed
@@ -86,6 +84,24 @@ def _refuse_foreign_hdc(run: Run, hdc: str) -> None:
     them) is never real-device evidence."""
     for step in run.steps:
         for observation in _observations(step):
+            evidence = step.result if step.command == "job.evidence" else step.result.get("evidence") or {}
+            if observation.get("providerId") == "arkforge" or evidence.get("providerId") == "arkforge":
+                # The published flash provider reports its own tool, not HDC.
+                # Keep this restricted to its exact operation and original
+                # provider/target provenance; Runtime still owns bundle,
+                # Campaign and capability verification.
+                tool = observation.get("toolSha256")
+                if not (evidence.get("operationReference") == "flash.full-restore@1"
+                        and evidence.get("actualEffect") == "destructive"
+                        and evidence.get("providerId") == observation.get("providerId") == "arkforge"
+                        and isinstance(tool, str) and re.fullmatch(r"[0-9a-f]{64}", tool)
+                        and isinstance(observation.get("toolVersion"), str) and bool(observation["toolVersion"])
+                        and isinstance(evidence.get("targetId"), str) and bool(evidence["targetId"])
+                        and observation.get("targetId") == evidence.get("targetId")
+                        and type(observation.get("bindingRevision")) is int
+                        and observation["bindingRevision"] == evidence.get("bindingRevision")):
+                    raise RefusedInput(f"{step.file}: flash observation has inconsistent ArkForge provenance")
+                continue
             tool = observation.get("toolSha256")
             if tool is not None and tool != hdc:
                 raise RefusedInput(f"{step.file}: a Job was observed through HDC {tool}, not {hdc}")
@@ -152,7 +168,7 @@ def _journey(name: str, run: Run, date: str, facts: dict, revision: str, digest:
     elif name == "GJ-3":
         journeys.gj3(context, ROLLBACK_FIXTURE_SHA256)
     elif name == "GJ-4":
-        journeys.gj4(context, GJ4_FIRMWARE)
+        journeys.gj4(context)
     else:
         journeys.gj5(context)
     started = bool(context.executions)
@@ -183,6 +199,8 @@ def _journey(name: str, run: Run, date: str, facts: dict, revision: str, digest:
         "criteria": [c.document() for c in judge.checks],
         "notes": "",
     }
+    if name == "GJ-4" and context.flash_image is not None:
+        document["flashImage"] = context.flash_image
     if failing:
         document["firstFailingCriterion"] = {
             "criterion": failing["criterion"],

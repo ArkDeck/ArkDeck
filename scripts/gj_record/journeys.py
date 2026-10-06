@@ -26,6 +26,7 @@ import json
 import re
 
 from .criteria import Judge
+from .flash_image import ImageProofError, MissingImageProof, consumed_image_version
 from .run import Run, Step
 
 _VERIFIED = re.compile(r"^verified (\S+) (\[.*\])$")
@@ -50,6 +51,7 @@ class Context:
         self.jobs: list[str] = []
         self.job_execution: dict[str, str] = {}
         self.executions: list[str] = []
+        self.flash_image: dict | None = None
 
     def execution_id(self, prefix: str, suffix: str = "") -> str:
         return f"{prefix}-{self.compact}" + (f"-{suffix}" if suffix else "")
@@ -581,27 +583,38 @@ def rollback_fixture(
 # -- GJ-4 ---------------------------------------------------------------------
 
 
-def gj4(context: Context, expected_firmware: str) -> None:
+def gj4(context: Context) -> None:
     run, judge = context.run, context.judge
+    expected_firmware = None
     execution = context.execution_id("gj4")
     job, _ = context.settled(execution, "flash.full-restore@1")
     if job:
         step, contents = context.job(job, execution, required=("flash-report.json", "post-flash-facts.json"))
         if step is not None:
+            try:
+                context.flash_image, sources = consumed_image_version(run, step)
+                expected_firmware = context.flash_image["runtimeBuildVersion"]
+                judge.that(f"{execution}: declared version comes from the consumed whole image", True, None,
+                           step, *sources)
+            except MissingImageProof as error:
+                judge.missing(f"{execution}: consumed image version", str(error))
+            except ImageProofError as error:
+                judge.that(f"{execution}: consumed image version", False, str(error), step)
             evidence = step.result.get("evidence") or {}
             kinds = evidence.get("actualStepKinds") or []
             for kind in FLASH_STEP_KINDS:
                 judge.that(f"{execution}: actualStepKinds has {kind}", kind in kinds, kinds, step)
             observation = evidence.get("observation") or {}
-            judge.expect(f"{execution}: machine readback firmware", observation.get("firmware"), expected_firmware, step)
+            if expected_firmware is not None:
+                judge.expect(f"{execution}: machine readback firmware", observation.get("firmware"), expected_firmware, step)
             judge.expect(
                 f"{execution}: readback method", observation.get("confirmationMethod"), "machineReadback", step
             )
         held = [s for s in run.execution(execution) if human_action(s)]
         judge.that(f"{execution}: humanActions", not held, len(held), *held)
         facts = context.document(contents, "post-flash-facts.json", execution)
-        if facts is not None:
-            judge.expect(f"{execution}: post-flash-facts firmware", facts.get("firmware"), expected_firmware)
+        if expected_firmware is not None:
+            judge.expect(f"{execution}: post-flash-facts firmware", (facts or {}).get("firmware"), expected_firmware)
         report = context.document(contents, "flash-report.json", execution)
         if report is not None:
             judge.expect(f"{execution}: flash-report completeness", report.get("completeness"), "complete")
@@ -609,7 +622,11 @@ def gj4(context: Context, expected_firmware: str) -> None:
     postflight = context.execution_id("gj4", "postflight")
     job, _ = context.settled(postflight, "observe.device@1")
     if job:
-        context.job(job, postflight)
+        observed, _ = context.job(job, postflight)
+        if observed is not None and expected_firmware is not None:
+            observation = (observed.result.get("evidence") or {}).get("observation") or {}
+            judge.expect(f"{postflight}: restored image firmware", observation.get("firmware"),
+                         expected_firmware, observed)
 
 
 # -- GJ-5 ---------------------------------------------------------------------
