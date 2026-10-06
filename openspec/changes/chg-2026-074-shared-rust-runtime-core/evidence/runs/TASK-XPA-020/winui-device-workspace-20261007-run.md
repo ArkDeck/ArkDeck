@@ -83,5 +83,22 @@ was followed by `--write` and the final `--check`; it did not change unrelated s
 
 ## CI
 
-Not yet run for this increment. Root owns commit/publication onto the reviewed lower stack;
-hosted required checks and maintainer review remain separate from these local checks.
+Initial head `afb6f9072665ba8d1de7c1278432ccd5587a8bf1`: SDD Guard run
+37502758170 passed. Swift CI run 37502758525 failed in its planner contract tests before
+compiled lanes ran: the newly consumed `DeviceLocalizable.xcstrings` was missing from the
+Windows planner input map. The correction adds that direct consumer input and replaces its
+obsolete unrelated-input example with the full expected App/design/Windows lane assertion;
+the generator-wide input assertion is unchanged. The affected PathClassificationTests passed
+all 23 cases locally. The full planner suite on this Windows host returned 1: its existing
+POSIX-shell checks could not find `sh`, and its POSIX `/example/ArkDeck` path assumption differs
+on Windows. Those host-specific results are not counted as a pass; the hosted Linux planner
+suite remains required. Logs: `root-planner-path-classification.log`,
+`root-device-ci-first.log`. Final source diff and SDD checks returned 0.
+
+Before the initial publication, staged diff check also detected CRLF whitespace on the new
+derived description JSON. Only its outer source formatting was converted to LF, with full
+parsed JSON equality asserted; embedded Artifact values and original producer data were
+preserved. Initial/final check logs and both source-hash manifests are retained locally.
+These source corrections do not change the tested Device behavior or Raw Artifacts, so the
+native checks above were not repeated. CI and maintainer review of the corrected head remain
+required before publication in protected main or any live hardware execution.
