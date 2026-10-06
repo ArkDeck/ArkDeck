@@ -30,6 +30,15 @@ impl Client<BoundedConnection> {
         })?;
         remaining(deadline)?;
         let connection = LocalConnection::connect(endpoint, identity)?;
+        Self::from_authenticated(connection, deadline)
+    }
+
+    /// Keep an already authenticated connection and its original total budget.
+    /// In particular, Windows startup must not reconnect after proving the image.
+    pub(crate) fn from_authenticated(
+        connection: LocalConnection,
+        deadline: Instant,
+    ) -> Result<Self, ClientError> {
         remaining(deadline)?;
         let mut client = Self::new(BoundedConnection {
             connection,

@@ -6,8 +6,8 @@
 //! launches the pinned daemon image ([`StartTarget::identity`]: the path and
 //! its signer certificate pin or package family) detached, with no console
 //! window, as the image alone for its argument array, and waits a bounded
-//! time for the pipe. What answers on the pipe is then checked as every
-//! connection checks its daemon — the pipe owner SID, the server process's
+//! time for the pipe and a valid health answer. What answers on the pipe is
+//! checked as every connection checks its daemon — the pipe owner SID, the server process's
 //! image path and signer pin or package family — and a process that fails
 //! that check is reported with the process id this client started, never
 //! trusted. Starting never weakens or skips that check.
@@ -16,8 +16,11 @@
 //! single-instance guard decides that. Clients also take a starters' turn
 //! (`StarterLock`) and look at the pipe again under it, so that concurrent
 //! starters launch one daemon, and a pipe another starter brought up is
-//! simply used. Nothing here sends a frame: no request is sent, so none can
-//! be replayed, and a request lost later is never replayed by a restart.
+//! simply used. The authenticated proving connection sends one read-only
+//! health frame within the original start deadline. No caller or business
+//! request is sent, and a failed readiness exchange is never reconnected or
+//! replayed. A request lost later is never replayed by a restart.
+use crate::{BoundedConnection, Client};
 use arkdeck_platform::{
     DetachedDaemon, InstanceScope, LocalConnection, LocalEndpoint, ServerIdentity, StarterLock,
     StateRoot, await_pipe_instance, default_user_endpoint, pipe_present,
@@ -25,6 +28,7 @@ use arkdeck_platform::{
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::io;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -84,12 +88,12 @@ impl StartTarget {
 /// How the daemon came to be serving.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Started {
-    /// Its pipe was there; nothing was started.
+    /// Its pipe was there and answered health; nothing was started.
     AlreadyServing,
-    /// This client launched it, and it proved its identity.
+    /// This client launched it, and it proved its identity and health.
     Launched { pid: u32 },
     /// Another starter's daemon serves (it proved its identity if this
-    /// client launched a process meanwhile).
+    /// client launched a process meanwhile) and answers health.
     ServedByAnother,
 }
 
@@ -112,9 +116,9 @@ pub enum StartRefusal {
     /// The image was not launched: no identity is configured, the image is
     /// not the pinned one, or the process could not be created.
     LaunchRefused,
-    /// The launched daemon exited with this code before its pipe appeared.
+    /// The launched daemon exited with this code before readiness was proved.
     DaemonExited(u32),
-    /// No pipe appeared within the wait.
+    /// The pipe or its completed health proof was unavailable within the wait.
     NotReady,
     /// What serves the pipe did not prove the pinned identity.
     IdentityRefused,
@@ -157,9 +161,9 @@ fn failure(refusal: StartRefusal, message: impl Into<String>, pid: Option<u32>) 
 }
 
 /// Starts the target's daemon if its pipe is absent and waits at most
-/// `wait` for a daemon that proves its identity (see the module's
-/// documentation). A pipe that is already there is left to the caller's own
-/// connection, which checks it as always.
+/// `wait` for a daemon that proves its identity and health. Every outcome
+/// requires the same authenticated connection's completed readiness exchange;
+/// the caller still checks its own connection as always.
 pub fn ensure_running(target: &StartTarget, wait: Duration) -> Result<Started, StartFailure> {
     let deadline = Instant::now() + wait;
     let look = |pid: Option<u32>| {
@@ -172,6 +176,7 @@ pub fn ensure_running(target: &StartTarget, wait: Duration) -> Result<Started, S
         })
     };
     if look(None)? {
+        serving_peer(target, deadline, None)?;
         return Ok(Started::AlreadyServing);
     }
     let turn = StarterLock::acquire(&target.scope, wait)
@@ -190,6 +195,7 @@ pub fn ensure_running(target: &StartTarget, wait: Duration) -> Result<Started, S
             )
         })?;
     if look(None)? {
+        serving_peer(target, deadline, None)?;
         drop(turn);
         return Ok(Started::ServedByAnother);
     }
@@ -259,33 +265,71 @@ pub fn ensure_running(target: &StartTarget, wait: Duration) -> Result<Started, S
             }
         }
     }
-    let server = connect_verified(&target.endpoint, &target.identity, deadline)
-        .map(|connection| connection.authenticated_peer_pid())
-        .map_err(|error| {
-            failure(
-                StartRefusal::IdentityRefused,
-                format!(
-                    "the daemon serving {} after this client started pid {} did not prove the \
-                     installed identity and is not trusted: {error}",
-                    target.endpoint.as_path().display(),
-                    daemon.pid()
-                ),
-                pid,
-            )
-        })?;
-    // The proving connection took the instance on offer: the caller's own
-    // connection waits (bounded) for the next one rather than finding every
-    // instance busy.
-    let left = deadline.saturating_duration_since(Instant::now());
-    if !left.is_zero() {
-        let _ = await_pipe_instance(&target.endpoint, left);
-    }
+    let server = serving_peer(target, deadline, pid).map_err(|mut refusal| {
+        // The first pipe may have appeared before composition failed. Keep
+        // the retained child's known exit instead of reporting startup success.
+        if let Ok(Some(code)) = daemon.wait_exit(Duration::ZERO)
+            && code != 0
+        {
+            refusal.refusal = StartRefusal::DaemonExited(code);
+            refusal.message = format!(
+                "the daemon (pid {}) exited with status {code} before readiness: {}",
+                daemon.pid(),
+                refusal.message
+            );
+        }
+        refusal
+    })?;
     drop(turn);
     Ok(if server == daemon.pid() {
         Started::Launched { pid: server }
     } else {
         Started::ServedByAnother
     })
+}
+
+/// The pipe is reserved before backend composition. Image identity alone is
+/// therefore insufficient: use that very connection to prove serving readiness.
+fn serving_peer(
+    target: &StartTarget,
+    deadline: Instant,
+    launched: Option<u32>,
+) -> Result<u32, StartFailure> {
+    let connection = connect_verified(&target.endpoint, &target.identity, deadline).map_err(|error| {
+        failure(
+            StartRefusal::IdentityRefused,
+            format!(
+                "the daemon serving {} did not prove the installed identity and is not trusted: {error}",
+                target.endpoint.as_path().display()
+            ),
+            launched,
+        )
+    })?;
+    let server = connection.authenticated_peer_pid();
+    let mut client = Client::<BoundedConnection>::from_authenticated(connection, deadline)
+        .map_err(|error| readiness_failure(error, launched))?;
+    verify_readiness(&mut client, launched)?;
+    Ok(server)
+}
+
+fn readiness_failure(error: crate::ClientError, launched: Option<u32>) -> StartFailure {
+    failure(
+        StartRefusal::NotReady,
+        format!(
+            "the daemon did not complete its startup health proof; no caller request was sent or replayed: {error}"
+        ),
+        launched,
+    )
+}
+
+fn verify_readiness<S: Read + Write>(
+    client: &mut Client<S>,
+    launched: Option<u32>,
+) -> Result<(), StartFailure> {
+    client
+        .health("daemon-start-readiness")
+        .map(|_| ())
+        .map_err(|error| readiness_failure(error, launched))
 }
 
 /// A connection to the daemon serving `endpoint` once it proved `identity`
@@ -307,5 +351,199 @@ pub fn connect_verified(
             }
             answer => return answer,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arkdeck_contract::{
+        CATALOG_DIGEST, CONTRACT_IDENTITY, MAX_RESPONSE_BYTES, METHODS, PROTOCOL_VERSION,
+        encode_frame,
+    };
+    use serde_json::{Value, json};
+    use std::io::Cursor;
+    use std::sync::{Arc, Mutex, mpsc};
+
+    fn health() -> Value {
+        json!({"id":"daemon-start-readiness","ok":true,"result":{
+            "status":"ok","protocolVersion":PROTOCOL_VERSION,
+            "contractIdentity":CONTRACT_IDENTITY,"catalogDigest":CATALOG_DIGEST,
+            "providers":[],"publishedMethods":METHODS}})
+    }
+
+    struct Stream {
+        input: Cursor<Vec<u8>>,
+        sent: Arc<Mutex<Vec<u8>>>,
+        failure: Option<io::ErrorKind>,
+    }
+    impl Read for Stream {
+        fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+            if let Some(kind) = self.failure {
+                return Err(io::Error::new(kind, "fixture initialization failed"));
+            }
+            self.input.read(bytes)
+        }
+    }
+    impl Write for Stream {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.sent.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+    fn client(
+        bytes: Vec<u8>,
+        failure: Option<io::ErrorKind>,
+    ) -> (Client<Stream>, Arc<Mutex<Vec<u8>>>) {
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        (
+            Client::new(Stream {
+                input: Cursor::new(bytes),
+                sent: Arc::clone(&sent),
+                failure,
+            }),
+            sent,
+        )
+    }
+    fn frames(sent: &Arc<Mutex<Vec<u8>>>) -> Vec<Value> {
+        String::from_utf8(sent.lock().unwrap().clone())
+            .unwrap()
+            .lines()
+            .map(|frame| serde_json::from_str(frame).unwrap())
+            .collect()
+    }
+    fn assert_one_read_only_frame(sent: &Arc<Mutex<Vec<u8>>>) {
+        let frames = frames(sent);
+        assert_eq!(frames.len(), 1);
+        assert_eq!(frames[0]["id"], "daemon-start-readiness");
+        assert_eq!(frames[0]["method"], "health");
+        assert!(frames[0].get("params").is_none());
+    }
+
+    #[test]
+    fn an_early_proving_connection_waits_for_its_only_health_reply() {
+        struct Gated {
+            sent: Arc<Mutex<Vec<u8>>>,
+            input: Cursor<Vec<u8>>,
+            awaiting: Option<mpsc::Sender<()>>,
+            release: mpsc::Receiver<Vec<u8>>,
+        }
+        impl Read for Gated {
+            fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+                if let Some(awaiting) = self.awaiting.take() {
+                    awaiting.send(()).unwrap();
+                    self.input =
+                        Cursor::new(self.release.recv_timeout(Duration::from_secs(10)).unwrap());
+                }
+                self.input.read(bytes)
+            }
+        }
+        impl Write for Gated {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                self.sent.lock().unwrap().extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+        let sent = Arc::new(Mutex::new(Vec::new()));
+        let (awaiting, waiting) = mpsc::channel();
+        let (release, reply) = mpsc::channel();
+        let (completed, completion) = mpsc::channel();
+        let writes = Arc::clone(&sent);
+        let worker = std::thread::spawn(move || {
+            let mut client = Client::new(Gated {
+                sent: writes,
+                input: Cursor::new(Vec::new()),
+                awaiting: Some(awaiting),
+                release: reply,
+            });
+            completed
+                .send(verify_readiness(&mut client, Some(7)))
+                .unwrap();
+        });
+        waiting.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert_one_read_only_frame(&sent);
+        assert!(matches!(
+            completion.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+        release
+            .send(encode_frame(&health(), MAX_RESPONSE_BYTES).unwrap())
+            .unwrap();
+        assert!(
+            completion
+                .recv_timeout(Duration::from_secs(10))
+                .unwrap()
+                .is_ok()
+        );
+        worker.join().unwrap();
+        assert_one_read_only_frame(&sent);
+    }
+
+    #[test]
+    fn initialization_eof_timeout_and_broken_pipe_refuse_without_replay() {
+        for fault in [
+            None,
+            Some(io::ErrorKind::TimedOut),
+            Some(io::ErrorKind::BrokenPipe),
+        ] {
+            let (mut client, sent) = client(Vec::new(), fault);
+            let failure = verify_readiness(&mut client, Some(7)).unwrap_err();
+            assert_eq!(failure.refusal, StartRefusal::NotReady);
+            assert_eq!(failure.pid, Some(7));
+            assert!(failure.message.contains("startup health proof"));
+            assert!(
+                failure
+                    .message
+                    .contains("no caller request was sent or replayed")
+            );
+            assert!(verify_readiness(&mut client, Some(7)).is_err());
+            assert_one_read_only_frame(&sent);
+        }
+    }
+
+    #[test]
+    fn every_incompatible_health_refuses_before_any_business_frame() {
+        for (field, value) in [
+            ("status", json!("starting")),
+            ("contractIdentity", json!("wrong")),
+            ("protocolVersion", json!("2.0.0")),
+            ("catalogDigest", json!("invalid")),
+            ("publishedMethods", json!(["health"])),
+            ("providers", json!([""])),
+        ] {
+            let mut reply = health();
+            reply["result"][field] = value;
+            let (mut client, sent) =
+                client(encode_frame(&reply, MAX_RESPONSE_BYTES).unwrap(), None);
+            assert_eq!(
+                verify_readiness(&mut client, None).unwrap_err().refusal,
+                StartRefusal::NotReady
+            );
+            assert!(verify_readiness(&mut client, None).is_err());
+            assert_one_read_only_frame(&sent);
+        }
+        for bytes in [b"{}\n".to_vec(), b"partial".to_vec()] {
+            let (mut client, sent) = client(bytes, None);
+            assert!(verify_readiness(&mut client, None).is_err());
+            assert!(verify_readiness(&mut client, None).is_err());
+            assert_one_read_only_frame(&sent);
+        }
+    }
+
+    #[test]
+    fn the_original_expired_start_deadline_sends_no_health_frame() {
+        let (mut client, sent) = client(encode_frame(&health(), MAX_RESPONSE_BYTES).unwrap(), None);
+        client.deadline = Some(Instant::now() - Duration::from_secs(1));
+        assert_eq!(
+            verify_readiness(&mut client, Some(7)).unwrap_err().refusal,
+            StartRefusal::NotReady
+        );
+        assert!(frames(&sent).is_empty());
     }
 }
