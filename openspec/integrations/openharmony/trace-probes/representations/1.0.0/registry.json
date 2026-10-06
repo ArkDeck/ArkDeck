@@ -1,0 +1,103 @@
+{
+  "schemaVersion": "arkdeck.trace-representations/1",
+  "registryId": "OPENHARMONY-TRACE-REPRESENTATIONS",
+  "registryVersion": "1.0.0",
+  "integrationProfile": "OPENHARMONY-TOOLS@0.8.0",
+  "baseRegistry": {
+    "id": "OPENHARMONY-TRACE-PROBES",
+    "version": "1.0.0",
+    "path": "openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml",
+    "sha256": "5825db47f97dea3bddaede95b7c6401fa898bf9dd2c6c5c783628d9a89ffcde3",
+    "resourcesPath": "openspec/integrations/openharmony/trace-probes/1.0.0/resources.json",
+    "resourcesSha256": "6b77b020b50921ef419720a434a186aba48c13e7284fa66598d4efd0c4f14879"
+  },
+  "comparisonPolicy": {
+    "stream": "stdout",
+    "stderrMustBeEmpty": true,
+    "timestampPrefix": "existing exact YYYY/MM/DD HH:MM:SS prefix validation",
+    "lineEndings": "homogeneous CRLF only, then exact existing LF suffix comparison",
+    "bareOrMixedLineEndings": "unsupported",
+    "missingTruncatedChangedOrExtraBytes": "unsupported",
+    "preserveOriginalRawBytesAndHash": true,
+    "unknownFamilyDisposition": "unsupported"
+  },
+  "representations": [
+    {
+      "tool": "hitrace",
+      "kind": "help",
+      "family": "hitrace.dayu200-oh7.text",
+      "selection": "captureEligible",
+      "baseResource": "tr001-hitrace-help-dayu200-oh7",
+      "lfByteCount": 3382,
+      "lfSuffixSha256": "b40edec78a823762d64599b21c4fd2c82be4a9071e0457120a6e6526433ed3f8",
+      "crlfByteCount": 3428,
+      "crlfPairCount": 46,
+      "crlfSuffixSha256": "cbba18918a3418167656b3bd68d40d86b187d436d9c690bc912c56e0a94fc51d",
+      "diagnosticWholeSha256": "b7f6db5d6816a163b3aea4c8a29ff8d232f11f00630d9fe7efed6e8e012c2a3e"
+    },
+    {
+      "tool": "hitrace",
+      "kind": "tags",
+      "family": "hitrace.dayu200-oh7.text",
+      "selection": "captureEligible",
+      "baseResource": "tr001-hitrace-tags-dayu200-oh7",
+      "lfByteCount": 3604,
+      "lfSuffixSha256": "9c781ec48cf4b1cc6f3115be75687efb7e8b9078fdee767e1bee150ad2b758d0",
+      "crlfByteCount": 3687,
+      "crlfPairCount": 83,
+      "crlfSuffixSha256": "a65d51430ba81921e06378998a6bd6c8fc03f0ca6bfcf5aa97636ea5ffe3226c",
+      "diagnosticWholeSha256": "c0b28b5f517dfcf4e694082b80c9ecbc6e1b217b84a23521513f826cf45b1858"
+    },
+    {
+      "tool": "bytrace",
+      "kind": "help",
+      "family": "bytrace.dayu200-oh7.text",
+      "selection": "probeOnly",
+      "baseResource": "tr001-bytrace-help-dayu200-oh7",
+      "lfByteCount": 3382,
+      "lfSuffixSha256": "e11541d1b671170d16c300d01dcbb5f50301e9e2533622f1e91b257a8561548e",
+      "crlfByteCount": 3428,
+      "crlfPairCount": 46,
+      "crlfSuffixSha256": "1612a06d5fa4afc2294947b73a802f2a4c5c8b626eb01d448e1a2195a5ac6b24",
+      "diagnosticWholeSha256": "d1a6bf671b1099f1780c29d74f8d2a54f04f83e148b25a0d827462ec10aea5b1"
+    },
+    {
+      "tool": "bytrace",
+      "kind": "tags",
+      "family": "bytrace.dayu200-oh7.text",
+      "selection": "probeOnly",
+      "baseResource": "tr001-bytrace-tags-dayu200-oh7",
+      "lfByteCount": 3604,
+      "lfSuffixSha256": "d8475c07177f87f8640ef3a52382e0ccaed42115c6a1592ef42c99fffb18204a",
+      "crlfByteCount": 3687,
+      "crlfPairCount": 83,
+      "crlfSuffixSha256": "cc9c7ec0d6d897a3b57110b8969a1dbae7406b047685545aa9c01b369ec2cae8",
+      "diagnosticWholeSha256": "a09f718916cac81fb6e18183eb001ca18d6399f51959dac87084c85d8cc8fcf4"
+    }
+  ],
+  "authority": {
+    "newToolFamilyTagOrCommand": false,
+    "changesHdcIdentityOrBinding": false,
+    "changesRuntimeCapabilityOrCaptureSuccess": false,
+    "bytraceCaptureEligible": false,
+    "requiresExistingCurrentToolTargetAndBindingProof": true
+  },
+  "provenance": {
+    "evidenceClass": "repoReadOnlyDiagnostic",
+    "formalAcceptance": false,
+    "hardwarePass": false,
+    "captureDate": "2026-10-06",
+    "platform": "windows",
+    "deviceFamily": "DAYU200",
+    "firmware": "OpenHarmony 7.0.0.37",
+    "hdcExecutableSha256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+    "capturedTraceProbeCliStdoutEnvelopeSha256": "774d6897e431360537e72326dee6f778d5978619bd2dfa70703dda01a850a6ae",
+    "diagnosticExitCode": 0,
+    "diagnosticStderrByteCount": 0,
+    "bareCrCount": 0,
+    "bareLfCount": 0,
+    "rootVerifiedNormalizedSuffixByteEquality": true,
+    "sourceChange": "CHG-2026-074-shared-rust-runtime-core",
+    "sourceEvidence": "evidence/runs/TASK-XPA-011/windows-trace-crlf-20261006-run.md"
+  }
+}

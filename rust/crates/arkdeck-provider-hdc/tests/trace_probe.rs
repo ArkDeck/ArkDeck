@@ -11,6 +11,7 @@ use arkdeck_provider_hdc::{
     evaluate_tag_list, trace_probe,
 };
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{
     sync::{
         Barrier, Mutex,
@@ -44,6 +45,20 @@ fn ok(stdout: &[u8]) -> Result<Receipt, DispatchFailure> {
 }
 fn restamped(bytes: &[u8], stamp: &str) -> Vec<u8> {
     [stamp.as_bytes(), &bytes[20..]].concat()
+}
+/// Synthetic transport spelling of the immutable LF golden, not a new capture.
+fn crlf(bytes: &[u8]) -> Vec<u8> {
+    assert!(!bytes.contains(&b'\r'));
+    bytes
+        .iter()
+        .flat_map(|&byte| {
+            if byte == b'\n' {
+                vec![b'\r', b'\n']
+            } else {
+                vec![byte]
+            }
+        })
+        .collect()
 }
 /// What Swift answered for the full portrait.
 fn recorded_tags() -> Vec<String> {
@@ -167,6 +182,148 @@ fn only_the_registered_tag_list_names_tags() {
             (TraceSelection::Unsupported, vec![])
         );
     }
+}
+
+#[test]
+fn registered_crlf_representations_preserve_each_tools_family_and_tags() {
+    let help = crlf(HITRACE_HELP);
+    let tags = crlf(HITRACE_TAGS);
+    assert_eq!(help.len(), 3_428);
+    assert_eq!(tags.len(), 3_687);
+    assert_eq!(
+        evaluate_help(TraceTool::Hitrace, &help, b""),
+        TraceSelection::CaptureEligible(HITRACE_HELP_FAMILY)
+    );
+    assert_eq!(
+        evaluate_tag_list(TraceTool::Hitrace, &tags, b""),
+        (
+            TraceSelection::CaptureEligible(HITRACE_HELP_FAMILY),
+            recorded_tags()
+        )
+    );
+    let stamp = "2026/10/06 12:30:00 ";
+    assert_eq!(
+        evaluate_help(TraceTool::Hitrace, &restamped(&help, stamp), b""),
+        TraceSelection::CaptureEligible(HITRACE_HELP_FAMILY)
+    );
+    assert_eq!(
+        evaluate_tag_list(TraceTool::Hitrace, &restamped(&tags, stamp), b"").1,
+        recorded_tags()
+    );
+    // Bytrace's observed CRLF spelling remains probe-only, never capture-eligible.
+    assert_eq!(
+        evaluate_help(TraceTool::Bytrace, &crlf(BYTRACE_HELP), b""),
+        TraceSelection::ProbeOnly(BYTRACE_HELP_FAMILY)
+    );
+    assert_eq!(
+        evaluate_tag_list(TraceTool::Bytrace, &crlf(BYTRACE_TAGS), b""),
+        (
+            TraceSelection::ProbeOnly(BYTRACE_HELP_FAMILY),
+            recorded_tags()
+        )
+    );
+    assert_eq!(
+        evaluate_help(TraceTool::Bytrace, &help, b""),
+        TraceSelection::Unsupported
+    );
+}
+
+#[test]
+fn crlf_registration_does_not_repair_mixed_bare_drifted_or_partial_bytes() {
+    for (tool, golden, help) in [
+        (TraceTool::Hitrace, HITRACE_HELP, true),
+        (TraceTool::Hitrace, HITRACE_TAGS, false),
+        (TraceTool::Bytrace, BYTRACE_HELP, true),
+        (TraceTool::Bytrace, BYTRACE_TAGS, false),
+    ] {
+        let bytes = crlf(golden);
+        let first = bytes.iter().position(|&byte| byte == b'\r').unwrap();
+        let mut bare_lf = bytes.clone();
+        bare_lf.remove(first);
+        let mut bare_cr = bytes.clone();
+        bare_cr.remove(first + 1);
+        let mut doubled = bytes.clone();
+        doubled.insert(first, b'\r');
+        let mut drifted = bytes.clone();
+        drifted[100] ^= 0x20;
+        for malformed in [
+            bare_lf,
+            bare_cr,
+            doubled,
+            drifted,
+            bytes[..bytes.len() - 1].to_vec(),
+            [bytes.as_slice(), b"\r"].concat(),
+            [bytes.as_slice(), b"\r\n"].concat(),
+            restamped(&bytes, "2026/13/06 12:30:00 "),
+        ] {
+            if help {
+                assert_eq!(
+                    evaluate_help(tool, &malformed, b""),
+                    TraceSelection::Unsupported
+                );
+            } else {
+                assert_eq!(
+                    evaluate_tag_list(tool, &malformed, b""),
+                    (TraceSelection::Unsupported, vec![])
+                );
+            }
+        }
+        if help {
+            assert_eq!(
+                evaluate_help(tool, &bytes, b"note\r\n"),
+                TraceSelection::Unsupported
+            );
+        } else {
+            assert_eq!(
+                evaluate_tag_list(tool, &bytes, b"note\r\n"),
+                (TraceSelection::Unsupported, vec![])
+            );
+        }
+    }
+}
+
+#[test]
+fn a_crlf_probe_keeps_its_original_raw_help_and_whole_hash() {
+    let help = crlf(HITRACE_HELP);
+    let tags = crlf(HITRACE_TAGS);
+    let answer = |command: &[&str]| match command {
+        ["shell", "hitrace", "--help"] => ok(&help),
+        ["shell", "hitrace", "-l"] => ok(&tags),
+        _ => device(command),
+    };
+    let dispatch = script(&answer);
+    let probe = trace_probe(&dispatch, KEY).unwrap();
+    assert_eq!(probe.adapter_disposition, "captureEligible");
+    assert_eq!(probe.family, Some(HITRACE_HELP_FAMILY));
+    assert_eq!(probe.supported_tags, recorded_tags());
+    assert_eq!(
+        probe.raw_help.as_deref(),
+        Some(std::str::from_utf8(&help).unwrap())
+    );
+    let raw_hash = format!("{:x}", Sha256::digest(&help));
+    assert_eq!(probe.raw_help_sha256.as_deref(), Some(raw_hash.as_str()));
+    assert_eq!(probe.tools[0].raw_help_sha256, probe.raw_help_sha256);
+    assert_ne!(raw_hash, format!("{:x}", Sha256::digest(HITRACE_HELP)));
+    assert_eq!(dispatch.plans.lock().unwrap().len(), 12);
+}
+
+#[test]
+fn registered_crlf_help_requires_its_own_complete_registered_tag_receipt() {
+    let help = crlf(HITRACE_HELP);
+    let mut tags = crlf(HITRACE_TAGS);
+    tags[200] ^= 0x20;
+    let answer = |command: &[&str]| match command {
+        ["shell", "hitrace", "--help"] => ok(&help),
+        ["shell", "hitrace", "-l"] => ok(&tags),
+        _ => device(command),
+    };
+    let dispatch = script(&answer);
+    let probe = trace_probe(&dispatch, KEY).unwrap();
+    assert_eq!(probe.tools[0].disposition, "captureEligible");
+    assert_eq!(probe.adapter_disposition, "unsupported");
+    assert_eq!((probe.tool, probe.family), (None, None));
+    assert!(probe.supported_tags.is_empty());
+    assert_eq!(dispatch.plans.lock().unwrap().len(), 12);
 }
 
 #[test]

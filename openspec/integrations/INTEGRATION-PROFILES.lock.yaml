@@ -1,12 +1,12 @@
 # Integration adapter 输入的版本登记(V2:普通 profile 不逐文件 hash pin;历史对比用 git;
 # golden fixture 与 production probe resource 例外:逐文件 SHA-256 pin)
-lock: INTEGRATION-PROFILES-0.8.1
+lock: INTEGRATION-PROFILES-0.9.0
 status: current
-updated_at: 2026-10-04
+updated_at: 2026-10-06
 
 profiles:
   - id: OPENHARMONY-TOOLS
-    version: 0.7.1
+    version: 0.8.0
     path: openspec/integrations/openharmony/profile.md
 
 catalogs:
@@ -89,6 +89,13 @@ trace_probe_registries:
     profile: OPENHARMONY-TOOLS@0.4.0
     path: openspec/integrations/openharmony/trace-probes/1.0.0/registry.yaml
     sha256: 5825db47f97dea3bddaede95b7c6401fa898bf9dd2c6c5c783628d9a89ffcde3
+
+trace_representation_registries:
+  - id: OPENHARMONY-TRACE-REPRESENTATIONS
+    version: 1.0.0
+    profile: OPENHARMONY-TOOLS@0.8.0
+    path: openspec/integrations/openharmony/trace-probes/representations/1.0.0/registry.json
+    sha256: e0fe28bd62f0f725d8c24b3e8acd488ddd42c3f8c61af42c717049fa54ecde62
 
 trace_probe_resources:
   - id: tr001-resources-manifest
@@ -381,8 +388,19 @@ windows_probe_resources:
     sha256: 400345520e299d18478ff32d1763d2fd521737b4c321ff99f90d5ed24ec48ed2
 
 adoption_boundary:
-  previous_lock: INTEGRATION-PROFILES-0.8.0
-  previous_openharmony_profile: OPENHARMONY-TOOLS@0.7.0
+  previous_lock: INTEGRATION-PROFILES-0.8.1
+  previous_openharmony_profile: OPENHARMONY-TOOLS@0.7.1
+  trace_representation_rule: >-
+    OPENHARMONY-TRACE-REPRESENTATIONS@1.0.0 adds only the pinned homogeneous CRLF spelling
+    of the exact existing hitrace/bytrace help and tag-list families. Raw size and suffix SHA,
+    no bare/mixed line endings, empty stderr and exact normalized LF size/suffix SHA are all
+    required; original raw bytes/hashes are preserved. Hitrace remains capture eligible only
+    with its own complete help/tag receipts; bytrace remains probe-only. No tool identity,
+    target/binding, argv, tag, capture-success, cleanup or Runtime authority is added. The
+    original trace registry, resources and seven LF golden bytes/hashes remain unchanged.
+    Provenance is repoReadOnlyDiagnostic, never formal hardware acceptance.
+  historic_windows_server_startup_previous_lock: INTEGRATION-PROFILES-0.8.0
+  historic_windows_server_startup_previous_profile: OPENHARMONY-TOOLS@0.7.0
   windows_server_startup_rule: >-
     OPENHARMONY-HDC-WINDOWS-PROBES@1.1.0 (CHG-2026-078 r3) adds exactly one form to the Windows
     deviceObservationSnapshot family: the 14-byte server-startup listing [Empty] CR TAB hdc CR LF
