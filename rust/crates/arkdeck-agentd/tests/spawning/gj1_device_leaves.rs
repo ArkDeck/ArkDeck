@@ -24,8 +24,7 @@ use arkdeck_platform::{HostDirectory, LocalEndpoint};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
-#[path = "../../../arkdeck-hoststore/tests/support/catalog_lineage.rs"]
-mod catalog_lineage;
+use crate::support::catalog_lineage;
 
 /// The oracles' connect key, which the board's serial equals.
 pub(crate) const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

@@ -17,6 +17,231 @@ const NATIVE: &str = "deploy.native-library.app-owned@1";
 const PACKET_SHA: &str = "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab";
 const PACKET: &[u8] =
     include_bytes!("../../../../tests/fixtures/catalog-lineage-c6-e4/catalogs.json");
+const HAP_PLANS: &[u8] =
+    include_bytes!("../../../../tests/fixtures/catalog-lineage-c6-e4/hap-plans.json");
+const HAP_PLANS_SHA: &str = "686920fba1d6ecdfe52a18014b5da25f66668a9181ffe37101a92c3ca4fa381f";
+const HAP_CASES: &[u8] = include_bytes!("../../../../tests/fixtures/debug-hap/cases.json");
+const HAP_CASES_SHA: &str = "73ca561f75946518c57d512356679be18e864fd8c09c6aff8b40ffef2496d718";
+const HAP_ROOT: &str = "/private/tmp/arkdeck-hdc-oracle";
+
+pub struct HapPlans {
+    rows: BTreeMap<String, Value>,
+    exchanges: BTreeMap<String, Value>,
+}
+
+impl HapPlans {
+    pub fn frozen() -> Result<Self, String> {
+        if sha256_hex(HAP_PLANS) != HAP_PLANS_SHA || sha256_hex(HAP_CASES) != HAP_CASES_SHA {
+            return Err("frozen HAP source/capsule bytes changed".into());
+        }
+        let packet: Value = serde_json::from_slice(HAP_PLANS).map_err(|_| "HAP capsule JSON")?;
+        Self::validated(&packet)
+    }
+
+    pub fn validated(packet: &Value) -> Result<Self, String> {
+        let fields = packet.as_object().ok_or("HAP capsule object")?;
+        let allowed = [
+            "schemaVersion",
+            "sourceFixture",
+            "sourceCasesSha256",
+            "catalogLineagePacketSha256",
+            "rows",
+        ];
+        if fields.len() != allowed.len()
+            || fields.keys().any(|key| !allowed.contains(&key.as_str()))
+            || packet["schemaVersion"] != "arkdeck.test-hap-plan-lineage/1"
+            || packet["sourceFixture"] != "debug-hap"
+            || packet["sourceCasesSha256"] != HAP_CASES_SHA
+            || packet["catalogLineagePacketSha256"] != PACKET_SHA
+        {
+            return Err("unknown HAP capsule source".into());
+        }
+        let source: Value = serde_json::from_slice(HAP_CASES).map_err(|_| "HAP source JSON")?;
+        let mut exchanges = BTreeMap::new();
+        for exchange in source["exchanges"].as_array().ok_or("HAP exchanges")? {
+            if exchange["method"] != "job.plan" || exchange["answer"]["ok"] != true {
+                continue;
+            }
+            let name = exchange["name"]
+                .as_str()
+                .ok_or("HAP source case")?
+                .to_owned();
+            if exchanges.insert(name, exchange.clone()).is_some() {
+                return Err("duplicate HAP source case".into());
+            }
+        }
+        let inputs = packet["rows"].as_array().ok_or("HAP capsule rows")?;
+        if exchanges.len() != 10 || inputs.len() != 10 {
+            return Err("exact ten HAP plans required".into());
+        }
+        let lineage = Lineage::frozen()?;
+        let mut rows = BTreeMap::new();
+        for row in inputs {
+            let allowed = [
+                "case",
+                "requestJson",
+                "historicalPlanSha256",
+                "currentPlanSha256",
+                "completeCurrentPlan",
+            ];
+            let fields = row.as_object().ok_or("HAP row object")?;
+            let name = row["case"].as_str().ok_or("HAP case")?;
+            let exchange = exchanges.get(name).ok_or("unknown HAP plan case")?;
+            let plan = &row["completeCurrentPlan"];
+            if fields.len() != allowed.len()
+                || fields.keys().any(|key| !allowed.contains(&key.as_str()))
+                || row["requestJson"] != exchange["params"]["requestJson"]
+                || row["historicalPlanSha256"]
+                    != exchange["answer"]["result"]["materializedPlanDigest"]
+                || plan["operationReference"] != "debug.hap@1"
+            {
+                return Err("HAP original request/plan mismatch".into());
+            }
+            let request: Value =
+                serde_json::from_str(row["requestJson"].as_str().ok_or("HAP request JSON")?)
+                    .map_err(|_| "HAP request JSON")?;
+            if request["operation"]["id"] != "debug.hap"
+                || request["operation"]["version"] != 1
+                || plan["inputs"] != request["inputs"]
+            {
+                return Err("HAP request material differs".into());
+            }
+            let historical = row["historicalPlanSha256"].as_str().ok_or("HAP old hash")?;
+            if row["currentPlanSha256"] != lineage.current_digest(plan, historical)? {
+                return Err("HAP full current hash mismatch".into());
+            }
+            if rows.insert(name.to_owned(), row.clone()).is_some() {
+                return Err("duplicate HAP capsule case".into());
+            }
+        }
+        if rows.keys().ne(exchanges.keys()) {
+            return Err("HAP plan census mismatch".into());
+        }
+        Ok(Self { rows, exchanges })
+    }
+
+    pub fn current_plan(&self, name: &str) -> Result<&Value, String> {
+        self.rows
+            .get(name)
+            .map(|row| &row["completeCurrentPlan"])
+            .ok_or_else(|| "unknown HAP plan case".into())
+    }
+
+    /// The published selection predicate and original compensation order,
+    /// correlated with every declaration in the whole pinned plan capsule.
+    pub fn step_set_digest(&self, name: &str) -> Result<String, String> {
+        use arkdeck_contract::operation_catalog::CatalogOperation;
+        let plan = self.current_plan(name)?;
+        let inputs = plan["inputs"].as_object().ok_or("HAP plan inputs")?;
+        let descriptor =
+            CatalogOperation::lookup("debug.hap", Some(1)).ok_or("current HAP descriptor")?;
+        let mut selected: Vec<_> = descriptor
+            .steps
+            .iter()
+            .filter(|step| descriptor.step_is_selected(step, inputs))
+            .map(|step| (step.step_id.clone(), step))
+            .collect();
+        for id in [
+            "stop-ability",
+            "cleanup-uninstall",
+            "cleanup-remote-staging",
+        ] {
+            if id == "cleanup-uninstall"
+                && inputs.get("cleanupPolicy").and_then(Value::as_str) == Some("retain")
+            {
+                continue;
+            }
+            let step = descriptor
+                .steps
+                .iter()
+                .find(|step| step.step_id == id)
+                .ok_or("HAP compensation declaration")?;
+            selected.push((format!("compensation-{id}"), step));
+        }
+        let steps = plan["steps"].as_array().ok_or("complete HAP steps")?;
+        if steps.len() != selected.len() {
+            return Err("HAP selected declaration census".into());
+        }
+        let mut lines = Vec::new();
+        for (actual, (id, step)) in steps.iter().zip(selected) {
+            if actual["stepID"] != id
+                || actual["kind"] != step.kind
+                || actual["effect"] != step.effect
+                || actual["cancellation"] != step.cancellation
+                || actual["binding"] != step.binding
+            {
+                return Err("complete HAP selected declaration differs".into());
+            }
+            lines.push(format!(
+                "{id}|{}|{}|{}|{}",
+                step.kind, step.effect, step.cancellation, step.binding
+            ));
+        }
+        Ok(sha256_hex(lines.join("\n").as_bytes()))
+    }
+
+    /// Prove the independently serialized raw host plan digest first. The
+    /// only path substitution is an exact source-bound string leaf under the
+    /// original fixture root; all non-digest answer fields remain exact.
+    pub fn verify_hap_plan_answer(
+        &self,
+        actual: &Value,
+        original: &Value,
+        root: &Path,
+    ) -> Result<Value, String> {
+        let name = original["name"].as_str().ok_or("HAP original case")?;
+        if self.exchanges.get(name) != Some(original) || !root.is_absolute() {
+            return Err("HAP original exchange/root mismatch".into());
+        }
+        let plan = Self::at_root(self.current_plan(name)?, root)?;
+        let observed_digest = sha256_hex(&plan_bytes(&plan)?);
+        if actual["result"]["materializedPlanDigest"] != observed_digest {
+            return Err("raw HAP host plan digest mismatch".into());
+        }
+        let mut expected = Self::at_root(&original["answer"], root)?;
+        expected["result"]["catalogDigest"] = json!(CURRENT);
+        expected["result"]["materializedPlanDigest"] = json!(observed_digest);
+        expected["result"]["stepSetDigestSHA256"] = json!(self.step_set_digest(name)?);
+        if actual != &expected {
+            return Err("complete HAP plan answer differs".into());
+        }
+        Ok(expected)
+    }
+
+    pub fn at_root(value: &Value, root: &Path) -> Result<Value, String> {
+        if !root.is_absolute() {
+            return Err("absolute HAP fixture root required".into());
+        }
+        Ok(match value {
+            Value::String(text) if text.starts_with(&format!("{HAP_ROOT}/")) => {
+                let suffix = &text[HAP_ROOT.len() + 1..];
+                if suffix.split('/').any(|part| {
+                    part.is_empty() || part == "." || part == ".." || part.contains(['\\', ':'])
+                }) {
+                    return Err("HAP fixture path leaf differs".into());
+                }
+                let mut path = root.to_path_buf();
+                for component in suffix.split('/') {
+                    path.push(component);
+                }
+                json!(path.to_string_lossy())
+            }
+            Value::Array(values) => Value::Array(
+                values
+                    .iter()
+                    .map(|value| Self::at_root(value, root))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Value::Object(fields) => Value::Object(
+                fields
+                    .iter()
+                    .map(|(key, value)| Ok((key.clone(), Self::at_root(value, root)?)))
+                    .collect::<Result<_, String>>()?,
+            ),
+            _ => value.clone(),
+        })
+    }
+}
 
 #[derive(Clone)]
 pub struct Lineage {

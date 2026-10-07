@@ -4,7 +4,7 @@
 mod lineage;
 
 use arkdeck_contract::sha256_hex;
-use lineage::{CURRENT, Lineage, OLD};
+use lineage::{CURRENT, HapPlans, Lineage, OLD};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -209,4 +209,132 @@ fn unknown_lineage_and_catalog_descriptor_tampering_are_refused() {
     let mut extra = original.clone();
     extra["genericTranslation"] = json!(true);
     assert!(Lineage::validated(&extra).is_err());
+}
+
+#[test]
+fn all_ten_hap_capsules_prove_exact_raw_host_digest_and_whole_answer() {
+    let plans = HapPlans::frozen().unwrap();
+    let source: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/debug-hap/cases.json"
+    ))
+    .unwrap();
+    let root = std::env::temp_dir().join("arkdeck-lineage-no-files-created");
+    let mut count = 0;
+    for exchange in source["exchanges"].as_array().unwrap() {
+        if exchange["method"] != "job.plan" || exchange["answer"]["ok"] != true {
+            continue;
+        }
+        let name = exchange["name"].as_str().unwrap();
+        let plan = HapPlans::at_root(plans.current_plan(name).unwrap(), &root).unwrap();
+        let mut actual = HapPlans::at_root(&exchange["answer"], &root).unwrap();
+        actual["result"]["catalogDigest"] = json!(CURRENT);
+        actual["result"]["materializedPlanDigest"] =
+            json!(sha256_hex(&lineage::plan_bytes(&plan).unwrap()));
+        actual["result"]["stepSetDigestSHA256"] = json!(plans.step_set_digest(name).unwrap());
+        assert_eq!(
+            plans
+                .verify_hap_plan_answer(&actual, exchange, &root)
+                .unwrap(),
+            actual
+        );
+        let mut drift = actual.clone();
+        drift["result"]["materializedPlanDigest"] = json!("0".repeat(64));
+        assert!(
+            plans
+                .verify_hap_plan_answer(&drift, exchange, &root)
+                .is_err()
+        );
+        drift = actual.clone();
+        drift["result"]["stepSetDigestSHA256"] = json!("0".repeat(64));
+        assert!(
+            plans
+                .verify_hap_plan_answer(&drift, exchange, &root)
+                .is_err()
+        );
+        drift = actual.clone();
+        drift["result"]
+            .as_object_mut()
+            .unwrap()
+            .remove("stepSetDigestSHA256");
+        assert!(
+            plans
+                .verify_hap_plan_answer(&drift, exchange, &root)
+                .is_err()
+        );
+        drift = actual.clone();
+        drift["result"]["unrelated"] = json!(true);
+        assert!(
+            plans
+                .verify_hap_plan_answer(&drift, exchange, &root)
+                .is_err()
+        );
+        let mut wrong_exchange = exchange.clone();
+        wrong_exchange["params"]["requestJson"] = json!("{}");
+        assert!(
+            plans
+                .verify_hap_plan_answer(&actual, &wrong_exchange, &root)
+                .is_err()
+        );
+        assert!(
+            plans
+                .verify_hap_plan_answer(&actual, exchange, Path::new("relative"))
+                .is_err()
+        );
+        count += 1;
+    }
+    assert_eq!(count, 10);
+}
+
+#[test]
+fn hap_capsule_missing_duplicate_unknown_request_and_full_plan_drift_refuse() {
+    let packet: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/catalog-lineage-c6-e4/hap-plans.json"
+    ))
+    .unwrap();
+    for edit in [
+        "missing",
+        "duplicate",
+        "unknown",
+        "request",
+        "hash",
+        "plan",
+        "source",
+        "extra",
+    ] {
+        let mut value = packet.clone();
+        match edit {
+            "missing" => {
+                value["rows"].as_array_mut().unwrap().pop();
+            }
+            "duplicate" => value["rows"][1] = value["rows"][0].clone(),
+            "unknown" => value["rows"][0]["case"] = json!("unknown.plan"),
+            "request" => value["rows"][0]["requestJson"] = json!("{}"),
+            "hash" => value["rows"][0]["currentPlanSha256"] = json!("f".repeat(64)),
+            "plan" => {
+                value["rows"][0]["completeCurrentPlan"]["steps"][0]["unrelated"] = json!(true)
+            }
+            "source" => value["sourceCasesSha256"] = json!("f".repeat(64)),
+            _ => value["rows"][0]["genericMapping"] = json!(true),
+        }
+        assert!(HapPlans::validated(&value).is_err(), "{edit}");
+    }
+}
+
+#[test]
+fn hap_path_substitution_is_only_an_exact_path_string_leaf() {
+    let root = std::env::temp_dir().join("arkdeck-lineage-no-files-created");
+    let value = json!({"/private/tmp/arkdeck-hdc-oracle/key":
+        ["near /private/tmp/arkdeck-hdc-oracle/artifacts/a", "/private/tmp/arkdeck-hdc-oracle-other/artifacts/a",
+         "/private/tmp/arkdeck-hdc-oracle/artifacts/a"]});
+    let mapped = HapPlans::at_root(&value, &root).unwrap();
+    let rows = mapped["/private/tmp/arkdeck-hdc-oracle/key"]
+        .as_array()
+        .unwrap();
+    assert_eq!(rows[0], value["/private/tmp/arkdeck-hdc-oracle/key"][0]);
+    assert_eq!(rows[1], value["/private/tmp/arkdeck-hdc-oracle/key"][1]);
+    assert_eq!(
+        rows[2],
+        json!(root.join("artifacts").join("a").to_string_lossy())
+    );
+    assert!(HapPlans::at_root(&json!("/private/tmp/arkdeck-hdc-oracle/../other"), &root).is_err());
 }

@@ -1,6 +1,6 @@
 //! GJ-2 (`debug.hap@1`) and GJ-3 (`deploy.native-library.app-owned@1`) end
 //! to end on Windows (TASK-XPA-009): every exchange the Swift oracles
-//! recorded (`rust/tests/fixtures/debug-hap`, 63; the versioned current
+//! recorded (`rust/tests/fixtures/debug-hap-catalog-e4-v1`, 63; the versioned current
 //! `deploy-native-library-observed-v1`, 40), sent by the real signed `arkdeck.exe` to the signed test daemon
 //! (`signed_daemon.rs`), which composes the production Windows development
 //! root and the shared fake HDC's answers in process. Every answer, every
@@ -197,6 +197,10 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
     let provenance = document(&fixture, "provenance.json");
     let root = debug_hap::rebuild(&fixture);
     let current_native = name == hdc_oracle::native_current::NAME;
+    let current_hap = name == hdc_oracle::hap_current::NAME;
+    if current_hap {
+        hdc_oracle::hap_current::assert_source(&fixture);
+    }
     if current_native {
         hdc_oracle::native_current::assert_source(&fixture);
     }
@@ -256,7 +260,7 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
     let spelled_json = |value: &Value| -> Value {
         serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
     };
-    let mut labels = if current_native {
+    let mut labels = if current_native || current_hap {
         debug_hap::HostLabels::portable()
     } else {
         debug_hap::HostLabels::default()
@@ -326,7 +330,10 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
                 &digest,
             ));
         }
-        let actual = if current_native {
+        if current_hap && exchange["method"] == "job.plan" {
+            hdc_oracle::hap_current::assert_plan(&actual, exchange, &root);
+        }
+        let actual = if current_native || current_hap {
             actual
         } else {
             legacy_plan_answer(actual)
@@ -413,7 +420,7 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
 
 #[test]
 fn the_real_cli_runs_every_swift_debug_hap_through_the_signed_test_daemon() {
-    replay("debug-hap", 63, 108);
+    replay(hdc_oracle::hap_current::NAME, 63, 108);
     gj1_device_leaves::assert_windows_status(&["cleanupDebt.continue"], "implemented");
 }
 
@@ -588,7 +595,12 @@ fn domain_leaf(fixture_name: &str, leaf: &[&str], command: &str, operation: &str
 
 #[test]
 fn the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job() {
-    domain_leaf("debug-hap", &["debug", "hap"], "debug.hap", "debug.hap@1");
+    domain_leaf(
+        hdc_oracle::hap_current::NAME,
+        &["debug", "hap"],
+        "debug.hap",
+        "debug.hap@1",
+    );
     gj1_device_leaves::assert_windows_status(&["debug.hap@1"], "implemented");
 }
 

@@ -7,6 +7,7 @@
 //! inode and claim generation are read as labels.
 #![allow(dead_code)]
 
+pub mod catalog_lineage;
 pub mod debug_hap;
 #[path = "../fixture_fs/mod.rs"]
 pub mod fixture_fs;

@@ -112,7 +112,9 @@ fn historical_terminal_digest_never_authorizes_run_or_compensation() {
 /// the root.
 #[test]
 fn rust_runs_every_swift_debug_hap_as_swift_does() {
-    hdc_oracle::assert_replays("debug-hap", 63, CALLS);
+    // The immutable Swift recipe, re-recorded under the current full Catalog.
+    // Historical terminal/held authority remains separately refused above.
+    hdc_oracle::assert_replays(hdc_oracle::hap_current::NAME, 63, CALLS);
 }
 
 /// The installed case admitted as Swift admitted it, with the fake in `mode`.

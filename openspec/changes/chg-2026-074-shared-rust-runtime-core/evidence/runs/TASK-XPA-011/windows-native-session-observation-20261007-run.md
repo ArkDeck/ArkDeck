@@ -128,11 +128,43 @@ with two jobs. Commands and immutable results are retained under
   `DEBUG_PLAN_STEPS` gains only the three exact required read-only rows, with
   every unrelated prototype byte preserved. No App feature or test gallery
   is introduced by this derived-plan update.
+- The current HAP software oracle was generated once through production
+  owners in a temporary test namespace: exit 0 (`hap-record-38.json`). It
+  preserves all 63 original requests and 108 fake-HDC calls, every historical
+  file's hash, and the original states, unknown outcomes, residue and complete
+  capability use/count predicates. The separate 199-file fixture is
+  `debug-hap-catalog-e4-v1`; no old authority seed or golden byte was changed.
+  Its eight lineage guards passed (`hap-lineage-38.log`), including the exact
+  mandatory step-set digest and complete raw plan answer before host labels.
+- The new whole HAP replay passed two cases (the CREATE_NEW recorder is
+  explicitly ignored in normal runs); the old terminal-authority refusal,
+  existing full HAP recipe, exact signed CLI replay and domain leaf each
+  passed one case (`hap-replay-39.json`). The first differing historical
+  answer was `installed.plan.result.catalogDigest`: the full ten-plan capsule
+  independently proves old and current digests; fresh authority and its
+  publication hashes are recorded under the current Catalog instead of
+  translated from historical outputs.
+- The selected Windows CI Flash consumer was reproduced exactly: six cases
+  passed, zero skipped, exit 0 (`root-flash-targeted-35.json`). Its JSON is
+  byte-for-byte identical except one Catalog SHA and equals the entire
+  official Swift literal. The Swift step-kind expectation gains exactly the
+  two new Native read-kind references; all 32 earlier entries and the complete
+  dictionary equality remain (`root-consumer-complete-proof-36.json`). Swift
+  is unavailable locally, so that source test awaits selected CI.
+- After the shared fixture routing changed, current Native's three normal
+  cases passed with its recorder explicitly ignored (`native-shared-regression-40.log`).
+  Final all-target clippy for Hoststore, Agentd and Soak and bounded affected
+  formatting both exited 0 (`compile-41.json`). The initial duplicate
+  test-module load failure is retained in `clippy-hap-40.log`; one shared
+  import replaces the duplicate, with no behavior or assertion change.
+  Sandbox-only run 37 stopped at repository ownership before any check;
+  the normal-owner run used the unchanged stable cache and Git trust.
 
 Live opt-ins were cleared; account fixtures use private temporary profiles
-and their own stand-ins. The historical HAP whole-answer compatibility failure
-remains explicit, rather than being omitted or accepted by a learned digest
-mapping. The affected Swift case and macOS analyzer comparisons are not locally
+and their own stand-ins. The original HAP whole-answer failure is retained;
+the new current-Catalog whole oracle closes its targeted replay without
+rewriting old authority or accepting a learned Catalog/issuer mapping.
+The affected Swift case and macOS analyzer comparisons are not locally
 executable on Windows and remain for selected CI.
 
 Initial source/test failures remain in their original logs: generator fixture
@@ -168,3 +200,15 @@ The full public job log is retained as
 86-case local result above accompany a normal follow-up commit. Selected CI
 for that updated head remains pending. No maintainer approval, protected
 publication, real-device result or historical census repair is claimed.
+
+At head `826be6fd1d0cb28efe0c906328a24a5e2de445e4`, Swift CI run
+`37581515286` reached the compile lanes. Windows ClientKit job `112662109804`
+failed the existing `FlashTests` whole JSON equality: the Windows Flash copy
+still carried the old Catalog SHA. Swift tests job `112662109835` failed the
+existing whole step-kind dictionary equality: two new Native read kinds were
+missing from its expectation. The complete original logs are retained as
+`root-ci-windows-clientkit-37581515286-2.stdout.log` and
+`root-ci-swift-tests-37581515286-2.stdout.log`. Both are concrete derived
+consumer defects; neither assertion was weakened. The follow-up includes
+their exact source corrections and the current HAP software oracle. CI for
+that follow-up has not run at the time of this record.

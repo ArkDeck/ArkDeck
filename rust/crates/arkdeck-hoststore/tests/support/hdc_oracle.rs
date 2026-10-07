@@ -38,6 +38,9 @@ pub mod native_readback;
 #[path = "native_current.rs"]
 pub mod native_current;
 
+#[path = "hap_current.rs"]
+pub mod hap_current;
+
 /// The fake's application state, which each oracle clears before every Job
 /// it runs: whether a package is installed, whether the ability runs, and
 /// whether a new native library is published.
@@ -355,7 +358,18 @@ pub fn record_native_current(output: &Path) {
         40,
         240,
         Mutations::Owned,
-        Some(output),
+        Some((output, true)),
+    );
+}
+
+/// Explicit CREATE_NEW software recording after the full unchanged-HAP proof.
+pub fn record_hap_current(output: &Path) {
+    replay_into(
+        "debug-hap",
+        63,
+        108,
+        Mutations::Owned,
+        Some((output, false)),
     );
 }
 
@@ -364,9 +378,9 @@ fn replay_into(
     exchanges: usize,
     calls: usize,
     mutations: Mutations,
-    output: Option<&Path>,
+    output: Option<(&Path, bool)>,
 ) {
-    if let Some(path) = output {
+    if let Some((path, _)) = output {
         assert!(!path.exists(), "CREATE_NEW oracle destination");
     }
     let owned = mutations != Mutations::ReadOnly;
@@ -374,11 +388,19 @@ fn replay_into(
     let fixture = super::fixture(name);
     let cases = document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
-    let current = name == native_current::NAME || output.is_some();
-    if output.is_some() {
+    let current_native = name == native_current::NAME || output.is_some_and(|(_, native)| native);
+    let current_hap = name == hap_current::NAME || output.is_some_and(|(_, native)| !native);
+    let current = current_native || current_hap;
+    if current_hap {
+        hap_current::assert_historical_source();
+        if output.is_none() {
+            hap_current::assert_source(&fixture);
+        }
+    }
+    if output.is_some_and(|(_, native)| native) {
         native_current::install_answers(&owners.root, &fixture);
     }
-    let native_import = current.then(|| native_current::prepare_import(&owners.root));
+    let native_import = current_native.then(|| native_current::prepare_import(&owners.root));
     let hdc = owners.hdc(&owners.dispatch);
     let admitter = if owned {
         owners.admitter(&hdc, &owners.default_root)
@@ -553,7 +575,7 @@ fn replay_into(
         if current || method.starts_with("cleanupDebt.") {
             assert_conforms(method, &actual);
         }
-        if current && method == "job.run" && exchange.get("mode").is_some() {
+        if current_native && method == "job.run" && exchange.get("mode").is_some() {
             publication_proofs.push(native_current::publication_proof(
                 &owners,
                 native_import.as_ref().unwrap(),
@@ -571,6 +593,9 @@ fn replay_into(
             sorted_calls.extend(exchange_calls.into_iter().map(|line| format!("{line}\n")));
             seen = lines.len();
         }
+        if current_hap && method == "job.plan" {
+            hap_current::assert_plan(&actual, exchange, &root);
+        }
         // Compared once every derived value is learned, below.
         let actual = if current {
             actual
@@ -585,7 +610,10 @@ fn replay_into(
     }
     assert_eq!(replayed, exchanges, "every exchange");
 
-    if current {
+    if current_hap {
+        hap_current::assert_original_calls(&owners.calls(), &owners.root);
+    }
+    if current_native {
         native_current::assert_original_calls(&owners.calls(), &owners.root);
         assert_eq!(publication_proofs.len(), 5);
     }
@@ -630,7 +658,11 @@ fn replay_into(
         assert_eq!(consumed, 1, "{case}");
     }
 
-    if let Some(output) = output {
+    if let Some((output, native)) = output {
+        if !native {
+            hap_current::record(output, &fixture, &owners, &recorded_cases, &spelled);
+            return;
+        }
         native_current::record(
             output,
             &fixture,
@@ -641,7 +673,7 @@ fn replay_into(
         );
         return;
     }
-    if current {
+    if current_native {
         answers.extend(native_current::publication_answers(
             &fixture,
             &publication_proofs,
@@ -696,7 +728,12 @@ pub fn assert_relabelled(
     // A Session manifest names the platform it was published on: two bytes
     // longer as `PLATFORM-WINDOWS@0.2.0`, read above as the oracle's.
     keys.push("manifestByteCount");
-    if fixture.file_name().and_then(|name| name.to_str()) == Some(native_current::NAME) {
+    if [native_current::NAME, hap_current::NAME].contains(
+        &fixture
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default(),
+    ) {
         keys.push("manifestSHA256");
     }
     let documents = |bytes: &[u8]| -> Vec<Value> {
@@ -739,8 +776,12 @@ pub fn assert_relabelled(
             labels.learn_within(&json!(ours), &json!(theirs), seal, "sha256");
         }
     }
-    let index = if fixture.file_name().and_then(|name| name.to_str()) == Some(native_current::NAME)
-    {
+    let index = if [native_current::NAME, hap_current::NAME].contains(
+        &fixture
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default(),
+    ) {
         super::index_normalized(default_root, &spelled)
     } else {
         super::index(default_root)
@@ -801,6 +842,15 @@ pub fn assert_relabelled(
             &spelled,
         );
         native_current::assert_import_snapshot(fixture, replayed_root, labels, &spelled);
+    } else if fixture.file_name().and_then(|name| name.to_str()) == Some(hap_current::NAME) {
+        native_current::assert_leftovers(
+            fixture,
+            replayed_root,
+            default_root,
+            index,
+            labels,
+            &spelled,
+        );
     } else {
         super::assert_leftovers_relabelled_with_index(
             fixture,
