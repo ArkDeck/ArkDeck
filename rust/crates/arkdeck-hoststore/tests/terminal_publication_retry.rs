@@ -11,9 +11,9 @@ mod workspace;
 
 use arkdeck_contract::WireError;
 use arkdeck_hoststore::{
-    AdmissionVerdict, ArtifactReadStore, CapabilityStore, ImportUploadStore, JobReconciler,
-    JobRecord, JobStore, JournalWriter, OperationRequest, SessionPublisher, SessionStore,
-    StorageClaims,
+    AdmissionVerdict, AnalyzerProfile, ArtifactReadStore, CapabilityStore, ImportUploadStore,
+    JobAdmitter, JobCanceller, JobPlanner, JobReconciler, JobRecord, JobStore, JournalWriter,
+    OperationRequest, SessionPublisher, SessionStore, StorageClaims,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -42,6 +42,14 @@ struct Owners {
 
 impl Owners {
     fn new() -> Self {
+        let owners = Self::empty();
+        for job in JOBS {
+            owners.retain(job);
+        }
+        owners
+    }
+
+    fn empty() -> Self {
         let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
         let root = std::env::temp_dir()
             .canonicalize()
@@ -71,7 +79,7 @@ impl Owners {
             &"a".repeat(64),
             &fixed_now().unwrap(),
         );
-        let owners = Self {
+        Self {
             jobs: Some(JobStore::open_owner(&root.join("state")).unwrap()),
             capabilities: CapabilityStore::open(&root.join("state/capabilities")).unwrap(),
             sessions: SessionStore::open(&root.join("session-owner"), &root.join("Sessions"))
@@ -82,21 +90,19 @@ impl Owners {
             probe: OracleProbe::new(&json!({"availableBytes": 8_u64 * 1024 * 1024 * 1024})),
             imported,
             root,
-        };
-        for job in JOBS {
-            owners.retain(job);
         }
-        owners
     }
 
     fn retain(&self, job: &str) {
-        let corpus = support::fixture("job-run-analyzer")
-            .join("store/jobs")
-            .join(job);
+        self.retain_source("job-run-analyzer", job, |_| {});
+    }
+
+    fn retain_source(&self, fixture: &str, job: &str, change: impl FnOnce(&mut Value)) {
+        let corpus = support::fixture(fixture).join("store/jobs").join(job);
         let mut value: Value =
             serde_json::from_slice(&fs::read(corpus.join("job-record.json")).unwrap()).unwrap();
         assert_eq!(value["state"], "succeeded");
-        assert_eq!(value["actualEffect"], "hostOnly");
+        change(&mut value);
         value["sessionPublicationRecord"] = json!({
             "sessionID": format!("session-{job}"), "catalogDigest": value["catalogDigest"],
             "policyGeneration": "0", "root": {"path": "", "device": "0", "inode": "0", "volumeIdentity": ""},
@@ -157,15 +163,74 @@ impl Owners {
     }
 
     fn inspection(&self) -> Result<Value, WireError> {
+        self.lifecycle("inspection", &self.imported)
+    }
+
+    fn lifecycle(&self, leaf: &str, imported: &Value) -> Result<Value, WireError> {
+        let fields = if leaf == "release" {
+            json!({"importId": imported["importId"], "generation": "2"})
+        } else {
+            json!({"importId": imported["importId"]})
+        };
         self.imports.lifecycle_resource(
             &self.artifacts,
             self.jobs(),
-            "artifact.import.inspection",
-            json!({"importId": self.imported["importId"]})
-                .as_object()
-                .unwrap(),
+            &format!("artifact.import.{leaf}"),
+            fields.as_object().unwrap(),
             &fixed_now().unwrap(),
         )
+    }
+
+    fn cancelled_import_consumer(&self, publish: bool) -> String {
+        // Real local admission and cancellation, without a runner or any
+        // analyzer launch. No Session publisher means no finalized event.
+        let analyzer = AnalyzerProfile::crash_signature(&std::env::current_exe().unwrap()).unwrap();
+        let request = json!({
+            "documentType": "runtime-operation-request", "schemaVersion": "1.0.0",
+            "requestId": "req-unsettled-import", "idempotencyKey": "idem-unsettled-import",
+            "target": {"targetId": "TGT-ISOLATED-IMPORT"},
+            "operation": {"id": "analyzer.extract-crash-signature", "version": 1},
+            "inputs": {"sourceArtifactRef": self.imported["receipt"]["lease"]}
+        });
+        let accepted = JobAdmitter {
+            authority: None,
+            planner: JobPlanner {
+                imports: Some(&self.imports),
+                artifacts: Some(&self.artifacts),
+                analyzer: Some(&analyzer),
+                state_root: &self.root,
+                hdc: None,
+                workspace: None,
+            },
+            jobs: self.jobs(),
+            now: fixed_now,
+        }
+        .submit(&serde_json::to_vec(&request).unwrap())
+        .unwrap();
+        let job = accepted["jobId"].as_str().unwrap().to_owned();
+        let publisher = SessionPublisher {
+            sessions: &self.sessions,
+            claims: &self.claims,
+            probe: &self.probe,
+        };
+        JobCanceller {
+            jobs: self.jobs(),
+            now: fixed_now,
+            sessions: publish.then_some(&publisher),
+        }
+        .handle(json!({"jobId": job}).as_object().unwrap())
+        .unwrap();
+        assert_eq!(self.record(&job)["state"], "cancelled");
+        assert_eq!(self.record(&job)["outcomeUnknown"], false);
+        assert!(self.record(&job)["admissionEvidence"].is_object());
+        assert_eq!(
+            JournalWriter::open(&self.directory(&job), false)
+                .unwrap()
+                .facts()
+                .finalized,
+            publish
+        );
+        job
     }
 
     fn record(&self, job: &str) -> Value {
@@ -206,11 +271,11 @@ fn tree(path: &Path) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
 }
 
 #[test]
-fn the_whole_census_clears_only_after_both_original_sources_are_finalized() {
+fn unrelated_import_inspection_does_not_require_either_sources_publication() {
     let owners = Owners::new();
     let capabilities = tree(&owners.root.join("state/capabilities"));
-    assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
-    for (index, job) in JOBS.into_iter().enumerate() {
+    assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
+    for job in JOBS {
         let before = owners.record(job);
         let journal = fs::read(owners.directory(job).join("journal.jsonl")).unwrap();
         let status = owners.reconcile(job).unwrap();
@@ -235,12 +300,393 @@ fn the_whole_census_clears_only_after_both_original_sources_are_finalized() {
         let appended: Value = serde_json::from_slice(&bytes[journal.len()..]).unwrap();
         assert_eq!(appended["kind"], "finalized");
         assert_eq!(appended["payload"]["terminalStatus"], "succeeded");
-        if index == 0 {
-            assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
-        }
+        assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
     }
     assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
     assert_eq!(tree(&owners.root.join("state/capabilities")), capabilities);
+}
+
+#[test]
+fn an_unfinalized_terminal_input_stays_pinned_while_an_unrelated_import_can_be_released() {
+    let mut owners = Owners::new();
+    let job = owners.cancelled_import_consumer(false);
+    let unrelated = support::debug_hap::import_package(
+        &owners.imports,
+        &owners.artifacts,
+        "census-unrelated",
+        "TGT-ISOLATED-IMPORT",
+        1,
+        &"a".repeat(64),
+        &fixed_now().unwrap(),
+    );
+    let jobs = tree(&owners.root.join("state/jobs"));
+    let capabilities = tree(&owners.root.join("state/capabilities"));
+    let input = owners
+        .root
+        .join("artifacts")
+        .join(owners.imported["importId"].as_str().unwrap());
+    let input_bytes = tree(&input);
+    let record = owners.record(&job);
+    for restarted in [false, true] {
+        if restarted {
+            owners.reopen();
+        }
+        for leaf in ["inspection", "release"] {
+            assert_eq!(
+                owners.lifecycle(leaf, &owners.imported).unwrap_err().code,
+                "recordUnreadable"
+            );
+        }
+        assert_eq!(
+            owners.lifecycle("inspection", &unrelated).unwrap()["references"]["state"],
+            "clear"
+        );
+        assert_eq!(
+            owners.lifecycle("release", &unrelated).unwrap()["state"],
+            "released"
+        );
+        assert_eq!(tree(&owners.root.join("state/jobs")), jobs);
+        assert_eq!(tree(&owners.root.join("state/capabilities")), capabilities);
+        assert_eq!(tree(&input), input_bytes);
+        assert_eq!(owners.record(&job), record);
+    }
+    // The independent retention census also keeps these unfinalized Jobs.
+    // A sweep cannot use unrelated Import release to reclaim their sources.
+    arkdeck_hoststore::collect_expired_artifacts(
+        owners.jobs(),
+        &owners.artifacts,
+        "2026-11-01T00:00:00Z",
+    )
+    .unwrap();
+    assert_eq!(tree(&input), input_bytes);
+    assert_eq!(tree(&owners.root.join("state/jobs")), jobs);
+    assert_eq!(tree(&owners.root.join("state/capabilities")), capabilities);
+    assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
+}
+
+#[test]
+fn a_published_marker_without_its_finalized_journal_cannot_release_the_original_input() {
+    let owners = Owners::new();
+    let job = owners.cancelled_import_consumer(true);
+    let directory = owners.directory(&job);
+    let record = owners.record(&job);
+    assert!(record["sessionPublicationRecord"]["receipt"].is_object());
+    let journal = fs::read_to_string(directory.join("journal.jsonl")).unwrap();
+    let mut original = Vec::new();
+    let mut finalized = 0;
+    for line in journal.lines() {
+        let event: Value = serde_json::from_str(line).unwrap();
+        if event["kind"] == "finalized" {
+            finalized += 1;
+        } else {
+            original.extend_from_slice(line.as_bytes());
+            original.push(b'\n');
+        }
+    }
+    assert_eq!(finalized, 1);
+    fs::write(directory.join("journal.jsonl"), original).unwrap();
+    let jobs = tree(&owners.root.join("state/jobs"));
+    let capabilities = tree(&owners.root.join("state/capabilities"));
+    let input = tree(
+        &owners
+            .root
+            .join("artifacts")
+            .join(owners.imported["importId"].as_str().unwrap()),
+    );
+    for leaf in ["inspection", "release"] {
+        assert_eq!(
+            owners.lifecycle(leaf, &owners.imported).unwrap_err().code,
+            "recordUnreadable"
+        );
+    }
+    assert_eq!(tree(&owners.root.join("state/jobs")), jobs);
+    assert_eq!(tree(&owners.root.join("state/capabilities")), capabilities);
+    assert_eq!(
+        tree(
+            &owners
+                .root
+                .join("artifacts")
+                .join(owners.imported["importId"].as_str().unwrap())
+        ),
+        input
+    );
+    assert_eq!(owners.record(&job), record);
+}
+
+#[test]
+fn an_unfinalized_census_still_refuses_other_source_defects_before_any_release() {
+    for scenario in [
+        "torn",
+        "foreignJob",
+        "foreignSession",
+        "stateMismatch",
+        "outstanding",
+        "unknown",
+        "missingCreated",
+        "missingJournal",
+        "missingDirectory",
+        "orphan",
+        "fingerprint",
+    ] {
+        let owners = Owners::new();
+        let directory = owners.directory(JOBS[0]);
+        let journal_path = directory.join("journal.jsonl");
+        let mut events: Vec<Value> = fs::read_to_string(&journal_path)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        match scenario {
+            "torn" => {
+                fs::OpenOptions::new()
+                    .append(true)
+                    .open(&journal_path)
+                    .unwrap()
+                    .write_all(b"{\"torn\":")
+                    .unwrap();
+            }
+            "foreignJob" => {
+                for event in &mut events {
+                    event["jobId"] = json!("job-foreign");
+                }
+            }
+            "foreignSession" => {
+                for event in &mut events {
+                    event["sessionId"] = json!("session-job-foreign");
+                }
+            }
+            "stateMismatch" => {
+                events.last_mut().unwrap()["payload"]["to"] = json!("failed");
+            }
+            "outstanding" => {
+                events.retain(|event| event["kind"] != "stepOutcome");
+            }
+            "unknown" => {
+                for event in &mut events {
+                    if event["kind"] == "stepOutcome" {
+                        event["payload"]["outcomeCertainty"] = json!("outcomeUnknown");
+                    }
+                }
+            }
+            "missingCreated" => {
+                events.remove(0);
+            }
+            "missingJournal" => {
+                fs::remove_file(&journal_path).unwrap();
+            }
+            "missingDirectory" => {
+                fs::remove_dir_all(&directory).unwrap();
+            }
+            "orphan" => {
+                arkdeck_platform::HostDirectory::open_or_create_private(
+                    &owners.root.join("state/jobs/job-orphan"),
+                )
+                .unwrap();
+            }
+            "fingerprint" => {
+                let mut record = owners.record(JOBS[0]);
+                record["request"]["requestId"] = json!("changed-request");
+                record["originalSubmissionRequest"]["requestId"] = json!("changed-request");
+                owners
+                    .jobs()
+                    .persist(
+                        &JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap(),
+                        &fixed_now().unwrap(),
+                    )
+                    .unwrap();
+            }
+            _ => unreachable!(),
+        }
+        if matches!(
+            scenario,
+            "foreignJob"
+                | "foreignSession"
+                | "stateMismatch"
+                | "outstanding"
+                | "unknown"
+                | "missingCreated"
+        ) {
+            let mut bytes = Vec::new();
+            for (sequence, event) in events.iter_mut().enumerate() {
+                event["sequence"] = json!(sequence);
+                bytes.extend(serde_json::to_vec(event).unwrap());
+                bytes.push(b'\n');
+            }
+            fs::write(&journal_path, bytes).unwrap();
+        }
+        let jobs = tree(&owners.root.join("state/jobs"));
+        let capabilities = tree(&owners.root.join("state/capabilities"));
+        let imports = tree(&owners.root.join("artifacts"));
+        for leaf in ["inspection", "release"] {
+            assert_eq!(
+                owners.lifecycle(leaf, &owners.imported).unwrap_err().code,
+                "recordUnreadable",
+                "{scenario}"
+            );
+        }
+        assert_eq!(tree(&owners.root.join("state/jobs")), jobs, "{scenario}");
+        assert_eq!(
+            tree(&owners.root.join("state/capabilities")),
+            capabilities,
+            "{scenario}"
+        );
+        assert_eq!(tree(&owners.root.join("artifacts")), imports, "{scenario}");
+    }
+}
+
+#[test]
+fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
+    // This frozen packet proves complete Catalog bytes, including the exact
+    // three Native step additions. The production exception concerns only
+    // input parsing; it is not a plan/admission or capability adapter.
+    support::catalog_lineage::Lineage::frozen().unwrap();
+    let packet: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/catalog-lineage-c6-e4/catalogs.json"
+    ))
+    .unwrap();
+    let old = packet["historicalOperations"].as_array().unwrap();
+    let current = packet["currentOperations"].as_array().unwrap();
+    let compiled: Vec<Value> =
+        serde_json::from_str(arkdeck_contract::CATALOG_CANONICAL_JSON).unwrap();
+    let by_reference = |rows: &[Value]| -> BTreeMap<String, Value> {
+        rows.iter()
+            .map(|row| {
+                (
+                    format!("{}@{}", row["id"].as_str().unwrap(), row["version"]),
+                    row.clone(),
+                )
+            })
+            .collect()
+    };
+    let old = by_reference(old);
+    let current = by_reference(current);
+    assert_eq!(old.len(), 32);
+    assert_eq!(current.len(), 32);
+    assert!(old.keys().eq(current.keys()));
+    for (reference, descriptor) in &old {
+        assert_eq!(
+            descriptor["inputs"], current[reference]["inputs"],
+            "{reference}"
+        );
+    }
+    let expected = match arkdeck_contract::CATALOG_DIGEST {
+        support::catalog_lineage::OLD => &old,
+        support::catalog_lineage::CURRENT => &current,
+        _ => panic!("a future Catalog needs an explicit input compatibility review"),
+    };
+    assert_eq!(&by_reference(&compiled), expected);
+}
+
+#[test]
+fn a_complete_original_c6_native_source_only_retains_its_declared_inputs() {
+    const JOB: &str = "job-186c8faffebe3b9cb8b0150ef9a645b2";
+    let owners = Owners::empty();
+    let original = fs::read(
+        support::fixture("deploy-native-library")
+            .join("store/jobs")
+            .join(JOB)
+            .join("job-record.json"),
+    )
+    .unwrap();
+    assert_eq!(
+        arkdeck_contract::sha256_hex(&original),
+        "42c059b0a329383c93d00f74751e52856b62736a3db9b28a1314ba13d18444c8"
+    );
+    owners.retain_source("deploy-native-library", JOB, |_| {});
+    let before = owners.record(JOB);
+    assert_eq!(before["catalogDigest"], support::catalog_lineage::OLD);
+    assert_eq!(
+        before["request"]["inputs"],
+        serde_json::from_slice::<Value>(&original).unwrap()["request"]["inputs"]
+    );
+    let jobs = tree(&owners.root.join("state/jobs"));
+    let capabilities = tree(&owners.root.join("state/capabilities"));
+    assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
+    assert_eq!(tree(&owners.root.join("state/jobs")), jobs);
+    assert_eq!(tree(&owners.root.join("state/capabilities")), capabilities);
+    assert_eq!(owners.record(JOB), before);
+}
+
+#[test]
+fn an_unfinalized_source_with_unknown_or_malformed_inputs_cannot_clear_any_import() {
+    for scenario in [
+        "hiddenObject",
+        "malformedLease",
+        "unknownOperation",
+        "unknownDigest",
+        "unknownField",
+        "wrongEnum",
+        "wrongType",
+    ] {
+        let owners = Owners::empty();
+        let (fixture, job) = if matches!(scenario, "wrongEnum" | "wrongType") {
+            (
+                "deploy-native-library",
+                "job-186c8faffebe3b9cb8b0150ef9a645b2",
+            )
+        } else {
+            ("job-run-analyzer", JOBS[0])
+        };
+        owners.retain_source(fixture, job, |record| {
+            let lease = owners.imported["receipt"]["lease"].clone();
+            for key in ["request", "originalSubmissionRequest"] {
+                match scenario {
+                    "hiddenObject" => {
+                        record[key]["inputs"]["sourceArtifactRef"] = json!({"hidden": lease});
+                    }
+                    "malformedLease" => {
+                        record[key]["inputs"]["sourceArtifactRef"] =
+                            json!("lease-v1:imp-broken:ART-broken");
+                    }
+                    "unknownOperation" => {
+                        record[key]["operation"]["id"] = json!("unknown.operation")
+                    }
+                    "unknownDigest" => (),
+                    "unknownField" => record[key]["inputs"]["unregistered"] = lease.clone(),
+                    "wrongEnum" | "wrongType" => {
+                        let descriptor =
+                            arkdeck_contract::operation_catalog::CatalogOperation::lookup(
+                                "deploy.native-library.app-owned",
+                                Some(1),
+                            )
+                            .unwrap();
+                        descriptor
+                            .validate_inputs(record[key]["inputs"].as_object().unwrap())
+                            .unwrap();
+                        record[key]["inputs"]["expectedABI"] = if scenario == "wrongType" {
+                            json!(1)
+                        } else {
+                            json!("unknown-abi")
+                        };
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            if scenario == "unknownOperation" {
+                record["operationReference"] = json!("unknown.operation@1");
+            }
+            if scenario == "unknownDigest" {
+                record["catalogDigest"] = json!("b".repeat(64));
+            }
+        });
+        let jobs = tree(&owners.root.join("state/jobs"));
+        let capabilities = tree(&owners.root.join("state/capabilities"));
+        let imports = tree(&owners.root.join("artifacts"));
+        for leaf in ["inspection", "release"] {
+            assert_eq!(
+                owners.lifecycle(leaf, &owners.imported).unwrap_err().code,
+                "recordUnreadable",
+                "{scenario}"
+            );
+        }
+        assert_eq!(tree(&owners.root.join("state/jobs")), jobs, "{scenario}");
+        assert_eq!(
+            tree(&owners.root.join("state/capabilities")),
+            capabilities,
+            "{scenario}"
+        );
+        assert_eq!(tree(&owners.root.join("artifacts")), imports, "{scenario}");
+    }
 }
 
 #[test]
@@ -323,17 +769,23 @@ fn changed_owners_proposals_and_torn_or_foreign_journals_are_never_repaired() {
             capabilities,
             "{scenario}"
         );
-        assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
+        if scenario == "proposal" {
+            // The unverified proposal still blocks publication; both known
+            // original requests nevertheless name no part of this Import.
+            assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
+        } else {
+            assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
+        }
     }
 }
 
 #[cfg(windows)]
 #[test]
-fn both_consumed_workspace_jobs_must_publish_before_the_census_clears() {
+fn both_consumed_workspace_jobs_publish_without_blocking_an_unrelated_import() {
     let owners = workspace::Owners::new();
     let capabilities = tree(&owners.root.join("state/capabilities"));
-    assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
-    for (index, job) in owners.job_ids.iter().enumerate() {
+    assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
+    for job in &owners.job_ids {
         let before = owners.record(job);
         let journal = fs::read(owners.directory(job).join("journal.jsonl")).unwrap();
         let original: Vec<Value> = journal
@@ -361,9 +813,7 @@ fn both_consumed_workspace_jobs_must_publish_before_the_census_clears() {
         let appended: Value = serde_json::from_slice(&bytes[journal.len()..]).unwrap();
         assert_eq!(appended["kind"], "finalized");
         assert_eq!(appended["payload"]["terminalStatus"], "succeeded");
-        if index == 0 {
-            assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
-        }
+        assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
     }
     assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
     assert_eq!(owners.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
@@ -423,7 +873,7 @@ fn consumed_workspace_without_original_tool_context_stays_unpublished() {
         fs::read(owners.directory(job).join("journal.jsonl")).unwrap(),
         journal
     );
-    assert_eq!(owners.inspection().unwrap_err().code, "recordUnreadable");
+    assert_eq!(owners.inspection().unwrap()["references"]["state"], "clear");
     assert_eq!(owners.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
     assert_eq!(tree(&owners.root.join("state/capabilities")), capabilities);
 }
