@@ -295,6 +295,12 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
     private void Trace(SettingsState state)
     {
         Subtitle(UiStrings.WindowsSettingsTraceSubtitle);
+        TraceSectionBar();
+        if (_traceSection == "licenses")
+        {
+            TraceLicenseContent();
+            return;
+        }
         var cache = Section("settings.trace.cache", UiStrings.WindowsSettingsTraceTitle);
         if (state.TraceCache.Unavailable is { } why)
         {
