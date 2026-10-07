@@ -628,3 +628,14 @@ SDD is checked before the same-PR normal publication, with its full
 command/exit/streams retained in the adjacent allowance light-check receipt.
 No Rust/Catalog source changed, so no repeated Cargo build is required.
 CI for the new head is pending; no Runtime or hardware acceptance is claimed.
+
+
+### Job-specific workflow allowance contract alignment
+
+The normal pushes at lower `4c9ec815ae070b318ab88fe7412800e38a0ff0a6` and upper `d164ff2d437a232a39cc1e82b1775912994e61ba` exposed an additional CI planner failure before any compiled lane ran. Lower Swift run37645884491/plan112876402150 and upper run37646552334/plan112878701472 both failed `scripts/test_agent_pr_workflow.py` with18 cases, one error and one failure. The workflow validator still required the old identical timeout token in both job blocks; its contract-only negative mutation consequently left the workflow unchanged. Complete original logs and the independent same-cause comparison receipt are retained. These runs are FAILED, not passes.
+
+Move each exact allowance into the existing job-specific token set: workspace Windows40/macOS50/Linux30, contracts Windows50/macOS50/Linux30. Existing per-job and whole-workflow uniqueness checks remain unchanged. Seven negative mutations reject removal, independent drift and swapping of the two policies. Matrix, policy dependency, workers, cache discipline, compilation/test steps, Runtime deadlines, failure aggregation, operation semantics and acceptance requirements are unchanged. This CI-only test script has no exact source/fixture path binding in the Rust manifest, Catalog or contracts; no generated source pin is changed.
+
+Local targeted checks: `python -X utf8 -B scripts/test_agent_pr_workflow.py` exited0, all18 tests passed (0.203s suite /0.394s process). Complete stdout/stderr and actual source SHA are recorded in `root-workflow-policy-alignment-targeted-20261007-2.json`. The first invocation without UTF8 mode failed while decoding an existing macOS workflow under Windows cp936; receipt1/full streams remain preserved as a failure. Explicit UTF8 matches the Linux CI encoding without an unrelated source edit. Changed Python AST parsing passed. SDD and diff results are in the separate lightweight receipt. No Cargo or local unified gate was repeated for this test-only alignment.
+
+CI: new exact-head required checks remain pending until the ordinary stacked pushes finish. This correction does not infer maintainer adoption or any hardware acceptance.
