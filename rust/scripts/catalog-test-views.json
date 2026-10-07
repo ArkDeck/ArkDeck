@@ -568,7 +568,7 @@
     "crates/arkdeck-hoststore/tests/crash_window.rs": "be9718793122d92a1b31301d4337b3d03140868bc29acd1696e796668c9516b0",
     "crates/arkdeck-hoststore/tests/debug_hap_current_oracle.rs": "a795c93b67a496d7a01434b652a359604c66d81507fc5cac6494d24538211613",
     "crates/arkdeck-hoststore/tests/debug_hap_plan.rs": "835331d0a4587fb56394c76cbf64e3ae1efd3633195019d0d521e2ab679e5705",
-    "crates/arkdeck-hoststore/tests/debug_hap_run.rs": "adcf36cf1813c5111ca33ac77585c8e886c467caab789313fe34382158f01fbe",
+    "crates/arkdeck-hoststore/tests/debug_hap_run.rs": "b8fca69dd4aadd71acdd8008432dbe74a0e025ef466dd8f1089aabd5b1b45225",
     "crates/arkdeck-hoststore/tests/debug_hap_submit.rs": "5ecd72a4c40256db18858ab0a838855e5cebd927cd10281f4b4492179d75b294",
     "crates/arkdeck-hoststore/tests/debug_invocation.rs": "bedcdd89b2c4e13e06763c4335f851a96b95905c2c2e1d9ba233eb12f960c0af",
     "crates/arkdeck-hoststore/tests/debug_template_run.rs": "a68dfaf8c52b04525eafc958321a9e25a41ecda3538b9d6d10dc8639df7fc052",
