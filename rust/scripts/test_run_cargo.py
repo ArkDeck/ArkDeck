@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import contextlib
+import hashlib
+import io
+import json
 import os
 from pathlib import Path
 import shutil
@@ -39,6 +43,10 @@ class CargoRunnerTests(unittest.TestCase):
         self.calls = []
         self.exit_code = 0
         self.concurrent_edit = False
+        self.mbx = self.base / "mbx"
+        self.mbx.write_bytes(b"pinned compiler cache fixture")
+        self.mbx.chmod(0o755)
+        self.mbx_version = "mbx 1.22.0\n"
 
     def git(self, *args):
         return runner.cache.git(self.source, *args)
@@ -50,7 +58,9 @@ class CargoRunnerTests(unittest.TestCase):
         return path
 
     def fake_run(self, argv, **kwargs):
-        if argv[0] != "cargo" and argv[0] != "host-check":
+        if argv == [str(self.mbx), "--version"]:
+            return subprocess.CompletedProcess(argv, 0, stdout=self.mbx_version)
+        if argv[0] not in ("cargo", "host-check", str(self.mbx)):
             return REAL_RUN(argv, **kwargs)
         self.calls.append((argv, kwargs))
         target = Path(kwargs["env"]["CARGO_TARGET_DIR"])
@@ -204,6 +214,155 @@ class CargoRunnerTests(unittest.TestCase):
         self.assertEqual(argv, ["host-check", "rust/scripts/check-contracts.py"])
         self.assertEqual(kwargs["cwd"], self.root / "workspace")
         self.assertEqual(kwargs["env"]["ARKDECK_RUST_STABLE_VIEWS"], "1")
+
+    def mbx_environment(self):
+        return {"ARKDECK_CARGO_MBX": str(self.mbx),
+                "ARKDECK_CARGO_MBX_SHA256": hashlib.sha256(self.mbx.read_bytes()).hexdigest(),
+                "ARKDECK_CARGO_MBX_CACHE_ROOT": str(self.base / "shared-store")}
+
+    def test_mbx_routes_only_compilation_and_keeps_owned_target_jobs_and_locked_graph(self):
+        environment = self.mbx_environment() | {"MBX_TARGET_VIEWS": "1", "MBX_INCREMENTAL": "1", "MBX_REMOTE_MODE": "read-write"}
+        with patch.object(runner.platform, "system", return_value="Darwin"), \
+                patch.object(runner.platform, "machine", return_value="arm64"):
+            for command in sorted(runner.COMMANDS):
+                self.invoke(command, "--check" if command == "fmt" else "--offline", environment=environment)
+                argv, kwargs = self.calls[-1]
+                self.assertEqual(argv[0], str(self.mbx) if command in runner.COMPILE_COMMANDS else "cargo")
+                self.assertEqual(kwargs["env"]["CARGO_TARGET_DIR"], str(self.root / "workspace/rust/target"))
+                self.assertEqual(kwargs["env"]["CARGO_BUILD_JOBS"], "2")
+                if command in runner.COMPILE_COMMANDS:
+                    self.assertIn("--locked", argv)
+                    for key in ("MBX_TARGET_VIEWS", "MBX_TARGET_LANES", "MBX_INCREMENTAL", "MBX_EAGER_INCREMENTAL",
+                                "MBX_SHARE_WORKSPACE_ROOT", "MBX_RESTORE_HARDLINK"):
+                        self.assertEqual(kwargs["env"][key], "0")
+                    self.assertEqual(kwargs["env"]["MBX_REMOTE_MODE"], "write-only")
+                    self.assertEqual(kwargs["env"]["MBX_GC_MAX_TOTAL_SIZE"], "2147483648B")
+            self.invoke("exec", "host-check", environment=environment)
+            self.assertEqual(self.calls[-1][0], ["host-check"])
+
+    def test_mbx_invalid_identity_version_storage_host_and_ci_fail_without_cargo_fallback(self):
+        with patch.object(runner.platform, "system", return_value="Darwin"), \
+                patch.object(runner.platform, "machine", return_value="arm64"):
+            for overrides in ({"ARKDECK_CARGO_MBX_SHA256": "0" * 64}, {"ARKDECK_CARGO_MBX": "relative"},
+                              {"ARKDECK_CARGO_MBX_CACHE_ROOT": None}, {"ARKDECK_CARGO_MBX_CACHE_ROOT": str(self.root / "store")},
+                              {"ARKDECK_CARGO_MBX_CACHE_ROOT": str(self.source)}, {"ARKDECK_CARGO_MBX_MAX_TOTAL_SIZE": "0GiB"},
+                              {"CI": "true"}, {"GITHUB_ACTIONS": "true"}, {"GITLAB_CI": "true"}):
+                with self.subTest(overrides=overrides), self.assertRaises(ValueError):
+                    self.invoke("check", environment=self.mbx_environment() | overrides)
+            self.mbx_version = "mbx 1.23.0\n"
+            with self.assertRaisesRegex(ValueError, "exact version"):
+                self.invoke("check", environment=self.mbx_environment())
+        with self.assertRaisesRegex(ValueError, "native macOS arm64"), \
+                patch.object(runner.platform, "system", return_value="Linux"):
+            self.invoke("check", environment=self.mbx_environment())
+        self.assertFalse(self.calls)
+
+    @unittest.skipIf(sys.platform == "win32", "creating symlinks requires a Windows privilege")
+    def test_mbx_executable_and_store_links_are_rejected(self):
+        link = self.base / "mbx-link"
+        link.symlink_to(self.mbx)
+        store_link = self.base / "store-link"
+        store_link.symlink_to(self.base, target_is_directory=True)
+        with patch.object(runner.platform, "system", return_value="Darwin"), \
+                patch.object(runner.platform, "machine", return_value="arm64"):
+            for overrides in ({"ARKDECK_CARGO_MBX": str(link)}, {"ARKDECK_CARGO_MBX_CACHE_ROOT": str(store_link)}):
+                with self.assertRaises(ValueError):
+                    self.invoke("check", environment=self.mbx_environment() | overrides)
+        self.assertFalse(self.calls)
+
+    def maintenance(self, command, *options, environment=None):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(self.invoke(command, *options, environment=environment), 0)
+        return json.loads(output.getvalue())
+
+    def test_capacity_is_stat_only_counts_views_once_and_does_not_refresh_sources(self):
+        self.invoke("check")
+        target = self.root / "workspace/rust/target"
+        for view in ("published", "candidate"):
+            path = target / "contract-check" / view / "rust/target/debug/deps/library.rlib"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b"dependency")
+        store = self.base / "shared-store"
+        store.mkdir()
+        (store / "object").write_bytes(b"shared action")
+        self.write("rust/src/main.rs", "// user changed source\n")
+        with patch.object(runner.hashlib, "sha256", side_effect=AssertionError("stats must not hash")):
+            report = self.maintenance("cache-stats", "--max-total-size", "1B",
+                                      environment={"ARKDECK_CARGO_MBX_CACHE_ROOT": str(store)})
+        self.assertTrue(report["overBudget"])
+        self.assertEqual(len(report["targets"]), 3)
+        self.assertEqual(report["totalLogicalBytes"], report["cache"]["logicalBytes"] + 13)
+        self.assertEqual(report["sharedStore"]["logicalBytes"], 13)
+        self.assertEqual((self.root / "workspace/rust/src/main.rs").read_text(), 'fn main() { println!("first"); }\n')
+        self.assertEqual(len(self.calls), 1)
+
+    def test_compaction_previews_then_removes_only_scratch_when_over_budget(self):
+        self.invoke("check")
+        target = self.root / "workspace/rust/target"
+        targets = [target, *(target / "contract-check" / view / "rust/target" for view in ("published", "candidate"))]
+        files = {}
+        for directory in targets:
+            for name in ("debug/incremental/chunk", "release/incremental/chunk", "debug/deps/library.rlib",
+                         "debug/.fingerprint/input", "debug/daemon.dSYM/symbols", "readonly-check/report.json"):
+                path = directory / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+                files[path] = (path.stat().st_ino, path.read_bytes())
+        below = self.maintenance("cache-compact", "--max-total-size", "1GiB", "--apply")
+        self.assertFalse(below["compaction"]["apply"])
+        preview = self.maintenance("cache-compact", "--max-total-size", "1B")
+        self.assertFalse(preview["apply"])
+        self.assertEqual(preview["before"], preview["after"])
+        for path, (inode, contents) in files.items():
+            self.assertEqual((path.stat().st_ino, path.read_bytes()), (inode, contents))
+        result = self.maintenance("cache-compact", "--max-total-size", "1B", "--apply")
+        self.assertTrue(result["after"]["overBudget"])
+        self.assertFalse(result["budgetAchievable"])
+        self.assertLess(result["after"]["totalLogicalBytes"], result["before"]["totalLogicalBytes"])
+        for path, (inode, contents) in files.items():
+            if "incremental" in path.parts:
+                self.assertFalse(path.exists())
+            else:
+                self.assertEqual((path.stat().st_ino, path.read_bytes()), (inode, contents))
+
+    def test_maintenance_uses_the_chat_lock_and_cannot_adopt_another_owner(self):
+        self.invoke("check")
+        with runner.runner_lock(self.root), self.assertRaisesRegex(ValueError, "already in use"):
+            self.maintenance("cache-compact", "--max-total-size", "1B", "--apply")
+        with self.assertRaisesRegex(ValueError, "another chat"):
+            self.maintenance("cache-stats", "--max-total-size", "1B", environment={"CODEX_THREAD_ID": "other"})
+
+    @unittest.skipIf(sys.platform == "win32", "creating symlinks requires a Windows privilege")
+    def test_capacity_never_follows_links_and_compaction_validates_all_views_before_deleting(self):
+        self.invoke("check")
+        target = self.root / "workspace/rust/target"
+        scratch = target / "debug/incremental/chunk"
+        scratch.parent.mkdir(parents=True)
+        scratch.write_text("preserve on invalid view")
+        outside = self.base / "outside"
+        (outside / "incremental").mkdir(parents=True)
+        (outside / "incremental/keep").write_bytes(b"outside bytes must not be counted")
+        view = target / "contract-check/candidate/rust/target"
+        view.mkdir(parents=True)
+        (view / "release").symlink_to(outside, target_is_directory=True)
+        first = self.maintenance("cache-stats", "--max-total-size", "1GiB")
+        (outside / "incremental/keep").write_bytes(b"x" * 10_000)
+        second = self.maintenance("cache-stats", "--max-total-size", "1GiB")
+        self.assertEqual(first["totalLogicalBytes"], second["totalLogicalBytes"])
+        with self.assertRaisesRegex(ValueError, "profile contains a symlink"):
+            self.maintenance("cache-compact", "--max-total-size", "1B", "--apply")
+        self.assertTrue(scratch.exists())
+        self.assertEqual((outside / "incremental/keep").stat().st_size, 10_000)
+
+    def test_size_parser_and_maintenance_options_reject_invalid_budgets(self):
+        self.assertEqual(runner.parse_size("2GiB"), 2 * 1024 ** 3)
+        self.assertEqual(runner.parse_size("512"), 512)
+        for value in ("0", "-1", "1.5GiB", "1GB", "", " 2GiB"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                runner.parse_size(value)
+        with self.assertRaisesRegex(ValueError, "only supported"):
+            self.maintenance("cache-stats", "--max-total-size", "1GiB", "--apply")
 
     @unittest.skipUnless(os.environ.get("ARKDECK_TEST_REAL_CARGO") == "1", "opt-in native Cargo cache check")
     def test_real_cargo_reuses_unchanged_snapshot_and_rebuilds_changed_snapshot(self):

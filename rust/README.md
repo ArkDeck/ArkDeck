@@ -112,8 +112,77 @@ the current checkout. Published and candidate views
 retain separate source directories and Cargo targets. In hosted CI the
 workspace tests and `check-contracts.py` run as two jobs side by side on each
 host, each with its own cache root and therefore its own cache key, so neither
-restores or saves the other's build products. Local checks keep their
-ordinary task-owned targets unless the CI cache root is explicitly supplied.
+restores or saves the other's build products. Local checks use
+one chat-owned target through `scripts/run-cargo.py`, retaining it across tasks,
+branches and source snapshots. The same owner lock covers checks and maintenance.
+
+### Local target capacity and shared compilation cache
+
+From the repository root, inspect this chat's cache before collecting scratch:
+
+```sh
+python3 rust/scripts/run-cargo.py cache-stats --max-total-size 20GiB
+python3 rust/scripts/run-cargo.py cache-compact --max-total-size 20GiB
+python3 rust/scripts/run-cargo.py cache-compact --max-total-size 20GiB --apply
+```
+
+`cache-compact` previews by default. With `--apply`, it removes incremental
+scratch only when the reported total exceeds the budget. It uses the existing
+CI compactor for the main target and the published/candidate contract targets,
+including both debug and release scratch. Linked products, dependency outputs,
+debug symbols, fingerprints, source views and validation evidence stay intact.
+The workspace already disables dev incremental compilation and uses line tables
+with no dependency debuginfo; scratch left by older configurations can still
+occupy space. No maintenance command synchronizes sources or invokes Cargo.
+
+The JSON report counts the entire owner cache once, with nested contract targets
+shown as breakdowns, and optionally adds `ARKDECK_CARGO_MBX_CACHE_ROOT` once.
+Counting uses file metadata and never follows internal links. `logicalBytes`
+and `allocatedBytes` differ on APFS; allocated file blocks are not exclusive
+physical usage when files share blocks, and unavailable block counts are null.
+The budget is a collection target, not a quota. `overBudget` and
+`budgetAchievable` report whether retained products prevent reaching it; the
+command never deletes another owner's target or linked products to force a fit.
+The shared-store count is an observation; another chat may be building there.
+
+An optional native macOS arm64 pilot uses
+[mbx 1.22.0](https://github.com/jdx/mr-boxington/releases/tag/v1.22.0) to share
+compiler results while retaining each owner's regular target directory:
+
+```sh
+export ARKDECK_CARGO_MBX=/absolute/path/to/mbx
+export ARKDECK_CARGO_MBX_SHA256=ea4c2ff0fb24c303e6f43467af97d5106f8330ff50a8c517f967ac645430a4ed
+export ARKDECK_CARGO_MBX_CACHE_ROOT=/absolute/external/shared-store
+export ARKDECK_CARGO_MBX_MAX_TOTAL_SIZE=2GiB
+python3 rust/scripts/run-cargo.py check -p arkdeck-contract
+```
+
+Download the official `mbx-aarch64-apple-darwin.tar.gz` asset and verify its
+release checksum before extracting. For v1.22.0, the archive SHA-256 is
+`e548b5758498cf822a180b6328597e6aded8fe9bb3046cd918399172ae30dde2`, and the
+extracted executable SHA-256 is
+`ea4c2ff0fb24c303e6f43467af97d5106f8330ff50a8c517f967ac645430a4ed`.
+The runner checks the executable digest and exact mbx version, and fails on an
+invalid opt-in configuration. The store must be disjoint from the source and
+owner cache. It can be reused by multiple local chats. Build/check/test/clippy/run
+use mbx; fmt, metadata, fetch, policy tools, lockfile generation and `exec` retain
+their existing path. The committed rustup channel, `--locked`, two build jobs and
+native-target guard remain in effect. Child Cargo calls inside `exec` are not
+wrapped by this pilot.
+
+The runner fixes the [mbx collection budget](https://mr-boxington.jdx.dev/configuration#single-cache-budget)
+to 2 GiB by default, with a 5 GiB free-space safeguard. This budget covers mbx's
+managed data, not the runner-owned target. It disables target adoption/lanes,
+incremental state, workspace-path remapping and hardlink restoration. APFS
+reflinks can share output blocks; keep target and store on the same filesystem
+for that benefit. Compiler cache misses still compile normally. Contract test
+targets that embed fixtures from outside the `rust/` workspace may report an
+unmapped path and compile without storing that result; the check still runs.
+The pilot rejects CI environments and disables remote cache access through mbx's local-only
+`write-only` policy; hosted CI keeps its trusted-main cache workflow. Unset
+`ARKDECK_CARGO_MBX` to use ordinary Cargo again; no global setup or PATH change
+is required. No repository-wide cleanup or measured performance improvement is
+implied by enabling the pilot.
 
 On macOS, `scripts/run-workspace-tests.py` compiles the complete default test
 inventory, then asks Cargo to run two queues with the same workspace features.

@@ -245,7 +245,7 @@ def directory_sizes(root: Path) -> dict[Path, int]:
     return sizes
 
 
-def compact(root: Path) -> dict:
+def compact(root: Path, *, apply: bool = True) -> dict:
     """Discard only compiler scratch state, retaining linked products and views.
 
     No profile/flags change: cached executables, dependencies, fingerprints,
@@ -255,26 +255,30 @@ def compact(root: Path) -> dict:
     targets = [mirror / "rust/target"]
     targets += [targets[0] / "contract-check" / view / "rust/target"
                 for view in ("published", "candidate")]
+    removed = []
     for target in targets:
         # Reject an intermediate symlink before traversing or removing anything.
         if any(p.is_symlink() for p in (target, *target.parents) if p != root and root in p.parents):
             raise ValueError(f"cache target contains a symlink: {target}")
-        if (target / "debug").is_symlink():
-            raise ValueError(f"cache profile contains a symlink: {target}")
-        incremental = target / "debug/incremental"
-        if incremental.exists() and not incremental.is_dir() and not incremental.is_symlink():
-            raise ValueError(f"compiler scratch state must be a directory: {incremental}")
+        for profile in ("debug", "release"):
+            if (target / profile).is_symlink():
+                raise ValueError(f"cache profile contains a symlink: {target}")
+            incremental = target / profile / "incremental"
+            if incremental.exists() and not incremental.is_dir() and not incremental.is_symlink():
+                raise ValueError(f"compiler scratch state must be a directory: {incremental}")
+            removed.append(incremental)
     sizes = directory_sizes(root)
-    report = {"beforeBytes": sizes[root], "targets": []}
-    removed = [target / "debug/incremental" for target in targets]
-    for target, incremental in zip(targets, removed):
+    report = {"apply": apply, "beforeBytes": sizes[root], "targets": []}
+    for target in targets:
         entry = {"path": str(target.relative_to(root)), "beforeBytes": sizes.get(target, 0),
-                 "incrementalBytes": sizes.get(incremental, 0),
+                 "incrementalBytes": sum(sizes.get(target / profile / "incremental", 0) for profile in ("debug", "release")),
                  "depsBytes": sizes.get(target / "debug/deps", 0),
                  "buildBytes": sizes.get(target / "debug/build", 0)}
-        remove(incremental)
         entry["afterBytes"] = entry["beforeBytes"] - sum(sizes.get(p, 0) for p in removed if target in p.parents)
         report["targets"].append(entry)
+    if apply:
+        for incremental in removed:
+            remove(incremental)
     report["afterBytes"] = sizes[root] - sum(sizes.get(p, 0) for p in removed)
     print(json.dumps(report, indent=2), flush=True)
     return report
