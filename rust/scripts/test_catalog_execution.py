@@ -155,7 +155,8 @@ class ParityConsumerScopeTests(unittest.TestCase):
 
 
 class CompleteModuleHostCfgTests(unittest.TestCase):
-    def exercise(self, platform, key='arkdeck-cli/device_wait', listing='', output=None):
+    def exercise(self, platform, key='arkdeck-cli/device_wait', listing='', output=None,
+                 ignored=(), ignored_listing='', run_exit=0):
         with tempfile.TemporaryDirectory(prefix='arkdeck-module-host-cfg-') as temporary:
             cwd = Path(temporary) / 'rust'
             cwd.mkdir()
@@ -170,7 +171,7 @@ class CompleteModuleHostCfgTests(unittest.TestCase):
             executable = str(cwd / 'target' / (name + '.exe'))
             messages = [{'reason': 'compiler-artifact', 'package_id': 'owner', 'target': target,
                          'executable': executable}, {'reason': 'build-finished', 'success': True}]
-            row = {'route': 'both', 'functions': {}, 'ignored': [],
+            row = {'route': 'both', 'functions': {}, 'ignored': list(ignored),
                    'modulePlatforms': runner.catalog_views.MODULE_HOST_PLATFORMS.get(key, [])}
             manifest = {'targets': {key: row}}
             manifest_path = cwd / runner.catalog_views.MANIFEST
@@ -187,13 +188,14 @@ class CompleteModuleHostCfgTests(unittest.TestCase):
                     text = '\n'.join(json.dumps(message) for message in messages) + '\n'
                 elif '--test' in argv:
                     text = 'Running tests/' + name + '.rs (' + executable + ')\n'
-                    text += (listing + '\n0 tests, 0 benchmarks\n' if '--list' in argv else
+                    text += ((ignored_listing if '--ignored' in argv else listing) + '\n0 tests, 0 benchmarks\n' if '--list' in argv else
                              output if output is not None else
                              'running 0 tests\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n')
                 else:
                     text = 'built workspace bins\n'
                 path.write_text(text, encoding='utf-8')
-                return {'name': label, 'argv': argv, 'exitCode': 0, 'log': str(path)}
+                return {'name': label, 'argv': argv,
+                        'exitCode': run_exit if label.endswith('-execute') else 0, 'log': str(path)}
 
             with patch.object(runner.subprocess, 'check_output', return_value=json.dumps(metadata)), \
                  patch.object(runner, 'host_cfg', return_value=set()), \
@@ -223,6 +225,46 @@ class CompleteModuleHostCfgTests(unittest.TestCase):
                 self.assertEqual(actual, [runner.BASE + ['--test', 'device_wait', '--no-run', '--message-format=json'],
                                           runner.BASE + ['--test', 'device_wait', '--', '--list'],
                                           runner.BASE + ['--test', 'device_wait']])
+
+    def test_audited_ignored_only_target_is_observed_without_substantive_completion(self):
+        output = 'test known ... ignored, requires explicit native material\n' + \
+                 'test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s\n'
+        result, calls, report = self.exercise('darwin', 'arkdeck-hoststore/tool_list_native',
+                                            listing='known: test', ignored=('known',),
+                                            ignored_listing='known: test', output=output)
+        self.assertEqual(result, 0)
+        self.assertTrue(report['completed'])
+        row = report['targets'][0]
+        self.assertEqual((row['execution'], row['passed'], row['ignored'], row['substantivePassed']),
+                         ('audited-ignored-only', 0, 1, 0))
+        self.assertFalse(row['completed'])
+        self.assertFalse(row['coverage'])
+        actual = [argv for argv in calls if argv[-2:] == ['--exact', 'known']]
+        self.assertEqual(actual, [runner.BASE + ['--test', 'tool_list_native', '--', '--exact', 'known']])
+
+    def test_audited_ignored_only_target_rejects_unknown_census_bad_receipt_or_cargo_failure(self):
+        good = 'test known ... ignored\n' + \
+               'test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s\n'
+        invalid = ['test result: ok. 0 passed; 0 failed; 1 ignored;\n',
+                   good + 'test known ... ignored\n',
+                   'test known ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored;\n',
+                   'test known ... FAILED\ntest result: FAILED. 0 passed; 1 failed; 0 ignored;\n',
+                   good.replace('1 ignored', '2 ignored'),
+                   good + good.splitlines()[-1] + '\n']
+        for output, run_exit in [(text, 0) for text in invalid] + [(good, 1)]:
+            with self.subTest(output=output, run_exit=run_exit):
+                result, _, report = self.exercise('darwin', 'arkdeck-hoststore/tool_list_native',
+                                                listing='known: test', ignored=('known',),
+                                                ignored_listing='known: test', output=output, run_exit=run_exit)
+                self.assertEqual(result, 1)
+                self.assertFalse(report['completed'])
+                self.assertEqual(report['targets'][0]['execution'], 'failed')
+                if run_exit:
+                    self.assertEqual(report['targets'][0]['error'], 'Cargo returned failure despite ignored receipt')
+        result, _, report = self.exercise('darwin', 'arkdeck-hoststore/tool_list_native',
+                                        listing='known: test', ignored=(), ignored_listing='known: test', output=good)
+        self.assertEqual(result, 'unclassified ignored function')
+        self.assertFalse(report['completed'])
 
     def test_active_or_unclassified_empty_module_is_never_an_exclusion(self):
         for platform, key in [('darwin', 'arkdeck-cli/device_wait'), ('linux', 'arkdeck-cli/unreviewed')]:

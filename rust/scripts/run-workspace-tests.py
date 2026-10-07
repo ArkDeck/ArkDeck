@@ -632,7 +632,12 @@ def catalog_selected(cwd: Path, workers: int, directory: Path, *, parity_consume
                             raise ValueError('excluded sibling executed a test')
                         continue
                     if set(selected[key]).issubset(known_ignored[key]):
-                        raise ValueError('ignored-only selection cannot discharge coverage')
+                        verified = catalog_views.verify_audited_ignored_execution(
+                            sections[key], selected[key], known_ignored[key], names[key])
+                        if run['exitCode']:
+                            raise ValueError('Cargo returned failure despite ignored receipt')
+                        receipt.update(verified, execution='audited-ignored-only', substantivePassed=0)
+                        continue
                     verified = (catalog_views.verify_custom_execution(sections[key], selected[key], protocols[key])
                                 if key in protocols else catalog_views.verify_execution(
                                     sections[key], selected[key], sorted(set(selected[key]).intersection(known_ignored[key]))))
