@@ -97,18 +97,34 @@ development MSIX.
    Import-Certificate -FilePath D:\certs\arkdeck-dev.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
    ```
 
-3. Build the development RC and sign its MSIX (normal terminal; `signtool` is from Windows SDK
-   10.0.26100):
+3. Build and sign the development RC and MSIX in one producer run (normal terminal). The
+   maintainer's `sign-development-msix.ps1` accepts the package path as its only argument and
+   signs it with the certificate from steps 1–2 (`signtool` is from Windows SDK 10.0.26100):
 
    ```powershell
-   pwsh D:\src\ArkDeck\windows\scripts\package-rc.ps1 -OutputDirectory D:\temp\rc-dev-<date> -SigningMode development -Smoke
+   pwsh D:\src\ArkDeck\windows\scripts\package-rc.ps1 -OutputDirectory D:\temp\rc-dev-<date> -SigningMode development `
+     -MsixSignCommand D:\signing\sign-development-msix.ps1 -MsixPublisher 'CN=ArkDeck Development' `
+     -FeedBaseUri https://<development-feed-host>/arkdeck/windows/ -Smoke
    $msix = (Get-ChildItem D:\temp\rc-dev-<date>\msix -Recurse -Filter *.msix).FullName
-   signtool sign /fd SHA256 /sha1 <THUMBPRINT> $msix
    Add-AppxPackage $msix
    ```
 
-   `package-rc.ps1` builds the MSIX unsigned (identity `ArkDeck.Development`, publisher
-   `CN=ArkDeck Development`). Signing it is this maintainer step.
+   The producer calls the signing command before recording `msix.sha256` and copying the
+   final package. Confirm `msix.signing.installable` is true, the MSIX's whole SHA-256 and
+   length equal `rc-manifest.json`, and its valid signing certificate's subject equals the
+   manifest `Publisher` (`CN=ArkDeck Development`). Do not sign or otherwise modify any
+   inventoried package afterward. This is development qualification, not production release
+   signing or a production distribution result; keep the protected source revision and
+   package/manifest hashes in its record.
+
+   `-FeedBaseUri` only writes the matching feed locally; it does not upload or install an
+   update. For installed-update qualification, retain the same package identity and Publisher
+   as the installed prior version and use a strictly higher package version. Follow the
+   byte-verified MSIX-first, feed-last publication sequence in
+   [`windows-update.md`](../../release/windows-update.md), using a separate development feed.
+   Install the initial package through that feed for an App Installer channel; direct
+   `Add-AppxPackage` above establishes only the packaged-client smoke. An unpackaged refusal
+   or same-version install is not an update result.
 
    **Expected:**
    - `package-rc.ps1` ends with smoke **PASS**: all files match the manifest, doctor `ok: true`
