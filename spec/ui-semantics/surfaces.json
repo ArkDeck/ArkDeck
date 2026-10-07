@@ -707,11 +707,6 @@
         {"automationId": "diagnostics.title", "origin": "windows", "role": "text", "name": ["@app.navigation.diagnostics"]},
         {"automationId": "diagnostics.session.reload", "origin": "macos", "role": "button", "name": ["@diagnostics.session.reload"]},
         {"automationId": "diagnostics.alignment", "origin": "macos", "role": "text", "name": ["@diagnostics.alignment.cannotAlign"]},
-        {"automationId": "diagnostics.capture.arm", "origin": "macos", "role": "button", "name": ["@diagnostics.capture.arm"]},
-        {"automationId": "diagnostics.capture.mark", "origin": "macos", "role": "button", "name": ["@windows.diagnostics.capture.mark"]},
-        {"automationId": "diagnostics.capture.unavailable", "origin": "windows", "role": "text", "name": ["@windows.diagnostics.capture.unavailable"]},
-        {"automationId": "diagnostics.capture.unavailable.detail", "origin": "windows", "role": "text", "name": ["@windows.diagnostics.capture.unavailable.detail"]},
-        {"automationId": "diagnostics.capture.reasonCode", "origin": "macos", "role": "text", "name": ["diagnostic_session_capture_not_connected"]},
         {"automationId": "diagnostics.partial", "origin": "macos", "role": "text", "name": ["@diagnostics.partial"]},
         {"automationId": "diagnostics.session.job", "origin": "macos", "role": "text", "name": ["job-6c545eb6042a9ea99e700467bbb77d06"]},
         {"automationId": "diagnostics.session.readOnly", "origin": "macos", "role": "text", "name": ["@diagnostics.session.readOnly"]},
@@ -727,6 +722,21 @@
         {"automationId": "diagnostics.artifacts.openElsewhere", "origin": "macos", "role": "text", "name": ["@diagnostics.artifacts.openElsewhere"]},
         {"automationId": "diagnostics.selection", "origin": "macos", "role": "text", "name": ["@diagnostics.selection.timeOnly"]},
         {"automationId": "diagnostics.alignment.detail", "origin": "windows", "role": "text", "name": ["@diagnostics.alignment.explain"]}
+      ]
+    },
+    {
+      "id": "diagnostics.capture.recording",
+      "scenario": "diagnostic-capture",
+      "page": "diagnostics",
+      "steps": [{"invoke": "diagnostics.capture.arm"}],
+      "elements": [
+        {"automationId": "diagnostics.capture.arm", "origin": "macos", "role": "button", "name": ["@diagnostics.capture.arm"]},
+        {"automationId": "diagnostics.capture.mark", "origin": "macos", "role": "button", "name": ["@windows.diagnostics.capture.mark"]},
+        {"automationId": "diagnostics.capture.stop", "origin": "macos", "role": "button", "name": ["@diagnostics.capture.stop"]},
+        {"automationId": "diagnostics.capture.state", "origin": "windows", "role": "text", "name": ["@diagnostics.capture.state.recording"], "live": "polite"},
+        {"automationId": "diagnostics.capture.job", "origin": "windows", "role": "text", "name": ["job-859b86ab3981a6c5194e9a6c77ac9667"]},
+        {"automationId": "diagnostics.capture.markCount", "origin": "windows", "role": "text", "name": ["@diagnostics.capture.marks", ": 0 / 50"]},
+        {"automationId": "diagnostics.capture.boundary", "origin": "windows", "role": "text", "name": ["@diagnostics.capture.boundary"]}
       ]
     },
     {

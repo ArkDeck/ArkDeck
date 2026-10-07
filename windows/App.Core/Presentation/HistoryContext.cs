@@ -80,7 +80,7 @@ public sealed record HistoryWorkspaceContext(
             "input.tap" or "input.long-press" or "input.swipe" or "capture.screen-sequence" => WorkspaceKind.Device,
             "observe.device" or "observe.devices" => WorkspaceKind.Viewer,
             "analyzer.analyze-trace" or "analyzer.summarize-trace" => WorkspaceKind.Trace,
-            "analyzer.extract-crash-signature" or "analyzer.summarize-hilog" => WorkspaceKind.Diagnostics,
+            "capture.diagnostic-session" or "analyzer.extract-crash-signature" or "analyzer.summarize-hilog" => WorkspaceKind.Diagnostics,
             _ => null,
         };
     }

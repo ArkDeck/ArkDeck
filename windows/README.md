@@ -185,9 +185,14 @@ first, `ControlResult` back.
   (`DiagnosticSession`, checked against the Swift CLI's 15 diagnostics-inspect oracle cases) —
   the alignment state, the marks and why a mark has no picture, what was never looked for, the
   missing products, the Artifacts with a bounded local text preview and the sensitive Trace
-  opened in the Trace viewer — or a HiLog summary verified as macOS verifies it. No Diagnostic
-  Session capture provider is composed, so Arm and Mark (Ctrl+M) say so with the macOS reason
-  code `diagnostic_session_capture_not_connected`.
+  opened in the Trace viewer — or a HiLog summary verified as macOS verifies it. Arm submits
+  one bounded `capture.diagnostic-session@1` Job after confirming the current Target, binding
+  and complete same-Target Job snapshot. Mark (Ctrl+M), Stop and preparation cancellation name
+  that accepted owner; a lost answer is read back without resending the action. The session keeps
+  its original owner across page navigation, and completion opens its verified products.
+  History remains an immutable reader with no capture controls. Optional host clock observations
+  stay unvalidated; alignment remains `CannotAlign`. Scripted capture tests establish software
+  behavior, not hardware acceptance.
 - **Remote build sources (TASK-XPA-020).** The macOS App-side SSH servers: Settings › Servers
   saves an SSH endpoint after a probe verifies the connection, the credential, the SFTP build root
   and the host key (its fingerprint shown, trusted only by saving that probe); Debug › Artifacts ›

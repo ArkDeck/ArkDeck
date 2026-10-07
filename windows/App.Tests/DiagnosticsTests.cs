@@ -30,6 +30,16 @@ public sealed class DiagnosticsTests
     }
 
     [TestMethod]
+    public void OnlyThePublishedInteractiveReferenceAddsAnUnambiguousHistoryReader()
+    {
+        Assert.IsTrue(DiagnosticsState.IsDiagnosticsRecord(DiagnosticCaptureProvider.Operation, null));
+        Assert.IsTrue(DiagnosticsState.IsDiagnosticsRecord("capture.diagnostics@1", null));
+        Assert.IsFalse(DiagnosticsState.IsDiagnosticsRecord("capture.unknown@1", null));
+        Assert.AreEqual(WorkspaceKind.Diagnostics, HistoryWorkspaceContext.UnambiguousKind(DiagnosticCaptureProvider.Operation));
+        Assert.IsNull(HistoryWorkspaceContext.UnambiguousKind("capture.diagnostics@1"), "The old multi-workspace capture keeps its original input-based classification");
+    }
+
+    [TestMethod]
     public async Task ASavedSessionIsReadAsTheSwiftInspectorReadsIt()
     {
         var loader = new SurfaceLoader(ScriptedDaemon.Channel(ScriptedDaemon.Diagnostics));

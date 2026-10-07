@@ -86,7 +86,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue, Trust, DeviceScreen];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue, Trust, DeviceScreen, DiagnosticCapture];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -244,7 +244,7 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => (mode == DeviceScreen ? DeviceScreenRoute(request, method) : null) ?? (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
+                _ => (mode == DiagnosticCapture ? DiagnosticCaptureRoute(request, method) : null) ?? (mode == DeviceScreen ? DeviceScreenRoute(request, method) : null) ?? (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(ObservationsNow())),

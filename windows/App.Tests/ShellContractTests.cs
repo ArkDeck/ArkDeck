@@ -104,8 +104,8 @@ public sealed class ShellContractTests
             var text = File.ReadAllText(file);
             foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "Settings.cs" or "Agents.cs" or "Imports.cs" or "RuntimeJobs.cs" or "Flash.cs"
-                or "DeviceOperations.cs" or "DeviceKeyboardUpload.cs" or "ControlChannel.cs"
-                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs" or "ScriptedDaemon.Continue.cs" or "ScriptedDaemon.Settings.cs" or "ScriptedDaemon.DeviceScreen.cs"))
+                or "DeviceOperations.cs" or "DeviceKeyboardUpload.cs" or "DiagnosticCapture.cs" or "ControlChannel.cs"
+                or "ScriptedDaemon.cs" or "ScriptedDaemon.Debug.cs" or "ScriptedDaemon.Flash.cs" or "ScriptedDaemon.Continue.cs" or "ScriptedDaemon.Settings.cs" or "ScriptedDaemon.DeviceScreen.cs" or "ScriptedDaemon.DiagnosticCapture.cs"))
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }
@@ -137,6 +137,8 @@ public sealed class ShellContractTests
             // Overview's prepared continuation (macOS RuntimeWorkspaceContinuation): a new
             // read-only Job of one of the two published observation operations.
             "observe.device",
+            // The existing macOS DiagnosticCaptureFacade's one interactive capture request.
+            "capture.diagnostic-session",
         };
         var built = new List<string>();
         foreach (var file in RepoPaths.AppSources("*.cs").Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
