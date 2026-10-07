@@ -174,6 +174,7 @@ public sealed partial class SessionsPage() : SurfacePage<SessionsState>(
         }
         var dialog = Ui.Dialog(XamlRoot, "sessions.cleanup.preview", S.Text(UiStrings.WindowsSessionsCleanupTitle), content,
             S.Text(UiStrings.WindowsSessionsCleanupConfirm), S.Text(UiStrings.SettingsCommonCancel));
+        dialog.DefaultButton = ContentDialogButton.Close;
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
         var applied = await Task.Run(() => App.Loader.CleanupApplyAsync(p));
