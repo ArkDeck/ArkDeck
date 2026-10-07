@@ -1,0 +1,123 @@
+{
+  "answer" : {
+    "ok" : true,
+    "result" : {
+      "actualStepKinds" : null,
+      "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+      "events" : {
+        "jobId" : "job-a8542c33a62a4286b4976973db7f1579",
+        "method" : "job.events"
+      },
+      "evidence" : {
+        "jobId" : "job-a8542c33a62a4286b4976973db7f1579",
+        "method" : "job.evidence"
+      },
+      "job" : {
+        "actualEffect" : "deviceMutation",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-a8542c33a62a4286b4976973db7f1579",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-a8542c33a62a4286b4976973db7f1579",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-a8542c33a62a4286b4976973db7f1579",
+            "kind" : "job"
+          }
+        },
+        "operation" : "deploy.native-library.app-owned@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status\/1",
+        "sessionId" : "session-job-a8542c33a62a4286b4976973db7f1579",
+        "sessionPublication" : {
+          "catalogGeneration" : "1",
+          "manifestSha256" : "77ae263ba68e27dfaed4c9ae99d35f1a8976ba8c17028499dad3701c74542b9e",
+          "reasonCode" : null,
+          "state" : "published"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-3ba3f5f43b92",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "debug"
+      },
+      "materializedBindingRevision" : 1,
+      "materializedPlanDigest" : "9003a8351f6ab967de385e276187ba08aad0ca075411f1a86aad240888bf0074",
+      "materializedStableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+      "providerId" : "hdc",
+      "request" : {
+        "authorization" : {
+          "capabilityId" : "CAP-RT-POLICY-53686F7B3FD09DD7170E8B1131EBF0F3FB60B7F8-G1"
+        },
+        "documentType" : "runtime-operation-request",
+        "idempotencyKey" : "idem-mutation-published",
+        "inputs" : {
+          "expectedABI" : "arm64-v8a",
+          "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+          "libraryLogicalName" : "libexample.so",
+          "restartProfile" : "restartAbility",
+          "rollbackPolicy" : "autoRollback",
+          "targetBundle" : "com.example.demo",
+          "verificationProfile" : "hashProcessAndMaps"
+        },
+        "operation" : {
+          "id" : "deploy.native-library.app-owned",
+          "version" : 1
+        },
+        "requestId" : "req-mutation-published",
+        "requestedOutputs" : [
+          "derivedArtifacts"
+        ],
+        "schemaVersion" : "1.0.0",
+        "target" : {
+          "expectedBindingRevision" : 1,
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "ringCoverage" : null,
+      "schemaVersion" : "arkdeck.job\/1",
+      "screenSequence" : null,
+      "timeline" : {
+        "entries" : [
+          "jobCreated",
+          "queued->preflight",
+          "preflight->running",
+          "reason: steps-start",
+          "verify-elf-locally abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+          "host-step verify-elf-locally",
+          "hash-library abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+          "host-step hash-library",
+          "running->finalizing",
+          "reason: evidenceIncomplete: three-step typed preflight is incomplete before send-to-staging",
+          "finalizing->failed",
+          "reason: evidenceIncomplete: three-step typed preflight is incomplete before send-to-staging"
+        ],
+        "kind" : "inline"
+      }
+    }
+  },
+  "method" : "job.show",
+  "name" : "published.job.show",
+  "params" : {
+    "jobId" : "job-a8542c33a62a4286b4976973db7f1579"
+  }
+}

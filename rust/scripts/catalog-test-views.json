@@ -91,7 +91,7 @@
     "crates/arkdeck-agentd/tests/spawning/gj1_device_leaves.rs": "ba19de652d3e3662acd5ea57a81cfc8fb4a32dfe1a96c70dd18489afe937ce95",
     "crates/arkdeck-agentd/tests/spawning/gj1_device_reads.rs": "81471780cc5a1d7ba53587d629376aab7d8f74fdbbbf73cce6447747a0a6116e",
     "crates/arkdeck-agentd/tests/spawning/gj1_inputs.rs": "d1986f815b0fba8710c8bb22d207fbae699a39138284f2267f0b6643f000578d",
-    "crates/arkdeck-agentd/tests/spawning/gj23_replay.rs": "54745e30f9945f488be37d1a675c45d2eac7c72ebc499388a4b07d9eff77574d",
+    "crates/arkdeck-agentd/tests/spawning/gj23_replay.rs": "dd058550a16ed74ce89c3391ce0dba4939202c0d8ceb0a5a0487b4ff5024becd",
     "crates/arkdeck-agentd/tests/spawning/job_archive_cli.rs": "2f1d9d653a4f047d8543dd8eac3a27160769c30950a22a005370c58fe2ca5df2",
     "crates/arkdeck-agentd/tests/spawning/main.rs": "a030ef6d804be75f88d4f8fba7ab56c5151fa885f87b63c783cb6d1a5d47da5a",
     "crates/arkdeck-agentd/tests/spawning/managed_hdc_server.rs": "09383cb5ddec6e6ea2df8d10d3a6b9440c57a7d56598bec012c4b7be08c9c15f",
@@ -456,7 +456,7 @@
     "crates/arkdeck-hoststore/src/main.rs": "c54209164869e0acf1df706bb082f4c763c41ee3b7fe98905279f35886e8e8ed",
     "crates/arkdeck-hoststore/src/mutation_execution.rs": "e4e5b1c063b0634c79b247a5587b0339f66acfa37187078c5dfcc711e4381ff9",
     "crates/arkdeck-hoststore/src/mutation_state_continuity.rs": "dc5f2a6701b0469c668e188721c52a03d555bd3149870913602efc62bc5382b2",
-    "crates/arkdeck-hoststore/src/native_library_plan.rs": "dc82fe9d6270896d1f991900cae5d31c64c37b0ea630876b0c0626d472356645",
+    "crates/arkdeck-hoststore/src/native_library_plan.rs": "98db9333574a81630b41b206774908ecd699720f550a4a5c47f219c5ca573b19",
     "crates/arkdeck-hoststore/src/operation_availability.rs": "4a669f4fb2b0ba5d42931abfa35d3aa7f9adc7dbade3a064d7e764202a3c1c57",
     "crates/arkdeck-hoststore/src/operation_request.rs": "3a988951126cdec3a4720150186e874f7f2895320359c023690f40e18844d053",
     "crates/arkdeck-hoststore/src/post_flash_alias.rs": "f36d5b4afea971462567e88261cc7146e2bcdff4ff9d71fa6e7de35c3ca697db",
@@ -568,14 +568,14 @@
     "crates/arkdeck-hoststore/tests/crash_window.rs": "be9718793122d92a1b31301d4337b3d03140868bc29acd1696e796668c9516b0",
     "crates/arkdeck-hoststore/tests/debug_hap_current_oracle.rs": "a795c93b67a496d7a01434b652a359604c66d81507fc5cac6494d24538211613",
     "crates/arkdeck-hoststore/tests/debug_hap_plan.rs": "835331d0a4587fb56394c76cbf64e3ae1efd3633195019d0d521e2ab679e5705",
-    "crates/arkdeck-hoststore/tests/debug_hap_run.rs": "fbcf1bb009782251dca627c309d01a03ef3771d1778e242ea3fb1fb7f55e75f9",
+    "crates/arkdeck-hoststore/tests/debug_hap_run.rs": "adcf36cf1813c5111ca33ac77585c8e886c467caab789313fe34382158f01fbe",
     "crates/arkdeck-hoststore/tests/debug_hap_submit.rs": "5ecd72a4c40256db18858ab0a838855e5cebd927cd10281f4b4492179d75b294",
     "crates/arkdeck-hoststore/tests/debug_invocation.rs": "bedcdd89b2c4e13e06763c4335f851a96b95905c2c2e1d9ba233eb12f960c0af",
     "crates/arkdeck-hoststore/tests/debug_template_run.rs": "a68dfaf8c52b04525eafc958321a9e25a41ecda3538b9d6d10dc8639df7fc052",
     "crates/arkdeck-hoststore/tests/deveco_pins_native.rs": "1f888ef702438d7e7d38ad0ac3ddf3dd93196625fc0ad11922d1b863dac6c705",
     "crates/arkdeck-hoststore/tests/deveco_registry_read.rs": "2f10eab7d22af8ded1cd27a7ecc593449031f8a69b7c100b4288ac6c72b5524d",
     "crates/arkdeck-hoststore/tests/device_mutation_lane.rs": "09f321dfeb830a43560f356bd804896631811dd627ca0c3efbbd98150a1f95aa",
-    "crates/arkdeck-hoststore/tests/device_mutation_reconcile.rs": "510eaea4cf1e8007e7d925375e09e9b7daa30397e48ce17200f7fb4beef0c7fd",
+    "crates/arkdeck-hoststore/tests/device_mutation_reconcile.rs": "dd45a505b9bc2919a5288b24d50468ad936598f11f1e0a732bfa5e1095a3b33d",
     "crates/arkdeck-hoststore/tests/device_reconcile.rs": "f1ec9869f6f6a5d4366810d25697c064436d55f7d390e4b10716dd0ffc0a1288",
     "crates/arkdeck-hoststore/tests/failed_publication_recognition.rs": "8e48aa3fff93be9606db1ca2900bbd4f4329ed609deb9788f87c8ef2e31ea179",
     "crates/arkdeck-hoststore/tests/fixture_fs/mod.rs": "82982f3ba55e056c684a4e83499dddc77d9a0e8d4e7bea9aef7378117a73ce4c",
@@ -606,11 +606,12 @@
     "crates/arkdeck-hoststore/tests/journal_scratch/mod.rs": "3fb012ce28a3651cb4c6582aa5a8364373c726410201db640ab2b1f6ec20027e",
     "crates/arkdeck-hoststore/tests/keyboard_input_run.rs": "f46233dd5bf01f7ea2f0bce273725b1623dc97f103dbdc52a992a3a5368ab216",
     "crates/arkdeck-hoststore/tests/loader_binding_jobs.rs": "f04fe8d3f800975112e1b17dbf9db1c56c45c0cddfb152aef554593fe49b67bc",
-    "crates/arkdeck-hoststore/tests/native_library_current_oracle.rs": "2833eac950957d159ee863a21ae7886ea643c31658255a181219e129212c825f",
-    "crates/arkdeck-hoststore/tests/native_library_plan.rs": "8df228bf20c0eee52194b557b634b84b083f4e60c36d74ce4c0f6e6ea7a532e2",
+    "crates/arkdeck-hoststore/tests/native_library_current_oracle.rs": "1fdb7da090a319e053bccbfe4070a794f06ee34fc0ddf5fc3c95ef3fa22b4871",
+    "crates/arkdeck-hoststore/tests/native_library_plan.rs": "09a0d2d886fb624b174f0111aefdae7cc694f78716caca1b8a7dbc265661ef17",
     "crates/arkdeck-hoststore/tests/native_library_run.rs": "eba8ebfb313067721d1edd1f0685e364eef1eb4d585c589263cfb4a0c80105e4",
     "crates/arkdeck-hoststore/tests/native_library_submit.rs": "c400063faa514b878c49cec4691e86f385d79b644d65bc9b3e237f80c97c5997",
     "crates/arkdeck-hoststore/tests/native_readback_index.rs": "2d0952101f7b75f7422b24b9fe898ebcdc6446ec4057351c2d05844618a7dbd5",
+    "crates/arkdeck-hoststore/tests/native_reconcile_current_oracle.rs": "47b1b8df9bb1cce059f5f1ee521f086600e5365b376e8583e8ff33bf2d5ba432",
     "crates/arkdeck-hoststore/tests/observe_device.rs": "65e0e92454438fa7f49b3920096d944495e611a830ee31a8dcb0d8fdbfbeead9",
     "crates/arkdeck-hoststore/tests/pointer_input_plan.rs": "83ce82fb896aa9543a2cb882f1e6c332f7ab2b7e7269bab022aa9c905802a391",
     "crates/arkdeck-hoststore/tests/pointer_input_run.rs": "f1248e49ccfc3a7792b7b49ba51d47dc1ca49f5ad8962953fa27be5f9a526a0e",
@@ -628,13 +629,14 @@
     "crates/arkdeck-hoststore/tests/support/debug_hap.rs": "3f90c19462bc1a4ccd97c30847ce335f90a182297f11a2a965a8a902f6f07363",
     "crates/arkdeck-hoststore/tests/support/flash_lane.rs": "4bdca163658740f75f6de137efe8335748c6e8fe675cd760ebbc604e6a803529",
     "crates/arkdeck-hoststore/tests/support/hap_current.rs": "0882cc6b440d127e8f3f26d9aa2c96a20e5dbb8102a592103f4799481e9bc39a",
-    "crates/arkdeck-hoststore/tests/support/hdc_oracle.rs": "8bc5538bbd854f5fdb775841ba127b093d2b8390d565cc09959db7273f900e1b",
-    "crates/arkdeck-hoststore/tests/support/mod.rs": "4d4d7d2ee9f3081b517060f1ec8ca0a4323e6337e3517f2b9dffa73d0a444655",
-    "crates/arkdeck-hoststore/tests/support/native_current.rs": "c02987177427a6234a619e8ddd3e6c236a6bf0806e2da3646302f61514fbdc3d",
+    "crates/arkdeck-hoststore/tests/support/hdc_oracle.rs": "0d2af6f33990c5e517f5ac9e95b344e3037c07ce5e6e32e90b17565a0d46c162",
+    "crates/arkdeck-hoststore/tests/support/mod.rs": "f8487cd301feb4195e2a7d06ceb34076e7d14005b33ae2bf3b0932f3388d7477",
+    "crates/arkdeck-hoststore/tests/support/native_current.rs": "0c127781f4059bcd7b6500f98e62d51ffb12dc684d9a0202d790274d1d12966c",
     "crates/arkdeck-hoststore/tests/support/native_library.rs": "86b7095086b10ccca63d80aebea1c73ca0cfb6299be026054d89143182340293",
     "crates/arkdeck-hoststore/tests/support/native_observation.rs": "247df22b350f5fe83f471ee0ba9e2d63f1465fae1a17c0ee03393ad458dd1cbc",
     "crates/arkdeck-hoststore/tests/support/native_readback.rs": "d7bbaa013641ba67a37bf8187c20c325ecbcdfd7e8e8ac7127d780c0f936ff37",
-    "crates/arkdeck-hoststore/tests/support/reconcile.rs": "337d5bc45359c59aa06ffa9b876f553a23c13fd23432d7ee1c09bf710aa0d5a2",
+    "crates/arkdeck-hoststore/tests/support/native_reconcile_current.rs": "f38cec2235ef3814a1670733a21c7f9861bc89e758b213ef3e8bd85352381a45",
+    "crates/arkdeck-hoststore/tests/support/reconcile.rs": "a7b1e073422bcfd3e266e3c03f30d7d20a4ddafbb7b8b66dbd816ac4ba1dc86d",
     "crates/arkdeck-hoststore/tests/support/workspace_publication_retry.rs": "d5d93d58b6a4e9562bdf590c89350da63fa23d3c8f9e699482147fdb33e5883a",
     "crates/arkdeck-hoststore/tests/target_adoption.rs": "ac4399a0d8eae0efb504140de3197c319dc36ee4f43acc0ab23d8bcfaf65a55b",
     "crates/arkdeck-hoststore/tests/terminal_publication_retry.rs": "c4b3deb302af0fa088c5ff3e7d094c282b9a5b3b89fbc5638c23a18141e85e7c",
@@ -2254,6 +2256,8 @@
     "tests/fixtures/catalog-extension-recording.json": "e5686beddb22589748594750d2f7d7030b4c03ae93a6d4e5671edf7ed2ce086f",
     "tests/fixtures/catalog-lineage-c6-e4/catalogs.json": "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab",
     "tests/fixtures/catalog-lineage-c6-e4/hap-plans.json": "686920fba1d6ecdfe52a18014b5da25f66668a9181ffe37101a92c3ca4fa381f",
+    "tests/fixtures/catalog-lineage-c6-e4/native-reconcile-c6-plan.json": "06e3ce9a79c7826f850f6d0a194ff1e443edcaa6b0a2ddb8c841e1a70b3cdc3b",
+    "tests/fixtures/catalog-lineage-c6-e4/native-reconcile-c6-policy.json": "2d892e3777e750efd5ffa02044296ea83c4308dd6a80f696525133453f268041",
     "tests/fixtures/catalog-lineage-c6-e4/README.md": "37640de64f1bb845150ae0bdebdb749882552cf53dc6860dd02b85e86fa1c584",
     "tests/fixtures/cli-version/cases.json": "5bdfce80c08dd5e520b69704373a7900eb2970c4d6e26850397e0babe65f436f",
     "tests/fixtures/client-failure-mapping/cases.json": "6bc952f6fea9761b40312f1314e8eb32c19746a5cdbe57f9b1daed12e4387dd3",
@@ -4240,6 +4244,38 @@
     "tests/fixtures/device-mutation-reconcile/tapBeforeConsume/store/jobs/job-6250119b3d4e0a864cb5ee6c6ec48e83/session-manifest.proposal.json": "f5eee4f2d34a8d32204618a9317a9121cdbfeacac0a9bdb3e5f617df05a3c1e8",
     "tests/fixtures/device-mutation-reconcile/tapBeforeConsume/targets-state/targets.json": "219caf0d443d902a3fa31adf44d28f1e3611bd25df00ee3a53e696e855077b22",
     "tests/fixtures/device-mutation-reconcile/tapBeforeConsume/tree.json": "d82c8498cb7fcd0ef19e0118b80f3cac8c2a1ca87321e281a5cbb01842c9ea52",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-01.json": "dec14718656ab05bbf3e7033e5b45a520fee293db5766caba465ddafa13a9bbd",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-02.json": "59860a16da795277203ba783299a74b838f38c50712f4c54f7ef8830c831b6fd",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-03.json": "c55bd20a97395f2f76a8d0edd6453cc814053b43b9016950c596e8274764cc59",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-04.json": "5806a8d1a86c86e00b54826faebee88b89aa857ff8ded1ebf94eb00ddfbec775",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-05.json": "0d1abb2327d7b98ae09821d0035149e08eb04958e98f406b6128fe96d04e2949",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-06.json": "a410ccc5c6b5cd1fa8596439246ba59ae3312c46e308b3075e37d2baf37b2d8b",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-07.json": "9f3f175a67082f13b01fdaa880e6d30057cf66d4ac5e3899eda7367e6425678b",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-08.json": "6983c5069bafbc8770dc6da0fd33c374b4e67cdc8db1ee908d456146f644c077",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-09.json": "3d8226432eba04573b530a532e97ae6a97d8a296e0f7ba0f2796e20b88a0548f",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-10.json": "ca3c8d8f11a7581e6ebd363885e6914667d8ec5e5aced6efa6dffc63aa572d22",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-11.json": "68e81e98ee0d59322eb354e07f8b56a38fa2cb25f1f8818c7e317139d35505ac",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-12.json": "cfaf872a3bc1e1a90d939ba203da9fb95198c0c8a770599f75cf3c7e89c74b93",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-13.json": "74e868a025201e6767f5f9a8c10b5fa1c30240559b422e5119afd2c57c80fb21",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-14.json": "2641b55999d15ce94352e91568be5bc7cf7666c18f08253dc87ce57bac8e4faa",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-15.json": "294898f646b46f7c2249a493e477760fd8c22b710dd08af268b36fabaedc72eb",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-16.json": "390afca97f9b724826d19b3b8daeaed70e2325f39f8a5ffda9dafeacc4bc15c7",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-17.json": "c78c94edfca1e4c6db1272af706f0622fa89934c686f3190af36fe2515423e11",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-18.json": "01bf2e9b91cd9c27291a0eb3c8d77f485174644158c03a7806568afd3b5ec566",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-19.json": "d13ac3df10f6f285bf666e55a5a05be2be5a07131a673ee9f732b511b515fffd",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-20.json": "d761fe3ad4f35684a9bbccae82bcccab203897a1dd419925acf99a21dad93015",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-21.json": "d6219f38ce0478499a5d59c949c5e0f04d2a42333fe68f7fdb870c8ade446d85",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/answer-22.json": "c24aef7d7815060fe0118a34149d5ed25821e6609eadbfd9fcf159e03d0129c0",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/oracle.json": "ce4164e452a524e157d79fce10757bec27780f37df81d99c56a1eed115d4c630",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/provenance.json": "a80a7542c32e9886edf6dabfa250e9e406f48b1f88b168f68f4cdb588065aecf",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/raw-oracle.json": "663ee4e39a2da12d2fc03d8b7669d6a08f458969b683520881f7cc2f0e612120",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/snapshot-published.resume.json": "d25262ff5c7ea2c3b90afbf69b6b30efe7aee4b2683ef708ab5b486233de193c",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/snapshot-published.run.json": "d25262ff5c7ea2c3b90afbf69b6b30efe7aee4b2683ef708ab5b486233de193c",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/snapshot-reconcilePublished.json": "d25262ff5c7ea2c3b90afbf69b6b30efe7aee4b2683ef708ab5b486233de193c",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/snapshot-reconcileUnpublished.json": "2836c87a45eec428b97a0a5bea600589a1fdadb0c5753a2b10da1bc180184ace",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/snapshot-restart.json": "d25262ff5c7ea2c3b90afbf69b6b30efe7aee4b2683ef708ab5b486233de193c",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/snapshot-secondRestart.json": "2836c87a45eec428b97a0a5bea600589a1fdadb0c5753a2b10da1bc180184ace",
+    "tests/fixtures/device-mutation-reconcile-native-published-c6-v4/snapshot-unpublished.run.json": "2836c87a45eec428b97a0a5bea600589a1fdadb0c5753a2b10da1bc180184ace",
     "tests/fixtures/device-reconcile/artifacts/job-60dc14cbc8ab013c914bf12aa6d87a64/ART-a719837d6558a910f84d55bcb6ed059d": "1a4295c7721ebbca78c21f44ab196807b408391d520ebba5ab22dcbcc8c59ed0",
     "tests/fixtures/device-reconcile/artifacts/job-60dc14cbc8ab013c914bf12aa6d87a64/ART-c0f9d919b66d758dee8b2f4feb346777": "d5a1681264e49af5cb4f40368c6522e436867629daedbd604d33abdf05063cda",
     "tests/fixtures/device-reconcile/artifacts/job-60dc14cbc8ab013c914bf12aa6d87a64/ART-f1f261b124c3fb15dbf279b39f1386fe": "783b8d41ca1bf9868ba82eb98916f3d8c672664510d8def5c741f1f6ee0e7479",
@@ -7483,85 +7519,85 @@
     "arkdeck-agentd/spawning": {
       "route": "mixed",
       "functions": {
-        "flash_socket_control::job_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
-        "account_tool_selection::the_signed_account_daemon": "both",
-        "flash_host_facts_control::a_host_without_the_facts_answers_as_swifts_daemon_without_its_observers": "both",
-        "flash_socket_control::bind_loader_binds_the_current_loader_over_the_control_socket": "both",
-        "flash_execution_control::flash_execution_reaches_the_runtime_owner_in_a_separate_process": "both",
-        "gj1_device_leaves::every_capture_preset_completes_over_the_signed_test_daemon": "both",
-        "managed_hdc_server::a_launched_server_is_stopped_when_dropped_while_the_monitor_holds_it": "both",
-        "flash_alias_cli::the_signed_cli_republishes_the_post_flash_alias_oracles_lineage_bytes": "both",
-        "gj1_device_leaves::diagnostics_capture_completes_over_the_signed_test_daemon": "both",
-        "gj1_inputs::screen_record_answers_as_the_swift_oracle_over_the_signed_test_daemon": "historical",
-        "flash_socket_control::agent_run_of_the_alias_flashes_to_completion_over_the_control_socket": "both",
-        "gj1_inputs::keyboard_input_answers_as_the_macos_runtime_over_the_signed_test_daemon": "both",
-        "app_ingress_fake_hdc::uidump_interrupted_capture_is_unknown_and_never_replayed": "both",
-        "flash_alias_cli::the_signed_cli_reconciles_aliases_as_the_swift_host_reads_oracle": "both",
-        "app_ingress_fake_hdc::uidump_missing_received_file_is_not_published_or_replayed": "both",
-        "app_ingress_fake_hdc::debug_template_jobs_execute_and_publish_through_the_app_ingress": "both",
-        "flash_socket_control::agent_run_flashes_to_completion_over_the_control_socket": "both",
-        "workspace_symbolize_leaf::the_real_cli_symbolizes_a_devices_crash_with_the_daemons_own_mode": "both",
-        "workspace_continuation_cli::a_completed_job_is_continued_over_the_signed_test_daemon": "both",
-        "trace_probe_control::trace_probe_replays_the_swift_oracle_through_production_host": "both",
-        "gj23_replay::the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job": "both",
-        "signed_daemon::the_signed_test_daemon": "both",
-        "account_tool_selection::the_signed_cli_selects_a_candidate_and_reads_the_settled_selection_after_restart": "both",
-        "gj1_device_reads::the_real_cli_observes_adopts_and_reads_availability_as_the_swift_oracle": "both",
-        "flash_host_facts_control::members_swift_ignores_change_neither_the_reads_nor_the_answers": "both",
-        "flash_socket_control::the_recovery_broker_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
-        "gj1_device_leaves::observation_expectations_reject_tamper_and_preserve_every_non_catalog_byte": "both",
-        "managed_hdc_server::a_crash_after_a_restart_leaves_its_replacement_and_starts_refuse_it_until_it_ends": "both",
-        "flash_host_facts_control::the_rust_daemon_replays_the_swift_flash_host_facts_oracle": "both",
-        "flash_socket_control::device_access_and_the_lane_preview_answer_over_the_control_socket": "both",
-        "gj1_inputs::pointer_inputs_answer_as_the_swift_oracle_over_the_signed_test_daemon": "historical",
-        "target_observation_control::an_uncertain_registry_fails_closed_through_the_control_layer": "both",
-        "flash_socket_control::flash_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
-        "account_tool_selection::the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner": "both",
-        "debug_leaves_cli::the_real_cli_reads_debug_probes_through_the_signed_test_daemon": "both",
-        "flash_execution_control::flash_unknown_outcome_reconciles_passively_without_replay": "both",
-        "gj23_replay::the_real_cli_debug_native_deploy_leaf_runs_the_swift_oracle_s_job": "current",
-        "workspace_sign_leaf::the_real_cli_signs_a_hap_with_a_registered_signing_preset": "both",
-        "gj23_replay::the_real_cli_runs_every_swift_debug_hap_through_the_signed_test_daemon": "both",
-        "gj1_device_reads::the_real_cli_names_and_clears_a_candidate_in_the_current_observation": "both",
         "managed_hdc_server::no_plan_is_dispatched_once_the_managed_server_is_not_the_one_launched": "both",
-        "managed_hdc_server::foreground_exit_window_is_bounded_and_stop_is_expected": "both",
-        "flash_broker_control::the_broker_executes_its_pinned_flash_to_completion": "both",
-        "managed_hdc_server::host_never_claims_zero_dispatch_after_lifecycle_audit_failure": "both",
-        "diagnostic_session_cli::a_diagnostic_session_is_marked_and_stopped_over_the_signed_test_daemon": "both",
-        "flash_socket_control::flash_run_flashes_to_completion_over_the_control_socket": "both",
-        "managed_hdc_server::selection_cleanup_uses_selected_inode_even_when_executable_sha_is_unchanged": "both",
-        "workspace_sign_leaf::the_daemon_build_has_no_fixture_signing": "both",
-        "gj1_device_reads::the_real_cli_probes_trace_as_the_swift_oracle": "both",
-        "flash_socket_control::the_recovery_broker_flashes_to_completion_over_the_control_socket": "both",
-        "flash_broker_control::flash_broker_process_fixture": "both",
-        "flash_broker_control::the_broker_settles_an_unknown_flash_outcome_without_replay": "both",
-        "flash_socket_control::agent_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
-        "gj1_device_leaves::agent_resume_completes_a_paused_execution_over_the_signed_test_daemon": "both",
-        "managed_hdc_server::a_stop_ends_the_proved_replacement_and_the_next_start_launches_its_own": "both",
-        "app_ingress_fake_hdc::uidump_runs_through_production_host_and_publishes_its_file_artifacts": "both",
-        "managed_hdc_server::an_unrelated_server_in_the_replacements_place_is_neither_stopped_nor_inherited": "both",
-        "gj1_inputs::port_forwards_answer_as_the_swift_oracle_over_the_signed_test_daemon": "historical",
-        "flash_execution_control::flash_execution_process_fixture": "both",
-        "flash_socket_control::flash_socket_process_fixture": "both",
-        "flash_socket_control::job_plan_submit_and_run_flash_to_completion_over_the_control_socket": "both",
-        "gj1_device_leaves::target_observe_pauses_resumes_and_completes_over_the_signed_test_daemon": "both",
-        "app_ingress_fake_hdc::app_reads_and_trace_maintenance_answer_from_the_production_owners": "both",
-        "debug_read_control::debug_reads_replay_the_existing_swift_oracle_through_production_host": "both",
-        "the_daemon_modules_compiled_here_keep_no_tests_beside_them": "both",
-        "job_archive_cli::a_quiescent_job_is_archived_over_the_signed_test_daemon": "both",
-        "debug_read_control::debug_reads_execute_only_closed_commands_on_an_adopted_route": "both",
-        "signed_daemon::the_real_cli_drives_the_signed_test_daemon_over_its_pipe": "both",
-        "managed_hdc_server::confirmed_restart_transfers_dispatch_only_after_terminal_identity_proof": "both",
+        "account_tool_selection::the_signed_cli_selects_a_candidate_and_reads_the_settled_selection_after_restart": "both",
         "gj23_replay::the_real_cli_runs_every_swift_native_deployment_through_the_signed_test_daemon": "both",
-        "app_ingress_fake_hdc::overview_continuation_runs_fresh_observation_through_the_runtime": "both",
-        "debug_template_cli::closed_templates_run_through_the_signed_cli_and_unknown_intents_never_replay": "both",
-        "workspace_symbolize_leaf::diagnostics_capture_publishes_the_named_crash_log": "both",
-        "target_observation_control::the_registry_reader_adopts_the_swift_fake_device_as_the_oracle_s_relations_do": "both",
-        "trace_probe_control::only_the_adopted_route_reaches_the_device": "both",
-        "gj1_device_leaves::the_human_action_loop_runs_over_the_signed_test_daemon": "both",
+        "flash_broker_control::flash_broker_process_fixture": "both",
+        "workspace_sign_leaf::the_daemon_build_has_no_fixture_signing": "both",
+        "debug_read_control::debug_reads_replay_the_existing_swift_oracle_through_production_host": "both",
+        "gj23_replay::the_real_cli_runs_every_swift_debug_hap_through_the_signed_test_daemon": "both",
+        "account_tool_selection::the_signed_account_daemon": "both",
+        "gj23_replay::the_real_cli_debug_native_deploy_leaf_runs_the_swift_oracle_s_job": "current",
+        "debug_read_control::debug_reads_execute_only_closed_commands_on_an_adopted_route": "both",
+        "managed_hdc_server::a_stop_ends_the_proved_replacement_and_the_next_start_launches_its_own": "both",
+        "account_tool_selection::the_account_daemon_composes_its_selected_hdc_beside_the_tool_selection_owner": "both",
+        "gj1_device_leaves::agent_resume_completes_a_paused_execution_over_the_signed_test_daemon": "both",
         "target_observation_control::the_daemon_observes_and_adopts_the_swift_fake_device_through_the_control_layer": "both",
+        "managed_hdc_server::an_unrelated_server_in_the_replacements_place_is_neither_stopped_nor_inherited": "both",
+        "flash_alias_cli::the_signed_cli_reconciles_aliases_as_the_swift_host_reads_oracle": "both",
+        "managed_hdc_server::confirmed_restart_transfers_dispatch_only_after_terminal_identity_proof": "both",
+        "flash_host_facts_control::members_swift_ignores_change_neither_the_reads_nor_the_answers": "both",
+        "gj1_device_leaves::the_human_action_loop_runs_over_the_signed_test_daemon": "both",
+        "app_ingress_fake_hdc::uidump_interrupted_capture_is_unknown_and_never_replayed": "both",
+        "flash_socket_control::agent_run_flashes_to_completion_over_the_control_socket": "both",
+        "gj1_device_reads::the_real_cli_observes_adopts_and_reads_availability_as_the_swift_oracle": "both",
+        "app_ingress_fake_hdc::app_reads_and_trace_maintenance_answer_from_the_production_owners": "both",
+        "gj1_device_leaves::diagnostics_capture_completes_over_the_signed_test_daemon": "both",
+        "flash_socket_control::agent_run_of_the_alias_flashes_to_completion_over_the_control_socket": "both",
+        "debug_leaves_cli::the_real_cli_reads_debug_probes_through_the_signed_test_daemon": "both",
+        "gj1_inputs::keyboard_input_answers_as_the_macos_runtime_over_the_signed_test_daemon": "both",
+        "flash_socket_control::job_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
+        "job_archive_cli::a_quiescent_job_is_archived_over_the_signed_test_daemon": "both",
+        "app_ingress_fake_hdc::overview_continuation_runs_fresh_observation_through_the_runtime": "both",
+        "managed_hdc_server::a_crash_after_a_restart_leaves_its_replacement_and_starts_refuse_it_until_it_ends": "both",
+        "flash_host_facts_control::a_host_without_the_facts_answers_as_swifts_daemon_without_its_observers": "both",
+        "target_observation_control::the_registry_reader_adopts_the_swift_fake_device_as_the_oracle_s_relations_do": "both",
+        "flash_socket_control::bind_loader_binds_the_current_loader_over_the_control_socket": "both",
+        "flash_socket_control::the_recovery_broker_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
+        "diagnostic_session_cli::a_diagnostic_session_is_marked_and_stopped_over_the_signed_test_daemon": "both",
+        "flash_socket_control::flash_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
+        "flash_socket_control::job_plan_submit_and_run_flash_to_completion_over_the_control_socket": "both",
+        "gj1_inputs::pointer_inputs_answer_as_the_swift_oracle_over_the_signed_test_daemon": "historical",
+        "gj1_device_reads::the_real_cli_probes_trace_as_the_swift_oracle": "both",
+        "flash_socket_control::agent_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket": "both",
         "debug_probe_replay::debug_reads_replay_the_swift_oracle_through_the_production_host": "both",
-        "managed_hdc_server::selected_tool_stays_frozen_until_a_new_graph_verifies_and_publishes_it": "both"
+        "managed_hdc_server::selection_cleanup_uses_selected_inode_even_when_executable_sha_is_unchanged": "both",
+        "flash_alias_cli::the_signed_cli_republishes_the_post_flash_alias_oracles_lineage_bytes": "both",
+        "managed_hdc_server::a_launched_server_is_stopped_when_dropped_while_the_monitor_holds_it": "both",
+        "target_observation_control::an_uncertain_registry_fails_closed_through_the_control_layer": "both",
+        "debug_template_cli::closed_templates_run_through_the_signed_cli_and_unknown_intents_never_replay": "both",
+        "app_ingress_fake_hdc::debug_template_jobs_execute_and_publish_through_the_app_ingress": "both",
+        "managed_hdc_server::selected_tool_stays_frozen_until_a_new_graph_verifies_and_publishes_it": "both",
+        "flash_socket_control::flash_run_flashes_to_completion_over_the_control_socket": "both",
+        "workspace_symbolize_leaf::diagnostics_capture_publishes_the_named_crash_log": "both",
+        "managed_hdc_server::foreground_exit_window_is_bounded_and_stop_is_expected": "both",
+        "trace_probe_control::only_the_adopted_route_reaches_the_device": "both",
+        "gj1_device_reads::the_real_cli_names_and_clears_a_candidate_in_the_current_observation": "both",
+        "managed_hdc_server::host_never_claims_zero_dispatch_after_lifecycle_audit_failure": "both",
+        "flash_broker_control::the_broker_settles_an_unknown_flash_outcome_without_replay": "both",
+        "gj1_device_leaves::observation_expectations_reject_tamper_and_preserve_every_non_catalog_byte": "both",
+        "trace_probe_control::trace_probe_replays_the_swift_oracle_through_production_host": "both",
+        "workspace_continuation_cli::a_completed_job_is_continued_over_the_signed_test_daemon": "both",
+        "workspace_sign_leaf::the_real_cli_signs_a_hap_with_a_registered_signing_preset": "both",
+        "flash_host_facts_control::the_rust_daemon_replays_the_swift_flash_host_facts_oracle": "both",
+        "flash_execution_control::flash_execution_process_fixture": "both",
+        "flash_broker_control::the_broker_executes_its_pinned_flash_to_completion": "both",
+        "the_daemon_modules_compiled_here_keep_no_tests_beside_them": "both",
+        "app_ingress_fake_hdc::uidump_missing_received_file_is_not_published_or_replayed": "both",
+        "app_ingress_fake_hdc::uidump_runs_through_production_host_and_publishes_its_file_artifacts": "both",
+        "gj1_inputs::port_forwards_answer_as_the_swift_oracle_over_the_signed_test_daemon": "historical",
+        "flash_socket_control::the_recovery_broker_flashes_to_completion_over_the_control_socket": "both",
+        "flash_socket_control::device_access_and_the_lane_preview_answer_over_the_control_socket": "both",
+        "flash_execution_control::flash_execution_reaches_the_runtime_owner_in_a_separate_process": "both",
+        "signed_daemon::the_real_cli_drives_the_signed_test_daemon_over_its_pipe": "both",
+        "flash_socket_control::flash_socket_process_fixture": "both",
+        "gj23_replay::the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job": "both",
+        "gj1_device_leaves::every_capture_preset_completes_over_the_signed_test_daemon": "both",
+        "gj1_inputs::screen_record_answers_as_the_swift_oracle_over_the_signed_test_daemon": "historical",
+        "signed_daemon::the_signed_test_daemon": "both",
+        "gj1_device_leaves::target_observe_pauses_resumes_and_completes_over_the_signed_test_daemon": "both",
+        "workspace_symbolize_leaf::the_real_cli_symbolizes_a_devices_crash_with_the_daemons_own_mode": "both",
+        "flash_execution_control::flash_unknown_outcome_reconciles_passively_without_replay": "both"
       },
       "ignored": [
         "flash_broker_control::flash_broker_process_fixture",
@@ -8033,7 +8069,10 @@
     "arkdeck-cli/device_wait": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/diagnostics_inspect": {
       "route": "both",
@@ -8058,17 +8097,26 @@
     "arkdeck-cli/flash_host_facts": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/flash_host_reads": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/flash_invocation_broker": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/hdc_control_actions": {
       "route": "both",
@@ -8128,12 +8176,18 @@
     "arkdeck-cli/job_wait": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/job_watch": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/legacy_json": {
       "route": "both",
@@ -8143,7 +8197,10 @@
     "arkdeck-cli/loader_binding": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/machine_contracts": {
       "route": "both",
@@ -8158,7 +8215,10 @@
     "arkdeck-cli/operation_validate": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/read_leaves": {
       "route": "both",
@@ -8178,12 +8238,116 @@
     "arkdeck-cli/runtime_health": {
       "route": "both",
       "functions": {},
-      "ignored": []
+      "ignored": [],
+      "modulePlatforms": [
+        "darwin"
+      ]
     },
     "arkdeck-cli/runtime_service": {
-      "route": "both",
-      "functions": {},
-      "ignored": []
+      "route": "mixed",
+      "functions": {
+        "a_cutover_names_what_only_the_swift_runtime_can_settle": "both",
+        "a_cutover_the_first_pass_refuses_changes_nothing": "both",
+        "a_cutover_the_held_pass_refuses_starts_the_old_service_again": "both",
+        "a_failed_rust_bootstrap_can_explicitly_roll_back_without_rewriting_runtime_state": "both",
+        "a_fresh_verify_that_needs_a_person_or_is_refused_answers_as_swift_does": "both",
+        "a_signing_preset_refuses_the_cutover_before_the_helper_runs": "both",
+        "a_typed_install_failing_after_its_pin_leaves_the_pin_and_selection_for_a_retry": "both",
+        "agentd_diagnostics_name_the_agentd_spelling": "both",
+        "agentd_update_keeps_the_legacy_workspace_pair_and_agentd_install_carries_nothing_over": "both",
+        "an_uninstall_whose_release_fails_reports_it_after_the_removal_it_keeps": "both",
+        "restart_fails_when_the_current_job_closure_changes_across_it": "both",
+        "restart_fails_when_the_replacement_is_the_same_process_or_speaks_another_catalog": "both",
+        "restart_is_refused_while_a_current_job_is_active_or_unclosed": "both",
+        "restart_of_an_unready_service_touches_nothing": "both",
+        "restart_proves_a_new_process_with_the_same_catalog_and_the_same_closed_unknown_jobs": "both",
+        "restart_reads_every_page_of_one_snapshot": "both",
+        "restart_retries_only_launchds_transient_eio_and_enables_once_after_three": "both",
+        "signing_identity_and_bootstrap_failures_report_both_causes": "both",
+        "signing_identity_refresh_precedes_bootstrap_and_failure_restores_validated_service": "both",
+        "status_keeps_the_legacy_workspace_pair_only_when_it_is_the_closed_demo_profile": "both",
+        "status_measures_the_one_arkforge_release_unit_and_refuses_retired_lane_names": "both",
+        "status_names_each_drift_and_is_not_ready": "both",
+        "status_of_a_ready_service_pins_both_identities_and_asks_the_daemon_for_health": "both",
+        "status_of_an_absent_service_reads_nothing_from_launchd": "both",
+        "status_pins_an_owner_controlled_arktrace_descriptor_and_refuses_a_world_writable_one": "both",
+        "the_analyzer_probe_is_the_recorded_swift_case": "both",
+        "the_cli_answers_status_in_swifts_envelope_and_never_reaches_the_accounts_launchd": "both",
+        "the_cli_answers_the_agentd_spelling_as_deprecated": "both",
+        "the_cli_holds_a_retained_bundle_to_the_production_helper_policy": "both",
+        "the_cli_installs_nothing_it_cannot_validate_and_uninstalls_an_absent_service": "both",
+        "the_cli_refuses_restart_with_an_empty_stdout_and_verify_answers_an_absent_service": "both",
+        "the_cli_refuses_the_options_these_leaves_do_not_take": "both",
+        "the_cutover_takes_both_preflight_passes_and_records_the_old_state": "both",
+        "the_typed_install_is_the_zero_runtime_path_and_refuses_before_it_pins": "both",
+        "the_typed_install_pins_its_bundle_selects_its_tool_installs_them_and_keeps_only_that_pin": "both",
+        "typed_install_refreshes_signing_before_bootstrap_and_finalizes_pin": "both",
+        "uninstall_removes_the_service_then_releases_the_installations_pins": "both",
+        "update_installs_a_swift_helper_as_swift_does_and_keeps_the_one_it_replaces": "both",
+        "update_installs_the_retained_facade_pair_and_rolls_back_to_it": "both",
+        "update_refuses_a_helper_whose_daemon_is_neither_runtime": "both",
+        "update_refuses_its_options_and_a_signing_preset_before_anything_changes": "both",
+        "update_to_a_rust_daemon_that_does_not_analyze_crash_ledgers_is_refused_by_name": "both",
+        "verify_fails_without_a_document_when_a_daemon_fact_is_unreadable": "both",
+        "verify_of_an_unready_service_emits_its_state_and_opens_no_socket": "both",
+        "verify_reopens_the_recorded_observe_job_through_durable_reads_only": "historical",
+        "verify_reports_drift_as_blockers_and_fails_after_its_document": "historical",
+        "verify_without_a_job_runs_observe_through_the_daemon_and_reopens_its_job": "historical"
+      },
+      "ignored": [],
+      "platformFunctions": {
+        "darwin": [
+          "a_cutover_names_what_only_the_swift_runtime_can_settle",
+          "a_cutover_the_first_pass_refuses_changes_nothing",
+          "a_cutover_the_held_pass_refuses_starts_the_old_service_again",
+          "a_failed_rust_bootstrap_can_explicitly_roll_back_without_rewriting_runtime_state",
+          "a_fresh_verify_that_needs_a_person_or_is_refused_answers_as_swift_does",
+          "a_signing_preset_refuses_the_cutover_before_the_helper_runs",
+          "a_typed_install_failing_after_its_pin_leaves_the_pin_and_selection_for_a_retry",
+          "agentd_diagnostics_name_the_agentd_spelling",
+          "agentd_update_keeps_the_legacy_workspace_pair_and_agentd_install_carries_nothing_over",
+          "an_uninstall_whose_release_fails_reports_it_after_the_removal_it_keeps",
+          "restart_fails_when_the_current_job_closure_changes_across_it",
+          "restart_fails_when_the_replacement_is_the_same_process_or_speaks_another_catalog",
+          "restart_is_refused_while_a_current_job_is_active_or_unclosed",
+          "restart_of_an_unready_service_touches_nothing",
+          "restart_proves_a_new_process_with_the_same_catalog_and_the_same_closed_unknown_jobs",
+          "restart_reads_every_page_of_one_snapshot",
+          "restart_retries_only_launchds_transient_eio_and_enables_once_after_three",
+          "signing_identity_and_bootstrap_failures_report_both_causes",
+          "signing_identity_refresh_precedes_bootstrap_and_failure_restores_validated_service",
+          "status_keeps_the_legacy_workspace_pair_only_when_it_is_the_closed_demo_profile",
+          "status_measures_the_one_arkforge_release_unit_and_refuses_retired_lane_names",
+          "status_names_each_drift_and_is_not_ready",
+          "status_of_a_ready_service_pins_both_identities_and_asks_the_daemon_for_health",
+          "status_of_an_absent_service_reads_nothing_from_launchd",
+          "status_pins_an_owner_controlled_arktrace_descriptor_and_refuses_a_world_writable_one",
+          "the_analyzer_probe_is_the_recorded_swift_case",
+          "the_cli_answers_status_in_swifts_envelope_and_never_reaches_the_accounts_launchd",
+          "the_cli_answers_the_agentd_spelling_as_deprecated",
+          "the_cli_holds_a_retained_bundle_to_the_production_helper_policy",
+          "the_cli_installs_nothing_it_cannot_validate_and_uninstalls_an_absent_service",
+          "the_cli_refuses_restart_with_an_empty_stdout_and_verify_answers_an_absent_service",
+          "the_cli_refuses_the_options_these_leaves_do_not_take",
+          "the_cutover_takes_both_preflight_passes_and_records_the_old_state",
+          "the_typed_install_is_the_zero_runtime_path_and_refuses_before_it_pins",
+          "the_typed_install_pins_its_bundle_selects_its_tool_installs_them_and_keeps_only_that_pin",
+          "typed_install_refreshes_signing_before_bootstrap_and_finalizes_pin",
+          "uninstall_removes_the_service_then_releases_the_installations_pins",
+          "update_installs_a_swift_helper_as_swift_does_and_keeps_the_one_it_replaces",
+          "update_installs_the_retained_facade_pair_and_rolls_back_to_it",
+          "update_refuses_a_helper_whose_daemon_is_neither_runtime",
+          "update_refuses_its_options_and_a_signing_preset_before_anything_changes",
+          "update_to_a_rust_daemon_that_does_not_analyze_crash_ledgers_is_refused_by_name",
+          "verify_fails_without_a_document_when_a_daemon_fact_is_unreadable",
+          "verify_of_an_unready_service_emits_its_state_and_opens_no_socket",
+          "verify_reopens_the_recorded_observe_job_through_durable_reads_only",
+          "verify_reports_drift_as_blockers_and_fails_after_its_document",
+          "verify_without_a_job_runs_observe_through_the_daemon_and_reopens_its_job"
+        ],
+        "win32": [],
+        "linux": []
+      }
     },
     "arkdeck-cli/runtime_update": {
       "route": "both",
@@ -8636,9 +8800,23 @@
       ]
     },
     "arkdeck-hoststore/debug_hap_plan": {
-      "route": "both",
-      "functions": {},
-      "ignored": []
+      "route": "mixed",
+      "functions": {
+        "entry_and_additional_imports_are_held_until_success_or_preflight_refusal": "both",
+        "native_swift_plans_match_with_nothing_admitted_or_dispatched": "historical"
+      },
+      "ignored": [],
+      "platformFunctions": {
+        "darwin": [
+          "entry_and_additional_imports_are_held_until_success_or_preflight_refusal",
+          "native_swift_plans_match_with_nothing_admitted_or_dispatched"
+        ],
+        "win32": [
+          "entry_and_additional_imports_are_held_until_success_or_preflight_refusal",
+          "native_swift_plans_match_with_nothing_admitted_or_dispatched"
+        ],
+        "linux": []
+      }
     },
     "arkdeck-hoststore/debug_hap_run": {
       "route": "current",
@@ -8646,9 +8824,38 @@
       "ignored": []
     },
     "arkdeck-hoststore/debug_hap_submit": {
-      "route": "both",
-      "functions": {},
-      "ignored": []
+      "route": "mixed",
+      "functions": {
+        "a_hap_naming_a_capability_is_admitted_under_it_or_denied_as_swift_does": "both",
+        "an_admitted_hap_is_cancelled_at_preflight_with_no_use_spent": "both",
+        "an_admitted_hap_keeps_its_imported_packages_from_release": "both",
+        "an_agent_run_admits_the_hap_it_will_run": "both",
+        "between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_blocks_the_next_hap": "historical",
+        "rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued": "historical",
+        "without_an_hdc_composition_an_admitted_hap_is_not_run_and_consumes_no_use": "both"
+      },
+      "ignored": [],
+      "platformFunctions": {
+        "darwin": [
+          "a_hap_naming_a_capability_is_admitted_under_it_or_denied_as_swift_does",
+          "an_admitted_hap_is_cancelled_at_preflight_with_no_use_spent",
+          "an_admitted_hap_keeps_its_imported_packages_from_release",
+          "an_agent_run_admits_the_hap_it_will_run",
+          "between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_blocks_the_next_hap",
+          "rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued",
+          "without_an_hdc_composition_an_admitted_hap_is_not_run_and_consumes_no_use"
+        ],
+        "win32": [
+          "a_hap_naming_a_capability_is_admitted_under_it_or_denied_as_swift_does",
+          "an_admitted_hap_is_cancelled_at_preflight_with_no_use_spent",
+          "an_admitted_hap_keeps_its_imported_packages_from_release",
+          "an_agent_run_admits_the_hap_it_will_run",
+          "between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_blocks_the_next_hap",
+          "rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued",
+          "without_an_hdc_composition_an_admitted_hap_is_not_run_and_consumes_no_use"
+        ],
+        "linux": []
+      }
     },
     "arkdeck-hoststore/debug_invocation": {
       "route": "mixed",
@@ -9050,9 +9257,23 @@
       ]
     },
     "arkdeck-hoststore/native_library_plan": {
-      "route": "current",
-      "functions": {},
-      "ignored": []
+      "route": "mixed",
+      "functions": {
+        "rust_plans_the_swift_native_library_requests": "historical",
+        "rust_refuses_a_native_deployment_without_a_verified_code_sign_helper": "both"
+      },
+      "ignored": [],
+      "platformFunctions": {
+        "darwin": [
+          "rust_plans_the_swift_native_library_requests",
+          "rust_refuses_a_native_deployment_without_a_verified_code_sign_helper"
+        ],
+        "win32": [
+          "rust_plans_the_swift_native_library_requests",
+          "rust_refuses_a_native_deployment_without_a_verified_code_sign_helper"
+        ],
+        "linux": []
+      }
     },
     "arkdeck-hoststore/native_library_run": {
       "route": "current",
@@ -9068,6 +9289,13 @@
       "route": "both",
       "functions": {},
       "ignored": []
+    },
+    "arkdeck-hoststore/native_reconcile_current_oracle": {
+      "route": "historical",
+      "functions": {},
+      "ignored": [
+        "record_published_native_reconcile_oracle"
+      ]
     },
     "arkdeck-hoststore/observe_device": {
       "route": "mixed",

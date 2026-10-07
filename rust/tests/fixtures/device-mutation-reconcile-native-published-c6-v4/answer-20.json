@@ -1,0 +1,13 @@
+{
+  "answer" : {
+    "ok" : true,
+    "result" : [
+
+    ]
+  },
+  "method" : "cleanupDebt.list",
+  "name" : "debt.list",
+  "params" : {
+
+  }
+}

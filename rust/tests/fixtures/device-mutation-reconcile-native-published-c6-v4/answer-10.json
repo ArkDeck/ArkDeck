@@ -1,0 +1,19 @@
+{
+  "answer" : {
+    "error" : {
+      "code" : "resourceConflict",
+      "details" : {
+        "jobId" : "job-ce8967dc34b3de4312837b9a56dd5bb2",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission"
+      },
+      "message" : "job job-ce8967dc34b3de4312837b9a56dd5bb2 is failed, not runnable"
+    },
+    "ok" : false
+  },
+  "method" : "job.run",
+  "name" : "unpublished.resume",
+  "params" : {
+    "jobId" : "job-ce8967dc34b3de4312837b9a56dd5bb2"
+  }
+}

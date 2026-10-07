@@ -1,0 +1,58 @@
+{
+  "answer" : {
+    "ok" : true,
+    "result" : {
+      "actualEffect" : "deviceMutation",
+      "createdAtUtc" : "2026-09-14T00:00:00Z",
+      "executionMode" : "execute",
+      "failure" : {
+        "category" : "execution",
+        "code" : "executionFailed",
+        "recovery" : "inspectJob",
+        "retryability" : "runtimeDecisionRequired",
+        "schemaVersion" : "1.0.0"
+      },
+      "finishedAtUtc" : "2026-09-14T00:00:00Z",
+      "jobId" : "job-a8542c33a62a4286b4976973db7f1579",
+      "nextAction" : {
+        "kind" : "readResult",
+        "owner" : {
+          "id" : "job-a8542c33a62a4286b4976973db7f1579",
+          "kind" : "job"
+        },
+        "reasonCode" : "job.resultAvailable",
+        "resource" : {
+          "id" : "job-a8542c33a62a4286b4976973db7f1579",
+          "kind" : "job"
+        }
+      },
+      "operation" : "deploy.native-library.app-owned@1",
+      "outcome" : "failed",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "recoveryEpochId" : null,
+      "resolvedByTargetAliasResolutionId" : null,
+      "schemaVersion" : "arkdeck.job-status\/1",
+      "sessionId" : "session-job-a8542c33a62a4286b4976973db7f1579",
+      "sessionPublication" : {
+        "catalogGeneration" : "1",
+        "manifestSha256" : "77ae263ba68e27dfaed4c9ae99d35f1a8976ba8c17028499dad3701c74542b9e",
+        "reasonCode" : null,
+        "state" : "published"
+      },
+      "startedAtUtc" : "2026-09-14T00:00:00Z",
+      "state" : "failed",
+      "supersededByRecoveryEpochId" : null,
+      "targetId" : "TGT-3ba3f5f43b92",
+      "threadId" : null,
+      "waitingForHuman" : false,
+      "workspaceKind" : "debug"
+    }
+  },
+  "method" : "job.status",
+  "name" : "published.job.status",
+  "params" : {
+    "jobId" : "job-a8542c33a62a4286b4976973db7f1579"
+  }
+}

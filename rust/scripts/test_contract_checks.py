@@ -150,8 +150,7 @@ class ReadOnlyImportExpectationTests(unittest.TestCase):
 
 
 class ReadOnlyMachineOutputTests(unittest.TestCase):
-    """The pinned leaves' machine output: `observedAt` read as its label, then byte-equal to
-    the committed fixtures, which the recorded macOS lane produced (TASK-XPA-002)."""
+    """Full fixture bytes, with the time label and verified source-view identity."""
 
     def run_matrix(self, directory: Path, outputs: dict, write: bool = False) -> None:
         rows = []
@@ -166,10 +165,11 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
         self.assertEqual(sorted(path.name for path in fixtures.iterdir() if path.suffix == ".jsonl"),
                          sorted(f"{name}.cli.jsonl" for name in readonly.MACHINE_OUTPUT_LEAVES))
         observed = {}
+        digest = readonly.catalog_test_views.catalog(readonly.ROOT / "rust")
         for name in readonly.MACHINE_OUTPUT_LEAVES:
             data = (fixtures / f"{name}.cli.jsonl").read_bytes()
-            observed[name] = data.replace(b'"observedAt":"<observedAt>"',
-                                          b'"observedAt":"2026-09-30T12:38:52Z"')
+            observed[name] = readonly.machine_output_fixture(name, data, digest).replace(
+                b'"observedAt":"<observedAt>"', b'"observedAt":"2026-09-30T12:38:52Z"')
         with tempfile.TemporaryDirectory() as temporary:
             self.run_matrix(Path(temporary), observed)
         for name, change in (("operations", (b'"availability":"unavailable"', b'"availability":"available"')),
@@ -194,6 +194,179 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
             self.assertEqual((fixtures / "doctor.cli.jsonl").read_bytes(),
                              b'{"observedAt":"<observedAt>","n":"doctor"}\n')
             self.assertEqual((fixtures / "candidates.cli.jsonl").read_bytes(), b'{"n":"candidates"}\n')
+
+    def test_both_closed_views_change_only_the_single_catalog_field(self):
+        originals = {name: (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes()
+                     for name in readonly.MACHINE_OUTPUT_LEAVES}
+        old = readonly.catalog_test_views.OLD.encode()
+        current = readonly.catalog_test_views.CURRENT.encode()
+        for name, data in originals.items():
+            with self.subTest(name=name):
+                projected = readonly.machine_output_fixture(name, data, current.decode())
+                if name in ("doctor", "deep", "healthy"):
+                    self.assertEqual(data.count(old), 1)
+                    self.assertEqual(projected, data.replace(old, current, 1))
+                else:
+                    self.assertEqual(projected, data)
+                self.assertEqual(readonly.machine_output_fixture(name, projected, old.decode()), data)
+                self.assertEqual((readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes(), data)
+
+    def test_unknown_view_or_fixture_identity_is_rejected(self):
+        original = (readonly.MACHINE_OUTPUT / "doctor.cli.jsonl").read_bytes()
+        old = readonly.catalog_test_views.OLD
+        for digest in ("0" * 64, "", "future"):
+            with self.subTest(digest=digest), self.assertRaises(AssertionError):
+                readonly.machine_output_fixture("doctor", original, digest)
+        unknown = original.replace(old.encode(), b"0" * 64)
+        with self.assertRaises(AssertionError):
+            readonly.machine_output_fixture("doctor", unknown, old)
+
+    def test_changed_counts_or_duplicate_digest_are_rejected(self):
+        for name in ("doctor", "deep", "healthy"):
+            original = (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes()
+            malformed = (
+                original.replace(b'"operationCount":32', b'"operationCount":31', 1),
+                original.replace(b'"availableOperationCount":0', b'"availableOperationCount":1', 1),
+                original[:-2] + b',"extra":{"digest":"' +
+                readonly.catalog_test_views.OLD.encode() + b'"}}\n',
+            )
+            for data in malformed:
+                with self.subTest(name=name, data=data), self.assertRaises(AssertionError):
+                    readonly.machine_output_fixture(name, data, readonly.catalog_test_views.CURRENT)
+
+    def test_wrong_catalog_and_non_catalog_output_changes_still_fail(self):
+        digest = readonly.catalog_test_views.catalog(readonly.ROOT / "rust")
+        outputs = {name: readonly.machine_output_fixture(
+            name, (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes(), digest).replace(
+                b'"observedAt":"<observedAt>"', b'"observedAt":"2026-09-30T12:38:52Z"')
+            for name in readonly.MACHINE_OUTPUT_LEAVES}
+        other = readonly.catalog_test_views.OLD if digest == readonly.catalog_test_views.CURRENT \
+            else readonly.catalog_test_views.CURRENT
+        for name in ("doctor", "deep", "healthy"):
+            for before, after in ((digest.encode(), other.encode()),
+                                  (digest.encode(), b"0" * 64),
+                                  (b'"operationCount":32', b'"operationCount":31')):
+                changed = dict(outputs, **{name: outputs[name].replace(before, after, 1)})
+                self.assertNotEqual(changed, outputs)
+                with tempfile.TemporaryDirectory() as temporary, self.subTest(name=name, after=after), \
+                        self.assertRaises(AssertionError):
+                    self.run_matrix(Path(temporary), changed)
+
+    def test_unverified_source_view_refuses_before_reading_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(readonly.catalog_test_views, "catalog", side_effect=ValueError("source drift")), \
+                self.assertRaisesRegex(ValueError, "source drift"):
+            readonly.machine_output(Path(temporary), [], False)
+
+
+def candidate_execution_receipt(info):
+    """A synthetic producer receipt for isolated runner tests, never hardware evidence."""
+    return {
+        "schemaVersion": "arkdeck.catalog-test-execution/1",
+        "catalogDigest": info["catalogDigest"],
+        "completed": True,
+        "integrationPackages": ["arkdeck-cli", "arkdeck-contract"],
+        "targets": [
+            {"target": f"{package}/consumer", "execution": "actual", "completed": True,
+             "selected": ["consumer_case"], "functions": ["consumer_case"],
+             "passed": 1, "ignored": 0, "coverage": True, "substantivePassed": 1}
+            for package in ("arkdeck-cli", "arkdeck-contract")
+        ],
+    }
+
+
+class CandidateConsumerRoutingTests(unittest.TestCase):
+    """Candidate owner execution cannot bypass exact Catalog function routing."""
+
+    def test_drifted_candidate_uses_only_the_closed_router_and_preserves_host_checks(self):
+        view = Path("isolated-view")
+        commands = runner.commands(view, Path("output"), checkout_tested=True, candidate_inputs=True)
+        self.assertEqual(commands[0],
+                         ([sys.executable, str(view / "rust/scripts/run-workspace-tests.py"),
+                           "--parity-consumers"], view / "rust"))
+        self.assertFalse(any(argv[:2] == ["cargo", "test"] for argv, _ in commands))
+        self.assertEqual(commands[1][0][-1], "process-selftest")
+        self.assertEqual(commands[2][0], ["cargo", "build", "--workspace", "--bins", "--locked"])
+        self.assertEqual(commands[3][0][1], str(view / "rust/scripts/check-readonly.py"))
+
+    def run_candidate(self, root, receipt):
+        info = {"kind": "candidate", "inputDigest": "b" * 64, "catalogDigest": "c" * 64}
+        output = root / "output"
+        calls = []
+
+        def run(argv, *, cwd, env, check):
+            self.assertTrue(check)
+            self.assertEqual(env["ARKDECK_RUST_TEST_VIEW"], "candidate")
+            self.assertEqual(env["ARKDECK_RUST_TEST_REPORT_DIR"], str(output / "test-execution"))
+            calls.append(argv)
+            if receipt is not None and "--parity-consumers" in argv:
+                runner.write_json(output / "test-execution/candidate/catalog-execution.json", receipt)
+            return subprocess.CompletedProcess(argv, 0)
+
+        with patch.object(contract, "git", return_value=b"d" * 40), \
+                patch.object(runner, "rust_digest", return_value="e" * 64):
+            runner.run_view(root / "view", output, info,
+                            {"inputDigest": "a" * 64, "commit": "f" * 40}, run=run)
+        return output, calls
+
+    def test_exact_completed_consumer_receipt_is_pinned_in_provenance(self):
+        info = {"catalogDigest": "c" * 64}
+        with tempfile.TemporaryDirectory() as temporary:
+            output, calls = self.run_candidate(Path(temporary), candidate_execution_receipt(info))
+            receipt = output / "test-execution/candidate/catalog-execution.json"
+            provenance = json.loads((output / "provenance.json").read_bytes())
+            self.assertTrue(provenance["completed"])
+            self.assertEqual(provenance["result"], "pass")
+            self.assertEqual(provenance["candidateExecutionReceiptSHA256"], contract.sha(receipt.read_bytes()))
+            self.assertFalse(provenance["deviceAcceptance"])
+            self.assertEqual(len(calls), 4)
+
+    def test_absent_wrong_view_scope_and_nonexecution_receipts_refuse(self):
+        original = candidate_execution_receipt({"catalogDigest": "c" * 64})
+        negatives = [("absent", None)]
+        for field, value in (("catalogDigest", "0" * 64), ("completed", False),
+                             ("integrationPackages", "workspace"),
+                             ("integrationPackages", ["arkdeck-cli"]),
+                             ("integrationPackages", ["arkdeck-contract", "arkdeck-cli"])):
+            changed = copy.deepcopy(original)
+            changed[field] = value
+            negatives.append((f"wrong-{field}-{value}", changed))
+        for field, value in (("execution", "other-view"), ("execution", "optional-material-unavailable"),
+                             ("passed", 0), ("passed", True), ("passed", 2),
+                             ("ignored", 1), ("ignored", True), ("ignored", -1),
+                             ("completed", False), ("coverage", False),
+                             ("selected", []), ("selected", ["consumer_case", "consumer_case"]),
+                             ("selected", [""]), ("selected", [1]),
+                             ("functions", []), ("functions", ["different_case"]),
+                             ("substantivePassed", 0), ("substantivePassed", True),
+                             ("substantivePassed", 2), ("target", "arkdeck-cli"),
+                             ("target", "arkdeck-cli/"), ("target", None)):
+            changed = copy.deepcopy(original)
+            changed["targets"][0][field] = value
+            negatives.append((f"nonexecution-{field}-{value}", changed))
+        missing = copy.deepcopy(original)
+        missing["targets"].pop()
+        negatives.append(("missing-cli-or-contract", missing))
+        foreign = copy.deepcopy(original)
+        foreign["targets"].append({**foreign["targets"][0], "target": "arkdeck-agentd/foreign"})
+        negatives.append(("foreign-executed-owner", foreign))
+        for value in (None, {}, "not-a-list", [None], ["not-a-row"]):
+            changed = copy.deepcopy(original)
+            changed["targets"] = value
+            negatives.append((f"malformed-targets-{value}", changed))
+        missing_target = copy.deepcopy(original)
+        del missing_target["targets"][0]["target"]
+        negatives.append(("missing-actual-target", missing_target))
+        negatives.append(("malformed-document", []))
+        for label, receipt in negatives:
+            with tempfile.TemporaryDirectory() as temporary, self.subTest(label=label):
+                root = Path(temporary)
+                with self.assertRaises((OSError, ValueError)):
+                    self.run_candidate(root, receipt)
+                provenance = json.loads((root / "output/provenance.json").read_bytes())
+                self.assertFalse(provenance["completed"])
+                self.assertEqual(provenance["result"], "fail")
+                self.assertNotIn("candidateExecutionReceiptSHA256", provenance)
 
 
 class ContractChecksTests(unittest.TestCase):
@@ -641,8 +814,7 @@ class ContractChecksTests(unittest.TestCase):
         self.assertNotEqual(drifted["inputDigest"], self.published_info["inputDigest"])
         lint = ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"]
         workspace_tests = [sys.executable, str(self.root / "view/rust/scripts/run-workspace-tests.py")]
-        contract_and_cli = ["cargo", "test", "--package", "arkdeck-contract",
-                            "--package", "arkdeck-cli", "--locked"]
+        contract_and_cli = [*workspace_tests, "--parity-consumers"]
         for label, info, repeated in (
             ("candidate-of-published-inputs", identical, False),
             ("candidate-of-drifted-inputs", drifted, False),
@@ -653,6 +825,10 @@ class ContractChecksTests(unittest.TestCase):
 
                 def run(argv, *, cwd, env, check):
                     calls.append(argv)
+                    if "--parity-consumers" in argv:
+                        runner.write_json(self.root / "outputs" / label /
+                                          "test-execution/candidate/catalog-execution.json",
+                                          candidate_execution_receipt(info))
                     return subprocess.CompletedProcess(argv, 0)
 
                 runner.run_view(self.root / "view", self.root / "outputs" / label, info,
@@ -662,12 +838,11 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(
                     ["cargo", "test", "--package", "arkdeck-contract", "--locked"] in calls,
                     label == "candidate-of-published-inputs")
-                # Drifted candidate inputs test what reads the candidate kind,
-                # after building the binaries the CLI's process tests launch.
+                # The closed router builds the same-view sibling binaries and
+                # executes exact CLI/contract cases with workspace features.
                 self.assertEqual(contract_and_cli in calls, label == "candidate-of-drifted-inputs")
-                if contract_and_cli in calls:
-                    bins = ["cargo", "build", "--workspace", "--bins", "--locked"]
-                    self.assertLess(calls.index(bins), calls.index(contract_and_cli))
+                self.assertNotIn(["cargo", "test", "--package", "arkdeck-contract",
+                                  "--package", "arkdeck-cli", "--locked"], calls)
                 self.assertIn(["cargo", "build", "--workspace", "--bins", "--locked"], calls)
 
     def test_any_native_stage_failure_stops_that_view_and_is_preserved(self):
@@ -855,17 +1030,20 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(env["ARKDECK_RUST_TEST_VIEW"], label)
                 self.assertEqual(env["CARGO_TARGET_DIR"], str(self.root / label / "rust/target"))
                 calls.append(argv)
+                if "--parity-consumers" in argv:
+                    runner.write_json(self.root / "outputs" / label /
+                                      "test-execution/candidate/catalog-execution.json",
+                                      candidate_execution_receipt(info))
                 return subprocess.CompletedProcess(argv, 0)
 
             with patch.dict(os.environ, {"ARKDECK_RUST_TEST_WORKERS": "2"}):
                 runner.run_view(self.root / label, self.root / "outputs" / label, info, self.published_info, run=run)
             if label == "candidate":
-                # The candidate is the lane's checkout: the binaries the CLI's
-                # process tests launch, then only its kind's tests.
-                self.assertEqual(calls[0], ["cargo", "build", "--workspace", "--bins", "--locked"])
-                self.assertEqual(calls[1][:2], ["cargo", "test"])
-                self.assertIn("arkdeck-cli", calls[1])
-                self.assertEqual([argv[1] for argv in calls[2:4]], ["run", "build"])
+                # Candidate integration cases use the closed router; normal
+                # platform process checks and sibling binary build stay present.
+                self.assertEqual(calls[0], [sys.executable,
+                    str(self.root / label / "rust/scripts/run-workspace-tests.py"), "--parity-consumers"])
+                self.assertEqual([argv[1] for argv in calls[1:3]], ["run", "build"])
                 continue
             self.assertEqual(calls[0][1], "clippy")
             self.assertEqual(calls[1], [sys.executable, str(self.root / label / "rust/scripts/run-workspace-tests.py")])

@@ -28,6 +28,12 @@ Status: planned. Local transport is synthetic; no hardware result is claimed.
   historical provenance while recording the actual zero-call preflight refusal,
   five known failed diagnostic Sessions, one finalized event per Job and clear
   unrelated Import inspection. It does not fabricate target/tool observations.
+- The separate c6 Native reconcile recording preserves all 22 literal requests,
+  seven complete owner snapshots and 88 original file pins. Its two exercised
+  Jobs fail known before mutation and finalize diagnostic Sessions; the third
+  fresh submission remains in its actual preflight state. The original fixed
+  capability lookup keeps its complete success or notFound envelope, proved
+  against the full host plan and policy material rather than rewritten.
 - Source/fixture inventories, official complete generated Catalog output,
   package/source/executable Cargo Running bindings and complete non-ignored
   case receipts are checked. Default-only custom harnesses execute their actual

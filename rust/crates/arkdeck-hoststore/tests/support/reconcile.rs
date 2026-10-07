@@ -8,8 +8,10 @@
 //! afresh, then `recoverActiveJobs`), each recorded request answered by the
 //! Rust owner that serves it, and each recorded store snapshot compared file
 //! by file.
+#[cfg(unix)]
+use super::assert_store;
 use super::native_library::code_sign_helper;
-use super::{OracleProbe, assert_store, debug_hap, document, fixed_now, fixed_precise_now};
+use super::{OracleProbe, debug_hap, document, fixed_now, fixed_precise_now};
 use arkdeck_contract::{WireError, sha256_hex};
 use arkdeck_hoststore::{
     ArtifactReadStore, CapabilityStore, DeviceHolds, HdcComposition, JobAdmitter, JobPlanner,
@@ -133,6 +135,7 @@ impl Daemon {
     /// A daemon over the root another process left at the fixed root, not
     /// rebuilt and with no owner open yet: what a run that died there left,
     /// before any start reads it.
+    #[cfg(unix)]
     pub fn attach(name: &str) -> Self {
         let fixture = super::fixture(name);
         let provenance = document(&fixture, "provenance.json");
@@ -430,6 +433,7 @@ impl Daemon {
     /// and every Job file (records read machine-independently) and every file
     /// of the capability store, byte for byte, and, where the oracle kept it,
     /// the calls the fake had received.
+    #[cfg(unix)]
     pub fn assert_snapshot(&self, prefix: &str) {
         if self.fixture.file_name().and_then(|name| name.to_str()) == Some("nativeLibrary") {
             let index = super::hdc_oracle::native_readback::historical_index(
@@ -499,6 +503,7 @@ impl Daemon {
     /// recorded: the fake's every call, the Target document, and the Job
     /// store, capability store, Sessions, storage owner, Artifacts and tree
     /// byte for byte. The owners are closed first.
+    #[cfg(unix)]
     pub fn assert_leftovers(&mut self) {
         self.close();
         assert_eq!(

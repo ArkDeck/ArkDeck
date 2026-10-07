@@ -484,7 +484,18 @@ def host_selected(cwd: Path, directory: Path) -> int:
     return code
 
 
-def catalog_selected(cwd: Path, workers: int, directory: Path) -> int:
+PARITY_CONSUMERS = frozenset({'arkdeck-contract', 'arkdeck-cli'})
+
+
+def integration_groups(declared: dict, plan: dict, *, parity_consumers: bool = False) -> dict:
+    """A closed parity scope, retaining every same-name workspace sibling."""
+    scope = PARITY_CONSUMERS if parity_consumers else {key.split('/')[0] for key in declared}
+    selected_names = {target['name'] for package, target in plan['run'] if package in scope}
+    return {name: sorted(key for key, target in declared.items() if target['name'] == name)
+            for name in sorted(selected_names)}
+
+
+def catalog_selected(cwd: Path, workers: int, directory: Path, *, parity_consumers: bool = False) -> int:
     """Execute exact source-pinned cases in their declared Catalog view.
 
     Cargo still owns every environment and executable. Listing is never
@@ -505,7 +516,8 @@ def catalog_selected(cwd: Path, workers: int, directory: Path) -> int:
     report = {"schemaVersion": "arkdeck.catalog-test-execution/1", "catalogDigest": digest,
               "manifestSHA256": catalog_views.sha((cwd / catalog_views.MANIFEST).read_bytes()),
               "workers": workers, "completed": False, "stages": stages, "targets": receipts,
-              "hostCfgExcluded": sorted(f"{p}/{t['name']}" for p, t in plan['excluded'])}
+              "hostCfgExcluded": sorted(f"{p}/{t['name']}" for p, t in plan['excluded']),
+              "integrationPackages": sorted(PARITY_CONSUMERS) if parity_consumers else 'workspace'}
     try:
         # Each view builds its own sibling CLI/daemon images before any
         # process fixture; neither a stale target nor another view may answer.
@@ -523,9 +535,7 @@ def catalog_selected(cwd: Path, workers: int, directory: Path) -> int:
         bindings = artifact_bindings(messages, metadata)
         custom = catalog_views.custom_harnesses(metadata)
         declared = catalog_views.targets(metadata)
-        selected_names = {target['name'] for _, target in plan['run']}
-        groups = {name: sorted(key for key, target in declared.items() if target['name'] == name)
-                  for name in sorted(selected_names)}
+        groups = integration_groups(declared, plan, parity_consumers=parity_consumers)
         excluded = {f"{p}/{t['name']}" for p, t in plan['excluded']}
         if sys.platform == 'win32' and not re.fullmatch(r'[A-Fa-f0-9]{40}', os.environ.get('ARKDECK_DEV_SIGNER_THUMBPRINT', '')):
             raise ValueError('Windows signed process fixtures require the declared development signer')
@@ -567,9 +577,26 @@ def catalog_selected(cwd: Path, workers: int, directory: Path) -> int:
                 if listing['exitCode']:
                     raise ValueError('libtest listing failed')
                 names = {key: catalog_views.listed(sections[key]) for key in keys}
+                module_excluded = {key for key in keys if catalog_views.module_host_cfg_excluded(
+                    key, rows[key], sys.platform)}
+                if module_excluded:
+                    if len(keys) != 1 or any(names[key] for key in module_excluded):
+                        raise ValueError('host-excluded module changed its target or case census')
+                    run = recorded(command, directory, label + '-execute', cwd)
+                    local_stages.append(run)
+                    sections = running_sections(Path(run['log']).read_text(encoding='utf-8'), keys, bindings, cwd)
+                    if run['exitCode']:
+                        raise ValueError('host-excluded module execution failed')
+                    key = keys[0]
+                    catalog_views.verify_host_cfg_empty(sections[key])
+                    return local_stages, [{'target': key, 'completed': True, 'passed': 0, 'coverage': False,
+                                           'execution': 'host-cfg-excluded', 'listed': [],
+                                           'modulePlatforms': rows[key]['modulePlatforms'],
+                                           'cargoTarget': bindings[key]}]
                 if any(not names[key] and key not in excluded for key in keys):
                     raise ValueError('empty libtest list is not an audited host cfg exclusion')
-            selected = {key: catalog_views.selected(rows[key], names[key], digest) for key in keys}
+            selected = {key: catalog_views.selected(rows[key], names[key], digest)
+                        if not parity_consumers or key.split('/')[0] in PARITY_CONSUMERS else [] for key in keys}
             known_ignored = {key: sorted(set(rows[key]['ignored']).intersection(names[key])) for key in keys}
             if not protocols:
                 ignored_list = recorded(command + ['--', '--list', '--ignored'], directory, label + '-ignored-list', cwd)
@@ -661,6 +688,8 @@ def catalog_selected(cwd: Path, workers: int, directory: Path) -> int:
 
 
 def main() -> int:
+    if sys.argv[1:] not in ([], ['--parity-consumers']):
+        raise ValueError('unknown workspace test scope')
     workers = int(os.environ.get("ARKDECK_RUST_TEST_WORKERS", "1"))
     output = os.environ.get("ARKDECK_RUST_TEST_REPORT_DIR")
     # Checkout / published / candidate use separate reports as well as targets.
@@ -670,7 +699,7 @@ def main() -> int:
     if workers not in (1, 2):
         raise ValueError('workspace test workers must be 1 or 2')
     directory = Path(output) / name if output else Path(tempfile.mkdtemp(prefix='arkdeck-catalog-tests-'))
-    return catalog_selected(RUST, workers, directory)
+    return catalog_selected(RUST, workers, directory, parity_consumers=sys.argv[1:] == ['--parity-consumers'])
 
 
 if __name__ == "__main__":

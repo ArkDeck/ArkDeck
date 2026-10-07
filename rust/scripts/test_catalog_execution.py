@@ -130,6 +130,130 @@ class CargoTargetReceiptTests(unittest.TestCase):
             runner.group_filters(names, {'a/same':['shared'], 'b/same':[]})
 
 
+class ParityConsumerScopeTests(unittest.TestCase):
+    def test_closed_scope_retains_every_same_name_workspace_sibling(self):
+        declared = {key: {'name': key.split('/')[1]} for key in (
+            'arkdeck-cli/shared', 'arkdeck-contract/contract',
+            'arkdeck-hoststore/shared', 'arkdeck-hoststore/private')}
+        plan = {'run': [(key.split('/')[0], target) for key, target in declared.items()]}
+        self.assertEqual(runner.integration_groups(declared, plan, parity_consumers=True), {
+            'contract': ['arkdeck-contract/contract'],
+            'shared': ['arkdeck-cli/shared', 'arkdeck-hoststore/shared']})
+        self.assertEqual(runner.integration_groups(declared, plan), {
+            'contract': ['arkdeck-contract/contract'],
+            'private': ['arkdeck-hoststore/private'],
+            'shared': ['arkdeck-cli/shared', 'arkdeck-hoststore/shared']})
+        self.assertIn('--workspace', runner.BASE)
+        self.assertNotIn('--package', runner.BASE)
+
+    def test_unknown_command_scope_is_refused_before_any_cargo_call(self):
+        with patch.object(sys, 'argv', ['run-workspace-tests.py', '--packages', 'arkdeck-cli']), \
+             patch.object(runner, 'catalog_selected') as selected:
+            with self.assertRaisesRegex(ValueError, 'unknown workspace test scope'):
+                runner.main()
+            selected.assert_not_called()
+
+
+class CompleteModuleHostCfgTests(unittest.TestCase):
+    def exercise(self, platform, key='arkdeck-cli/device_wait', listing='', output=None):
+        with tempfile.TemporaryDirectory(prefix='arkdeck-module-host-cfg-') as temporary:
+            cwd = Path(temporary) / 'rust'
+            cwd.mkdir()
+            report = Path(temporary) / 'report'
+            report.mkdir()
+            package, name = key.split('/')
+            target = {'kind': ['test'], 'name': name, 'test': True,
+                      'src_path': str(cwd / 'crates' / package / 'tests' / (name + '.rs'))}
+            metadata = {'workspace_members': ['owner'], 'packages': [
+                {'id': 'owner', 'name': package, 'manifest_path': str(cwd / 'crates' / package / 'Cargo.toml'),
+                 'targets': [target]}]}
+            executable = str(cwd / 'target' / (name + '.exe'))
+            messages = [{'reason': 'compiler-artifact', 'package_id': 'owner', 'target': target,
+                         'executable': executable}, {'reason': 'build-finished', 'success': True}]
+            row = {'route': 'both', 'functions': {}, 'ignored': [],
+                   'modulePlatforms': runner.catalog_views.MODULE_HOST_PLATFORMS.get(key, [])}
+            manifest = {'targets': {key: row}}
+            manifest_path = cwd / runner.catalog_views.MANIFEST
+            manifest_path.parent.mkdir(parents=True)
+            manifest_path.write_text(json.dumps(manifest), encoding='utf-8')
+            plan = {'run': [(package, target)], 'excluded': [],
+                    'commands': [('integrations', runner.BASE + ['--test', name])]}
+            calls = []
+
+            def recorded(argv, directory, label, cwd):
+                calls.append(argv)
+                path = directory / (label + '.log')
+                if label == 'compile':
+                    text = '\n'.join(json.dumps(message) for message in messages) + '\n'
+                elif '--test' in argv:
+                    text = 'Running tests/' + name + '.rs (' + executable + ')\n'
+                    text += (listing + '\n0 tests, 0 benchmarks\n' if '--list' in argv else
+                             output if output is not None else
+                             'running 0 tests\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n')
+                else:
+                    text = 'built workspace bins\n'
+                path.write_text(text, encoding='utf-8')
+                return {'name': label, 'argv': argv, 'exitCode': 0, 'log': str(path)}
+
+            with patch.object(runner.subprocess, 'check_output', return_value=json.dumps(metadata)), \
+                 patch.object(runner, 'host_cfg', return_value=set()), \
+                 patch.object(runner, 'host_plan', return_value=plan), \
+                 patch.object(runner, 'recorded', side_effect=recorded), \
+                 patch.object(runner.catalog_views, 'load', return_value=manifest), \
+                 patch.object(runner.catalog_views, 'catalog', return_value=runner.catalog_views.CURRENT), \
+                 patch.object(runner.catalog_views, 'custom_harnesses', return_value={}), \
+                 patch.object(runner.sys, 'platform', platform), \
+                 patch.dict(os.environ, {'ARKDECK_DEV_SIGNER_THUMBPRINT': 'a' * 40}, clear=True):
+                try:
+                    result = runner.catalog_selected(cwd, 1, report)
+                except ValueError as error:
+                    result = str(error)
+            return result, calls, json.loads((report / 'catalog-execution.json').read_bytes())
+
+    def test_only_audited_inactive_module_executes_and_reports_zero_coverage(self):
+        for platform in ('linux', 'win32'):
+            with self.subTest(platform=platform):
+                result, calls, report = self.exercise(platform)
+                self.assertEqual(result, 0)
+                self.assertTrue(report['completed'])
+                self.assertEqual(report['targets'][0]['execution'], 'host-cfg-excluded')
+                self.assertEqual(report['targets'][0]['passed'], 0)
+                self.assertFalse(report['targets'][0]['coverage'])
+                actual = [argv for argv in calls if '--test' in argv]
+                self.assertEqual(actual, [runner.BASE + ['--test', 'device_wait', '--no-run', '--message-format=json'],
+                                          runner.BASE + ['--test', 'device_wait', '--', '--list'],
+                                          runner.BASE + ['--test', 'device_wait']])
+
+    def test_active_or_unclassified_empty_module_is_never_an_exclusion(self):
+        for platform, key in [('darwin', 'arkdeck-cli/device_wait'), ('linux', 'arkdeck-cli/unreviewed')]:
+            with self.subTest(platform=platform, key=key):
+                result, _, report = self.exercise(platform, key)
+                self.assertEqual(result, 'empty libtest list is not an audited host cfg exclusion')
+                self.assertFalse(report['completed'])
+
+    def test_excluded_module_cannot_hide_nonempty_failed_missing_or_duplicate_completion(self):
+        invalid = ['', 'test result: FAILED. 0 passed; 1 failed; 0 ignored;\n',
+                   'test result: ok. 0 passed; 0 failed; 1 ignored;\n',
+                   'test result: ok. 0 passed; 0 failed; 0 ignored;\n' * 2,
+                   'test new_case ... ok\ntest result: ok. 1 passed; 0 failed; 0 ignored;\n']
+        for output in invalid:
+            with self.subTest(output=output):
+                result, _, report = self.exercise('linux', output=output)
+                self.assertIsInstance(result, str)
+                self.assertFalse(report['completed'])
+        result, _, report = self.exercise('linux', listing='runtime::new_case: test')
+        self.assertEqual(result, 'host-excluded module changed its target or case census')
+        self.assertFalse(report['completed'])
+
+    def test_unknown_platform_or_module_declaration_is_refused(self):
+        with self.assertRaises(ValueError):
+            runner.catalog_views.module_host_cfg_excluded('arkdeck-cli/device_wait',
+                                                         {'modulePlatforms': ['linux']}, 'linux')
+        with self.assertRaises(ValueError):
+            runner.catalog_views.module_host_cfg_excluded('arkdeck-cli/device_wait',
+                                                         {'modulePlatforms': ['darwin']}, 'unreviewed')
+
+
 class CustomHarnessExecutionTests(unittest.TestCase):
     def exercise(self, protocol, output=None):
         with tempfile.TemporaryDirectory(prefix='arkdeck-custom-protocol-') as temporary:

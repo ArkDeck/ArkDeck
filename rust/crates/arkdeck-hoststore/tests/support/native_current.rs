@@ -301,6 +301,7 @@ pub fn expected_calls() -> String {
 
 pub fn publication_answers(
     fixture: &Path,
+    root: &Path,
     actual: &[Value],
     spelled: &impl Fn(&[u8]) -> Vec<u8>,
 ) -> Vec<(Value, Value, Value)> {
@@ -315,13 +316,130 @@ pub fn publication_answers(
         .iter()
         .zip(expected.as_array().unwrap())
         .map(|(actual, expected)| {
+            let mut expected = expected.clone();
+            expected["sessionShow"]["sizeBytes"] =
+                json!(publication_size(fixture, root, actual, &expected,).to_string());
             (
                 json!(format!("publication.{}", actual["jobId"].as_str().unwrap())),
                 actual.clone(),
-                expected.clone(),
+                expected,
             )
         })
         .collect()
+}
+
+/// Reconstruct only the source-bound platform field, preserving every other
+/// original byte. This is a host representation, never a learned size label.
+fn platform_manifest(bytes: &[u8], platform: &str) -> Vec<u8> {
+    let mut document: Value = serde_json::from_slice(bytes).unwrap();
+    let old = document["platformProfile"].as_str().unwrap();
+    assert!(["PLATFORM-MACOS@0.2.0", "PLATFORM-WINDOWS@0.2.0"].contains(&old));
+    assert!(["PLATFORM-MACOS@0.2.0", "PLATFORM-WINDOWS@0.2.0"].contains(&platform));
+    let quoted = serde_json::to_string(old).unwrap();
+    let text = std::str::from_utf8(bytes).unwrap();
+    assert_eq!(text.matches(&quoted).count(), 1);
+    let projected = text.replacen(&quoted, &serde_json::to_string(platform).unwrap(), 1);
+    document["platformProfile"] = json!(platform);
+    assert_eq!(serde_json::from_str::<Value>(&projected).unwrap(), document);
+    projected.into_bytes()
+}
+
+fn session_files(directory: &Path) -> BTreeMap<std::path::PathBuf, Vec<u8>> {
+    fn visit(base: &Path, directory: &Path, files: &mut BTreeMap<std::path::PathBuf, Vec<u8>>) {
+        for entry in fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            let metadata = fs::symlink_metadata(&path).unwrap();
+            assert!(!metadata.is_symlink());
+            if metadata.is_dir() {
+                visit(base, &path, files);
+            } else {
+                assert!(metadata.is_file());
+                assert!(
+                    files
+                        .insert(
+                            path.strip_prefix(base).unwrap().to_owned(),
+                            fs::read(path).unwrap()
+                        )
+                        .is_none()
+                );
+            }
+        }
+    }
+    let mut files = BTreeMap::new();
+    visit(directory, directory, &mut files);
+    files
+}
+
+pub fn publication_size(fixture: &Path, root: &Path, actual: &Value, expected: &Value) -> usize {
+    let job = expected["jobId"].as_str().unwrap();
+    assert_eq!(actual["jobId"], job);
+    let original = document(fixture, &format!("store/jobs/{job}/job-record.json"));
+    let relative = original["sessionPublicationRecord"]["relativeSessionPath"]
+        .as_str()
+        .unwrap();
+    assert!(
+        Path::new(relative)
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
+    );
+    let source = session_files(&fixture.join("sessions").join(relative));
+    let host = session_files(&root.join("Sessions").join(relative));
+    assert_eq!(
+        source.keys().collect::<Vec<_>>(),
+        host.keys().collect::<Vec<_>>()
+    );
+    let manifest = Path::new("manifest.json");
+    let original_manifest = platform_manifest(&source[manifest], "PLATFORM-WINDOWS@0.2.0");
+    assert_eq!(sha256_hex(&original_manifest), expected["manifestSHA256"]);
+    assert_eq!(
+        original_manifest.len().to_string(),
+        expected["manifestByteCount"]
+    );
+    let other_bytes: usize = source
+        .iter()
+        .filter(|(path, _)| path.as_path() != manifest)
+        .map(|(_, bytes)| bytes.len())
+        .sum();
+    assert_eq!(
+        (other_bytes + original_manifest.len()).to_string(),
+        expected["sessionShow"]["sizeBytes"]
+    );
+    let host_manifest = &host[manifest];
+    // The raw proof still names the host's complete Manifest, before labels.
+    let job_owner = if root.join("store").exists() {
+        "store"
+    } else {
+        "jobs-state"
+    };
+    let raw_proof = document(root, &format!("{job_owner}/jobs/{job}/job-record.json"));
+    assert_eq!(
+        sha256_hex(host_manifest),
+        raw_proof["sessionPublicationRecord"]["receipt"]["manifestSHA256"]
+    );
+    assert_eq!(host_manifest.len().to_string(), actual["manifestByteCount"]);
+    let host_bytes: usize = host.values().map(Vec::len).sum();
+    assert_eq!(host_bytes.to_string(), actual["sessionShow"]["sizeBytes"]);
+    for (path, bytes) in &source {
+        if path.as_path() != manifest {
+            assert_eq!(
+                host[path].len(),
+                bytes.len(),
+                "unchanged entry count {path:?}"
+            );
+        }
+    }
+    let platform = if cfg!(windows) {
+        "PLATFORM-WINDOWS@0.2.0"
+    } else {
+        "PLATFORM-MACOS@0.2.0"
+    };
+    assert_eq!(
+        serde_json::from_slice::<Value>(host_manifest).unwrap()["platformProfile"],
+        platform
+    );
+    // Complete source/host entry byte equality follows in assert_leftovers;
+    // this aggregate is independently derived before answer comparison.
+    other_bytes + platform_manifest(&source[manifest], platform).len()
 }
 
 fn write_new(root: &Path, path: &str, bytes: &[u8]) {

@@ -28,6 +28,13 @@ use support::native_library::{self, FIXTURE, answer};
 
 #[test]
 fn rust_plans_the_swift_native_library_requests() {
+    // This exact historical whole-frame oracle runs in the pinned c6 view.
+    // The current Native full-plan unit and observed-v1 replay separately
+    // require all three new evidence reads and their complete plan hashes.
+    assert_eq!(
+        arkdeck_contract::CATALOG_DIGEST,
+        support::catalog_lineage::OLD
+    );
     let _lock = debug_hap::exclusive();
     let fixture = support::fixture(FIXTURE);
     let cases = support::document(&fixture, "cases.json");
@@ -51,34 +58,8 @@ fn rust_plans_the_swift_native_library_requests() {
         if actual["ok"] == true {
             materialized += 1;
         }
-        let mut actual = support::legacy_plan_answer(actual);
-        let mut expected = exchange["answer"].clone();
-        if actual["ok"] == true {
-            assert_eq!(
-                actual["result"]["catalogDigest"],
-                arkdeck_contract::CATALOG_DIGEST
-            );
-            let steps = actual["result"]["steps"].as_array_mut().unwrap();
-            let prefix: Vec<_> = steps.drain(2..5).collect();
-            assert_eq!(
-                prefix
-                    .iter()
-                    .map(|step| step["stepId"].as_str().unwrap())
-                    .collect::<Vec<_>>(),
-                [
-                    "confirm-evidence-target",
-                    "read-evidence-model",
-                    "read-evidence-firmware"
-                ]
-            );
-            assert!(prefix.iter().all(|step| step["effect"] == "readOnly"
-                && step["binding"] == "confirmedDevice"
-                && step["optional"] == false));
-            // CHG-2026-081 adds this verified prefix to the current materialized
-            // plan. Every pre-existing public plan field/step remains the oracle's.
-            expected["result"]["catalogDigest"] =
-                serde_json::json!(arkdeck_contract::CATALOG_DIGEST);
-        }
+        let actual = support::legacy_plan_answer(actual);
+        let expected = exchange["answer"].clone();
         labels.learn(&actual, &expected, "/result/materializedPlanDigest");
         let actual = labels.swift(&actual);
         if actual != expected {

@@ -686,6 +686,7 @@ fn replay_into(
     if current_native {
         answers.extend(native_current::publication_answers(
             &fixture,
+            &owners.root,
             &publication_proofs,
             &spelled,
         ));

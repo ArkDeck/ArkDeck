@@ -1,0 +1,16 @@
+{
+  "answer" : {
+    "ok" : true,
+    "result" : {
+      "deduplicated" : false,
+      "jobId" : "job-d9de22a23a070a782afab9b5ed649300",
+      "newDispatchCount" : 0,
+      "schemaVersion" : "arkdeck.job-acceptance\/1"
+    }
+  },
+  "method" : "job.submit",
+  "name" : "afterUnknown.submit",
+  "params" : {
+    "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-mutation-afterUnknown\",\"inputs\":{\"expectedABI\":\"arm64-v8a\",\"libraryArtifactLease\":\"lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397\",\"libraryLogicalName\":\"libexample.so\",\"restartProfile\":\"restartAbility\",\"rollbackPolicy\":\"autoRollback\",\"targetBundle\":\"com.example.demo\",\"verificationProfile\":\"hashProcessAndMaps\"},\"operation\":{\"id\":\"deploy.native-library.app-owned\",\"version\":1},\"requestId\":\"req-mutation-afterUnknown\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+  }
+}

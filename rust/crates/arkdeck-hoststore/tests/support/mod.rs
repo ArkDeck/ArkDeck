@@ -20,9 +20,11 @@ pub mod native_library;
 pub mod native_observation;
 #[path = "../../../arkdeck-provider-hdc/tests/common/oracle_fake.rs"]
 pub mod oracle_fake;
-// The device reconcilers these replays drive are macOS-only, and the shared
-// fake HDC they dispatch to is a POSIX shell script.
-#[cfg(target_os = "macos")]
+// Historical dispatching replays remain Unix-only. The separately recorded
+// published-c6 Native refusal also opens these owners on Windows, with NoDispatch.
+#[cfg(any(target_os = "macos", windows))]
+pub mod native_reconcile_current;
+#[cfg(any(target_os = "macos", windows))]
 pub mod reconcile;
 
 use arkdeck_hoststore::{StorageProbe, StorageSnapshot};
