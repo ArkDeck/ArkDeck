@@ -1263,6 +1263,7 @@ fn device_context(
     let mut connect_key: Option<&str> = None;
     let mut confirmed_outcome = false;
     let mut mutation = false;
+    let mut mutation_times = Vec::new();
     for intent in intents {
         let target = &intent["payload"]["target"];
         let key = target["connectKey"].as_str().filter(|key| !key.is_empty());
@@ -1292,12 +1293,18 @@ fn device_context(
             .filter(|outcome| outcome["payload"]["outcomeCertainty"] == "confirmed")
             .ok_or_else(|| refused("Journal device outcome is missing or not confirmed"))?;
         confirmed_outcome |= outcome["payload"]["result"] == "succeeded";
-        mutation |= declaration(intent).is_some_and(|step| {
+        if declaration(intent).is_some_and(|step| {
             matches!(
                 step["effect"].as_str(),
                 Some("deviceMutation" | "destructive")
             )
-        });
+        }) {
+            mutation = true;
+            mutation_times.push(
+                seconds(intent["timestamp"].as_str())
+                    .ok_or_else(|| refused("mutation intent time is unreadable"))?,
+            );
+        }
     }
     let (Some(connect_key), true) = (connect_key, confirmed_outcome) else {
         return Err(refused(
@@ -1311,7 +1318,7 @@ fn device_context(
         if !admission["reference"]
             .as_str()
             .is_some_and(|reference| !reference.is_empty())
-            || !admitted.is_some_and(|admitted| admitted <= confirmed_at)
+            || !admitted.is_some_and(|admitted| admitted <= finished_at)
             || !member("completeOverwriteRecovery").is_null()
         {
             return Err(unaudited());
@@ -1326,6 +1333,7 @@ fn device_context(
         match admission["kind"].as_str() {
             Some("defaultReadOnlyPolicy") => {
                 if mutation
+                    || !admitted.is_some_and(|admitted| admitted <= confirmed_at)
                     || !member("validUntilUTC").is_null()
                     || !member("consumptionFingerprintSHA256").is_null()
                     || !member("runtimeCapabilityCorrelation").is_null()
@@ -1335,7 +1343,13 @@ fn device_context(
             }
             Some("runtimeCapability") => {
                 let correlation = &admission["runtimeCapabilityCorrelation"];
-                if !correlation["reservationID"]
+                // The Runtime first confirms fresh evidence, then consumes
+                // the use before every mutation/compensation intent. Later
+                // continuations retain that consumed use, including its expiry.
+                if !admitted.is_some_and(|admitted| {
+                    confirmed_at <= admitted
+                        && mutation_times.iter().all(|intent| admitted <= *intent)
+                }) || !correlation["reservationID"]
                     .as_str()
                     .is_some_and(|s| !s.is_empty())
                     || !correlation["useOrdinal"].as_u64().is_some_and(|n| n > 0)

@@ -1096,3 +1096,338 @@ fn concurrent_preconsume_retries_keep_one_receipt_and_restart_does_not_republish
         calls_before
     );
 }
+
+/// A deterministic one-second boundary between fresh evidence and the actual
+/// capability consumption. Only the in-process oracle is used on Windows.
+static PUBLICATION_ADMITTED: AtomicBool = AtomicBool::new(false);
+
+fn publication_now() -> Option<String> {
+    Some(
+        if PUBLICATION_ADMITTED.load(Ordering::SeqCst) {
+            "2026-09-14T00:00:01Z"
+        } else {
+            "2026-09-14T00:00:00Z"
+        }
+        .into(),
+    )
+}
+
+fn consumed_publication_reconcile(
+    owners: &Owners,
+    job: &str,
+) -> Result<Value, arkdeck_contract::WireError> {
+    let publisher = owners.publisher();
+    arkdeck_hoststore::JobReconciler {
+        jobs: &owners.jobs,
+        artifacts: &owners.artifacts,
+        imports: None,
+        now: publication_now,
+        sessions: Some(&publisher),
+        hdc: None,
+        capabilities: None,
+        runner: None,
+    }
+    .handle(json!({"jobId": job}).as_object().unwrap())
+}
+
+struct PublicationClockDispatch<'a>(&'a FakeDispatch);
+
+impl HdcDispatch for PublicationClockDispatch<'_> {
+    fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
+        self.0.dispatch(plan)
+    }
+
+    fn mutation_identity_current(&self) -> bool {
+        let current = self.0.mutation_identity_current();
+        PUBLICATION_ADMITTED.store(true, Ordering::SeqCst);
+        current
+    }
+}
+
+/// Run a real fixture through the production admission and fake provider,
+/// retaining only its failed publication as an older producer did. The
+/// consumed capability record is never edited or reconstructed.
+fn retained_consumed_hap(owners: &Owners, cases: &Value, mode: &str) -> String {
+    PUBLICATION_ADMITTED.store(false, Ordering::SeqCst);
+    let dispatch = PublicationClockDispatch(&owners.dispatch);
+    let hdc = owners.hdc(&dispatch);
+    let publisher = owners.publisher();
+    let job = admitted(owners, &hdc, cases, mode);
+    let mut runner = owners.runner(&hdc, &publisher, true);
+    runner.now = publication_now;
+    runner.sessions = None;
+    let status = runner
+        .handle(json!({"jobId": job}).as_object().unwrap())
+        .unwrap();
+    assert_eq!(
+        status["state"],
+        if mode == "normal" {
+            "succeeded"
+        } else {
+            "failed"
+        },
+        "{status}"
+    );
+    assert_eq!(status["outcomeUnknown"], false);
+    let mut record = owners.record(&job);
+    assert_eq!(
+        record["evidenceObservation"]["confirmedAtUTC"],
+        "2026-09-14T00:00:00Z"
+    );
+    assert_eq!(
+        record["admissionEvidence"]["admittedAtUTC"],
+        "2026-09-14T00:00:01Z"
+    );
+    record["sessionPublicationRecord"] = json!({
+        "sessionID": format!("session-{job}"), "catalogDigest": record["catalogDigest"],
+        "policyGeneration": "0", "root": {"path": "", "device": "0", "inode": "0", "volumeIdentity": ""},
+        "relativeSessionPath": "", "claims": [], "phase": "awaitingStorage",
+        "failure": {"code": "sourceIntegrityFailed", "certainty": "confirmed", "detail": "isolated consumed HAP publication fixture"},
+    });
+    owners
+        .jobs
+        .persist(
+            &JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap(),
+            &publication_now().unwrap(),
+        )
+        .unwrap();
+    job
+}
+
+#[test]
+fn fresh_evidence_before_consumption_publishes_only_the_known_terminal_hap() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    for mode in ["normal", "startFailed"] {
+        let owners = Owners::open(&fixture);
+        let job = retained_consumed_hap(&owners, &cases, mode);
+        let before = owners.record(&job);
+        let journal_before = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+        let capabilities = debug_hap::tree_bytes(&owners.default_root.join("capabilities"));
+        let calls = owners.calls();
+        let imports =
+            arkdeck_hoststore::ImportUploadStore::open(&owners.root.join("artifacts")).unwrap();
+        let receipt = debug_hap::import_package(
+            &imports,
+            &owners.artifacts,
+            "publication-census",
+            "TGT-ISOLATED-IMPORT",
+            1,
+            &"a".repeat(64),
+            &fixed_now().unwrap(),
+        );
+        let inspect = || {
+            imports.lifecycle_resource(
+                &owners.artifacts,
+                &owners.jobs,
+                "artifact.import.inspection",
+                json!({"importId": receipt["importId"]})
+                    .as_object()
+                    .unwrap(),
+                &fixed_now().unwrap(),
+            )
+        };
+        assert_eq!(inspect().unwrap_err().code, "recordUnreadable");
+        let status = consumed_publication_reconcile(&owners, &job).unwrap();
+        assert_eq!(status["state"], before["state"]);
+        assert_eq!(
+            status["sessionPublication"]["state"], "published",
+            "{status}"
+        );
+        let mut after = owners.record(&job);
+        let published = after["sessionPublicationRecord"].clone();
+        after["sessionPublicationRecord"] = before["sessionPublicationRecord"].clone();
+        assert_eq!(after, before);
+        let session = owners
+            .root
+            .join("Sessions")
+            .join(published["relativeSessionPath"].as_str().unwrap());
+        let manifest = support::document(&session, "manifest.json");
+        assert_eq!(
+            manifest["runtimeAuthority"]["admittedAtUtc"],
+            before["admissionEvidence"]["admittedAtUTC"]
+        );
+        assert_eq!(
+            manifest["runtimeAuthority"]["planDigest"],
+            before["materializedPlanDigest"]
+        );
+        let journal_after = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+        assert!(journal_after.starts_with(&journal_before));
+        let finalized: Value = serde_json::from_slice(
+            journal_after[journal_before.len()..]
+                .strip_suffix(b"\n")
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(finalized["kind"], "finalized");
+        assert_eq!(finalized["timestamp"], publication_now().unwrap());
+        assert_eq!(finalized["payload"]["terminalStatus"], before["state"]);
+        assert_eq!(inspect().unwrap()["references"]["state"], "clear");
+        let persisted = fs::read(owners.job_file(&job, "job-record.json")).unwrap();
+        let repeat = consumed_publication_reconcile(&owners, &job);
+        if before["state"] == "failed" {
+            // Failure lineage repair remains outside the HAP retry lane.
+            // The settled Session is retained without touching that authority.
+            assert_eq!(repeat.unwrap_err().code, "rejected");
+        } else {
+            assert_eq!(repeat.unwrap(), status);
+        }
+        assert_eq!(
+            fs::read(owners.job_file(&job, "job-record.json")).unwrap(),
+            persisted
+        );
+        assert_eq!(
+            fs::read(owners.job_file(&job, "journal.jsonl")).unwrap(),
+            journal_after
+        );
+        assert_eq!(owners.calls(), calls);
+        assert_eq!(
+            debug_hap::tree_bytes(&owners.default_root.join("capabilities")),
+            capabilities
+        );
+    }
+}
+
+#[test]
+fn consumed_hap_publication_refuses_late_missing_expired_or_uncertain_authority() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    for scenario in [
+        "mutationBeforeAdmission",
+        "compensationBeforeAdmission",
+        "missingAudit",
+        "expired",
+        "planDrift",
+        "missingReservation",
+        "missingFingerprint",
+        "unknown",
+        "torn",
+    ] {
+        let owners = Owners::open(&fixture);
+        let job = retained_consumed_hap(
+            &owners,
+            &cases,
+            if scenario == "compensationBeforeAdmission" {
+                "startFailed"
+            } else {
+                "normal"
+            },
+        );
+        let path = owners.job_file(&job, "journal.jsonl");
+        let mut record = owners.record(&job);
+        match scenario {
+            "mutationBeforeAdmission" | "compensationBeforeAdmission" => {
+                let mut events: Vec<Value> = fs::read_to_string(&path)
+                    .unwrap()
+                    .lines()
+                    .map(|line| serde_json::from_str(line).unwrap())
+                    .collect();
+                let intent = events
+                    .iter_mut()
+                    .find(|event| {
+                        if scenario == "compensationBeforeAdmission" {
+                            event["kind"] == "compensationIntent"
+                        } else {
+                            event["kind"] == "stepIntent"
+                                && event["payload"]["step"]["effect"] == "deviceMutation"
+                        }
+                    })
+                    .unwrap();
+                intent["timestamp"] = json!("2026-09-14T00:00:00Z");
+                fs::write(
+                    &path,
+                    events
+                        .iter()
+                        .map(|event| format!("{}\n", serde_json::to_string(event).unwrap()))
+                        .collect::<String>(),
+                )
+                .unwrap();
+            }
+            "missingAudit" => {
+                record.as_object_mut().unwrap().remove("admissionEvidence");
+            }
+            "expired" => {
+                record["admissionEvidence"]["validUntilUTC"] =
+                    record["admissionEvidence"]["admittedAtUTC"].clone();
+            }
+            "planDrift" => {
+                record["admissionEvidence"]["runtimeCapabilityCorrelation"]["planDigestSHA256"] =
+                    json!("a".repeat(64));
+            }
+            "missingReservation" => {
+                record["admissionEvidence"]["runtimeCapabilityCorrelation"]["reservationID"] =
+                    Value::Null;
+            }
+            "missingFingerprint" => {
+                record["admissionEvidence"]["consumptionFingerprintSHA256"] = Value::Null;
+            }
+            "unknown" => {
+                record["outcomeUnknown"] = json!(true);
+            }
+            "torn" => {
+                use std::io::Write;
+                fs::OpenOptions::new()
+                    .append(true)
+                    .open(&path)
+                    .unwrap()
+                    .write_all(b"{torn")
+                    .unwrap();
+            }
+            _ => unreachable!(),
+        }
+        let source_tree = debug_hap::tree_bytes(path.parent().unwrap());
+        let source_calls = owners.calls();
+        let source_capabilities = debug_hap::tree_bytes(&owners.default_root.join("capabilities"));
+        let decoded = match JobRecord::decode(&serde_json::to_vec(&record).unwrap()) {
+            Ok(record) => record,
+            Err(error) => {
+                assert!(
+                    ["planDrift", "missingReservation", "missingFingerprint"].contains(&scenario),
+                    "{scenario}: {error:?}"
+                );
+                assert_eq!(error.code, "recordUnreadable", "{scenario}");
+                assert_eq!(debug_hap::tree_bytes(path.parent().unwrap()), source_tree);
+                assert_eq!(owners.calls(), source_calls);
+                assert_eq!(
+                    debug_hap::tree_bytes(&owners.default_root.join("capabilities")),
+                    source_capabilities
+                );
+                continue;
+            }
+        };
+        owners
+            .jobs
+            .persist(&decoded, &publication_now().unwrap())
+            .unwrap();
+        let before = owners.record(&job);
+        let journal = fs::read(&path).unwrap();
+        let capabilities = debug_hap::tree_bytes(&owners.default_root.join("capabilities"));
+        let calls = owners.calls();
+        let result = consumed_publication_reconcile(&owners, &job);
+        assert!(
+            (result.is_err()
+                || result
+                    .as_ref()
+                    .is_ok_and(|status| status["sessionPublication"]["state"] != "published")),
+            "{scenario}: {result:?}"
+        );
+        let mut after = owners.record(&job);
+        after["sessionPublicationRecord"] = before["sessionPublicationRecord"].clone();
+        assert_eq!(after, before, "{scenario}");
+        assert_eq!(fs::read(&path).unwrap(), journal, "{scenario}");
+        assert!(
+            !owners
+                .job_file(&job, "session-manifest.proposal.json")
+                .exists(),
+            "{scenario}"
+        );
+        assert_eq!(owners.calls(), calls, "{scenario}");
+        assert_eq!(
+            debug_hap::tree_bytes(&owners.default_root.join("capabilities")),
+            capabilities,
+            "{scenario}"
+        );
+    }
+}
