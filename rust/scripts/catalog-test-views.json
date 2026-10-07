@@ -76,7 +76,7 @@
     "crates/arkdeck-agentd/tests/managed_hdc_process.rs": "a19ffc565a66828a8719e2e6857f7da724ad0aeaead88ec951d88d1f9e158666",
     "crates/arkdeck-agentd/tests/production_composition.rs": "f2817c26b098eb2f0184ab96f546f6632ec3b562685b347378f4505efdbcd189",
     "crates/arkdeck-agentd/tests/retired_facade.rs": "8e37258ef9cba3d76f47ab6f767cf975de286faebb0f15735973bdac83e490bd",
-    "crates/arkdeck-agentd/tests/spawning/account_tool_selection.rs": "2241e6c73044434aedc7c3984e3c8f2bbdc943a784b3cbd716546e81d265d386",
+    "crates/arkdeck-agentd/tests/spawning/account_tool_selection.rs": "78226204bd9f8f6f26e2efd9fb4aa819d4bb9213688d30d8ea587a7df37b0d0f",
     "crates/arkdeck-agentd/tests/spawning/app_ingress_fake_hdc.rs": "b1c14399d4cbecf7289e0b9ca81af319660b6dde61280b14eeb9169a113cad0c",
     "crates/arkdeck-agentd/tests/spawning/debug_leaves_cli.rs": "773eb809a5ad67ecd61a45911984944999504aca9c6ec05e27567a8defe21c2d",
     "crates/arkdeck-agentd/tests/spawning/debug_probe_replay.rs": "b877e177937830861b2bfeeaf4a91013c38bae2e77a136c6c52f6db3cfd0c038",
