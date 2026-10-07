@@ -91,6 +91,31 @@ class HistoricalCatalogInputs(unittest.TestCase):
         expected = generator.generate_matrix(list(self.old.values()), profiles, views.OLD).encode()
         self.assertEqual(historical.files[MATRIX], expected)
 
+    def test_materialized_development_baseline_pins_its_actual_selected_bytes(self):
+        historical = runner.historical_catalog_inputs(self.inputs)
+        selected = runner.contract.baseline(historical, '1' * 40)
+        published = runner.contract.baseline(self.inputs, '2' * 40)
+        self.assertNotEqual(selected['inputDigest'], published['inputDigest'])
+        destination = self.base / 'materialized'
+
+        def empty_current_rust(source, target):
+            (target / 'crates/arkdeck-contract/src').mkdir(parents=True)
+
+        with patch.object(runner, 'copy_rust', side_effect=empty_current_rust), \
+             patch.object(runner.contract, 'formatted', side_effect=lambda text: text):
+            runner.materialize(destination, historical, selected, published,
+                               catalog_source='// isolated generated Catalog\n',
+                               review_source=self.projection,
+                               catalog_generator_source=self.generator)
+        actual = json.loads((destination / 'spec/baselines/swift-single-v1.json').read_bytes())
+        self.assertEqual(actual, selected)
+        self.assertEqual(actual['catalogDigest'], views.OLD)
+        for path, pin in actual['files'].items():
+            data = (destination / path).read_bytes()
+            self.assertEqual(hashlib.sha256(data).hexdigest(), pin['sha256'], path)
+            self.assertEqual(blob(data), pin['blob'], path)
+        self.assertFalse((destination / 'spec/baselines/swift-candidate-inputs.json').exists())
+
     def test_a_historical_input_stays_exact_when_the_base_is_already_historical(self):
         historical = runner.historical_catalog_inputs(self.inputs)
         repeated = runner.historical_catalog_inputs(historical)

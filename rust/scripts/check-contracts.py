@@ -15,6 +15,7 @@ import importlib.util
 import json
 import io
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -233,7 +234,12 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
     integrations = ROOT / INTEGRATIONS
     if integrations.is_dir():
         shutil.copytree(integrations, destination / INTEGRATIONS, dirs_exist_ok=True)
-    write_json(destination / "spec/baselines/swift-single-v1.json", published_info)
+    # A development view embeds its own complete selected input baseline.
+    # The reconstructed historical JSON bytes may differ from the merge-base's
+    # spelling even when every descriptor value is identical. Candidate views
+    # retain the separate published baseline for their correlation checks.
+    write_json(destination / "spec/baselines/swift-single-v1.json",
+               info if info["kind"] == "development" else published_info)
     if info["kind"] == "candidate":
         write_json(destination / "spec/baselines/swift-candidate-inputs.json", info)
     generated = destination / "rust/crates/arkdeck-contract/src"
@@ -279,9 +285,12 @@ def commands(view: Path, output: Path, *, owners: bool = False,
             # first, in this view's own target, so no binary of a cached or
             # other build answers with another contract's digest (#2548's
             # regression: windows_signed_runtime read a stale daemon).
-            native = [(["cargo", "build", "--workspace", "--bins", "--locked"], rust),
-                      (["cargo", "test", "--package", "arkdeck-contract",
-                        "--package", "arkdeck-cli", "--locked"], rust)]
+            # Reuse the exact function routes for integration consumers. The
+            # router retains --workspace feature unification and all ordinary
+            # lib/bin/doc/example defaults; historical cases still execute in
+            # the mandatory c6 view, with their own complete receipts.
+            native = [([sys.executable, str(rust / "scripts/run-workspace-tests.py"),
+                        "--parity-consumers"], rust)]
     else:
         native = [
             (["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"], rust),
@@ -381,8 +390,43 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
                                for row in value['targets'])):
                 raise ValueError('mandatory historical owner execution receipt absent or invalid')
             provenance['historicalExecutionReceiptSHA256'] = contract.sha(receipt.read_bytes())
+        if candidate_inputs:
+            receipt = output / 'test-execution/candidate/catalog-execution.json'
+            value = json.loads(receipt.read_bytes())
+            if (not isinstance(value, dict) or not isinstance(value.get('targets'), list)
+                    or any(not isinstance(row, dict) for row in value['targets'])):
+                raise ValueError('candidate consumer execution receipt has an invalid shape')
+            executed = set()
+            targets = set()
+            for row in value['targets']:
+                target = row.get('target')
+                if (not isinstance(target, str) or not re.fullmatch(r'[A-Za-z0-9_-]+/[A-Za-z0-9_-]+', target)
+                        or target in targets):
+                    raise ValueError('candidate consumer target is missing, invalid or duplicated')
+                targets.add(target)
+                if row.get('execution') != 'actual':
+                    continue
+                selected = row.get('selected')
+                passed, ignored = row.get('passed'), row.get('ignored')
+                if (row.get('completed') is not True or row.get('coverage') is not True
+                        or not isinstance(selected, list) or not selected
+                        or any(not isinstance(name, str) or not name for name in selected)
+                        or len(set(selected)) != len(selected) or row.get('functions') != selected
+                        or type(passed) is not int or passed <= 0
+                        or type(ignored) is not int or ignored < 0
+                        or passed + ignored != len(selected)
+                        or type(row.get('substantivePassed')) is not int
+                        or not 0 < row['substantivePassed'] <= passed):
+                    raise ValueError('candidate consumer case execution census is incomplete')
+                executed.add(target.split('/')[0])
+            if (value.get('catalogDigest') != info['catalogDigest']
+                    or value.get('completed') is not True
+                    or value.get('integrationPackages') != ['arkdeck-cli', 'arkdeck-contract']
+                    or executed != {'arkdeck-cli', 'arkdeck-contract'}):
+                raise ValueError('mandatory candidate consumer execution receipt absent or invalid')
+            provenance['candidateExecutionReceiptSHA256'] = contract.sha(receipt.read_bytes())
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
-        provenance.update(result="fail", error=str(error))
+        provenance.update(completed=False, result="fail", error=str(error))
         raise
     finally:
         write_json(path, provenance)

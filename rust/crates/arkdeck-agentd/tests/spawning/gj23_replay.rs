@@ -352,6 +352,7 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
         );
         answers.extend(hdc_oracle::native_current::publication_answers(
             &fixture,
+            &root,
             &publication_proofs,
             &spelled,
         ));

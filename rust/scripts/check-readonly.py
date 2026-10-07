@@ -13,7 +13,9 @@ The machine output of `doctor` (plain, `--deep` and `--require-healthy`), `opera
 and `device candidates` must equal the recorded fixtures in
 `rust/tests/fixtures/readonly-machine-output` byte for byte on every host that runs the
 matrix (TASK-XPA-002: Windows output byte-equal to the macOS fixtures), once the one
-wall-clock member, `observedAt`, reads as its label. Rewrite them from a run with
+wall-clock member, `observedAt`, reads as its label. The closed c6/e4 source views
+also select their own Catalog digest; every other fixture byte remains exact.
+Rewrite them from a run with
 `--write-machine-output` after a change that legitimately moves them; every host's lane
 then has to reproduce the new bytes.
 """
@@ -36,6 +38,7 @@ import tomllib
 import uuid
 
 import jsonschema
+import catalog_test_views
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "spec/baselines/swift-single-v1.json"
@@ -378,9 +381,36 @@ def validate_spk3(directory: Path) -> None:
     print(json.dumps({"validationFile": str(output), **result}))
 
 
+def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
+    """Derive only the Catalog identity for the two fully verified source views.
+
+    This changes no recording or fixture. Operation counts and every byte outside
+    the single Catalog digest still have to equal the pinned machine output.
+    """
+    assert digest in (catalog_test_views.OLD, catalog_test_views.CURRENT), "unknown Catalog view"
+    assert name in MACHINE_OUTPUT_LEAVES, "unknown machine-output leaf"
+    if name not in ("doctor", "deep", "healthy"):
+        return data
+    document = json.loads(data)
+    report = document["error"]["details"]["report"] if name == "healthy" else document["result"]
+    declared = report["checks"]["catalog"]
+    assert declared == {
+        "availableOperationCount": 0, "digest": declared["digest"],
+        "operationCount": 32, "unavailableOperationCount": 32,
+    }, "machine-output Catalog structure changed"
+    assert declared["digest"] in (catalog_test_views.OLD, catalog_test_views.CURRENT), \
+        "unknown fixture Catalog"
+    original = b'"digest":"' + declared["digest"].encode("ascii") + b'"'
+    assert data.count(original) == 1, "machine-output Catalog digest must occur once"
+    return data.replace(original, b'"digest":"' + digest.encode("ascii") + b'"', 1)
+
+
 def machine_output(directory: Path, rows: list, write: bool) -> None:
     """The pinned leaves' stdout, `observedAt` labelled, against the fixtures (or written
     to them): the same bytes on macOS, Linux and, through the signed pipe, Windows."""
+    # This validates all 32 operation sources and the complete generated Rust
+    # Catalog against the immutable lineage, rather than trusting an output hash.
+    digest = None if write else catalog_test_views.catalog(ROOT / "rust")
     for name in MACHINE_OUTPUT_LEAVES:
         # The matrix's own recording: on Windows the unsigned refusal came first.
         row = [row for row in rows if row["file"].endswith(f"-{name}.cli.jsonl")][-1]
@@ -391,7 +421,7 @@ def machine_output(directory: Path, rows: list, write: bool) -> None:
         if write:
             fixture.write_bytes(labelled)
         else:
-            assert labelled == fixture.read_bytes(), (
+            assert labelled == machine_output_fixture(name, fixture.read_bytes(), digest), (
                 f"{name}: the machine output differs from {fixture.relative_to(ROOT)}; if the "
                 f"change is intended, rewrite it with --write-machine-output", labelled)
 

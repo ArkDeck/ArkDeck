@@ -271,3 +271,146 @@ The follow-up fixes derived consumers and introduces the exact mandatory
 two-view execution above; its new-head CI result is pending. Existing accepted
 assertions, original requests and authority are preserved rather than broadly
 translating digests or ignoring the failing cases.
+
+At head `e15c85cb595b6823a77fccf210d39394c3d6aeb8`, run `37598243309`
+passed the planner, Swift tests, App build, Windows ClientKit and
+host-independent lane. Workspace/parity execution reached concrete additional
+consumer defects. Linux/Windows CLI targets whose only test module is macOS
+were mistaken for an unclassified empty target. The historical materialization
+embedded the merge-base byte baseline instead of the reconstructed selected
+input baseline. Three original HAP plan/admission functions and three macOS
+service-verification functions still compared their complete c6 recordings in
+the current view. The full failed job logs are retained as
+`ci-job-112716400898-79.stdout.log`, `ci-job-112716400887-79.stdout.log`,
+`ci-job-112716400836-79.stdout.log`, `ci-job-112716400858-79.stdout.log` and
+`ci-job-112716400811-79.stdout.log`.
+
+The bounded follow-up keeps these original complete assertions mandatory in
+the historical view. The original nine Native plan requests likewise keep
+their whole c6 frames; the current five full-plan hashes and the 40-exchange,
+240-call Native owner replay remain mandatory. The HAP persisted-consumption
+negative now uses the source-bound current evidence record, preserving its
+three read-only calls, zero consumption and zero send assertions. It no longer
+transplants a terminal legacy step digest into a fresh current admission.
+
+The Native public Session aggregate mismatch was a recording representation:
+the normalized retained Manifest says `PLATFORM-MACOS@0.2.0`, while the original
+Windows public receipt includes the longer Windows platform value. The consumer
+reconstructs only that unique typed field and first proves every original
+Manifest SHA/count and complete original Session aggregate. It then verifies
+the actual raw Manifest receipt and whole tree size, and derives the host
+aggregate from the same complete entry census. The existing whole-file and
+tree equality remains unchanged; no arbitrary size mapping is learned.
+
+### Local targeted checks for the e15 follow-up
+
+`router-close-80.json` records 28 closed-view guards, 12 execution guards and
+10 historical materialization guards, all exit 0. Root independently passed
+seven readonly derivative guards (`root-readonly-view-80.json`) and four exact
+nested-module host guards (`root-module-cfg-82.json`). No empty list alone
+permits an exclusion: the nine source-pinned inactive targets execute their
+normal workspace command and require one exact zero-case receipt; they report
+no coverage. Unknown targets, active-host emptiness and incomplete receipts
+still fail.
+
+`consumer-checks-84.json` records affected formatting exit 0, the HAP
+persisted-consumption negative 1/1 and the current Native target 4/4 with one
+ignored recorder, all exit 0. The first local filter attempts in `82` and `83`
+truthfully failed the compiled-view/source guard: a preceding standalone c6
+build in the stable shared target was newer than unchanged e4 mirror inputs.
+Refreshing only the two unchanged generated mirror file timestamps forced the
+correct dependency rebuild; their whole SHA values did not change. No cache
+replacement, global clean, source-proof waiver or device execution was used.
+CI for the normal follow-up head remains pending.
+
+The final `consumer-checks-86.json` records the original c6 Native nine-plan,
+five-success whole-frame replay (1/1), affected Hoststore/Agentd all-target
+clippy, the signed isolated Native CLI owner replay (1/1), and formatting,
+all exit 0. `router-close-85.json` records the 28 closed-view, 12 execution and
+10 historical baseline guards, all exit 0. `light-checks-89.json` records SDD
+and diff checks, both exit 0. The unavailable `sh` launch in `87` and the
+missing `dirname` child PATH failure in `88` are retained separately; explicit
+Git shell paths and their normal child PATH produced the successful `89`.
+No dependency installation, installed Runtime, account store, Harmony SDK,
+transport or device was used by these checks.
+
+The last macOS parity job `112716400837` completed with failure at
+2026-10-07T09:25:58Z. Its whole original log is retained as
+`ci-job-112716400837-79.stdout.log`, SHA256
+`8545ef662b90b05da05ba5a62138d2a72b554a3a43ef840a536eeb8e0ebfeb27`.
+`parity-all-three-census-90.json` binds the complete Linux, Windows and macOS
+logs and their exact failure locations. The candidate parity path directly
+ran CLI tests and bypassed the reviewed three-function service routes; it now
+uses the fixed `--parity-consumers` router scope for Contract/CLI integrations.
+All same-name workspace siblings, feature unification and normal workspace
+library, binary, documentation and example defaults remain. Each actual
+consumer receipt must prove its complete selected-case census, and a malformed,
+missing, duplicate or failed receipt leaves provenance incomplete.
+`parity-scope-91.json` records the two new scope guards, exit 0; Root's
+`root-candidate-routing-91` and `root-candidate-consumers-92` record three
+receipt guards and two affected actual-Git-input consumers, all exit 0.
+
+That macOS log additionally exposed the original Native reconcile fixture's
+parked-state expectation. Its 22 literal requests, seven snapshot boundaries
+and 88 original provenance files remain immutable. Current c6 owners refuse
+before mutation when the required job-local observation is missing, rather
+than creating the old unknown publish. A separately recorded diagnostic
+consumer must preserve all original requests and full outputs; it must not
+invent missing observation, replay an unknown intent, or force the third
+fresh request to become terminal. The current e4 full Native positive and
+verified rollback software proofs remain mandatory. This last bounded
+consumer uses `device-mutation-reconcile-native-published-c6-v4`, recorded
+CREATE_NEW by genuine current owners in the pinned c6 input view. Its two
+exercised Jobs fail known and finalize diagnostic Sessions without transport
+or consumption; the third accepted submission keeps its actual `preflight`
+state. The original fixed capability lookup remains a complete `notFound`
+answer in the recorded Windows host, with its exact original request intact.
+Cross-host comparison proves the matching-policy success branch independently
+from the full production-encoder plan and policy material; it never converts
+a refused Runtime response into success.
+
+`native-reconcile-record-106.json` records the successful explicit software
+recorder, exit 0, 38.082 seconds, with the source snapshot unchanged. Its
+32-file output contains all 22 answers, seven snapshots, raw and canonical
+whole owner documents and a provenance record pinning all 31 data files.
+The original 88 source files remain unchanged. The new snapshot separately
+verifies the exact 588-byte sealed input and its whole SHA; it retains the
+Windows read/write-probe refusal as raw evidence and derives only the exact
+sealed permission role. No original fixture or copied-input ACL is changed.
+
+The first filter in `94` executed zero tests and is not counted as coverage.
+The corrected encoder case passed in `95`; its complete policy companion
+passed in `97` (the same test case, not an additional distinct test). Recorder
+compile failures `96` and `101`, schema/encoding failures `98` and `99`, and
+the permission-representation refusal `102` are retained. The incomplete
+v1/v2/v3 output directories were retained outside the repository fixture tree
+with whole-byte equality receipts `100` and `103`; no original file was
+overwritten. The normal replay `108` passed its complete answer/store case
+but the negative fixture failed while creating a hard link after sealing on
+Windows (PermissionDenied). Its original log remains; this is not counted
+as a passing negative test. A corrected task-private linked specimen must
+exercise the verifier before the final negative result is reported.
+
+The corrected negative in `native-reconcile-final-109.json` passed 1/1,
+exit 0, 36.929 seconds. It retains every full-plan, policy, root, seal, index,
+aggregate, tree and whole-answer refusal. Its actual task-private permission
+checks observe writable payload rejection, sealed payload verification and
+multiply linked payload rejection; the linked specimen is created while
+writable. The previously passed complete replay is retained rather than
+repeated. Clippy's three byte-array spelling errors in `109` are preserved;
+the equivalent newline byte-string literals change no encoded bytes.
+`final-lint-111.json` records affected Hoststore/Agentd all-target clippy exit 0
+and formatting exit 0. The official `fmt --all --check` hit Windows command
+length error 206; `workspace-format-113.json` exhaustively checks all 13 exact
+workspace members individually, every exit 0. No formatting assertion is
+waived.
+
+Health's independent whole-file readback is
+`native-reconcile-v4-independent-readback-2.json`, SHA256
+`60ed82f5014438600f2b321ba7834c93fc2a29261c3205c6a6244864ec0c419c`.
+It validates every new data pin, original source pin, raw answer/snapshot,
+complete owner tree and both diagnostic Session closures. Source review also
+validated the exact root relation, full encoder/policy capsules, fixed-ID
+lookup branch and sealed-input proof. These checks are software regressions;
+they do not grant new authority or constitute a device result. The exact new
+head's selected CI remains pending publication.

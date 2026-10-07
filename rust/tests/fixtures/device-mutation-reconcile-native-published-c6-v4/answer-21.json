@@ -1,0 +1,21 @@
+{
+  "answer" : {
+    "ok" : true,
+    "result" : [
+      {
+        "capabilityId" : "CAP-RT-POLICY-53686F7B3FD09DD7170E8B1131EBF0F3FB60B7F8-G1",
+        "consumptionCount" : 0,
+        "effectCeiling" : "deviceMutation",
+        "lineageAllowsNewExecution" : true,
+        "lineageBlocker" : null,
+        "maximumUses" : 10000,
+        "remainingUses" : 10000
+      }
+    ]
+  },
+  "method" : "capability.list",
+  "name" : "capabilities.list",
+  "params" : {
+
+  }
+}

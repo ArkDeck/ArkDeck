@@ -1,0 +1,14 @@
+{
+  "answer" : {
+    "error" : {
+      "code" : "notFound",
+      "message" : "unknown capability"
+    },
+    "ok" : false
+  },
+  "method" : "capability.inspect",
+  "name" : "capabilities.inspect0",
+  "params" : {
+    "capabilityId" : "CAP-RT-POLICY-8E3E5F70A2AE27D039AD672EDC6D708C6BEAEADB-G1"
+  }
+}

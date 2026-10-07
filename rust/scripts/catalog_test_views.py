@@ -38,6 +38,16 @@ CUSTOM_HARNESSES = {
     'arkdeck-provider-workspace/windows_signing_flow': ('listed-summary', ('win32',)),
 }
 
+# Each complete test module (and its support module) is explicitly macOS-only.
+# Their full source pins are part of the manifest; zero output alone never
+# establishes this exclusion. Other item-level cfg shapes remain unclassified.
+MODULE_HOST_PLATFORMS = {
+    'arkdeck-cli/' + name: ['darwin'] for name in (
+        'device_wait', 'flash_host_facts', 'flash_host_reads',
+        'flash_invocation_broker', 'job_wait', 'job_watch', 'loader_binding',
+        'operation_validate', 'runtime_health')
+}
+
 CHILD_ENTRIES = {
     'arkdeck-hoststore/job_journal_restart': ['journal_restart_child'],
     'arkdeck-hoststore/job_journal_process_death': ['journal_append_process_death_child'],
@@ -173,7 +183,7 @@ def load(rust: Path, metadata: dict) -> dict:
         raise ValueError('unclassified integration target')
     custom = custom_harnesses(metadata)
     for key, row in value['targets'].items():
-        fields = set(row) - {'platformFunctions', 'customCases', 'childEntries', 'optionalMaterial'}
+        fields = set(row) - {'platformFunctions', 'customCases', 'childEntries', 'optionalMaterial', 'modulePlatforms'}
         if fields != {'route', 'functions', 'ignored'} or row['route'] not in ('both', 'current', 'historical', 'mixed'):
             raise ValueError('unknown test target route')
         if (row['route'] == 'mixed') != bool(row['functions']):
@@ -207,6 +217,8 @@ def load(rust: Path, metadata: dict) -> dict:
             raise ValueError('unclassified non-substantive child entry')
         if row.get('optionalMaterial', {}) != OPTIONAL_MATERIAL.get(key, {}):
             raise ValueError('unclassified optional material prerequisite')
+        if row.get('modulePlatforms', []) != MODULE_HOST_PLATFORMS.get(key, []):
+            raise ValueError('unclassified complete-module host cfg')
     catalog(rust)
     return value
 
@@ -237,6 +249,24 @@ def platform_row(row: dict, platform: str) -> dict:
         return row
     return {**row, 'functions': {name: row['functions'][name]
                                for name in row['platformFunctions'][platform]}}
+
+
+def module_host_cfg_excluded(key: str, row: dict, platform: str) -> bool:
+    if platform not in ('win32', 'darwin', 'linux'):
+        raise ValueError('unclassified test platform')
+    expected = MODULE_HOST_PLATFORMS.get(key, [])
+    if row.get('modulePlatforms', []) != expected:
+        raise ValueError('unclassified complete-module host cfg')
+    return bool(expected) and platform not in expected
+
+
+def verify_host_cfg_empty(text: str) -> None:
+    plain = '\n'.join(re.sub(r'\x1b\[[0-9;]*m', '', text).splitlines())
+    if listed(plain) or re.search(r'^test [^\s]+ \.\.\.', plain, re.M):
+        raise ValueError('host-excluded module reported a case')
+    results = re.findall(r'^test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored;', plain, re.M)
+    if results != [('ok', '0', '0', '0')]:
+        raise ValueError('host-excluded module requires one exact zero-case completion')
 
 
 def verify_execution(text: str, names: list[str], ignored: tuple[str, ...] | list[str] = ()) -> dict:
