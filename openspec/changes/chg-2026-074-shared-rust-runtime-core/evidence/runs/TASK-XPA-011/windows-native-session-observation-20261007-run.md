@@ -579,3 +579,52 @@ and `99c183e7ad34a4942dad53c7630179d6a06ce2ef0315e6758dce706e64de90f6`,
 respectively. Its cause remains undiagnosed until actual macOS evidence
 reports that detail; it is not classified as the two lower spawn failures or
 an invalid run. The next CI remains pending.
+
+
+## Windows contract parity whole-job allowance follow-up
+
+CI: PR #2628 head89c4fd42d226e740923d3c6a84cf461802fc492e, run37639394314,
+Windows parity job112854680059, is cancelled. Its only failure annotation is
+`The job has exceeded the maximum execution time of 40m0s`. Every actual
+contract check completed successfully at15:26:46 UTC (39m47s after job start),
+and the complete31,819,477-byte artifact11492399713 uploaded at15:26:55.
+The candidate receipt71 targets/186 stages and historical203/561 are both
+completed:true, with every stage exit0 and zero target errors. The final
+required swift aggregate is genuinely failed; completed test receipts do not
+override a cancelled CI job. All other selected lanes and guard succeeded.
+
+Upper PR #2629 headd002ee2545a68484f3a0d11e4c76f1e5a72f9bb6,
+run37639573364, Windows parity112855410962 has the same40m0s annotation.
+The candidate receipt is complete; historical execution was interrupted
+during the default Hoststore unit tests. Its last logged case passed, but
+the next running case is unknown and there is no complete historical
+receipt. This upper run is not counted as passed. Every other selected
+lane succeeded, including the exact original Mac ArkForge8/8 cases.
+
+The lower complete job log SHA256 is
+`11a373e473faeee8cbb6edf10ffac4e812d92b8716f37dd2fe23f1d1dcb77ddb`;
+complete Windows receipt proof is `lower-89c-windows-parity-critical-proof.json`,
+SHA256 `907fc60eabcdc066477d76dab167d07ed528712891b53a4400fb76769113419f`.
+Both original cancelled logs, annotation, artifacts and upper incomplete
+execution remain retained. The phase comparison against successfulee0 shows
+the same command/stage census,196 compilation lines, compile artifact
+census, cache key and target namespaces; Windows already used one worker.
+No duplicate-build defect or load/port invalid-run exception is proved.
+
+Only the Windows contracts whole-job CI allowance changes40 to50 minutes.
+macOS contracts stay50, Linux30 and Windows workspace40. All workflow
+steps, isolated views, assertions, selected coverage, artifact upload,
+failure aggregation and individual test/Runtime/operation/acceptance
+budgets are unchanged. Full parsed workflow equality proves this sole
+semantic delta. An incomplete or failed check still makes required swift red.
+
+Local targeted checks: from scripts/ci,
+`python -B -m unittest test_plan.PathClassificationTests.test_planner_and_workflow_changes_cannot_self_skip`
+passes1/1, exit0. Full streams and command are retained in
+`root-contract-allowance-targeted-20261007-1.*`; receipt SHA256
+`fee9b03023903107049a9a0b276e3535e49d89ef05ffdd4482e344fb039d049d`.
+YAML parsing and complete semantic readback pass; diff check exits0.
+SDD is checked before the same-PR normal publication, with its full
+command/exit/streams retained in the adjacent allowance light-check receipt.
+No Rust/Catalog source changed, so no repeated Cargo build is required.
+CI for the new head is pending; no Runtime or hardware acceptance is claimed.

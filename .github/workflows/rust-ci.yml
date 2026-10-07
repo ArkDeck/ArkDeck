@@ -189,8 +189,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     # Windows baseline run 37407371986 finished this whole job in 22m59s;
     # run 37415892010 exhausted 30 minutes while suites were still passing,
-    # before reaching the platform PTY/shell tests. Give Windows the same
-    # 40-minute whole-job CI allowance as contract parity. This changes no
+    # before reaching the platform PTY/shell tests. Give Windows a
+    # 40-minute whole-job CI allowance. This changes no
     # individual test, Runtime or operation deadline. Linux keeps 30 minutes.
     # Keep macOS at 50 minutes; GitHub names those images after their Xcode
     # major, so a newer xcode-prefixed image retains the same allowance.
@@ -401,8 +401,15 @@ jobs:
     # candidate view repeated the workspace tests: each view's tests ran
     # 15 minutes on Windows. The candidate view no longer repeats them, which
     # leaves the published view's ~20 minutes and the candidate's ~6.
-    # Keep macOS at 50 and Linux at 30; no checks or view isolation are skipped.
-    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}
+    # #2628 run 37639394314 completed every Windows contract check at
+    # 39m47s and uploaded its complete evidence at 39m56s, then the 40-minute
+    # whole-job limit cancelled cleanup. #2629 run 37639573364 reached that
+    # same limit during the historical default unit tests, with no assertion
+    # failure. The complete routed workload needs room for all views and
+    # evidence finalization: Windows and macOS get 50 minutes, Linux 30.
+    # Test/Runtime/operation deadlines, coverage and failure aggregation stay
+    # unchanged; every selected check and isolated view must still complete.
+    timeout-minutes: ${{ (startsWith(matrix.os, 'xcode') || matrix.os == 'windows-latest') && 50 || 30 }}
     defaults:
       run:
         shell: bash
