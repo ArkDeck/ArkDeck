@@ -701,7 +701,17 @@ fn retained_preconsume_hap_failure_republishes_without_provider_or_authority_wri
             &fixed_now().unwrap(),
         )
     };
-    assert_eq!(inspection().unwrap_err().code, "recordUnreadable");
+    let expected_inspection = json!({
+        "schemaVersion": "arkdeck.import-inspection/1",
+        "import": receipt,
+        "references": {
+            "state": "clear",
+            "activeJobIds": [],
+            "outcomeUnknownJobIds": [],
+            "activeMaterializationCount": "0",
+        },
+    });
+    assert_eq!(inspection().unwrap(), expected_inspection);
     let journal_before = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
     let record_before = owners.record(&job);
     let calls_before = owners.calls();
@@ -729,7 +739,7 @@ fn retained_preconsume_hap_failure_republishes_without_provider_or_authority_wri
     let finalized: Value = serde_json::from_slice(appended.strip_suffix(b"\n").unwrap()).unwrap();
     assert_eq!(finalized["kind"], "finalized");
     assert_eq!(finalized["payload"]["terminalStatus"], "failed");
-    assert_eq!(inspection().unwrap()["references"]["state"], "clear");
+    assert_eq!(inspection().unwrap(), expected_inspection);
     let persisted = fs::read(owners.job_file(&job, "job-record.json")).unwrap();
     assert_eq!(publication_reconcile(&owners, &job).unwrap(), status);
     assert_eq!(
@@ -1236,7 +1246,17 @@ fn fresh_evidence_before_consumption_publishes_only_the_known_terminal_hap() {
                 &fixed_now().unwrap(),
             )
         };
-        assert_eq!(inspect().unwrap_err().code, "recordUnreadable");
+        let expected_inspection = json!({
+            "schemaVersion": "arkdeck.import-inspection/1",
+            "import": receipt,
+            "references": {
+                "state": "clear",
+                "activeJobIds": [],
+                "outcomeUnknownJobIds": [],
+                "activeMaterializationCount": "0",
+            },
+        });
+        assert_eq!(inspect().unwrap(), expected_inspection);
         let status = consumed_publication_reconcile(&owners, &job).unwrap();
         assert_eq!(status["state"], before["state"]);
         assert_eq!(
@@ -1271,7 +1291,7 @@ fn fresh_evidence_before_consumption_publishes_only_the_known_terminal_hap() {
         assert_eq!(finalized["kind"], "finalized");
         assert_eq!(finalized["timestamp"], publication_now().unwrap());
         assert_eq!(finalized["payload"]["terminalStatus"], before["state"]);
-        assert_eq!(inspect().unwrap()["references"]["state"], "clear");
+        assert_eq!(inspect().unwrap(), expected_inspection);
         let persisted = fs::read(owners.job_file(&job, "job-record.json")).unwrap();
         let repeat = consumed_publication_reconcile(&owners, &job);
         if before["state"] == "failed" {

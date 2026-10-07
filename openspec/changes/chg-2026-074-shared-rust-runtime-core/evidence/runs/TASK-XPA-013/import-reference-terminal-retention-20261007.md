@@ -105,7 +105,67 @@ hoststore crate, direct-dependent tests and macOS cases were not executed in
 this bounded D0 window. They remain for the synchronized stack's checks; no
 account-touching fixture or unrelated suite was substituted for those checks.
 
+The CI consumer follow-up changes only two unrelated-Import expectations in
+`debug_hap_run`: `retained_preconsume_hap_failure_republishes_without_provider_or_authority_writes`
+and `fresh_evidence_before_consumption_publishes_only_the_known_terminal_hap`.
+Before and after the original publication retry, each now compares the whole
+successful inspection with its actual immutable committed Import projection,
+`clear` references, both empty Job arrays and the string count `0`. The original
+Job/WAL, authority, Provider-call, publication retry and own-input refusal
+assertions remain. Reversing only these four assertion hunks reconstructs the
+original published file byte for byte.
+
+- `run-cargo.py fmt -p arkdeck-hoststore --check`: exit 0 (43.134 s);
+  `tools/logs/native-session-observation-20261007/upper-hap-format-131.stdstreams`.
+- `run-cargo.py test --locked --offline -p arkdeck-hoststore --test debug_hap_run -- --exact retained_preconsume_hap_failure_republishes_without_provider_or_authority_writes fresh_evidence_before_consumption_publishes_only_the_known_terminal_hap`:
+  exit 0; 2 passed, 0 failed, 0 ignored, 12 filtered (2.42 s test body,
+  44.537 s command). `upper-hap-targeted-131.stdstreams` and the complete
+  `upper-hap-targeted-131.json` command/source receipt are in the same log
+  directory. The stable source SHA is
+  `b8fca69dd4aadd71acdd8008432dbe74a0e025ef466dd8f1089aabd5b1b45225`.
+  These checks used the existing isolated signing-readiness cache, jobs=2,
+  with live/HDC/DevEco opt-ins removed. No account, SDK or device fixture ran.
+  The unaffected 44-case checks above were not repeated for this test-only
+  consumer correction.
+- Delivery-note `sh scripts/check-sdd.sh`: exit 0 (2.733 s), 121 acceptance
+  IDs, 0 errors and 0 warnings; the original command and whole-log receipt
+  are `upper-hap-note-sdd-132.json` and `upper-hap-note-sdd-132.log` in the
+  same log directory.
+
 ## CI
 
-This adjacent increment is not pushed. Current-head CI has not run. These
-software checks are not hardware evidence or a formal Golden Journey result.
+[PR #2629](https://github.com/ArkDeck/ArkDeck/pull/2629) published head
+`d489646021dff2be8f328dffd9377668cdafd5a0` on adjacent lower
+`1ffd9709a5e086cf15a1a527a6c7d384ea2aff09`. Swift CI run `37615096070`
+completed with required aggregate `swift` failure (job `112784004208`,
+2026-10-07 12:08:53 UTC). Both SDD Guard runs `37615095875` and
+`37615228315` succeeded. Plan, Swift tests, App build, Windows ClientKit,
+Rust host-independent and both Ubuntu Rust lanes succeeded.
+
+Windows workspace job `112771821148` and macOS workspace job
+`112771821273` each passed 12 and failed the two exact HAP cases named
+above: their obsolete pre-retry `unwrap_err()` received the complete clear
+unrelated-Import result. Complete original logs are retained in
+`tools/logs/import-ci-windows-37615096070-112771821148.log` and
+`tools/logs/import-ci-macos-37615096070-112771821273.log`. These are
+consumer failures, not host-load or timeout classifications.
+
+macOS parity job `112771821216` also exposed the lower current Native oracle's
+three task-private fake-host files at mode `644`, where whole snapshots require
+`600`, across seven snapshots and the final store (24 differences per affected
+function). Its whole log is `import-ci-macos-parity-37615096070-112771821216.log`.
+Windows parity job `112771821328` completed all visible test bodies and stage
+commands with exit 0, then the historical execution receipt rejected the sole
+ignored `session_publication_cost::copying_a_journal_into_its_session_costs`
+selection: `ignored-only selection cannot discharge coverage`. Its complete
+log and original public artifact receipt are
+`import-ci-windows-parity-37615096070-112771821328.log` and
+`import-ci-windows-parity-37615096070-catalog-execution.json`. Both lower
+consumer corrections are owned by the adjacent Native layer; this increment
+does not waive their assertions or change its manifest.
+
+The original failed run and logs remain. The local HAP consumer correction and
+adjacent lower fixes still require CI on their next synchronized heads; no
+new-head green conclusion is claimed here. These software checks are not
+hardware evidence or a formal Golden Journey result, and CI is not maintainer
+approval.
