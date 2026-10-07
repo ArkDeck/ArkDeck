@@ -10601,6 +10601,60 @@
       "table": "DiagnosticsLocalizable",
       "en": "The host clock changed during measurement. This observation cannot align the tracks.",
       "zh-Hans": "\u6d4b\u91cf\u671f\u95f4\u4e3b\u673a\u65f6\u95f4\u53d1\u751f\u8df3\u53d8\uff0c\u4e0d\u80fd\u636e\u6b64\u5bf9\u9f50\u8f68\u9053\u3002"
+    },
+    {
+      "key": "windows.settings.tools.selected",
+      "table": null,
+      "en": "Selected",
+      "zh-Hans": "\u5df2\u9009\u4e2d"
+    },
+    {
+      "key": "windows.settings.bundles.title",
+      "table": null,
+      "en": "Registered bundles",
+      "zh-Hans": "\u5df2\u767b\u8bb0 Bundle"
+    },
+    {
+      "key": "windows.settings.bundles.empty",
+      "table": null,
+      "en": "No registered bundles",
+      "zh-Hans": "\u6ca1\u6709\u5df2\u767b\u8bb0\u7684 Bundle"
+    },
+    {
+      "key": "windows.settings.bundles.unavailable",
+      "table": null,
+      "en": "Bundle inventory is unavailable",
+      "zh-Hans": "Bundle \u5e93\u5b58\u4e0d\u53ef\u7528"
+    },
+    {
+      "key": "windows.settings.bundles.bytes",
+      "table": null,
+      "en": "Bytes",
+      "zh-Hans": "\u5b57\u8282\u6570"
+    },
+    {
+      "key": "windows.settings.bundles.entries",
+      "table": null,
+      "en": "Entries",
+      "zh-Hans": "\u6210\u5458\u6570"
+    },
+    {
+      "key": "windows.settings.bundles.retained",
+      "table": null,
+      "en": "Content retained",
+      "zh-Hans": "\u5185\u5bb9\u5df2\u4fdd\u7559"
+    },
+    {
+      "key": "windows.settings.bundles.references",
+      "table": null,
+      "en": "References",
+      "zh-Hans": "\u5f15\u7528\u6570"
+    },
+    {
+      "key": "windows.settings.bundles.trust",
+      "table": null,
+      "en": "Runtime trust assessment",
+      "zh-Hans": "Runtime \u4fe1\u4efb\u8bc4\u4f30"
     }
   ]
 }

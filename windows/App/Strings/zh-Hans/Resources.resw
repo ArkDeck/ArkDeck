@@ -7078,4 +7078,40 @@ SHA-256：%4$@</value>
     <value>测量期间主机时间发生跳变，不能据此对齐轨道。</value>
     <comment>diagnostics.alignment.clockDiscontinuity (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
+  <data name="windows_settings_tools_selected" xml:space="preserve">
+    <value>已选中</value>
+    <comment>windows.settings.tools.selected (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_title" xml:space="preserve">
+    <value>已登记 Bundle</value>
+    <comment>windows.settings.bundles.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_empty" xml:space="preserve">
+    <value>没有已登记的 Bundle</value>
+    <comment>windows.settings.bundles.empty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_unavailable" xml:space="preserve">
+    <value>Bundle 库存不可用</value>
+    <comment>windows.settings.bundles.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_bytes" xml:space="preserve">
+    <value>字节数</value>
+    <comment>windows.settings.bundles.bytes (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_entries" xml:space="preserve">
+    <value>成员数</value>
+    <comment>windows.settings.bundles.entries (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_retained" xml:space="preserve">
+    <value>内容已保留</value>
+    <comment>windows.settings.bundles.retained (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_references" xml:space="preserve">
+    <value>引用数</value>
+    <comment>windows.settings.bundles.references (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_trust" xml:space="preserve">
+    <value>Runtime 信任评估</value>
+    <comment>windows.settings.bundles.trust (Windows only)</comment>
+  </data>
 </root>

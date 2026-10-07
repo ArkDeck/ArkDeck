@@ -345,7 +345,7 @@
         {"automationId": "settings.toolchains.path", "origin": "windows", "role": "text", "name": ["C:\\Tools\\hdc\\hdc.exe"]},
         {"automationId": "settings.toolchains.clientVersion", "origin": "windows", "role": "text", "name": ["3.2.0f"]},
         {"automationId": "settings.toolchains.tools.list", "origin": "windows", "role": "list", "name": ["@windows.settings.tools.title"]},
-        {"automationId": "settings.toolchains.tool.tool-hdc-3.2.0f", "origin": "windows", "role": "listItem", "name": ["tool-hdc-3.2.0f · hdc · windows-x64 · active"]}
+        {"automationId": "settings.toolchains.tool.tool-hdc-3.2.0f", "origin": "windows", "role": "listItem", "name": ["tool-hdc-3.2.0f · hdc · windows-x64 · active · ", "@windows.settings.tools.selected", ": true"]}
       ]
     },
     {

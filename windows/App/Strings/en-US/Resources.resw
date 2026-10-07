@@ -7078,4 +7078,40 @@ SHA-256: %4$@</value>
     <value>The host clock changed during measurement. This observation cannot align the tracks.</value>
     <comment>diagnostics.alignment.clockDiscontinuity (DiagnosticsLocalizable.xcstrings)</comment>
   </data>
+  <data name="windows_settings_tools_selected" xml:space="preserve">
+    <value>Selected</value>
+    <comment>windows.settings.tools.selected (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_title" xml:space="preserve">
+    <value>Registered bundles</value>
+    <comment>windows.settings.bundles.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_empty" xml:space="preserve">
+    <value>No registered bundles</value>
+    <comment>windows.settings.bundles.empty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_unavailable" xml:space="preserve">
+    <value>Bundle inventory is unavailable</value>
+    <comment>windows.settings.bundles.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_bytes" xml:space="preserve">
+    <value>Bytes</value>
+    <comment>windows.settings.bundles.bytes (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_entries" xml:space="preserve">
+    <value>Entries</value>
+    <comment>windows.settings.bundles.entries (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_retained" xml:space="preserve">
+    <value>Content retained</value>
+    <comment>windows.settings.bundles.retained (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_references" xml:space="preserve">
+    <value>References</value>
+    <comment>windows.settings.bundles.references (Windows only)</comment>
+  </data>
+  <data name="windows_settings_bundles_trust" xml:space="preserve">
+    <value>Runtime trust assessment</value>
+    <comment>windows.settings.bundles.trust (Windows only)</comment>
+  </data>
 </root>

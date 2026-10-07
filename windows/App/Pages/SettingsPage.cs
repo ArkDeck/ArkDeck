@@ -14,7 +14,7 @@ namespace ArkDeck.App.Pages;
 /// <summary>
 /// Settings, with the macOS Settings tabs the Windows daemon can speak to (General,
 /// Toolchains, Storage, Trace) and two Windows tabs (Runtime, Workspace). Everything is read:
-/// <c>health</c>, <c>doctor</c>, <c>runtime.hdc.status</c>, <c>runtime.tool.list</c>,
+/// <c>health</c>, <c>doctor</c>, <c>runtime.hdc.status</c>, <c>runtime.tool.list</c>, <c>runtime.bundle.list</c>,
 /// <c>runtime.storage.status</c>, <c>trace.cache.status</c>, <c>workspace.project.list|show</c>
 /// and <c>workspace.preset.list</c>, each shown as it came or as
 /// <c>unavailable(reasonCode)</c> with its CLI command. Changing a setting — the Runtime
@@ -257,12 +257,13 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
             var list = Ui.List("settings.toolchains.tools.list", S.Text(UiStrings.WindowsSettingsToolsTitle));
             foreach (var tool in state.Tools.Value!)
             {
-                var text = $"{tool.ToolRef} · {tool.Kind} · {tool.Platform} · {tool.State}";
+                var text = ToolInventoryText(tool);
                 list.Items.Add(Ui.Item("settings.toolchains.tool." + tool.ToolRef, text, Ui.Text($"settings.toolchains.tool.{tool.ToolRef}.text", text, "ArkDeckMonoStyle")));
             }
             tools.Children.Add(list);
         }
         tools.Children.Add(CliRow("settings.toolchains.signing", CliCommands.RuntimeSigningStatus));
+        BundleInventory(state);
     }
 
     private void Storage(SettingsState state)

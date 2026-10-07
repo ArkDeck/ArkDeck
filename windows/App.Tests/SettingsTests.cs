@@ -32,6 +32,7 @@ public sealed class SettingsTests
                  {
                      (settings.Hdc.Unavailable, "unavailable(rejected): this method is unavailable in the read-only Rust foundation", "arkdeck runtime hdc status"),
                      (settings.Tools.Unavailable, "unavailable(operationUnavailable): Bootstrap bundle list owner is not configured", "arkdeck runtime tool list"),
+                     (settings.Bundles.Unavailable, "unavailable(operationUnavailable): Bootstrap bundle list owner is not configured", "arkdeck runtime bundle list"),
                      (settings.Storage.Unavailable, "unavailable(rejected): Runtime storage owners are not configured", "arkdeck runtime storage status"),
                      (settings.TraceCache.Unavailable, "unavailable(rejected): Trace cache owner is not configured", "arkdeck trace cache status"),
                      (settings.Projects.Unavailable, "unavailable(operationUnavailable): workspace project owner is unavailable", "arkdeck workspace project list"),
@@ -85,6 +86,7 @@ public sealed class SettingsTests
     {
         var settings = await Loader(ScriptedDaemon.Unavailable).SettingsAsync();
         Assert.IsNotNull(settings.DaemonFailure);
+        Assert.AreEqual(Unavailable.DaemonUnavailableCode, settings.Bundles.Unavailable!.ReasonCode);
         Assert.AreEqual(Unavailable.DaemonUnavailableCode, settings.Projects.Unavailable!.ReasonCode);
         Assert.IsNotNull((await Loader(ScriptedDaemon.Unavailable).ProjectAsync(ScriptedDaemon.ProjectRef)).DaemonFailure);
     }
