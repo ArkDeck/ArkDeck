@@ -1,44 +1,12 @@
-//! Replays the Swift native-library oracle
-//! (`rust/tests/fixtures/deploy-native-library`, recorded by
-//! `NativeLibraryOracleContractTests` over the shared fake HDC) through the
-//! production Rust planner, admitter, runner, result reader, cleanup debt
-//! list and continuation, and capability reads, under the durable mutation
-//! authority the pointer, port-rule and debug HAP replays run under. Every
-//! exchange answers as Swift answered it, message included:
-//! - the deployments. The library is verified on the host, sent into the
-//!   Job's owned staging with the code-sign helper and believed only through
-//!   its staging readback, backed up, published by the helper with its
-//!   fs-verity attestation or, replacing a library that had none, without
-//!   one, the application restarted and the library found in its maps, then
-//!   the staging and the backup removed;
-//! - the failures. A library the loader does not map is rolled back from its
-//!   backup, and a target without its app-owned directory fails at the backup
-//!   with nothing to roll back. Each Job then removes what it staged and
-//!   fails with its original failure;
-//! - the debt. A cleanup that removes nothing is skipped and owed in the
-//!   cleanup debt ledger with the exact action that failed, and its Job
-//!   succeeds with the residue counted; `cleanupDebt.list` lists it;
-//! - its continuation, with the fake answering normally again. The
-//!   succeeded Job is loaded as restart recovery loads it (its record marked
-//!   `recovered: journal clean`), the readback finds the staging present, the
-//!   one retry is made durable and removes and reads it absent under the use
-//!   the Job consumed, and the debt is settled, the residue counted 0 and the
-//!   list empty.
-//!
-//! Each Job consumes its one capability use before its send, every later
-//! mutation and the compensations run under it, and it is settled with the
-//! Job; the continuation consumes none. The fake receives Swift's 225 calls
-//! in order, and everything the replay leaves below the root is Swift's byte
-//! for byte.
-//!
-//! Three more tests fault what no oracle records, each on the loader failure
-//! the oracle does record: a rollback that does not restore the previous
-//! library fails its Job with the rollback's failure and removes nothing
-//! more, a compensation cleanup that leaves the staging owes its debt while
-//! the Job fails with its original failure, and one whose outcome is lost
-//! owes its debt and parks the Job with its intent outstanding. Every
-//! transport byte comes from the shared fake HDC; none of this is hardware
-//! acceptance. The runs spawn the fake, so this binary is theirs.
+//! Current native deployment observation and publication over the unchanged
+//! Swift fixture inputs. Five scenarios retain all 225 original native
+//! transport calls; a separate typed prefix supplies genuine synthetic
+//! target/model/firmware readbacks before capability consumption and send.
+//! Complete success and known failure/rollback paths publish their whole
+//! Session and finalize once. Confirmed native cleanup failure remains a
+//! failed executed step and a known failed Job, with its debt intact.
+//! Fault tests preserve failed and unknown restoration/cleanup outcomes.
+//! Synthetic transport only; no device or hardware acceptance is claimed.
 #![cfg(any(target_os = "macos", windows))]
 
 mod support;
@@ -48,19 +16,410 @@ use serde_json::{Map, Value, json};
 use std::fs;
 use std::time::Duration;
 use support::debug_hap;
-use support::hdc_oracle::FakeDispatch;
 use support::hdc_oracle::{self, Owners, exchange};
+use support::native_observation::Observed;
 
 /// Every call Swift's runs and its continuation made.
 const CALLS: usize = 225;
-/// Every exchange: nine plans, five submissions, five runs and a refused
-/// rerun, the three reads of each Job, the list of the debt, its
-/// continuation and the list after it, and the two capability reads.
-const EXCHANGES: usize = 40;
+#[test]
+fn native_deployments_preserve_frozen_transport_and_publish_current_sessions() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("deploy-native-library");
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let dispatch = Observed::new(&owners.dispatch);
+    let hdc = owners.hdc(&dispatch);
+    let publisher = owners.publisher();
+    let runner = owners.runner(&hdc, &publisher, true);
+    let imports =
+        arkdeck_hoststore::ImportUploadStore::open(&owners.root.join("artifacts")).unwrap();
+    let unrelated = debug_hap::import_package(
+        &imports,
+        &owners.artifacts,
+        "native-publication-census",
+        "TGT-ISOLATED-IMPORT",
+        1,
+        &"a".repeat(64),
+        &support::fixed_now().unwrap(),
+    );
+    for name in [
+        "deployed",
+        "loaderFailure",
+        "targetAbsent",
+        "unattested",
+        "cleanupFailure",
+    ] {
+        owners
+            .admitter(&hdc, &owners.default_root)
+            .handle(
+                exchange(&cases, &format!("{name}.submit"))["params"]
+                    .as_object()
+                    .unwrap(),
+            )
+            .unwrap();
+        owners.mode(name);
+        let status = runner
+            .handle(
+                exchange(&cases, &format!("{name}.run"))["params"]
+                    .as_object()
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            status["state"],
+            if name == "cleanupFailure" {
+                json!("failed")
+            } else {
+                exchange(&cases, &format!("{name}.run"))["answer"]["result"]["state"].clone()
+            }
+        );
+        assert_eq!(status["outcomeUnknown"], false);
+        let job = cases["jobs"][name].as_str().unwrap();
+        let record = owners.record(job);
+        support::native_observation::assert_observation(&record, &owners.digest);
+        if name == "cleanupFailure" {
+            assert_eq!(status["outstandingResidueCount"], 1);
+            assert!(
+                owners.root.join("device-published").exists(),
+                "verified replacement retained"
+            );
+            assert!(!record["timeline"].as_array().unwrap().iter().any(|line| {
+                line.as_str().is_some_and(|line| {
+                    line.contains("native deployment failure restored")
+                        || line.starts_with("skipped cleanup-staging")
+                })
+            }));
+        }
+        assert_eq!(
+            record["sessionPublicationRecord"]["phase"], "catalogPublished",
+            "{name}: {}",
+            record["sessionPublicationRecord"]
+        );
+        support::native_observation::assert_session(&owners, &record);
+        let journal: Vec<Value> = fs::read_to_string(owners.job_file(job, "journal.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(
+            journal
+                .iter()
+                .filter(|row| row["kind"] == "finalized")
+                .count(),
+            1
+        );
+        assert!(journal.iter().all(|row| row["jobId"] == job));
+        // The complete owner census is clear, including known failed/rolled-back Jobs.
+        let inspection = imports
+            .lifecycle_resource(
+                &owners.artifacts,
+                &owners.jobs,
+                "artifact.import.inspection",
+                json!({"importId":unrelated["importId"]})
+                    .as_object()
+                    .unwrap(),
+                &support::fixed_now().unwrap(),
+            )
+            .unwrap();
+        assert_eq!(inspection["references"]["state"], "clear");
+        assert!(
+            inspection["references"]["activeJobIds"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        let before = owners.calls();
+        assert!(
+            runner
+                .handle(json!({"jobId":job}).as_object().unwrap())
+                .is_err()
+        );
+        assert_eq!(owners.calls(), before, "no terminal native replay");
+    }
+    owners.mode("deployed");
+    runner
+        .continue_cleanup_debt(
+            exchange(&cases, "debt.continuePath")["params"]
+                .as_object()
+                .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(dispatch.reads.load(std::sync::atomic::Ordering::SeqCst), 15);
+    let actual = support::oracle_fake::oracle_spelling(&owners.calls(), &owners.root);
+    let expected = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
+    assert_eq!(expected.lines().count(), CALLS);
+    assert_eq!(
+        actual, expected,
+        "all frozen native send/publish/rollback/cleanup calls unchanged"
+    );
+}
+
+struct CorruptDebt<'a> {
+    inner: &'a (dyn HdcDispatch + Sync),
+    path: std::path::PathBuf,
+    directory: bool,
+    settled: Option<Value>,
+}
+
+impl HdcDispatch for CorruptDebt<'_> {
+    fn mutation_identity_current(&self) -> bool {
+        self.inner.mutation_identity_current()
+    }
+    fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
+        let result = self.inner.dispatch(plan);
+        if plan.arguments.get(3).map(String::as_str) == Some("rmdir") && !self.path.exists() {
+            if self.directory {
+                fs::create_dir(&self.path).unwrap();
+            } else if let Some(settled) = &self.settled {
+                fs::write(&self.path, serde_json::to_vec(settled).unwrap()).unwrap();
+            } else {
+                fs::write(&self.path, b"not-json").unwrap();
+            }
+        }
+        result
+    }
+}
 
 #[test]
-fn rust_runs_every_swift_native_library_deployment_as_swift_does() {
-    hdc_oracle::assert_replays("deploy-native-library", EXCHANGES, CALLS);
+fn unconfirmed_native_cleanup_debt_never_finalizes_or_replays_a_failed_dispatch() {
+    for compensation in [false, true] {
+        for damage in ["corrupt", "directory", "settled"] {
+            let _lock = debug_hap::exclusive();
+            let fixture = support::fixture("deploy-native-library");
+            let cases = support::document(&fixture, "cases.json");
+            let owners = Owners::open(&fixture);
+            let case = if compensation {
+                "loaderFailure"
+            } else {
+                "cleanupFailure"
+            };
+            let job = cases["jobs"][case].as_str().unwrap();
+            let settled = (damage == "settled").then(|| {
+                let old = support::document(&fixture, "artifacts/cleanup-debt.json");
+                let old_job = old[0]["jobID"].as_str().unwrap();
+                let mut record: Value = serde_json::from_str(
+                    &serde_json::to_string(&old[0])
+                        .unwrap()
+                        .replace(old_job, job),
+                )
+                .unwrap();
+                record["stepID"] = json!(if compensation {
+                    "cleanup-native-library-compensation"
+                } else {
+                    "cleanup-staging-and-backup"
+                });
+                json!([record])
+            });
+            let observed = Observed::new(&owners.dispatch);
+            let fault = Faulted {
+                inner: &observed,
+                fault: if compensation {
+                    Fault::CleanupIneffective
+                } else {
+                    Fault::None
+                },
+            };
+            let dispatch = CorruptDebt {
+                inner: &fault,
+                path: owners.root.join("artifacts/cleanup-debt.json"),
+                directory: damage == "directory",
+                settled: settled.clone(),
+            };
+            let hdc = owners.hdc(&dispatch);
+            let publisher = owners.publisher();
+            owners
+                .admitter(&hdc, &owners.default_root)
+                .handle(
+                    exchange(&cases, &format!("{case}.submit"))["params"]
+                        .as_object()
+                        .unwrap(),
+                )
+                .unwrap();
+            owners.mode(case);
+            let runner = owners.runner(&hdc, &publisher, true);
+            let status = runner
+                .handle(json!({"jobId":job}).as_object().unwrap())
+                .unwrap();
+            assert_eq!(status["state"], "waitingForRecovery");
+            assert_eq!(status["outcomeUnknown"], true);
+            let record = owners.record(job);
+            assert_eq!(record["operationFailure"]["code"], "executionFailed");
+            assert_ne!(
+                record["sessionPublicationRecord"]["phase"],
+                "catalogPublished"
+            );
+            let rows: Vec<Value> = fs::read_to_string(owners.job_file(job, "journal.jsonl"))
+                .unwrap()
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect();
+            let step = if compensation {
+                "cleanup-native-library-compensation"
+            } else {
+                "cleanup-staging-and-backup"
+            };
+            let outcome = rows
+                .iter()
+                .find(|row| row["stepId"] == step && row["kind"] == "stepOutcome")
+                .unwrap();
+            assert_eq!(outcome["payload"]["result"], "failed");
+            assert_eq!(outcome["payload"]["outcomeCertainty"], "confirmed");
+            assert!(!rows.iter().any(|row| row["kind"] == "finalized"));
+            if compensation {
+                assert!(record["timeline"].as_array().unwrap().iter().any(|line| {
+                    line.as_str()
+                        .is_some_and(|line| line.contains(LOADER_FAILURE))
+                }));
+            }
+            let calls = owners.calls();
+            assert!(
+                runner
+                    .handle(json!({"jobId":job}).as_object().unwrap())
+                    .is_err()
+            );
+            assert_eq!(owners.calls(), calls);
+            if damage == "directory" {
+                assert!(dispatch.path.is_dir());
+            } else if let Some(settled) = settled {
+                assert_eq!(
+                    fs::read(&dispatch.path).unwrap(),
+                    serde_json::to_vec(&settled).unwrap()
+                );
+            } else {
+                assert_eq!(fs::read(&dispatch.path).unwrap(), b"not-json");
+            }
+            let root = owners.root.clone();
+            let state_root = owners.default_root.clone();
+            let digest = owners.digest.clone();
+            let journal_path = owners.job_file(job, "journal.jsonl");
+            let record_path = owners.job_file(job, "job-record.json");
+            let journal_bytes = fs::read(&journal_path).unwrap();
+            let record_bytes = fs::read(&record_path).unwrap();
+            drop(owners);
+            let jobs = arkdeck_hoststore::JobStore::open_owner(&state_root).unwrap();
+            let params = json!({"jobId":job});
+            let restored = jobs
+                .handle_resource("job.status", params.as_object().unwrap())
+                .unwrap();
+            assert_eq!(restored["state"], "waitingForRecovery");
+            assert_eq!(restored["outcomeUnknown"], true);
+            let artifacts =
+                arkdeck_hoststore::ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+            let targets =
+                arkdeck_hoststore::TargetStore::open(&root.join("targets-state")).unwrap();
+            let capabilities =
+                arkdeck_hoststore::CapabilityStore::open(&state_root.join("capabilities")).unwrap();
+            let hdc = arkdeck_hoststore::HdcComposition {
+                targets: &targets,
+                dispatch: &debug_hap::NoDispatch,
+                receive_root: None,
+                tool_sha256: &digest,
+                now: support::fixed_now,
+                code_sign_helper: None,
+            };
+            let refusal = arkdeck_hoststore::JobReconciler {
+                jobs: &jobs,
+                artifacts: &artifacts,
+                imports: None,
+                now: support::fixed_now,
+                sessions: None,
+                hdc: Some(&hdc),
+                capabilities: Some(&capabilities),
+                runner: None,
+            }
+            .handle(params.as_object().unwrap())
+            .unwrap_err();
+            assert!(
+                refusal
+                    .message
+                    .contains("unknown outcome has no persisted exact typed action"),
+                "storage uncertainty has no published device-action recovery: {refusal:?}"
+            );
+            assert_eq!(fs::read(&journal_path).unwrap(), journal_bytes);
+            assert_eq!(fs::read(&record_path).unwrap(), record_bytes);
+            assert_eq!(
+                fs::read_to_string(root.join("hdc-invocations.log")).unwrap(),
+                calls
+            );
+        }
+    }
+}
+
+#[test]
+fn native_preflight_refuses_missing_firmware_or_wrong_target_before_any_mutation() {
+    for missing_firmware in [true, false] {
+        let _lock = debug_hap::exclusive();
+        let fixture = support::fixture("deploy-native-library");
+        let cases = support::document(&fixture, "cases.json");
+        let owners = Owners::open(&fixture);
+        let mut dispatch = Observed::new(&owners.dispatch);
+        dispatch.missing_firmware = missing_firmware;
+        dispatch.mismatched_target = !missing_firmware;
+        let hdc = owners.hdc(&dispatch);
+        let publisher = owners.publisher();
+        owners
+            .admitter(&hdc, &owners.default_root)
+            .handle(
+                exchange(&cases, "deployed.submit")["params"]
+                    .as_object()
+                    .unwrap(),
+            )
+            .unwrap();
+        let status = owners
+            .runner(&hdc, &publisher, true)
+            .handle(
+                exchange(&cases, "deployed.run")["params"]
+                    .as_object()
+                    .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(
+            status["state"],
+            if missing_firmware {
+                "waitingForRecovery"
+            } else {
+                "failed"
+            }
+        );
+        assert_eq!(status["outcomeUnknown"], missing_firmware);
+        assert!(
+            owners.calls().is_empty(),
+            "no send/publish/rollback on incomplete observation"
+        );
+        let record = owners.record(cases["jobs"]["deployed"].as_str().unwrap());
+        assert!(record.get("evidenceObservation").is_none());
+        assert!(
+            !record["timeline"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|line| line == "capability consumed before first mutation")
+        );
+        if missing_firmware {
+            assert_eq!(record["recoveryStepID"], "read-evidence-firmware");
+            let before_reads = dispatch.reads.load(std::sync::atomic::Ordering::SeqCst);
+            assert!(
+                owners
+                    .runner(&hdc, &publisher, true)
+                    .handle(
+                        exchange(&cases, "deployed.run")["params"]
+                            .as_object()
+                            .unwrap()
+                    )
+                    .is_err()
+            );
+            assert_eq!(
+                dispatch.reads.load(std::sync::atomic::Ordering::SeqCst),
+                before_reads,
+                "unknown firmware observation never replays"
+            );
+        } else {
+            assert_eq!(
+                record["sessionPublicationRecord"]["failure"]["code"],
+                "sourceIntegrityFailed"
+            );
+        }
+    }
 }
 
 /// What a fault does to the one command it names: a rollback's move that
@@ -77,7 +436,7 @@ enum Fault {
 
 /// The fake HDC with one command faulted; every other command reaches it.
 struct Faulted<'a> {
-    inner: &'a FakeDispatch,
+    inner: &'a (dyn HdcDispatch + Sync),
     fault: Fault,
 }
 
@@ -129,8 +488,9 @@ fn loader_failure_with(fault: Fault) -> Run {
     let fixture = support::fixture("deploy-native-library");
     let cases = support::document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
+    let observed = Observed::new(&owners.dispatch);
     let dispatch = Faulted {
-        inner: &owners.dispatch,
+        inner: &observed,
         fault,
     };
     let hdc = owners.hdc(&dispatch);

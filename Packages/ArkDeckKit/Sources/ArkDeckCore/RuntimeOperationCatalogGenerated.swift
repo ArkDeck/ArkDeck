@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036"
+  public static let catalogDigest = "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -424,6 +424,9 @@ extension RuntimeOperationCatalog {
       steps: [
         CatalogStepDescriptor(stepID: "verify-elf-locally", kind: .verifyArtifact, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
         CatalogStepDescriptor(stepID: "hash-library", kind: .hashFile, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "confirm-evidence-target", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "read-evidence-model", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "deviceModel")),
+        CatalogStepDescriptor(stepID: "read-evidence-firmware", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")),
         CatalogStepDescriptor(stepID: "send-to-staging", kind: .sendFile, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .bestEffortCleanup),
         CatalogStepDescriptor(stepID: "verify-remote-staging", kind: .runApprovedRemoteRead, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
         CatalogStepDescriptor(stepID: "backup-current-version", kind: .runApprovedRemoteMutation, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .rollbackPublished),

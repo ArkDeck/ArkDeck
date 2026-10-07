@@ -1,0 +1,73 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-0f4af16f8e0f1132c1d158cb1f7372f9",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 861,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-186c8faffebe3b9cb8b0150ef9a645b2",
+      "mediaType" : "application\/json",
+      "name" : "publish-report.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-186c8faffebe3b9cb8b0150ef9a645b2",
+      "sha256" : "130efae36dd029f2eedeeee6a07d16e84cf77dee957292c8db0b54d442d695b1",
+      "sourceOperation" : "deploy.native-library.app-owned@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "atomic-publish"
+    },
+    {
+      "artifactID" : "ART-f73097e8096f74557d6a1f91fa02e8ef",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 786,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-186c8faffebe3b9cb8b0150ef9a645b2",
+      "mediaType" : "application\/json",
+      "name" : "verification-report.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-186c8faffebe3b9cb8b0150ef9a645b2",
+      "sha256" : "267e8d5f8041d7c2d393e540dfe22684f8634c0baeeda825aecb150466bb7967",
+      "sourceOperation" : "deploy.native-library.app-owned@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "verify-loaded-library"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

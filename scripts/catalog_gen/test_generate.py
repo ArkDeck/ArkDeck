@@ -332,7 +332,9 @@ class RealCatalogTests(unittest.TestCase):
             ),
         ]
         for operation in operations:
-            if operation["id"] not in generate.ACTION_REFERENCE_REQUIRED_OPERATIONS:
+            if operation["id"] not in (
+                generate.ACTION_REFERENCE_REQUIRED_OPERATIONS | {"deploy.native-library.app-owned"}
+            ):
                 continue
             device_steps = [
                 step for step in operation["steps"]
@@ -745,14 +747,14 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "deviceModel")'
             ),
-            11,
+            12,
         )
         self.assertEqual(
             swift.count(
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild")'
             ),
-            11,
+            12,
         )
         self.assertEqual(
             swift.count(

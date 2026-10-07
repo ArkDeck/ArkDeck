@@ -24,10 +24,136 @@ use arkdeck_platform::{HostDirectory, LocalEndpoint};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
+#[path = "../../../arkdeck-hoststore/tests/support/catalog_lineage.rs"]
+mod catalog_lineage;
+
 /// The oracles' connect key, which the board's serial equals.
 pub(crate) const KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 /// The Target the oracles adopted.
 pub(crate) const TARGET: &str = "TGT-3ba3f5f43b92";
+
+// These immutable Swift payloads are expectations, never seeds or authority.
+// Only their typed top-level Catalog field changes for a fresh observation.
+const OBSERVE_PAYLOADS: [(&str, &str, &str, usize); 3] = [
+    (
+        "ART-425d5127b8c74cc6c7c05ef4cb1e5f1c",
+        "tool-facts.json",
+        "9f6f75c195377b11dec88b5682df98ce3e8ee4222ef646a19c7791a244773766",
+        240,
+    ),
+    (
+        "ART-67508a7fd890cb7f31821eab538280a5",
+        "device-facts.json",
+        "6761aae97e4209feb39653e1e6eb7dc9d1c44b5ebd27ad44e2951f3face9917d",
+        457,
+    ),
+    (
+        "ART-d62fbafa7e5d327d9a28e8b61aa880bb",
+        "binding-snapshot.json",
+        "73de7718e8b3c16e0096f242686f1a6e4febf3adec50a4c9440c3816e853bc91",
+        529,
+    ),
+];
+
+fn current_observe_payload(index: usize, frozen: &[u8]) -> Result<Vec<u8>, String> {
+    let (_, name, digest, count) = OBSERVE_PAYLOADS.get(index).ok_or("unknown payload")?;
+    if frozen.len() != *count || arkdeck_contract::sha256_hex(frozen) != *digest {
+        return Err("immutable observation payload changed".into());
+    }
+    let old: Value = serde_json::from_slice(frozen).map_err(|_| "observation JSON")?;
+    if old["catalogDigest"] != catalog_lineage::OLD
+        || old["operation"] != "observe.device@1"
+        || old["artifact"] != *name
+    {
+        return Err("different observation schema".into());
+    }
+    let text = std::str::from_utf8(frozen).map_err(|_| "observation UTF-8")?;
+    let from = format!("\"catalogDigest\" : \"{}\"", catalog_lineage::OLD);
+    if text.matches(&from).count() != 1 {
+        return Err("nonunique Catalog field".into());
+    }
+    let to = format!("\"catalogDigest\" : \"{}\"", catalog_lineage::CURRENT);
+    let current = text.replacen(&from, &to, 1).into_bytes();
+    let actual: Value = serde_json::from_slice(&current).map_err(|_| "derived observation JSON")?;
+    let mut expected = old;
+    expected["catalogDigest"] = json!(catalog_lineage::CURRENT);
+    if actual != expected || current.len() != frozen.len() {
+        return Err("a non-Catalog observation field changed".into());
+    }
+    Ok(current)
+}
+
+fn current_observe_artifacts(fixture: &Path, completed: &Value) -> Value {
+    assert_eq!(arkdeck_contract::CATALOG_DIGEST, catalog_lineage::CURRENT);
+    let lineage = catalog_lineage::Lineage::frozen().unwrap();
+    lineage.operation("observe.device@1").unwrap();
+    lineage
+        .assert_current_sources(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+        )
+        .unwrap();
+    let cases = std::fs::read(fixture.join("cases.json")).unwrap();
+    assert_eq!(
+        arkdeck_contract::sha256_hex(&cases),
+        "275d9c9428f68a9aa69d2173b8cea2aa404d8e19619d540547cfff6100929669"
+    );
+    let mut artifacts = completed["artifacts"].clone();
+    let rows = artifacts.as_array_mut().unwrap();
+    assert_eq!(rows.len(), OBSERVE_PAYLOADS.len());
+    let job = "job-d166d1a72b51eb3b14528dae5cac37ee";
+    for (index, ((id, name, digest, count), row)) in
+        OBSERVE_PAYLOADS.iter().zip(rows.iter_mut()).enumerate()
+    {
+        assert_eq!(row["sha256"], *digest);
+        assert_eq!(row["byteCount"], *count);
+        assert_eq!(row["bytesVerified"], true);
+        assert_eq!(row["reference"], format!("arkdeck-artifact://{job}/{id}"));
+        // Reproduce the frozen identity first using the unchanged publisher's
+        // complete job/name/payload-digest material; never learn an actual ID.
+        let old_identity =
+            arkdeck_contract::sha256_hex(format!("{job}\0{name}\0{digest}").as_bytes());
+        assert_eq!(*id, format!("ART-{}", &old_identity[..32]));
+        let path = fixture
+            .join("artifacts/job-d166d1a72b51eb3b14528dae5cac37ee")
+            .join(id);
+        let frozen = std::fs::read(path).unwrap();
+        let current = current_observe_payload(index, &frozen).unwrap();
+        let current_digest = arkdeck_contract::sha256_hex(&current);
+        let current_identity =
+            arkdeck_contract::sha256_hex(format!("{job}\0{name}\0{current_digest}").as_bytes());
+        row["reference"] = json!(format!(
+            "arkdeck-artifact://{job}/ART-{}",
+            &current_identity[..32]
+        ));
+        row["sha256"] = json!(current_digest);
+    }
+    artifacts
+}
+
+#[test]
+fn observation_expectations_reject_tamper_and_preserve_every_non_catalog_byte() {
+    let fixture = fixtures("agent-human-action");
+    for (index, (id, _, _, _)) in OBSERVE_PAYLOADS.iter().enumerate() {
+        let frozen = std::fs::read(
+            fixture
+                .join("artifacts/job-d166d1a72b51eb3b14528dae5cac37ee")
+                .join(id),
+        )
+        .unwrap();
+        let current = current_observe_payload(index, &frozen).unwrap();
+        let restored = String::from_utf8(current.clone())
+            .unwrap()
+            .replace(catalog_lineage::CURRENT, catalog_lineage::OLD)
+            .into_bytes();
+        assert_eq!(restored, frozen);
+        assert!(current_observe_payload(index, &current).is_err());
+        let mut tampered = frozen.clone();
+        tampered[0] ^= 1;
+        assert!(current_observe_payload(index, &tampered).is_err());
+        assert!(current_observe_payload(index, &frozen[..frozen.len() - 1]).is_err());
+        assert!(current_observe_payload((index + 1) % OBSERVE_PAYLOADS.len(), &frozen).is_err());
+    }
+}
 
 /// A development root holding the oracle's adopted Target, and the fake's
 /// own root, below `scratch`.
@@ -433,24 +559,10 @@ fn agent_resume_completes_a_paused_execution_over_the_signed_test_daemon() {
         result["jobId"], cases["jobs"]["connect"],
         "the oracle's Job"
     );
-    let artifacts = |value: &Value| -> Vec<(Value, Value, Value)> {
-        value["artifacts"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|artifact| {
-                (
-                    artifact["reference"].clone(),
-                    artifact["sha256"].clone(),
-                    artifact["byteCount"].clone(),
-                )
-            })
-            .collect()
-    };
     assert_eq!(
-        artifacts(result),
-        artifacts(&completed),
-        "the oracle's Artifacts"
+        result["artifacts"],
+        current_observe_artifacts(&fixture, &completed),
+        "whole verified Artifacts, with only the independently proved Catalog field changed"
     );
     let (status, state) = daemon.cli(&["agent", "status", "--execution-id", "har-connect"]);
     assert_eq!(status, Some(0), "{state}");

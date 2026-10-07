@@ -1,15 +1,15 @@
-//! Replays the plans and submissions of the Swift native-library oracle
-//! (`rust/tests/fixtures/deploy-native-library`, recorded by
-//! `NativeLibraryOracleContractTests` over the shared fake HDC) through the
-//! Rust planner and admitter, with the Runtime's own `MutationAuthority` at
-//! the oracle's fixed root, which holds the library the oracle published.
+//! Replays the versioned current plans and submissions, retaining every
+//! request from the frozen Swift native-library oracle, through the Rust
+//! planner and admitter with the Runtime's own `MutationAuthority` at the
+//! fixed root. The old input bytes remain unchanged; the current oracle
+//! records the required observation prefix and current Catalog/authority.
 //! Nothing runs, so the replay covers what admission alone decides:
-//! - every plan and all five submissions, answered as Swift answered them;
-//! - the one capability, installed exactly as Swift issued it. It is named by
+//! - every plan and all five submissions, compared in full to the current oracle;
+//! - the one capability, installed exactly as the current owner issued it. It is named by
 //!   the exact inputs and by the library, whose identity, digest and size are
 //!   among the facts it is authorized by, and no use of it is consumed;
 //! - each Job's request, original submission and materialization, its
-//!   admission row and the start of its journal, as Swift persisted them.
+//!   admission row and the start of its journal, as the current owner persisted them.
 //!
 //! An agent execution admits the deployment it will run, as `job.submit`
 //! does; the runs themselves are `native_library_run.rs`'s.
@@ -53,15 +53,16 @@ fn envelopes(checkpoint: &Value) -> Vec<Value> {
 }
 
 #[test]
-fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_issued() {
+fn rust_admits_current_native_submissions_without_consuming_or_dispatching() {
     let _lock = debug_hap::exclusive();
-    let fixture = support::fixture(FIXTURE);
+    let fixture = support::fixture(support::hdc_oracle::native_current::NAME);
+    support::hdc_oracle::native_current::assert_source(&fixture);
     let cases = support::document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc(&NoDispatch);
     let admitter = owners.admitter(&hdc, &owners.default_root);
     let (mut plans, mut submissions, mut differences) = (0, 0, Vec::new());
-    let mut labels = debug_hap::HostLabels::default();
+    let mut labels = debug_hap::HostLabels::portable();
     for exchange in cases["exchanges"].as_array().unwrap() {
         let params = exchange["params"].as_object().unwrap();
         let actual = match exchange["method"].as_str().unwrap() {
@@ -80,7 +81,6 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
             }
             _ => continue,
         };
-        let actual = support::legacy_plan_answer(actual);
         labels.learn(
             &actual,
             &exchange["answer"],
@@ -96,11 +96,11 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     }
     assert_eq!((plans, submissions), (9, 5), "every plan and submission");
 
-    // The capability Swift issued at the first submission, which every later
+    // The capability issued at the first submission, which every later
     // one reused. Admission consumes no use: it keeps its whole budget and no
     // ledger is written; its uses came with the runs this replay does not
-    // make. Swift's runs appended theirs to its ledger and never rewrote the
-    // checkpoint its install wrote, so the checkpoint here is Swift's, byte
+    // make. Those runs appended theirs to the ledger without rewriting the
+    // checkpoint its install wrote, so the checkpoint here is exact, byte
     // for byte.
     let checkpoint = |store: &Path| fs::read(store.join("capabilities").join(CHECKPOINT)).unwrap();
     let (swift_bytes, issued_bytes) = (
@@ -135,7 +135,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     );
 
     // Each Job runs the request naming its capability; the caller's own is
-    // its original submission. What admission wrote is Swift's: these
+    // its original submission. What admission wrote matches the current oracle: these
     // members, which no later step changes, and the journal's first two
     // events, byte for byte.
     for (case, job) in cases["jobs"].as_object().unwrap() {
@@ -190,7 +190,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
         "admission dispatches nothing"
     );
 
-    // The admission rows are Swift's: identity, request hash, sequence and
+    // The admission rows match: identity, request hash, sequence and
     // creation. Their state, version and record come with the runs. The index
     // is read once the Job owner is closed.
     let store = owners.default_root.clone();
@@ -340,12 +340,13 @@ fn a_deployment_of_an_imported_library_is_admitted_and_keeps_its_import_from_rel
 
 /// An agent execution starts the Job it comes to own at once, and this
 /// Runtime now runs a native deployment: `agent.run` admits it under the
-/// capability Swift issues, as `job.submit` does, and hands the Job to its
+/// capability the current versioned owner issues, as `job.submit` does, and hands the Job to its
 /// caller to start. Admission dispatches nothing and consumes no use.
 #[test]
 fn an_agent_run_admits_the_deployment_it_will_run() {
     let _lock = debug_hap::exclusive();
-    let fixture = support::fixture(FIXTURE);
+    let fixture = support::fixture(support::hdc_oracle::native_current::NAME);
+    support::hdc_oracle::native_current::assert_source(&fixture);
     let cases = support::document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc(&NoDispatch);
@@ -394,11 +395,11 @@ fn an_agent_run_admits_the_deployment_it_will_run() {
         )
     );
     assert!(record.get("admissionEvidence").is_none());
-    // The capability Swift issues for these exact inputs and this library,
+    // The current owner capability for these exact inputs and this library,
     // with its whole budget.
     let issued = read(&owners.default_root.join("capabilities").join(CHECKPOINT));
     let swift = read(&fixture.join("store/capabilities").join(CHECKPOINT));
-    let mut labels = debug_hap::HostLabels::default();
+    let mut labels = debug_hap::HostLabels::portable();
     labels.learn_keys(&issued, &swift, &["capabilityID"]);
     assert_eq!(
         labels.swift(&json!(envelopes(&issued))),

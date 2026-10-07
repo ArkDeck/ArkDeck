@@ -113,6 +113,19 @@ fn native_plan_digest(
     context: &StepContext<'_>,
     now: &str,
 ) -> Result<String, PlanRefusal> {
+    let document = native_plan_document(request, descriptor, facts, context, now)?;
+    Ok(sha256_hex(
+        &session_json::encode(&document).map_err(|_| internal_failure())?,
+    ))
+}
+
+fn native_plan_document(
+    request: &OperationRequest,
+    descriptor: &CatalogOperation,
+    facts: &DeviceFacts,
+    context: &StepContext<'_>,
+    now: &str,
+) -> Result<Value, PlanRefusal> {
     let reference = descriptor.reference();
     let mut steps = Vec::new();
     for step in descriptor
@@ -134,13 +147,12 @@ fn native_plan_digest(
         context,
         now,
     )?);
-    let document = json!({"operationReference": reference, "catalogDigest": CATALOG_DIGEST,
+    Ok(
+        json!({"operationReference": reference, "catalogDigest": CATALOG_DIGEST,
         "inputs": request.inputs, "targetID": request.target_id,
         "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
-        "providerID": descriptor.provider, "steps": steps});
-    Ok(sha256_hex(
-        &session_json::encode(&document).map_err(|_| internal_failure())?,
-    ))
+        "providerID": descriptor.provider, "steps": steps}),
+    )
 }
 
 /// A resolved input as its provider is given it: its identity, its digest
@@ -195,25 +207,32 @@ fn materialize_step(
     if action.effect() != step.effect {
         return Err(internal_failure());
     }
-    let FilePlan::Sequence(invocations) = action
+    let plan = action
         .plan(&step.step_id, Some(&facts.connect_key), context)
-        .map_err(preflight)?
-    else {
-        return Err(internal_failure());
-    };
+        .map_err(preflight)?;
     document["journalArguments"] =
         device_steps::journal_arguments_in(step, reference, &request.inputs, &action, context)
             .ok_or_else(internal_failure)?;
-    document["processKind"] = json!("processSequence");
     document["executableSHA256"] = json!("resolved-at-dispatch");
-    document["processInvocations"] = invocations
-        .iter()
-        .map(|invocation| {
-            json!({"arguments": invocation.arguments,
-                "timeoutSeconds": invocation.timeout.as_secs(),
-                "continueAfterNonZero": invocation.continue_after_non_zero})
-        })
-        .collect();
+    match plan {
+        FilePlan::Process(plan) if device_steps::evidence_preflight_step(step) => {
+            document["processKind"] = json!("process");
+            document["argumentSummary"] = json!(plan.arguments);
+            document["timeoutSeconds"] = json!(plan.timeout.as_secs());
+        }
+        FilePlan::Sequence(invocations) => {
+            document["processKind"] = json!("processSequence");
+            document["processInvocations"] = invocations
+                .iter()
+                .map(|invocation| {
+                    json!({"arguments": invocation.arguments,
+                    "timeoutSeconds": invocation.timeout.as_secs(),
+                    "continueAfterNonZero": invocation.continue_after_non_zero})
+                })
+                .collect();
+        }
+        _ => return Err(internal_failure()),
+    }
     Ok(document)
 }
 
@@ -306,6 +325,15 @@ mod tests {
                     .as_bytes(),
             )
             .unwrap();
+            let mut current = native_plan_document(
+                &request,
+                descriptor,
+                &facts,
+                &context,
+                "2026-09-14T00:00:00Z",
+            )
+            .unwrap();
+            let current_digest = sha256_hex(&session_json::encode(&current).unwrap());
             assert_eq!(
                 native_plan_digest(
                     &request,
@@ -315,11 +343,37 @@ mod tests {
                     "2026-09-14T00:00:00Z"
                 )
                 .unwrap(),
+                current_digest
+            );
+            let steps = current["steps"].as_array_mut().unwrap();
+            let prefix: Vec<_> = steps.drain(2..5).collect();
+            assert_eq!(
+                prefix
+                    .iter()
+                    .map(|step| step["stepID"].as_str().unwrap())
+                    .collect::<Vec<_>>(),
+                [
+                    "confirm-evidence-target",
+                    "read-evidence-model",
+                    "read-evidence-firmware"
+                ]
+            );
+            assert!(prefix.iter().all(|step| step["effect"] == "readOnly"
+                && step["binding"] == "confirmedDevice"
+                && step["processKind"] == "process"));
+            current["catalogDigest"] = exchange["answer"]["result"]["catalogDigest"].clone();
+            let historical_digest = sha256_hex(&session_json::encode(&current).unwrap());
+            assert_eq!(
+                historical_digest,
                 exchange["answer"]["result"]["materializedPlanDigest"]
                     .as_str()
                     .unwrap(),
                 "{}",
                 exchange["name"]
+            );
+            assert_ne!(
+                current_digest, historical_digest,
+                "the original plan cannot authorize the new prefix"
             );
             replayed += 1;
         }

@@ -16,6 +16,7 @@ pub mod fixture_fs;
 pub mod flash_lane;
 pub mod hdc_oracle;
 pub mod native_library;
+pub mod native_observation;
 #[path = "../../../arkdeck-provider-hdc/tests/common/oracle_fake.rs"]
 pub mod oracle_fake;
 // The device reconcilers these replays drive are macOS-only, and the shared

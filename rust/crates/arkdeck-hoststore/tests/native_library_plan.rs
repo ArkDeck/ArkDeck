@@ -51,14 +51,37 @@ fn rust_plans_the_swift_native_library_requests() {
         if actual["ok"] == true {
             materialized += 1;
         }
-        let actual = support::legacy_plan_answer(actual);
-        labels.learn(
-            &actual,
-            &exchange["answer"],
-            "/result/materializedPlanDigest",
-        );
+        let mut actual = support::legacy_plan_answer(actual);
+        let mut expected = exchange["answer"].clone();
+        if actual["ok"] == true {
+            assert_eq!(
+                actual["result"]["catalogDigest"],
+                arkdeck_contract::CATALOG_DIGEST
+            );
+            let steps = actual["result"]["steps"].as_array_mut().unwrap();
+            let prefix: Vec<_> = steps.drain(2..5).collect();
+            assert_eq!(
+                prefix
+                    .iter()
+                    .map(|step| step["stepId"].as_str().unwrap())
+                    .collect::<Vec<_>>(),
+                [
+                    "confirm-evidence-target",
+                    "read-evidence-model",
+                    "read-evidence-firmware"
+                ]
+            );
+            assert!(prefix.iter().all(|step| step["effect"] == "readOnly"
+                && step["binding"] == "confirmedDevice"
+                && step["optional"] == false));
+            // CHG-2026-081 adds this verified prefix to the current materialized
+            // plan. Every pre-existing public plan field/step remains the oracle's.
+            expected["result"]["catalogDigest"] =
+                serde_json::json!(arkdeck_contract::CATALOG_DIGEST);
+        }
+        labels.learn(&actual, &expected, "/result/materializedPlanDigest");
         let actual = labels.swift(&actual);
-        if actual != exchange["answer"] {
+        if actual != expected {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",
                 exchange["name"], exchange["answer"]

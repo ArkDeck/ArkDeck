@@ -7,6 +7,19 @@ import Testing
 /// with Catalog/ JSON is owned by scripts/catalog_gen + check-sdd family 11;
 /// these tests pin the Swift-side guarantees the runtime will rely on.
 struct RuntimeOperationCatalogTests {
+  @Test func nativeDeviceObservationPrecedesEveryMutation() throws {
+    let native = try #require(
+      RuntimeOperationCatalog.descriptor(reference: "deploy.native-library.app-owned@1"))
+    #expect(native.steps.prefix(2).map(\.stepID) == ["verify-elf-locally", "hash-library"])
+    let prefix = Array(native.steps.dropFirst(2).prefix(3))
+    #expect(prefix.map(\.stepID) == [
+      "confirm-evidence-target", "read-evidence-model", "read-evidence-firmware",
+    ])
+    #expect(prefix.map(\.kind) == [.probeDevice, .runApprovedRemoteRead, .runApprovedRemoteRead])
+    #expect(prefix.allSatisfy { $0.effect == .readOnly && $0.binding == .confirmedDevice && !$0.isOptional })
+    #expect(native.steps.firstIndex { $0.effect == .deviceMutation } == 5)
+  }
+
   @Test func catalogContainsExactlyThePublishedOperations() {
     #expect(
       RuntimeOperationCatalog.operations.map(\.reference).sorted() == [

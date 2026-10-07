@@ -1,0 +1,652 @@
+[
+  {
+    "finalized": {
+      "eventId": "session-finalized",
+      "jobId": "job-186c8faffebe3b9cb8b0150ef9a645b2",
+      "kind": "finalized",
+      "payload": {
+        "manifestSha256": "8d5b48b365790dcbf12ad7c71a101c44b0adb384176d312e30122599ae7c6d99",
+        "outcomeCertainty": "confirmed",
+        "terminalStatus": "succeeded"
+      },
+      "schemaVersion": "1.0.0",
+      "sequence": 27,
+      "sessionId": "session-job-186c8faffebe3b9cb8b0150ef9a645b2",
+      "timestamp": "2026-09-14T00:00:00Z"
+    },
+    "importInspection": {
+      "import": {
+        "createdAtUtc": "2026-09-14T00:00:00Z",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "maximumChunkBytes": "2097152",
+        "metadata": {
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "deviceProfile": null,
+          "importRequestId": "hap-import-native-current-census",
+          "kind": "hap",
+          "name": "native-current-census.hap",
+          "schemaVersion": "arkdeck.import-intent/1",
+          "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "targetId": "TGT-ISOLATED-IMPORT"
+        },
+        "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+        "nextOffset": "34",
+        "receipt": {
+          "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "generation": "2",
+          "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "importRequestId": "hap-import-native-current-census",
+          "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "mediaType": "application/vnd.openharmony.hap",
+          "name": "native-current-census.hap",
+          "owner": {
+            "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+            "kind": "import"
+          },
+          "privacy": "standard",
+          "schemaVersion": "arkdeck.import-receipt/1",
+          "targetId": "TGT-ISOLATED-IMPORT",
+          "validation": {
+            "container": "zip",
+            "kind": "hap"
+          }
+        },
+        "schemaVersion": "arkdeck.import/1",
+        "state": "committed",
+        "updatedAtUtc": "2026-09-14T00:00:00Z"
+      },
+      "references": {
+        "activeJobIds": [],
+        "activeMaterializationCount": "0",
+        "outcomeUnknownJobIds": [],
+        "state": "clear"
+      },
+      "schemaVersion": "arkdeck.import-inspection/1"
+    },
+    "importReceipt": {
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "generation": "2",
+      "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+      "importRequestId": "hap-import-native-current-census",
+      "maximumChunkBytes": "2097152",
+      "metadata": {
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "deviceProfile": null,
+        "importRequestId": "hap-import-native-current-census",
+        "kind": "hap",
+        "name": "native-current-census.hap",
+        "schemaVersion": "arkdeck.import-intent/1",
+        "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "targetId": "TGT-ISOLATED-IMPORT"
+      },
+      "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+      "nextOffset": "34",
+      "receipt": {
+        "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "mediaType": "application/vnd.openharmony.hap",
+        "name": "native-current-census.hap",
+        "owner": {
+          "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "kind": "import"
+        },
+        "privacy": "standard",
+        "schemaVersion": "arkdeck.import-receipt/1",
+        "targetId": "TGT-ISOLATED-IMPORT",
+        "validation": {
+          "container": "zip",
+          "kind": "hap"
+        }
+      },
+      "schemaVersion": "arkdeck.import/1",
+      "state": "committed",
+      "updatedAtUtc": "2026-09-14T00:00:00Z"
+    },
+    "jobId": "job-186c8faffebe3b9cb8b0150ef9a645b2",
+    "manifestByteCount": "10366",
+    "manifestSHA256": "8d5b48b365790dcbf12ad7c71a101c44b0adb384176d312e30122599ae7c6d99",
+    "sessionShow": {
+      "completedAtUtc": "2026-09-14T00:00:00Z",
+      "expiresAtUtc": "2026-12-13T00:00:00Z",
+      "generation": "1",
+      "pinned": false,
+      "policyGeneration": "1",
+      "schemaVersion": "arkdeck.session/1",
+      "sessionId": "session-job-186c8faffebe3b9cb8b0150ef9a645b2",
+      "sizeBytes": "30153"
+    }
+  },
+  {
+    "finalized": {
+      "eventId": "session-finalized",
+      "jobId": "job-77f80bef1b0b380733dd6c0759c5ccb4",
+      "kind": "finalized",
+      "payload": {
+        "manifestSha256": "a91a8767f73f3954a98a71a5c65f4f653ada7606fe7dcfde9312e61b06dd3996",
+        "outcomeCertainty": "confirmed",
+        "terminalStatus": "failed"
+      },
+      "schemaVersion": "1.0.0",
+      "sequence": 29,
+      "sessionId": "session-job-77f80bef1b0b380733dd6c0759c5ccb4",
+      "timestamp": "2026-09-14T00:00:00Z"
+    },
+    "importInspection": {
+      "import": {
+        "createdAtUtc": "2026-09-14T00:00:00Z",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "maximumChunkBytes": "2097152",
+        "metadata": {
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "deviceProfile": null,
+          "importRequestId": "hap-import-native-current-census",
+          "kind": "hap",
+          "name": "native-current-census.hap",
+          "schemaVersion": "arkdeck.import-intent/1",
+          "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "targetId": "TGT-ISOLATED-IMPORT"
+        },
+        "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+        "nextOffset": "34",
+        "receipt": {
+          "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "generation": "2",
+          "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "importRequestId": "hap-import-native-current-census",
+          "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "mediaType": "application/vnd.openharmony.hap",
+          "name": "native-current-census.hap",
+          "owner": {
+            "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+            "kind": "import"
+          },
+          "privacy": "standard",
+          "schemaVersion": "arkdeck.import-receipt/1",
+          "targetId": "TGT-ISOLATED-IMPORT",
+          "validation": {
+            "container": "zip",
+            "kind": "hap"
+          }
+        },
+        "schemaVersion": "arkdeck.import/1",
+        "state": "committed",
+        "updatedAtUtc": "2026-09-14T00:00:00Z"
+      },
+      "references": {
+        "activeJobIds": [],
+        "activeMaterializationCount": "0",
+        "outcomeUnknownJobIds": [],
+        "state": "clear"
+      },
+      "schemaVersion": "arkdeck.import-inspection/1"
+    },
+    "importReceipt": {
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "generation": "2",
+      "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+      "importRequestId": "hap-import-native-current-census",
+      "maximumChunkBytes": "2097152",
+      "metadata": {
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "deviceProfile": null,
+        "importRequestId": "hap-import-native-current-census",
+        "kind": "hap",
+        "name": "native-current-census.hap",
+        "schemaVersion": "arkdeck.import-intent/1",
+        "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "targetId": "TGT-ISOLATED-IMPORT"
+      },
+      "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+      "nextOffset": "34",
+      "receipt": {
+        "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "mediaType": "application/vnd.openharmony.hap",
+        "name": "native-current-census.hap",
+        "owner": {
+          "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "kind": "import"
+        },
+        "privacy": "standard",
+        "schemaVersion": "arkdeck.import-receipt/1",
+        "targetId": "TGT-ISOLATED-IMPORT",
+        "validation": {
+          "container": "zip",
+          "kind": "hap"
+        }
+      },
+      "schemaVersion": "arkdeck.import/1",
+      "state": "committed",
+      "updatedAtUtc": "2026-09-14T00:00:00Z"
+    },
+    "jobId": "job-77f80bef1b0b380733dd6c0759c5ccb4",
+    "manifestByteCount": "11741",
+    "manifestSHA256": "a91a8767f73f3954a98a71a5c65f4f653ada7606fe7dcfde9312e61b06dd3996",
+    "sessionShow": {
+      "completedAtUtc": "2026-09-14T00:00:00Z",
+      "expiresAtUtc": "2026-12-13T00:00:00Z",
+      "generation": "2",
+      "pinned": false,
+      "policyGeneration": "1",
+      "schemaVersion": "arkdeck.session/1",
+      "sessionId": "session-job-77f80bef1b0b380733dd6c0759c5ccb4",
+      "sizeBytes": "34563"
+    }
+  },
+  {
+    "finalized": {
+      "eventId": "session-finalized",
+      "jobId": "job-40ebc2b42062093893bd7bc3eaa2a837",
+      "kind": "finalized",
+      "payload": {
+        "manifestSha256": "0f4bdfb284e8a3a863e0805788c557d37a2cf68c74ab4f5e00ce8efac6a221a1",
+        "outcomeCertainty": "confirmed",
+        "terminalStatus": "failed"
+      },
+      "schemaVersion": "1.0.0",
+      "sequence": 19,
+      "sessionId": "session-job-40ebc2b42062093893bd7bc3eaa2a837",
+      "timestamp": "2026-09-14T00:00:00Z"
+    },
+    "importInspection": {
+      "import": {
+        "createdAtUtc": "2026-09-14T00:00:00Z",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "maximumChunkBytes": "2097152",
+        "metadata": {
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "deviceProfile": null,
+          "importRequestId": "hap-import-native-current-census",
+          "kind": "hap",
+          "name": "native-current-census.hap",
+          "schemaVersion": "arkdeck.import-intent/1",
+          "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "targetId": "TGT-ISOLATED-IMPORT"
+        },
+        "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+        "nextOffset": "34",
+        "receipt": {
+          "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "generation": "2",
+          "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "importRequestId": "hap-import-native-current-census",
+          "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "mediaType": "application/vnd.openharmony.hap",
+          "name": "native-current-census.hap",
+          "owner": {
+            "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+            "kind": "import"
+          },
+          "privacy": "standard",
+          "schemaVersion": "arkdeck.import-receipt/1",
+          "targetId": "TGT-ISOLATED-IMPORT",
+          "validation": {
+            "container": "zip",
+            "kind": "hap"
+          }
+        },
+        "schemaVersion": "arkdeck.import/1",
+        "state": "committed",
+        "updatedAtUtc": "2026-09-14T00:00:00Z"
+      },
+      "references": {
+        "activeJobIds": [],
+        "activeMaterializationCount": "0",
+        "outcomeUnknownJobIds": [],
+        "state": "clear"
+      },
+      "schemaVersion": "arkdeck.import-inspection/1"
+    },
+    "importReceipt": {
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "generation": "2",
+      "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+      "importRequestId": "hap-import-native-current-census",
+      "maximumChunkBytes": "2097152",
+      "metadata": {
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "deviceProfile": null,
+        "importRequestId": "hap-import-native-current-census",
+        "kind": "hap",
+        "name": "native-current-census.hap",
+        "schemaVersion": "arkdeck.import-intent/1",
+        "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "targetId": "TGT-ISOLATED-IMPORT"
+      },
+      "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+      "nextOffset": "34",
+      "receipt": {
+        "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "mediaType": "application/vnd.openharmony.hap",
+        "name": "native-current-census.hap",
+        "owner": {
+          "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "kind": "import"
+        },
+        "privacy": "standard",
+        "schemaVersion": "arkdeck.import-receipt/1",
+        "targetId": "TGT-ISOLATED-IMPORT",
+        "validation": {
+          "container": "zip",
+          "kind": "hap"
+        }
+      },
+      "schemaVersion": "arkdeck.import/1",
+      "state": "committed",
+      "updatedAtUtc": "2026-09-14T00:00:00Z"
+    },
+    "jobId": "job-40ebc2b42062093893bd7bc3eaa2a837",
+    "manifestByteCount": "7689",
+    "manifestSHA256": "0f4bdfb284e8a3a863e0805788c557d37a2cf68c74ab4f5e00ce8efac6a221a1",
+    "sessionShow": {
+      "completedAtUtc": "2026-09-14T00:00:00Z",
+      "expiresAtUtc": "2026-12-13T00:00:00Z",
+      "generation": "3",
+      "pinned": false,
+      "policyGeneration": "1",
+      "schemaVersion": "arkdeck.session/1",
+      "sessionId": "session-job-40ebc2b42062093893bd7bc3eaa2a837",
+      "sizeBytes": "21411"
+    }
+  },
+  {
+    "finalized": {
+      "eventId": "session-finalized",
+      "jobId": "job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+      "kind": "finalized",
+      "payload": {
+        "manifestSha256": "abd4ca6159dd9484278e2eb025f1e562d1bbb4a623c462344072e18df3b8bf8e",
+        "outcomeCertainty": "confirmed",
+        "terminalStatus": "succeeded"
+      },
+      "schemaVersion": "1.0.0",
+      "sequence": 27,
+      "sessionId": "session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+      "timestamp": "2026-09-14T00:00:00Z"
+    },
+    "importInspection": {
+      "import": {
+        "createdAtUtc": "2026-09-14T00:00:00Z",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "maximumChunkBytes": "2097152",
+        "metadata": {
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "deviceProfile": null,
+          "importRequestId": "hap-import-native-current-census",
+          "kind": "hap",
+          "name": "native-current-census.hap",
+          "schemaVersion": "arkdeck.import-intent/1",
+          "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "targetId": "TGT-ISOLATED-IMPORT"
+        },
+        "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+        "nextOffset": "34",
+        "receipt": {
+          "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "generation": "2",
+          "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "importRequestId": "hap-import-native-current-census",
+          "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "mediaType": "application/vnd.openharmony.hap",
+          "name": "native-current-census.hap",
+          "owner": {
+            "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+            "kind": "import"
+          },
+          "privacy": "standard",
+          "schemaVersion": "arkdeck.import-receipt/1",
+          "targetId": "TGT-ISOLATED-IMPORT",
+          "validation": {
+            "container": "zip",
+            "kind": "hap"
+          }
+        },
+        "schemaVersion": "arkdeck.import/1",
+        "state": "committed",
+        "updatedAtUtc": "2026-09-14T00:00:00Z"
+      },
+      "references": {
+        "activeJobIds": [],
+        "activeMaterializationCount": "0",
+        "outcomeUnknownJobIds": [],
+        "state": "clear"
+      },
+      "schemaVersion": "arkdeck.import-inspection/1"
+    },
+    "importReceipt": {
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "generation": "2",
+      "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+      "importRequestId": "hap-import-native-current-census",
+      "maximumChunkBytes": "2097152",
+      "metadata": {
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "deviceProfile": null,
+        "importRequestId": "hap-import-native-current-census",
+        "kind": "hap",
+        "name": "native-current-census.hap",
+        "schemaVersion": "arkdeck.import-intent/1",
+        "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "targetId": "TGT-ISOLATED-IMPORT"
+      },
+      "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+      "nextOffset": "34",
+      "receipt": {
+        "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "mediaType": "application/vnd.openharmony.hap",
+        "name": "native-current-census.hap",
+        "owner": {
+          "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "kind": "import"
+        },
+        "privacy": "standard",
+        "schemaVersion": "arkdeck.import-receipt/1",
+        "targetId": "TGT-ISOLATED-IMPORT",
+        "validation": {
+          "container": "zip",
+          "kind": "hap"
+        }
+      },
+      "schemaVersion": "arkdeck.import/1",
+      "state": "committed",
+      "updatedAtUtc": "2026-09-14T00:00:00Z"
+    },
+    "jobId": "job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+    "manifestByteCount": "10368",
+    "manifestSHA256": "abd4ca6159dd9484278e2eb025f1e562d1bbb4a623c462344072e18df3b8bf8e",
+    "sessionShow": {
+      "completedAtUtc": "2026-09-14T00:00:00Z",
+      "expiresAtUtc": "2026-12-13T00:00:00Z",
+      "generation": "4",
+      "pinned": false,
+      "policyGeneration": "1",
+      "schemaVersion": "arkdeck.session/1",
+      "sessionId": "session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+      "sizeBytes": "30155"
+    }
+  },
+  {
+    "finalized": {
+      "eventId": "session-finalized",
+      "jobId": "job-c847deffe96d07c4cf8bdedd8b092c3d",
+      "kind": "finalized",
+      "payload": {
+        "manifestSha256": "eafc5b47f622c7777f49bc19bc4c3378532856413901687b543e9722ba8cbbe8",
+        "outcomeCertainty": "confirmed",
+        "terminalStatus": "failed"
+      },
+      "schemaVersion": "1.0.0",
+      "sequence": 27,
+      "sessionId": "session-job-c847deffe96d07c4cf8bdedd8b092c3d",
+      "timestamp": "2026-09-14T00:00:00Z"
+    },
+    "importInspection": {
+      "import": {
+        "createdAtUtc": "2026-09-14T00:00:00Z",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "maximumChunkBytes": "2097152",
+        "metadata": {
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "deviceProfile": null,
+          "importRequestId": "hap-import-native-current-census",
+          "kind": "hap",
+          "name": "native-current-census.hap",
+          "schemaVersion": "arkdeck.import-intent/1",
+          "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "targetId": "TGT-ISOLATED-IMPORT"
+        },
+        "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+        "nextOffset": "34",
+        "receipt": {
+          "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+          "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "bindingRevision": "1",
+          "byteCount": "34",
+          "generation": "2",
+          "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "importRequestId": "hap-import-native-current-census",
+          "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+          "mediaType": "application/vnd.openharmony.hap",
+          "name": "native-current-census.hap",
+          "owner": {
+            "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+            "kind": "import"
+          },
+          "privacy": "standard",
+          "schemaVersion": "arkdeck.import-receipt/1",
+          "targetId": "TGT-ISOLATED-IMPORT",
+          "validation": {
+            "container": "zip",
+            "kind": "hap"
+          }
+        },
+        "schemaVersion": "arkdeck.import/1",
+        "state": "committed",
+        "updatedAtUtc": "2026-09-14T00:00:00Z"
+      },
+      "references": {
+        "activeJobIds": [],
+        "activeMaterializationCount": "0",
+        "outcomeUnknownJobIds": [],
+        "state": "clear"
+      },
+      "schemaVersion": "arkdeck.import-inspection/1"
+    },
+    "importReceipt": {
+      "createdAtUtc": "2026-09-14T00:00:00Z",
+      "generation": "2",
+      "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+      "importRequestId": "hap-import-native-current-census",
+      "maximumChunkBytes": "2097152",
+      "metadata": {
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "deviceProfile": null,
+        "importRequestId": "hap-import-native-current-census",
+        "kind": "hap",
+        "name": "native-current-census.hap",
+        "schemaVersion": "arkdeck.import-intent/1",
+        "sha256": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "targetId": "TGT-ISOLATED-IMPORT"
+      },
+      "metadataFingerprint": "cdccbce255821deb8e6d88338a41d442ad27318e826deece911051f0eabf5834",
+      "nextOffset": "34",
+      "receipt": {
+        "artifactDigest": "73bf9c3fbf62c4530c8a790b020d144e18176217ca83607e513079322889ccdf",
+        "artifactId": "ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "bindingRevision": "1",
+        "byteCount": "34",
+        "generation": "2",
+        "importId": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+        "importRequestId": "hap-import-native-current-census",
+        "lease": "lease-v1:imp-0766b95f-2a83-4130-a3aa-953d640896a1:ART-0ac31c6462d11bb188d50c8d8572e23a",
+        "mediaType": "application/vnd.openharmony.hap",
+        "name": "native-current-census.hap",
+        "owner": {
+          "id": "imp-0766b95f-2a83-4130-a3aa-953d640896a1",
+          "kind": "import"
+        },
+        "privacy": "standard",
+        "schemaVersion": "arkdeck.import-receipt/1",
+        "targetId": "TGT-ISOLATED-IMPORT",
+        "validation": {
+          "container": "zip",
+          "kind": "hap"
+        }
+      },
+      "schemaVersion": "arkdeck.import/1",
+      "state": "committed",
+      "updatedAtUtc": "2026-09-14T00:00:00Z"
+    },
+    "jobId": "job-c847deffe96d07c4cf8bdedd8b092c3d",
+    "manifestByteCount": "10463",
+    "manifestSHA256": "eafc5b47f622c7777f49bc19bc4c3378532856413901687b543e9722ba8cbbe8",
+    "sessionShow": {
+      "completedAtUtc": "2026-09-14T00:00:00Z",
+      "expiresAtUtc": "2026-12-13T00:00:00Z",
+      "generation": "5",
+      "pinned": false,
+      "policyGeneration": "1",
+      "schemaVersion": "arkdeck.session/1",
+      "sessionId": "session-job-c847deffe96d07c4cf8bdedd8b092c3d",
+      "sizeBytes": "30343"
+    }
+  }
+]

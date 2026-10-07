@@ -145,15 +145,19 @@ pub(crate) fn recovery_policy_fingerprint(
     session_scoped: bool,
     recovery: Option<&str>,
 ) -> String {
-    sha256_hex(
-        format!(
-            "{CATALOG_DIGEST}\n{}\n{}",
-            scope_fingerprint(query, session_scoped),
-            recovery.unwrap_or("ordinary")
-        )
-        .as_bytes(),
+    sha256_hex(recovery_policy_material(query, session_scoped, recovery).as_bytes()).to_uppercase()
+}
+
+pub(crate) fn recovery_policy_material(
+    query: &CapabilityQuery,
+    session_scoped: bool,
+    recovery: Option<&str>,
+) -> String {
+    format!(
+        "{CATALOG_DIGEST}\n{}\n{}",
+        scope_fingerprint(query, session_scoped),
+        recovery.unwrap_or("ordinary")
     )
-    .to_uppercase()
 }
 
 /// Swift `exactCapabilityConstraints(for:)`: each string input pinned exactly

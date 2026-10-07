@@ -1,0 +1,4782 @@
+{
+  "catalogLineagePacketSha256": "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab",
+  "rows": [
+    {
+      "case": "installed.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "2813b21a941d21f914ad52d708b8a5450fd197375b79851a550c725b06bfab49",
+      "historicalPlanSha256": "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-installed\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-installed\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "packageSet.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "additionalHapArtifactLeases": [
+            "lease-v1:job-input-hap:ART-2ab8ee3a91b3198ef6404e610ed5179f"
+          ],
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "mkdir",
+                  "-p",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "file",
+                  "send",
+                  "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 300
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "file",
+                  "send",
+                  "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-2ab8ee3a91b3198ef6404e610ed5179f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 300
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "send-hap"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rmdir",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "ls",
+                  "-ld",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 15
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-remote-staging"
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rmdir",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "ls",
+                  "-ld",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 15
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-remote-staging"
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "88fa936b8255bbe5e88a5b91a78c3df55e8e8d9cd9184deab66854d3e19f060e",
+      "historicalPlanSha256": "028647d2b5d3beeaefc98b79c04686db6da6ac56cb8610814caff966e1dd6ecf",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-packageSet\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"additionalHapArtifactLeases\":[\"lease-v1:job-input-hap:ART-2ab8ee3a91b3198ef6404e610ed5179f\"],\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-packageSet\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "notInstalled.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "2813b21a941d21f914ad52d708b8a5450fd197375b79851a550c725b06bfab49",
+      "historicalPlanSha256": "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-notInstalled\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-notInstalled\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "startFailed.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "2813b21a941d21f914ad52d708b8a5450fd197375b79851a550c725b06bfab49",
+      "historicalPlanSha256": "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-startFailed\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-startFailed\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "stillRunning.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "2813b21a941d21f914ad52d708b8a5450fd197375b79851a550c725b06bfab49",
+      "historicalPlanSha256": "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-stillRunning\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-stillRunning\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "stillInstalled.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "2813b21a941d21f914ad52d708b8a5450fd197375b79851a550c725b06bfab49",
+      "historicalPlanSha256": "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-stillInstalled\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-stillInstalled\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "cleanupDebt.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "2813b21a941d21f914ad52d708b8a5450fd197375b79851a550c725b06bfab49",
+      "historicalPlanSha256": "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-cleanupDebt\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-cleanupDebt\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "emptyHilog.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "uninstall",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "stopped"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "2813b21a941d21f914ad52d708b8a5450fd197375b79851a550c725b06bfab49",
+      "historicalPlanSha256": "722d6e4841590a95725be304cb99a272a5e3cad771b6a7deb6b523b59c719ad8",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-emptyHilog\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"uninstall\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"stopped\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-emptyHilog\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "omittedDefaults.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo",
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processKind": "process",
+            "stepID": "send-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 30,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "cleanup-remote-staging",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "packageName": "com.example.demo"
+            },
+            "kind": "uninstallPackage",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "uninstall",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 120
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "bm",
+                  "dump",
+                  "-n",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-uninstall"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned.hap"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processKind": "process",
+            "stepID": "compensation-cleanup-remote-staging",
+            "timeoutSeconds": 15
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "7a9c8306e656c5f6f62d3fbb282ca08b54451a335acb0fd5e266537786e2180b",
+      "historicalPlanSha256": "4e47f5778a0d7c7f7fbcac9edcaa120f6757d03ea14400af7d91dcab6e8c8152",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-omittedDefaults\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-omittedDefaults\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "retainRunning.plan",
+      "completeCurrentPlan": {
+        "bindingRevision": 1,
+        "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+        "inputs": {
+          "abilityName": "EntryAbility",
+          "additionalHapArtifactLeases": [
+            "lease-v1:job-input-hap:ART-2ab8ee3a91b3198ef6404e610ed5179f"
+          ],
+          "bundleName": "com.example.demo",
+          "captureDiagnostics": true,
+          "cleanupPolicy": "retain",
+          "diagnosticsDurationSeconds": 10,
+          "hapArtifactLease": "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy": "installOrReplace",
+          "postRunAbilityState": "running"
+        },
+        "operationReference": "debug.hap@1",
+        "providerID": "hdc",
+        "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "steps": [
+          {
+            "binding": "none",
+            "cancellation": "immediate",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "verifyArtifact",
+            "processKind": "engine",
+            "stepID": "verify-hap-artifact"
+          },
+          {
+            "argumentSummary": [
+              "list",
+              "targets",
+              "-v"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "evidencePolicy": "coreMinimum"
+            },
+            "kind": "probeDevice",
+            "processKind": "process",
+            "stepID": "confirm-evidence-target",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.product.name"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "deviceModel",
+              "artifactId": "artifact-read-evidence-model",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-model",
+            "timeoutSeconds": 15
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "param",
+              "get",
+              "const.ohos.fullname"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "firmwareBuild",
+              "artifactId": "artifact-read-evidence-firmware",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {}
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "read-evidence-firmware",
+            "timeoutSeconds": 15
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages",
+              "sourceArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "sourceSha256": "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575"
+            },
+            "kind": "sendFile",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "mkdir",
+                  "-p",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "file",
+                  "send",
+                  "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 300
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "file",
+                  "send",
+                  "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-2ab8ee3a91b3198ef6404e610ed5179f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 300
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "send-hap"
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "install",
+              "-p",
+              "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages",
+              "-r"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "packageArtifactId": "ART-ce40ab95d8ec5ac89835a46e2d301004",
+              "packageName": "com.example.demo",
+              "replacePolicy": "allow"
+            },
+            "kind": "installPackage",
+            "processKind": "process",
+            "stepID": "install-hap",
+            "timeoutSeconds": 300
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "bm",
+              "dump",
+              "-n",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "actionId": "packageInfo",
+              "artifactId": "artifact-package-readback",
+              "catalogId": "arkdeck-remote-operations",
+              "parameters": {
+                "bundleName": "com.example.demo"
+              }
+            },
+            "kind": "runApprovedRemoteRead",
+            "processKind": "process",
+            "stepID": "package-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "startApplication",
+            "processKind": "process",
+            "stepID": "start-ability",
+            "timeoutSeconds": 60
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "expectedState": "running",
+              "probeId": "process.com.example.demo"
+            },
+            "kind": "verifyRemoteState",
+            "processKind": "process",
+            "stepID": "process-readback",
+            "timeoutSeconds": 30
+          },
+          {
+            "argumentSummary": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "hilog",
+              "-x"
+            ],
+            "binding": "confirmedDevice",
+            "cancellation": "immediate",
+            "effect": "readOnly",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": true,
+            "journalArguments": {
+              "actionId": "boundedHilog",
+              "artifactId": "artifact-capture-diagnostics",
+              "catalogId": "arkdeck-diagnostics",
+              "parameters": {
+                "byteBudget": 16777216,
+                "durationSeconds": 10,
+                "filters": []
+              }
+            },
+            "kind": "captureRemoteStdout",
+            "processKind": "process",
+            "stepID": "capture-diagnostics",
+            "timeoutSeconds": 45
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rmdir",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "ls",
+                  "-ld",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 15
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "cleanup-remote-staging"
+          },
+          {
+            "binding": "none",
+            "cancellation": "atSafeBoundary",
+            "effect": "hostOnly",
+            "isOptional": false,
+            "kind": "finalizeSession",
+            "processKind": "engine",
+            "stepID": "finalize-session"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "abilityName": "EntryAbility",
+              "bundleName": "com.example.demo"
+            },
+            "kind": "stopApplication",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "aa",
+                  "force-stop",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 60
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "pidof",
+                  "com.example.demo"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-stop-ability"
+          },
+          {
+            "binding": "confirmedDevice",
+            "cancellation": "atSafeBoundary",
+            "effect": "deviceMutation",
+            "executableSHA256": "resolved-at-dispatch",
+            "isOptional": false,
+            "journalArguments": {
+              "ownershipEvidenceId": "owned-job-authorization-envelope",
+              "remotePath": "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+            },
+            "kind": "cleanupOwnedRemotePath",
+            "processInvocations": [
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rm",
+                  "-f",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap"
+                ],
+                "continueAfterNonZero": true,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "rmdir",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 30
+              },
+              {
+                "arguments": [
+                  "-t",
+                  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "shell",
+                  "ls",
+                  "-ld",
+                  "/data/local/tmp/arkdeck-job-authorization-envelope-send-hap-owned-packages"
+                ],
+                "continueAfterNonZero": false,
+                "timeoutSeconds": 15
+              }
+            ],
+            "processKind": "processSequence",
+            "stepID": "compensation-cleanup-remote-staging"
+          }
+        ],
+        "targetID": "TGT-3ba3f5f43b92"
+      },
+      "currentPlanSha256": "3ed348bf3cdc875e530673d00bd4c2f419f207c5d2ba6da68c37b89d66d3da61",
+      "historicalPlanSha256": "7fe306587006309e2af68d3563c8396f81bd342e0eef9fb615f4cb82e8342a4d",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-retainRunning\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"additionalHapArtifactLeases\":[\"lease-v1:job-input-hap:ART-2ab8ee3a91b3198ef6404e610ed5179f\"],\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"retain\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"running\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-retainRunning\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    }
+  ],
+  "schemaVersion": "arkdeck.test-hap-plan-lineage/1",
+  "sourceCasesSha256": "73ca561f75946518c57d512356679be18e864fd8c09c6aff8b40ffef2496d718",
+  "sourceFixture": "debug-hap"
+}

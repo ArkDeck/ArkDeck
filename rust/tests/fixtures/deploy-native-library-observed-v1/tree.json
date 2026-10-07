@@ -1,0 +1,842 @@
+[
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "store/jobs/job-186c8faffebe3b9cb8b0150ef9a645b2"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-186c8faffebe3b9cb8b0150ef9a645b2/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-186c8faffebe3b9cb8b0150ef9a645b2/job-record.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-186c8faffebe3b9cb8b0150ef9a645b2/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-186c8faffebe3b9cb8b0150ef9a645b2/session-manifest.proposal.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "store/jobs/job-40ebc2b42062093893bd7bc3eaa2a837"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-40ebc2b42062093893bd7bc3eaa2a837/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-40ebc2b42062093893bd7bc3eaa2a837/job-record.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-40ebc2b42062093893bd7bc3eaa2a837/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-40ebc2b42062093893bd7bc3eaa2a837/session-manifest.proposal.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "store/jobs/job-77f80bef1b0b380733dd6c0759c5ccb4"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-77f80bef1b0b380733dd6c0759c5ccb4/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-77f80bef1b0b380733dd6c0759c5ccb4/job-record.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-77f80bef1b0b380733dd6c0759c5ccb4/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-77f80bef1b0b380733dd6c0759c5ccb4/session-manifest.proposal.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "store/jobs/job-c847deffe96d07c4cf8bdedd8b092c3d"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-c847deffe96d07c4cf8bdedd8b092c3d/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-c847deffe96d07c4cf8bdedd8b092c3d/job-record.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-c847deffe96d07c4cf8bdedd8b092c3d/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-c847deffe96d07c4cf8bdedd8b092c3d/session-manifest.proposal.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "store/jobs/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/job-record.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/jobs/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/session-manifest.proposal.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/capabilities/.runtime-capabilities.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/capabilities/runtime-capabilities.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "store/capabilities/runtime-capabilities.ledger"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/.arkdeck-retention-catalog.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/.arkdeck-retention-catalog.lock"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/.session-identity.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/derived"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-0.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-1.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-2.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-3.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-4.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-5.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-6.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-7.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-8.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-9.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-a.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-b.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-c.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-d.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-e.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/partial/.publication-lock-f.lock"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/artifacts/raw"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/audit"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/audit/session.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-186c8faffebe3b9cb8b0150ef9a645b2/manifest.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/.session-identity.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/derived"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-0.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-1.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-2.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-3.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-4.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-5.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-6.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-7.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-8.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-9.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-a.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-b.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-c.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-d.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-e.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/partial/.publication-lock-f.lock"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/artifacts/raw"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/audit"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/audit/session.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-40ebc2b42062093893bd7bc3eaa2a837/manifest.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/.session-identity.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/derived"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-0.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-1.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-2.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-3.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-4.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-5.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-6.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-7.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-8.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-9.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-a.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-b.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-c.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-d.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-e.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/partial/.publication-lock-f.lock"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/artifacts/raw"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/audit"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/audit/session.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-77f80bef1b0b380733dd6c0759c5ccb4/manifest.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/.session-identity.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/derived"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-0.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-1.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-2.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-3.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-4.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-5.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-6.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-7.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-8.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-9.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-a.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-b.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-c.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-d.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-e.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/partial/.publication-lock-f.lock"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/artifacts/raw"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/audit"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/audit/session.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-c847deffe96d07c4cf8bdedd8b092c3d/manifest.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/.manifest.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/.session-identity.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/derived"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-0.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-1.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-2.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-3.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-4.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-5.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-6.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-7.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-8.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-9.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-a.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-b.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-c.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-d.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-e.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/partial/.publication-lock-f.lock"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/artifacts/raw"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/audit"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/audit/session.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/journal.jsonl"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "sessions/2026/09/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/manifest.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "session-owner/.session-storage.lock"
+  }
+]

@@ -62,7 +62,7 @@ pub(crate) const DEVICE_OPERATIONS: [&str; 13] = [
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
 /// for a complete evidence preflight.
-const EVIDENCE_OPERATIONS: [&str; 10] = [
+const EVIDENCE_OPERATIONS: [&str; 11] = [
     "observe.device@1",
     "capture.diagnostics@1",
     DIAGNOSTIC_SESSION,
@@ -73,6 +73,7 @@ const EVIDENCE_OPERATIONS: [&str; 10] = [
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
+    NATIVE,
 ];
 
 /// The catalog that names every approved remote read.
@@ -476,7 +477,7 @@ pub(crate) fn action_in(
             .map(StepAction::Keyboard)
             .map_err(ActionRefusal::Invalid);
     }
-    if reference == NATIVE {
+    if reference == NATIVE && !evidence_preflight_step(step) {
         return native_action(step, inputs, context);
     }
     if reference == HAP

@@ -35,6 +35,9 @@ use std::path::{Path, PathBuf};
 #[path = "native_readback.rs"]
 pub mod native_readback;
 
+#[path = "native_current.rs"]
+pub mod native_current;
+
 /// The fake's application state, which each oracle clears before every Job
 /// it runs: whether a package is installed, whether the ability runs, and
 /// whether a new native library is published.
@@ -341,11 +344,41 @@ pub fn assert_read_only_replays(name: &str, exchanges: usize, calls: usize) {
 }
 
 fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
+    replay_into(name, exchanges, calls, mutations, None);
+}
+
+/// Explicit CREATE_NEW recording of the proposed current Native oracle.
+/// This never updates the historical Swift fixture or a contract pin.
+pub fn record_native_current(output: &Path) {
+    replay_into(
+        "deploy-native-library",
+        40,
+        240,
+        Mutations::Owned,
+        Some(output),
+    );
+}
+
+fn replay_into(
+    name: &str,
+    exchanges: usize,
+    calls: usize,
+    mutations: Mutations,
+    output: Option<&Path>,
+) {
+    if let Some(path) = output {
+        assert!(!path.exists(), "CREATE_NEW oracle destination");
+    }
     let owned = mutations != Mutations::ReadOnly;
     let _lock = debug_hap::exclusive();
     let fixture = super::fixture(name);
     let cases = document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
+    let current = name == native_current::NAME || output.is_some();
+    if output.is_some() {
+        native_current::install_answers(&owners.root, &fixture);
+    }
+    let native_import = current.then(|| native_current::prepare_import(&owners.root));
     let hdc = owners.hdc(&owners.dispatch);
     let admitter = if owned {
         owners.admitter(&hdc, &owners.default_root)
@@ -368,7 +401,7 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         // The additional native proof is asserted in full before projecting
         // it out of this one frozen pre-proof oracle comparison.
         let native;
-        let bytes = if name == "deploy-native-library" {
+        let bytes = if name == "deploy-native-library" && !current {
             native = native_readback::historical_bytes(bytes);
             native.as_slice()
         } else {
@@ -390,7 +423,7 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         } else {
             r#""/tmp/arkdeck-hdc-oracle/Sessions""#
         };
-        let text = if cfg!(windows) {
+        let text = if cfg!(windows) || current {
             text.replace(&sessions, foundation)
         } else {
             text
@@ -406,13 +439,19 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
     let spelled_json = |value: &Value| -> Value {
         serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
     };
-    let mut labels = debug_hap::HostLabels::default();
+    let mut labels = if current {
+        debug_hap::HostLabels::portable()
+    } else {
+        debug_hap::HostLabels::default()
+    };
     let swift_capabilities = if owned {
         document(&fixture, "store/capabilities/runtime-capabilities.json")
     } else {
         Value::Null
     };
     let (mut answers, mut replayed) = (Vec::new(), 0);
+    let mut publication_proofs = Vec::new();
+    let mut recorded_cases = cases.clone();
     // The concurrent calls' own log, each exchange's read sorted.
     let concurrent = fixture.join("hdc-calls.log").is_file();
     let (mut sorted_calls, mut seen) = (Vec::new(), 0);
@@ -481,6 +520,9 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
             }
             "capability.list" | "capability.inspect" => {
                 let params = labels.host_json(&Value::Object(params.clone()));
+                if output.is_some() {
+                    recorded_cases["exchanges"][replayed - 1]["params"] = params.clone();
+                }
                 match owners
                     .capabilities
                     .handle(method, params.as_object().unwrap())
@@ -508,8 +550,15 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
         };
         // What the daemon would answer passes the method's published
         // contract, as its control layer requires of every answer.
-        if method.starts_with("cleanupDebt.") {
+        if current || method.starts_with("cleanupDebt.") {
             assert_conforms(method, &actual);
+        }
+        if current && method == "job.run" && exchange.get("mode").is_some() {
+            publication_proofs.push(native_current::publication_proof(
+                &owners,
+                native_import.as_ref().unwrap(),
+                params["jobId"].as_str().unwrap(),
+            ));
         }
         if concurrent {
             let log = fs::read_to_string(owners.root.join("hdc-calls.log")).unwrap_or_default();
@@ -523,21 +572,31 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
             seen = lines.len();
         }
         // Compared once every derived value is learned, below.
-        answers.push((
-            name.clone(),
-            spelled_json(&super::legacy_plan_answer(actual)),
-            exchange["answer"].clone(),
-        ));
+        let actual = if current {
+            actual
+        } else {
+            super::legacy_plan_answer(actual)
+        };
+        let actual = spelled_json(&actual);
+        if output.is_some() {
+            recorded_cases["exchanges"][replayed - 1]["answer"] = actual.clone();
+        }
+        answers.push((name.clone(), actual, exchange["answer"].clone()));
     }
     assert_eq!(replayed, exchanges, "every exchange");
 
+    if current {
+        native_current::assert_original_calls(&owners.calls(), &owners.root);
+        assert_eq!(publication_proofs.len(), 5);
+    }
+
     // The fake received Swift's calls, in order (where they ran
     // concurrently, each exchange's sorted).
-    if concurrent {
+    if output.is_none() && concurrent {
         let swift = fs::read_to_string(fixture.join("hdc-calls.log")).unwrap();
         assert_eq!(swift.lines().count(), calls);
         assert_eq!(sorted_calls.concat(), swift, "each exchange's calls");
-    } else {
+    } else if output.is_none() {
         let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
         assert_eq!(swift.lines().count(), calls);
         assert_eq!(
@@ -569,6 +628,25 @@ fn replay(name: &str, exchanges: usize, calls: usize, mutations: Mutations) {
             .filter(|line| *line == "capability consumed before first mutation")
             .count();
         assert_eq!(consumed, 1, "{case}");
+    }
+
+    if let Some(output) = output {
+        native_current::record(
+            output,
+            &fixture,
+            &owners,
+            &recorded_cases,
+            &publication_proofs,
+            spelled,
+        );
+        return;
+    }
+    if current {
+        answers.extend(native_current::publication_answers(
+            &fixture,
+            &publication_proofs,
+            &spelled,
+        ));
     }
 
     let Owners {
@@ -618,6 +696,9 @@ pub fn assert_relabelled(
     // A Session manifest names the platform it was published on: two bytes
     // longer as `PLATFORM-WINDOWS@0.2.0`, read above as the oracle's.
     keys.push("manifestByteCount");
+    if fixture.file_name().and_then(|name| name.to_str()) == Some(native_current::NAME) {
+        keys.push("manifestSHA256");
+    }
     let documents = |bytes: &[u8]| -> Vec<Value> {
         serde_json::from_slice(bytes).map_or_else(
             |_| {
@@ -658,7 +739,12 @@ pub fn assert_relabelled(
             labels.learn_within(&json!(ours), &json!(theirs), seal, "sha256");
         }
     }
-    let index = super::index(default_root);
+    let index = if fixture.file_name().and_then(|name| name.to_str()) == Some(native_current::NAME)
+    {
+        super::index_normalized(default_root, &spelled)
+    } else {
+        super::index(default_root)
+    };
     let index =
         if fixture.file_name().and_then(|name| name.to_str()) == Some("deploy-native-library") {
             native_readback::historical_index(&index, |job| {
@@ -677,6 +763,10 @@ pub fn assert_relabelled(
     for (_, actual, expected) in answers {
         labels.learn(actual, expected, "/result/materializedPlanDigest");
         labels.learn_keys(actual, expected, &ANSWER_DERIVED);
+    }
+    let current = fixture.file_name().and_then(|name| name.to_str()) == Some(native_current::NAME);
+    if current {
+        native_current::learn_import_labels(fixture, replayed_root, answers, labels, &spelled);
     }
     // A read-only oracle's refusal wording is Swift's (T2): reported.
     let semantic = |answer: &Value| {
@@ -701,11 +791,23 @@ pub fn assert_relabelled(
         })
         .collect();
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    super::assert_leftovers_relabelled_with_index(
-        fixture,
-        replayed_root,
-        default_root,
-        index,
-        |bytes| labels.swift_bytes(&spelled(bytes)),
-    );
+    if current {
+        native_current::assert_leftovers(
+            fixture,
+            replayed_root,
+            default_root,
+            index,
+            labels,
+            &spelled,
+        );
+        native_current::assert_import_snapshot(fixture, replayed_root, labels, &spelled);
+    } else {
+        super::assert_leftovers_relabelled_with_index(
+            fixture,
+            replayed_root,
+            default_root,
+            index,
+            |bytes| labels.swift_bytes(&spelled(bytes)),
+        );
+    }
 }
