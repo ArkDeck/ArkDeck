@@ -216,7 +216,10 @@ public sealed record JobTerminal(string JobId, string State, bool OutcomeUnknown
 }
 
 /// <summary>A Job as <c>job.show</c> reads it: its terminal facts and its status object.</summary>
-public sealed record JobShown(JobTerminal Terminal, JsonObject Status);
+public sealed record JobShown(JobTerminal Terminal, JsonObject Status)
+{
+    public JsonObject? Document { get; init; }
+}
 
 /// <summary>A submitted Job: its identifier (<c>arkdeck.job-acceptance/1</c>).</summary>
 public sealed record JobAcceptance(string JobId)
@@ -361,7 +364,7 @@ public sealed partial class SurfaceLoader
                 : await TimelinePagesAsync(jobId).ConfigureAwait(false);
             var state = TypedJson.Required(job, "state", TypedJson.String);
             var unknown = TypedJson.Required(job, "outcomeUnknown", TypedJson.Bool);
-            return new(Loaded<JobShown>.Of(new JobShown(new JobTerminal(jobId, state, unknown, JobTerminal.FailureCodeOf(job, state, unknown), entries), job)),
+            return new(Loaded<JobShown>.Of(new JobShown(new JobTerminal(jobId, state, unknown, JobTerminal.FailureCodeOf(job, state, unknown), entries), job) { Document = show }),
                 detail.DaemonFailure, detail.Reached);
         }
         catch (Exception error) when (error is ContractException or InvalidCastException or KeyNotFoundException or FormatException)

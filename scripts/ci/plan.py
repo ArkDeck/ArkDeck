@@ -161,6 +161,7 @@ WINDOWS_INPUT_FILES = frozenset({
     "rust/scripts/windows-dev-identity.ps1",
     # The App's shared strings are these macOS tables' values (generate-ui-strings.py).
     "ArkDeckApp/Resources/Localizable.xcstrings",
+    "ArkDeckApp/Resources/DeviceLocalizable.xcstrings",
     "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
     "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
     "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",

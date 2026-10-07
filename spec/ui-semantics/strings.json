@@ -9935,6 +9935,672 @@
       "table": null,
       "en": "(until %@)",
       "zh-Hans": "（至 %@）"
+    },
+    {
+      "key": "device.screen.picture",
+      "table": "DeviceLocalizable",
+      "en": "Device screenshot",
+      "zh-Hans": "\u8bbe\u5907\u622a\u56fe"
+    },
+    {
+      "key": "device.frame.age",
+      "table": "DeviceLocalizable",
+      "en": "Picture taken",
+      "zh-Hans": "\u753b\u9762\u62cd\u6444\u4e8e"
+    },
+    {
+      "key": "device.frame.none",
+      "table": "DeviceLocalizable",
+      "en": "No picture yet",
+      "zh-Hans": "\u5c1a\u65e0\u753b\u9762"
+    },
+    {
+      "key": "device.gesture.longPress",
+      "table": "DeviceLocalizable",
+      "en": "Long press",
+      "zh-Hans": "\u957f\u6309"
+    },
+    {
+      "key": "device.gesture.swipe",
+      "table": "DeviceLocalizable",
+      "en": "Swipe",
+      "zh-Hans": "\u6ed1\u52a8"
+    },
+    {
+      "key": "device.gesture.tap",
+      "table": "DeviceLocalizable",
+      "en": "Tap",
+      "zh-Hans": "\u70b9\u51fb"
+    },
+    {
+      "key": "device.gestures.longPress",
+      "table": "DeviceLocalizable",
+      "en": "Hold for half a second to send a long press.",
+      "zh-Hans": "\u6309\u4f4f\u534a\u79d2\u4ee5\u4e0a\uff0c\u53d1\u9001\u4e00\u6b21\u957f\u6309\u3002"
+    },
+    {
+      "key": "device.gestures.swipe",
+      "table": "DeviceLocalizable",
+      "en": "Drag to send a swipe; the time you held it is the swipe's duration.",
+      "zh-Hans": "\u62d6\u52a8\u53d1\u9001\u4e00\u6b21\u6ed1\u52a8\uff1b\u4f60\u6309\u4f4f\u7684\u65f6\u957f\u5c31\u662f\u6ed1\u52a8\u65f6\u957f\u3002"
+    },
+    {
+      "key": "device.gestures.tap",
+      "table": "DeviceLocalizable",
+      "en": "Click the picture to send a tap at that point.",
+      "zh-Hans": "\u5355\u51fb\u753b\u9762\uff0c\u5728\u8be5\u70b9\u53d1\u9001\u4e00\u6b21\u70b9\u51fb\u3002"
+    },
+    {
+      "key": "device.gestures.title",
+      "table": "DeviceLocalizable",
+      "en": "How input works",
+      "zh-Hans": "\u64cd\u4f5c\u65b9\u5f0f"
+    },
+    {
+      "key": "device.log.captureFailed",
+      "table": "DeviceLocalizable",
+      "en": "Screenshot failed",
+      "zh-Hans": "\u622a\u56fe\u5931\u8d25"
+    },
+    {
+      "key": "device.log.captured",
+      "table": "DeviceLocalizable",
+      "en": "Screenshot captured",
+      "zh-Hans": "\u5df2\u83b7\u53d6\u622a\u56fe"
+    },
+    {
+      "key": "device.log.confirmed",
+      "table": "DeviceLocalizable",
+      "en": "confirmed",
+      "zh-Hans": "\u5df2\u786e\u8ba4"
+    },
+    {
+      "key": "device.log.empty",
+      "table": "DeviceLocalizable",
+      "en": "Nothing sent yet.",
+      "zh-Hans": "\u5c1a\u672a\u53d1\u9001\u4efb\u4f55\u64cd\u4f5c\u3002"
+    },
+    {
+      "key": "device.log.failed",
+      "table": "DeviceLocalizable",
+      "en": "failed",
+      "zh-Hans": "\u5931\u8d25"
+    },
+    {
+      "key": "device.log.title",
+      "table": "DeviceLocalizable",
+      "en": "Operation log",
+      "zh-Hans": "\u64cd\u4f5c\u8bb0\u5f55"
+    },
+    {
+      "key": "device.log.unknown",
+      "table": "DeviceLocalizable",
+      "en": "outcome unknown",
+      "zh-Hans": "\u7ed3\u679c\u672a\u77e5"
+    },
+    {
+      "key": "device.screen.capture",
+      "table": "DeviceLocalizable",
+      "en": "Get screenshot",
+      "zh-Hans": "\u83b7\u53d6\u622a\u56fe"
+    },
+    {
+      "key": "device.screen.capturing",
+      "table": "DeviceLocalizable",
+      "en": "Capturing\u2026",
+      "zh-Hans": "\u6b63\u5728\u83b7\u53d6\u622a\u56fe\u2026"
+    },
+    {
+      "key": "device.screen.empty.ready",
+      "table": "DeviceLocalizable",
+      "en": "Get a screenshot to act on the device.",
+      "zh-Hans": "\u83b7\u53d6\u4e00\u5f20\u622a\u56fe\u540e\u5373\u53ef\u5728\u5176\u4e0a\u64cd\u4f5c\u8bbe\u5907\u3002"
+    },
+    {
+      "key": "device.screen.empty.title",
+      "table": "DeviceLocalizable",
+      "en": "No screenshot yet",
+      "zh-Hans": "\u5c1a\u672a\u83b7\u53d6\u622a\u56fe"
+    },
+    {
+      "key": "device.stale.badge",
+      "table": "DeviceLocalizable",
+      "en": "Out of date",
+      "zh-Hans": "\u5df2\u8fc7\u671f"
+    },
+    {
+      "key": "device.stale.refused",
+      "table": "DeviceLocalizable",
+      "en": "Not sent \u2014 this picture is out of date",
+      "zh-Hans": "\u672a\u53d1\u9001\u2014\u2014\u8fd9\u5f20\u753b\u9762\u5df2\u7ecf\u8fc7\u671f"
+    },
+    {
+      "key": "device.stale.refused.detail",
+      "table": "DeviceLocalizable",
+      "en": "Your last gesture changed the device. Get a new screenshot before pressing again; a point picked on this one no longer means what it did.",
+      "zh-Hans": "\u4e0a\u4e00\u4e2a\u624b\u52bf\u5df2\u7ecf\u6539\u53d8\u4e86\u8bbe\u5907\u3002\u518d\u70b9\u4e4b\u524d\u5148\u53d6\u4e00\u5f20\u65b0\u622a\u56fe\u2014\u2014\u5728\u8fd9\u5f20\u56fe\u4e0a\u9009\u7684\u4f4d\u7f6e\uff0c\u5df2\u7ecf\u4e0d\u662f\u5b83\u539f\u6765\u6307\u7684\u4e1c\u897f\u4e86\u3002"
+    },
+    {
+      "key": "device.target.none",
+      "table": "DeviceLocalizable",
+      "en": "No device",
+      "zh-Hans": "\u65e0\u8bbe\u5907"
+    },
+    {
+      "key": "device.target.none.detail",
+      "table": "DeviceLocalizable",
+      "en": "Device sends device mutations and will not guess which device you meant.",
+      "zh-Hans": "\u771f\u673a\u64cd\u4f5c\u4f1a\u5199\u8bbe\u5907\uff0c\u56e0\u6b64\u4e0d\u4f1a\u66ff\u4f60\u731c\u662f\u54ea\u4e00\u53f0\u3002"
+    },
+    {
+      "key": "device.record.title",
+      "table": "DeviceLocalizable",
+      "en": "Recording",
+      "zh-Hans": "\u5f55\u5c4f"
+    },
+    {
+      "key": "device.record.start",
+      "table": "DeviceLocalizable",
+      "en": "Record",
+      "zh-Hans": "\u5f55\u5236"
+    },
+    {
+      "key": "device.record.frames",
+      "table": "DeviceLocalizable",
+      "en": "frames",
+      "zh-Hans": "\u5e27"
+    },
+    {
+      "key": "device.record.preflighting",
+      "table": "DeviceLocalizable",
+      "en": "Checking storage",
+      "zh-Hans": "\u68c0\u67e5\u7a7a\u95f4\u4e2d"
+    },
+    {
+      "key": "device.record.capturing",
+      "table": "DeviceLocalizable",
+      "en": "Capturing",
+      "zh-Hans": "\u91c7\u96c6\u4e2d"
+    },
+    {
+      "key": "device.record.assembling",
+      "table": "DeviceLocalizable",
+      "en": "Assembling",
+      "zh-Hans": "\u5408\u6210\u4e2d"
+    },
+    {
+      "key": "device.record.validating",
+      "table": "DeviceLocalizable",
+      "en": "Validating",
+      "zh-Hans": "\u6821\u9a8c\u4e2d"
+    },
+    {
+      "key": "device.record.ready",
+      "table": "DeviceLocalizable",
+      "en": "Recording ready",
+      "zh-Hans": "\u5f55\u5c4f\u5df2\u5c31\u7eea"
+    },
+    {
+      "key": "device.record.failed",
+      "table": "DeviceLocalizable",
+      "en": "Recording failed",
+      "zh-Hans": "\u5f55\u5c4f\u5931\u8d25"
+    },
+    {
+      "key": "device.record.saveAs",
+      "table": "DeviceLocalizable",
+      "en": "Save As\u2026",
+      "zh-Hans": "\u53e6\u5b58\u4e3a\u2026"
+    },
+    {
+      "key": "device.record.saveFailed",
+      "table": "DeviceLocalizable",
+      "en": "Couldn\u2019t save recording",
+      "zh-Hans": "\u65e0\u6cd5\u4fdd\u5b58\u5f55\u5c4f"
+    },
+    {
+      "key": "device.record.again",
+      "table": "DeviceLocalizable",
+      "en": "Record again",
+      "zh-Hans": "\u518d\u5f55\u4e00\u6bb5"
+    },
+    {
+      "key": "device.record.rate",
+      "table": "DeviceLocalizable",
+      "en": "measured",
+      "zh-Hans": "\u5b9e\u6d4b"
+    },
+    {
+      "key": "device.record.gap",
+      "table": "DeviceLocalizable",
+      "en": "frames were lost",
+      "zh-Hans": "\u5e27\u4e22\u5931"
+    },
+    {
+      "key": "device.record.timeline",
+      "table": "DeviceLocalizable",
+      "en": "Frames are laid out at the spacing they were taken at, not at an average.",
+      "zh-Hans": "\u5404\u5e27\u6309\u5b9e\u9645\u62cd\u6444\u95f4\u8ddd\u6392\u5e03\uff0c\u4e0d\u662f\u6309\u5e73\u5747\u503c\u3002"
+    },
+    {
+      "key": "device.record.noRoom",
+      "table": "DeviceLocalizable",
+      "en": "Not enough room to keep this recording",
+      "zh-Hans": "\u653e\u4e0d\u4e0b\u8fd9\u6bb5\u5f55\u5c4f"
+    },
+    {
+      "key": "device.record.noRoom.detail",
+      "table": "DeviceLocalizable",
+      "en": "The artifact store refuses a new recording rather than deleting one you already have.",
+      "zh-Hans": "\u5236\u54c1\u5e93\u4f1a\u62d2\u7edd\u65b0\u5f55\u5c4f\uff0c\u800c\u4e0d\u662f\u5220\u6389\u4f60\u5df2\u6709\u7684\u90a3\u4e00\u6bb5\u3002"
+    },
+    {
+      "key": "device.record.wouldFit",
+      "table": "DeviceLocalizable",
+      "en": "would fit",
+      "zh-Hans": "\u653e\u5f97\u4e0b"
+    },
+    {
+      "key": "device.record.needs",
+      "table": "DeviceLocalizable",
+      "en": "needs",
+      "zh-Hans": "\u9700\u8981"
+    },
+    {
+      "key": "device.record.free",
+      "table": "DeviceLocalizable",
+      "en": "free",
+      "zh-Hans": "\u5269\u4f59"
+    },
+    {
+      "key": "device.record.headroomUnknown",
+      "table": "DeviceLocalizable",
+      "en": "Could not read the artifact store's remaining room, so this run was not checked against it. The runtime still refuses a recording it cannot keep.",
+      "zh-Hans": "\u8bfb\u4e0d\u5230\u5236\u54c1\u5e93\u5269\u4f59\u7a7a\u95f4\uff0c\u8fd9\u6b21\u8fd0\u884c\u6ca1\u6709\u5bf9\u5b83\u505a\u68c0\u67e5\u3002\u8fd0\u884c\u65f6\u4ecd\u4f1a\u62d2\u7edd\u4e00\u6bb5\u5b83\u5b58\u4e0d\u4e0b\u7684\u5f55\u5c4f\u3002"
+    },
+    {
+      "key": "device.input.clipboardConsent",
+      "table": "DeviceLocalizable",
+      "en": "Allow this text to replace the device clipboard",
+      "zh-Hans": "\u5141\u8bb8\u8fd9\u6bb5\u6587\u5b57\u66ff\u6362\u8bbe\u5907\u526a\u8d34\u677f"
+    },
+    {
+      "key": "device.input.focusHelp",
+      "table": "DeviceLocalizable",
+      "en": "Send one key or text to the current focus on the default display. Refresh the picture after each input.",
+      "zh-Hans": "\u5411\u9ed8\u8ba4\u5c4f\u5e55\u5f53\u524d\u7126\u70b9\u53d1\u9001\u4e00\u4e2a\u6309\u952e\u6216\u4e00\u6bb5\u6587\u5b57\u3002\u6bcf\u6b21\u8f93\u5165\u540e\u8bf7\u5237\u65b0\u753b\u9762\u3002"
+    },
+    {
+      "key": "device.input.key",
+      "table": "DeviceLocalizable",
+      "en": "Key",
+      "zh-Hans": "\u6309\u952e"
+    },
+    {
+      "key": "device.input.privacyHelp",
+      "table": "DeviceLocalizable",
+      "en": "Text is retained as a sensitive local Artifact. Some input, including Chinese, uses the device clipboard. Success confirms injector acceptance; check the device for the result.",
+      "zh-Hans": "\u6587\u5b57\u4fdd\u5b58\u4e3a\u672c\u5730\u654f\u611f Artifact\u3002\u4e2d\u6587\u7b49\u8f93\u5165\u4f1a\u4f7f\u7528\u8bbe\u5907\u526a\u8d34\u677f\u3002\u6210\u529f\u4ec5\u8868\u793a\u6ce8\u5165\u5668\u5df2\u63a5\u53d7\uff0c\u8bf7\u67e5\u770b\u8bbe\u5907\u786e\u8ba4\u7ed3\u679c\u3002"
+    },
+    {
+      "key": "device.input.sendKey",
+      "table": "DeviceLocalizable",
+      "en": "Send key",
+      "zh-Hans": "\u53d1\u9001\u6309\u952e"
+    },
+    {
+      "key": "device.input.sendText",
+      "table": "DeviceLocalizable",
+      "en": "Send text",
+      "zh-Hans": "\u53d1\u9001\u6587\u5b57"
+    },
+    {
+      "key": "device.input.text",
+      "table": "DeviceLocalizable",
+      "en": "Text \u00b7 up to 512 UTF-8 bytes",
+      "zh-Hans": "\u6587\u5b57 \u00b7 \u6700\u591a 512 \u4e2a UTF-8 \u5b57\u8282"
+    },
+    {
+      "key": "device.input.title",
+      "table": "DeviceLocalizable",
+      "en": "Device keyboard",
+      "zh-Hans": "\u8bbe\u5907\u952e\u76d8"
+    },
+    {
+      "key": "device.input.key.arrowDown",
+      "table": "DeviceLocalizable",
+      "en": "Down arrow",
+      "zh-Hans": "\u4e0b\u65b9\u5411\u952e"
+    },
+    {
+      "key": "device.input.key.arrowLeft",
+      "table": "DeviceLocalizable",
+      "en": "Left arrow",
+      "zh-Hans": "\u5de6\u65b9\u5411\u952e"
+    },
+    {
+      "key": "device.input.key.arrowRight",
+      "table": "DeviceLocalizable",
+      "en": "Right arrow",
+      "zh-Hans": "\u53f3\u65b9\u5411\u952e"
+    },
+    {
+      "key": "device.input.key.arrowUp",
+      "table": "DeviceLocalizable",
+      "en": "Up arrow",
+      "zh-Hans": "\u4e0a\u65b9\u5411\u952e"
+    },
+    {
+      "key": "device.input.key.back",
+      "table": "DeviceLocalizable",
+      "en": "Device Back",
+      "zh-Hans": "\u8bbe\u5907\u8fd4\u56de"
+    },
+    {
+      "key": "device.input.key.backspace",
+      "table": "DeviceLocalizable",
+      "en": "Backspace",
+      "zh-Hans": "\u9000\u683c"
+    },
+    {
+      "key": "device.input.key.enter",
+      "table": "DeviceLocalizable",
+      "en": "Enter",
+      "zh-Hans": "\u56de\u8f66"
+    },
+    {
+      "key": "device.input.key.escape",
+      "table": "DeviceLocalizable",
+      "en": "Escape",
+      "zh-Hans": "Escape"
+    },
+    {
+      "key": "device.input.key.home",
+      "table": "DeviceLocalizable",
+      "en": "Device Home",
+      "zh-Hans": "\u8bbe\u5907\u4e3b\u9875"
+    },
+    {
+      "key": "device.input.key.tab",
+      "table": "DeviceLocalizable",
+      "en": "Tab",
+      "zh-Hans": "\u5236\u8868\u952e"
+    },
+    {
+      "key": "windows.device.screen.screenTitle",
+      "table": null,
+      "en": "Device screen",
+      "zh-Hans": "\u8bbe\u5907\u753b\u9762"
+    },
+    {
+      "key": "windows.device.screen.historical",
+      "table": null,
+      "en": "Historical screenshot \u00b7 input unavailable",
+      "zh-Hans": "\u5386\u53f2\u622a\u56fe \u00b7 \u65e0\u6cd5\u53d1\u9001\u8f93\u5165"
+    },
+    {
+      "key": "windows.device.screen.current",
+      "table": null,
+      "en": "Current picture",
+      "zh-Hans": "\u5f53\u524d\u753b\u9762"
+    },
+    {
+      "key": "windows.device.screen.busy",
+      "table": null,
+      "en": "An operation is in progress. Wait for its outcome.",
+      "zh-Hans": "\u64cd\u4f5c\u6b63\u5728\u8fdb\u884c\uff0c\u8bf7\u7b49\u5f85\u7ed3\u679c\u3002"
+    },
+    {
+      "key": "windows.device.screen.inputConfirmed",
+      "table": null,
+      "en": "Injector accepted the input. Capture again before the next input.",
+      "zh-Hans": "\u6ce8\u5165\u5668\u5df2\u63a5\u53d7\u8f93\u5165\u3002\u518d\u6b21\u8f93\u5165\u524d\u8bf7\u91cd\u65b0\u622a\u56fe\u3002"
+    },
+    {
+      "key": "windows.device.screen.inputUnknown",
+      "table": null,
+      "en": "Outcome unknown. Never resend this intent; inspect its Job.",
+      "zh-Hans": "\u7ed3\u679c\u672a\u77e5\u3002\u4e0d\u8981\u91cd\u53d1\u672c\u6b21\u610f\u56fe\uff0c\u8bf7\u68c0\u67e5\u5176 Job\u3002"
+    },
+    {
+      "key": "windows.device.screen.inputFailed",
+      "table": null,
+      "en": "Input not confirmed. Inspect its Job or refusal.",
+      "zh-Hans": "\u8f93\u5165\u672a\u83b7\u786e\u8ba4\u3002\u8bf7\u68c0\u67e5\u5176 Job \u6216\u62d2\u7edd\u539f\u56e0\u3002"
+    },
+    {
+      "key": "windows.device.screen.pointerHelp",
+      "table": null,
+      "en": "Tab focuses the picture. Arrows move the pointer; Shift moves faster. Enter or Space taps, Alt+Enter holds, Shift+Enter sets then completes a swipe. Escape clears its start.",
+      "zh-Hans": "\u6309 Tab \u805a\u7126\u753b\u9762\u3002\u65b9\u5411\u952e\u79fb\u52a8\u6307\u9488\uff0cShift \u52a0\u901f\u3002\u56de\u8f66\u6216\u7a7a\u683c\u70b9\u51fb\uff0cAlt+\u56de\u8f66\u957f\u6309\uff0cShift+\u56de\u8f66\u8bbe\u7f6e\u5e76\u5b8c\u6210\u6ed1\u52a8\uff0cEsc \u6e05\u9664\u8d77\u70b9\u3002"
+    },
+    {
+      "key": "windows.device.screen.pointerPosition",
+      "table": null,
+      "en": "Pointer %@, %@",
+      "zh-Hans": "\u6307\u9488 %@\uff0c%@"
+    },
+    {
+      "key": "windows.device.screen.recordSummary",
+      "table": null,
+      "en": "%@ frames \u00b7 %@ seconds \u00b7 %@ measured frames/s \u00b7 %@ missing",
+      "zh-Hans": "%@ \u5e27 \u00b7 %@ \u79d2 \u00b7 \u5b9e\u6d4b %@ \u5e27/\u79d2 \u00b7 \u7f3a\u5931 %@ \u5e27"
+    },
+    {
+      "key": "windows.device.screen.movieSummary",
+      "table": null,
+      "en": "Local MP4 \u00b7 %@ bytes \u00b7 %@ \u00d7 %@ \u00b7 SHA-256 %@",
+      "zh-Hans": "\u672c\u5730 MP4 \u00b7 %@ \u5b57\u8282 \u00b7 %@ \u00d7 %@ \u00b7 SHA-256 %@"
+    },
+    {
+      "key": "windows.device.screen.movieLocal",
+      "table": null,
+      "en": "This movie is composed locally from Runtime frames; it is not a Runtime Artifact or hardware verdict.",
+      "zh-Hans": "\u6b64\u5f71\u7247\u5728\u672c\u5730\u7531 Runtime \u5e27\u5408\u6210\uff0c\u4e0d\u662f Runtime Artifact \u6216\u786c\u4ef6\u9a8c\u6536\u7ed3\u8bba\u3002"
+    },
+    {
+      "key": "windows.device.screen.movieUnavailable",
+      "table": null,
+      "en": "Native movie composition is unavailable. Save the verified frames and measured timings instead.",
+      "zh-Hans": "\u539f\u751f\u5f71\u7247\u5408\u6210\u4e0d\u53ef\u7528\u3002\u53ef\u4fdd\u5b58\u5df2\u6838\u9a8c\u7684\u5e27\u548c\u5b9e\u6d4b\u65f6\u5e8f\u3002"
+    },
+    {
+      "key": "windows.device.screen.movieReveal",
+      "table": null,
+      "en": "Show in Explorer",
+      "zh-Hans": "\u5728\u8d44\u6e90\u7ba1\u7406\u5668\u4e2d\u663e\u793a"
+    },
+    {
+      "key": "windows.device.screen.saveFrames",
+      "table": null,
+      "en": "Save frames and timings\u2026",
+      "zh-Hans": "\u4fdd\u5b58\u5e27\u548c\u65f6\u5e8f\u2026"
+    },
+    {
+      "key": "windows.device.screen.saved",
+      "table": null,
+      "en": "Saved %@",
+      "zh-Hans": "\u5df2\u4fdd\u5b58 %@"
+    },
+    {
+      "key": "windows.device.screen.decodeFailed",
+      "table": null,
+      "en": "The screenshot could not be decoded. No input is enabled.",
+      "zh-Hans": "\u622a\u56fe\u65e0\u6cd5\u89e3\u7801\uff0c\u672a\u542f\u7528\u8f93\u5165\u3002"
+    },
+    {
+      "key": "windows.device.screen.boundary",
+      "table": null,
+      "en": "Each gesture sends one typed operation. Confirmed or unknown input makes this picture out of date; capture again. Unknown intent is never replayed.",
+      "zh-Hans": "\u6bcf\u6b21\u624b\u52bf\u53d1\u9001\u4e00\u4e2a typed operation\u3002\u8f93\u5165\u5df2\u786e\u8ba4\u6216\u7ed3\u679c\u672a\u77e5\u65f6\u753b\u9762\u4f1a\u8fc7\u671f\uff0c\u9700\u91cd\u65b0\u622a\u56fe\u3002\u672a\u77e5\u610f\u56fe\u6c38\u4e0d\u91cd\u653e\u3002"
+    },
+    {
+      "key": "windows.device.screen.frameSummary",
+      "table": null,
+      "en": "%@ \u00d7 %@ \u00b7 Job %@ \u00b7 Artifact %@",
+      "zh-Hans": "%@ \u00d7 %@ \u00b7 Job %@ \u00b7 Artifact %@"
+    },
+    {
+      "key": "diagnostics.capture.duration",
+      "table": "DiagnosticsLocalizable",
+      "en": "Maximum recording",
+      "zh-Hans": "\u6700\u957f\u5f55\u5236"
+    },
+    {
+      "key": "diagnostics.capture.stop",
+      "table": "DiagnosticsLocalizable",
+      "en": "Stop and save",
+      "zh-Hans": "\u505c\u6b62\u5e76\u4fdd\u5b58"
+    },
+    {
+      "key": "diagnostics.capture.cancelPreparation",
+      "table": "DiagnosticsLocalizable",
+      "en": "Cancel preparation",
+      "zh-Hans": "\u53d6\u6d88\u51c6\u5907"
+    },
+    {
+      "key": "diagnostics.capture.refresh",
+      "table": "DiagnosticsLocalizable",
+      "en": "Refresh status",
+      "zh-Hans": "\u5237\u65b0\u72b6\u6001"
+    },
+    {
+      "key": "diagnostics.capture.marks",
+      "table": "DiagnosticsLocalizable",
+      "en": "Markers",
+      "zh-Hans": "\u6807\u8bb0"
+    },
+    {
+      "key": "diagnostics.capture.chooseTarget",
+      "table": "DiagnosticsLocalizable",
+      "en": "Adopt one device to start a session.",
+      "zh-Hans": "\u7ed1\u5b9a\u4e00\u53f0\u8bbe\u5907\u540e\u5f00\u59cb\u91c7\u96c6\u3002"
+    },
+    {
+      "key": "diagnostics.capture.uncertain",
+      "table": "DiagnosticsLocalizable",
+      "en": "Session state is uncertain. Refresh or inspect this Job in History before starting another capture.",
+      "zh-Hans": "\u4f1a\u8bdd\u72b6\u6001\u4e0d\u786e\u5b9a\u3002\u8bf7\u5237\u65b0\u72b6\u6001\u6216\u5728 History \u67e5\u770b\u6b64 Job\uff0c\u518d\u51b3\u5b9a\u540e\u7eed\u64cd\u4f5c\u3002"
+    },
+    {
+      "key": "diagnostics.capture.boundary",
+      "table": "DiagnosticsLocalizable",
+      "en": "Bounded trace with host-timed markers; logs drain after capture. Markers have no screenshots or device-clock calibration. Recording stops at its Runtime deadline even if this view closes.",
+      "zh-Hans": "\u6709\u754c Trace \u91c7\u96c6\uff0c\u6807\u8bb0\u4f7f\u7528\u4e3b\u673a\u65f6\u95f4\uff1b\u65e5\u5fd7\u5728\u5f55\u5236\u540e\u8bfb\u53d6\u3002\u6807\u8bb0\u4e0d\u542b\u622a\u56fe\uff0c\u4e5f\u672a\u4e0e\u8bbe\u5907\u65f6\u949f\u6821\u51c6\u3002\u5173\u95ed\u9875\u9762\u540e\uff0cRuntime \u4ecd\u4f1a\u6309\u65f6\u9650\u505c\u6b62\u5f55\u5236\u3002"
+    },
+    {
+      "key": "diagnostics.capture.state.preparing",
+      "table": "DiagnosticsLocalizable",
+      "en": "Preparing",
+      "zh-Hans": "\u51c6\u5907\u4e2d"
+    },
+    {
+      "key": "diagnostics.capture.state.recording",
+      "table": "DiagnosticsLocalizable",
+      "en": "Recording",
+      "zh-Hans": "\u5f55\u5236\u4e2d"
+    },
+    {
+      "key": "diagnostics.capture.state.finalizing",
+      "table": "DiagnosticsLocalizable",
+      "en": "Saving",
+      "zh-Hans": "\u4fdd\u5b58\u4e2d"
+    },
+    {
+      "key": "diagnostics.capture.state.interrupted",
+      "table": "DiagnosticsLocalizable",
+      "en": "Interrupted \u00b7 outcome needs inspection",
+      "zh-Hans": "\u5df2\u4e2d\u65ad \u00b7 \u8bf7\u68c0\u67e5\u7ed3\u679c"
+    },
+    {
+      "key": "diagnostics.capture.state.closed",
+      "table": "DiagnosticsLocalizable",
+      "en": "Session ended",
+      "zh-Hans": "\u4f1a\u8bdd\u5df2\u7ed3\u675f"
+    },
+    {
+      "key": "diagnostics.capture.phase.checking",
+      "table": "DiagnosticsLocalizable",
+      "en": "Checking device and storage",
+      "zh-Hans": "\u68c0\u67e5\u8bbe\u5907\u548c\u5b58\u50a8\u7a7a\u95f4"
+    },
+    {
+      "key": "diagnostics.capture.phase.submitting",
+      "table": "DiagnosticsLocalizable",
+      "en": "Submitting session",
+      "zh-Hans": "\u63d0\u4ea4\u91c7\u96c6"
+    },
+    {
+      "key": "diagnostics.capture.phase.active",
+      "table": "DiagnosticsLocalizable",
+      "en": "Waiting for Runtime",
+      "zh-Hans": "\u7b49\u5f85 Runtime"
+    },
+    {
+      "key": "diagnostics.capture.phase.finished",
+      "table": "DiagnosticsLocalizable",
+      "en": "Session ended",
+      "zh-Hans": "\u4f1a\u8bdd\u5df2\u7ed3\u675f"
+    },
+    {
+      "key": "diagnostics.capture.phase.unavailable",
+      "table": "DiagnosticsLocalizable",
+      "en": "Unable to start this session",
+      "zh-Hans": "\u65e0\u6cd5\u5f00\u59cb\u6b64\u6b21\u91c7\u96c6"
+    },
+    {
+      "key": "diagnostics.capture.phase.uncertain",
+      "table": "DiagnosticsLocalizable",
+      "en": "Session state is uncertain",
+      "zh-Hans": "\u4f1a\u8bdd\u72b6\u6001\u4e0d\u786e\u5b9a"
+    },
+    {
+      "key": "windows.settings.trace.licenses.title",
+      "table": null,
+      "en": "Open Source Licenses",
+      "zh-Hans": "\u5f00\u6e90\u8bb8\u53ef\u8bc1"
+    },
+    {
+      "key": "windows.settings.trace.licenses.product",
+      "table": null,
+      "en": "ArkTrace \u2014 MIT License",
+      "zh-Hans": "ArkTrace \u2014 MIT \u8bb8\u53ef\u8bc1"
+    },
+    {
+      "key": "windows.settings.trace.licenses.notices",
+      "table": null,
+      "en": "Third-Party Notices",
+      "zh-Hans": "\u7b2c\u4e09\u65b9\u58f0\u660e"
+    },
+    {
+      "key": "windows.settings.trace.licenses.unavailable",
+      "table": null,
+      "en": "License resources are unavailable in this build.",
+      "zh-Hans": "\u6b64\u6784\u5efa\u4e2d\u65e0\u6cd5\u4f7f\u7528\u8bb8\u53ef\u8bc1\u8d44\u6e90\u3002"
+    },
+    {
+      "key": "windows.settings.trace.licenses.reveal",
+      "table": null,
+      "en": "Show License Files in Explorer",
+      "zh-Hans": "\u5728\u8d44\u6e90\u7ba1\u7406\u5668\u4e2d\u663e\u793a\u8bb8\u53ef\u8bc1\u6587\u4ef6"
+    },
+    {
+      "key": "windows.settings.trace.licenses.revealFailed",
+      "table": null,
+      "en": "License files could not be opened safely.",
+      "zh-Hans": "\u65e0\u6cd5\u5b89\u5168\u6253\u5f00\u8bb8\u53ef\u8bc1\u6587\u4ef6\u3002"
+    },
+    {
+      "key": "diagnostics.alignment.observedWindow",
+      "table": "DiagnosticsLocalizable",
+      "en": "Clock observation window: {milliseconds} ms. Cross-clock accuracy still needs validation.",
+      "zh-Hans": "\u65f6\u949f\u6d4b\u91cf\u7a97\u53e3\uff1a{milliseconds} ms\u3002\u8de8\u65f6\u949f\u8bef\u5dee\u4ecd\u5f85\u9a8c\u8bc1\u3002"
+    },
+    {
+      "key": "diagnostics.alignment.clockDiscontinuity",
+      "table": "DiagnosticsLocalizable",
+      "en": "The host clock changed during measurement. This observation cannot align the tracks.",
+      "zh-Hans": "\u6d4b\u91cf\u671f\u95f4\u4e3b\u673a\u65f6\u95f4\u53d1\u751f\u8df3\u53d8\uff0c\u4e0d\u80fd\u636e\u6b64\u5bf9\u9f50\u8f68\u9053\u3002"
     }
   ]
 }

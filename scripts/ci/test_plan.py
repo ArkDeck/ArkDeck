@@ -301,6 +301,12 @@ class PathClassificationTests(unittest.TestCase):
                 with self.subTest(input=path, changed_path=candidate):
                     self.assertTrue(PLAN.classify_paths([candidate]).windows)
 
+    def test_device_shared_strings_select_the_windows_consumer_lane(self):
+        self.assert_lanes(
+            ["ArkDeckApp/Resources/DeviceLocalizable.xcstrings"],
+            swift=False, app=True, ds=True, windows=True,
+        )
+
     def test_unrelated_sources_do_not_select_windows(self):
         for path in (
             "rust/crates/arkdeck-contract/src/lib.rs",
@@ -308,7 +314,6 @@ class PathClassificationTests(unittest.TestCase):
             "spec/recovery/README.md",
             "docs/design/cross-platform/windows-phase-agent-prompt.md",
             "docs/design/arkdeck-ds/src/styles.css",
-            "ArkDeckApp/Resources/DeviceLocalizable.xcstrings",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
         ):
             with self.subTest(path=path):

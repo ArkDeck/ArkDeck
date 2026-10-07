@@ -46,7 +46,30 @@ public sealed class ControlSession(PipeEndpoint endpoint, DaemonIdentity identit
     public Task<ControlResult> RequestAsync(string method, JsonObject? parameters = null) =>
         CallAsync(client => client.RequestAsync(NewId(), method, parameters));
 
-    private async Task<ControlResult> CallAsync(Func<ControlClient, Task<JsonValue>> call)
+    /// <summary>One synchronous Device Job run with its freshly read Catalog timeout plus the ordinary handshake allowance.
+    /// The caller deadline changes; endpoint, image identity, health and no-replay rules do not.</summary>
+    public Task<ControlResult> RunJobOnceAsync(string jobId, TimeSpan callBudget)
+    {
+        if (string.IsNullOrEmpty(jobId) || callBudget < TimeSpan.FromSeconds(11) || callBudget > TimeSpan.FromSeconds(910))
+            return Task.FromResult(ControlResult.Failed(new ControlFailure(ControlFailureKind.InvalidRequest, "Device run deadline is outside its bounded published range")));
+        return CallAsync(client => client.RequestAsync(NewId(), "job.run", new JsonObject([new("jobId", new JsonString(jobId))])), callBudget);
+    }
+
+    public Task<ControlResult> DiagnosticStatusAsync(string jobId) => DiagnosticCall("diagnostic.session.status", jobId);
+    public Task<ControlResult> DiagnosticMarkAsync(string jobId, string markerId) => string.IsNullOrEmpty(markerId)
+        ? Task.FromResult(ControlResult.Failed(new(ControlFailureKind.InvalidRequest, "A diagnostic marker identity is required")))
+        : DiagnosticCall("diagnostic.session.mark", jobId, markerId);
+    public Task<ControlResult> DiagnosticStopAsync(string jobId) => DiagnosticCall("diagnostic.session.stop", jobId);
+    public Task<ControlResult> DiagnosticCancelPreparationAsync(string jobId) => DiagnosticCall("job.cancel", jobId);
+    private Task<ControlResult> DiagnosticCall(string method, string jobId, string? markerId = null)
+    {
+        if (string.IsNullOrEmpty(jobId)) return Task.FromResult(ControlResult.Failed(new(ControlFailureKind.InvalidRequest, "A diagnostic Job identity is required")));
+        var parameters = new JsonObject(markerId is null ? [new("jobId", new JsonString(jobId))]
+            : [new("jobId", new JsonString(jobId)), new("markerId", new JsonString(markerId))]);
+        return CallAsync(client => client.RequestAsync(NewId(), method, parameters), TimeSpan.FromSeconds(120));
+    }
+
+    private async Task<ControlResult> CallAsync(Func<ControlClient, Task<JsonValue>> call, TimeSpan? callBudget = null)
     {
         if (_endpointError is not null)
         {
@@ -55,7 +78,7 @@ public sealed class ControlSession(PipeEndpoint endpoint, DaemonIdentity identit
         }
         try
         {
-            using var client = ControlClient.Connect(endpoint, identity, budget);
+            using var client = ControlClient.Connect(endpoint, identity, callBudget ?? budget);
             return ControlResult.Success(await call(client).ConfigureAwait(false));
         }
         catch (ControlClientException error)

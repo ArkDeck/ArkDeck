@@ -1663,6 +1663,117 @@ public static class UiStrings
     public const string DeviceWaitUnavailable = "device.wait.unavailable";
     public const string WindowsDeviceAliasClear = "windows.device.alias.clear";
     public const string WindowsDeviceWaitUntil = "windows.device.wait.until";
+    public const string DeviceScreenPicture = "device.screen.picture";
+    public const string DeviceFrameAge = "device.frame.age";
+    public const string DeviceFrameNone = "device.frame.none";
+    public const string DeviceGestureLongPress = "device.gesture.longPress";
+    public const string DeviceGestureSwipe = "device.gesture.swipe";
+    public const string DeviceGestureTap = "device.gesture.tap";
+    public const string DeviceGesturesLongPress = "device.gestures.longPress";
+    public const string DeviceGesturesSwipe = "device.gestures.swipe";
+    public const string DeviceGesturesTap = "device.gestures.tap";
+    public const string DeviceGesturesTitle = "device.gestures.title";
+    public const string DeviceLogCaptureFailed = "device.log.captureFailed";
+    public const string DeviceLogCaptured = "device.log.captured";
+    public const string DeviceLogConfirmed = "device.log.confirmed";
+    public const string DeviceLogEmpty = "device.log.empty";
+    public const string DeviceLogFailed = "device.log.failed";
+    public const string DeviceLogTitle = "device.log.title";
+    public const string DeviceLogUnknown = "device.log.unknown";
+    public const string DeviceScreenCapture = "device.screen.capture";
+    public const string DeviceScreenCapturing = "device.screen.capturing";
+    public const string DeviceScreenEmptyReady = "device.screen.empty.ready";
+    public const string DeviceScreenEmptyTitle = "device.screen.empty.title";
+    public const string DeviceStaleBadge = "device.stale.badge";
+    public const string DeviceStaleRefused = "device.stale.refused";
+    public const string DeviceStaleRefusedDetail = "device.stale.refused.detail";
+    public const string DeviceTargetNone = "device.target.none";
+    public const string DeviceTargetNoneDetail = "device.target.none.detail";
+    public const string DeviceRecordTitle = "device.record.title";
+    public const string DeviceRecordStart = "device.record.start";
+    public const string DeviceRecordFrames = "device.record.frames";
+    public const string DeviceRecordPreflighting = "device.record.preflighting";
+    public const string DeviceRecordCapturing = "device.record.capturing";
+    public const string DeviceRecordAssembling = "device.record.assembling";
+    public const string DeviceRecordValidating = "device.record.validating";
+    public const string DeviceRecordReady = "device.record.ready";
+    public const string DeviceRecordFailed = "device.record.failed";
+    public const string DeviceRecordSaveAs = "device.record.saveAs";
+    public const string DeviceRecordSaveFailed = "device.record.saveFailed";
+    public const string DeviceRecordAgain = "device.record.again";
+    public const string DeviceRecordRate = "device.record.rate";
+    public const string DeviceRecordGap = "device.record.gap";
+    public const string DeviceRecordTimeline = "device.record.timeline";
+    public const string DeviceRecordNoRoom = "device.record.noRoom";
+    public const string DeviceRecordNoRoomDetail = "device.record.noRoom.detail";
+    public const string DeviceRecordWouldFit = "device.record.wouldFit";
+    public const string DeviceRecordNeeds = "device.record.needs";
+    public const string DeviceRecordFree = "device.record.free";
+    public const string DeviceRecordHeadroomUnknown = "device.record.headroomUnknown";
+    public const string DeviceInputClipboardConsent = "device.input.clipboardConsent";
+    public const string DeviceInputFocusHelp = "device.input.focusHelp";
+    public const string DeviceInputKey = "device.input.key";
+    public const string DeviceInputPrivacyHelp = "device.input.privacyHelp";
+    public const string DeviceInputSendKey = "device.input.sendKey";
+    public const string DeviceInputSendText = "device.input.sendText";
+    public const string DeviceInputText = "device.input.text";
+    public const string DeviceInputTitle = "device.input.title";
+    public const string DeviceInputKeyArrowDown = "device.input.key.arrowDown";
+    public const string DeviceInputKeyArrowLeft = "device.input.key.arrowLeft";
+    public const string DeviceInputKeyArrowRight = "device.input.key.arrowRight";
+    public const string DeviceInputKeyArrowUp = "device.input.key.arrowUp";
+    public const string DeviceInputKeyBack = "device.input.key.back";
+    public const string DeviceInputKeyBackspace = "device.input.key.backspace";
+    public const string DeviceInputKeyEnter = "device.input.key.enter";
+    public const string DeviceInputKeyEscape = "device.input.key.escape";
+    public const string DeviceInputKeyHome = "device.input.key.home";
+    public const string DeviceInputKeyTab = "device.input.key.tab";
+    public const string WindowsDeviceScreenScreenTitle = "windows.device.screen.screenTitle";
+    public const string WindowsDeviceScreenHistorical = "windows.device.screen.historical";
+    public const string WindowsDeviceScreenCurrent = "windows.device.screen.current";
+    public const string WindowsDeviceScreenBusy = "windows.device.screen.busy";
+    public const string WindowsDeviceScreenInputConfirmed = "windows.device.screen.inputConfirmed";
+    public const string WindowsDeviceScreenInputUnknown = "windows.device.screen.inputUnknown";
+    public const string WindowsDeviceScreenInputFailed = "windows.device.screen.inputFailed";
+    public const string WindowsDeviceScreenPointerHelp = "windows.device.screen.pointerHelp";
+    public const string WindowsDeviceScreenPointerPosition = "windows.device.screen.pointerPosition";
+    public const string WindowsDeviceScreenRecordSummary = "windows.device.screen.recordSummary";
+    public const string WindowsDeviceScreenMovieSummary = "windows.device.screen.movieSummary";
+    public const string WindowsDeviceScreenMovieLocal = "windows.device.screen.movieLocal";
+    public const string WindowsDeviceScreenMovieUnavailable = "windows.device.screen.movieUnavailable";
+    public const string WindowsDeviceScreenMovieReveal = "windows.device.screen.movieReveal";
+    public const string WindowsDeviceScreenSaveFrames = "windows.device.screen.saveFrames";
+    public const string WindowsDeviceScreenSaved = "windows.device.screen.saved";
+    public const string WindowsDeviceScreenDecodeFailed = "windows.device.screen.decodeFailed";
+    public const string WindowsDeviceScreenBoundary = "windows.device.screen.boundary";
+    public const string WindowsDeviceScreenFrameSummary = "windows.device.screen.frameSummary";
+    public const string DiagnosticsCaptureDuration = "diagnostics.capture.duration";
+    public const string DiagnosticsCaptureStop = "diagnostics.capture.stop";
+    public const string DiagnosticsCaptureCancelPreparation = "diagnostics.capture.cancelPreparation";
+    public const string DiagnosticsCaptureRefresh = "diagnostics.capture.refresh";
+    public const string DiagnosticsCaptureMarks = "diagnostics.capture.marks";
+    public const string DiagnosticsCaptureChooseTarget = "diagnostics.capture.chooseTarget";
+    public const string DiagnosticsCaptureUncertain = "diagnostics.capture.uncertain";
+    public const string DiagnosticsCaptureBoundary = "diagnostics.capture.boundary";
+    public const string DiagnosticsCaptureStatePreparing = "diagnostics.capture.state.preparing";
+    public const string DiagnosticsCaptureStateRecording = "diagnostics.capture.state.recording";
+    public const string DiagnosticsCaptureStateFinalizing = "diagnostics.capture.state.finalizing";
+    public const string DiagnosticsCaptureStateInterrupted = "diagnostics.capture.state.interrupted";
+    public const string DiagnosticsCaptureStateClosed = "diagnostics.capture.state.closed";
+    public const string DiagnosticsCapturePhaseChecking = "diagnostics.capture.phase.checking";
+    public const string DiagnosticsCapturePhaseSubmitting = "diagnostics.capture.phase.submitting";
+    public const string DiagnosticsCapturePhaseActive = "diagnostics.capture.phase.active";
+    public const string DiagnosticsCapturePhaseFinished = "diagnostics.capture.phase.finished";
+    public const string DiagnosticsCapturePhaseUnavailable = "diagnostics.capture.phase.unavailable";
+    public const string DiagnosticsCapturePhaseUncertain = "diagnostics.capture.phase.uncertain";
+    public const string WindowsSettingsTraceLicensesTitle = "windows.settings.trace.licenses.title";
+    public const string WindowsSettingsTraceLicensesProduct = "windows.settings.trace.licenses.product";
+    public const string WindowsSettingsTraceLicensesNotices = "windows.settings.trace.licenses.notices";
+    public const string WindowsSettingsTraceLicensesUnavailable = "windows.settings.trace.licenses.unavailable";
+    public const string WindowsSettingsTraceLicensesReveal = "windows.settings.trace.licenses.reveal";
+    public const string WindowsSettingsTraceLicensesRevealFailed = "windows.settings.trace.licenses.revealFailed";
+    public const string DiagnosticsAlignmentObservedWindow = "diagnostics.alignment.observedWindow";
+    public const string DiagnosticsAlignmentClockDiscontinuity = "diagnostics.alignment.clockDiscontinuity";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3322,5 +3433,116 @@ public static class UiStrings
         DeviceWaitUnavailable,
         WindowsDeviceAliasClear,
         WindowsDeviceWaitUntil,
+        DeviceScreenPicture,
+        DeviceFrameAge,
+        DeviceFrameNone,
+        DeviceGestureLongPress,
+        DeviceGestureSwipe,
+        DeviceGestureTap,
+        DeviceGesturesLongPress,
+        DeviceGesturesSwipe,
+        DeviceGesturesTap,
+        DeviceGesturesTitle,
+        DeviceLogCaptureFailed,
+        DeviceLogCaptured,
+        DeviceLogConfirmed,
+        DeviceLogEmpty,
+        DeviceLogFailed,
+        DeviceLogTitle,
+        DeviceLogUnknown,
+        DeviceScreenCapture,
+        DeviceScreenCapturing,
+        DeviceScreenEmptyReady,
+        DeviceScreenEmptyTitle,
+        DeviceStaleBadge,
+        DeviceStaleRefused,
+        DeviceStaleRefusedDetail,
+        DeviceTargetNone,
+        DeviceTargetNoneDetail,
+        DeviceRecordTitle,
+        DeviceRecordStart,
+        DeviceRecordFrames,
+        DeviceRecordPreflighting,
+        DeviceRecordCapturing,
+        DeviceRecordAssembling,
+        DeviceRecordValidating,
+        DeviceRecordReady,
+        DeviceRecordFailed,
+        DeviceRecordSaveAs,
+        DeviceRecordSaveFailed,
+        DeviceRecordAgain,
+        DeviceRecordRate,
+        DeviceRecordGap,
+        DeviceRecordTimeline,
+        DeviceRecordNoRoom,
+        DeviceRecordNoRoomDetail,
+        DeviceRecordWouldFit,
+        DeviceRecordNeeds,
+        DeviceRecordFree,
+        DeviceRecordHeadroomUnknown,
+        DeviceInputClipboardConsent,
+        DeviceInputFocusHelp,
+        DeviceInputKey,
+        DeviceInputPrivacyHelp,
+        DeviceInputSendKey,
+        DeviceInputSendText,
+        DeviceInputText,
+        DeviceInputTitle,
+        DeviceInputKeyArrowDown,
+        DeviceInputKeyArrowLeft,
+        DeviceInputKeyArrowRight,
+        DeviceInputKeyArrowUp,
+        DeviceInputKeyBack,
+        DeviceInputKeyBackspace,
+        DeviceInputKeyEnter,
+        DeviceInputKeyEscape,
+        DeviceInputKeyHome,
+        DeviceInputKeyTab,
+        WindowsDeviceScreenScreenTitle,
+        WindowsDeviceScreenHistorical,
+        WindowsDeviceScreenCurrent,
+        WindowsDeviceScreenBusy,
+        WindowsDeviceScreenInputConfirmed,
+        WindowsDeviceScreenInputUnknown,
+        WindowsDeviceScreenInputFailed,
+        WindowsDeviceScreenPointerHelp,
+        WindowsDeviceScreenPointerPosition,
+        WindowsDeviceScreenRecordSummary,
+        WindowsDeviceScreenMovieSummary,
+        WindowsDeviceScreenMovieLocal,
+        WindowsDeviceScreenMovieUnavailable,
+        WindowsDeviceScreenMovieReveal,
+        WindowsDeviceScreenSaveFrames,
+        WindowsDeviceScreenSaved,
+        WindowsDeviceScreenDecodeFailed,
+        WindowsDeviceScreenBoundary,
+        WindowsDeviceScreenFrameSummary,
+        DiagnosticsCaptureDuration,
+        DiagnosticsCaptureStop,
+        DiagnosticsCaptureCancelPreparation,
+        DiagnosticsCaptureRefresh,
+        DiagnosticsCaptureMarks,
+        DiagnosticsCaptureChooseTarget,
+        DiagnosticsCaptureUncertain,
+        DiagnosticsCaptureBoundary,
+        DiagnosticsCaptureStatePreparing,
+        DiagnosticsCaptureStateRecording,
+        DiagnosticsCaptureStateFinalizing,
+        DiagnosticsCaptureStateInterrupted,
+        DiagnosticsCaptureStateClosed,
+        DiagnosticsCapturePhaseChecking,
+        DiagnosticsCapturePhaseSubmitting,
+        DiagnosticsCapturePhaseActive,
+        DiagnosticsCapturePhaseFinished,
+        DiagnosticsCapturePhaseUnavailable,
+        DiagnosticsCapturePhaseUncertain,
+        WindowsSettingsTraceLicensesTitle,
+        WindowsSettingsTraceLicensesProduct,
+        WindowsSettingsTraceLicensesNotices,
+        WindowsSettingsTraceLicensesUnavailable,
+        WindowsSettingsTraceLicensesReveal,
+        WindowsSettingsTraceLicensesRevealFailed,
+        DiagnosticsAlignmentObservedWindow,
+        DiagnosticsAlignmentClockDiscontinuity,
     ];
 }

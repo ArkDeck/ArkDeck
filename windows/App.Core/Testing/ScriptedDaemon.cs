@@ -86,7 +86,7 @@ public static partial class ScriptedDaemon
     /// recorded ArkTrace projection (rust/tests/fixtures/trace-inspect, "base").</summary>
     public const string Inspector = "inspector";
 
-    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue, Trust];
+    public static readonly IReadOnlyList<string> Scenarios = [Unavailable, ContractMismatch, Foundation, Recovers, Outage, Jobs, DevelopmentRoot, Inspector, Flash, Viewer, Diagnostics, Recovery, History, Continue, Trust, DeviceScreen];
 
     public const string RunningJobId = "job-0000000000000000000000000000a001";
     public const string FailedJobId = "job-0000000000000000000000000000a002";
@@ -244,7 +244,7 @@ public static partial class ScriptedDaemon
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     _ => SettingsOwnerAbsent(request, method),
                 },
-                _ => (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
+                _ => (mode == DeviceScreen ? DeviceScreenRoute(request, method) : null) ?? (mode == Flash ? FlashRoute(request, method) : null) ?? (mode == Viewer ? ViewerRoute(request, method) : null) ?? (mode == Diagnostics ? DiagnosticsRoute(request, method) : null) ?? (scenario == History ? HistoryRoute(request, method) : null) ?? (scenario == Continue ? ContinueRoute(request, method) : null) ?? Debug(request, method) ?? method switch
                 {
                     "doctor" => Success(request, Parse(HealthyDoctor)),
                     "device.observations" => Success(request, Parse(ObservationsNow())),
@@ -830,7 +830,7 @@ public static partial class ScriptedDaemon
         ]);
 
         private static JsonObject Receipt(string id, JsonObject metadata, long generation) => (JsonObject)Parse($$"""
-            {"artifactDigest":"{{((JsonString)metadata["sha256"]).Value}}","artifactId":"ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","bindingRevision":"{{((JsonString)metadata["bindingRevision"]).Value}}","byteCount":"{{((JsonString)metadata["byteCount"]).Value}}","generation":"{{generation}}","importId":"{{id}}","importRequestId":"{{((JsonString)metadata["importRequestId"]).Value}}","lease":"lease-v1:{{id}}:ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","mediaType":"{{(((JsonString)metadata["kind"]).Value == "hap" ? "application/vnd.openharmony.hap" : "application/octet-stream")}}","name":"{{((JsonString)metadata["name"]).Value}}","owner":{"id":"{{id}}","kind":"import"},"privacy":"standard","schemaVersion":"arkdeck.import-receipt/1","targetId":"{{((JsonString)metadata["targetId"]).Value}}","validation":{"kind":"{{((JsonString)metadata["kind"]).Value}}"{{NativeFacts(metadata)}}
+            {"artifactDigest":"{{((JsonString)metadata["sha256"]).Value}}","artifactId":"ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","bindingRevision":"{{((JsonString)metadata["bindingRevision"]).Value}}","byteCount":"{{((JsonString)metadata["byteCount"]).Value}}","generation":"{{generation}}","importId":"{{id}}","importRequestId":"{{((JsonString)metadata["importRequestId"]).Value}}","lease":"lease-v1:{{id}}:ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","mediaType":"{{(((JsonString)metadata["kind"]).Value == "hap" ? "application/vnd.openharmony.hap" : ((JsonString)metadata["kind"]).Value == "keyboard-input" ? "application/json" : "application/octet-stream")}}","name":"{{((JsonString)metadata["name"]).Value}}","owner":{"id":"{{id}}","kind":"import"},"privacy":"{{(((JsonString)metadata["kind"]).Value == "keyboard-input" ? "sensitive" : "standard")}}","schemaVersion":"arkdeck.import-receipt/1","targetId":"{{((JsonString)metadata["targetId"]).Value}}","validation":{"kind":"{{((JsonString)metadata["kind"]).Value}}"{{NativeFacts(metadata)}}
             """ + "}}");
 
         /// <summary>A native library's ELF facts as the Runtime's Import validation reports them
