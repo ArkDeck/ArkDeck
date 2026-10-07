@@ -61,9 +61,77 @@ MSIX 形态也按发布者身份钉 daemon（委托的次要决定，待下一�
 
 1. 打开维护者发布的 `https://<更新源主机>/…/ArkDeck.appinstaller`，或执行
    `Add-AppxPackage -AppInstallerFile <URI>`。App Installer 应显示证书里的发布者，无警告，无需提权。
-2. 用与 xcopy 相同的两个发布者变量配置，`ARKDECK_DAEMON_PATH` 指向
-   `(Get-AppxPackage -Name <包名>).InstallLocation` 下的 `arkdeck-agentd.exe`。
-3. 从开始菜单打开 ArkDeck。之后的版本由更新源送达，见 [`windows-update.md`](windows-update.md)。
+2. 在维护者提供、已核对的同一发布版本 `rc-manifest.json` 所在目录打开 PowerShell。以下命令从清单取得
+   包身份，再读取当前用户实际安装的包；不猜测 `WindowsApps` 路径或包名。缺包、多包、版本或发布者不符时停止。
+
+   ```powershell
+   $ErrorActionPreference = 'Stop'
+   $rc = Get-Content -LiteralPath .\rc-manifest.json -Raw | ConvertFrom-Json
+   if (-not $rc.msix.identityName -or $rc.msix.signed -ne $true) {
+       throw '需要同一发布版本的已签名 MSIX 清单。'
+   }
+   $packages = @(Get-AppxPackage -Name $rc.msix.identityName)
+   if ($packages.Count -ne 1) { throw '未找到唯一的已安装 ArkDeck 包。' }
+   $pkg = $packages[0]
+   if ($pkg.Name -cne $rc.msix.identityName -or $pkg.Publisher -cne $rc.msix.publisher -or
+       $pkg.Version.ToString() -ne $rc.msix.packageVersion) {
+       throw '已安装包与发布清单不一致。'
+   }
+   $daemon = Join-Path $pkg.InstallLocation 'arkdeck-agentd.exe'
+   $cli = Join-Path $pkg.InstallLocation 'bin\arkdeck.exe'
+   if (-not (Test-Path -LiteralPath $daemon -PathType Leaf) -or
+       -not (Test-Path -LiteralPath $cli -PathType Leaf)) {
+       throw '包内 daemon 或 CLI 缺失。'
+   }
+   if ((Get-FileHash -LiteralPath $daemon -Algorithm SHA256).Hash -ne $rc.msix.daemonSha256 -or
+       (Get-FileHash -LiteralPath $cli -Algorithm SHA256).Hash -ne $rc.msix.cliSha256) {
+       throw '包内 daemon 或 CLI 与发布清单的 SHA-256 不一致。'
+   }
+
+   $pins = @{}
+   switch ($rc.signing.mode) {
+       'production' {
+           $pins.ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = $rc.daemonConfiguration.ARKDECK_DAEMON_PUBLISHER_ORGANIZATION
+           $pins.ARKDECK_DAEMON_PUBLISHER_EKU = $rc.daemonConfiguration.ARKDECK_DAEMON_PUBLISHER_EKU
+           if (-not $pins.ARKDECK_DAEMON_PUBLISHER_ORGANIZATION -or -not $pins.ARKDECK_DAEMON_PUBLISHER_EKU) {
+               throw '正式发布者身份不完整。'
+           }
+       }
+       'development' {
+           $pins.ARKDECK_DAEMON_SIGNER_SHA256 = $rc.daemonConfiguration.ARKDECK_DAEMON_SIGNER_SHA256
+           if ($pins.ARKDECK_DAEMON_SIGNER_SHA256 -cnotmatch '^[0-9a-f]{64}$') {
+               throw '开发签名 pin 缺失或格式错误。'
+           }
+       }
+       default { throw '未签名的 RC 不能用于首次启动。' }
+   }
+   foreach ($name in @('ARKDECK_DAEMON_PUBLISHER_ORGANIZATION', 'ARKDECK_DAEMON_PUBLISHER_EKU', 'ARKDECK_DAEMON_SIGNER_SHA256')) {
+       [Environment]::SetEnvironmentVariable($name, $pins[$name], 'User')
+       [Environment]::SetEnvironmentVariable($name, $pins[$name], 'Process')
+   }
+   [Environment]::SetEnvironmentVariable('ARKDECK_DAEMON_PATH', $null, 'User')
+   $env:ARKDECK_DAEMON_PATH = $daemon
+
+   $doctorJson = & $cli --output json doctor
+   $doctorExit = $LASTEXITCODE
+   $doctorJson | Write-Output
+   if ($doctorExit -ne 0) { throw 'CLI 首次启动未完成；保留诊断，暂不打开 App。' }
+   $doctor = ($doctorJson -join [Environment]::NewLine) | ConvertFrom-Json
+   if ($doctor.schemaVersion -ne 'arkdeck.cli.result/1' -or $doctor.command -ne 'doctor' -or
+       $doctor.ok -isnot [bool] -or $doctor.ok -ne $true) {
+       throw 'doctor 未返回成功的 CLI 结果；暂不打开 App。'
+   }
+   ```
+
+   正式包使用与 xcopy 相同的发布者身份；开发包仅用于已信任该开发证书的主机。身份值同时写入用户环境，
+   使开始菜单启动的 App 能读到；若启动器仍持有旧环境，重新登录后在新终端重跑上述步骤。
+   `ARKDECK_DAEMON_PATH` 只为本次 CLI 设置，App 默认取包内兄弟 daemon；不要持久化带版本的包安装路径。
+   若配置了可选 `ARKDECK_DAEMON_PACKAGE_FAMILY`，它也必须对应当前包，不能代替签名 pin。
+3. 上述代码检查 `doctor` 退出 0 和 JSON 顶层 `ok: true`，并显示原始 JSON；`result.ready`、
+   `result.findingCounts.blocker` 和 `result.findings` 仍需查看，`ok` 只表示诊断请求成功。随后从开始菜单打开 ArkDeck。daemon 仍由签名身份校验后的
+   CLI 启动（decision 11）；App 只连接已运行的 daemon，不负责启动，也不调用 `runtime service install`。
+   daemon 停止后，再打开 App 前先运行包内 CLI 的同一预热步骤。之后的版本由更新源送达；使用新版本的
+   清单重新定位包和预热，见 [`windows-update.md`](windows-update.md)。
 
 ## 升级
 
