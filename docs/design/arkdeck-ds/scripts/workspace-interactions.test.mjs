@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {existsSync, readFileSync, readdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {join, relative} from 'node:path';
+import {join, relative, sep} from 'node:path';
 import test from 'node:test';
 import vm from 'node:vm';
 import {createRequire} from 'node:module';
@@ -602,11 +602,11 @@ test('every App View file and preview is covered and linked', () => {
   const declaration = /\b(?:struct|class)\s+\w+(?:<[^{}]*>)?\s*:\s*[^\n{]*\b(?:View|NSViewRepresentable|NSView)\b/;
   const actual = files(join(root, 'ArkDeckApp'))
     .filter(path => path.endsWith('.swift') && declaration.test(readFileSync(path, 'utf8')))
-    .map(path => relative(root, path)).sort();
+    .map(path => relative(root, path).split(sep).join('/')).sort();
   assert.deepEqual(actual, coverage.appViewFiles);
   for (const path of actual) assert.ok(report.includes(path), `missing source link: ${path}`);
   const previews = files(join(root, '.design-sync/previews'))
-    .filter(path => path.endsWith('.tsx')).map(path => relative(root, path)).sort();
+    .filter(path => path.endsWith('.tsx')).map(path => relative(root, path).split(sep).join('/')).sort();
   assert.deepEqual(previews, coverage.previewFiles);
   for (const path of coverage.designInputs) assert.ok(read(path).length);
   const ids = [...report.matchAll(/^\| ([a-z][A-Za-z]+\.[A-Za-z]+) \|/gm)].map(match => match[1]);

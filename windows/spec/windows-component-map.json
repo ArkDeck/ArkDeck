@@ -1,0 +1,942 @@
+{
+  "schemaVersion": "arkdeck.windows-component-map/1",
+  "feature": "app.design.components",
+  "scope": "TASK-XPA-020 native semantic projection",
+  "boundary": {
+    "designPreviewCount": 32,
+    "controlledExportCount": 59,
+    "pixelGalleryParity": false,
+    "narratorHumanValidation": false,
+    "hardwareEvidence": false,
+    "productionGalleryRoute": false
+  },
+  "componentGroups": [
+    {
+      "id": "actions",
+      "components": [
+        "Button",
+        "ToolbarButton"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Named native Button actions preserve invocation, keyboard access and accessible names; CSS button geometry is not asserted.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static Button Button("
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "foundation",
+          "snapshotId": "overview.foundation",
+          "automationIds": [
+            "overview.refresh"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "status-and-effect",
+      "components": [
+        "Chip",
+        "EffectBadge",
+        "Callout"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Text and unavailable/impact prose preserve non-color state/effect meaning; native text/card presentation replaces CSS chips and badges.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static TextBlock Text("
+        },
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static StackPanel UnavailableNotice("
+        },
+        {
+          "path": "windows/App/Pages/FlashPage.cs",
+          "contains": "flash.impact.userdata"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "foundation",
+          "snapshotId": "flash.foundation",
+          "automationIds": [
+            "flash.availability.status"
+          ]
+        },
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "foundation",
+          "snapshotId": "debug.foundation",
+          "automationIds": [
+            "debug.availability.blocked"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "busy-progress",
+      "components": [
+        "IndeterminateBar"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Named native ProgressRing indicates pending work; no percentage is invented.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static ProgressRing Progress("
+        },
+        {
+          "path": "windows/App/Pages/ViewerPage.cs",
+          "contains": "viewer.recapture.progress"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/ViewerFlowTests.cs",
+          "method": "AViewIsCapturedAndInspected",
+          "scenario": "viewer",
+          "snapshotId": null,
+          "automationIds": [
+            "viewer.recapture"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cards",
+      "components": [
+        "Card"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "WinUI Card Border uses native Fluent surface brushes and shared radii/spacing; web opaque panel pixels are not copied.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static Border Card("
+        },
+        {
+          "path": "windows/App/Themes/ArkDeckStyles.xaml",
+          "contains": "x:Key=\"ArkDeckCardStyle\""
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "diagnostics",
+          "snapshotId": "diagnostics.session",
+          "automationIds": [
+            "diagnostics.partial",
+            "diagnostics.artifacts.title"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "facts",
+      "components": [
+        "KeyValueList"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Wrapping label/value Grid preserves exact named facts and selectable values.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static Grid Fact("
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "diagnostics",
+          "snapshotId": "diagnostics.hilog",
+          "automationIds": [
+            "diagnostics.hilog.count.lines.label",
+            "diagnostics.hilog.source.title"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "window-chrome",
+      "components": [
+        "WindowFrame",
+        "Symbol"
+      ],
+      "classification": "platformChrome",
+      "projection": "Native TitleBar/Mica and FontIcon use Windows platform chrome; no SF traffic lights or JS Symbol glyph identity is asserted.",
+      "sources": [
+        {
+          "path": "windows/App/MainWindow.xaml",
+          "contains": "<TitleBar"
+        },
+        {
+          "path": "windows/App/MainWindow.xaml",
+          "contains": "<MicaBackdrop"
+        },
+        {
+          "path": "windows/App/MainWindow.xaml",
+          "contains": "<FontIcon"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "foundation",
+          "snapshotId": "shell.foundation",
+          "automationIds": [
+            "app.navigation.overview",
+            "app.navigation.device"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "navigation",
+      "components": [
+        "NavItem"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native NavigationViewItem provides the same named destinations with activation/access keys.",
+      "sources": [
+        {
+          "path": "windows/App/MainWindow.xaml",
+          "contains": "<NavigationViewItem x:Name=\"NavOverview\""
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "foundation",
+          "snapshotId": "shell.foundation",
+          "automationIds": [
+            "app.navigation.overview",
+            "app.navigation.history"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "selectors",
+      "components": [
+        "SegmentedControl",
+        "FilterPills",
+        "Tabs",
+        "Select",
+        "RadioGroup",
+        "TagPicker"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native ComboBox, RadioButtons and named tab buttons preserve selected/filter choices; pill/tag CSS shape is not asserted.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/HistoryPage.cs",
+          "contains": "private StackPanel Filters()"
+        },
+        {
+          "path": "windows/App/Pages/HistoryPage.cs",
+          "contains": "var combo = new ComboBox"
+        },
+        {
+          "path": "windows/App/Pages/DebugPage.Tabs.cs",
+          "contains": "var direction = new RadioButtons"
+        },
+        {
+          "path": "windows/App/Pages/ViewerPage.cs",
+          "contains": "viewer.inspector.tab."
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/HistoryFilterFlowTests.cs",
+          "method": "TheListIsFilteredPagedAndItsFilterSaved",
+          "scenario": "history",
+          "snapshotId": null,
+          "automationIds": [
+            "history.filter.status",
+            "history.filter.search",
+            "history.filter.reset"
+          ]
+        },
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "jobs",
+          "snapshotId": "debug.jobs.network",
+          "automationIds": [
+            "debug.network.direction.forward",
+            "debug.network.direction.reverse"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "text-input",
+      "components": [
+        "TextField"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native TextBox preserves editable filter value, its named field and empty-result recovery.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/HistoryPage.cs",
+          "contains": "var search = new TextBox"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/HistoryFilterFlowTests.cs",
+          "method": "TheListIsFilteredPagedAndItsFilterSaved",
+          "scenario": "history",
+          "snapshotId": null,
+          "automationIds": [
+            "history.filter.search",
+            "history.filter.empty"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tables-and-device-rows",
+      "components": [
+        "DataTable",
+        "DeviceRow"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native lists/card rows preserve named Runtime rows and selection; no HTML table grid pixels are asserted.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static ListView Choice("
+        },
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static SemanticList ActionList("
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.cs",
+          "contains": "Ui.Heading(\"device.targets.title\""
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "targets",
+          "snapshotId": "device.targets",
+          "automationIds": [
+            "device.targets.title"
+          ]
+        },
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "jobs",
+          "snapshotId": "history.jobs",
+          "automationIds": [
+            "history.table"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "logs",
+      "components": [
+        "LogTail"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Bounded log text/rows preserve exact observed text and explicit reads, without manufacturing live log streams.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/DebugPage.Tabs.cs",
+          "contains": "debug.logs.viewport"
+        },
+        {
+          "path": "windows/App/Controls/JobInspector.cs",
+          "contains": "jobInspector.log.text"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/DebugFlowTests.cs",
+          "method": "ALogCaptureAndATemplateRunAsTypedJobs",
+          "scenario": "jobs",
+          "snapshotId": null,
+          "automationIds": [
+            "debug.logs.viewport.3",
+            "debug.logs.filters.invalid"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "stage-and-byte-progress",
+      "components": [
+        "PhaseTrack",
+        "DeterminateProgress"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Flash stage text and native ProgressBar project Runtime phases and real write percentage only; stage/node CSS is not asserted.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/FlashPage.cs",
+          "contains": "private void Progress()"
+        },
+        {
+          "path": "windows/App/Pages/FlashPage.cs",
+          "contains": "IsIndeterminate = progress.WritePercent is null"
+        },
+        {
+          "path": "windows/App/Pages/FlashPage.cs",
+          "contains": "flash.workspace.progress.stage."
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/FlashFlowTests.cs",
+          "method": "AnArchiveIsReviewedPlannedAndFlashedWithTheOneNamedButton",
+          "scenario": "flash",
+          "snapshotId": null,
+          "automationIds": [
+            "flash.execute.submit",
+            "flash.execute.terminal",
+            "flash.postflight.build.match"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "confirmation",
+      "components": [
+        "DangerConfirmDialog"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native ContentDialog preserves title, explicit primary/close actions and cancellation; no web modal geometry is asserted.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/Ui.cs",
+          "contains": "public static ContentDialog Dialog("
+        },
+        {
+          "path": "windows/App/Controls/JobInspector.cs",
+          "contains": "jobInspector.cancel.confirm"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/SurfaceFlowTests.cs",
+          "method": "AQueuedJobIsCancelledAfterConfirmation",
+          "scenario": "jobs",
+          "snapshotId": null,
+          "automationIds": [
+            "jobInspector.cancel.confirm"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "recovery",
+      "components": [
+        "RecoveryBanner"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Named native recovery content and guidance preserve Runtime authority/unknown boundaries and History continuation.",
+      "sources": [
+        {
+          "path": "windows/App/MainWindow.xaml.cs",
+          "contains": "jobRecovery.guidance."
+        },
+        {
+          "path": "windows/App/Controls/ContinuationCard.cs",
+          "contains": "class ContinuationCard"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "recovery",
+          "snapshotId": "jobRecovery.recovery",
+          "automationIds": [
+            "jobRecovery.count"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "job-inspector",
+      "components": [
+        "JobInspector"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native JobInspector preserves current status, residue, relationships, events and explicit bounded Artifact reads.",
+      "sources": [
+        {
+          "path": "windows/App/Controls/JobInspector.cs",
+          "contains": "public sealed partial class JobInspector"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/JobInspectorFlowTests.cs",
+          "method": "TheRelationTheResidueAndTheLogAreShown",
+          "scenario": "recovery",
+          "snapshotId": null,
+          "automationIds": [
+            "jobInspector.residue",
+            "jobInspector.log.text"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "viewer",
+      "components": [
+        "ViewerWorkspace",
+        "ViewerInspectorStack",
+        "ViewerScreenshot",
+        "ComponentTree",
+        "DumpInspector"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native Viewer split layout/image overlay/tree/inspectors preserve search, selection, fields and verified screenshot identity; the JS inline sample drawing is not device evidence.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/ViewerPage.cs",
+          "contains": "private UIElement Screenshot("
+        },
+        {
+          "path": "windows/App/Pages/ViewerPage.cs",
+          "contains": "private UIElement TreeList("
+        },
+        {
+          "path": "windows/App/Pages/ViewerPage.cs",
+          "contains": "private StackPanel Properties("
+        },
+        {
+          "path": "windows/App/Pages/ViewerPage.cs",
+          "contains": "private UIElement RawDump("
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/ViewerFlowTests.cs",
+          "method": "AViewIsCapturedAndInspected",
+          "scenario": "viewer",
+          "snapshotId": null,
+          "automationIds": [
+            "viewer.screenshot.hitTest",
+            "viewer.properties.type",
+            "viewer.rawDump",
+            "viewer.search.matchCount",
+            "viewer.tree.noMatches"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "diagnostic-sections",
+      "components": [
+        "SectionGroup",
+        "DiagnosticAlignmentDisclosure",
+        "DiagnosticTimeline",
+        "DiagnosticTrack",
+        "DiagnosticTimeCursor",
+        "DiagnosticTraceEvent",
+        "DiagnosticLogMarker",
+        "DiagnosticMarker",
+        "DiagnosticScreenshotPoint",
+        "DiagnosticScreenThumbnail",
+        "DiagnosticUnalignedTrackNotice",
+        "PartialSessionBanner"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native saved-session sections/text/disclosures preserve exact original timeline, marks, screenshot applicability/absence, alignment and selection facts. TimeCursor has a selection footer, not a draggable range; ScreenThumbnail has applicability/absence prose, not a bitmap widget; points/tracks are textual source projections, not geometric clock alignment.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "private StackPanel SessionSection("
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "string.Join(\"\\n\", session.Timeline)"
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "private Border Mark("
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "private UIElement Footer("
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "diagnostics.partial"
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "diagnostics.alignment.detail"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/DiagnosticsFlowTests.cs",
+          "method": "ASavedSessionIsOpenedFromHistoryAndRead",
+          "scenario": "diagnostics",
+          "snapshotId": null,
+          "automationIds": [
+            "diagnostics.partial",
+            "diagnostics.mark.1.title",
+            "diagnostics.mark.time.2",
+            "diagnostics.mark.1.noScreenshot",
+            "diagnostics.selection",
+            "diagnostics.artifact.read.hilog.txt"
+          ]
+        },
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "diagnostics",
+          "snapshotId": "diagnostics.session",
+          "automationIds": [
+            "diagnostics.mark.1.noScreenshot",
+            "diagnostics.selection",
+            "diagnostics.alignment.detail"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "diagnostic-logs",
+      "components": [
+        "DiagnosticLogRow"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native explicit whole Artifact preview and HiLog summary retain bounded text/source facts. The design-only selectable per-line log button is not claimed as a native widget.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "private async Task PreviewAsync("
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "diagnostics.preview.text"
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "private StackPanel HilogSummary("
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/DiagnosticsFlowTests.cs",
+          "method": "ASavedSessionIsOpenedFromHistoryAndRead",
+          "scenario": "diagnostics",
+          "snapshotId": null,
+          "automationIds": [
+            "diagnostics.partial",
+            "diagnostics.mark.1.title",
+            "diagnostics.mark.time.2",
+            "diagnostics.mark.1.noScreenshot",
+            "diagnostics.selection",
+            "diagnostics.artifact.read.hilog.txt"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "diagnostic-live-controls",
+      "components": [
+        "DiagnosticPresetPicker",
+        "DiagnosticChannelStatus"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native duration ComboBox and one-owner capture state/control strip preserve the current fixed typed capture operation and admitted session status. There is no design-only preset catalogue promotion.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "private StackPanel CapturePane()"
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "var duration = new ComboBox"
+        },
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "diagnostics.capture.markCount"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "diagnostic-capture",
+          "snapshotId": "diagnostics.capture.recording",
+          "automationIds": [
+            "diagnostics.capture.arm",
+            "diagnostics.capture.mark",
+            "diagnostics.capture.stop",
+            "diagnostics.capture.state",
+            "diagnostics.capture.markCount"
+          ]
+        },
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/DiagnosticCaptureFlowTests.cs",
+          "method": "OneInteractiveCaptureKeepsItsOwnerAcrossNavigationAndOpensItsOwnHistory",
+          "scenario": "diagnostic-capture",
+          "snapshotId": null,
+          "automationIds": [
+            "diagnostics.capture.arm",
+            "diagnostics.capture.mark",
+            "diagnostics.capture.stop"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "production-boundary",
+      "components": [
+        "ProductionBoundaryCallout",
+        "PerformanceImpactNotice"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native explanatory prose preserves production/software/privacy and bounded-capture impact boundaries; no color-only distinction or fake capability is introduced.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/DiagnosticsPage.cs",
+          "contains": "diagnostics.capture.boundary"
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "device.screen.boundary"
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "device.record.timeline"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "semanticSnapshot",
+          "path": "windows/App.UITests/SemanticSnapshotTests.cs",
+          "method": "PagesMatchTheirSemanticSnapshots",
+          "scenario": "diagnostic-capture",
+          "snapshotId": "diagnostics.capture.recording",
+          "automationIds": [
+            "diagnostics.capture.boundary"
+          ]
+        },
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/DeviceScreenFlowTests.cs",
+          "method": "CurrentPictureBecomesStaleAndNativeMovieKeepsMeasuredSpacing",
+          "scenario": "device-screen",
+          "snapshotId": null,
+          "automationIds": [
+            "device.screen.picture",
+            "device.screen.pointer.position",
+            "device.screen.liveness",
+            "device.record.frames",
+            "device.record.summary",
+            "device.record.saveFrames"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "device-screen",
+      "components": [
+        "DeviceScreenshotEmptyState",
+        "DeviceControlSurface",
+        "DeviceTouchFeedback",
+        "DeviceStaleInputGuard",
+        "DeviceControlEventRow"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native image+Canvas feedback/named liveness/refusal and event rows preserve current/historical frame identity and no stale input; JS sample imagery is not treated as observed.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "device.screen.empty"
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "private StackPanel Picture("
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "device.screen.pointer.position"
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "DeviceStaleRefused"
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "device.screen.log."
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/DeviceScreenFlowTests.cs",
+          "method": "CurrentPictureBecomesStaleAndNativeMovieKeepsMeasuredSpacing",
+          "scenario": "device-screen",
+          "snapshotId": null,
+          "automationIds": [
+            "device.screen.picture",
+            "device.screen.pointer.position",
+            "device.screen.liveness",
+            "device.record.frames",
+            "device.record.summary",
+            "device.record.saveFrames"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "device-recording",
+      "components": [
+        "DeviceFrameCountStepper",
+        "RecordingArtifactResult"
+      ],
+      "classification": "nativeSemanticProjection",
+      "projection": "Native NumberBox 2..300 and verified frame/movie result/read/export affordances preserve actual measured timings and honest native encoder unavailability.",
+      "sources": [
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "private StackPanel RecordingControls()"
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "Minimum = 2, Maximum = 300"
+        },
+        {
+          "path": "windows/App/Pages/DevicePage.Screen.cs",
+          "contains": "device.record.nativeUnavailable"
+        }
+      ],
+      "proofs": [
+        {
+          "kind": "scriptedFlow",
+          "path": "windows/App.UITests/DeviceScreenFlowTests.cs",
+          "method": "CurrentPictureBecomesStaleAndNativeMovieKeepsMeasuredSpacing",
+          "scenario": "device-screen",
+          "snapshotId": null,
+          "automationIds": [
+            "device.screen.picture",
+            "device.screen.pointer.position",
+            "device.screen.liveness",
+            "device.record.frames",
+            "device.record.summary",
+            "device.record.saveFrames"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "retired-automation",
+      "components": [
+        "BudgetMeters",
+        "OperationList",
+        "StageTrack",
+        "StatusStrip"
+      ],
+      "classification": "retiredAutomation",
+      "projection": "Historical Automation references retained by the JS design package; no production Windows capability, route or native completion is claimed.",
+      "sources": [
+        {
+          "path": "docs/design/implementation-audit-2026-08-27.md",
+          "contains": "BudgetMeters/OperationList/StageTrack/StatusStrip"
+        }
+      ],
+      "proofs": []
+    }
+  ],
+  "previews": [
+    ".design-sync/previews/BudgetMeters.tsx",
+    ".design-sync/previews/Button.tsx",
+    ".design-sync/previews/Callout.tsx",
+    ".design-sync/previews/Card.tsx",
+    ".design-sync/previews/Chip.tsx",
+    ".design-sync/previews/DangerConfirmDialog.tsx",
+    ".design-sync/previews/DataTable.tsx",
+    ".design-sync/previews/DeterminateProgress.tsx",
+    ".design-sync/previews/DeviceRow.tsx",
+    ".design-sync/previews/EffectBadge.tsx",
+    ".design-sync/previews/FilterPills.tsx",
+    ".design-sync/previews/IndeterminateBar.tsx",
+    ".design-sync/previews/JobInspector.tsx",
+    ".design-sync/previews/KeyValueList.tsx",
+    ".design-sync/previews/LogTail.tsx",
+    ".design-sync/previews/NavItem.tsx",
+    ".design-sync/previews/OperationList.tsx",
+    ".design-sync/previews/PhaseTrack.tsx",
+    ".design-sync/previews/RadioGroup.tsx",
+    ".design-sync/previews/RecoveryBanner.tsx",
+    ".design-sync/previews/SegmentedControl.tsx",
+    ".design-sync/previews/Select.tsx",
+    ".design-sync/previews/SessionSurfaces.tsx",
+    ".design-sync/previews/StageTrack.tsx",
+    ".design-sync/previews/StatusStrip.tsx",
+    ".design-sync/previews/Symbol.tsx",
+    ".design-sync/previews/Tabs.tsx",
+    ".design-sync/previews/TagPicker.tsx",
+    ".design-sync/previews/TextField.tsx",
+    ".design-sync/previews/ToolbarButton.tsx",
+    ".design-sync/previews/ViewerSurfaces.tsx",
+    ".design-sync/previews/WindowFrame.tsx"
+  ],
+  "upstream": [
+    {
+      "id": "ArkTraceCanvas",
+      "classification": "upstreamExternal",
+      "projection": "The prototype's upstream ArkTrace canvas illustration is neither a controlled JS export nor Windows native timeline completeness. Existing Windows parser/viewer unavailability remains separate.",
+      "sources": [
+        {
+          "path": ".design-sync/NOTES.md",
+          "contains": "upstream-owned ArkTrace canvas illustration"
+        },
+        {
+          "path": "windows/App/Pages/TraceViewerPage.cs",
+          "contains": "Windows has no ArkTrace"
+        }
+      ]
+    }
+  ]
+}

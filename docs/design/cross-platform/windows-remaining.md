@@ -1,8 +1,20 @@
-# Windows: what remains (census as of `main` 2026-10-06)
+# Windows: what remains (2026-10-07 App coverage increment)
 
-Source: `openspec/contracts/cli-feature-coverage.json` after #2578, symbolize, continuation, alias, template and tool-selection increments.
-Of the 162 features the Windows CLI must serve, 149 are `implemented`, 11
-`partial` and 2 `notImplemented`; 101 are macOS-only. Measured since: `debug.hap@1`,
+Source: the official `cli-feature-coverage.json` generator and its exact Windows
+App source/fixture mapping. The App increment is pending maintainer review and
+protected-main publication; this census does not claim those changes are in the
+currently installed Runtime.
+
+The 162 Windows CLI features remain unchanged: 149 `implemented`, 11 `partial`
+and 2 `notImplemented`. The 68 App capabilities are separately Windows-required
+under accepted ruling 10: 59 `implemented` software targets, one `partial`
+installed-update target and eight accepted `deferred` rich TraceViewer targets.
+There are 230 Windows-required entries and 33 non-App macOS-only entries; the
+scope/status digest of all 195 non-App entries is unchanged. GUI status comes
+from exact Windows source/fixture records, with hardware, Narrator and installed
+release validation stated separately; a measured CLI equivalent proves no GUI.
+
+CLI measurements include `debug.hap@1`,
 `deploy.native-library.app-owned@1` and `cleanupDebt.continue` (TASK-XPA-009 domain leaves);
 `device.observations`, `target.availability` and `trace.probe` (TASK-XPA-005 device reads);
 `runtime.hdc.status`, `.impact-preview`, `.restart` and `control-action.list`, `.show`,
@@ -13,11 +25,22 @@ candidate in the composed Target observation owner's current observation);
 `workspace.sign-openharmony-hap@1` (TASK-XPA-011, live with the host's DevEco Studio, over a test
 build's fixture signing and the Swift oracle's stand-in signer);
 `workspace.symbolize-crash@1` (TASK-XPA-011: the Swift oracle's published crash, symbolized by the
-daemon's own `--symbolize-crash` mode through the real CLI). A feature is `implemented` on Windows only
+daemon's own `--symbolize-crash` mode through the real CLI). A non-App CLI feature is `implemented` on Windows only
 when each CLI leaf it reaches is in `WINDOWS_MEASURED_LEAVES` (a signed-CLI process test on
 Windows); a generic leaf (`agent run`, `agent resume`, `human-action resume`, `job plan|submit|run`)
 is counted only once every operation it reaches answers on Windows as Swift does (lead's ruling of
 2026-10-04).
+
+The App source registry covers every one of the 68 IDs and refuses missing,
+duplicate, unknown or orphan IDs. Actual native Save/Folder cancellation and
+whole-file/scope checks supplement the existing native Open flow. The design
+mapping closes all 59 controlled exports and 32 independently built previews
+under §H.1/§H.3 native semantic projection; source-reference checks are distinct
+from the named native UIA flows and accessibility runs. Retired Automation,
+upstream ArkTrace canvas, pixel-gallery parity and audible Narrator acceptance
+are not promoted. The remaining App update validation needs an installed,
+signed same-publisher higher-version MSIX and its release feed; the unpackaged
+refusal fixture cannot establish that result.
 
 Owners: every owner of the macOS owner census is composed by the Windows daemon
 (`Host::owner_census` lists the same names on both), so no owner is absent. Carved: the development root
@@ -112,11 +135,55 @@ the run note is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj1-2026-10-06-run.md`.
 The earlier user-skipped window remains historical truth.
 
-GJ-2/3/5 remain incomplete. The original paired GJ-2 signed HAP is still missing;
-the separate smoke HAP does not replace it. GJ-3 still needs its signed ARM32
-library and pinned rollback fixture. Signing and device verification of the
-repaired WaterFlow HAP remain blocked on board-trusted debug signing material
-and preset; the successful separate smoke does not establish GJ-5's signed
-crash repro/verify loop. Its remaining crash-probe input gates and the formal
-runbook's durable Artifact/readback requirements remain open. GJ-4 additionally
-requires AF-W1 and the destructive HardwareCampaign gate.
+GJ-2/3/5 remain incomplete, but their signing payloads are prepared. Maintainer
+review and protected-main publication of #2606 adopted the exact same-HAP pair,
+signed ARMv7 forward library and signed ghost rollback baseline in
+`scripts/gj_record/baselines/gj-pair-armv7-20261006/manifest.json`. The HAP digest
+is `ec5ce24958a16047c784a4af0f2197db86009abe1a3fbb193363a8bdd825e4bf`;
+the lost historical files no longer block execution. Standalone library SDK
+signature checks are preparation, not proof of device loading or rollback.
+
+The real GJ-2 capture originally failed `artifactIntegrityFailed` because Windows
+HDC emits registered help/tags in CRLF. Released #2608 registers only four exact
+CRLF representations; Raw bytes and whole hashes are retained. Production
+release-library checks over all four saved real outputs pass, and tampered,
+mixed-line-ending and truncated inputs still refuse. Binary Trace validation is
+unchanged. Complete HiLog/UI/Trace, typed service restart and durable Job/Artifact
+readback still require a fresh successful device run; old Raw is never joined.
+
+The installed protected-main Runtime `f245a1d9c34c6deb56d9f50236db0a5284cc062b`
+was exercised in the retained account. Its native startup exits 69 because an
+unknown-owner HDC listener occupies the registered endpoint. The retained exit,
+stdout/stderr and absent/present/absent pipe observation establish this failure;
+POL-HDC-001 forbids adopting or stopping that listener. #2614 preserves this
+child's exit when readiness loses its pipe, and #2615 documents the existing
+packaged CLI warm-up before the connect-only App. Both are software fixes,
+pending maintainer approval, not a waiver of that ownership gate.
+
+GJ-3's released #2609 readback includes actual backup/restored whole hashes,
+PID/maps and reload facts. Its new full forward/post-publication ghost failure/
+automatic rollback/reload runs on both hosts await paired GJ-2. GJ-5 retains
+nine independent checks: eight known-success Jobs, crash count 0→1, unhealthy
+reproduction then healthy verification, and a revision-conflict negative with
+zero new dispatch and identical adjacent 21-Job ledgers. Signing material and
+preset are present. Released #2611 fixes the recorder's actual `result.status`
+projection; canonical paired GJ-5 still needs its own fresh full run.
+
+The signed/notarized macOS RC build 4 is already downloadable from release run
+37461315601. Its protected-main ancestor has the same Catalog/contracts; reuse
+does not require another build. The prepared executable entry is
+`scripts/gj_record/mac-entry/entry.py`. No currently accessible Mac has proved
+DAYU200 USB access: a usable Mac SSH endpoint/account with existing safe
+authentication, followed by the same board at its fixed USB port, is required.
+
+GJ-4 is independent: ArkForge's production `windows-acceptance.yml` has no AF-W1
+run, and no downloadable matched `arkforge.release-bundle/v1` Windows release.
+The ArkForge release/protected `windows-production` environment and qualified
+DAYU200 runner owners must provide both. Ordinary Windows/Rust CI is not AF-W1,
+and an acceptance JSON alone is not the release Bundle. The prepared published
+DAYU200 OpenHarmony 7.0.0.43 image has whole SHA-256
+`781d2eaebe2f8d10a25d13102a38259b134210480b2153786032a3bdea675fed`.
+The draft is one primary flash, 1800 seconds and 128 MiB, preserving protected
+partitions and overwriting userdata. Bundle/AF-W1 must first pass Runtime
+admission; the named destructive HardwareCampaign and user execution window
+authorization remain outstanding. No flash was dispatched.

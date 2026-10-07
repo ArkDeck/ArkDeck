@@ -21,6 +21,8 @@ use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
+mod windows_app;
+
 /// Swift `featureCoverageSchemaVersion`.
 const SCHEMA_VERSION: &str = "arkdeck.cli.feature-coverage/1";
 /// Swift `ProductCoverageClassification.allCases`.
@@ -982,6 +984,8 @@ struct Entry {
     note: Option<String>,
     /// The canonical commands the entry reaches; not written.
     referenced_leaves: Vec<String>,
+    /// App targets use GUI evidence rather than CLI-equivalent measurement.
+    windows_app: Option<&'static windows_app::Surface>,
 }
 
 impl Entry {
@@ -1000,11 +1004,13 @@ impl Entry {
             owner: None,
             note: None,
             referenced_leaves: vec![command(leaf).into()],
+            windows_app: None,
         }
     }
 
     /// §14's closed status set: implemented on macOS, or `partial` where
-    /// blocked. On Windows, what this CLI serves there:
+    /// blocked. App targets have their own exact GUI evidence mapping. Other
+    /// Windows entries describe what this CLI serves there:
     /// - `notImplemented` where a leaf the entry reaches is refused off macOS
     ///   ([`MACOS_HOST_LEAVES`]), or the entry reaches no leaf (a generic
     ///   Catalog operation reaches `job submit`, and is `partial`);
@@ -1026,6 +1032,17 @@ impl Entry {
     }
 
     fn windows_status(&self) -> &'static str {
+        if self.source.starts_with("app:") {
+            return self
+                .windows_app
+                .expect("an exact Windows App mapping")
+                .status
+                .as_str();
+        }
+        assert!(
+            self.windows_app.is_none(),
+            "non-App coverage has an App proof"
+        );
         let leaves: Vec<&Value> = self
             .referenced_leaves
             .iter()
@@ -1198,6 +1215,7 @@ fn entries(methods: &[&str]) -> Vec<Entry> {
                     owner: None,
                     note: None,
                     referenced_leaves: Vec::new(),
+                    windows_app: None,
                 }
             }
         };
@@ -1207,6 +1225,7 @@ fn entries(methods: &[&str]) -> Vec<Entry> {
         entries.push(entry);
     }
     // App product capabilities.
+    windows_app::validate(array(&app_registry()["capabilities"]));
     let mut capabilities: Vec<&Value> = array(&app_registry()["capabilities"]).iter().collect();
     capabilities.sort_by_key(|capability| capability["id"].as_str());
     for capability in capabilities {
@@ -1221,6 +1240,8 @@ fn entries(methods: &[&str]) -> Vec<Entry> {
             .map(str::to_owned)
             .collect();
         let resolved: Vec<&Value> = patterns.iter().map(|pattern| resolve(pattern)).collect();
+        let windows_app =
+            windows_app::for_id(capability["id"].as_str().expect("an App capability ID"));
         entries.push(Entry {
             feature: text("id"),
             source: format!("app:{}", text("surface")),
@@ -1230,13 +1251,14 @@ fn entries(methods: &[&str]) -> Vec<Entry> {
             target_command: patterns.first().cloned(),
             equivalent_commands: patterns.iter().skip(1).cloned().collect(),
             conformance_fixture: resolved.first().map(|leaf| fixture(leaf)),
-            required_platforms: vec!["macos"],
+            required_platforms: PLATFORMS.to_vec(),
             owner: Some(text("owner")),
-            note: Some(text("title")),
+            note: Some(windows_app.note(&text("title"))),
             referenced_leaves: resolved
                 .iter()
                 .map(|leaf| command(leaf).to_owned())
                 .collect(),
+            windows_app: Some(windows_app),
         });
     }
     // Leaves nothing above reaches: features in their own right.
@@ -1274,6 +1296,16 @@ fn validate(entries: &[Entry]) {
             "feature {} is covered twice",
             entry.feature
         );
+        if entry.source.starts_with("app:") {
+            let surface = entry.windows_app.expect("an exact Windows App mapping");
+            assert_eq!(surface.id, entry.feature);
+            assert_eq!(entry.required_platforms, PLATFORMS);
+            assert!(entry.note.is_some());
+            if surface.status == windows_app::Status::Implemented {
+                assert_eq!(entry.classification, entry.target_classification);
+                assert_ne!(entry.classification, "blocked");
+            }
+        }
         assert!(
             CLASSIFICATIONS.contains(&entry.classification.as_str())
                 && CLASSIFICATIONS.contains(&entry.target_classification.as_str()),
@@ -1406,8 +1438,10 @@ fn problems_for(methods: &[&str]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{METHODS, document, document_for, problems_for};
-    use serde_json::Value;
+    use super::{
+        METHODS, PLATFORMS, app_registry, array, document, document_for, entries, problems_for,
+    };
+    use serde_json::{Value, json};
 
     fn windows(document: &Value, feature: &str) -> Value {
         document["entries"]
@@ -1418,6 +1452,82 @@ mod tests {
             .unwrap_or_else(|| panic!("no entry {feature}"))["implementationStatusByPlatform"]
             ["windows"]
             .clone()
+    }
+
+    #[test]
+    fn app_scope_is_windows_required_and_preserves_the_original_registry_targets() {
+        let document = document();
+        let apps: Vec<_> = document["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["source"].as_str().unwrap().starts_with("app:"))
+            .collect();
+        assert_eq!(apps.len(), 68);
+        for capability in array(&app_registry()["capabilities"]) {
+            let entry = apps
+                .iter()
+                .find(|entry| entry["feature"] == capability["id"])
+                .unwrap();
+            assert_eq!(entry["requiredPlatforms"], json!(PLATFORMS));
+            assert_eq!(entry["classification"], capability["classification"]);
+            assert_eq!(entry["targetClassification"], capability["classification"]);
+            assert_eq!(
+                entry["implementationStatusByPlatform"]["macos"],
+                "implemented"
+            );
+            assert!(entry["note"].as_str().unwrap().contains("not the GUI"));
+        }
+    }
+
+    #[test]
+    fn cli_measurement_cannot_promote_an_incomplete_gui_target() {
+        let mut app = entries(METHODS)
+            .into_iter()
+            .find(|entry| entry.feature == "app.settings.updates")
+            .unwrap();
+        assert_eq!(app.windows_status(), "partial");
+        // Even a real measured input leaf is not proof of an installed App update.
+        app.referenced_leaves = vec!["input.tap".to_owned()];
+        assert_eq!(app.windows_status(), "partial");
+        app.windows_app = None;
+        assert!(std::panic::catch_unwind(|| app.windows_status()).is_err());
+
+        let navigation = entries(METHODS)
+            .into_iter()
+            .find(|entry| entry.feature == "app.shell.navigation")
+            .unwrap();
+        assert!(navigation.referenced_leaves.is_empty());
+        assert_eq!(
+            navigation.windows_status(),
+            "implemented",
+            "a real GUI needs no CLI leaf"
+        );
+    }
+
+    #[test]
+    fn app_mapping_does_not_change_any_non_app_platform_scope_or_status() {
+        let document = document();
+        let rows: Vec<_> = document["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| !entry["source"].as_str().unwrap().starts_with("app:"))
+            .map(|entry| {
+                json!({
+                    "feature": entry["feature"],
+                    "requiredPlatforms": entry["requiredPlatforms"],
+                    "implementationStatusByPlatform": entry["implementationStatusByPlatform"],
+                })
+            })
+            .collect();
+        // Original d02b2288 contract: 162 Windows-required + 33 macOS-only,
+        // independent of the later Device App layer. No frozen oracle is repinned.
+        assert_eq!(rows.len(), 195);
+        assert_eq!(
+            arkdeck_contract::sha256_hex(&serde_json::to_vec(&rows).unwrap()),
+            "0146aaeedba0d30f00d550e79b431178b9929d78b7b7e81d5715497e55df4469"
+        );
     }
 
     /// Windows' status is what this CLI serves there: a leaf without the

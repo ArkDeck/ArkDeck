@@ -302,13 +302,15 @@
       "equivalentCommands": [],
       "feature": "app.automation.retired",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Retired Automation plane",
+      "note": "Retired Automation plane. Windows App: The retired Automation plane has no App route or executor; the current Agents surface is separate. Windows GUI fixture: windows/App.Tests/ShellContractTests.cs#TheAppHoldsNoRuntimeSemantics. Evidence: docs/design/implementation-audit-2026-08-27.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "AppShell",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:automation.retired",
       "targetClassification": "refused",
@@ -322,13 +324,15 @@
       ],
       "feature": "app.debug.apps",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "HAP install, launch and observe",
+      "note": "HAP install, launch and observe. Windows App: HAP selection and typed Job submission are exercised through UIA. Windows GUI fixture: windows/App.UITests/DebugFlowTests.cs#AHapAndANativeLibraryAreChosenPlannedAndRun. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-debug-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.apps",
       "targetClassification": "direct",
@@ -342,13 +346,15 @@
       ],
       "feature": "app.debug.artifacts",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Native library deployment",
+      "note": "Native library deployment. Windows App: Native import, plan and typed submission are exercised through UIA. Windows GUI fixture: windows/App.UITests/DebugFlowTests.cs#AHapAndANativeLibraryAreChosenPlannedAndRun. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-debug-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.artifacts",
       "targetClassification": "direct",
@@ -362,13 +368,15 @@
       ],
       "feature": "app.debug.browser",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Remote build source browser",
+      "note": "Remote build source browser. Windows App: Remote browsing is exercised with real loopback SSH and Credential Manager, not inferred from import CLI parity. Windows GUI fixture: windows/App.UITests/RemoteSourcesFlowTests.cs#AServerIsVerifiedSavedBrowsedAndRemoved. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-remote-build-sources-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.browser",
       "targetClassification": "platformService",
@@ -382,13 +390,15 @@
       ],
       "feature": "app.debug.commands",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Closed read-only command templates",
+      "note": "Closed read-only command templates. Windows App: The closed template selection and typed Job are exercised through UIA. Windows GUI fixture: windows/App.UITests/DebugFlowTests.cs#ALogCaptureAndATemplateRunAsTypedJobs. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-debug-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.commands",
       "targetClassification": "direct",
@@ -400,13 +410,15 @@
       "equivalentCommands": [],
       "feature": "app.debug.logConfirm",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "HiLog request confirmation",
+      "note": "HiLog request confirmation. Windows App: The HiLog confirmation is exercised through UIA. Windows GUI fixture: windows/App.UITests/DebugFlowTests.cs#ALogCaptureAndATemplateRunAsTypedJobs. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-debug-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.logConfirm",
       "targetClassification": "presentation",
@@ -418,13 +430,15 @@
       "equivalentCommands": [],
       "feature": "app.debug.logs",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Bounded HiLog window",
+      "note": "Bounded HiLog window. Windows App: The bounded HiLog request and result are exercised through UIA. Windows GUI fixture: windows/App.UITests/DebugFlowTests.cs#ALogCaptureAndATemplateRunAsTypedJobs. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-debug-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.logs",
       "targetClassification": "direct",
@@ -438,13 +452,15 @@
       ],
       "feature": "app.debug.network",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Typed port forwarding",
+      "note": "Typed port forwarding. Windows App: Typed forwarding creation and removal are exercised through UIA. Windows GUI fixture: windows/App.UITests/DebugFlowTests.cs#APortRuleIsAddedAndDeletedThroughTheRuntime. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-debug-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.network",
       "targetClassification": "direct",
@@ -456,13 +472,15 @@
       "equivalentCommands": [],
       "feature": "app.debug.plan",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Deployment replacement plan",
+      "note": "Deployment replacement plan. Windows App: Deployment plan review is exercised through UIA. Windows GUI fixture: windows/App.UITests/DebugFlowTests.cs#AHapAndANativeLibraryAreChosenPlannedAndRun. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-debug-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Debug",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:debug.plan",
       "targetClassification": "direct",
@@ -474,13 +492,15 @@
       "equivalentCommands": [],
       "feature": "app.design.components",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Design-system component gallery",
+      "note": "Design-system component gallery. Windows App: All 59 controlled JS exports and 32 independently built previews have closed existing source/fixture mappings under accepted H.1/H.3 native semantic projection. Native accessibility/flow checks remain separate from source-reference closure. Retired Automation and the upstream canvas stay outside native capability claims; no production gallery route, pixel parity, Narrator-by-ear or hardware completion is claimed. Windows GUI fixture: windows/App.Tests/WindowsComponentMappingTests.cs#EveryControlledExportAndAll32PreviewsHaveExactNativeProjectionReferences. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/windows-component-mapping-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "AppShell",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:design.components",
       "targetClassification": "presentation",
@@ -497,13 +517,15 @@
       ],
       "feature": "app.device.control",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Typed pointer and private keyboard input",
+      "note": "Typed pointer and private keyboard input. Windows App: Confirmed-bound pointer and private keyboard input invalidate the current picture; incomplete outcomes never resend. Host Core/UIA checks do not establish hardware acceptance. Windows GUI fixture: windows/App.UITests/DeviceScreenFlowTests.cs#CurrentPictureBecomesStaleAndNativeMovieKeepsMeasuredSpacing. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-device-workspace-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Device",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:device.control",
       "targetClassification": "direct",
@@ -517,13 +539,15 @@
       ],
       "feature": "app.device.details",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Observed device details",
+      "note": "Observed device details. Windows App: Observed facts and target details have a UIA path. Windows GUI fixture: windows/App.UITests/DeviceTrustFlowTests.cs#AnUnauthorizedDeviceIsWaitedForUntilItTrustsThisComputer. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-device-trust-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Device",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:device.details",
       "targetClassification": "direct",
@@ -535,13 +559,15 @@
       "equivalentCommands": [],
       "feature": "app.device.events",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Live input event feedback",
+      "note": "Live input event feedback. Windows App: Live device-pixel coordinates and confirmed/stale input feedback are rendered in the screen workspace; the UIA flow observes the exact input result and refusal. Windows GUI fixture: windows/App.UITests/DeviceScreenFlowTests.cs#CurrentPictureBecomesStaleAndNativeMovieKeepsMeasuredSpacing. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-device-workspace-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Device",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:device.events",
       "targetClassification": "presentation",
@@ -555,13 +581,15 @@
       ],
       "feature": "app.device.recording",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Screen capture and recording",
+      "note": "Screen capture and recording. Windows App: Whole verified screenshot/sequence readers and measured native Windows Media composition are exercised through Core/UIA; explicit movie export rechecks the whole local derivative. Windows GUI fixture: windows/App.UITests/DeviceScreenFlowTests.cs#CurrentPictureBecomesStaleAndNativeMovieKeepsMeasuredSpacing. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-device-workspace-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Device",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:device.recording",
       "targetClassification": "direct",
@@ -575,13 +603,15 @@
       ],
       "feature": "app.device.rename",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Local display name",
+      "note": "Local display name. Windows App: Generation-bound target naming is exercised through the UI. Windows GUI fixture: windows/App.UITests/SurfaceFlowTests.cs#ATargetIsRenamedAndClearedThroughTheRuntime. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-surfaces-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Device",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:device.rename",
       "targetClassification": "local",
@@ -595,13 +625,15 @@
       ],
       "feature": "app.device.trust",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "First-trust prompt and adoption",
+      "note": "First-trust prompt and adoption. Windows App: Trust instructions, bounded wait and fresh observation are exercised through UIA. The adopted App scope keeps Target adoption in its foreground CLI handoff; it adds no GUI identity authority. Windows GUI fixture: windows/App.UITests/DeviceTrustFlowTests.cs#AnUnauthorizedDeviceIsWaitedForUntilItTrustsThisComputer. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-device-trust-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Device",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:device.trust",
       "targetClassification": "direct",
@@ -613,13 +645,15 @@
       "equivalentCommands": [],
       "feature": "app.diagnostics.capture",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Diagnostics capture",
+      "note": "Diagnostics capture. Windows App: One bounded published capture, Mark/Stop, actual Recording/Closed UIA notifications, owner retention and immutable History are exercised through Core and UIA. These host software checks do not establish hardware acceptance. Windows GUI fixture: windows/App.UITests/DiagnosticCaptureFlowTests.cs#OneInteractiveCaptureKeepsItsOwnerAcrossNavigationAndOpensItsOwnHistory. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/windows-diagnostics-capture-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Diagnostics",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:diagnostics.capture",
       "targetClassification": "direct",
@@ -631,13 +665,15 @@
       "equivalentCommands": [],
       "feature": "app.diagnostics.concept",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Diagnostics concept pages",
+      "note": "Diagnostics concept pages. Windows App: The no-record concept/next-step presentation is exercised through UIA. Windows GUI fixture: windows/App.UITests/DiagnosticsFlowTests.cs#WithoutARecordThePageSaysHowToOpenOne. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-diagnostics-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Diagnostics",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:diagnostics.concept",
       "targetClassification": "presentation",
@@ -649,13 +685,15 @@
       "equivalentCommands": [],
       "feature": "app.diagnostics.hilogSummary",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "HiLog summary",
+      "note": "HiLog summary. Windows App: The saved verified HiLog summary and provenance are exercised through UIA. Windows GUI fixture: windows/App.UITests/DiagnosticsFlowTests.cs#ASavedHilogSummaryIsOpenedFromHistoryAndVerified. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-diagnostics-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Diagnostics",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:diagnostics.hilogSummary",
       "targetClassification": "direct",
@@ -669,13 +707,15 @@
       ],
       "feature": "app.diagnostics.reader",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Diagnostics reader",
+      "note": "Diagnostics reader. Windows App: Saved session marks, timeline and explicit text previews are exercised through UIA. Windows GUI fixture: windows/App.UITests/DiagnosticsFlowTests.cs#ASavedSessionIsOpenedFromHistoryAndRead. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-diagnostics-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Diagnostics",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:diagnostics.reader",
       "targetClassification": "local",
@@ -690,13 +730,15 @@
       ],
       "feature": "app.flash.main",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Flash prerequisites and device access",
+      "note": "Flash prerequisites and device access. Windows App: Prerequisites and board access are reviewed in the scripted UI flow; this is not hardware acceptance. Windows GUI fixture: windows/App.UITests/FlashFlowTests.cs#AnArchiveIsReviewedPlannedAndFlashedWithTheOneNamedButton. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-flash-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Flash",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:flash.main",
       "targetClassification": "direct",
@@ -710,13 +752,15 @@
       ],
       "feature": "app.flash.plan",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Exact flash plan",
+      "note": "Exact flash plan. Windows App: The exact Runtime plan is reviewed in the UI flow. Windows GUI fixture: windows/App.UITests/FlashFlowTests.cs#AnArchiveIsReviewedPlannedAndFlashedWithTheOneNamedButton. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-flash-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Flash",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:flash.plan",
       "targetClassification": "direct",
@@ -730,13 +774,15 @@
       ],
       "feature": "app.flash.runtime",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Flash execution timeline",
+      "note": "Flash execution timeline. Windows App: The single named typed action and its timeline are exercised over the fixture provider. Windows GUI fixture: windows/App.UITests/FlashFlowTests.cs#AnArchiveIsReviewedPlannedAndFlashedWithTheOneNamedButton. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-flash-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Flash",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:flash.runtime",
       "targetClassification": "direct",
@@ -748,13 +794,15 @@
       "equivalentCommands": [],
       "feature": "app.history.context",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Workspace continuation context",
+      "note": "Workspace continuation context. Windows App: Workspace context is handed to the actual captured-record readers through UIA. Windows GUI fixture: windows/App.UITests/HistoryHandoffFlowTests.cs#ACaptureRecordReopensInTraceAndInDiagnostics. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-history-handoff-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "History",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:history.context",
       "targetClassification": "direct",
@@ -769,13 +817,15 @@
       ],
       "feature": "app.history.detail",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Job detail and evidence",
+      "note": "Job detail and evidence. Windows App: Summary, evidence and Journal correlation are exercised through UIA. Windows GUI fixture: windows/App.UITests/HistoryFilterFlowTests.cs#ARecordShowsItsSummaryJournalCorrelationAndRecovery. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-history-filters-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "History",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:history.detail",
       "targetClassification": "direct",
@@ -790,13 +840,15 @@
       ],
       "feature": "app.history.export",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Artifact and Session export",
+      "note": "Artifact and Session export. Windows App: Verified Artifact and preview-bound Session export have UI surfaces; native-picker completeness is tracked separately. Windows GUI fixture: windows/App.UITests/SurfaceFlowTests.cs#TheExportPreviewNamesWhatWillBeWritten. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-surfaces-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "History",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:history.export",
       "targetClassification": "direct",
@@ -810,13 +862,15 @@
       ],
       "feature": "app.history.filters",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Saved history filter",
+      "note": "Saved history filter. Windows App: Saved filters are exercised through UIA. Windows GUI fixture: windows/App.UITests/HistoryFilterFlowTests.cs#TheListIsFilteredPagedAndItsFilterSaved. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-history-filters-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "History",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:history.filters",
       "targetClassification": "local",
@@ -828,13 +882,15 @@
       "equivalentCommands": [],
       "feature": "app.history.list",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Job history",
+      "note": "Job history. Windows App: Paged Job history is exercised through UIA. Windows GUI fixture: windows/App.UITests/HistoryFilterFlowTests.cs#TheListIsFilteredPagedAndItsFilterSaved. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-history-filters-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "History",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:history.list",
       "targetClassification": "direct",
@@ -846,13 +902,15 @@
       "equivalentCommands": [],
       "feature": "app.menu.help.traceShortcuts",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Help › Trace Keyboard Shortcuts",
+      "note": "Help › Trace Keyboard Shortcuts. Windows App: TASK-XPA-021 / accepted decision 5 defers the complete rich-viewer shortcuts help. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:menu.help.traceShortcuts",
       "targetClassification": "presentation",
@@ -864,13 +922,15 @@
       "equivalentCommands": [],
       "feature": "app.menu.trace.capture",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace › Capture Trace…",
+      "note": "Trace › Capture Trace…. Windows App: The Windows capture command is wired to the Trace workspace. Windows GUI fixture: windows/App.UITests/KeyboardCommandFlowTests.cs#CtrlFFindsTheSearchAndCtrlNOpensTrace. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-keyboard-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:menu.trace.capture",
       "targetClassification": "direct",
@@ -882,13 +942,15 @@
       "equivalentCommands": [],
       "feature": "app.menu.trace.filterProcesses",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Trace › Filter Trace Processes",
+      "note": "Trace › Filter Trace Processes. Windows App: TASK-XPA-021 / accepted decision 5 defers the rich process-filter command. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:menu.trace.filterProcesses",
       "targetClassification": "presentation",
@@ -900,13 +962,15 @@
       "equivalentCommands": [],
       "feature": "app.menu.trace.open",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace › Open Trace…",
+      "note": "Trace › Open Trace…. Windows App: The Windows open command uses the real file dialog and recent list. Windows GUI fixture: windows/App.UITests/TraceFlowTests.cs#ALocalTraceOpensAndJoinsTheRecentList. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:menu.trace.open",
       "targetClassification": "presentation",
@@ -918,13 +982,15 @@
       "equivalentCommands": [],
       "feature": "app.menu.trace.reload",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace › Reload Trace",
+      "note": "Trace › Reload Trace. Windows App: The Windows reload command re-reads the current surface. Windows GUI fixture: windows/App.UITests/KeyboardCommandFlowTests.cs#CtrlRReadsThePageAgain. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-keyboard-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:menu.trace.reload",
       "targetClassification": "presentation",
@@ -936,13 +1002,15 @@
       "equivalentCommands": [],
       "feature": "app.menu.trace.searchEvents",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Trace › Search Events",
+      "note": "Trace › Search Events. Windows App: TASK-XPA-021 / accepted decision 5 defers the rich event-search command. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:menu.trace.searchEvents",
       "targetClassification": "presentation",
@@ -956,13 +1024,15 @@
       ],
       "feature": "app.overview.environment",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Environment and connection facts",
+      "note": "Environment and connection facts. Windows App: Runtime/HDC and device environment facts are rendered in scope. Windows GUI fixture: windows/App.UITests/OverviewEnvironmentFlowTests.cs#TheEnvironmentShowsTheRuntimesHdcAndTheDeviceInScope. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-overview-hdc-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Overview",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:overview.environment",
       "targetClassification": "direct",
@@ -976,13 +1046,15 @@
       ],
       "feature": "app.overview.hdcImpact",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "HDC lifecycle impact preview",
+      "note": "HDC lifecycle impact preview. Windows App: The Runtime impact projection is read and displayed, with no App-owned restart. Windows GUI fixture: windows/App.UITests/OverviewEnvironmentFlowTests.cs#TheEnvironmentShowsTheRuntimesHdcAndTheDeviceInScope. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-overview-hdc-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Overview",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:overview.hdcImpact",
       "targetClassification": "direct",
@@ -996,13 +1068,15 @@
       ],
       "feature": "app.overview.main",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Current target and next step",
+      "note": "Current target and next step. Windows App: Current-target scope and next-step presentation are exercised through UIA. Windows GUI fixture: windows/App.UITests/OverviewScopeFlowTests.cs#TheOnlineDeviceAndItsServerAreInScope. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-overview-scope-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Overview",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:overview.main",
       "targetClassification": "direct",
@@ -1016,13 +1090,15 @@
       ],
       "feature": "app.overview.resume",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Resume a waiting execution",
+      "note": "Resume a waiting execution. Windows App: The waiting execution is resumed through the Runtime-owned human-action UI. Windows GUI fixture: windows/App.UITests/AgentImportFlowTests.cs#AHumanActionIsResumedWithOneOfItsValues. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-agent-import-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Overview",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:overview.resume",
       "targetClassification": "direct",
@@ -1036,13 +1112,15 @@
       ],
       "feature": "app.settings.diagnostics",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Support bundle",
+      "note": "Support bundle. Windows App: Support-bundle preview and approved-scope export are exercised through UIA, excluding device raw. Windows GUI fixture: windows/App.UITests/SettingsLocalFlowTests.cs#TheIconUpdatesAndTheDiagnosticBundleAreLocal. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-settings-local-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.diagnostics",
       "targetClassification": "local",
@@ -1054,13 +1132,15 @@
       "equivalentCommands": [],
       "feature": "app.settings.general",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "General preferences",
+      "note": "General preferences. Windows App: App-local icon preferences are exercised through UIA. Windows GUI fixture: windows/App.UITests/SettingsLocalFlowTests.cs#TheIconUpdatesAndTheDiagnosticBundleAreLocal. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-settings-local-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.general",
       "targetClassification": "presentation",
@@ -1072,13 +1152,15 @@
       "equivalentCommands": [],
       "feature": "app.settings.serverDelete",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Remote build source removal",
+      "note": "Remote build source removal. Windows App: Remote-source removal is exercised through UIA. Windows GUI fixture: windows/App.UITests/RemoteSourcesFlowTests.cs#AServerIsVerifiedSavedBrowsedAndRemoved. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-remote-build-sources-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.serverDelete",
       "targetClassification": "platformService",
@@ -1090,13 +1172,15 @@
       "equivalentCommands": [],
       "feature": "app.settings.serverEditor",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Remote build source editor",
+      "note": "Remote build source editor. Windows App: Host-key-pinned editing and Credential Manager storage are exercised through UIA. Windows GUI fixture: windows/App.UITests/RemoteSourcesFlowTests.cs#AServerIsVerifiedSavedBrowsedAndRemoved. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-remote-build-sources-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.serverEditor",
       "targetClassification": "platformService",
@@ -1108,13 +1192,15 @@
       "equivalentCommands": [],
       "feature": "app.settings.servers",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Remote build sources",
+      "note": "Remote build sources. Windows App: Server verification and persistence are exercised through UIA with real loopback SSH. Windows GUI fixture: windows/App.UITests/RemoteSourcesFlowTests.cs#AServerIsVerifiedSavedBrowsedAndRemoved. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-remote-build-sources-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.servers",
       "targetClassification": "platformService",
@@ -1129,13 +1215,15 @@
       ],
       "feature": "app.settings.storage",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Runtime storage",
+      "note": "Runtime storage. Windows App: Generation-bound storage policy/root actions are exercised through UIA. Windows GUI fixture: windows/App.UITests/SettingsWriteFlowTests.cs#ThePolicyAndThePurgeAreConfirmedAndTheRuntimeAnswers. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-settings-storage-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.storage",
       "targetClassification": "local",
@@ -1151,13 +1239,15 @@
       ],
       "feature": "app.settings.toolchains",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Tool, bundle and signing lifecycle",
+      "note": "Tool, bundle and signing lifecycle. Windows App: Read-only HDC/tool/project/preset and bounded complete Bundle inventory are measured through bilingual UIA, including exact selected facts and honest empty/refused states. Registration, selection and lifecycle remain the existing foreground CLI handoff; displayed trust does not grant authority. Windows GUI fixture: windows/App.UITests/ToolchainInventoryFlowTests.cs#CompleteInventoryShowsBothPagesAndRuntimeSelectedFacts. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/windows-toolchain-inventory-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.toolchains",
       "targetClassification": "direct",
@@ -1171,13 +1261,15 @@
       ],
       "feature": "app.settings.traceCache",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace derived cache",
+      "note": "Trace derived cache. Windows App: Inactive derived-cache purge is exercised through UIA. Windows GUI fixture: windows/App.UITests/SettingsWriteFlowTests.cs#ThePolicyAndThePurgeAreConfirmedAndTheRuntimeAnswers. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-settings-storage-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.traceCache",
       "targetClassification": "local",
@@ -1189,13 +1281,15 @@
       "equivalentCommands": [],
       "feature": "app.settings.traceLicenses",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace licenses",
+      "note": "Trace licenses. Windows App: Lazy local legal resources, complete original CRLF/Unicode text and native selection are measured in isolated App copies; missing Windows ArkTrace release content remains honestly unavailable. Fixtures do not establish bundle provenance. Windows GUI fixture: windows/App.UITests/TraceLicensesFlowTests.cs#TraceLicensesDisplaysAndSelectsFullOriginalLocalTextWithoutWritingIt. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-trace-licenses-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.traceLicenses",
       "targetClassification": "presentation",
@@ -1209,13 +1303,15 @@
       ],
       "feature": "app.settings.updates",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "partial"
       },
       "lifecycle": "current",
-      "note": "Runtime updates",
+      "note": "Runtime updates. Windows App: The MSIX update API is implemented, but the measured UI fixture covers only the unpackaged refusal; installed update validation remains open. Windows GUI fixture: windows/App.UITests/SettingsLocalFlowTests.cs#TheIconUpdatesAndTheDiagnosticBundleAreLocal. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-settings-local-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Settings",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:settings.updates",
       "targetClassification": "local",
@@ -1227,13 +1323,15 @@
       "equivalentCommands": [],
       "feature": "app.shell.inspector",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Inspector panel chrome",
+      "note": "Inspector panel chrome. Windows App: Inspector chrome and its record details are exercised through UIA. Windows GUI fixture: windows/App.UITests/JobInspectorFlowTests.cs#TheRelationTheResidueAndTheLogAreShown. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-job-inspector-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "AppShell",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:shell.inspector",
       "targetClassification": "presentation",
@@ -1245,13 +1343,15 @@
       "equivalentCommands": [],
       "feature": "app.shell.navigation",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Workspace navigation",
+      "note": "Workspace navigation. Windows App: Navigation has named, invokable UIA surfaces. Windows GUI fixture: windows/App.UITests/SemanticSnapshotTests.cs#PagesMatchTheirSemanticSnapshots. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-settings-a11y-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "AppShell",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:shell.navigation",
       "targetClassification": "presentation",
@@ -1266,13 +1366,15 @@
       ],
       "feature": "app.shell.recovery",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Recovery and human-action banner",
+      "note": "Recovery and human-action banner. Windows App: Recovery is rendered from Runtime records and handed to History. Windows GUI fixture: windows/App.UITests/JobRecoveryFlowTests.cs#RecordsThatNeedAPersonAreShownAndOpenInHistory. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-job-recovery-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "AppShell",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:shell.recovery",
       "targetClassification": "direct",
@@ -1284,13 +1386,15 @@
       "equivalentCommands": [],
       "feature": "app.system.panels",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "System panels",
+      "note": "System panels. Windows App: The existing native file-open, actual Save and Folder dialogs are exercised through UIA. Cancellation preserves the destination; confirmed Save matches every source byte and SHA, and explicit support export binds the selected parent and complete approved scope. No picker override or hardware result is claimed. Windows GUI fixture: windows/App.UITests/NativePanelsFlowTests.cs#NativeSaveCancelWritesNothingAndConfirmedExportPreservesWholeArtifact. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-native-panels-20261007-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "AppShell",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:system.panels",
       "targetClassification": "presentation",
@@ -1304,13 +1408,15 @@
       ],
       "feature": "app.trace.artifact",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace artifact export",
+      "note": "Trace artifact export. Windows App: Published Trace Artifacts use History's verified export UI; no separate Trace-page export button is claimed. Windows GUI fixture: windows/App.UITests/SurfaceFlowTests.cs#TheExportPreviewNamesWhatWillBeWritten. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-020/winui-surfaces-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Trace",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:trace.artifact",
       "targetClassification": "direct",
@@ -1322,13 +1428,15 @@
       "equivalentCommands": [],
       "feature": "app.trace.capture",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace capture",
+      "note": "Trace capture. Windows App: Bounded typed capture and whole-Artifact opening are exercised through UIA. Windows GUI fixture: windows/App.UITests/TraceFlowTests.cs#ACaptureOpensItsVerifiedTraceInTheViewer. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Trace",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:trace.capture",
       "targetClassification": "direct",
@@ -1340,13 +1448,15 @@
       "equivalentCommands": [],
       "feature": "app.trace.runtime",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace runtime readiness",
+      "note": "Trace runtime readiness. Windows App: Runtime availability and structured refusal are exercised through UIA. Windows GUI fixture: windows/App.UITests/TraceFlowTests.cs#ACaptureOpensItsVerifiedTraceInTheViewer. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Trace",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:trace.runtime",
       "targetClassification": "direct",
@@ -1358,13 +1468,15 @@
       "equivalentCommands": [],
       "feature": "app.traceViewer.annotation",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Trace annotation",
+      "note": "Trace annotation. Windows App: TASK-XPA-021 / accepted decision 5 defers rich Trace annotations. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:traceViewer.annotation",
       "targetClassification": "presentation",
@@ -1376,13 +1488,15 @@
       "equivalentCommands": [],
       "feature": "app.traceViewer.event",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Trace event detail",
+      "note": "Trace event detail. Windows App: TASK-XPA-021 / accepted decision 5 defers rich Trace event details. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:traceViewer.event",
       "targetClassification": "presentation",
@@ -1394,13 +1508,15 @@
       "equivalentCommands": [],
       "feature": "app.traceViewer.loading",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Trace loading state",
+      "note": "Trace loading state. Windows App: Whole-Artifact preparation and explicit parser-unavailable state are implemented. Windows GUI fixture: windows/App.UITests/TraceFlowTests.cs#ACaptureOpensItsVerifiedTraceInTheViewer. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:traceViewer.loading",
       "targetClassification": "presentation",
@@ -1412,13 +1528,15 @@
       "equivalentCommands": [],
       "feature": "app.traceViewer.range",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Trace range selection",
+      "note": "Trace range selection. Windows App: TASK-XPA-021 / accepted decision 5 defers rich Trace range selection. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:traceViewer.range",
       "targetClassification": "presentation",
@@ -1430,13 +1548,15 @@
       "equivalentCommands": [],
       "feature": "app.traceViewer.recent",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Recent traces",
+      "note": "Recent traces. Windows App: Local opening and recent-file maintenance are exercised through UIA. Windows GUI fixture: windows/App.UITests/TraceFlowTests.cs#ALocalTraceOpensAndJoinsTheRecentList. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:traceViewer.recent",
       "targetClassification": "presentation",
@@ -1448,13 +1568,15 @@
       "equivalentCommands": [],
       "feature": "app.traceViewer.shortcuts",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Trace keyboard shortcuts",
+      "note": "Trace keyboard shortcuts. Windows App: TASK-XPA-021 / accepted decision 5 and Windows ruling 66 defer rich-viewer shortcuts with timeline/search/zoom/annotation. Existing capture/open/reload keyboard commands are measured under their separate delivered menu targets. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:traceViewer.shortcuts",
       "targetClassification": "presentation",
@@ -1468,13 +1590,15 @@
       ],
       "feature": "app.traceViewer.timeline",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "deferred"
       },
       "lifecycle": "current",
-      "note": "Trace timeline",
+      "note": "Trace timeline. Windows App: TASK-XPA-021 / accepted decision 5 defers rich timeline rendering; capture/inspect/export does not prove it. No completed Windows GUI fixture for this target. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/proposal.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "TraceViewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:traceViewer.timeline",
       "targetClassification": "presentation",
@@ -1486,13 +1610,15 @@
       "equivalentCommands": [],
       "feature": "app.viewer.accessibility",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Accessibility tree",
+      "note": "Accessibility tree. Windows App: The accessibility tree and inspector are exercised through UIA. Windows GUI fixture: windows/App.UITests/ViewerFlowTests.cs#AViewIsCapturedAndInspected. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Viewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:viewer.accessibility",
       "targetClassification": "local",
@@ -1504,13 +1630,15 @@
       "equivalentCommands": [],
       "feature": "app.viewer.advanced",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Component detail dump",
+      "note": "Component detail dump. Windows App: The component-detail dump and search are exercised through UIA. Windows GUI fixture: windows/App.UITests/ViewerFlowTests.cs#AViewIsCapturedAndInspected. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Viewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:viewer.advanced",
       "targetClassification": "direct",
@@ -1524,13 +1652,15 @@
       ],
       "feature": "app.viewer.layout",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Layout bounds",
+      "note": "Layout bounds. Windows App: Bounds and hit testing are exercised through UIA. Windows GUI fixture: windows/App.UITests/ViewerFlowTests.cs#AViewIsCapturedAndInspected. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Viewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:viewer.layout",
       "targetClassification": "local",
@@ -1542,13 +1672,15 @@
       "equivalentCommands": [],
       "feature": "app.viewer.main",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "UI dump capture",
+      "note": "UI dump capture. Windows App: UI dump capture and its verified host presentation are exercised through UIA. Windows GUI fixture: windows/App.UITests/ViewerFlowTests.cs#AViewIsCapturedAndInspected. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Viewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:viewer.main",
       "targetClassification": "direct",
@@ -1560,13 +1692,15 @@
       "equivalentCommands": [],
       "feature": "app.viewer.properties",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Node properties",
+      "note": "Node properties. Windows App: Node properties are exercised through UIA. Windows GUI fixture: windows/App.UITests/ViewerFlowTests.cs#AViewIsCapturedAndInspected. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Viewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:viewer.properties",
       "targetClassification": "local",
@@ -1578,13 +1712,15 @@
       "equivalentCommands": [],
       "feature": "app.viewer.raw",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
-      "note": "Raw dump text",
+      "note": "Raw dump text. Windows App: Verified raw dump text is inspected in the UI. Windows GUI fixture: windows/App.UITests/ViewerFlowTests.cs#AViewIsCapturedAndInspected. Evidence: openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/winui-trace-viewer-run.md. The argv conformance fixture covers the CLI equivalent, not the GUI.",
       "owner": "Viewer",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "app:viewer.raw",
       "targetClassification": "direct",
