@@ -719,10 +719,9 @@ RUST_POLICY_TOKENS = (
 )
 # The two host matrices, `workspace` and `contracts`, each carry these once:
 # the same policy gate (and only it, so neither waits for the other), hosts,
-# whole-job allowance, worker count and cache discipline.
+# worker count and cache discipline. Whole-job allowances are job-specific.
 RUST_NATIVE_JOB_TOKENS = (
     "    needs: policy\n",
-    "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}\n",
     "      fail-fast: false\n",
     "        os: [ubuntu-latest, xcode-27, windows-latest]\n",
     "    runs-on: ${{ matrix.os }}\n",
@@ -737,6 +736,7 @@ RUST_NATIVE_JOB_TOKENS = (
 # Answers that can differ between hosts: each runs exactly once per host, in
 # the `workspace` matrix.
 RUST_WORKSPACE_TOKENS = (
+    "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || matrix.os == 'windows-latest' && 40 || 30 }}\n",
     # Each native job owns its cache root; the root is part of the cache key,
     # so the two jobs never restore, carry or save each other's products.
     'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-workspace" >> "$GITHUB_ENV"',
@@ -756,6 +756,7 @@ RUST_WORKSPACE_TOKENS = (
 # The published and candidate contract views: once per host, in the
 # `contracts` matrix beside `workspace`, since they read none of its products.
 RUST_CONTRACTS_TOKENS = (
+    "    timeout-minutes: ${{ (startsWith(matrix.os, 'xcode') || matrix.os == 'windows-latest') && 50 || 30 }}\n",
     'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"',
     'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-contract-test-timings" >> "$GITHUB_ENV"',
     "        working-directory: .\n"
@@ -1489,6 +1490,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
         )
         recordings = "      - name: Preserve actual read-only recordings\n"
         lock_check = "      - name: Verify checks left locked inputs unchanged\n"
+        workspace_timeout = RUST_WORKSPACE_TOKENS[0]
+        contracts_timeout = RUST_CONTRACTS_TOKENS[0]
         mutations = (
             # A host-independent check repeated on every host is the cost the
             # policy job removes, and one on no host is no check at all.
@@ -1551,14 +1554,16 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "    needs: policy\n", "    needs: [policy, workspace]\n"
             ),
             rust[:rust.index("  contracts:\n")],
-            # Both isolated views retain their exact Windows whole-job
-            # allowance, including independent drift in either matrix.
-            rust.replace(" || matrix.os == 'windows-latest' && 40", ""),
-            rust.replace(" || matrix.os == 'windows-latest' && 40", "", 1),
-            rust[:rust.index("  contracts:\n")] + rust[rust.index("  contracts:\n"):].replace(
-                " || matrix.os == 'windows-latest' && 40", "", 1
-            ),
-            rust.replace(" || matrix.os == 'windows-latest' && 40", " || matrix.os == 'windows-latest' && 41", 1),
+            # Each matrix retains its own exact whole-job allowance:
+            # workspace Windows40/macOS50/Linux30; contracts Windows50/macOS50/Linux30.
+            # Independent removal, drift or swapping must still fail closed.
+            rust.replace(workspace_timeout, "").replace(contracts_timeout, ""),
+            rust.replace(workspace_timeout, ""),
+            rust.replace(contracts_timeout, ""),
+            rust.replace(workspace_timeout, workspace_timeout.replace("&& 40", "&& 41")),
+            rust.replace(contracts_timeout, contracts_timeout.replace("&& 50", "&& 51")),
+            rust.replace(workspace_timeout, contracts_timeout),
+            rust.replace(contracts_timeout, workspace_timeout),
         )
         for mutated in mutations:
             # A mutation that no longer matches the workflow proves nothing.
