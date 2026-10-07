@@ -21,6 +21,7 @@ const INPUT_PATH: &str =
 const INPUT_NAME: &str = "ART-469c10579b3c5461ab4d0a891c316397";
 const INPUT_SHA: &str = "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53";
 const INPUT_SIZE: u64 = 588;
+const HOST_FILES: [&str; 3] = ["hdc-answers.sh", "hdc-invocations.log", "hdc-mode"];
 const STEPS: [&str; 7] = [
     "published.run",
     "restart",
@@ -291,9 +292,35 @@ fn proof(daemon: &Daemon, answers: &[Value]) -> Value {
         "capabilityCheckpoint": capabilities, "freshCapabilityInspection": fresh_inspection})
 }
 
+/// Only this current oracle's freshly rebuilt copies use deterministic private
+/// modes. Shared legacy creators and every original fixture stay untouched.
+fn prepare_current_host_files(daemon: &Daemon) {
+    assert_eq!(
+        fs::read(daemon.root.join("hdc-invocations.log")).unwrap(),
+        b""
+    );
+    write_new(&daemon.root.join("hdc-mode"), b"normal\n");
+    let original = fs::read(daemon.fixture.join("hdc-answers.sh")).unwrap();
+    assert_eq!(
+        sha256_hex(&original),
+        daemon.provenance["files"]["hdc-answers.sh"]
+    );
+    for name in HOST_FILES {
+        let path = daemon.root.join(name);
+        assert!(fs::symlink_metadata(&path).unwrap().file_type().is_file());
+        super::fixture_fs::owner_only(&path);
+        assert_eq!(super::oracle_mode(&path, false), "600");
+    }
+    assert_eq!(
+        fs::read(daemon.root.join("hdc-answers.sh")).unwrap(),
+        original
+    );
+}
+
 fn execute(output: Option<&Path>) -> Value {
     let (source_cases, provenance) = source();
     let mut daemon = Daemon::open(SOURCE);
+    prepare_current_host_files(&daemon);
     let mut answers = Vec::new();
     let mut snapshots = BTreeMap::new();
     for exchange in source_cases["exchanges"].as_array().unwrap() {
@@ -895,9 +922,28 @@ fn project_snapshot(snapshot: &Value, projection: &mut Projection) -> Value {
     assert_eq!(sha256_hex(&originals[INPUT_PATH]), INPUT_SHA);
     let windows = projection.platform == "PLATFORM-WINDOWS@0.2.0";
     assert!(windows || projection.platform == "PLATFORM-MACOS@0.2.0");
-    let mut roles = [0_u8; 2];
+    let mut roles = [0_u8; 5];
     for entry in result["tree"].as_array_mut().unwrap() {
         let name = entry[0].as_str().unwrap().to_owned();
+        if let Some(role) = HOST_FILES
+            .iter()
+            .position(|leaf| name == format!("root/{leaf}"))
+        {
+            roles[role + 2] += 1;
+            assert_eq!(entry[1], "file");
+            assert_eq!(entry[2], "600", "current-only private host file {name}");
+            let content = &originals[&name];
+            match role {
+                0 => assert_eq!(
+                    sha256_hex(content),
+                    document(&super::fixture(SOURCE), "provenance.json")["files"]["hdc-answers.sh"],
+                    "complete original synthetic answers"
+                ),
+                1 => assert_eq!(content.as_slice(), b"", "zero transport calls"),
+                2 => assert_eq!(content.as_slice(), b"normal\n", "actual reset fake mode"),
+                _ => unreachable!(),
+            }
+        }
         if name == "root/hdc" {
             roles[0] += 1;
             assert_eq!(entry[1], "file");
@@ -922,7 +968,7 @@ fn project_snapshot(snapshot: &Value, projection: &mut Projection) -> Value {
             entry[2] = json!("400");
         }
     }
-    assert_eq!(roles, [1, 1], "each exact source role occurs once");
+    assert_eq!(roles, [1, 1, 1, 1, 1], "each exact source role occurs once");
     result
 }
 
@@ -1120,6 +1166,34 @@ pub fn assert_rejects_drift() {
     assert_seed_seal_refuses_unsealed_or_linked_bytes();
     let raw = document(&super::fixture(NAME), "raw-oracle.json");
     let baseline = comparison(&raw);
+    for leaf in HOST_FILES {
+        let name = format!("root/{leaf}");
+        let mut wrong_mode = raw.clone();
+        let entry = wrong_mode["finalStore"]["tree"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|entry| entry[0] == name)
+            .unwrap();
+        entry[2] = json!("644");
+        assert!(
+            std::panic::catch_unwind(|| comparison(&wrong_mode)).is_err(),
+            "current host role rejects broader mode: {name}"
+        );
+        let mut wrong_bytes = raw.clone();
+        let file = &mut wrong_bytes["finalStore"]["files"][&name];
+        let mut content = bytes(&file["bytes"]);
+        if let Some(first) = content.first_mut() {
+            *first ^= 1;
+        } else {
+            content.push(b'x');
+        }
+        *file = json!({"sha256": sha256_hex(&content), "bytes": content});
+        assert!(
+            std::panic::catch_unwind(|| comparison(&wrong_bytes)).is_err(),
+            "current host role rejects changed bytes with a matching raw hash: {name}"
+        );
+    }
     fn changed_record(raw: &mut Value, change: impl FnOnce(&mut Value)) {
         let id = raw["safety"]["jobs"][0]["jobId"]
             .as_str()

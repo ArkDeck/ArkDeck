@@ -290,6 +290,27 @@ def verify_execution(text: str, names: list[str], ignored: tuple[str, ...] | lis
     return {'functions': names, 'passed': int(passed), 'ignored': int(ignored), 'completed': True}
 
 
+def verify_audited_ignored_execution(text: str, names: list[str], ignored: list[str], listed_names: list[str]) -> dict:
+    """Verify an existing ignored-only receipt without claiming executed coverage."""
+    if not names or len(names) != len(set(names)) or len(ignored) != len(set(ignored)) or set(names) != set(ignored):
+        raise ValueError('ignored-only selection is not the exact audited census')
+    if len(listed_names) != len(set(listed_names)) or not set(names).issubset(listed_names):
+        raise ValueError('ignored-only selection differs from the full listed census')
+    plain = '\n'.join(re.sub(r'\x1b\[[0-9;]*m', '', text).splitlines())
+    lines = plain.splitlines()
+    case_lines = [line for line in lines if line.startswith('test ') and not line.startswith('test result:')]
+    rows = [re.fullmatch(r'test ([^\s]+) \.\.\. ignored(?:,.*)?', line) for line in case_lines]
+    if len(rows) != len(names) or any(row is None for row in rows) or {row[1] for row in rows} != set(names):
+        raise ValueError('audited ignored cases were not each reported once')
+    summaries = [line for line in lines if line.startswith('test result:')]
+    results = [re.fullmatch(r'test result: (ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored;'
+                           r' 0 measured; (\d+) filtered out; finished in (\d+(?:\.\d+)?)s', line) for line in summaries]
+    expected = ('ok', '0', '0', str(len(names)), str(len(listed_names) - len(names)))
+    if len(results) != 1 or results[0] is None or results[0].groups()[:5] != expected:
+        raise ValueError('audited ignored completion census mismatch')
+    return {'functions': names, 'passed': 0, 'ignored': len(names), 'completed': False, 'coverage': False}
+
+
 def verify_custom_execution(text: str, names: list[str], protocol: str) -> dict:
     """The closed existing custom summaries, without inventing libtest output."""
     plain = '\n'.join(re.sub(r'\x1b\[[0-9;]*m', '', text).splitlines())

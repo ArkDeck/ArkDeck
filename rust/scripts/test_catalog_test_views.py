@@ -75,6 +75,46 @@ class CoverageReceipts(unittest.TestCase):
             with self.subTest(rows=rows), self.assertRaises(ValueError):
                 views.verify_execution(self.receipt(rows, passed=0, ignored=ignored), names)
 
+    def test_exact_audited_ignored_receipt_never_claims_completion_or_coverage(self):
+        text = self.receipt(['test known_performance ... ignored, requires an explicit quiet host'],
+                            passed=0, ignored=1)
+        for value in (text, '\x1b[32m' + text.replace('\n', '\r\n') + '\x1b[0m'):
+            result = views.verify_audited_ignored_execution(value, ['known_performance'], ['known_performance'], ['known_performance'])
+            self.assertEqual(result, {'functions': ['known_performance'], 'passed': 0, 'ignored': 1,
+                                      'completed': False, 'coverage': False})
+            with self.assertRaises(ValueError):
+                views.verify_execution(value, ['known_performance'], ['known_performance'])
+
+    def test_ignored_only_receipt_cannot_hide_unknown_missing_duplicate_or_ordinary_cases(self):
+        good = self.receipt(['test known ... ignored'], passed=0, ignored=1)
+        cases = [(good, [], []), (good, ['known'], []), (good, ['known'], ['known', 'missing']),
+                 (good, ['known', 'known'], ['known']), (good, ['known'], ['known', 'known'])]
+        for text, names, ignored in cases:
+            with self.subTest(names=names, ignored=ignored), self.assertRaises(ValueError):
+                views.verify_audited_ignored_execution(text, names, ignored, names)
+        for text in (self.receipt([], passed=0, ignored=1),
+                     self.receipt(['test known ... ignored', 'test known ... ignored'], passed=0, ignored=2),
+                     self.receipt(['test known ... ignored', 'test unknown ... ignored'], passed=0, ignored=2),
+                     self.receipt(['test known ... ok'], passed=1),
+                     self.receipt(['test known ... FAILED'], passed=0, failed=1, state='FAILED'),
+                     self.receipt(['test known ... ignored'], passed=0, ignored=2),
+                     good + good.splitlines()[-1] + '\n', good + 'test foreign ... skipped\n',
+                     good + 'test result: unknown\n', good.replace('known ... ignored', 'known ... skipped'),
+                     good.replace('finished in 0.01s', 'finished in 0.01s unexpected'),
+                     good.replace('; 0 measured; 0 filtered out; finished in 0.01s', ''),
+                     good.replace('0.01s', '...s'), good.replace('0 filtered out', '1 filtered out'),
+                     'test known ... ignored\n'):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                views.verify_audited_ignored_execution(text, ['known'], ['known'], ['known'])
+
+    def test_ignored_only_filter_count_binds_the_whole_listed_census(self):
+        text = self.receipt(['test known ... ignored'], passed=0, ignored=1).replace('0 filtered out', '1 filtered out')
+        result = views.verify_audited_ignored_execution(text, ['known'], ['known'], ['known', 'other_view'])
+        self.assertFalse(result['coverage'])
+        for listed in (['known'], ['known', 'other_view', 'other_view'], ['other_view']):
+            with self.subTest(listed=listed), self.assertRaises(ValueError):
+                views.verify_audited_ignored_execution(text, ['known'], ['known'], listed)
+
     def test_ignored_negative_does_not_borrow_the_positive_execution(self):
         text = self.receipt(['test positive ... ok', 'test negative ... ignored'],
                             passed=1, ignored=1)

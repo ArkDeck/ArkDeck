@@ -414,3 +414,75 @@ validated the exact root relation, full encoder/policy capsules, fixed-ID
 lookup branch and sealed-input proof. These checks are software regressions;
 they do not grant new authority or constitute a device result. The exact new
 head's selected CI remains pending publication.
+
+
+### Audited ignored-target execution receipts
+
+Local targeted checks: `ignored-bookkeeping-final-126.json` records 47 focused
+pure parser/runner guards, exit 0, and rechecks all five actual ignored-only
+macOS receipts from the failed job artifact. Each remains zero passed,
+`completed: false` and `coverage: false`; global workspace completion can
+observe this expected exclusion without claiming substantive coverage. The
+new verifier requires the exact audited nonempty names, full real libtest
+summary, full-listed minus selected filtered count, and bound Cargo execution.
+Missing, duplicate, unknown, malformed, ordinary-case, wrong-count and failed
+Cargo results refuse. The original substantive `verify_execution` predicate,
+all declared ignores, assertions, Catalog routes and fixtures are unchanged.
+The initial new fixture truncated its summary (`124`, 45 pass/1 fail); that
+log remains, and only the synthetic fixture was corrected to actual libtest
+shape. `125` records the intermediate 46-case pass before final summary and
+filter-count tightening; the final result is `126`. No Cargo, Runtime, account,
+SDK or transport checks were repeated for this Python bookkeeping correction.
+
+CI: PR #2628 head `1ffd9709a5e086cf15a1a527a6c7d384ea2aff09`, run
+`37613667412`, macOS workspace job `112767208199` failed after all substantive
+libtest cases passed because five existing ignored-only targets were treated
+as missing coverage. Whole log `ci-job-112767208199-122.stdout.log` has SHA256
+`515cd2af6d53839df6759acc32320ec3c1f12d23c34923fa0551f12f37ff8b75`.
+The original execution receipt is retained in artifact `11479034644`, whole
+ZIP SHA256 `957d33867d2ff349408e6b4102078827938868e3fe2157f6ed16f8a227bd608c`;
+its five expected exclusions remain explicit. Windows workspace job
+`112767208342` also has no failed assertion and reports its existing quiet-host
+measurement ignored, before the same runner exit. Its full log is retained in
+`ci-job-112767208342-127.stdout.log`. macOS parity job `112767208283` separately
+has two Native c6 full-output comparison failures at the same assertion;
+`ci-job-112767208283-127.stdout.log` preserves both. Those are distinct from
+this bookkeeping fix and require exact output diagnosis. A new follow-up's
+CI remains pending; no earlier failed job is relabelled passed.
+
+
+### Current Native synthetic host-file permissions
+
+Local targeted checks: `native-mode-final-133.json` records the affected
+Hoststore/Agentd formatting, the isolated pinned-c6
+`native_reconcile_current_oracle` target (2 passed, 0 failed, 1 explicitly
+ignored recorder), affected all-target clippy with `-D warnings`, and affected
+format checks; every command exits 0. The complete 22-answer/seven-snapshot
+replay and expanded failure guards pass in 46.578 seconds (test body 2.63
+seconds); clippy takes 42.935 seconds. The test child has all live and recording
+opt-ins removed and reuses the existing fixed Cargo target. Both original and
+v4 whole-file inventories are unchanged. The formatter's final helper SHA256
+is `de5fe77951e6c5c85076ec253a1d702bf0b8901fefecf400e42f36ea6cddd2aa`.
+`lower-mode-manifest-refresh-134.json` proves only that helper's source pin
+changes; all 333 targets, routing, other source pins and 6,499 fixture pins
+remain equal. No fixture is re-recorded and no live operation is executed.
+
+CI: the two failed Native comparisons in macOS parity job `112767208283`
+have exactly 24 scalar differences: three newly created fake host files in
+each of seven snapshots and the final tree. macOS default creation produces
+mode 644, while the Windows task-private files have mode 600; every other
+complete value is equal. The current-only replay now initializes exactly
+`hdc-answers.sh`, the empty `hdc-invocations.log`, and CREATE_NEW `hdc-mode`
+with owner mode 600 before requests. All comparisons still require actual
+mode 600 and exact original script/empty-log/normal-mode bytes. Three wrong
+mode and three byte-tamper cases with matching raw hashes refuse. Shared
+legacy creators, production permissions and all stored fixtures stay intact.
+Root and Health independently reviewed this source scope CLEAN. The original
+macOS failures remain preserved in `ci-job-112767208283-127.stdout.log` and
+artifact `11479669711`; they are software portability defects, not device
+results. Windows parity job `112767208302` finished in 38m56s, within its
+40-minute limit, with no failed test assertion and the observed ignored-only
+cost target followed by receipt exit 1. Its complete log is
+`ci-job-112767208302-132.stdout.log`; without its uploaded receipt, no whole
+Windows error census is claimed. The next exact follow-up head's CI is pending
+publication. Earlier failed heads are not relabelled passed.
