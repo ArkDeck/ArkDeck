@@ -106,3 +106,30 @@ Root 检查实际四态/完整判据，不以 assembler process exit 或 prepara
 ## CI
 
 入口及独占 capture 修复已由维护者合入 [PR #2607](https://github.com/ArkDeck/ArkDeck/pull/2607)，protected main 为 `4d4ee61b7f229dfc7155f646cb73adebba7b58d4`。SDD `guard` 在 [run 37441785353](https://github.com/ArkDeck/ArkDeck/actions/runs/37441785353) 成功；[Swift CI run 37441534142](https://github.com/ArkDeck/ArkDeck/actions/runs/37441534142) 的 planner 成功且未选择编译车道，`swift` 汇总成功跳过。实际 Mac native API、发布包和设备步骤仍未在本轮执行，这些 CI 结果不构成 GJ pass。
+
+## 2026-10-07: build 5 and shared Session applicability
+
+The preceding 2026-10-06 preparation and CI records remain historical. The signed/notarized build 4 from [release run 37461315601](https://github.com/ArkDeck/ArkDeck/actions/runs/37461315601), source `361d306fd667bb59ad5e1ba8346eef64960b75ee`, remains immutable. Its Catalog/contracts still match this pair, but its shared Rust Session publisher contains the admission-chronology defect corrected by [PR #2623](https://github.com/ArkDeck/ArkDeck/pull/2623). Fresh evidence can precede capability consumption by one second; the old publisher refuses the valid known-terminal HAP source before finalization, and the complete import-reference census correctly refuses that unfinished publication. The correction applies to macOS as well as Windows.
+
+Formal Mac acceptance now needs a released source containing that reviewed correction. Build 5 keeps marketing version `0.1.0` and synchronizes the App/CLI/daemon build metadata through the official `scripts/release/release_version.py bump-build`; App `Info.plist` keeps its published build-setting placeholders. This is an implementation-applicability requirement, not a new same-git-SHA rule for the two hosts: same Catalog/canonical operations, adopted material bytes and all original Journey predicates remain mandatory, while each host records its actual source and image identity. Do not overwrite build 4 or relabel its receipt.
+
+This metadata layer follows [PR #2624](https://github.com/ArkDeck/ArkDeck/pull/2624), directly above the shared Session fix. Merging its `release-version.json` change into protected `main` automatically triggers the official `release-rc.yml` workflow. The planned new artifact is `arkdeck-rc-0.1.0-5` with `ArkDeck-0.1.0-5.dmg`; readiness requires its actual successful signing/notarization, immutable receipt and exact merged protected-main source, not this version edit or a branch build. Re-dispatching build 4 would skip an existing artifact. This preparation does not dispatch or publish a release and does not access signing secrets.
+
+The reviewed adapter remains unchanged: exactly the original nine configuration fields and explicit `--execute`. Root supplies the actual release source/whole CLI and daemon hashes, fresh private output root and actual caller date; the earlier `2026-10-06` command examples are historical, not a required date for a new run. No Runtime journal, receipt or credential is copied to establish readiness.
+
+### Local targeted checks
+
+The official bump/check/print and four pure `Versions` cases are the local scope; no Rust/App rebuild, helper execution, SDK or device operation is needed for this metadata delta. Check receipts are retained under `tools/logs/macos-rc-build5-20261007/`. The official Windows write produced newline churn; the final files preserve original parent bytes outside the five build-value replacements and are full-content equivalent to the official output after newline normalization. Actual checks passed:
+
+| Command | Result | Log under the directory above |
+| --- | --- | --- |
+| `python scripts/release/release_version.py bump-build`, then `check` / `print` | each exit0; `0.1.0` / build`5` in lockstep | `version-bump.log`, `version-final-check.log`, `version-final-print.log` |
+| `python scripts/release/test_build_macos_release.py Versions` | exit0, four tests / no skips, 0.533s | `versions-pure.log` |
+| `sh scripts/check-sdd.sh` (installed Git shell) | exit0 | `sdd-pre.log` |
+| `git diff --check` | exit0 | `diff-pre.log` |
+
+Final exact-source SDD/diff receipts and the five-file byte/hash manifest are retained with this packet; these pure checks do not build or run the Mac release.
+
+### CI
+
+Not yet submitted for this build5 layer. Ordinary PR CI and maintainer review precede protected-main publication; the subsequent official release run and actual Mac device window remain separate from these pure checks. The historical #2607/build4 results above do not establish build5 or GJ pass.
