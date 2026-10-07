@@ -509,6 +509,11 @@ impl JobReconciler<'_> {
                 .session_publication()
                 .is_some_and(unbound_source_failure)
         {
+            if record.admission().is_some() {
+                // Retry only the unchanged known terminal publication source;
+                // this path never resumes HAP execution or repairs authority.
+                return self.terminal_publication_retry(record);
+            }
             return self.preconsume_hap_publication(record);
         }
         if !reconciled(record.operation(), &record.state) {
