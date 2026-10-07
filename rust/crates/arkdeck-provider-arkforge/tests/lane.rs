@@ -618,10 +618,14 @@ mod lane {
         assert!(!scene.serving("public.sock"));
 
         let scene = Scene::new("org.openharmony.dayu200", "replay");
-        assert!(unavailable(scene.compose()).starts_with(
-            "the daemon bound toolchain replay, while this lane expects \
+        let detail = unavailable(scene.compose());
+        assert!(
+            detail.starts_with(
+                "the daemon bound toolchain replay, while this lane expects \
                  arkforged-native-rockusb"
-        ));
+            ),
+            "{detail}"
+        );
         assert!(scene.ended(), "the generation was stopped");
         assert!(!scene.serving("public.sock"));
     }
