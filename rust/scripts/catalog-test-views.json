@@ -835,7 +835,7 @@
     "crates/arkdeck-provider-arkforge/src/managed_control.rs": "0ed670cf6f5187ad53cfed4d176affa5e1878419419600ff35d033e8c8341ec6",
     "crates/arkdeck-provider-arkforge/tests/device_access.rs": "1516efe545858c04110ae3607e7c5fda97df059c7f326c6ddab03df9f26bd177",
     "crates/arkdeck-provider-arkforge/tests/digest_domain_vectors.rs": "807caecadd0cfa5f3c8baeaee459da6193a6618ab3f1dadc9b8483421b9deead",
-    "crates/arkdeck-provider-arkforge/tests/lane.rs": "8257ee4e78fe455ce9b57be42eaf324a665b13261e2c5431b156a60680fd5536",
+    "crates/arkdeck-provider-arkforge/tests/lane.rs": "74039de5d14e4ed853b130cebb98b56f30589c9d08e74dd85d26071881e6bf6c",
     "crates/arkdeck-provider-arkforge/tests/lane_preview.rs": "9c6d1549a513138ffbab68558bae1ba61275db80a7fc8dd2a6805349f05a799e",
     "crates/arkdeck-provider-arkforge/tests/live_preview_missing.rs": "9f319be929eb27035712afd6dfb2b11256dc620da34fd3059930a976edda9455",
     "crates/arkdeck-provider-arkforge/tests/permit_vectors.rs": "5e431459ec296431639945fe4e98a2fa3968d741244f7a4682286599b8ac183a",

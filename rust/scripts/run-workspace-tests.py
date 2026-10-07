@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Run every workspace test through Cargo, with two bounded macOS queues.
+"""Run every workspace test through Cargo with bound execution receipts.
 
-Cargo builds all default targets first. Only audited integration targets with
-unique temporary roots may overlap the conservative queue. New targets stay
-in the conservative queue. Cargo still owns test environments, feature
-unification, custom harnesses and doctests; no test executable is run directly.
+Catalog-selected per-target Cargo commands run serially: even fresh Cargo
+commands refresh shared sibling binary paths used by spawning tests. The
+legacy execute() scheduler retains its two audited macOS queues. Cargo still
+owns test environments, feature unification, custom harnesses and doctests;
+no test executable is run directly.
 
 With one worker (the Windows and Linux CI hosts) Cargo is asked for every
 default test target except the integration tests whose crate-level
@@ -515,7 +516,8 @@ def catalog_selected(cwd: Path, workers: int, directory: Path, *, parity_consume
     stages, receipts = [], []
     report = {"schemaVersion": "arkdeck.catalog-test-execution/1", "catalogDigest": digest,
               "manifestSHA256": catalog_views.sha((cwd / catalog_views.MANIFEST).read_bytes()),
-              "workers": workers, "completed": False, "stages": stages, "targets": receipts,
+              "workers": 1, "requestedWorkers": workers,
+              "completed": False, "stages": stages, "targets": receipts,
               "hostCfgExcluded": sorted(f"{p}/{t['name']}" for p, t in plan['excluded']),
               "integrationPackages": sorted(PARITY_CONSUMERS) if parity_consumers else 'workspace'}
     try:
@@ -654,21 +656,10 @@ def catalog_selected(cwd: Path, workers: int, directory: Path, *, parity_consume
                     receipt.update(completed=False, execution='failed', error=str(error))
             return local_stages, list(group_receipts.values())
 
-        serial = [name for name, keys in groups.items() if not all(tuple(key.split('/')) in ISOLATED for key in keys)]
-        isolated = [name for name, keys in groups.items() if all(tuple(key.split('/')) in ISOLATED for key in keys)]
-
-        def queue(names):
-            results = []
-            for name in names:
-                results.append(target_group(name))
-            return results
-
-        if workers == 2:
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                futures = [pool.submit(queue, owners) for owners in (serial, isolated)]
-                results = [result for future in futures for result in future.result()]
-        else:
-            results = queue(list(groups))
+        # Cargo can unlink and recopy un-hashed sibling binaries even when all
+        # compiler artifacts are fresh. Another target must not refresh those
+        # paths while a process fixture is spawning one of them.
+        results = [target_group(name) for name in groups]
         for local_stages, group_receipts in results:
             stages.extend(local_stages)
             receipts.extend(group_receipts)

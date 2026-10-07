@@ -486,3 +486,96 @@ cost target followed by receipt exit 1. Its complete log is
 `ci-job-112767208302-132.stdout.log`; without its uploaded receipt, no whole
 Windows error census is claimed. The next exact follow-up head's CI is pending
 publication. Earlier failed heads are not relabelled passed.
+
+### Serial Catalog Cargo target commands
+
+Local targeted checks: `catalog-scheduler-143-pure.json` records 18 passing
+scheduler and execution-receipt tests, and
+`catalog-scheduler-143-receipt-guards.json` records 31 passing view guards;
+both commands exit 0. The two new scheduler cases request two workers with
+both audited CLI and shared daemon targets. They require one active Cargo
+command, exact list/ignored/selected/Running receipts, and every later target
+plus library/bin, documentation and example stages after a failed first
+target. The receipt reports effective `workers: 1` and the original
+`requestedWorkers`. `catalog-scheduler-143-legacy.json` records five passing
+unchanged legacy scheduler cases, including the real dependency-free Cargo
+fixture that requires its two audited queues to overlap and preserves queue
+and documentation failures. It exits 0 in 3.888 seconds. Initial fixture
+receipt `catalog-scheduler-142-pure.json` retains two failed subcases caused
+by expecting ignored names where the existing verified receipt stores the
+ignored count; only the new expectation was corrected. No product Rust,
+Runtime, account, SDK, signing or device checks were run for this change.
+Catalog selectors, authority, test assertions and every fixture byte remain
+unchanged. Only Catalog per-target Cargo scheduling is serial;
+legacy `execute()` and its audited overlap list are unchanged.
+
+CI: PR #2628 exact head `2c469af9fe58389b4737665e3d557d1618992812`,
+run `37625508614`, has two actual macOS failures. Workspace job
+`112806652137` fails
+`artifact_retention_process::lapsed_artifacts_are_reclaimed_once_before_the_daemon_serves`
+at line 126, spawning the Cargo daemon binary with OS error 2; its other
+case passes. Parity job `112806652309` fails
+`domain_leaves::a_capture_preset_submits_swifts_preset_inputs` at line 333,
+spawning the Cargo CLI binary with the same error; its other eight cases
+pass. The complete logs are
+`lower-2c-ci-008-job-112806652137-full-log.stdout.log` and
+`lower-2c-ci-011-job-112806652309-full-log.stdout.log`, respectively. Public
+artifacts `11483919885` and `11484454254` retain complete receipts: exactly
+one target error in each failed view, and the parity historical view is
+complete with no errors. The overlapping commands are the daemon retention
+execution with the workspace checkpoint ignored-list command, and the CLI
+domain execution with the agent resume ignored-list command.
+`tool-select-cargo-uplift-causal-readback-1.json` binds the two complete logs
+to official Cargo 1.99.0 source commit
+`5f94df4789f005f9a352888e8355ffc645b7ed0e`: fresh and compiled outputs both
+refresh sibling binaries, and macOS removes then copies a different-inode
+destination. A concurrent Cargo call can therefore remove an un-hashed
+binary while another test spawns it. No syscall trace was retained; this
+source and timing diagnosis is not a claim of an observed unlink event or
+an invalid run under the four load criteria. There is no retry, added sleep,
+assertion relaxation or binary-path workaround. Windows workspace and both
+Ubuntu lanes pass on this head. Windows parity also passes in 38m03s, within
+its 40-minute limit. The required `guard` checks pass and `swift` aggregate
+job `112823729149` fails. Complete final receipt `lower-2c-ci-final.json`
+preserves that terminal result. The next follow-up's CI remains pending; these failures stay
+preserved and are not relabelled passed.
+
+### ArkForge lane refusal diagnostics
+
+Local targeted checks: `arkforge-lane-diagnostic-146.json` records affected
+formatting, `test --offline -p arkdeck-provider-arkforge --test lane`,
+`clippy --offline -p arkdeck-provider-arkforge -p arkdeck-agentd --all-targets
+-- -D warnings`, and affected format checking through the official runner.
+Every command exits 0 in the existing `signing-readiness` cache. The actual
+Windows custom harness has seven cases, all passing; macOS has eight cases
+and was not executed locally. Clippy passes in 26.671 seconds. Initial
+`145` stopped before Cargo because the sandbox token differs from the
+repository owner; it remains preserved. The approved original-owner `146`
+executes the same offline commands, with live and recording opt-ins removed.
+Initial SDD wrapper `144` lacked Git's `dirname` executable on PATH and is
+retained separately; the final light check supplies the existing Git tool
+PATH. `catalog-followup-light-148.json` records SDD and diff exit 0 plus
+successful Python AST parsing. This is not a product or test assertion failure.
+`lower-lane-manifest-refresh-147.json` proves complete generated JSON equality
+and exactly one lane source-pin replacement, preserving every other byte,
+order, route, 333-target census and 6,499 fixture pins. Existing exhaustive
+format results remain applicable to all unchanged Rust files; only the
+affected provider was formatted and checked again.
+
+CI: upper PR #2629 head `671d9db4db0206f5173e83409dbbe5dba4a75010`,
+run `37625593393`, macOS parity job `112806914925` has one historical-view
+failure: `arkdeck-provider-arkforge/lane::a_daemon_that_is_not_ready_is_stopped_and_refused`.
+The second `replay` scene fails its expected refusal prefix at line 621;
+the other seven cases pass and every other historical receipt stage exits 0.
+Its actual refusal detail was not printed and cannot be recovered from that
+log. The minimal test-only change binds that existing detail once and prints
+it on the same exact prefix assertion. The expected string, stop/ended and
+public-endpoint checks remain unchanged. No AMFI, copy, permission, product,
+protocol, timeout or replay behavior changes. The complete log and receipt
+are `import-ci-macos-parity-37625593393-*.log` and the preserved historical
+execution receipt, with whole SHA256
+`716e0039004b6b378cb4d17dfb3a751c9301d538cc35d151a67410137a9db6ef`
+and `99c183e7ad34a4942dad53c7630179d6a06ce2ef0315e6758dce706e64de90f6`,
+respectively. Its cause remains undiagnosed until actual macOS evidence
+reports that detail; it is not classified as the two lower spawn failures or
+an invalid run. The next CI remains pending.

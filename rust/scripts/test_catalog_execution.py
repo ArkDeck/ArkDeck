@@ -4,7 +4,9 @@ No product Runtime, account store, SDK or device is accessed.
 """
 from __future__ import annotations
 import copy
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -12,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -294,6 +297,144 @@ class CompleteModuleHostCfgTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             runner.catalog_views.module_host_cfg_excluded('arkdeck-cli/device_wait',
                                                          {'modulePlatforms': ['darwin']}, 'unreviewed')
+
+
+class CatalogSchedulingTests(unittest.TestCase):
+    def exercise(self, requested_workers, failed=False):
+        with tempfile.TemporaryDirectory(prefix='arkdeck-catalog-scheduling-') as temporary:
+            cwd = Path(temporary) / 'rust'
+            cwd.mkdir()
+            directory = Path(temporary) / 'report'
+            metadata = {'workspace_members': [], 'packages': []}
+            manifest = {'targets': {}}
+            messages, targets = [], []
+            cases = {
+                'arkdeck-agentd/artifact_retention_process': ['daemon_spawn'],
+                'arkdeck-cli/domain_leaves': ['capture_preset', 'known_ignored'],
+                'arkdeck-cli/runtime_service': ['service_projection'],
+            }
+            bindings = {}
+            packages = {}
+            for key, names in cases.items():
+                package, name = key.split('/')
+                owner = package + '-owner'
+                target = {'kind': ['test'], 'name': name, 'test': True,
+                          'src_path': str(cwd / 'crates' / package / 'tests' / (name + '.rs'))}
+                if package not in packages:
+                    packages[package] = {'id': owner, 'name': package,
+                                         'manifest_path': str(cwd / 'crates' / package / 'Cargo.toml'),
+                                         'targets': []}
+                    metadata['workspace_members'].append(owner)
+                    metadata['packages'].append(packages[package])
+                packages[package]['targets'].append(target)
+                executable = str(cwd / 'target' / (name + '.exe'))
+                messages.append({'reason': 'compiler-artifact', 'package_id': owner,
+                                 'target': target, 'executable': executable})
+                bindings[name] = executable
+                targets.append((package, target))
+                manifest['targets'][key] = {'route': 'both', 'functions': {},
+                                            'ignored': ['known_ignored'] if 'known_ignored' in names else []}
+            messages.append({'reason': 'build-finished', 'success': True})
+            path = cwd / runner.catalog_views.MANIFEST
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps(manifest), encoding='utf-8')
+            plan = {'run': targets, 'excluded': [], 'commands': [
+                ('integrations', runner.BASE + ['--tests', '--lib', '--bins']),
+                ('doctests', runner.BASE + ['--doc']),
+                ('examples', runner.BASE + ['--examples']),
+            ]}
+            calls, active, maximum = [], 0, 0
+            lock = threading.Lock()
+
+            def recorded(argv, directory, label, cwd):
+                nonlocal active, maximum
+                with lock:
+                    active += 1
+                    maximum = max(maximum, active)
+                    self.assertEqual(active, 1, 'Cargo may refresh another test\'s sibling binary')
+                try:
+                    calls.append((label, argv))
+                    exit_code = 0
+                    if label == 'compile':
+                        text = '\n'.join(json.dumps(message) for message in messages) + '\n'
+                    elif label.startswith('target-'):
+                        name = argv[argv.index('--test') + 1]
+                        key = next(key for key in cases if key.endswith('/' + name))
+                        names = cases[key]
+                        ignored = manifest['targets'][key]['ignored']
+                        text = 'Running tests/' + name + '.rs (' + bindings[name] + ')\n'
+                        if '--list' in argv:
+                            listed = ignored if '--ignored' in argv else names
+                            text += ''.join(case + ': test\n' for case in listed)
+                            text += str(len(listed)) + ' tests, 0 benchmarks\n'
+                        else:
+                            did_fail = failed and name == 'artifact_retention_process'
+                            exit_code = 101 if did_fail else 0
+                            for case in names:
+                                outcome = 'ignored' if case in ignored else 'FAILED' if did_fail else 'ok'
+                                text += 'test ' + case + ' ... ' + outcome + '\n'
+                            passed = len(names) - len(ignored) - int(did_fail)
+                            text += ('test result: ' + ('FAILED' if did_fail else 'ok') + '. ' +
+                                     str(passed) + ' passed; ' + str(int(did_fail)) + ' failed; ' +
+                                     str(len(ignored)) + ' ignored; 0 measured; 0 filtered out; finished in 0.01s\n')
+                    else:
+                        text = 'workspace default stage completed\n'
+                    path = directory / (label + '.log')
+                    path.write_text(text, encoding='utf-8')
+                    return {'name': label, 'argv': argv, 'exitCode': exit_code, 'log': str(path)}
+                finally:
+                    with lock:
+                        active -= 1
+
+            with patch.object(runner.subprocess, 'check_output', return_value=json.dumps(metadata)), \
+                 patch.object(runner, 'host_cfg', return_value=set()), \
+                 patch.object(runner, 'host_plan', return_value=plan), \
+                 patch.object(runner, 'recorded', side_effect=recorded), \
+                 patch.object(runner.catalog_views, 'load', return_value=manifest), \
+                 patch.object(runner.catalog_views, 'catalog', return_value=runner.catalog_views.CURRENT), \
+                 patch.object(runner.catalog_views, 'custom_harnesses', return_value={}), \
+                 patch.object(runner, 'ThreadPoolExecutor', side_effect=AssertionError('per-target Cargo must stay serial')) as pool, \
+                 patch.object(runner.sys, 'platform', 'darwin'), \
+                 patch.dict(os.environ, {}, clear=True), contextlib.redirect_stdout(io.StringIO()):
+                result = runner.catalog_selected(cwd, requested_workers, directory)
+                pool.assert_not_called()
+            self.assertEqual((active, maximum), (0, 1))
+            return result, calls, json.loads((directory / 'catalog-execution.json').read_bytes()), cases
+
+    def test_requested_two_workers_serializes_audited_and_shared_groups_with_complete_receipts(self):
+        for requested in (1, 2):
+            with self.subTest(requested=requested):
+                result, calls, report, cases = self.exercise(requested)
+                self.assertEqual(result, 0)
+                self.assertTrue(report['completed'])
+                self.assertEqual((report['workers'], report['requestedWorkers']), (1, requested))
+                self.assertEqual([row['target'] for row in report['targets']], list(cases))
+                for row in report['targets']:
+                    self.assertEqual(row['listed'], cases[row['target']])
+                    self.assertEqual(row['selected'], cases[row['target']])
+                    self.assertEqual(row['ignored'], int(row['target'].endswith('/domain_leaves')))
+                    self.assertEqual(row['excludedByView'], [])
+                    self.assertTrue(row['completed'])
+                    self.assertTrue(row['coverage'])
+                    self.assertEqual(row['passed'], 1)
+                expected = ['bins', 'compile'] + [
+                    'target-' + key.split('/')[1] + suffix
+                    for key in cases for suffix in ('-list', '-ignored-list', '-execute')
+                ] + ['unit-tests', 'doctests', 'examples']
+                self.assertEqual([label for label, _ in calls], expected)
+                self.assertTrue(all('--workspace' in argv for _, argv in calls))
+
+    def test_failed_group_preserves_later_selected_groups_and_default_receipts(self):
+        result, calls, report, cases = self.exercise(2, failed=True)
+        self.assertEqual(result, 1)
+        self.assertFalse(report['completed'])
+        self.assertEqual((report['workers'], report['requestedWorkers']), (1, 2))
+        self.assertEqual([row['target'] for row in report['targets']], list(cases))
+        self.assertEqual(report['targets'][0]['execution'], 'failed')
+        self.assertFalse(report['targets'][0]['completed'])
+        self.assertTrue(all(row['completed'] and row['passed'] == 1 for row in report['targets'][1:]))
+        self.assertEqual([label for label, _ in calls[-3:]], ['unit-tests', 'doctests', 'examples'])
+        self.assertEqual([stage['exitCode'] for stage in report['stages'] if stage['exitCode']], [101])
 
 
 class CustomHarnessExecutionTests(unittest.TestCase):
