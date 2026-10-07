@@ -265,20 +265,10 @@ pub fn ensure_running(target: &StartTarget, wait: Duration) -> Result<Started, S
             }
         }
     }
-    let server = serving_peer(target, deadline, pid).map_err(|mut refusal| {
-        // The first pipe may have appeared before composition failed. Keep
-        // the retained child's known exit instead of reporting startup success.
-        if let Ok(Some(code)) = daemon.wait_exit(Duration::ZERO)
-            && code != 0
-        {
-            refusal.refusal = StartRefusal::DaemonExited(code);
-            refusal.message = format!(
-                "the daemon (pid {}) exited with status {code} before readiness: {}",
-                daemon.pid(),
-                refusal.message
-            );
-        }
-        refusal
+    let server = serving_peer(target, deadline, pid).map_err(|refusal| {
+        preserve_launched_exit(refusal, daemon.pid(), deadline, |left| {
+            daemon.wait_exit(left)
+        })
     })?;
     drop(turn);
     Ok(if server == daemon.pid() {
@@ -286,6 +276,32 @@ pub fn ensure_running(target: &StartTarget, wait: Duration) -> Result<Started, S
     } else {
         Started::ServedByAnother
     })
+}
+
+fn preserve_launched_exit(
+    mut refusal: StartFailure,
+    pid: u32,
+    deadline: Instant,
+    observe: impl FnOnce(Duration) -> io::Result<Option<u32>>,
+) -> StartFailure {
+    // Composition can close its reserved pipe before the process exit is
+    // signaled. Observe our retained child within the original start deadline;
+    // never reconnect or send another frame. Identity refusals remain immediate.
+    let left = if refusal.refusal == StartRefusal::NotReady {
+        deadline.saturating_duration_since(Instant::now())
+    } else {
+        Duration::ZERO
+    };
+    if let Ok(Some(code)) = observe(left)
+        && code != 0
+    {
+        refusal.refusal = StartRefusal::DaemonExited(code);
+        refusal.message = format!(
+            "the daemon (pid {pid}) exited with status {code} before readiness: {}",
+            refusal.message
+        );
+    }
+    refusal
 }
 
 /// The pipe is reserved before backend composition. Image identity alone is
@@ -545,5 +561,58 @@ mod tests {
             StartRefusal::NotReady
         );
         assert!(frames(&sent).is_empty());
+    }
+
+    #[test]
+    fn initialization_eof_preserves_the_child_exit_after_the_pipe_closes() {
+        let (mut client, sent) = client(Vec::new(), None);
+        let refusal = verify_readiness(&mut client, Some(7)).unwrap_err();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let refusal = preserve_launched_exit(refusal, 7, deadline, |left| {
+            assert!(!left.is_zero());
+            assert!(left <= Duration::from_secs(10));
+            // The retained native handle becomes signaled after pipe EOF.
+            Ok(Some(69))
+        });
+        assert_eq!(refusal.refusal, StartRefusal::DaemonExited(69));
+        assert_eq!(refusal.pid, Some(7));
+        assert!(refusal.message.contains("exited with status 69"));
+        assert!(refusal.message.contains("startup health proof"));
+        assert_one_read_only_frame(&sent);
+    }
+
+    #[test]
+    fn child_observation_never_extends_the_deadline_or_delays_identity_refusal() {
+        for (kind, deadline) in [
+            (StartRefusal::NotReady, Instant::now()),
+            (
+                StartRefusal::IdentityRefused,
+                Instant::now() + Duration::from_secs(10),
+            ),
+        ] {
+            let refusal = failure(kind, "original refusal", Some(7));
+            let refusal = preserve_launched_exit(refusal, 7, deadline, |left| {
+                assert!(left.is_zero());
+                Ok(None)
+            });
+            assert_eq!(refusal.refusal, kind);
+            assert_eq!(refusal.message, "original refusal");
+            assert_eq!(refusal.pid, Some(7));
+        }
+    }
+
+    #[test]
+    fn an_unproved_or_successful_exit_does_not_replace_the_readiness_failure() {
+        for observation in [
+            Ok(None),
+            Ok(Some(0)),
+            Err(io::Error::other("exit unavailable")),
+        ] {
+            let refusal = failure(StartRefusal::NotReady, "original refusal", Some(7));
+            let refusal = preserve_launched_exit(refusal, 7, Instant::now(), |_| observation);
+            assert_eq!(refusal.refusal, StartRefusal::NotReady);
+            assert_eq!(refusal.message, "original refusal");
+            assert_eq!(refusal.pid, Some(7));
+        }
     }
 }
