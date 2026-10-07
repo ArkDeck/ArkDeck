@@ -479,11 +479,17 @@ fn the_signed_cli_selects_a_candidate_and_reads_the_settled_selection_after_rest
         "humanAction":waiting["result"]["humanAction"]["actionId"],
         "resumeReference":waiting["result"]["humanAction"]["resumeReference"]
     });
-    std::io::Write::write_all(
-        &mut arkdeck_platform::create_private_file(&approve).unwrap(),
-        &serde_json::to_vec(&approval).unwrap(),
-    )
-    .unwrap();
+    // The child polls this name. Publish complete bytes atomically so it
+    // cannot open an empty or partly written request and panic while parsing.
+    let approval = serde_json::to_vec(&approval).unwrap();
+    arkdeck_platform::HostDirectory::open_or_create_private(&profile)
+        .unwrap()
+        .publish_document(
+            approve.file_name().unwrap().to_str().unwrap(),
+            &approval,
+            approval.len(),
+        )
+        .unwrap();
     let response = daemon.line_starting("arkdeck-fixture selection approval ");
     let approved: Value =
         serde_json::from_str(response.trim_start_matches("arkdeck-fixture selection approval "))
@@ -641,6 +647,7 @@ struct AccountDaemon {
     profile: PathBuf,
     pipe: String,
     child: Option<Child>,
+    stderr: PathBuf,
     lines: Receiver<String>,
     seen: Vec<String>,
 }
@@ -654,13 +661,11 @@ impl AccountDaemon {
                 command.env_remove(key);
             }
         }
-        let stderr = std::fs::File::create(
-            profile
-                .parent()
-                .unwrap()
-                .join(format!("account-daemon-stderr-{}.log", std::process::id())),
-        )
-        .unwrap();
+        let stderr_path = profile
+            .parent()
+            .unwrap()
+            .join(format!("account-daemon-stderr-{}.log", std::process::id()));
+        let stderr = std::fs::File::create(&stderr_path).unwrap();
         let mut child = command
             .args(["--exact", CHILD, "--nocapture", "--test-threads=1"])
             .env("USERPROFILE", profile)
@@ -686,6 +691,7 @@ impl AccountDaemon {
             profile: profile.to_owned(),
             pipe: String::new(),
             child: Some(child),
+            stderr: stderr_path,
             lines,
             seen: Vec::new(),
         };
@@ -703,11 +709,15 @@ impl AccountDaemon {
             match self.lines.recv_timeout(left) {
                 Ok(line) if line.starts_with(prefix) => return line,
                 Ok(line) => self.seen.push(line),
-                Err(_) => panic!(
-                    "the signed account daemon never printed {prefix:?}; it printed {:?} (its \
-                     stderr is beside the fake profile)",
-                    self.seen
-                ),
+                Err(_) => {
+                    let stderr = std::fs::read_to_string(&self.stderr)
+                        .unwrap_or_else(|error| format!("cannot read fixture stderr: {error}"));
+                    panic!(
+                        "the signed account daemon never printed {prefix:?}; it printed {:?}; \
+                         its stderr: {stderr}",
+                        self.seen
+                    );
+                }
             }
         }
     }

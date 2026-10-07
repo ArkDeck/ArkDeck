@@ -215,7 +215,7 @@ class WorkspaceCacheTests(unittest.TestCase):
         targets = [mirror / "rust/target"]
         targets += [targets[0] / "contract-check" / view / "rust/target" for view in ("published", "candidate")]
         for target in targets:
-            for name in ("debug/incremental/chunk", "debug/deps/library.rlib", "debug/agent.dSYM/symbols", "debug/.fingerprint/input", "readonly-check/report.json"):
+            for name in ("debug/incremental/chunk", "release/incremental/chunk", "debug/deps/library.rlib", "release/deps/library.rlib", "debug/agent.dSYM/symbols", "debug/.fingerprint/input", "readonly-check/report.json"):
                 path = target / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text(name)
@@ -224,7 +224,8 @@ class WorkspaceCacheTests(unittest.TestCase):
         self.assertLess(result["afterBytes"], result["beforeBytes"])
         for target in targets:
             self.assertFalse((target / "debug/incremental").exists())
-            for name in ("debug/deps/library.rlib", "debug/agent.dSYM/symbols", "debug/.fingerprint/input", "readonly-check/report.json"):
+            self.assertFalse((target / "release/incremental").exists())
+            for name in ("debug/deps/library.rlib", "release/deps/library.rlib", "debug/agent.dSYM/symbols", "debug/.fingerprint/input", "readonly-check/report.json"):
                 self.assertEqual((target / name).read_text(), name)
         self.assertEqual(result["afterBytes"], cache.directory_sizes(self.root)[self.root])
 
