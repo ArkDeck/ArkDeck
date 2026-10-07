@@ -6,8 +6,9 @@ use support::hdc_oracle::{self, native_current};
 
 #[test]
 fn every_current_native_exchange_and_complete_store_matches_its_versioned_oracle() {
-    native_current::assert_source(&support::fixture(native_current::NAME));
-    hdc_oracle::assert_replays(native_current::NAME, 40, 240);
+    let name = native_current::fixture_name();
+    native_current::assert_source(&support::fixture(name));
+    hdc_oracle::assert_replays(name, 40, native_current::call_count());
 }
 
 #[test]
@@ -23,37 +24,49 @@ fn native_oracle_refuses_a_missing_reordered_or_foreign_preflight_call() {
     let expected = native_current::expected_calls();
     let root = std::path::Path::new("/private/tmp/arkdeck-hdc-oracle");
     native_current::assert_original_calls(&expected, root);
-    let mut lines: Vec<_> = expected.lines().map(str::to_owned).collect();
-    lines.swap(0, 1);
-    assert!(
-        std::panic::catch_unwind(|| native_current::assert_original_calls(
-            &(lines.join("\n") + "\n"),
-            root
-        ))
-        .is_err()
-    );
-    let missing = expected.lines().skip(1).collect::<Vec<_>>().join("\n") + "\n";
-    assert!(
-        std::panic::catch_unwind(|| native_current::assert_original_calls(&missing, root)).is_err()
-    );
-    let foreign = expected.replacen("const.product.name", "const.product.model", 1);
-    assert!(
-        std::panic::catch_unwind(|| native_current::assert_original_calls(&foreign, root)).is_err()
-    );
-    let misplaced = expected.lines().skip(3).collect::<Vec<_>>().join("\n")
-        + "\n"
-        + &expected.lines().take(3).collect::<Vec<_>>().join("\n")
-        + "\n";
-    assert!(
-        std::panic::catch_unwind(|| native_current::assert_original_calls(&misplaced, root))
+    if expected.is_empty() {
+        assert!(
+            std::panic::catch_unwind(|| native_current::assert_original_calls(
+                "unpublished-device-call\n",
+                root
+            ))
             .is_err()
-    );
+        );
+    } else {
+        let mut lines: Vec<_> = expected.lines().map(str::to_owned).collect();
+        lines.swap(0, 1);
+        assert!(
+            std::panic::catch_unwind(|| native_current::assert_original_calls(
+                &(lines.join("\n") + "\n"),
+                root
+            ))
+            .is_err()
+        );
+        let missing = expected.lines().skip(1).collect::<Vec<_>>().join("\n") + "\n";
+        assert!(
+            std::panic::catch_unwind(|| native_current::assert_original_calls(&missing, root))
+                .is_err()
+        );
+        let foreign = expected.replacen("shell", "unpublished-command", 1);
+        assert!(
+            std::panic::catch_unwind(|| native_current::assert_original_calls(&foreign, root))
+                .is_err()
+        );
+        let misplaced = expected.lines().skip(3).collect::<Vec<_>>().join("\n")
+            + "\n"
+            + &expected.lines().take(3).collect::<Vec<_>>().join("\n")
+            + "\n";
+        assert!(
+            std::panic::catch_unwind(|| native_current::assert_original_calls(&misplaced, root))
+                .is_err()
+        );
+    }
 }
 
 #[test]
 fn current_import_labels_preserve_all_metadata_and_are_bijective() {
     let proofs = support::document(
-        &support::fixture(native_current::NAME),
+        &support::fixture(native_current::fixture_name()),
         "publication-proofs.json",
     );
     let expected = &proofs[0]["importReceipt"];

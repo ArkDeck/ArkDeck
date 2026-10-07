@@ -196,7 +196,7 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
     let cases = document(&fixture, "cases.json");
     let provenance = document(&fixture, "provenance.json");
     let root = debug_hap::rebuild(&fixture);
-    let current_native = name == hdc_oracle::native_current::NAME;
+    let current_native = hdc_oracle::native_current::is_fixture(name);
     let current_hap = name == hdc_oracle::hap_current::NAME;
     if current_hap {
         hdc_oracle::hap_current::assert_source(&fixture);
@@ -310,7 +310,6 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
                 .as_str()
                 .unwrap();
             let (_, shown) = daemon.cli(&["session", "show", "--session", session]);
-            assert_eq!(shown["ok"], true);
             let import = native_import.as_ref().unwrap();
             let (_, inspection) = daemon.cli(&[
                 "artifact",
@@ -319,6 +318,7 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
                 "--import",
                 import["importId"].as_str().unwrap(),
             ]);
+            assert_eq!(shown["ok"], true);
             assert_eq!(inspection["ok"], true);
             let digest = arkdeck_contract::sha256_hex(&fs::read(root.join("hdc")).unwrap());
             publication_proofs.push(hdc_oracle::native_current::proof(
@@ -404,7 +404,14 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
             .iter()
             .filter(|line| *line == "capability consumed before first mutation")
             .count();
-        assert_eq!(consumed, 1, "{case}");
+        let required = if current_native
+            && arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::OLD
+        {
+            0
+        } else {
+            1
+        };
+        assert_eq!(consumed, required, "{case}");
     }
     hdc_oracle::assert_relabelled(
         &fixture,
@@ -420,13 +427,17 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
 
 #[test]
 fn the_real_cli_runs_every_swift_debug_hap_through_the_signed_test_daemon() {
-    replay(hdc_oracle::hap_current::NAME, 63, 108);
+    replay(hdc_oracle::hap_current::fixture_name(), 63, 108);
     gj1_device_leaves::assert_windows_status(&["cleanupDebt.continue"], "implemented");
 }
 
 #[test]
 fn the_real_cli_runs_every_swift_native_deployment_through_the_signed_test_daemon() {
-    replay(hdc_oracle::native_current::NAME, 40, 240);
+    replay(
+        hdc_oracle::native_current::fixture_name(),
+        40,
+        hdc_oracle::native_current::call_count(),
+    );
 }
 
 /// The oracle's connect key, which the synthetic census's board serial
@@ -596,7 +607,7 @@ fn domain_leaf(fixture_name: &str, leaf: &[&str], command: &str, operation: &str
 #[test]
 fn the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job() {
     domain_leaf(
-        hdc_oracle::hap_current::NAME,
+        hdc_oracle::hap_current::fixture_name(),
         &["debug", "hap"],
         "debug.hap",
         "debug.hap@1",
@@ -607,7 +618,7 @@ fn the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job() {
 #[test]
 fn the_real_cli_debug_native_deploy_leaf_runs_the_swift_oracle_s_job() {
     domain_leaf(
-        hdc_oracle::native_current::NAME,
+        hdc_oracle::native_current::fixture_name(),
         &["debug", "native", "deploy"],
         "debug.native.deploy",
         "deploy.native-library.app-owned@1",

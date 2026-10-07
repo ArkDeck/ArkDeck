@@ -13,7 +13,7 @@ platforms: [macos, windows]
 
 The existing `deploy.native-library.app-owned@1` can finish deployment while
 Session publication refuses its missing job-local target/tool observation.
-That unfinalized durable Job also correctly blocks the complete Import-owner
+That unfinalized durable Job currently blocks the complete Import-owner
 census. This proposal adds the existing three read-only evidence steps to the
 native Catalog plan after local ELF/hash checks and before any device mutation.
 The Runtime records their actual verified results using the existing preflight
@@ -51,3 +51,22 @@ blocker has been settled.
 Compatibility: the scoped Catalog delta travels with its implementation and
 targeted checks; no accepted Core predicate or historical hardware result is
 changed. Synthetic transport is not device acceptance.
+
+The software regression gate uses two closed Catalog input views over the
+same current Rust implementation. The pinned c6 view retains the unchanged
+operations' original requests, authority, complete answers and stores. The e4
+view requires the current Native/HAP/GJ-1 owners, full descriptor/plan proofs
+and historical-source refusal guards. Exact mixed-target function routing,
+whole fixture pins and Cargo execution receipts prevent collected, empty or
+ignored cases from discharging required execution. The historical view stays
+mandatory after main itself publishes e4; it is not inferred from a merge base.
+
+Native is the changed operation. Under c6 its genuine current owners consume
+all 40 original requests but refuse missing preflight before any device
+mutation: the five diagnostic Sessions are failed, known, have no invented
+observation, and finalize without capability consumption or transport calls.
+This separately versioned output records zero actual calls instead of claiming
+the original 225 were performed. Their complete frozen requests, artifacts
+and 225-call provenance remain unchanged. Under e4 the full current oracle
+requires all 40 exchanges, 240 exact calls (225 original plus 15 preflight
+reads), five whole Session/publication proofs and complete Import inspection.

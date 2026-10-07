@@ -485,7 +485,7 @@ mod tests {
                         .map(|lease| resolve(lease.as_str().unwrap())),
                 );
             }
-            let current = hap_plan_document(
+            let mut current = hap_plan_document(
                 &request,
                 descriptor,
                 &facts,
@@ -525,6 +525,11 @@ mod tests {
                 "{}",
                 exchange["name"]
             );
+            // The HAP descriptor/lowering is identical in both compiled
+            // views. Its complete original hash was proved above; bind the
+            // immutable e4 capsule separately from this view's actual hash.
+            current["catalogDigest"] =
+                json!("e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7");
             capsule_rows.push(json!({
                 "case": exchange["name"],
                 "requestJson": exchange["params"]["requestJson"],

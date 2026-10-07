@@ -12,6 +12,27 @@ use std::io::Write;
 use std::path::Path;
 
 pub const NAME: &str = "deploy-native-library-observed-v1";
+pub const PUBLISHED_NAME: &str = "deploy-native-library-published-c6-v1";
+
+pub fn fixture_name() -> &'static str {
+    match CATALOG_DIGEST {
+        crate::support::catalog_lineage::CURRENT => NAME,
+        crate::support::catalog_lineage::OLD => PUBLISHED_NAME,
+        _ => panic!("unreviewed Native software oracle Catalog"),
+    }
+}
+
+pub fn is_fixture(name: &str) -> bool {
+    [NAME, PUBLISHED_NAME].contains(&name)
+}
+
+pub fn call_count() -> usize {
+    match CATALOG_DIGEST {
+        crate::support::catalog_lineage::CURRENT => 240,
+        crate::support::catalog_lineage::OLD => 0,
+        _ => panic!("unreviewed Native software oracle Catalog"),
+    }
+}
 const PREFIX: &str = "case \"$*\" in\n\"list targets -v\")\n  printf '%s\\t\\tUSB\\tConnected\\tlocalhost\\n' \"$key\"; exit 0 ;;\n\"-t $key shell param get const.product.name\")\n  printf 'OpenHarmony Reference Device\\n'; exit 0 ;;\n\"-t $key shell param get const.ohos.fullname\")\n  printf 'OpenHarmony-4.1-release\\n'; exit 0 ;;\nesac\n";
 
 /// Only the answer fragment changes; the pinned driver image remains exact.
@@ -65,7 +86,15 @@ pub fn proof(
         &fs::read(jobs.join("jobs").join(job).join("job-record.json")).unwrap(),
     )
     .unwrap();
-    native_observation::assert_observation(&record, digest);
+    let historical = CATALOG_DIGEST == crate::support::catalog_lineage::OLD;
+    if historical {
+        assert!(record.get("evidenceObservation").is_none_or(Value::is_null));
+        assert_eq!(record["state"], "failed");
+        assert!(record.get("outstandingResidueCount").is_none());
+        assert!(record["timeline"].as_array().unwrap().iter().any(|line| line == "reason: evidenceIncomplete: three-step typed preflight is incomplete before send-to-staging"));
+    } else {
+        native_observation::assert_observation(&record, digest);
+    }
     super::native_readback::timeline_proofs(record["timeline"].as_array().unwrap());
     let marker = &record["sessionPublicationRecord"];
     assert_eq!(marker["phase"], "catalogPublished");
@@ -81,11 +110,16 @@ pub fn proof(
     assert_eq!(manifest["sessionId"], marker["sessionID"]);
     assert_eq!(manifest["status"], record["state"]);
     assert_eq!(manifest["workflow"]["profileVersion"], CATALOG_DIGEST);
-    assert_eq!(manifest["runtimeAuthority"]["kind"], "runtimeCapability");
-    assert_eq!(
-        manifest["runtimeAuthority"]["planDigest"],
-        record["materializedPlanDigest"]
-    );
+    if historical {
+        assert!(manifest.get("runtimeAuthority").is_none());
+        assert!(manifest.get("device").is_none());
+    } else {
+        assert_eq!(manifest["runtimeAuthority"]["kind"], "runtimeCapability");
+        assert_eq!(
+            manifest["runtimeAuthority"]["planDigest"],
+            record["materializedPlanDigest"]
+        );
+    }
     assert_eq!(shown["sessionId"], marker["sessionID"]);
     assert_eq!(shown["generation"], marker["receipt"]["catalogGeneration"]);
     assert_eq!(inspection["import"]["importId"], receipt["importId"]);
@@ -110,6 +144,20 @@ pub fn proof(
         .map(|line| serde_json::from_str(line).unwrap())
         .collect();
     assert!(journal.iter().all(|row| row["jobId"] == job));
+    if historical {
+        assert!(
+            journal.iter().all(|row| {
+                row["kind"] != "runtimeCapabilityConsumed"
+                    && row["kind"] != "compensationIntent"
+                    && (row["kind"] != "stepIntent"
+                        || !matches!(
+                            row["payload"]["step"]["effect"].as_str(),
+                            Some("deviceMutation" | "destructive")
+                        ))
+            }),
+            "historical incomplete evidence cannot consume or dispatch mutation authority"
+        );
+    }
     let finalized: Vec<_> = journal
         .iter()
         .filter(|row| row["kind"] == "finalized")
@@ -126,7 +174,7 @@ pub fn proof(
         .find(|(_, id)| *id == job)
         .unwrap()
         .0;
-    let status = if case == "cleanupFailure" {
+    let status = if historical || case == "cleanupFailure" {
         "failed"
     } else {
         super::exchange(&original, &format!("{case}.run"))["answer"]["result"]["state"]
@@ -134,7 +182,7 @@ pub fn proof(
             .unwrap()
     };
     assert_eq!(record["state"], status);
-    if case == "cleanupFailure" {
+    if !historical && case == "cleanupFailure" {
         assert_eq!(record["outstandingResidueCount"], 1);
         let failed: Vec<_> = journal
             .iter()
@@ -199,7 +247,7 @@ pub fn publication_proof(owners: &Owners, receipt: &Value, job: &str) -> Value {
 /// call. Only the five ordered, exact three-read prefixes may be additional.
 pub fn assert_original_calls(log: &str, root: &Path) {
     let log = oracle_fake::oracle_spelling(log, root);
-    assert_eq!(log.lines().count(), 240);
+    assert_eq!(log.lines().count(), call_count());
     assert_eq!(
         log,
         expected_calls(),
@@ -212,6 +260,10 @@ pub fn expected_calls() -> String {
     let cases = document(&fixture, "cases.json");
     let historical = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
     assert_eq!(historical.lines().count(), 225);
+    if CATALOG_DIGEST == crate::support::catalog_lineage::OLD {
+        return String::new();
+    }
+    assert_eq!(CATALOG_DIGEST, crate::support::catalog_lineage::CURRENT);
     let reads = [
         "list\u{1f}targets\u{1f}-v\u{1f}",
         "-t\u{1f}aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\u{1f}shell\u{1f}param\u{1f}get\u{1f}const.product.name\u{1f}",
@@ -295,7 +347,7 @@ pub fn record(
     assert!(!output.exists(), "recording must use a new output tree");
     assert_eq!(
         output.file_name().and_then(|name| name.to_str()),
-        Some(NAME)
+        Some(fixture_name())
     );
     let original = debug_hap::tree_bytes(historical);
     assert_eq!(original.len(), 43, "the complete original source fixture");
@@ -520,6 +572,10 @@ pub fn learn_import_labels(
     );
     let snapshots = |base: &Path| -> BTreeMap<String, (String, Value)> {
         let mut snapshots = BTreeMap::new();
+        if !base.exists() {
+            assert_eq!(CATALOG_DIGEST, crate::support::catalog_lineage::OLD);
+            return snapshots;
+        }
         for file in fs::read_dir(base).unwrap() {
             let file = file.unwrap();
             let name = file.file_name().to_str().unwrap().to_owned();

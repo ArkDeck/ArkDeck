@@ -1,0 +1,67 @@
+[
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/.owner.lock"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "imports/artifact-snapshots"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/artifact-snapshots/.snapshots.lock"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/artifact-snapshots/snapshot-48d64624-06d5-4a39-99fa-3b260875c4d2.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/artifact-snapshots/snapshot-4a6788c2-89a4-4030-855c-c8dab3e4ac88.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/artifact-snapshots/snapshot-822b0fd5-db9a-4852-9ffc-85664c2a0a58.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/artifact-snapshots/snapshot-a99eac35-cd09-4f3e-ac80-fff5d440345f.json"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/artifact-snapshots/snapshot-f56642ea-e802-4a6e-bcbc-cad223b7bd60.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "imports/identities"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/identities/imp-146b6378-233e-4e7a-9d2e-611e5bf68458.json"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "imports/payloads"
+  },
+  {
+    "kind": "directory",
+    "mode": "700",
+    "path": "imports/records"
+  },
+  {
+    "kind": "file",
+    "mode": "600",
+    "path": "imports/records/b47edc1e1fdb99dd0670299fbed19ec6b9c2e918d6bc320cd6d4e634061cca6f.json"
+  }
+]

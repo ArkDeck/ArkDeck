@@ -5,8 +5,13 @@ use support::hdc_oracle::{self, hap_current};
 
 #[test]
 fn current_hap_preserves_every_exchange_call_and_complete_store() {
-    hap_current::assert_source(&support::fixture(hap_current::NAME));
-    hdc_oracle::assert_replays(hap_current::NAME, 63, 108);
+    let name = hap_current::fixture_name();
+    if name == hap_current::NAME {
+        hap_current::assert_source(&support::fixture(name));
+    } else {
+        hap_current::assert_historical_source();
+    }
+    hdc_oracle::assert_replays(name, 63, 108);
 }
 
 #[test]

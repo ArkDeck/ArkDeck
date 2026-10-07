@@ -682,6 +682,9 @@ RUST_POLICY_TOKENS = (
     "run: cargo fmt --all --check",
     "        working-directory: .\n"
     "        run: python rust/scripts/test_contract_checks.py\n",
+    "          python rust/scripts/test_catalog_test_views.py\n",
+    "          python rust/scripts/test_catalog_execution.py\n",
+    "          python rust/scripts/test_historical_catalog_views.py\n",
     # One ArkForge revision, and ArkForge's own wire and StepPermit vectors
     # rerun at it.
     "        working-directory: .\n"
@@ -1510,6 +1513,9 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "os: [ubuntu-latest, xcode-27]",
             ),
             rust.replace("run: python rust/scripts/test_contract_checks.py", "run: true"),
+            rust.replace("          python rust/scripts/test_catalog_test_views.py\n", "          true\n"),
+            rust.replace("          python rust/scripts/test_catalog_execution.py\n", "          true\n"),
+            rust.replace("          python rust/scripts/test_historical_catalog_views.py\n", "          true\n"),
             rust.replace(
                 "run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings\n",
                 "run: cargo clippy --workspace\n",

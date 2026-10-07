@@ -1,0 +1,144 @@
+{
+  "actualEffect" : "deviceMutation",
+  "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "3a2a6a5873ee9d84a238a6460693d4c50bd4193d1335acb09b87fa230ff3e3c4",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "deploy.native-library.app-owned@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-native-unattested",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-native-unattested",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-2E4B7A8DECD67732A895EAF52B57CA733E1F0A99-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-native-unattested",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-native-unattested",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+    "checkpointSeal" : {
+      "byteCount" : "1749",
+      "lastSequence" : 4,
+      "sha256" : "fbff44513f305ad4fcf5b32bed76cd3aeee0de803ffef0e4761afefa97d97d76"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "67285",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "2131",
+      "lastSequence" : 5,
+      "sha256" : "1c65aa8d443f50fd0082e8c2fa74f54743d62c8c372167224cdb8e48ca4e3e60"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "1138",
+      "manifestSHA256" : "5499d9ed81822ee5cac950554cb2c7c0a2c48fdba311100e734d4bd1ae3f2155",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "4",
+      "manifestSHA256" : "5499d9ed81822ee5cac950554cb2c7c0a2c48fdba311100e734d4bd1ae3f2155",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "verify-elf-locally abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step verify-elf-locally",
+    "hash-library abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step hash-library",
+    "running->finalizing",
+    "reason: evidenceIncomplete: three-step typed preflight is incomplete before send-to-staging",
+    "finalizing->failed",
+    "reason: evidenceIncomplete: three-step typed preflight is incomplete before send-to-staging"
+  ]
+}

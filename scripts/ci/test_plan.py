@@ -844,13 +844,18 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertLess(clippy, workspace_tests)
         self.assertLess(workspace_tests, regressions)
         self.assertLess(regressions, execution_regressions)
-        self.assertLess(execution_regressions, parity)
+        view_guards = [commands.index(f"{sys.executable} rust/scripts/{name}") for name in (
+            "test_catalog_test_views.py", "test_catalog_execution.py", "test_historical_catalog_views.py")]
+        self.assertLess(execution_regressions, view_guards[0])
+        self.assertLess(view_guards[0], view_guards[1])
+        self.assertLess(view_guards[1], view_guards[2])
+        self.assertLess(view_guards[2], parity)
         self.assertLess(parity, commands.index("cargo deny --locked check"))
         self.assertNotIn(f"{sys.executable} rust/scripts/check-readonly.py", commands)
         self.assertNotIn("xcodebuild", "\n".join(commands))
 
     def test_rust_commands_use_the_chat_cache_runner(self):
-        root = pathlib.Path("/example/ArkDeck")
+        root = pathlib.Path("/example/ArkDeck").resolve()
         commands = (("python3", "scripts/ci/test_plan.py"), ("cargo", "fmt", "--check"),
                     ("python3", "rust/scripts/check-contracts.py"))
         with mock.patch.object(PLAN, "local_commands", return_value=commands):
@@ -872,6 +877,9 @@ class CommandSelectionTests(unittest.TestCase):
         for command in (
             (sys.executable, "rust/scripts/test_contract_checks.py"),
             (sys.executable, "rust/scripts/test_ci_execution.py"),
+            (sys.executable, "rust/scripts/test_catalog_test_views.py"),
+            (sys.executable, "rust/scripts/test_catalog_execution.py"),
+            (sys.executable, "rust/scripts/test_historical_catalog_views.py"),
             (sys.executable, "rust/scripts/check-contracts.py"),
             ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
             (sys.executable, "rust/scripts/workspace-tests.py"),

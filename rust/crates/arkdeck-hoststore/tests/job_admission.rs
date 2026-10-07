@@ -6,6 +6,9 @@
 //! oracles' fixed root, under the lock their Swift producers also take.
 #![cfg(target_os = "macos")]
 
+#[path = "support/catalog_lineage.rs"]
+mod lineage;
+
 use arkdeck_hoststore::{AnalyzerProfile, ArtifactReadStore, JobAdmitter, JobPlanner, JobStore};
 use arkdeck_platform::{HostSqlite, SqliteValue as Sql};
 use serde_json::{Map, Value, json};
@@ -213,4 +216,110 @@ fn rust_admissions_reproduce_the_swift_oracle() {
         );
     }
     fs::remove_dir_all(&root).unwrap();
+}
+
+/// A fixed c6 reviewed plan remains immutable in a current e4 view. The
+/// original complete positive sequence belongs to its historical c6 view;
+/// this current-view test proves refusal without translating old authority.
+#[test]
+fn current_catalog_refuses_both_original_reviewed_plan_requests_without_admission() {
+    assert_eq!(arkdeck_contract::CATALOG_DIGEST, lineage::CURRENT);
+    let _lock = exclusive();
+    let source = lineage::Lineage::frozen().unwrap();
+    source
+        .assert_current_sources(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+        )
+        .unwrap();
+    source
+        .operation("analyzer.extract-crash-signature@1")
+        .unwrap();
+    let bytes = fs::read(fixture().join("cases.json")).unwrap();
+    assert_eq!(
+        arkdeck_contract::sha256_hex(&bytes),
+        "83282cb310eba2bee48fd0118c5fa61b927ee5c3601da2b764a5a9cc7743d076"
+    );
+    let cases: Vec<Value> = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(cases.len(), 18);
+    let original = |name: &str| {
+        let matches: Vec<_> = cases.iter().filter(|case| case["name"] == name).collect();
+        assert_eq!(matches.len(), 1);
+        matches[0]
+    };
+    let root = rebuild();
+    let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+    let profile = AnalyzerProfile::crash_signature(&root.join("analyzer")).unwrap();
+    let executable_sha = arkdeck_contract::sha256_hex(&fs::read(root.join("analyzer")).unwrap());
+    let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+    let admitter = JobAdmitter {
+        planner: JobPlanner {
+            imports: None,
+            artifacts: Some(&artifacts),
+            analyzer: Some(&profile),
+            state_root: &root,
+            hdc: None,
+            workspace: None,
+        },
+        jobs: &jobs,
+        now: fixed_now,
+        authority: None,
+    };
+    // Create one fresh current Job without running it, so both the duplicate
+    // and new-admission refusal branches are checked against real owner state.
+    let setup = original("admitted");
+    let result = admitter
+        .handle(setup["params"].as_object().unwrap())
+        .unwrap();
+    assert_eq!(json!({"ok": true, "result": result}), setup["response"]);
+    let baseline_index = index(&root.join("jobs-state"));
+    let baseline_files = job_files(&root.join("jobs-state/jobs"));
+    assert_eq!(baseline_index["rows"].as_array().unwrap().len(), 1);
+    for (name, message) in [
+        (
+            "duplicateWithReviewedPlan",
+            "the existing Job differs from the immutable reviewed plan",
+        ),
+        (
+            "admittedWithReviewedPlan",
+            "the fresh materialized plan differs from the immutable reviewed plan",
+        ),
+    ] {
+        let case = original(name);
+        assert_eq!(case["response"]["ok"], true);
+        let params = case["params"].as_object().unwrap();
+        let request: Value = serde_json::from_str(params["requestJson"].as_str().unwrap()).unwrap();
+        let old_digest = request["reviewedPlanDigest"].as_str().unwrap();
+        assert_eq!(
+            old_digest,
+            "5f31f98fb1b612ea7d0a2f37f003cd5d9d0dffefaa9919661abecc746a5a36a9"
+        );
+        let plan = source
+            .crash_signature_plan(
+                &request,
+                &executable_sha,
+                "/private/tmp/arkdeck-job-plan-oracle/artifacts/job-oracle-source/ART-cf645cc2f23c16cf9965b179bcb35b5e",
+            )
+            .unwrap();
+        let new_digest = source.current_digest(&plan, old_digest).unwrap();
+        assert_ne!(new_digest, old_digest);
+        let fresh = admitter
+            .planner
+            .plan(params["requestJson"].as_str().unwrap().as_bytes())
+            .unwrap();
+        assert_eq!(fresh["catalogDigest"], lineage::CURRENT);
+        assert_eq!(fresh["materializedPlanDigest"], new_digest);
+        let refusal = admitter.handle(params).unwrap_err();
+        assert!(refusal.proven);
+        assert_eq!(
+            json!({"ok": false, "error": {"code": refusal.code, "message": refusal.message,
+                "details": {"phase": "preAdmission", "newDispatchCount": 0}}}),
+            json!({"ok": false, "error": {"code": "reviewedPlanMismatch", "message": message,
+                "details": {"phase": "preAdmission", "newDispatchCount": 0}}}),
+            "{name}"
+        );
+        assert_eq!(index(&root.join("jobs-state")), baseline_index);
+        assert_eq!(job_files(&root.join("jobs-state/jobs")), baseline_files);
+    }
+    // No run/dispatch or mutation authority is composed by this test.
+    drop(jobs);
 }

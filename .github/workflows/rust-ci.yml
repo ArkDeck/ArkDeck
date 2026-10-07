@@ -105,6 +105,13 @@ jobs:
         working-directory: .
         run: python rust/scripts/test_ci_execution.py
 
+      - name: Closed Catalog view and actual test execution guards
+        working-directory: .
+        run: |
+          python rust/scripts/test_catalog_test_views.py
+          python rust/scripts/test_catalog_execution.py
+          python rust/scripts/test_historical_catalog_views.py
+
       # One ArkForge revision: every ArkForge crate, locked, at the one
       # revision rust/Cargo.toml pins (the Swift SDK pin was deleted with the
       # Swift Runtime), and ArkForge's own wire and StepPermit vectors must

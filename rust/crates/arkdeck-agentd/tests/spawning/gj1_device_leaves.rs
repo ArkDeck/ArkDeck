@@ -83,12 +83,12 @@ fn current_observe_payload(index: usize, frozen: &[u8]) -> Result<Vec<u8>, Strin
 }
 
 fn current_observe_artifacts(fixture: &Path, completed: &Value) -> Value {
-    assert_eq!(arkdeck_contract::CATALOG_DIGEST, catalog_lineage::CURRENT);
     let lineage = catalog_lineage::Lineage::frozen().unwrap();
     lineage.operation("observe.device@1").unwrap();
     lineage
-        .assert_current_sources(
+        .assert_catalog_view_sources(
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+            arkdeck_contract::CATALOG_DIGEST,
         )
         .unwrap();
     let cases = std::fs::read(fixture.join("cases.json")).unwrap();
@@ -96,6 +96,10 @@ fn current_observe_artifacts(fixture: &Path, completed: &Value) -> Value {
         arkdeck_contract::sha256_hex(&cases),
         "275d9c9428f68a9aa69d2173b8cea2aa404d8e19619d540547cfff6100929669"
     );
+    if arkdeck_contract::CATALOG_DIGEST == catalog_lineage::OLD {
+        return completed["artifacts"].clone();
+    }
+    assert_eq!(arkdeck_contract::CATALOG_DIGEST, catalog_lineage::CURRENT);
     let mut artifacts = completed["artifacts"].clone();
     let rows = artifacts.as_array_mut().unwrap();
     assert_eq!(rows.len(), OBSERVE_PAYLOADS.len());

@@ -104,17 +104,73 @@ pub(crate) fn describe(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Preserve the historical Swift frames. CHG-2026-081 adds only these
+    // three required read-only declarations to the Native descriptor; its
+    // published-base view still compiles the original eleven declarations.
+    fn native_descriptor_expectation(
+        recorded: &Value,
+        catalog: &str,
+    ) -> Result<Value, &'static str> {
+        if recorded["reference"] != "deploy.native-library.app-owned@1" {
+            return Ok(recorded.clone());
+        }
+        match catalog {
+            "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036" => {
+                Ok(recorded.clone())
+            }
+            "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7" => {
+                let old = recorded["steps"]
+                    .as_array()
+                    .ok_or("historical Native steps")?;
+                if recorded["stepCount"] != 11
+                    || old.len() != 11
+                    || old[0]["stepId"] != "verify-elf-locally"
+                    || old[1]["stepId"] != "hash-library"
+                    || old[2]["stepId"] != "send-to-staging"
+                    || old.iter().any(|step| {
+                        matches!(
+                            step["stepId"].as_str(),
+                            Some(
+                                "confirm-evidence-target"
+                                    | "read-evidence-model"
+                                    | "read-evidence-firmware"
+                            )
+                        )
+                    })
+                {
+                    return Err("historical Native declaration shape changed");
+                }
+                let mut steps = old.clone();
+                let prefix = [
+                    ("confirm-evidence-target", "probeDevice", Value::Null),
+                    ("read-evidence-model", "runApprovedRemoteRead", json!({"catalogId":"arkdeck-remote-operations","actionId":"deviceModel"})),
+                    ("read-evidence-firmware", "runApprovedRemoteRead", json!({"catalogId":"arkdeck-remote-operations","actionId":"firmwareBuild"})),
+                ].map(|(id, kind, action)| json!({
+                    "stepId":id, "kind":kind, "effect":"readOnly", "cancellation":"immediate",
+                    "binding":"confirmedDevice", "optional":false, "compensation":"none", "action":action
+                }));
+                steps.splice(2..2, prefix);
+                let mut expected = recorded.clone();
+                expected["steps"] = json!(steps);
+                expected["stepCount"] = json!(14);
+                Ok(expected)
+            }
+            _ => Err("unreviewed Native descriptor Catalog"),
+        }
+    }
+
     #[test]
     fn matches_actual_swift_descriptor_recordings_and_never_infers_availability() {
         let mut matched = std::collections::BTreeSet::new();
         for line in include_str!("../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl").lines() {
             let row:Value=serde_json::from_str(line).unwrap();
             if row["ok"]!=true {continue;}
-            let expected=&row["result"];let reference=expected["reference"].as_str().unwrap();
+            let expected=native_descriptor_expectation(&row["result"], arkdeck_contract::CATALOG_DIGEST).unwrap();let reference=expected["reference"].as_str().unwrap();
             let availability=json!({"availability":expected["availability"],"reasons":expected["availabilityReasons"],
                 "reasonCodes":expected["availabilityReasonCodes"],"reasonOrigins":expected["availabilityReasonOrigins"]});
             if let Some(actual)=describe(reference,&availability).unwrap() {
-                assert_eq!(&actual,expected,"{reference}");matched.insert(reference.to_owned());
+                assert_eq!(actual,expected,"{reference}");matched.insert(reference.to_owned());
             }
         }
         let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
@@ -167,5 +223,66 @@ mod tests {
         }
         assert!(invalid.is_empty(), "{}", invalid.join("; "));
         assert!(describe("unknown@1", &Value::Null).unwrap().is_none());
+    }
+
+    #[test]
+    fn native_descriptor_delta_preserves_every_historical_field_and_declaration() {
+        let frames = include_str!(
+            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/operation.describe.jsonl"
+        );
+        let native: Vec<Value> = frames
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .filter(|row| {
+                row["ok"] == true
+                    && row["result"]["reference"] == "deploy.native-library.app-owned@1"
+            })
+            .map(|row| row["result"].clone())
+            .collect();
+        assert_eq!(native.len(), 2);
+        for old in native {
+            let mut current = native_descriptor_expectation(
+                &old,
+                "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+            )
+            .unwrap();
+            let steps = current["steps"].as_array_mut().unwrap();
+            assert_eq!(steps.len(), 14);
+            assert!(
+                steps[2..5]
+                    .iter()
+                    .all(|step| step["effect"] == "readOnly" && step["optional"] == false)
+            );
+            steps.drain(2..5);
+            current["stepCount"] = json!(11);
+            assert_eq!(current, old);
+            assert_eq!(
+                native_descriptor_expectation(
+                    &old,
+                    "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036"
+                )
+                .unwrap(),
+                old
+            );
+            assert!(native_descriptor_expectation(&old, &"0".repeat(64)).is_err());
+            let mut drift = old.clone();
+            drift["stepCount"] = json!(10);
+            assert!(
+                native_descriptor_expectation(
+                    &drift,
+                    "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
+                )
+                .is_err()
+            );
+            drift = old.clone();
+            drift["steps"][2]["stepId"] = json!("different-mutation");
+            assert!(
+                native_descriptor_expectation(
+                    &drift,
+                    "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
+                )
+                .is_err()
+            );
+        }
     }
 }

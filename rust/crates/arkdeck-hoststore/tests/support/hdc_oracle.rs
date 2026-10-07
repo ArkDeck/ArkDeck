@@ -356,7 +356,7 @@ pub fn record_native_current(output: &Path) {
     replay_into(
         "deploy-native-library",
         40,
-        240,
+        native_current::call_count(),
         Mutations::Owned,
         Some((output, true)),
     );
@@ -388,7 +388,8 @@ fn replay_into(
     let fixture = super::fixture(name);
     let cases = document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
-    let current_native = name == native_current::NAME || output.is_some_and(|(_, native)| native);
+    let current_native =
+        native_current::is_fixture(name) || output.is_some_and(|(_, native)| native);
     let current_hap = name == hap_current::NAME || output.is_some_and(|(_, native)| !native);
     let current = current_native || current_hap;
     if current_hap {
@@ -397,7 +398,9 @@ fn replay_into(
             hap_current::assert_source(&fixture);
         }
     }
-    if output.is_some_and(|(_, native)| native) {
+    if output.is_some_and(|(_, native)| native)
+        && arkdeck_contract::CATALOG_DIGEST == super::catalog_lineage::CURRENT
+    {
         native_current::install_answers(&owners.root, &fixture);
     }
     let native_import = current_native.then(|| native_current::prepare_import(&owners.root));
@@ -655,7 +658,14 @@ fn replay_into(
             .iter()
             .filter(|line| *line == "capability consumed before first mutation")
             .count();
-        assert_eq!(consumed, 1, "{case}");
+        let required = if current_native
+            && arkdeck_contract::CATALOG_DIGEST == crate::support::catalog_lineage::OLD
+        {
+            0
+        } else {
+            1
+        };
+        assert_eq!(consumed, required, "{case}");
     }
 
     if let Some((output, native)) = output {
@@ -728,7 +738,12 @@ pub fn assert_relabelled(
     // A Session manifest names the platform it was published on: two bytes
     // longer as `PLATFORM-WINDOWS@0.2.0`, read above as the oracle's.
     keys.push("manifestByteCount");
-    if [native_current::NAME, hap_current::NAME].contains(
+    if [
+        native_current::NAME,
+        native_current::PUBLISHED_NAME,
+        hap_current::NAME,
+    ]
+    .contains(
         &fixture
             .file_name()
             .and_then(|name| name.to_str())
@@ -776,7 +791,12 @@ pub fn assert_relabelled(
             labels.learn_within(&json!(ours), &json!(theirs), seal, "sha256");
         }
     }
-    let index = if [native_current::NAME, hap_current::NAME].contains(
+    let index = if [
+        native_current::NAME,
+        native_current::PUBLISHED_NAME,
+        hap_current::NAME,
+    ]
+    .contains(
         &fixture
             .file_name()
             .and_then(|name| name.to_str())
@@ -805,7 +825,10 @@ pub fn assert_relabelled(
         labels.learn(actual, expected, "/result/materializedPlanDigest");
         labels.learn_keys(actual, expected, &ANSWER_DERIVED);
     }
-    let current = fixture.file_name().and_then(|name| name.to_str()) == Some(native_current::NAME);
+    let current = fixture
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(native_current::is_fixture);
     if current {
         native_current::learn_import_labels(fixture, replayed_root, answers, labels, &spelled);
     }

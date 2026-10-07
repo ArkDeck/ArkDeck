@@ -34,17 +34,91 @@ fn plan(lineage: &Lineage, case: &Value) -> Value {
 fn all_thirty_one_unchanged_descriptors_have_the_exact_complete_catalog_lineage() {
     let lineage = Lineage::frozen().unwrap();
     lineage
-        .assert_current_sources(
+        .assert_catalog_view_sources(
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+            arkdeck_contract::CATALOG_DIGEST,
         )
         .unwrap();
-    assert_eq!(arkdeck_contract::CATALOG_DIGEST, CURRENT);
     assert!(
         lineage
             .operation("deploy.native-library.app-owned@1")
             .is_err()
     );
     assert!(lineage.operation("unknown@1").is_err());
+}
+
+#[test]
+fn both_complete_source_views_are_exact_and_wrong_view_or_descriptor_drift_refuse() {
+    let lineage = Lineage::frozen().unwrap();
+    let packet: Value = serde_json::from_slice(include_bytes!(
+        "../../../tests/fixtures/catalog-lineage-c6-e4/catalogs.json"
+    ))
+    .unwrap();
+    let root = std::env::temp_dir().join(format!(
+        "arkdeck-lineage-source-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&root).unwrap();
+    for (field, digest, wrong) in [
+        ("historicalOperations", OLD, CURRENT),
+        ("currentOperations", CURRENT, OLD),
+    ] {
+        let directory = root.join(field);
+        std::fs::create_dir(&directory).unwrap();
+        let rows = packet[field].as_array().unwrap();
+        assert_eq!(rows.len(), 32);
+        for (index, row) in rows.iter().enumerate() {
+            std::fs::write(
+                directory.join(format!("{index}.json")),
+                serde_json::to_vec(row).unwrap(),
+            )
+            .unwrap();
+        }
+        lineage
+            .assert_catalog_view_sources(&directory, digest)
+            .unwrap();
+        assert!(
+            lineage
+                .assert_catalog_view_sources(&directory, wrong)
+                .is_err()
+        );
+        assert!(
+            lineage
+                .assert_catalog_view_sources(&directory, "unknown")
+                .is_err()
+        );
+        assert_eq!(
+            lineage.assert_current_sources(&directory).is_ok(),
+            digest == CURRENT
+        );
+        let mut altered = rows[0].clone();
+        altered["extraSourceField"] = json!(true);
+        std::fs::write(
+            directory.join("0.json"),
+            serde_json::to_vec(&altered).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            lineage
+                .assert_catalog_view_sources(&directory, digest)
+                .is_err()
+        );
+        std::fs::remove_file(directory.join("0.json")).unwrap();
+        assert!(
+            lineage
+                .assert_catalog_view_sources(&directory, digest)
+                .is_err()
+        );
+        for index in 1..rows.len() {
+            std::fs::remove_file(directory.join(format!("{index}.json"))).unwrap();
+        }
+        std::fs::remove_dir(&directory).unwrap();
+    }
+    std::fs::remove_dir(root).unwrap();
 }
 
 #[test]

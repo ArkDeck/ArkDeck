@@ -209,6 +209,11 @@ class ContractChecksTests(unittest.TestCase):
             # Rust formatting is exercised by the real generation check. These
             # tests isolate Git/input behavior and require no installed compiler.
             (contract, "formatted", lambda source: source),
+            # This class isolates Git/input snapshots using a minimal synthetic
+            # Catalog. The real immutable 32-operation reconstruction and full
+            # matrix/projection guards live in test_historical_catalog_views.py.
+            (runner, "historical_catalog_inputs", self.fake_historical_inputs),
+            (runner, "historical_review_projection", lambda source: source),
         ]:
             replacement = patch.object(module, key, value)
             replacement.start()
@@ -247,11 +252,22 @@ class ContractChecksTests(unittest.TestCase):
                  "commit", "-qm", "Published test inputs")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
         self.commit = self.git("rev-parse", "HEAD").decode().strip()
+        self.write("rust/tests/fixtures/catalog-lineage-c6-e4/catalogs.json",
+                   {"oldSourceCommit": self.commit})
         self.inputs, self.info, outputs = contract.checkout_outputs()
         for path, text in outputs.items():
             self.write(path.relative_to(self.root).as_posix(), text.encode())
         self.published = contract.published_inputs(self.commit)
         self.published_info = contract.baseline(self.published, self.commit)
+
+    def fake_historical_inputs(self, current):
+        historical = copy.deepcopy(current)
+        matrix = "Catalog/generated/effect-authorization-matrix.md"
+        data = b"Catalog digest: `" + runner.catalog_test_views.OLD.encode() + b"`\n"
+        historical.files[matrix] = data
+        historical.blobs[matrix] = runner.hashlib.sha1(
+            f"blob {len(data)}\0".encode() + data).hexdigest()
+        return historical
 
     def write(self, name, value):
         path = self.root / name
@@ -323,7 +339,7 @@ class ContractChecksTests(unittest.TestCase):
                 runner.check(self.root / "outputs")
 
     def test_check_summary_names_the_merge_base_as_the_published_baseline(self):
-        with patch.object(runner, "run_view", lambda view, output, info, published_info: None):
+        with patch.object(runner, "run_view", lambda view, output, info, published_info, **kwargs: None):
             output = runner.check(self.root / "outputs")
         summary = json.loads((output / "summary.json").read_bytes())
         self.assertEqual(summary["publishedBaselineCommit"], self.commit)
@@ -594,7 +610,10 @@ class ContractChecksTests(unittest.TestCase):
     def test_each_view_runs_the_complete_ordered_native_checks(self):
         view = self.root / "view"
         commands = runner.commands(view, self.root / "output")
-        self.assertEqual([argv[1] for argv, _ in commands[:4]], ["clippy", "test", "run", "build"])
+        self.assertEqual([argv[1] for argv, _ in commands[:4]],
+                         ["clippy", str(view / "rust/scripts/run-workspace-tests.py"), "run", "build"])
+        self.assertEqual(commands[1],
+                         ([sys.executable, str(view / "rust/scripts/run-workspace-tests.py")], view / "rust"))
         self.assertIn("--all-targets", commands[0][0])
         self.assertEqual(commands[0][0][-3:], ["--", "-D", "warnings"])
         self.assertEqual(commands[2][0][-1], "process-selftest")
@@ -621,7 +640,7 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual(identical["inputDigest"], self.published_info["inputDigest"])
         self.assertNotEqual(drifted["inputDigest"], self.published_info["inputDigest"])
         lint = ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"]
-        workspace_tests = ["cargo", "test", "--workspace", "--locked"]
+        workspace_tests = [sys.executable, str(self.root / "view/rust/scripts/run-workspace-tests.py")]
         contract_and_cli = ["cargo", "test", "--package", "arkdeck-contract",
                             "--package", "arkdeck-cli", "--locked"]
         for label, info, repeated in (
@@ -677,19 +696,19 @@ class ContractChecksTests(unittest.TestCase):
 
     def test_failure_in_either_view_cannot_leave_combined_check_green(self):
         self.drift_and_regenerate()
-        for failing_view in ("development", "candidate"):
+        for failing_view in ("development", "candidate", "historical"):
             with self.subTest(view=failing_view):
                 calls = []
 
-                def check_view(view, output, info, published_info):
-                    calls.append(info["kind"])
-                    if info["kind"] == failing_view:
+                def check_view(view, output, info, published_info, **kwargs):
+                    calls.append("historical" if kwargs.get("historical") else info["kind"])
+                    if calls[-1] == failing_view:
                         raise ValueError("expected test failure")
 
                 with patch.object(runner, "run_view", check_view):
                     with self.assertRaisesRegex(ValueError, "contract checks failed"):
                         runner.check(self.root / "outputs")
-                self.assertEqual(calls, ["development", "candidate"])
+                self.assertEqual(calls, ["development", "candidate", "historical"])
 
     def test_both_views_use_one_source_snapshot_and_report_concurrent_edits(self):
         self.drift_and_regenerate()
@@ -697,11 +716,13 @@ class ContractChecksTests(unittest.TestCase):
         source = self.root / "rust/scripts/check-readonly.py"
         original = source.read_bytes()
         projection = runner.review_projection()
+        generator = (self.root / "scripts/catalog_gen/generate.py").read_bytes()
 
-        def check_view(view, output, info, published_info):
-            calls.append(info["kind"])
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append("historical" if kwargs.get("historical") else info["kind"])
             self.assertEqual((view / "rust/scripts/check-readonly.py").read_bytes(), original)
             self.assertEqual((view / runner.REVIEW_PROJECTION).read_bytes(), projection)
+            self.assertEqual((view / "scripts/catalog_gen/generate.py").read_bytes(), generator)
             self.assertEqual((view / "rust/crates/arkdeck-contract/src/catalog_generated.rs").read_bytes(),
                              b"// test catalog\n")
             if info["kind"] == "development":
@@ -712,25 +733,31 @@ class ContractChecksTests(unittest.TestCase):
         with patch.object(runner, "run_view", check_view):
             with self.assertRaisesRegex(ValueError, "Rust sources changed.*App review projection changed.*Catalog generator changed"):
                 runner.check(self.root / "outputs")
-        self.assertEqual(calls, ["development", "candidate"])
+        self.assertEqual(calls, ["development", "candidate", "historical"])
 
     def test_identical_inputs_run_the_native_checks_once_and_record_the_coverage(self):
         calls = []
 
-        def check_view(view, output, info, published_info):
-            calls.append(info["kind"])
-            self.assertEqual(info["inputDigest"], published_info["inputDigest"])
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append("historical" if kwargs.get("historical") else info["kind"])
+            if kwargs.get("historical"):
+                self.assertEqual(info["catalogDigest"], runner.catalog_test_views.OLD)
+                self.assertNotEqual(info["inputDigest"], published_info["inputDigest"])
+            else:
+                self.assertEqual(info["inputDigest"], published_info["inputDigest"])
             write = runner.write_json
             write(output / "provenance.json", {"completed": True, "result": "pass"})
 
         outputs = self.root / "outputs"
         with patch.object(runner, "run_view", check_view):
             runner.check(outputs)
-        self.assertEqual(calls, ["candidate"])
+        self.assertEqual(calls, ["candidate", "historical"])
         (run,) = outputs.iterdir()
         summary = json.loads((run / "summary.json").read_bytes())
         self.assertTrue(summary["completed"])
         self.assertEqual(summary["publishedView"], "covered-by-candidate")
+        self.assertEqual(summary["historicalView"], "mandatory-run")
+        self.assertEqual(summary["historicalCatalogDigest"], runner.catalog_test_views.OLD)
         published = json.loads((run / "published/provenance.json").read_bytes())
         self.assertEqual(published["result"], "covered")
         self.assertEqual(published["coveredBy"], "candidate")
@@ -739,8 +766,22 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual(published["commands"], [])
         self.assertFalse(published["deviceAcceptance"])
 
+    def test_identical_inputs_still_require_the_actual_historical_view(self):
+        calls = []
+
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append(view.name)
+            if kwargs.get("historical"):
+                self.assertFalse(kwargs.get("workspace_covered"))
+                raise ValueError("expected mandatory historical failure")
+
+        with patch.object(runner, "run_view", check_view):
+            with self.assertRaisesRegex(ValueError, "historical.*mandatory historical failure"):
+                runner.check(self.root / "outputs")
+        self.assertEqual(calls, ["candidate", "historical"])
+
     def test_identical_inputs_still_fail_when_the_candidate_view_fails(self):
-        def check_view(view, output, info, published_info):
+        def check_view(view, output, info, published_info, **kwargs):
             raise ValueError("expected candidate failure")
 
         with patch.object(runner, "run_view", check_view):
@@ -751,14 +792,14 @@ class ContractChecksTests(unittest.TestCase):
         self.drift_and_regenerate()
         calls = []
 
-        def check_view(view, output, info, published_info):
-            calls.append(info["kind"])
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append("historical" if kwargs.get("historical") else info["kind"])
             runner.write_json(output / "provenance.json", {"completed": True, "result": "pass"})
 
         outputs = self.root / "outputs"
         with patch.object(runner, "run_view", check_view):
             runner.check(outputs)
-        self.assertEqual(calls, ["development", "candidate"])
+        self.assertEqual(calls, ["development", "candidate", "historical"])
         (run,) = outputs.iterdir()
         self.assertEqual(json.loads((run / "summary.json").read_bytes())["publishedView"], "run")
 
@@ -772,8 +813,8 @@ class ContractChecksTests(unittest.TestCase):
         visits = {}
         stamps = {}
 
-        def check_view(view, output, info, published_info):
-            name = "candidate" if info["kind"] == "candidate" else "published"
+        def check_view(view, output, info, published_info, **kwargs):
+            name = "historical" if kwargs.get("historical") else "candidate" if info["kind"] == "candidate" else "published"
             self.assertEqual(view, self.root / "rust/target/contract-check" / name)
             count = visits.get(name, 0)
             visits[name] = count + 1
@@ -802,7 +843,7 @@ class ContractChecksTests(unittest.TestCase):
             runner.check(self.root / "outputs")
             self.drift_and_regenerate()
             runner.check(self.root / "outputs")
-        self.assertEqual(visits, {"published": 3, "candidate": 3})
+        self.assertEqual(visits, {"published": 3, "candidate": 3, "historical": 3})
 
     def test_parallel_view_keeps_native_checks_and_labels_its_own_timing_report(self):
         self.drift_and_regenerate()

@@ -12,6 +12,13 @@ use std::path::Path;
 
 pub const NAME: &str = "debug-hap-catalog-e4-v1";
 const ORIGINAL: &str = "debug-hap";
+pub fn fixture_name() -> &'static str {
+    match CATALOG_DIGEST {
+        lineage::CURRENT => NAME,
+        lineage::OLD => ORIGINAL,
+        _ => panic!("unreviewed HAP software oracle Catalog"),
+    }
+}
 const CURRENT_PROVENANCE_SHA: &str =
     "8b76964022be81197457a65f4afdae8e60a491cfae38f9957d0471475d005160";
 const ORIGINAL_PROVENANCE_SHA: &str =
@@ -20,8 +27,9 @@ const ORIGINAL_PROVENANCE_SHA: &str =
 pub fn assert_historical_source() {
     let lineage = lineage::Lineage::frozen().unwrap();
     lineage
-        .assert_current_sources(
+        .assert_catalog_view_sources(
             &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Catalog/operations"),
+            CATALOG_DIGEST,
         )
         .unwrap();
     lineage.operation("debug.hap@1").unwrap();

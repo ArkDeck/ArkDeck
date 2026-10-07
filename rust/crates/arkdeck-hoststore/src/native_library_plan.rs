@@ -345,18 +345,28 @@ mod tests {
                 .unwrap(),
                 current_digest
             );
+            let published = CATALOG_DIGEST
+                == "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036";
             let steps = current["steps"].as_array_mut().unwrap();
-            let prefix: Vec<_> = steps.drain(2..5).collect();
+            let prefix: Vec<_> = if published {
+                Vec::new()
+            } else {
+                steps.drain(2..5).collect()
+            };
             assert_eq!(
                 prefix
                     .iter()
                     .map(|step| step["stepID"].as_str().unwrap())
                     .collect::<Vec<_>>(),
-                [
-                    "confirm-evidence-target",
-                    "read-evidence-model",
-                    "read-evidence-firmware"
-                ]
+                if published {
+                    Vec::new()
+                } else {
+                    vec![
+                        "confirm-evidence-target",
+                        "read-evidence-model",
+                        "read-evidence-firmware",
+                    ]
+                }
             );
             assert!(prefix.iter().all(|step| step["effect"] == "readOnly"
                 && step["binding"] == "confirmedDevice"
@@ -371,10 +381,21 @@ mod tests {
                 "{}",
                 exchange["name"]
             );
-            assert_ne!(
-                current_digest, historical_digest,
-                "the original plan cannot authorize the new prefix"
-            );
+            if published {
+                assert_eq!(
+                    current_digest, historical_digest,
+                    "published inputs keep the full original Native plan"
+                );
+            } else {
+                assert_eq!(
+                    CATALOG_DIGEST,
+                    "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
+                );
+                assert_ne!(
+                    current_digest, historical_digest,
+                    "the original plan cannot authorize the new prefix"
+                );
+            }
             replayed += 1;
         }
         assert_eq!(replayed, 5);

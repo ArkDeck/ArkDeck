@@ -188,6 +188,52 @@ authority, chronology or debt/replay defect. A separate reviewer confirmed
 the complete old/current Catalog and HAP plan proof; neither review involved
 private state, signing or hardware execution.
 
+The bounded cross-view follow-up keeps the original c6 positive oracles in a
+mandatory, independently pinned input view over current Rust. Exact mixed
+function routes keep current source-drift refusals and current Native/HAP/GJ-1
+owners under e4. All 32 descriptors, complete original/versioned fixture bytes,
+and source inventories are closed. Same-name Cargo targets retain `--workspace`
+feature selection; compile JSON and each Cargo `Running` source/executable
+bind every list and execution receipt to its actual package target. The 15
+custom harnesses use their real listed/default protocol. Known child entries
+and absent external-material opt-ins retain their actual reported status but
+cannot count as substantive coverage or live signing/distribution evidence.
+
+- Current Native's separate c6 oracle was generated once through real software
+  owners (`published-native-59.json`). It retains all 40 original requests and
+  the full 43-file/225-call historical provenance. The current missing-preflight
+  guard truthfully refuses before device mutation: actual calls are zero, all
+  five Jobs are known failed, no observation or capability consumption is
+  invented, and each whole diagnostic Session has one finalized event plus
+  clear unrelated Import inspection. The e4 oracle still requires all 40
+  exchanges and 240 exact calls; the c6 result is not hardware acceptance.
+- Normal c6 HAP and Native replays actually passed five cases, with two
+  recorders explicitly ignored (`published-replay-target-61.log`,
+  `published-replay-61.json`). The outer wrapper then failed while reserving an
+  already-used receipt filename. Its original failure is retained; the separate
+  CREATE_NEW `published-replay-61-wrapper-supplement.json` records that the test
+  process exited 0. No successful test was rerun to replace that wrapper failure.
+- Closed view guards passed 28 pure cases; execution guards passed eight pure
+  cases. Post-merge historical reconstruction passed nine pure cases, including
+  the full official c6 matrix and exact non-Catalog bytes. The earlier 26-case,
+  8-case and 9-case source snapshots remain in Root's `55`, `65` and `64`
+  receipts; newly added child/optional-material assertions are separate.
+- The dependency-free Cargo feature-union fixture passed one case, exit 0
+  (`native-router-1/checks.json`). Package-only selection genuinely fails its
+  feature-union assertion; the workspace command executes three exact filters
+  across two same-name targets with complete build/Running/case receipts. No
+  product Runtime, account store, SDK, HDC or device is used by this fixture.
+- Only affected source checks ran in `dual-view-close-69.json`: Native and HAP
+  full-plan units each passed one case; current cleanup continuation passed all
+  eight cases; Hoststore/Agentd all-target clippy and affected formatting exited
+  0. The existing macOS-only reviewed-plan negatives remain for actual CI;
+  their Windows cfg exclusion is not reported as a passing execution.
+- The original generated CLI consumer checks remain passing in
+  `cli-consumer-52.json`: exact operation projection, whole machine bundle and
+  maintainer contract consumers. The original c6/e4 source-view mismatch and
+  rejected or malformed recorder attempts remain in their logs; no frozen
+  source, seed, authority or expectation was edited to erase them.
+
 ## CI
 
 PR #2628, first head `c8d6b09f7b01eb33ebcf5640be6fa50e3843ca0a`:
@@ -212,3 +258,16 @@ missing from its expectation. The complete original logs are retained as
 consumer defects; neither assertion was weakened. The follow-up includes
 their exact source corrections and the current HAP software oracle. CI for
 that follow-up has not run at the time of this record.
+
+At head `87fcfeae77e5360933b17f54264dc46be8f7fca9`, run `37584367552`
+passed the planner, App build, Swift tests, Windows ClientKit and
+host-independent lane. Ubuntu parity failed the published c6 view's
+unconditional current-Catalog source assertion; Ubuntu workspace failed stale
+generated CLI/Native projections. macOS and Windows parity exposed current-only
+selectors used under c6. Their workspace lanes exposed historical c6 whole
+plan/authority/artifact expectations being run as e4, including 35 failed
+Windows functions in job `112671304507`. All full original logs are retained.
+The follow-up fixes derived consumers and introduces the exact mandatory
+two-view execution above; its new-head CI result is pending. Existing accepted
+assertions, original requests and authority are preserved rather than broadly
+translating digests or ignoring the failing cases.

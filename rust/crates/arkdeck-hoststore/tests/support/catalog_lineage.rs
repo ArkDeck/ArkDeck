@@ -245,6 +245,7 @@ impl HapPlans {
 
 #[derive(Clone)]
 pub struct Lineage {
+    historical_operations: BTreeMap<String, Value>,
     operations: BTreeMap<String, Value>,
 }
 
@@ -387,10 +388,37 @@ impl Lineage {
         if unchanged != 31 {
             return Err("unchanged descriptor census".into());
         }
-        Ok(Self { operations })
+        Ok(Self {
+            historical_operations: original,
+            operations,
+        })
     }
 
     pub fn assert_current_sources(&self, directory: &Path) -> Result<(), String> {
+        self.assert_sources(directory, &self.operations)
+    }
+
+    /// Both isolated CI views compile the candidate test implementation, but
+    /// each materializes its own complete Catalog sources. Bind this software
+    /// source proof to that view's compiled digest; never relabel its sources.
+    pub fn assert_catalog_view_sources(
+        &self,
+        directory: &Path,
+        catalog_digest: &str,
+    ) -> Result<(), String> {
+        let expected = match catalog_digest {
+            CURRENT => &self.operations,
+            OLD => &self.historical_operations,
+            _ => return Err("unknown compiled Catalog view".into()),
+        };
+        self.assert_sources(directory, expected)
+    }
+
+    fn assert_sources(
+        &self,
+        directory: &Path,
+        expected: &BTreeMap<String, Value>,
+    ) -> Result<(), String> {
         let mut observed = BTreeMap::new();
         for entry in fs::read_dir(directory).map_err(|_| "current Catalog source")? {
             let entry = entry.map_err(|_| "current Catalog entry")?;
@@ -409,7 +437,7 @@ impl Lineage {
                 return Err("duplicate source".into());
             }
         }
-        if observed != self.operations {
+        if &observed != expected {
             return Err("current descriptor source drift".into());
         }
         Ok(())
