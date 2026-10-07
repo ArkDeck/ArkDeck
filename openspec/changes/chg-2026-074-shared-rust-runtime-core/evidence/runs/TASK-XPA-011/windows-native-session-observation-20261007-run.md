@@ -121,6 +121,13 @@ with two jobs. Commands and immutable results are retained under
   formatting failure is retained at `fmt-affected-24.log`.
 - `sh scripts/check-sdd.sh` and `git diff --check`: final exit 0
   (`sdd-28.log`, `diff-28.log`, `docs-28.json`).
+- The first selected CI planner failure was reproduced and corrected at its
+  actual prototype consumer. `npm test` in `docs/design/arkdeck-ds`: exit 0;
+  86 cases passed, zero skipped (`ds-interactions-33.log`,
+  `ds-interactions-33.json`). The original parity assertion is unchanged;
+  `DEBUG_PLAN_STEPS` gains only the three exact required read-only rows, with
+  every unrelated prototype byte preserved. No App feature or test gallery
+  is introduced by this derived-plan update.
 
 Live opt-ins were cleared; account fixtures use private temporary profiles
 and their own stand-ins. The historical HAP whole-answer compatibility failure
@@ -151,5 +158,13 @@ private state, signing or hardware execution.
 
 ## CI
 
-Not yet run for this unpublished increment. No maintainer approval, protected
+PR #2628, first head `c8d6b09f7b01eb33ebcf5640be6fa50e3843ca0a`:
+Swift CI run `37580807219`, planner job `112659776407`, failed the existing
+Native prototype/Catalog parity assertion at `workspace-interactions.test.mjs:992`.
+Its actual prototype list lacked the three new read-only rows. Compile lanes
+were skipped and the `swift` aggregate failed; this was not a passing CI run.
+The full public job log is retained as
+`ci-plan-37580807219-112659776407.log`. The bounded consumer correction and
+86-case local result above accompany a normal follow-up commit. Selected CI
+for that updated head remains pending. No maintainer approval, protected
 publication, real-device result or historical census repair is claimed.
