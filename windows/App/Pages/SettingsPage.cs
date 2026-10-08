@@ -37,7 +37,7 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
     ];
 
     // Rebuilt by each render (an element is never moved between renders).
-    private StackPanel _tab = new() { Spacing = 14 };
+    private StackPanel _tab = new() { Spacing = 24 };
     private SettingsState? _state;
     private string _selectedTab = "general";
     private string? _selectedProject;
@@ -49,29 +49,45 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
     {
     }
 
-    /// <summary>The macOS Settings tab bar as a Fluent SelectorBar, on the tab last chosen.</summary>
-    private SelectorBar TabBar()
+    /// <summary>A native single-choice category list; all nine categories remain keyboard reachable.</summary>
+    private ListView TabBar()
     {
-        var bar = new SelectorBar();
-        AutomationProperties.SetAutomationId(bar, "settings.tabs");
-        AutomationProperties.SetName(bar, S.Text(UiStrings.WindowsNavigationSettings));
+        var bar = Ui.Choice("settings.tabs", S.Text(UiStrings.WindowsNavigationSettings));
+        bar.ItemsPanel = (ItemsPanelTemplate)Application.Current.Resources["ArkDeckCategoryItemsPanel"];
+        void TextScaleChanged(Windows.UI.ViewManagement.UISettings sender, object args) =>
+            bar.DispatcherQueue.TryEnqueue(() => ArrangeCategories(bar));
+        bar.Loaded += (_, _) =>
+        {
+            Ui.AccessibilitySettings.TextScaleFactorChanged += TextScaleChanged;
+            ArrangeCategories(bar);
+        };
+        bar.Unloaded += (_, _) => Ui.AccessibilitySettings.TextScaleFactorChanged -= TextScaleChanged;
+        bar.SizeChanged += (_, _) => ArrangeCategories(bar);
         foreach (var (tag, key) in Tabs)
         {
-            var item = new SelectorBarItem { Text = S.Text(key), Tag = tag };
-            AutomationProperties.SetAutomationId(item, "settings.tab." + tag);
-            AutomationProperties.SetName(item, S.Text(key));
+            var item = Ui.Item("settings.tab." + tag, S.Text(key), Ui.Text("settings.category." + tag, S.Text(key)));
+            item.Tag = tag;
             bar.Items.Add(item);
             if (tag == _selectedTab) bar.SelectedItem = item;
         }
         bar.SelectionChanged += (_, _) =>
         {
-            if (bar.SelectedItem is { Tag: string tag } && tag != _selectedTab)
+            if (bar.SelectedItem is ListViewItem { Tag: string tag } && tag != _selectedTab)
             {
                 _selectedTab = tag;
                 RenderTab();
             }
         };
         return bar;
+    }
+
+    private static void ArrangeCategories(ListView bar)
+    {
+        if (bar.ActualWidth <= 0 || Ui.Descendant<ItemsWrapGrid>(bar) is not { } panel) return;
+        var columns = Math.Max(1, (int)(bar.ActualWidth / (140 * Ui.LayoutTextScale)));
+        panel.ItemWidth = bar.ActualWidth / columns;
+        panel.ItemHeight = 44 * Ui.LayoutTextScale;
+        panel.MaximumRowsOrColumns = columns;
     }
 
     protected override Task<SettingsState> LoadAsync() => App.Loader.SettingsAsync();
@@ -82,9 +98,8 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
     protected override void Render(SettingsState state, StackPanel body)
     {
         _state = state;
-        _tab = new StackPanel { Spacing = 14 };
-        body.Children.Add(TabBar());
-        body.Children.Add(_tab);
+        _tab = new StackPanel { Spacing = 24 };
+        body.Children.Add(new AdaptiveColumns([TabBar(), _tab], [1, 4], minimumColumnWidth: 150, spacing: 24));
         RenderTab();
     }
 
@@ -110,8 +125,8 @@ public sealed partial class SettingsPage : SurfacePage<SettingsState>
 
     private StackPanel Section(string id, string titleKey)
     {
-        var panel = Ui.Stack(6, Ui.Heading(id + ".title", S.Text(titleKey)));
-        _tab.Children.Add(Ui.Card(panel, id));
+        var panel = Ui.Stack(8);
+        _tab.Children.Add(Ui.Group(id + ".title", S.Text(titleKey), panel, id));
         return panel;
     }
 

@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 
 namespace ArkDeck.App.Controls;
 
@@ -68,6 +69,14 @@ internal static class FocusWalk
         {
             var origin = fe.TransformToVisual(root).TransformPoint(new Windows.Foundation.Point(0, 0));
             (x, y, width, height) = (origin.X, origin.Y, fe.ActualWidth, fe.ActualHeight);
+            // Reading order uses document coordinates. Focusing a control can scroll its
+            // viewport while the page title stays pinned, which must not reorder the stops.
+            for (var ancestor = VisualTreeHelper.GetParent(fe); ancestor is not null; ancestor = VisualTreeHelper.GetParent(ancestor))
+            {
+                if (ancestor is not ScrollViewer scroll) continue;
+                x += scroll.HorizontalOffset;
+                y += scroll.VerticalOffset;
+            }
         }
         if (element is Control c) state = c.FocusState.ToString();
         return new JsonObject

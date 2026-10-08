@@ -42,6 +42,9 @@ public sealed class SemanticSnapshotTests
         foreach (var snapshot in snapshots)
         {
             app.Navigate(snapshot.Page);
+            if (snapshot.Elements.Any(element => element.AutomationId.StartsWith("jobInspector.", StringComparison.Ordinal)
+                    && element.AutomationId != "jobInspector.compact.status")
+                || snapshot.Steps.Any(step => step.AutomationId.StartsWith("jobInspector.", StringComparison.Ordinal))) app.ShowInspector();
             foreach (var step in snapshot.Steps)
             {
                 if (step.Action == "select") app.Select(step.AutomationId);
@@ -129,6 +132,7 @@ public sealed class SemanticSnapshotTests
         var exe = AppSession.RequireApp();
         var strings = Catalogue.Load("en-US");
         using var app = AppSession.Launch(exe, ["--test-transport", "jobs", "--language", "en-US"]);
+        app.ShowInspector();
         var row = app.Find("jobInspector.row.job-0000000000000000000000000000a001");
         var announced = new List<string>();
         using (app.Window.RegisterAutomationEvent(app.Automation.EventLibrary.Element.LiveRegionChangedEvent, TreeScope.Subtree,

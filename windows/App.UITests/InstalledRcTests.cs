@@ -52,7 +52,10 @@ public sealed class InstalledRcTests
         string overall;
         try
         {
-            overall = app.WaitForName("overview.doctor.overall", n => n.Length > 0);
+            // Overview reads both doctor and operation.list before rendering. An installed
+            // user's registered projects may need their full bounded inventory budgets.
+            overall = app.WaitForName("overview.doctor.overall", n => n.Length > 0,
+                TimeSpan.FromSeconds(80)); // two 30-second reads plus the ordinary UI wait
         }
         catch (AssertFailedException error)
         {

@@ -31,7 +31,7 @@ public sealed partial class MainWindow : Window
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
         // The window icon the person chose (macOS applyStoredSelection), the waveform by default.
         AppWindow.SetIcon(AppPreferences.IconAsset(App.Preferences.Icon));
-        AppWindow.Resize(new Windows.Graphics.SizeInt32(1280, 900));
+        SizeForDisplay();
 
         Title = S.Text(UiStrings.AppShellTitle);
         AppTitleBar.Title = Title;
@@ -71,6 +71,7 @@ public sealed partial class MainWindow : Window
         RecoveryBar.ActionButton = retry;
 
         if (App.Options.FocusWalkFile is { } walk) FocusWalk.Install(this, walk);
+        if (App.Options.RenderSnapshotFile is { } snapshot) RenderSnapshot.Install(this, snapshot);
 
         Inspector = new JobInspector();
         InspectorHost.Child = Inspector;

@@ -35,12 +35,12 @@ public interface IDiagnosticSessionChannel
 }
 
 /// <summary>The production channel: <see cref="ControlSession"/> over the authenticated pipe.</summary>
-public sealed class SessionChannel(ControlSession session) : IControlChannel, IRuntimeJobChannel, IDiagnosticSessionChannel
+public sealed class SessionChannel(ControlSession session, ControlSession? inventoryReads = null) : IControlChannel, IRuntimeJobChannel, IDiagnosticSessionChannel
 {
     public Task<ControlResult> HealthAsync() => session.HealthAsync();
 
     public Task<ControlResult> RequestAsync(string method, JsonObject? parameters = null) =>
-        session.RequestAsync(method, parameters);
+        (method is "doctor" or "operation.list" ? inventoryReads ?? session : session).RequestAsync(method, parameters);
 
     public Task<ControlResult> RunJobOnceAsync(string jobId, TimeSpan callBudget) => session.RunJobOnceAsync(jobId, callBudget);
     public Task<ControlResult> StatusAsync(string jobId) => session.DiagnosticStatusAsync(jobId);

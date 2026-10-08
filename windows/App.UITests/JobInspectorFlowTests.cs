@@ -17,6 +17,7 @@ public sealed class JobInspectorFlowTests
         var exe = AppSession.RequireApp();
         var strings = Catalogue.Load("en-US");
         using var app = AppSession.Launch(exe, ["--test-transport", "recovery", "--language", "en-US"]);
+        app.ShowInspector();
         app.Select("jobInspector.row." + Superseded);
         Assert.AreEqual(strings["jobInspector.result.supersededByRecovery"], app.WaitForName("jobInspector.establishedCurrentEpoch.message", n => n.Length > 0));
         Assert.AreEqual("epoch-0000000000000000000000000000e001", AppSession.Name(app.Find("jobInspector.fact.recoveryRelation")));

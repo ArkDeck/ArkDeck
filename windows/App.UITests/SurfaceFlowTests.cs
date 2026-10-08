@@ -87,6 +87,7 @@ public sealed class SurfaceFlowTests
         var exe = AppSession.RequireApp();
         var strings = Catalogue.Load("en-US");
         using var app = AppSession.Launch(exe, ["--test-transport", "jobs", "--language", "en-US"]);
+        app.ShowInspector();
         app.Select("jobInspector.row.job-0000000000000000000000000000a004");
         Assert.AreEqual(strings["job.state.queued"], app.WaitForName("jobInspector.state", n => n.Length > 0));
 

@@ -27,6 +27,8 @@ public sealed partial class ViewerPage() : SurfacePage<ViewerState>(
     "viewer", "viewer.title", UiStrings.AppNavigationUiDump,
     "viewer.refresh", UiStrings.ViewerToolbarRefresh, "viewer.loading", UiStrings.SettingsCommonLoading), IHistoryContextPage
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     private HistoryWorkspaceContext? _history;
     private string? _historyJob;
 
@@ -122,7 +124,7 @@ public sealed partial class ViewerPage() : SurfacePage<ViewerState>(
                 await RefreshAsync();
             }));
         }
-        _content = new StackPanel { Spacing = 12 };
+        _content = new StackPanel { Spacing = 24 };
         body.Children.Add(_content);
         body.Children.Add(_status);
         RenderContent();
@@ -140,10 +142,10 @@ public sealed partial class ViewerPage() : SurfacePage<ViewerState>(
         _content.Children.Add(Toolbar(_state));
         if (Capture is { } capture)
         {
-            _content.Children.Add(Ui.Card(Screenshot(capture), "viewer.pane.screenshot.card"));
-            _content.Children.Add(Ui.Card(Tree(capture), "viewer.pane.tree.card"));
-            _content.Children.Add(Separator());
-            _content.Children.Add(Ui.Card(Properties(capture), "viewer.properties"));
+            var tree = Ui.Stack(12, Ui.Card(Tree(capture), "viewer.pane.tree.card"), Separator());
+            _content.Children.Add(Ui.Columns(
+                Ui.Card(Screenshot(capture), "viewer.pane.screenshot.card"),
+                tree, Ui.Card(Properties(capture), "viewer.properties")));
             _content.Children.Add(Footer(capture));
         }
         else

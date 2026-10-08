@@ -23,6 +23,8 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
     "device", "device.title", UiStrings.AppNavigationDevice,
     "hdc.devices.refresh", UiStrings.HdcDevicesRefresh, "app.devices.checking", UiStrings.OverviewStatusRefreshing), IHistoryContextPage
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     // Rebuilt by each render (an element is never moved between renders).
     private StackPanel _detail = new() { Spacing = 8 };
     private TextBlock _nameStatus = Ui.Status("device.target.nameStatus");
@@ -108,7 +110,7 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
     }
 
     /// <summary>The adopted Targets and the selected one's detail.</summary>
-    private StackPanel Targets(DeviceState state)
+    private UIElement Targets(DeviceState state)
     {
         var panel = Ui.Stack(8, Ui.Heading("device.targets.title", S.Text(UiStrings.WindowsDeviceTargetsTitle)));
         _detail = new StackPanel { Spacing = 8 };
@@ -147,7 +149,6 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
         };
         panel.Children.Add(list);
         panel.Children.Add(_nameStatus);
-        panel.Children.Add(_detail);
         if (_selected is { } selected && _targets.Any(t => t.TargetId == selected))
         {
             DispatcherQueue.TryEnqueue(async () => await ShowTargetAsync(selected));
@@ -157,7 +158,7 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
             _selected = null;
             _detail.Children.Add(Ui.Text("device.target.select", S.Text(UiStrings.WindowsDeviceTargetSelect), "ArkDeckCaptionStyle"));
         }
-        return panel;
+        return Ui.MasterDetail(panel, _detail);
     }
 
     private async Task ShowTargetAsync(string targetId)

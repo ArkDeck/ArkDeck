@@ -21,6 +21,8 @@ public sealed partial class AgentsPage() : SurfacePage<AgentsState>(
     "agents", "agents.title", UiStrings.WindowsNavigationAgents,
     "agents.refresh", UiStrings.SettingsCommonRefresh, "agents.loading", UiStrings.SettingsCommonLoading)
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     // Rebuilt by each render (an element is never moved between renders).
     private StackPanel _detail = new() { Spacing = 8 };
     private TextBlock _status = Ui.Status("agents.status");
@@ -37,15 +39,16 @@ public sealed partial class AgentsPage() : SurfacePage<AgentsState>(
         _detail = new StackPanel { Spacing = 8 };
         body.Children.Add(Ui.Text("agents.subtitle", S.Text(UiStrings.WindowsAgentsSubtitle), "ArkDeckCaptionStyle"));
         body.Children.Add(_status);
-
-        body.Children.Add(Ui.Heading("agents.humanActions.title", S.Text(UiStrings.WindowsAgentsHumanActions)));
+        var records = Ui.Stack(16);
+        body.Children.Add(Ui.MasterDetail(records, Ui.Card(_detail, "agents.detail")));
+        records.Children.Add(Ui.Heading("agents.humanActions.title", S.Text(UiStrings.WindowsAgentsHumanActions)));
         if (state.HumanActions.Unavailable is { } noActions)
         {
-            body.Children.Add(Ui.Card(Ui.UnavailableNotice("agents.humanActions.unavailable", UiStrings.WindowsAgentsHumanActionsUnavailable, noActions)));
+            records.Children.Add(Ui.Card(Ui.UnavailableNotice("agents.humanActions.unavailable", UiStrings.WindowsAgentsHumanActionsUnavailable, noActions)));
         }
         else if (state.HumanActions.Value!.Count(a => a.IsWaiting) == 0)
         {
-            body.Children.Add(Ui.Text("agents.humanActions.empty", S.Text(UiStrings.WindowsAgentsHumanActionsEmpty)));
+            records.Children.Add(Ui.Text("agents.humanActions.empty", S.Text(UiStrings.WindowsAgentsHumanActionsEmpty)));
         }
         else
         {
@@ -64,20 +67,20 @@ public sealed partial class AgentsPage() : SurfacePage<AgentsState>(
             {
                 if (e.AddedItems.FirstOrDefault() is ListViewItem { Tag: HumanAction action }) await ShowHumanActionAsync(action);
             };
-            body.Children.Add(Ui.Card(actions));
+            records.Children.Add(Ui.Card(actions));
         }
 
-        body.Children.Add(Ui.Heading("agents.executions.title", S.Text(UiStrings.WindowsAgentsExecutions)));
+        records.Children.Add(Ui.Heading("agents.executions.title", S.Text(UiStrings.WindowsAgentsExecutions)));
         if (state.Executions.Unavailable is { } why)
         {
             _executions = [];
-            body.Children.Add(Ui.Card(Ui.UnavailableNotice("agents.unavailable", UiStrings.WindowsAgentsUnavailable, why)));
+            records.Children.Add(Ui.Card(Ui.UnavailableNotice("agents.unavailable", UiStrings.WindowsAgentsUnavailable, why)));
             return;
         }
         _executions = state.Executions.Value!;
         if (_executions.Count == 0)
         {
-            body.Children.Add(Ui.Text("agents.empty", S.Text(UiStrings.WindowsAgentsEmpty)));
+            records.Children.Add(Ui.Text("agents.empty", S.Text(UiStrings.WindowsAgentsEmpty)));
             return;
         }
         var list = Ui.Choice("agents.list", S.Text(UiStrings.WindowsAgentsExecutions));
@@ -96,8 +99,7 @@ public sealed partial class AgentsPage() : SurfacePage<AgentsState>(
         {
             if (e.AddedItems.FirstOrDefault() is ListViewItem { Tag: string id }) await ShowExecutionAsync(id);
         };
-        body.Children.Add(Ui.Card(list));
-        body.Children.Add(Ui.Card(_detail, "agents.detail"));
+        records.Children.Add(Ui.Card(list));
         if (_selected is { } selected && _executions.Any(e => e.ExecutionId == selected)) _ = ShowExecutionAsync(selected);
         else
         {

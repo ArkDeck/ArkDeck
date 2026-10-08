@@ -79,7 +79,9 @@ public sealed class AccessibilityTests
             // The actions a keyboard user must reach: every button of the page.
             var pageRoot = app.Find(page + ".page");
             var buttons = Buttons(pageRoot);
-            Assert.IsTrue(buttons.Contains(Refresh(page)), page);
+            // The page header is pinned above the body viewport.
+            app.Find(Refresh(page));
+            buttons.Add(Refresh(page));
 
             var forward = Walk(app, file, backward: false);
             var ids = forward.Select(s => s.Id).ToList();
@@ -241,6 +243,7 @@ public sealed class AccessibilityTests
             app.Invoke("history.artifact.export.ART-00000000000000000000000000000c01");
             app.Find("history.artifacts.exportPreview");
             EscapeCloses(app, "history.artifacts.exportPreview", "Escape closes the export preview");
+            app.ShowInspector();
             app.Select("jobInspector.row.job-0000000000000000000000000000a004");
             app.Invoke("jobInspector.cancel");
             app.Find("jobInspector.cancel.confirm");
@@ -378,6 +381,7 @@ public sealed class AccessibilityTests
         var strings = Catalogue.Load("en-US");
         foreach (var id in steps.Where(s => !s.StartsWith('@')))
         {
+            if (id.StartsWith("jobInspector.", StringComparison.Ordinal)) app.ShowInspector();
             var element = app.Find(id);
             if (element.Patterns.SelectionItem.IsSupported) element.Patterns.SelectionItem.Pattern.Select();
             else element.Patterns.Invoke.Pattern.Invoke();

@@ -22,6 +22,8 @@ public sealed partial class TraceViewerPage() : SurfacePage<TraceViewerState>(
     "traceViewer", "traceViewer.title", UiStrings.WindowsTraceViewerTitle,
     "traceViewer.refresh", UiStrings.WindowsTraceViewerReload, "traceViewer.loading", UiStrings.SettingsCommonLoading)
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     private readonly TraceRecents _recents = TraceRecents.In(App.Options.CacheRoot);
     private TextBlock _status = Ui.Status("trace.viewer.status");
     private TraceDocument? _document;
@@ -51,9 +53,11 @@ public sealed partial class TraceViewerPage() : SurfacePage<TraceViewerState>(
         ToolTipService.SetToolTip(capture, S.Text(UiStrings.WindowsTraceViewerCaptureHelp));
         AutomationProperties.SetHelpText(capture, S.Text(UiStrings.WindowsTraceViewerCaptureHelp));
         body.Children.Add(Ui.Row(capture, Ui.Button("trace.viewer.open", S.Text(UiStrings.WindowsTraceViewerOpen), async (_, _) => await ChooseAsync())));
-        body.Children.Add(Ui.Card(Recent(state), "trace.viewer.recent"));
-        body.Children.Add(Ui.Card(Timeline(state), "trace.viewer.timeline"));
-        body.Children.Add(Ui.Card(Inspector(state), "trace.viewer.inspector"));
+        var document = Ui.Stack(24,
+            Ui.Card(Recent(state), "trace.viewer.recent"),
+            Ui.Card(Timeline(state), "trace.viewer.timeline"));
+        body.Children.Add(new AdaptiveColumns([document, Ui.Card(Inspector(state), "trace.viewer.inspector")],
+            [2, 1], minimumColumnWidth: 280));
         body.Children.Add(_status);
     }
 

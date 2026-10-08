@@ -15,6 +15,9 @@ namespace ArkDeck.App.Controls;
 /// </summary>
 internal static class Ui
 {
+    internal static Windows.UI.ViewManagement.UISettings AccessibilitySettings { get; } = new();
+    internal static double LayoutTextScale => App.Options.TextScale * AccessibilitySettings.TextScaleFactor;
+
     private static Localizer S => App.Strings;
 
     public static TextBlock Text(string automationId, string text, string style = "ArkDeckBodyStyle")
@@ -27,6 +30,10 @@ internal static class Ui
             IsTextSelectionEnabled = true,
         };
         Scale(block);
+        // The deterministic accessibility probe uses the same system ink as a contrast theme.
+        if (App.Options.HighContrastTokens)
+            block.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                style == "ArkDeckCaptionStyle" ? "ArkDeckInk2Brush" : "ArkDeckInkBrush"];
         AutomationProperties.SetAutomationId(block, automationId);
         AutomationProperties.SetName(block, text);
         return block;
@@ -66,6 +73,22 @@ internal static class Ui
         if (automationId is not null) AutomationProperties.SetAutomationId(card, automationId);
         return card;
     }
+
+    /// <summary>A PowerToys-style group heading above its content card.</summary>
+    public static StackPanel Group(string titleId, string title, UIElement content, string? cardId = null) =>
+        Stack(8, Heading(titleId, title), Card(content, cardId));
+
+    /// <summary>Equal-width content panes, stacking in a narrow window or at large text sizes.</summary>
+    public static AdaptiveColumns Columns(params UIElement[] children) =>
+        new(children, minimumColumnWidth: children.Length > 2 ? 280 : 320);
+
+    /// <summary>A record list and its reader; the reader gets the larger share of the workspace.</summary>
+    public static AdaptiveColumns MasterDetail(UIElement list, UIElement detail) =>
+        new([list, detail], [2, 3], minimumColumnWidth: 300);
+
+    /// <summary>A labelled setting or fact, with its value aligned and bounded rather than shrink-wrapped.</summary>
+    public static AdaptiveColumns SettingRow(UIElement label, UIElement value) =>
+        new([label, value], [1, 2], minimumColumnWidth: 160, spacing: 12) { Padding = new Thickness(0, 4, 0, 4) };
 
     public static StackPanel Stack(double spacing = 8, params UIElement[] children)
     {
@@ -124,7 +147,7 @@ internal static class Ui
     /// <summary>A list of rows (one Tab stop, arrow keys between rows).</summary>
     public static ListView List(string automationId, string name)
     {
-        var list = new ListView { SelectionMode = ListViewSelectionMode.None };
+        var list = new ListView { SelectionMode = ListViewSelectionMode.None, HorizontalAlignment = HorizontalAlignment.Stretch };
         AutomationProperties.SetAutomationId(list, automationId);
         AutomationProperties.SetName(list, name);
         return list;
@@ -177,16 +200,9 @@ internal static class Ui
     /// a long value (a digest, a path) wraps inside the page instead of running past it.</summary>
     public static Grid Fact(string id, string label, string value)
     {
-        var grid = new Grid { ColumnSpacing = 8 };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var name = Text(id + ".label", label, "ArkDeckCaptionStyle");
-        name.MaxWidth = 280 * App.Options.TextScale;
+        var name = Text(id + ".label", label);
         var text = Text(id, value, "ArkDeckMonoStyle");
-        Grid.SetColumn(text, 1);
-        grid.Children.Add(name);
-        grid.Children.Add(text);
-        return grid;
+        return SettingRow(name, text);
     }
 
     /// <summary>The App's text size under <c>--text-scale</c> (layout tests only).</summary>
@@ -236,7 +252,7 @@ internal static class Ui
         return expander;
     }
 
-    private static T? Descendant<T>(DependencyObject root) where T : DependencyObject
+    internal static T? Descendant<T>(DependencyObject root) where T : DependencyObject
     {
         for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root); i++)
         {

@@ -82,9 +82,10 @@ public sealed partial class FlashPage() : SurfacePage<FlashState>(
         {
             body.Children.Add(Ui.Text("flash.target.historyMissing", S.Text(UiStrings.FlashTargetHistoryMissing), "ArkDeckCaptionStyle"));
         }
-        body.Children.Add(Ui.Card(CurrentDevice(state), "flash.workspace.currentDevice.card"));
         _primary = new StackPanel { Spacing = 12 };
-        body.Children.Add(Ui.Card(_primary, "flash.workspace.primary"));
+        body.Children.Add(new AdaptiveColumns([
+            Ui.Card(CurrentDevice(state), "flash.workspace.currentDevice.card"),
+            Ui.Card(_primary, "flash.workspace.primary")], [1, 2], minimumColumnWidth: 260, spacing: 24));
         body.Children.Add(_status);
         RenderPrimary();
         // The macOS plain disclosure toggle: its title says what it will do.

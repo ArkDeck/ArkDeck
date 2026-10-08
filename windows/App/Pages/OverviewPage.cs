@@ -52,7 +52,7 @@ public sealed partial class OverviewPage() : SurfacePage<OverviewState>(
 
     /// <summary>macOS <c>deviceBar</c>: the adopted device online now that the page describes
     /// (a picker when there are several), and the remote build server bound to it.</summary>
-    private FlowPanel Scope(OverviewState state)
+    private AdaptiveColumns Scope(OverviewState state)
     {
         var online = OverviewScope.Online(state.Devices?.Value);
         if (_preferredTarget is not null && online.All(t => t.TargetId != _preferredTarget)) _preferredTarget = null;
@@ -102,7 +102,7 @@ public sealed partial class OverviewPage() : SurfacePage<OverviewState>(
             _remoteGeneration++;
             RenderRemote(remote, new RemoteServerBinding(RemoteServerBindingState.Unbound));
         }
-        return Ui.Row(device, remote);
+        return Ui.Columns(device, remote);
     }
 
     /// <summary>macOS <c>OverviewRemoteServerViewModel</c>: only an explicit binding of this
