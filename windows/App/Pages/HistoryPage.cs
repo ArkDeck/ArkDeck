@@ -24,6 +24,8 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
     "history", "history.title", UiStrings.AppNavigationHistory,
     "history.refresh", UiStrings.HistoryActionRefresh, "history.loading", UiStrings.HistoryLoading)
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     // Rebuilt by each render; an element is never moved between renders, so a kept Artifact
     // result is kept as the function that builds it.
     private StackPanel _detail = new() { Spacing = 8 };
@@ -73,10 +75,9 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             _tableHost = new StackPanel { Spacing = 8 };
             _filtersHost.Content = Filters();
             body.Children.Add(Ui.Card(_filtersHost, "history.filters"));
-            body.Children.Add(Ui.Card(_tableHost, "history.list"));
             RenderTable();
             _detail = new StackPanel { Spacing = 8 };
-            body.Children.Add(Ui.Card(_detail, "history.detail"));
+            body.Children.Add(Ui.MasterDetail(Ui.Card(_tableHost, "history.list"), Ui.Card(_detail, "history.detail")));
             if (_selected is { } selected && _jobs.Any(j => j.JobId == selected))
             {
                 DispatcherQueue.TryEnqueue(async () => await ShowDetailAsync(selected));

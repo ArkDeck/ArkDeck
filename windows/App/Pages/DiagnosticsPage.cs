@@ -23,6 +23,8 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
     "diagnostics", "diagnostics.title", UiStrings.AppNavigationDiagnostics,
     "diagnostics.session.reload", UiStrings.DiagnosticsSessionReload, "diagnostics.session.loading", UiStrings.DiagnosticsSessionLoading), IHistoryContextPage
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     private DiagnosticJobContext? _context;
     private DiagnosticsState? _state;
     private TextBlock _status = Ui.Status("diagnostics.status");
@@ -109,8 +111,9 @@ public sealed partial class DiagnosticsPage() : SurfacePage<DiagnosticsState>(
                     Ui.Text("diagnostics.partial", S.Text(UiStrings.DiagnosticsPartial), "ArkDeckSectionTitleStyle"),
                     Ui.Text("diagnostics.partial.detail", S.Text(UiStrings.DiagnosticsPartialDetail), "ArkDeckCaptionStyle"))));
             }
-            body.Children.Add(Ui.Card(SessionSection(session), "diagnostics.session"));
-            body.Children.Add(Ui.Card(Marks(session.Reading), "diagnostics.marks"));
+            body.Children.Add(Ui.Columns(
+                Ui.Card(SessionSection(session), "diagnostics.session"),
+                Ui.Card(Marks(session.Reading), "diagnostics.marks")));
             if (session.Reading.NotDerived.Count > 0)
             {
                 body.Children.Add(Ui.Card(Ui.Stack(4,

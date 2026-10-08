@@ -22,6 +22,8 @@ public sealed partial class SessionsPage() : SurfacePage<SessionsState>(
     "sessions", "sessions.title", UiStrings.WindowsNavigationSessions,
     "sessions.refresh", UiStrings.SettingsCommonRefresh, "sessions.loading", UiStrings.SettingsCommonLoading)
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     // Rebuilt by each render (an element is never moved between renders).
     private StackPanel _detail = new() { Spacing = 8 };
     private TextBlock _status = Ui.Status("sessions.status");
@@ -68,8 +70,7 @@ public sealed partial class SessionsPage() : SurfacePage<SessionsState>(
         {
             if (e.AddedItems.FirstOrDefault() is ListViewItem { Tag: string id }) ShowSession(id);
         };
-        body.Children.Add(Ui.Card(list));
-        body.Children.Add(Ui.Card(_detail, "sessions.detail"));
+        body.Children.Add(Ui.MasterDetail(Ui.Card(list), Ui.Card(_detail, "sessions.detail")));
         if (_selected is { } selected && _sessions.Any(s => s.SessionId == selected)) ShowSession(selected);
         else
         {

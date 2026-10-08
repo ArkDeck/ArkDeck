@@ -21,6 +21,8 @@ namespace ArkDeck.App.Core.Daemon;
 /// tests can check the high-contrast mapping without switching the system theme.</item>
 /// <item><c>--focus-walk &lt;file&gt;</c> (with <c>--test-transport</c> only): the keyboard tests'
 /// in-process Tab walk (see the App's <c>FocusWalk</c>) writes its stops to the file.</item>
+/// <item><c>--render-snapshot &lt;file&gt;</c> and <c>--test-theme light|dark</c> (with
+/// <c>--test-transport</c> only): native XAML visual checks with an explicit startup theme.</item>
 /// <item><c>--cache-root &lt;directory&gt;</c>: the App's own cache (the Trace inbox and the Trace
 /// viewer's recent list), by default <c>ArkDeck</c> in the per-user temporary directory — never
 /// the Runtime's state root.</item>
@@ -31,7 +33,7 @@ namespace ArkDeck.App.Core.Daemon;
 /// </summary>
 public sealed record LaunchOptions(string? Language, string? StartPage, string? TestTransport, double TextScale = 1.0, bool HighContrastTokens = false, string? FocusWalkFile = null,
     string? CacheRootOption = null, string? RemoteSourcesRoot = null, string? PreferencesRoot = null, string? PickedFolder = null,
-    string? TraceFile = null, bool FastTrustWait = false, int? LiveObservationMilliseconds = null)
+    string? TraceFile = null, bool FastTrustWait = false, int? LiveObservationMilliseconds = null, string? RenderSnapshotFile = null, string? TestTheme = null)
 {
     /// <summary>The Trace files the App opens when Windows hands it one (macOS
     /// <c>CFBundleDocumentTypes</c>: htrace, ftrace, systrace, trace).</summary>
@@ -45,6 +47,8 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
         var scale = 1.0;
         var highContrast = false;
         string? focusWalk = null;
+        string? renderSnapshot = null;
+        string? testTheme = null;
         string? cacheRoot = null;
         string? remoteSources = null;
         string? preferences = null;
@@ -61,6 +65,8 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
                 case "--test-transport" when i + 1 < args.Count: transport = args[++i]; break;
                 case "--high-contrast-tokens": highContrast = true; break;
                 case "--focus-walk" when i + 1 < args.Count: focusWalk = args[++i]; break;
+                case "--render-snapshot" when i + 1 < args.Count: renderSnapshot = args[++i]; break;
+                case "--test-theme" when i + 1 < args.Count: testTheme = args[++i]; break;
                 case "--cache-root" when i + 1 < args.Count: cacheRoot = Path.GetFullPath(args[++i]); break;
                 case "--remote-sources-root" when i + 1 < args.Count: remoteSources = Path.GetFullPath(args[++i]); break;
                 case "--preferences-root" when i + 1 < args.Count: preferences = Path.GetFullPath(args[++i]); break;
@@ -94,7 +100,9 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
             // The trust wait's window and the live observation's tick are the macOS ones (180 s
             // and 5 s, 10 s); only the scripted transport's tests shorten them, and its runs
             // observe no device unless they ask.
-            transport is not null && fastTrustWait, transport is null ? null : liveObservation);
+            transport is not null && fastTrustWait, transport is null ? null : liveObservation,
+            transport is null ? null : renderSnapshot,
+            transport is not null && (testTheme is "light" or "dark") ? testTheme : null);
     }
 }
 
@@ -113,6 +121,10 @@ public static class DaemonConfiguration
 {
     /// <summary>The ClientKit budget of one call (connect, authenticate, health, request).</summary>
     public static readonly TimeSpan CallBudget = TimeSpan.FromSeconds(10);
+
+    // These read-only projections inspect registered tools and projects. The installed CLI
+    // allows 30 seconds for the same reads; ordinary and Job calls keep their own budgets.
+    public static readonly TimeSpan InventoryReadBudget = TimeSpan.FromSeconds(30);
 
     public static IControlChannel Create(LaunchOptions options, Func<string, string?> environment, string appDirectory)
     {
@@ -133,14 +145,17 @@ public static class DaemonConfiguration
         {
             try
             {
-                return new SessionChannel(new ControlSession(new PipeEndpoint(endpoint), identity, CallBudget));
+                var pipe = new PipeEndpoint(endpoint);
+                return new SessionChannel(new ControlSession(pipe, identity, CallBudget),
+                    new ControlSession(pipe, identity, InventoryReadBudget));
             }
             catch (ServerAuthenticationException error)
             {
                 return new UnconfiguredChannel(error.Message);
             }
         }
-        return new SessionChannel(ControlSession.ForCurrentUser(identity, CallBudget));
+        return new SessionChannel(ControlSession.ForCurrentUser(identity, CallBudget),
+            ControlSession.ForCurrentUser(identity, InventoryReadBudget));
     }
 
     private static string? Value(Func<string, string?> environment, string name) =>

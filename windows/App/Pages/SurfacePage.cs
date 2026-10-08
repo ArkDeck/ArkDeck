@@ -17,7 +17,7 @@ public abstract partial class SurfacePage<TState> : UserControl, IRefreshable wh
 {
     protected static Localizer S => App.Strings;
 
-    private readonly StackPanel _body = new() { Spacing = 14 };
+    private readonly StackPanel _body = new() { Spacing = 24 };
     // Hosts only; a host is never a Tab stop of its own (the keyboard test found empty stops).
     private readonly ContentControl _progress = new() { IsTabStop = false };
     private bool _refreshing;
@@ -27,22 +27,41 @@ public abstract partial class SurfacePage<TState> : UserControl, IRefreshable wh
         ProgressId = progressId;
         ProgressKey = progressKey;
         AutomationProperties.SetAutomationId(this, rootId);
-        var header = new Grid { ColumnSpacing = 8 };
+        var header = new Grid { ColumnSpacing = 16, Margin = new Thickness(24, 24, 24, 20), MaxWidth = PageMaxWidth };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(Ui.Heading(titleId, S.Text(titleKey), AutomationHeadingLevel.Level1));
         var refresh = Ui.Button(refreshId, S.Text(refreshKey), async (_, _) => await RefreshAsync());
         Grid.SetColumn(refresh, 1);
         header.Children.Add(refresh);
-        var page = new StackPanel { Spacing = 14, Padding = new Thickness(24, 16, 24, 24), MaxWidth = 960, HorizontalAlignment = HorizontalAlignment.Left };
-        page.Children.Add(header);
-        page.Children.Add(_progress);
-        page.Children.Add(_body);
-        var scroll = new ScrollViewer { Content = page };
+        refresh.VerticalAlignment = VerticalAlignment.Center;
+        _body.MaxWidth = PageMaxWidth;
+        var scroll = new ScrollViewer
+        {
+            Content = _body,
+            Padding = new Thickness(24, 0, 24, 48),
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            HorizontalScrollMode = ScrollMode.Disabled,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
         // The page viewport, by which the layout tests measure what is visible.
         AutomationProperties.SetAutomationId(scroll, rootId + ".page");
-        Content = scroll;
+        var page = new Grid();
+        page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        page.Children.Add(header);
+        Grid.SetRow(_progress, 1);
+        _progress.Margin = new Thickness(24, 0, 24, 8);
+        page.Children.Add(_progress);
+        Grid.SetRow(scroll, 2);
+        page.Children.Add(scroll);
+        Content = page;
     }
+
+    /// <summary>Forms follow PowerToys' 1000 epx limit; readers opt into the workspace width.</summary>
+    protected virtual double PageMaxWidth => 1000;
 
     private string ProgressId { get; }
 

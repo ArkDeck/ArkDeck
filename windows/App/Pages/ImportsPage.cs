@@ -23,6 +23,8 @@ public sealed partial class ImportsPage() : SurfacePage<ImportsState>(
     "imports", "imports.title", UiStrings.WindowsNavigationImports,
     "imports.refresh", UiStrings.SettingsCommonRefresh, "imports.loading", UiStrings.SettingsCommonLoading)
 {
+    protected override double PageMaxWidth => double.PositiveInfinity;
+
     private static readonly (string Kind, string Key, string[] Extensions)[] Kinds =
     [
         (ImportKind.Hap, UiStrings.WindowsImportsKindHap, [".hap", ".hsp"]),
@@ -87,8 +89,7 @@ public sealed partial class ImportsPage() : SurfacePage<ImportsState>(
         {
             if (e.AddedItems.FirstOrDefault() is ListViewItem { Tag: string id }) await ShowImportAsync(id);
         };
-        body.Children.Add(Ui.Card(list));
-        body.Children.Add(Ui.Card(_detail, "imports.detail"));
+        body.Children.Add(Ui.MasterDetail(Ui.Card(list), Ui.Card(_detail, "imports.detail")));
         if (_selected is { } selected && _imports.Any(i => i.ImportId == selected)) _ = ShowImportAsync(selected);
         else
         {

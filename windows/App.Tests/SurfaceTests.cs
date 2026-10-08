@@ -159,6 +159,11 @@ public sealed class SurfaceTests
         Assert.AreEqual(new LaunchOptions(null, null, null), LaunchOptions.Parse(["--text-scale", "2.25", "--high-contrast-tokens", "--focus-walk", "x.json"]),
             "the test hooks exist only beside the scripted transport; a real run follows Windows");
         Assert.AreEqual("x.json", LaunchOptions.Parse(["--test-transport", "jobs", "--focus-walk", "x.json"]).FocusWalkFile);
+        Assert.IsNull(LaunchOptions.Parse(["--render-snapshot", "x.png"]).RenderSnapshotFile,
+            "a real run cannot enable the XAML capture hook");
+        Assert.AreEqual("x.png", LaunchOptions.Parse(["--test-transport", "jobs", "--render-snapshot", "x.png"]).RenderSnapshotFile);
+        Assert.IsNull(LaunchOptions.Parse(["--test-theme", "dark"]).TestTheme);
+        Assert.AreEqual("dark", LaunchOptions.Parse(["--test-transport", "jobs", "--test-theme", "dark"]).TestTheme);
         Assert.ThrowsExactly<ArgumentException>(() => ScriptedDaemon.Channel("no-such-scenario"));
     }
 }

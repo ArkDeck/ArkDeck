@@ -57,7 +57,7 @@ public sealed partial class DebugPage() : SurfacePage<DebugState>(
         {
             _targetId = targets.FirstOrDefault()?.TargetId;
         }
-        _tab = new StackPanel { Spacing = 14 };
+        _tab = new StackPanel { Spacing = 24 };
         if (_history is { } history)
         {
             body.Children.Add(HistoryContextBanner.Create(history, async () =>
@@ -79,7 +79,7 @@ public sealed partial class DebugPage() : SurfacePage<DebugState>(
         RenderTab();
     }
 
-    private FlowPanel TargetRow(DebugState state)
+    private AdaptiveColumns TargetRow(DebugState state)
     {
         var label = S.Text(UiStrings.DebugTargetLabel);
         var picker = new ComboBox { MinWidth = 230 };
@@ -106,12 +106,14 @@ public sealed partial class DebugPage() : SurfacePage<DebugState>(
             _targetChosen = true;
             await RefreshAsync();
         };
-        var row = Ui.Row(Ui.Text("debug.target.label", label, "ArkDeckCaptionStyle"), picker);
+        picker.HorizontalAlignment = HorizontalAlignment.Stretch;
+        picker.MaxWidth = 440;
+        var value = Ui.Stack(4, picker);
         if (Target is { } selected)
         {
-            row.Children.Add(Ui.Text("debug.target.binding", S.Format(UiStrings.DebugTargetBinding, selected.BindingRevision, selected.ToolVersion), "ArkDeckMonoStyle"));
+            value.Children.Add(Ui.Text("debug.target.binding", S.Format(UiStrings.DebugTargetBinding, selected.BindingRevision, selected.ToolVersion), "ArkDeckMonoStyle"));
         }
-        return row;
+        return Ui.SettingRow(Ui.Text("debug.target.label", label), value);
     }
 
     /// <summary>The five tabs as a Fluent SelectorBar (arrow keys between tabs), on the tab

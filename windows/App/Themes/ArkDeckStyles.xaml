@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Product styles of the ArkDeck App (from the SPK-4 spike), built only from the generated ArkDeck tokens (ArkDeckTokens.xaml) and WinUI's
-  own Fluent layer brushes. Surfaces use WinUI layer/card brushes so Mica shows through
-  (tokens.css panel colours are opaque web stand-ins, v0.8 §2); ink, lines, state colours,
-  spacing, radii and the type ramp come from the tokens. No hex values here.
+  Windows presentation uses the native Fluent type ramp and theme brushes, with the
+  shared brand accent and high-contrast tokens in ArkDeckTokens.xaml. No literal colours.
 -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -13,42 +11,49 @@
         <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
         <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="{StaticResource ArkDeckRadiusLg}" />
-        <Setter Property="Padding" Value="{StaticResource ArkDeckSpace5Thickness}" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="16" />
     </Style>
 
-    <Style x:Key="ArkDeckPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SubtitleTextBlockStyle}">
-        <Setter Property="FontFamily" Value="{StaticResource ArkDeckFontUi}" />
-        <Setter Property="FontSize" Value="{StaticResource ArkDeckTextTitle}" />
-        <Setter Property="Foreground" Value="{ThemeResource ArkDeckInkBrush}" />
+    <Style x:Key="ArkDeckPageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
     </Style>
 
     <Style x:Key="ArkDeckSectionTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyStrongTextBlockStyle}">
-        <Setter Property="FontFamily" Value="{StaticResource ArkDeckFontUi}" />
-        <Setter Property="FontSize" Value="{StaticResource ArkDeckTextLg}" />
-        <Setter Property="Foreground" Value="{ThemeResource ArkDeckInkBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
     </Style>
 
     <Style x:Key="ArkDeckBodyStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
-        <Setter Property="FontFamily" Value="{StaticResource ArkDeckFontUi}" />
-        <Setter Property="FontSize" Value="{StaticResource ArkDeckTextMd}" />
-        <Setter Property="Foreground" Value="{ThemeResource ArkDeckInkBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
     </Style>
 
     <Style x:Key="ArkDeckCaptionStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
-        <Setter Property="FontFamily" Value="{StaticResource ArkDeckFontUi}" />
-        <Setter Property="FontSize" Value="{StaticResource ArkDeckTextSm}" />
-        <Setter Property="Foreground" Value="{ThemeResource ArkDeckInk2Brush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorSecondaryBrush}" />
     </Style>
 
     <Style x:Key="ArkDeckMonoStyle" TargetType="TextBlock" BasedOn="{StaticResource BodyTextBlockStyle}">
         <Setter Property="FontFamily" Value="{StaticResource ArkDeckFontMono}" />
         <Setter Property="FontSize" Value="{StaticResource ArkDeckTextSm}" />
-        <Setter Property="Foreground" Value="{ThemeResource ArkDeckInkBrush}" />
+        <Setter Property="Foreground" Value="{ThemeResource TextFillColorPrimaryBrush}" />
     </Style>
 
     <Style x:Key="ArkDeckDividerStyle" TargetType="Rectangle">
         <Setter Property="Height" Value="1" />
-        <Setter Property="Fill" Value="{ThemeResource ArkDeckLineBrush}" />
+        <Setter Property="Fill" Value="{ThemeResource DividerStrokeColorDefaultBrush}" />
+    </Style>
+
+    <Style TargetType="ListViewItem">
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="Margin" Value="0,2,0,0" />
+    </Style>
+
+    <ItemsPanelTemplate x:Key="ArkDeckCategoryItemsPanel">
+        <ItemsWrapGrid Orientation="Horizontal" />
+    </ItemsPanelTemplate>
+
+    <!-- Scripted-transport visual checks use the native opaque Mica fallback. -->
+    <Style x:Key="ArkDeckSnapshotStyle" TargetType="Grid">
+        <Setter Property="Background" Value="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
     </Style>
 </ResourceDictionary>

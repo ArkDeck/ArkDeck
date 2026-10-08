@@ -24,11 +24,11 @@ public sealed partial class JobInspector : UserControl
 
     private readonly Button _toggle;
     private readonly TextBlock _compact;
-    private readonly StackPanel _expanded = new() { Spacing = 8 };
+    private readonly StackPanel _expanded = new() { Spacing = 8, Visibility = Visibility.Collapsed };
     private readonly StackPanel _list = new() { Spacing = 8 };
     private readonly StackPanel _detail = new() { Spacing = 8 };
     private readonly DispatcherQueueTimer _poll;
-    private bool _isExpanded = true;
+    private bool _isExpanded;
     private string? _selectedJob;
     private string? _lastState;
     private TextBlock? _stateText;
@@ -41,7 +41,7 @@ public sealed partial class JobInspector : UserControl
     {
         AutomationProperties.SetAutomationId(this, "jobInspector");
         AutomationProperties.SetName(this, S.Text(UiStrings.JobInspectorRuntimeFacts));
-        _toggle = Ui.Button("jobInspector.toggle", S.Text(UiStrings.JobInspectorActionHide), (_, _) => SetExpanded(!_isExpanded));
+        _toggle = Ui.Button("jobInspector.toggle", S.Text(UiStrings.JobInspectorActionShow), (_, _) => SetExpanded(!_isExpanded));
         // macOS Command-Shift-J.
         _toggle.KeyboardAccelerators.Add(new Microsoft.UI.Xaml.Input.KeyboardAccelerator
         {
@@ -56,15 +56,11 @@ public sealed partial class JobInspector : UserControl
             Ui.Button("jobInspector.refresh", S.Text(UiStrings.JobInspectorActionRefresh), async (_, _) => await RefreshAsync()),
             Ui.Button("jobInspector.openHistory", S.Text(UiStrings.JobInspectorActionOpenHistory), (_, _) => MainWindow.Instance.Select("history")),
             _compact);
-        var columns = new Grid { ColumnSpacing = 16 };
-        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        columns.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
-        columns.Children.Add(_list);
-        Grid.SetColumn(_detail, 1);
-        columns.Children.Add(_detail);
+        var columns = Ui.MasterDetail(_list, _detail);
         _expanded.Children.Add(new ScrollViewer { Content = columns, MaxHeight = 280 });
-        Content = Ui.Stack(8, bar, _expanded);
-        Padding = new Thickness(16, 8, 16, 8);
+        var content = Ui.Stack(8, bar, _expanded);
+        content.Padding = new Thickness(16, 8, 16, 8);
+        Content = content;
 
         _poll = DispatcherQueue.GetForCurrentThread().CreateTimer();
         _poll.Interval = PollInterval;

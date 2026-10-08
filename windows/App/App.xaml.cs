@@ -32,6 +32,7 @@ public partial class App : Application
     public App()
     {
         Options = LaunchOptions.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray());
+        if (Options.TestTheme is { } theme) RequestedTheme = theme == "dark" ? ApplicationTheme.Dark : ApplicationTheme.Light;
 
         // AC-I18N-001: the App's language is set explicitly before any UI exists, so WinUI's
         // own strings (NavigationView, TitleBar) and the catalogue agree (SPK-4 finding 3).

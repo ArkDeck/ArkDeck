@@ -117,11 +117,11 @@ internal sealed class AppSession : IDisposable
     }
 
     /// <summary>Waits until the element's name satisfies <paramref name="predicate"/>.</summary>
-    public string WaitForName(string automationId, Func<string, bool> predicate)
+    public string WaitForName(string automationId, Func<string, bool> predicate, TimeSpan? timeout = null)
     {
         var watch = Stopwatch.StartNew();
         var last = "";
-        while (watch.Elapsed < Timeout)
+        while (watch.Elapsed < (timeout ?? Timeout))
         {
             if (TryFind(automationId, TimeSpan.FromMilliseconds(200)) is { } element)
             {
@@ -143,6 +143,16 @@ internal sealed class AppSession : IDisposable
 
     /// <summary>Selects a list item (UIA SelectionItem pattern, no synthetic input).</summary>
     public void Select(string automationId) => Find(automationId).Patterns.SelectionItem.Pattern.Select();
+
+    /// <summary>Tests of the inspector's expanded facts explicitly open the compact footer.</summary>
+    public void ShowInspector()
+    {
+        var toggle = Find("jobInspector.toggle");
+        if (new[] { "en-US", "zh-Hans" }.Any(language => Name(toggle) == Catalogue.Load(language)["jobInspector.action.show"]))
+            toggle.Patterns.Invoke.Pattern.Invoke();
+        WaitForName("jobInspector.toggle", name => new[] { "en-US", "zh-Hans" }
+            .Any(language => name == Catalogue.Load(language)["jobInspector.action.hide"]));
+    }
 
     public static string Name(AutomationElement element)
     {

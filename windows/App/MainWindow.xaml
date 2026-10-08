@@ -17,6 +17,7 @@
 
         <TitleBar
             x:Name="AppTitleBar"
+            Height="48"
             IsBackButtonVisible="False"
             IsPaneToggleButtonVisible="True"
             PaneToggleRequested="TitleBar_PaneToggleRequested">
@@ -33,7 +34,13 @@
             IsPaneToggleButtonVisible="False"
             IsSettingsVisible="False"
             PaneDisplayMode="Auto"
+            OpenPaneLength="240"
+            CompactPaneLength="48"
             SelectionChanged="NavView_SelectionChanged">
+            <NavigationView.Resources>
+                <SolidColorBrush x:Key="NavigationViewContentBackground" Color="Transparent" />
+                <Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+            </NavigationView.Resources>
             <NavigationView.MenuItems>
                 <NavigationViewItemHeader x:Name="SectionDevice" />
                 <NavigationViewItem x:Name="NavOverview" Tag="overview" AccessKey="O" AutomationProperties.AutomationId="app.navigation.overview">
@@ -82,6 +89,9 @@
                 </NavigationViewItem>
             </NavigationView.FooterMenuItems>
 
+            <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -124,6 +134,7 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="0,1,0,0" />
             </Grid>
+            </Border>
         </NavigationView>
     </Grid>
 </Window>

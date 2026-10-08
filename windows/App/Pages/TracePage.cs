@@ -110,7 +110,7 @@ public sealed partial class TracePage() : SurfacePage<TraceState>(
         var header = Ui.Row(
             Ui.Heading("trace.capture.title", S.Text(UiStrings.TraceCaptureTitle), AutomationHeadingLevel.Level2),
             Ui.Text("trace.availability.status", S.Text(availabilityKey)));
-        var capture = Ui.Stack(12, header, Device(state), Profile(), DurationSection(state));
+        var capture = Ui.Stack(16, header, Ui.Columns(Device(state), Profile()), DurationSection(state));
         _footer = new StackPanel { Spacing = 8 };
         capture.Children.Add(new Border { Height = 1, Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["DividerStrokeColorDefaultBrush"] });
         capture.Children.Add(_footer);
