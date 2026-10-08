@@ -5,6 +5,13 @@ use crate::operation_catalog::CatalogOperation;
 use crate::operation_request::OperationRequest;
 use std::collections::{BTreeMap, BTreeSet};
 
+// Read-side input-schema compatibility only. Neither this pair nor its
+// descriptor lookup grants execution, facts or capability authority.
+const HISTORICAL_INPUT_CATALOG: &str =
+    "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036";
+const OBSERVED_INPUT_CATALOG: &str =
+    "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7";
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ImportReference {
     pub(crate) value: String,
@@ -112,6 +119,7 @@ impl JobStore {
         let mut found = Vec::new();
         for row in &rows {
             let record = JobRecord::from_row(row)?;
+            let mut unsettled = false;
             if !record.verifies_submission(&row.request_hash) {
                 return Err(unreadable(()));
             }
@@ -155,22 +163,40 @@ impl JobStore {
                     let facts = replay.state.facts(replay.torn);
                     if facts.has_torn_tail
                         || facts.current_state.as_deref() != Some(&record.state)
-                        || !facts.finalized
                         || !facts.outstanding_intents.is_empty()
                         || !facts.unknown_outcomes.is_empty()
                         || facts.requires_unknown_finalized_outcome
                     {
                         return Err(unreadable(()));
                     }
+                    // Missing publication finalization cannot settle this
+                    // owner's inputs, but it does not obscure an unrelated
+                    // Import's references when the complete source is known.
+                    unsettled = !facts.finalized;
                 }
             }
-            if !record.requires_session_retention() {
+            if !unsettled && !record.requires_session_retention() {
                 continue;
             }
             let request =
                 OperationRequest::decode(&serde_json::to_vec(&record.request).map_err(unreadable)?)
                     .map_err(unreadable)?;
-            let refs = if record.catalog_digest() == arkdeck_contract::CATALOG_DIGEST {
+            let refs = if unsettled {
+                let current = arkdeck_contract::CATALOG_DIGEST;
+                let compatible = record.catalog_digest() == current
+                    || (record.catalog_digest() == HISTORICAL_INPUT_CATALOG
+                        && matches!(current, HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG));
+                if !compatible {
+                    return Err(unreadable(()));
+                }
+                let descriptor =
+                    CatalogOperation::lookup(&request.operation_id, request.operation_version)
+                        .ok_or_else(|| unreadable(()))?;
+                descriptor
+                    .validate_inputs(&request.inputs)
+                    .map_err(unreadable)?;
+                ImportReference::inputs(&request.inputs, descriptor).map_err(unreadable)?
+            } else if record.catalog_digest() == arkdeck_contract::CATALOG_DIGEST {
                 if let Some(descriptor) =
                     CatalogOperation::lookup(&request.operation_id, request.operation_version)
                 {
@@ -190,6 +216,11 @@ impl JobStore {
                 refs.into_iter().collect()
             };
             if refs.iter().any(|reference| reference.import_id == import) {
+                // Do not project a terminal storage owner as an active Job or
+                // release its input based on a publication marker alone.
+                if unsettled {
+                    return Err(unreadable(()));
+                }
                 if found.len() >= 1000 {
                     return Err(failure(
                         "inputTooLarge",
