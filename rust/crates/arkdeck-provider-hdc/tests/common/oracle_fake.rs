@@ -314,6 +314,14 @@ impl OracleFake {
         if all == "list targets -v" {
             return Self::fixture_device(&all, mode).unwrap();
         }
+        if [
+            format!("-t {KEY} shell param get const.product.name"),
+            format!("-t {KEY} shell param get const.ohos.fullname"),
+        ]
+        .contains(&all)
+        {
+            return Self::device_basics(&all, KEY).unwrap();
+        }
         let arg = |n: usize| argv.get(n - 1).map(String::as_str).unwrap_or_default();
         let running = self.root.join("device-running");
         let published = self.root.join("device-published");

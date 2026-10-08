@@ -127,6 +127,19 @@ fn hap_plan_digest(
     resolved: &[ResolvedArtifact],
     now: &str,
 ) -> Result<String, PlanRefusal> {
+    let document = hap_plan_document(request, descriptor, facts, resolved, now)?;
+    Ok(sha256_hex(
+        &session_json::encode(&document).map_err(|_| internal_failure())?,
+    ))
+}
+
+fn hap_plan_document(
+    request: &OperationRequest,
+    descriptor: &CatalogOperation,
+    facts: &DeviceFacts,
+    resolved: &[ResolvedArtifact],
+    now: &str,
+) -> Result<Value, PlanRefusal> {
     let mut steps = Vec::new();
     for step in descriptor
         .steps
@@ -155,13 +168,12 @@ fn hap_plan_digest(
             now,
         )?);
     }
-    let document = json!({"operationReference": descriptor.reference(), "catalogDigest": CATALOG_DIGEST,
+    Ok(
+        json!({"operationReference": descriptor.reference(), "catalogDigest": CATALOG_DIGEST,
         "inputs": request.inputs, "targetID": request.target_id,
         "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
-        "providerID": descriptor.provider, "steps": steps});
-    Ok(sha256_hex(
-        &session_json::encode(&document).map_err(|_| internal_failure())?,
-    ))
+        "providerID": descriptor.provider, "steps": steps}),
+    )
 }
 
 fn materialize_step(
@@ -356,7 +368,24 @@ mod tests {
             workspace_revision: None,
             workspace_file_scopes_digest: None,
         };
-        let policy = crate::capability_policy::policy_fingerprint(&query, false);
+        let historical_policy = |query: &CapabilityQuery| {
+            let material = crate::capability_policy::recovery_policy_material(query, false, None);
+            assert_eq!(
+                crate::capability_policy::policy_fingerprint(query, false),
+                sha256_hex(material.as_bytes()).to_uppercase()
+            );
+            let scope = material
+                .strip_prefix(&format!("{CATALOG_DIGEST}\n"))
+                .unwrap();
+            sha256_hex(
+                format!(
+                    "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036\n{scope}"
+                )
+                .as_bytes(),
+            )
+            .to_uppercase()
+        };
+        let policy = historical_policy(&query);
         assert!(
             record["request"]["authorization"]["capabilityId"]
                 .as_str()
@@ -368,17 +397,11 @@ mod tests {
             query
                 .artifact_facts
                 .insert(field.into(), "different".into());
-            assert_ne!(
-                crate::capability_policy::policy_fingerprint(&query, false),
-                policy
-            );
+            assert_ne!(historical_policy(&query), policy);
             query.artifact_facts.insert(field.into(), original);
         }
         query.artifact_facts.clear();
-        assert_ne!(
-            crate::capability_policy::policy_fingerprint(&query, false),
-            policy
-        );
+        assert_ne!(historical_policy(&query), policy);
         entry.row["byteCount"] = json!("24");
         assert!(
             primary_facts(&entry).is_err(),
@@ -425,6 +448,7 @@ mod tests {
             }
         };
         let mut replayed = 0;
+        let mut capsule_rows = Vec::new();
         for exchange in cases["exchanges"]
             .as_array()
             .unwrap()
@@ -461,7 +485,17 @@ mod tests {
                         .map(|lease| resolve(lease.as_str().unwrap())),
                 );
             }
+            let mut current = hap_plan_document(
+                &request,
+                descriptor,
+                &facts,
+                &resolved,
+                "2026-09-14T00:00:00Z",
+            )
+            .unwrap();
+            assert_eq!(current["catalogDigest"], CATALOG_DIGEST);
             assert_eq!(
+                sha256_hex(&session_json::encode(&current).unwrap()),
                 hap_plan_digest(
                     &request,
                     descriptor,
@@ -469,16 +503,80 @@ mod tests {
                     &resolved,
                     "2026-09-14T00:00:00Z"
                 )
-                .unwrap(),
+                .unwrap()
+            );
+            // The complete lowering is unchanged. Replacing only the exact
+            // frozen Catalog restores the independently recorded old digest;
+            // inputs, timeout, arguments, image and every step remain checked.
+            let mut historical = current.clone();
+            let historical_catalog = exchange["answer"]["result"]["catalogDigest"]
+                .as_str()
+                .unwrap();
+            assert_eq!(
+                historical_catalog,
+                "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036"
+            );
+            historical["catalogDigest"] = json!(historical_catalog);
+            assert_eq!(
+                sha256_hex(&session_json::encode(&historical).unwrap()),
                 exchange["answer"]["result"]["materializedPlanDigest"]
                     .as_str()
                     .unwrap(),
                 "{}",
                 exchange["name"]
             );
+            // The HAP descriptor/lowering is identical in both compiled
+            // views. Its complete original hash was proved above; bind the
+            // immutable e4 capsule separately from this view's actual hash.
+            current["catalogDigest"] =
+                json!("e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7");
+            capsule_rows.push(json!({
+                "case": exchange["name"],
+                "requestJson": exchange["params"]["requestJson"],
+                "historicalPlanSha256": exchange["answer"]["result"]["materializedPlanDigest"],
+                "currentPlanSha256": sha256_hex(&session_json::encode(&current).unwrap()),
+                "completeCurrentPlan": current,
+            }));
             replayed += 1;
         }
         assert_eq!(replayed, 10);
+        let capsule = json!({
+            "schemaVersion": "arkdeck.test-hap-plan-lineage/1",
+            "sourceFixture": "debug-hap",
+            "sourceCasesSha256": sha256_hex(&std::fs::read(fixture.join("cases.json")).unwrap()),
+            "catalogLineagePacketSha256": "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab",
+            "rows": capsule_rows,
+        });
+        let path = fixture
+            .parent()
+            .unwrap()
+            .join("catalog-lineage-c6-e4/hap-plans.json");
+        if let Some(output) = std::env::var_os("ARKDECK_RECORD_HAP_PLAN_CAPSULE") {
+            let destination = PathBuf::from(output);
+            let source = std::env::var_os("ARKDECK_CARGO_SOURCE_ROOT").map(PathBuf::from);
+            let permitted = source.map_or(path.clone(), |source| {
+                source.join("rust/tests/fixtures/catalog-lineage-c6-e4/hap-plans.json")
+            });
+            assert_eq!(
+                destination, permitted,
+                "only the named versioned capsule may be recorded"
+            );
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&destination)
+                .unwrap();
+            file.write_all(&serde_json::to_vec_pretty(&capsule).unwrap())
+                .unwrap();
+            file.sync_all().unwrap();
+        } else {
+            assert_eq!(
+                read(path),
+                capsule,
+                "the complete source-bound capsule is reproduced independently"
+            );
+        }
     }
     #[test]
     fn native_consumed_step_digest_includes_ordered_compensations() {

@@ -1,5 +1,5 @@
 {
-  "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+  "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
   "contractIdentity": "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2",
   "corpusFileCount": 110,
   "corpusMethodCounts": {
@@ -560,7 +560,7 @@
     "successes": 605
   },
   "directoryDigests": {
-    "Catalog/operations": "58f3e09fd8319d1bd23fad65ea35645eb4db444e8b51f9377cba3dd4f941ae6a",
+    "Catalog/operations": "1fcc3c4891428c4ae44903f4c60270deffe786483278d1a655cbcd22261de3c4",
     "Catalog/profiles": "b385e1efc8f3a3af52770c02d8885340e2cf4b206e84ad6fe3f7903f10cebd80",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "a0a16fc2f4d7d0c46f9efeee79d9c779ac084bb64858ed82d7c1786d1f40b52c",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
@@ -568,8 +568,8 @@
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
-      "blob": "a9953fb1104d12330010c1533c07b7e47bd326fc",
-      "sha256": "999b94ce6b927ce0031a8ad629283607ad64341a19a37426d2a4306e02cb322f"
+      "blob": "9f04a401105eccdafb1fbbd66b0cec80808c1ff0",
+      "sha256": "94b426dfd5117ccce51b897240be576e89c84195df735f3507ac996342643b30"
     },
     "Catalog/operations/analyzer.analyze-trace.v1.json": {
       "blob": "0a12b2f04854bc18c4b98381d4cc0bc1a6115c3e",
@@ -608,8 +608,8 @@
       "sha256": "ed124a35b09c731ba1aea591023e553bf78e2c24317ede5d41143d1ae8edbc01"
     },
     "Catalog/operations/deploy.native-library.app-owned.v1.json": {
-      "blob": "ec4d465fadcfa831488db124abce7400004923c0",
-      "sha256": "7a9e2ddc70a18a537939347999b0a0d5d628307d41955167e97dc312c67e1f4b"
+      "blob": "df6d175d7e76823c7bef21999bbb8fb06bd44cea",
+      "sha256": "1e02cabd4c6edc521d0db74cacbc18747223f95e723543512ad355ce9f3f8407"
     },
     "Catalog/operations/flash.dayu200.json": {
       "blob": "e2a475ee05cec391b6c245303eca8a6f48c36259",
@@ -1800,7 +1800,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "8417a3a15d06897be78ed4653b35b87b92708af86a74677317892fad377f1b9f",
+  "inputDigest": "39adc93ba5e29a99d8241eddd8488e51312cd42439c654985fd35a4c5c460b53",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

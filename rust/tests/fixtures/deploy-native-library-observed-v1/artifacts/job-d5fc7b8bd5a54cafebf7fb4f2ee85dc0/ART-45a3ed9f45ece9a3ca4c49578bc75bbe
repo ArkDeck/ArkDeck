@@ -1,0 +1,16 @@
+{
+  "abi" : "arm64-v8a",
+  "artifact" : "verification-report.json",
+  "attestation" : "matchesReplacedFile:none",
+  "buildId" : "00112233445566778899aabbccddeeff10213243",
+  "catalogDigest" : "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+  "firmware" : "OpenHarmony-4.1-release",
+  "jobId" : "job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+  "loaderVerified" : "true",
+  "model" : "OpenHarmony Reference Device",
+  "operation" : "deploy.native-library.app-owned@1",
+  "processIds" : "4321",
+  "publishedSha256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+  "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "transport" : "usb"
+}

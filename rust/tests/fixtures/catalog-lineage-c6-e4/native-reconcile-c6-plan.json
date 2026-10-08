@@ -1,0 +1,915 @@
+{
+  "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+  "catalogLineagePacketSha256": "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab",
+  "completePlan": {
+    "bindingRevision": 1,
+    "catalogDigest": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+    "inputs": {
+      "expectedABI": "arm64-v8a",
+      "libraryArtifactLease": "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName": "libexample.so",
+      "restartProfile": "restartAbility",
+      "rollbackPolicy": "autoRollback",
+      "targetBundle": "com.example.demo",
+      "verificationProfile": "hashProcessAndMaps"
+    },
+    "operationReference": "deploy.native-library.app-owned@1",
+    "providerID": "hdc",
+    "stableTargetIdentitySHA256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps": [
+      {
+        "binding": "none",
+        "cancellation": "immediate",
+        "effect": "hostOnly",
+        "isOptional": false,
+        "kind": "verifyArtifact",
+        "processKind": "engine",
+        "stepID": "verify-elf-locally"
+      },
+      {
+        "binding": "none",
+        "cancellation": "immediate",
+        "effect": "hostOnly",
+        "isOptional": false,
+        "kind": "hashFile",
+        "processKind": "engine",
+        "stepID": "hash-library"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "effect": "deviceMutation",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "remotePath": "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging",
+          "sourceArtifactId": "ART-469c10579b3c5461ab4d0a891c316397",
+          "sourceSha256": "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53"
+        },
+        "kind": "sendFile",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "mkdir",
+              "-p",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 300
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "file",
+              "send",
+              "/private/tmp/arkdeck-hdc-oracle/host/arkdeck-code-sign-enable",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "chmod",
+              "700",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "send-to-staging"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "effect": "readOnly",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "actionId": "nativeLibraryInspection",
+          "artifactId": "native-library-readback",
+          "catalogId": "arkdeck-remote-operations",
+          "parameters": {
+            "buildId": "00112233445566778899aabbccddeeff10213243",
+            "expectation": "stagingMatchesArtifact",
+            "expectedSha256": "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+            "targetPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+          }
+        },
+        "kind": "runApprovedRemoteRead",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-l",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 15
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "verify-remote-staging"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "effect": "deviceMutation",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "actionId": "nativeLibraryBackup",
+          "artifactId": "native-library-mutation",
+          "catalogId": "arkdeck-remote-operations",
+          "confirmationId": "runtime-capability-admission",
+          "parameters": {
+            "backupPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup",
+            "buildId": "00112233445566778899aabbccddeeff10213243",
+            "expectedSha256": "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+            "rollbackStagingPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback",
+            "stagingPath": "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging",
+            "targetPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+          }
+        },
+        "kind": "runApprovedRemoteMutation",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ld",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-l",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ln",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-l",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-la",
+              "/data/app/el1/bundle/public/com.example.demo/libs"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 15
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "backup-current-version"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "effect": "deviceMutation",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "actionId": "nativeLibraryAtomicPublish",
+          "artifactId": "native-library-mutation",
+          "catalogId": "arkdeck-remote-operations",
+          "confirmationId": "runtime-capability-admission",
+          "parameters": {
+            "backupPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup",
+            "buildId": "00112233445566778899aabbccddeeff10213243",
+            "expectedSha256": "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+            "rollbackStagingPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback",
+            "stagingPath": "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging",
+            "targetPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+          }
+        },
+        "kind": "runApprovedRemoteMutation",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ln",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable",
+              "verify",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable",
+              "publish",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable",
+              "verify",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ln",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 15
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "atomic-publish"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "effect": "deviceMutation",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo"
+        },
+        "kind": "stopApplication",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "force-stop",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sleep",
+              "2"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 5
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "restart-target"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "effect": "deviceMutation",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "abilityName": "EntryAbility",
+          "bundleName": "com.example.demo"
+        },
+        "kind": "startApplication",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sleep",
+              "2"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 5
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "start-target"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "immediate",
+        "effect": "readOnly",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "expectedState": "loaded:f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+          "probeId": "native-library-loader"
+        },
+        "kind": "verifyRemoteState",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable",
+              "verify",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable",
+              "verify",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "grep",
+              "-F",
+              "/data/storage/el1/bundle/libs/arm/libexample.so",
+              "/proc/*/maps"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "verify-loaded-library"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "effect": "deviceMutation",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": true,
+        "journalArguments": {
+          "ownershipEvidenceId": "owned-job-authorization-envelope",
+          "remotePath": "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging"
+        },
+        "kind": "cleanupOwnedRemotePath",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rmdir",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ld",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ld",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/arkdeck-code-sign-enable"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ld",
+              "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ld",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 15
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ls",
+              "-ld",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 15
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "cleanup-staging-and-backup"
+      },
+      {
+        "binding": "none",
+        "cancellation": "atSafeBoundary",
+        "effect": "hostOnly",
+        "isOptional": false,
+        "kind": "finalizeSession",
+        "processKind": "engine",
+        "stepID": "finalize-session"
+      },
+      {
+        "binding": "confirmedDevice",
+        "cancellation": "atSafeBoundary",
+        "effect": "deviceMutation",
+        "executableSHA256": "resolved-at-dispatch",
+        "isOptional": false,
+        "journalArguments": {
+          "actionId": "nativeLibraryRollback",
+          "artifactId": "native-library-mutation",
+          "catalogId": "arkdeck-remote-operations",
+          "confirmationId": "runtime-capability-admission",
+          "parameters": {
+            "backupPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup",
+            "buildId": "00112233445566778899aabbccddeeff10213243",
+            "expectedSha256": "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+            "rollbackStagingPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback",
+            "stagingPath": "/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-authorization-envelope/libexample.so.staging",
+            "targetPath": "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+          }
+        },
+        "kind": "runApprovedRemoteMutation",
+        "processInvocations": [
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup"
+            ],
+            "continueAfterNonZero": false,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "force-stop",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sleep",
+              "2"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 5
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "rm",
+              "-f",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "ln",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.backup",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "mv",
+              "-f",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-authorization-envelope.rollback",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sha256sum",
+              "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "aa",
+              "start",
+              "-b",
+              "com.example.demo",
+              "-a",
+              "EntryAbility"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 60
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "sleep",
+              "2"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 5
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "pidof",
+              "com.example.demo"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          },
+          {
+            "arguments": [
+              "-t",
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "shell",
+              "grep",
+              "-F",
+              "/data/storage/el1/bundle/libs/arm/libexample.so",
+              "/proc/*/maps"
+            ],
+            "continueAfterNonZero": true,
+            "timeoutSeconds": 30
+          }
+        ],
+        "processKind": "processSequence",
+        "stepID": "rollback-native-library"
+      }
+    ],
+    "targetID": "TGT-3ba3f5f43b92"
+  },
+  "originalNativeCasesSha256": "62646bc4cbc150fb4ceb1315453f4ea861b4b87d184d4be4c69e838e06698763",
+  "planSha256": "b60595abb20fc9f86c2e570f31bbf16803b3a95dea1996c037abbd4ad6a6aab3",
+  "rows": [
+    {
+      "case": "published.submit",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-mutation-published\",\"inputs\":{\"expectedABI\":\"arm64-v8a\",\"libraryArtifactLease\":\"lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397\",\"libraryLogicalName\":\"libexample.so\",\"restartProfile\":\"restartAbility\",\"rollbackPolicy\":\"autoRollback\",\"targetBundle\":\"com.example.demo\",\"verificationProfile\":\"hashProcessAndMaps\"},\"operation\":{\"id\":\"deploy.native-library.app-owned\",\"version\":1},\"requestId\":\"req-mutation-published\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "unpublished.submit",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-mutation-unpublished\",\"inputs\":{\"expectedABI\":\"arm64-v8a\",\"libraryArtifactLease\":\"lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397\",\"libraryLogicalName\":\"libexample.so\",\"restartProfile\":\"restartAbility\",\"rollbackPolicy\":\"autoRollback\",\"targetBundle\":\"com.example.demo\",\"verificationProfile\":\"hashProcessAndMaps\"},\"operation\":{\"id\":\"deploy.native-library.app-owned\",\"version\":1},\"requestId\":\"req-mutation-unpublished\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    },
+    {
+      "case": "afterUnknown.submit",
+      "requestJson": "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-mutation-afterUnknown\",\"inputs\":{\"expectedABI\":\"arm64-v8a\",\"libraryArtifactLease\":\"lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397\",\"libraryLogicalName\":\"libexample.so\",\"restartProfile\":\"restartAbility\",\"rollbackPolicy\":\"autoRollback\",\"targetBundle\":\"com.example.demo\",\"verificationProfile\":\"hashProcessAndMaps\"},\"operation\":{\"id\":\"deploy.native-library.app-owned\",\"version\":1},\"requestId\":\"req-mutation-afterUnknown\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+    }
+  ],
+  "schemaVersion": "arkdeck.test-native-reconcile-plan/1",
+  "sourceCasesSha256": "b26bda6e6f6ee57e1890d492cb8c409e6a005acfa02e13d5049019e179767e5e",
+  "sourceProvenanceSha256": "736dd3012a56d74b6bb83b0bb4f9767dcc36b711ebc4921b064417176e520413",
+  "sourceRoot": "/private/tmp/arkdeck-hdc-oracle"
+}

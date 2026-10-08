@@ -113,6 +113,19 @@ fn native_plan_digest(
     context: &StepContext<'_>,
     now: &str,
 ) -> Result<String, PlanRefusal> {
+    let document = native_plan_document(request, descriptor, facts, context, now)?;
+    Ok(sha256_hex(
+        &session_json::encode(&document).map_err(|_| internal_failure())?,
+    ))
+}
+
+fn native_plan_document(
+    request: &OperationRequest,
+    descriptor: &CatalogOperation,
+    facts: &DeviceFacts,
+    context: &StepContext<'_>,
+    now: &str,
+) -> Result<Value, PlanRefusal> {
     let reference = descriptor.reference();
     let mut steps = Vec::new();
     for step in descriptor
@@ -134,13 +147,12 @@ fn native_plan_digest(
         context,
         now,
     )?);
-    let document = json!({"operationReference": reference, "catalogDigest": CATALOG_DIGEST,
+    Ok(
+        json!({"operationReference": reference, "catalogDigest": CATALOG_DIGEST,
         "inputs": request.inputs, "targetID": request.target_id,
         "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
-        "providerID": descriptor.provider, "steps": steps});
-    Ok(sha256_hex(
-        &session_json::encode(&document).map_err(|_| internal_failure())?,
-    ))
+        "providerID": descriptor.provider, "steps": steps}),
+    )
 }
 
 /// A resolved input as its provider is given it: its identity, its digest
@@ -195,25 +207,32 @@ fn materialize_step(
     if action.effect() != step.effect {
         return Err(internal_failure());
     }
-    let FilePlan::Sequence(invocations) = action
+    let plan = action
         .plan(&step.step_id, Some(&facts.connect_key), context)
-        .map_err(preflight)?
-    else {
-        return Err(internal_failure());
-    };
+        .map_err(preflight)?;
     document["journalArguments"] =
         device_steps::journal_arguments_in(step, reference, &request.inputs, &action, context)
             .ok_or_else(internal_failure)?;
-    document["processKind"] = json!("processSequence");
     document["executableSHA256"] = json!("resolved-at-dispatch");
-    document["processInvocations"] = invocations
-        .iter()
-        .map(|invocation| {
-            json!({"arguments": invocation.arguments,
-                "timeoutSeconds": invocation.timeout.as_secs(),
-                "continueAfterNonZero": invocation.continue_after_non_zero})
-        })
-        .collect();
+    match plan {
+        FilePlan::Process(plan) if device_steps::evidence_preflight_step(step) => {
+            document["processKind"] = json!("process");
+            document["argumentSummary"] = json!(plan.arguments);
+            document["timeoutSeconds"] = json!(plan.timeout.as_secs());
+        }
+        FilePlan::Sequence(invocations) => {
+            document["processKind"] = json!("processSequence");
+            document["processInvocations"] = invocations
+                .iter()
+                .map(|invocation| {
+                    json!({"arguments": invocation.arguments,
+                    "timeoutSeconds": invocation.timeout.as_secs(),
+                    "continueAfterNonZero": invocation.continue_after_non_zero})
+                })
+                .collect();
+        }
+        _ => return Err(internal_failure()),
+    }
     Ok(document)
 }
 
@@ -293,6 +312,7 @@ mod tests {
                 .into(),
         };
         let mut replayed = 0;
+        let mut historical_plan = None;
         for exchange in cases["exchanges"]
             .as_array()
             .unwrap()
@@ -306,6 +326,15 @@ mod tests {
                     .as_bytes(),
             )
             .unwrap();
+            let mut current = native_plan_document(
+                &request,
+                descriptor,
+                &facts,
+                &context,
+                "2026-09-14T00:00:00Z",
+            )
+            .unwrap();
+            let current_digest = sha256_hex(&session_json::encode(&current).unwrap());
             assert_eq!(
                 native_plan_digest(
                     &request,
@@ -315,14 +344,314 @@ mod tests {
                     "2026-09-14T00:00:00Z"
                 )
                 .unwrap(),
+                current_digest
+            );
+            let published = CATALOG_DIGEST
+                == "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036";
+            let steps = current["steps"].as_array_mut().unwrap();
+            let prefix: Vec<_> = if published {
+                Vec::new()
+            } else {
+                steps.drain(2..5).collect()
+            };
+            assert_eq!(
+                prefix
+                    .iter()
+                    .map(|step| step["stepID"].as_str().unwrap())
+                    .collect::<Vec<_>>(),
+                if published {
+                    Vec::new()
+                } else {
+                    vec![
+                        "confirm-evidence-target",
+                        "read-evidence-model",
+                        "read-evidence-firmware",
+                    ]
+                }
+            );
+            assert!(prefix.iter().all(|step| step["effect"] == "readOnly"
+                && step["binding"] == "confirmedDevice"
+                && step["processKind"] == "process"));
+            current["catalogDigest"] = exchange["answer"]["result"]["catalogDigest"].clone();
+            let historical_digest = sha256_hex(&session_json::encode(&current).unwrap());
+            assert_eq!(
+                historical_digest,
                 exchange["answer"]["result"]["materializedPlanDigest"]
                     .as_str()
                     .unwrap(),
                 "{}",
                 exchange["name"]
             );
+            if published {
+                assert_eq!(
+                    current_digest, historical_digest,
+                    "published inputs keep the full original Native plan"
+                );
+            } else {
+                assert_eq!(
+                    CATALOG_DIGEST,
+                    "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
+                );
+                assert_ne!(
+                    current_digest, historical_digest,
+                    "the original plan cannot authorize the new prefix"
+                );
+            }
+            if let Some(previous) = &historical_plan {
+                assert_eq!(
+                    previous, &current,
+                    "all five frozen Native plans are identical"
+                );
+            } else {
+                historical_plan = Some(current);
+            }
             replayed += 1;
         }
         assert_eq!(replayed, 5);
+        // Reconcile's three immutable submit requests use this same complete
+        // plan. Produce the independent encoder capsule before any host path
+        // projection, never from a Runtime answer or an authority hash label.
+        let plan = historical_plan.unwrap();
+        let reconcile = fixture
+            .parent()
+            .unwrap()
+            .join("device-mutation-reconcile/nativeLibrary");
+        let reconcile_bytes = std::fs::read(reconcile.join("cases.json")).unwrap();
+        let provenance_bytes = std::fs::read(reconcile.join("provenance.json")).unwrap();
+        assert_eq!(
+            sha256_hex(&reconcile_bytes),
+            "b26bda6e6f6ee57e1890d492cb8c409e6a005acfa02e13d5049019e179767e5e"
+        );
+        assert_eq!(
+            sha256_hex(&provenance_bytes),
+            "736dd3012a56d74b6bb83b0bb4f9767dcc36b711ebc4921b064417176e520413"
+        );
+        assert_eq!(
+            sha256_hex(&std::fs::read(fixture.join("cases.json")).unwrap()),
+            "62646bc4cbc150fb4ceb1315453f4ea861b4b87d184d4be4c69e838e06698763"
+        );
+        let reconcile_cases: Value = serde_json::from_slice(&reconcile_bytes).unwrap();
+        let provenance: Value = serde_json::from_slice(&provenance_bytes).unwrap();
+        let files = provenance["files"].as_object().unwrap();
+        assert_eq!(files.len(), 88);
+        for (relative, digest) in files {
+            assert!(!relative.starts_with('/') && !relative.contains(['\\', ':']));
+            assert!(
+                relative
+                    .split('/')
+                    .all(|part| !matches!(part, "" | "." | ".."))
+            );
+            assert_eq!(
+                sha256_hex(&std::fs::read(reconcile.join(relative)).unwrap()),
+                digest.as_str().unwrap(),
+                "{relative}"
+            );
+        }
+        for key in ["target", "codeSignHelper", "library", "lease"] {
+            assert_eq!(reconcile_cases[key], cases[key], "same source-bound {key}");
+        }
+        let mut rows = Vec::new();
+        for exchange in reconcile_cases["exchanges"].as_array().unwrap() {
+            if exchange["method"] != "job.submit" {
+                continue;
+            }
+            let request_json = exchange["params"]["requestJson"].as_str().unwrap();
+            let request = OperationRequest::decode(request_json.as_bytes()).unwrap();
+            assert_eq!(
+                request.reference(),
+                plan["operationReference"].as_str().unwrap()
+            );
+            assert_eq!(json!(request.inputs), plan["inputs"]);
+            assert_eq!(request.target_id, plan["targetID"].as_str().unwrap());
+            assert_eq!(
+                request.expected_binding_revision,
+                Some(facts.binding_revision)
+            );
+            rows.push(json!({"case": exchange["name"], "requestJson": request_json}));
+        }
+        assert_eq!(
+            rows.iter()
+                .map(|row| row["case"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            vec![
+                "published.submit",
+                "unpublished.submit",
+                "afterUnknown.submit"
+            ]
+        );
+        let plan_sha = sha256_hex(&session_json::encode(&plan).unwrap());
+        assert_eq!(
+            plan_sha,
+            "b60595abb20fc9f86c2e570f31bbf16803b3a95dea1996c037abbd4ad6a6aab3"
+        );
+        let query = crate::capability_store::CapabilityQuery {
+            operation_id: descriptor.id().to_owned(),
+            operation_version: descriptor.version(),
+            effect: crate::capability_store::Effect::DeviceMutation,
+            target_stable_identity_sha256: Some(facts.identity.clone()),
+            target_binding_revision: Some(facts.binding_revision),
+            plan_digest: Some(plan_sha.clone()),
+            inputs: plan["inputs"].as_object().unwrap().clone(),
+            artifact_facts: debug_hap_plan::primary_facts(&LeasedArtifact {
+                job_id: job.to_owned(),
+                artifact_id: artifact.to_owned(),
+                row: row.clone(),
+                path: resolved[0].path.clone(),
+            })
+            .unwrap(),
+            workspace_identity_sha256: None,
+            workspace_revision: None,
+            workspace_file_scopes_digest: None,
+        };
+        assert!(!crate::capability_policy::session_scoped(
+            descriptor,
+            &query.inputs
+        ));
+        assert_eq!(
+            crate::capability_policy::subject(descriptor, &query.inputs),
+            query.inputs
+        );
+        let mut scope_lines = vec![
+            format!("operation={}", query.operation_reference()),
+            format!("effect={}", query.effect.raw()),
+            format!("target={}", facts.identity),
+            format!("bindingRevision={}", facts.binding_revision),
+            format!("planDigest={plan_sha}"),
+            format!(
+                "inputs={}",
+                String::from_utf8(
+                    session_json::encode(&Value::Object(query.inputs.clone())).unwrap()
+                )
+                .unwrap()
+            ),
+        ];
+        scope_lines.extend(
+            query
+                .artifact_facts
+                .iter()
+                .map(|(key, value)| format!("artifact.{key}={value}")),
+        );
+        let scope_material = scope_lines.join("\n");
+        let compiled_material =
+            crate::capability_policy::recovery_policy_material(&query, false, None);
+        assert_eq!(
+            compiled_material,
+            format!(
+                "{CATALOG_DIGEST}\n{}\nordinary",
+                sha256_hex(scope_material.as_bytes())
+            )
+        );
+        assert_eq!(
+            crate::capability_policy::policy_fingerprint(&query, false),
+            sha256_hex(compiled_material.as_bytes()).to_uppercase()
+        );
+        // Test-only backproof of the historical policy identity. No Runtime
+        // caller can replace Catalog material or install a capability here.
+        let policy_material = format!(
+            "{}\n{}\nordinary",
+            plan["catalogDigest"].as_str().unwrap(),
+            sha256_hex(scope_material.as_bytes())
+        );
+        let policy_fingerprint = sha256_hex(policy_material.as_bytes()).to_uppercase();
+        let policy_id = format!("CAP-RT-POLICY-{}-G1", &policy_fingerprint[..40]);
+        let old_capabilities =
+            read(reconcile.join("steps/published.run/capabilities/runtime-capabilities.json"));
+        assert_eq!(old_capabilities["records"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            old_capabilities["records"][0]["capability"]["capabilityID"],
+            policy_id
+        );
+        let policy_capsule = json!({
+            "schemaVersion": "arkdeck.test-native-reconcile-policy/1",
+            "sourceCasesSha256": sha256_hex(&reconcile_bytes),
+            "sourceProvenanceSha256": sha256_hex(&provenance_bytes),
+            "query": {
+                "operationId": query.operation_id, "operationVersion": query.operation_version,
+                "effect": query.effect.raw(), "targetStableIdentitySha256": query.target_stable_identity_sha256,
+                "targetBindingRevision": query.target_binding_revision, "planDigest": query.plan_digest,
+                "inputs": query.inputs, "artifactFacts": query.artifact_facts,
+                "workspaceIdentitySha256": query.workspace_identity_sha256,
+                "workspaceRevision": query.workspace_revision,
+                "workspaceFileScopesDigest": query.workspace_file_scopes_digest,
+            },
+            "sessionScoped": false, "recovery": null,
+            "scopeMaterial": scope_material, "policyMaterial": policy_material,
+            "policyFingerprint": policy_fingerprint, "capabilityId": policy_id,
+        });
+        let policy_path = fixture
+            .parent()
+            .unwrap()
+            .join("catalog-lineage-c6-e4/native-reconcile-c6-policy.json");
+        if let Some(output) = std::env::var_os("ARKDECK_RECORD_NATIVE_RECONCILE_POLICY") {
+            let destination = PathBuf::from(output);
+            let source = std::env::var_os("ARKDECK_CARGO_SOURCE_ROOT").map(PathBuf::from);
+            let permitted = source.map_or(policy_path.clone(), |source| {
+                source.join(
+                    "rust/tests/fixtures/catalog-lineage-c6-e4/native-reconcile-c6-policy.json",
+                )
+            });
+            assert_eq!(
+                destination, permitted,
+                "only the named versioned policy capsule may be recorded"
+            );
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(destination)
+                .unwrap();
+            file.write_all(&serde_json::to_vec_pretty(&policy_capsule).unwrap())
+                .unwrap();
+            file.sync_all().unwrap();
+        } else {
+            assert_eq!(
+                read(policy_path),
+                policy_capsule,
+                "the complete policy material is reproduced independently"
+            );
+        }
+        let capsule = json!({
+            "schemaVersion": "arkdeck.test-native-reconcile-plan/1",
+            "sourceCasesSha256": sha256_hex(&reconcile_bytes),
+            "sourceProvenanceSha256": sha256_hex(&provenance_bytes),
+            "originalNativeCasesSha256": "62646bc4cbc150fb4ceb1315453f4ea861b4b87d184d4be4c69e838e06698763",
+            "catalogLineagePacketSha256": "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab",
+            "sourceRoot": "/private/tmp/arkdeck-hdc-oracle",
+            "catalogDigest": plan["catalogDigest"],
+            "planSha256": plan_sha,
+            "completePlan": plan,
+            "rows": rows,
+        });
+        let capsule_path = fixture
+            .parent()
+            .unwrap()
+            .join("catalog-lineage-c6-e4/native-reconcile-c6-plan.json");
+        if let Some(output) = std::env::var_os("ARKDECK_RECORD_NATIVE_RECONCILE_PLAN") {
+            let destination = PathBuf::from(output);
+            let source = std::env::var_os("ARKDECK_CARGO_SOURCE_ROOT").map(PathBuf::from);
+            let permitted = source.map_or(capsule_path.clone(), |source| {
+                source
+                    .join("rust/tests/fixtures/catalog-lineage-c6-e4/native-reconcile-c6-plan.json")
+            });
+            assert_eq!(
+                destination, permitted,
+                "only the named versioned capsule may be recorded"
+            );
+            use std::io::Write;
+            let mut file = std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(destination)
+                .unwrap();
+            file.write_all(&serde_json::to_vec_pretty(&capsule).unwrap())
+                .unwrap();
+            file.sync_all().unwrap();
+        } else {
+            assert_eq!(
+                read(capsule_path),
+                capsule,
+                "the complete reconcile plan is reproduced independently"
+            );
+        }
     }
 }

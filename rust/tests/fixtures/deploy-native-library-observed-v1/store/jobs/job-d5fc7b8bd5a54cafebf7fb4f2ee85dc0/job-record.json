@@ -1,0 +1,252 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "sendFile",
+    "runApprovedRemoteMutation",
+    "stopApplication",
+    "startApplication",
+    "verifyRemoteState",
+    "cleanupOwnedRemotePath"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "88e1a2acf6558faee4902f5757be34674979ffba672396edec63acd3a4b77418",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-DFD3FD5E0BCB588C679FF80DCBE78D465C442C01-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+      "planDigestSHA256" : "571766d1d74b0735f5513ab02af286ac574c2d11123ef9b724656683c81a611b",
+      "reservationID" : "idem-native-unattested",
+      "stepSetDigestSHA256" : "bdd1fd683c1f677631dce99651aa8baba02de269163dfa4ea26761f188cdf2e0",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 4
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "571766d1d74b0735f5513ab02af286ac574c2d11123ef9b724656683c81a611b",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "deploy.native-library.app-owned@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-native-unattested",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-native-unattested",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-DFD3FD5E0BCB588C679FF80DCBE78D465C442C01-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-native-unattested",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-native-unattested",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+    "checkpointSeal" : {
+      "byteCount" : "18744",
+      "lastSequence" : 26,
+      "sha256" : "c7f4459573c70561ded8f7c742e8ceeebfd7c870ad549aeb5829dc6ed2bb54e6"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "84280",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "19130",
+      "lastSequence" : 27,
+      "sha256" : "a3fef672448b2fe140487da711ae136bb93854835625d7a6308e5f90903eb4ac"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "10368",
+      "manifestSHA256" : "abd4ca6159dd9484278e2eb025f1e562d1bbb4a623c462344072e18df3b8bf8e",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "succeeded"
+    },
+    "receipt" : {
+      "catalogGeneration" : "4",
+      "manifestSHA256" : "abd4ca6159dd9484278e2eb025f1e562d1bbb4a623c462344072e18df3b8bf8e",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "verify-elf-locally abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step verify-elf-locally",
+    "hash-library abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step hash-library",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "capability consumed before first mutation",
+    "intent send-to-staging",
+    "dispatched send-to-staging; awaiting readback",
+    "intent verify-remote-staging",
+    "verified verify-remote-staging [\"buildId\", \"remoteByteCount\", \"remoteSha256\"]",
+    "intent backup-current-version",
+    "verified backup-current-version [\"backupPath\", \"backupSha256\"]",
+    "native-readback backup-current-version {\"backupSha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"currentSha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"inputABI\":\"arm64-v8a\",\"inputBuildId\":\"00112233445566778899aabbccddeeff10213243\",\"inputSha256\":\"f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53\",\"phase\":\"backup\",\"schemaVersion\":\"arkdeck.native-library.readback\/1\"}",
+    "intent atomic-publish",
+    "verified atomic-publish [\"attestation\", \"buildId\", \"gid\", \"mode\", \"publishedSha256\", \"targetPath\", \"uid\"]",
+    "artifact publish-report.json -> ART-dc6db154a4955013d7cdb92bda976b6e",
+    "intent restart-target",
+    "verified restart-target [\"stopped\"]",
+    "intent start-target",
+    "verified start-target [\"processIds\", \"started\"]",
+    "intent verify-loaded-library",
+    "verified verify-loaded-library [\"abi\", \"attestation\", \"buildId\", \"loaderVerified\", \"processIds\", \"publishedSha256\"]",
+    "artifact verification-report.json -> ART-45a3ed9f45ece9a3ca4c49578bc75bbe",
+    "intent cleanup-staging-and-backup",
+    "verified cleanup-staging-and-backup [\"backupRetained\", \"cleaned\"]",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

@@ -1,7 +1,7 @@
 //! GJ-2 (`debug.hap@1`) and GJ-3 (`deploy.native-library.app-owned@1`) end
 //! to end on Windows (TASK-XPA-009): every exchange the Swift oracles
-//! recorded (`rust/tests/fixtures/debug-hap`, 63; `deploy-native-library`,
-//! 40), sent by the real signed `arkdeck.exe` to the signed test daemon
+//! recorded (`rust/tests/fixtures/debug-hap-catalog-e4-v1`, 63; the versioned current
+//! `deploy-native-library-observed-v1`, 40), sent by the real signed `arkdeck.exe` to the signed test daemon
 //! (`signed_daemon.rs`), which composes the production Windows development
 //! root and the shared fake HDC's answers in process. Every answer, every
 //! call the fake received, the Target document and everything the replay
@@ -196,6 +196,15 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
     let cases = document(&fixture, "cases.json");
     let provenance = document(&fixture, "provenance.json");
     let root = debug_hap::rebuild(&fixture);
+    let current_native = hdc_oracle::native_current::is_fixture(name);
+    let current_hap = name == hdc_oracle::hap_current::NAME;
+    if current_hap {
+        hdc_oracle::hap_current::assert_source(&fixture);
+    }
+    if current_native {
+        hdc_oracle::native_current::assert_source(&fixture);
+    }
+    let native_import = current_native.then(|| hdc_oracle::native_current::prepare_import(&root));
     rename(&root, true);
     let mut variables = vec![
         (
@@ -251,9 +260,14 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
     let spelled_json = |value: &Value| -> Value {
         serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
     };
-    let mut labels = debug_hap::HostLabels::default();
+    let mut labels = if current_native || current_hap {
+        debug_hap::HostLabels::portable()
+    } else {
+        debug_hap::HostLabels::default()
+    };
     let swift_capabilities = document(&fixture, "store/capabilities/runtime-capabilities.json");
     let mut answers = Vec::new();
+    let mut publication_proofs = Vec::new();
     for exchange in cases["exchanges"].as_array().unwrap() {
         let method = exchange["method"].as_str().unwrap();
         match (method, exchange["mode"].as_str()) {
@@ -278,16 +292,71 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
             let ours: Value = serde_json::from_slice(&bytes).unwrap();
             labels.learn_keys(&ours, &swift_capabilities, &["capabilityID"]);
         }
-        if method.starts_with("cleanupDebt.") {
+        if current_native || method.starts_with("cleanupDebt.") {
             hdc_oracle::assert_conforms(method, &actual);
         }
+        if current_native && method == "job.run" && exchange.get("mode").is_some() {
+            let job = exchange["params"]["jobId"].as_str().unwrap();
+            let record: Value = serde_json::from_slice(
+                &fs::read(
+                    root.join("jobs-state/jobs")
+                        .join(job)
+                        .join("job-record.json"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            let session = record["sessionPublicationRecord"]["sessionID"]
+                .as_str()
+                .unwrap();
+            let (_, shown) = daemon.cli(&["session", "show", "--session", session]);
+            let import = native_import.as_ref().unwrap();
+            let (_, inspection) = daemon.cli(&[
+                "artifact",
+                "import",
+                "inspect",
+                "--import",
+                import["importId"].as_str().unwrap(),
+            ]);
+            assert_eq!(shown["ok"], true);
+            assert_eq!(inspection["ok"], true);
+            let digest = arkdeck_contract::sha256_hex(&fs::read(root.join("hdc")).unwrap());
+            publication_proofs.push(hdc_oracle::native_current::proof(
+                &root,
+                job,
+                shown["result"].clone(),
+                inspection["result"].clone(),
+                import,
+                &digest,
+            ));
+        }
+        if current_hap && exchange["method"] == "job.plan" {
+            hdc_oracle::hap_current::assert_plan(&actual, exchange, &root);
+        }
+        let actual = if current_native || current_hap {
+            actual
+        } else {
+            legacy_plan_answer(actual)
+        };
         answers.push((
             exchange["name"].clone(),
-            spelled_json(&legacy_plan_answer(actual)),
+            spelled_json(&actual),
             exchange["answer"].clone(),
         ));
     }
     assert_eq!(answers.len(), exchanges, "every exchange");
+    if current_native {
+        hdc_oracle::native_current::assert_original_calls(
+            &fs::read_to_string(root.join("hdc-invocations.log")).unwrap(),
+            &root,
+        );
+        answers.extend(hdc_oracle::native_current::publication_answers(
+            &fixture,
+            &root,
+            &publication_proofs,
+            &spelled,
+        ));
+    }
     daemon.stop();
     rename(&root, false);
     // The agent execution owner every Windows development root composes
@@ -336,7 +405,14 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
             .iter()
             .filter(|line| *line == "capability consumed before first mutation")
             .count();
-        assert_eq!(consumed, 1, "{case}");
+        let required = if current_native
+            && arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::OLD
+        {
+            0
+        } else {
+            1
+        };
+        assert_eq!(consumed, required, "{case}");
     }
     hdc_oracle::assert_relabelled(
         &fixture,
@@ -352,13 +428,17 @@ fn replay(name: &str, exchanges: usize, calls: usize) {
 
 #[test]
 fn the_real_cli_runs_every_swift_debug_hap_through_the_signed_test_daemon() {
-    replay("debug-hap", 63, 108);
+    replay(hdc_oracle::hap_current::fixture_name(), 63, 108);
     gj1_device_leaves::assert_windows_status(&["cleanupDebt.continue"], "implemented");
 }
 
 #[test]
 fn the_real_cli_runs_every_swift_native_deployment_through_the_signed_test_daemon() {
-    replay("deploy-native-library", 40, 225);
+    replay(
+        hdc_oracle::native_current::fixture_name(),
+        40,
+        hdc_oracle::native_current::call_count(),
+    );
 }
 
 /// The oracle's connect key, which the synthetic census's board serial
@@ -466,9 +546,8 @@ fn domain_leaf(fixture_name: &str, leaf: &[&str], command: &str, operation: &str
     let receipt = &envelope["result"];
     assert_eq!(receipt["operationReference"], operation, "{receipt}");
     assert_eq!(receipt["outcomeUnknown"], false, "{receipt}");
-    // The evidence observation as the oracle's first Job result carries it
-    // (`debug.hap@1` binds the Target's observation; the native library
-    // deploy's evidence has none).
+    // The evidence observation as the versioned oracle's first Job result
+    // carries it. Current Native deployments have their own typed prefix.
     let result = exchanges
         .iter()
         .find(|exchange| exchange["method"] == "job.result")
@@ -492,9 +571,8 @@ fn domain_leaf(fixture_name: &str, leaf: &[&str], command: &str, operation: &str
         "{receipt}"
     );
 
-    // The oracle's first Job: its calls up to the next Job's observation,
-    // or (a Job that observes nothing, as the native library deploy) up to
-    // the first call naming another Job.
+    // The oracle's first Job: all calls up to the next Job's observation
+    // or the first call naming another Job.
     let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
     let swift: Vec<&str> = swift.lines().collect();
     let first_job = result["answer"]["result"]["evidence"]["jobId"]
@@ -529,14 +607,19 @@ fn domain_leaf(fixture_name: &str, leaf: &[&str], command: &str, operation: &str
 
 #[test]
 fn the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job() {
-    domain_leaf("debug-hap", &["debug", "hap"], "debug.hap", "debug.hap@1");
+    domain_leaf(
+        hdc_oracle::hap_current::fixture_name(),
+        &["debug", "hap"],
+        "debug.hap",
+        "debug.hap@1",
+    );
     gj1_device_leaves::assert_windows_status(&["debug.hap@1"], "implemented");
 }
 
 #[test]
 fn the_real_cli_debug_native_deploy_leaf_runs_the_swift_oracle_s_job() {
     domain_leaf(
-        "deploy-native-library",
+        hdc_oracle::native_current::fixture_name(),
         &["debug", "native", "deploy"],
         "debug.native.deploy",
         "deploy.native-library.app-owned@1",

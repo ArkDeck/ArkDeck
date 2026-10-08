@@ -1,0 +1,36 @@
+{
+  "capabilityId": "CAP-RT-POLICY-8E3E5F70A2AE27D039AD672EDC6D708C6BEAEADB-G1",
+  "policyFingerprint": "8E3E5F70A2AE27D039AD672EDC6D708C6BEAEADBC82473BA2CB5B2E1E2AAA726",
+  "policyMaterial": "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036\n661020602ed6e78d7b0f2a73e1f86a9200f4bef4a966fc9637b32474ae544141\nordinary",
+  "query": {
+    "artifactFacts": {
+      "artifactByteCount": "588",
+      "artifactId": "ART-469c10579b3c5461ab4d0a891c316397",
+      "artifactSha256": "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53"
+    },
+    "effect": "deviceMutation",
+    "inputs": {
+      "expectedABI": "arm64-v8a",
+      "libraryArtifactLease": "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName": "libexample.so",
+      "restartProfile": "restartAbility",
+      "rollbackPolicy": "autoRollback",
+      "targetBundle": "com.example.demo",
+      "verificationProfile": "hashProcessAndMaps"
+    },
+    "operationId": "deploy.native-library.app-owned",
+    "operationVersion": 1,
+    "planDigest": "b60595abb20fc9f86c2e570f31bbf16803b3a95dea1996c037abbd4ad6a6aab3",
+    "targetBindingRevision": 1,
+    "targetStableIdentitySha256": "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "workspaceFileScopesDigest": null,
+    "workspaceIdentitySha256": null,
+    "workspaceRevision": null
+  },
+  "recovery": null,
+  "schemaVersion": "arkdeck.test-native-reconcile-policy/1",
+  "scopeMaterial": "operation=deploy.native-library.app-owned@1\neffect=deviceMutation\ntarget=3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547\nbindingRevision=1\nplanDigest=b60595abb20fc9f86c2e570f31bbf16803b3a95dea1996c037abbd4ad6a6aab3\ninputs={\"expectedABI\":\"arm64-v8a\",\"libraryArtifactLease\":\"lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397\",\"libraryLogicalName\":\"libexample.so\",\"restartProfile\":\"restartAbility\",\"rollbackPolicy\":\"autoRollback\",\"targetBundle\":\"com.example.demo\",\"verificationProfile\":\"hashProcessAndMaps\"}\nartifact.artifactByteCount=588\nartifact.artifactId=ART-469c10579b3c5461ab4d0a891c316397\nartifact.artifactSha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+  "sessionScoped": false,
+  "sourceCasesSha256": "b26bda6e6f6ee57e1890d492cb8c409e6a005acfa02e13d5049019e179767e5e",
+  "sourceProvenanceSha256": "736dd3012a56d74b6bb83b0bb4f9767dcc36b711ebc4921b064417176e520413"
+}

@@ -142,7 +142,9 @@ fn a_debug_hap_is_reconciled_finalized_and_resumed_as_swift_does() {
 
 #[test]
 fn a_native_deployment_is_resumed_or_kept_parked_as_swift_decides() {
-    replay("nativeLibrary");
+    // The full original request/snapshot census now records the current
+    // published-c6 safety refusal before mutation; old fixture bytes remain.
+    support::native_reconcile_current::assert_replays();
 }
 
 /// The recorded screen sequence scenario, with the declared difference its

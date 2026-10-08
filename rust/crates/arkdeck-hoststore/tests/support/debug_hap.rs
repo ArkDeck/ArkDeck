@@ -277,6 +277,7 @@ pub fn invocations(root: &Path) -> Vec<u8> {
 pub struct HostLabels {
     swift: BTreeMap<String, String>,
     host: BTreeMap<String, String>,
+    portable: bool,
 }
 
 /// The capability store members derived from a plan digest and the Runtime
@@ -293,6 +294,14 @@ pub const DERIVED: [&str; 7] = [
 ];
 
 impl HostLabels {
+    /// A separately versioned Rust oracle can be recorded on either host.
+    /// Historical Swift oracles keep the default macOS exact-byte behavior.
+    pub fn portable() -> Self {
+        Self {
+            portable: true,
+            ..Self::default()
+        }
+    }
     /// Learns every string under one of `keys` in `host` as the one at the
     /// same place in `swift`, walking both documents together (Windows only).
     pub fn learn_keys(&mut self, host: &Value, swift: &Value, keys: &[&str]) {
@@ -345,10 +354,11 @@ impl HostLabels {
     /// A value this host derived where Swift's replay derived `swift`: the
     /// same value on macOS; on Windows learned as its label.
     pub fn derived(&mut self, host: &str, swift: &str) {
-        #[cfg(windows)]
-        self.learn_value(host, swift);
-        #[cfg(not(windows))]
-        assert_eq!(host, swift);
+        if cfg!(windows) || self.portable {
+            self.learn_value(host, swift);
+        } else {
+            assert_eq!(host, swift);
+        }
     }
 
     /// The host value read as `swift` (itself on macOS).
@@ -362,21 +372,19 @@ impl HostLabels {
     /// Learns `actual`'s string at `pointer` as `expected`'s at the same
     /// place (Windows only; on macOS nothing is learned).
     pub fn learn(&mut self, actual: &Value, expected: &Value, pointer: &str) {
-        #[cfg(windows)]
-        if let (Some(host), Some(swift)) = (
-            actual.pointer(pointer).and_then(Value::as_str),
-            expected.pointer(pointer).and_then(Value::as_str),
-        ) {
+        if (cfg!(windows) || self.portable)
+            && let (Some(host), Some(swift)) = (
+                actual.pointer(pointer).and_then(Value::as_str),
+                expected.pointer(pointer).and_then(Value::as_str),
+            )
+        {
             self.learn_value(host, swift);
         }
-        #[cfg(not(windows))]
-        let _ = (actual, expected, pointer);
     }
 
     /// Learns one host value as one Swift value (Windows only).
     pub fn learn_value(&mut self, host: &str, swift: &str) {
-        #[cfg(windows)]
-        {
+        if cfg!(windows) || self.portable {
             assert_eq!(host.len(), swift.len(), "{host} relabels {swift}");
             if let Some(previous) = self.swift.insert(host.to_owned(), swift.to_owned()) {
                 assert_eq!(previous, swift, "{host} reads as two Swift values");
@@ -385,8 +393,6 @@ impl HostLabels {
                 assert_eq!(previous, host, "{swift} is read from two host values");
             }
         }
-        #[cfg(not(windows))]
-        let _ = (host, swift);
     }
 
     /// `bytes` with every learned host value read as Swift's where it is a

@@ -863,5 +863,5 @@ pub use artifact_export::ArtifactExportRequest;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(windows, allow(dead_code))]
 mod catalog_review;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use catalog_review::flash_catalog_review;

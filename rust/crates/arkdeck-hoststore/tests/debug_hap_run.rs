@@ -112,7 +112,9 @@ fn historical_terminal_digest_never_authorizes_run_or_compensation() {
 /// the root.
 #[test]
 fn rust_runs_every_swift_debug_hap_as_swift_does() {
-    hdc_oracle::assert_replays("debug-hap", 63, CALLS);
+    // The immutable Swift recipe, re-recorded under the current full Catalog.
+    // Historical terminal/held authority remains separately refused above.
+    hdc_oracle::assert_replays(hdc_oracle::hap_current::fixture_name(), 63, CALLS);
 }
 
 /// The installed case admitted as Swift admitted it, with the fake in `mode`.
@@ -158,7 +160,12 @@ fn uses(owners: &Owners) -> usize {
 #[test]
 fn evidence_a_run_did_not_consume_is_never_continued() {
     let _lock = debug_hap::exclusive();
-    let fixture = support::fixture("debug-hap");
+    assert_eq!(
+        arkdeck_contract::CATALOG_DIGEST,
+        support::catalog_lineage::CURRENT
+    );
+    let fixture = support::fixture(hdc_oracle::hap_current::NAME);
+    hdc_oracle::hap_current::assert_source(&fixture);
     let cases = support::document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc(&owners.dispatch);
@@ -166,9 +173,10 @@ fn evidence_a_run_did_not_consume_is_never_continued() {
     let job = admitted(&owners, &hdc, &cases, "normal");
     let mut record = owners.record(&job);
     let swift = support::document(&fixture, &format!("store/jobs/{job}/job-record.json"));
-    // Swift's evidence in this host's plan digest and capability (the same
-    // on macOS; see `debug_hap::HostLabels`).
-    let mut labels = debug_hap::HostLabels::default();
+    // A consumed use from the complete same-Catalog software oracle, in
+    // this host's admitted plan and capability. The old terminal record's
+    // legacy step digest cannot be transplanted into a fresh admission.
+    let mut labels = debug_hap::HostLabels::portable();
     labels.learn_keys(&record, &swift, &["materializedPlanDigest", "capabilityId"]);
     record["admissionEvidence"] = labels.host_json(&swift["admissionEvidence"]);
     let record = JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap();

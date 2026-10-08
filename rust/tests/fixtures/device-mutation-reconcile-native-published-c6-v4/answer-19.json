@@ -1,0 +1,55 @@
+{
+  "answer" : {
+    "ok" : true,
+    "result" : {
+      "actualEffect" : "deviceMutation",
+      "actualStepKinds" : [
+
+      ],
+      "artifacts" : [
+
+      ],
+      "authority" : null,
+      "bindingRevision" : 1,
+      "blockers" : [
+        "artifactIntegrityFailed"
+      ],
+      "catalogDigest" : "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036",
+      "executionMode" : "execute",
+      "finishedAtUtc" : "2026-09-14T00:00:00Z",
+      "firstEvidenceStepAtUtc" : null,
+      "inventoryAvailable" : true,
+      "jobId" : "job-ce8967dc34b3de4312837b9a56dd5bb2",
+      "missingRequiredArtifacts" : [
+        "publish-report.json",
+        "verification-report.json"
+      ],
+      "observation" : null,
+      "operationReference" : "deploy.native-library.app-owned@1",
+      "outcomeUnknown" : false,
+      "parameters" : {
+        "expectedABI" : "arm64-v8a",
+        "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+        "libraryLogicalName" : "libexample.so",
+        "restartProfile" : "restartAbility",
+        "rollbackPolicy" : "autoRollback",
+        "targetBundle" : "com.example.demo",
+        "verificationProfile" : "hashProcessAndMaps"
+      },
+      "providerId" : "hdc",
+      "recoveryEpoch" : null,
+      "schemaVersion" : "arkdeck.job-evidence\/1",
+      "startedAtUtc" : "2026-09-14T00:00:00Z",
+      "status" : "artifactIntegrityFailed",
+      "targetId" : "TGT-3ba3f5f43b92",
+      "terminalState" : "failed",
+      "traceProbeAfter" : null,
+      "traceProbeBefore" : null
+    }
+  },
+  "method" : "job.evidence",
+  "name" : "unpublished.job.evidence",
+  "params" : {
+    "jobId" : "job-ce8967dc34b3de4312837b9a56dd5bb2"
+  }
+}

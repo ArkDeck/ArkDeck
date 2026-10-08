@@ -131,7 +131,7 @@ impl JobRunner<'_> {
                     return Err(stop);
                 };
                 let residue = Residue::RemotePath(deployment.staging_path.clone());
-                self.owe_cleanup(run, &step.step_id, &residue, &owed, &action);
+                self.owe_native_cleanup(run, &step.step_id, &residue, &owed, &action)?;
                 run.record
                     .timeline
                     .push(format!("native compensation cleanup debt: {owed}"));

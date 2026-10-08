@@ -28,6 +28,13 @@ use support::native_library::{self, FIXTURE, answer};
 
 #[test]
 fn rust_plans_the_swift_native_library_requests() {
+    // This exact historical whole-frame oracle runs in the pinned c6 view.
+    // The current Native full-plan unit and observed-v1 replay separately
+    // require all three new evidence reads and their complete plan hashes.
+    assert_eq!(
+        arkdeck_contract::CATALOG_DIGEST,
+        support::catalog_lineage::OLD
+    );
     let _lock = debug_hap::exclusive();
     let fixture = support::fixture(FIXTURE);
     let cases = support::document(&fixture, "cases.json");
@@ -52,13 +59,10 @@ fn rust_plans_the_swift_native_library_requests() {
             materialized += 1;
         }
         let actual = support::legacy_plan_answer(actual);
-        labels.learn(
-            &actual,
-            &exchange["answer"],
-            "/result/materializedPlanDigest",
-        );
+        let expected = exchange["answer"].clone();
+        labels.learn(&actual, &expected, "/result/materializedPlanDigest");
         let actual = labels.swift(&actual);
-        if actual != exchange["answer"] {
+        if actual != expected {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",
                 exchange["name"], exchange["answer"]

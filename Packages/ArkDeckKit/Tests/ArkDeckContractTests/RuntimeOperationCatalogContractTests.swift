@@ -63,6 +63,10 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
           catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
         "debug.hap@1/package-readback": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "packageInfo"),
+        "deploy.native-library.app-owned@1/read-evidence-model": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
+        "deploy.native-library.app-owned@1/read-evidence-firmware": CatalogActionReference(
+          catalogID: "arkdeck-remote-operations", actionID: "firmwareBuild"),
         "port-forward.create@1/read-evidence-model": CatalogActionReference(
           catalogID: "arkdeck-remote-operations", actionID: "deviceModel"),
         "port-forward.create@1/read-evidence-firmware": CatalogActionReference(

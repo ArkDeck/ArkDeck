@@ -1,0 +1,36 @@
+[
+  {
+    "bundleName" : "com.example.demo",
+    "jobID" : "job-fef1a0e4c7231791a53842cbdbc7afb0",
+    "persistedAction" : {
+      "arguments" : {
+        "bundleName" : "com.example.demo"
+      },
+      "kind" : "hdc.uninstallPackage"
+    },
+    "reason" : "confirmed compensation failure: cleanup-uninstall",
+    "recordedAtUTC" : "2026-09-14T00:00:00Z",
+    "remotePath" : "",
+    "retryAttemptStartedAtUTC" : "2026-09-14T00:00:00Z",
+    "settledAtUTC" : "2026-09-14T00:00:00Z",
+    "stepID" : "cleanup-uninstall"
+  },
+  {
+    "jobID" : "job-aab111522c0cbfb47e6694c029d517fa",
+    "persistedAction" : {
+      "arguments" : {
+        "jobId" : "job-aab111522c0cbfb47e6694c029d517fa",
+        "nonce" : "owned",
+        "remotePath" : "\/data\/local\/tmp\/arkdeck-job-aab111522c0cbfb47e6694c029d517fa-send-hap-owned.hap",
+        "stepId" : "send-hap"
+      },
+      "kind" : "hdc.cleanupOwnedRemotePath"
+    },
+    "reason" : "confirmed compensation failure: cleanup-remote-staging",
+    "recordedAtUTC" : "2026-09-14T00:00:00Z",
+    "remotePath" : "\/data\/local\/tmp\/arkdeck-job-aab111522c0cbfb47e6694c029d517fa-send-hap-owned.hap",
+    "retryAttemptStartedAtUTC" : "2026-09-14T00:00:00Z",
+    "settledAtUTC" : "2026-09-14T00:00:00Z",
+    "stepID" : "cleanup-remote-staging"
+  }
+]

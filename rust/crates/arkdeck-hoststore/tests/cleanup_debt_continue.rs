@@ -79,7 +79,8 @@ struct Owed {
 /// fake answers in `mode`, with `fault` on its run.
 fn owed_by(case: &str, mode: &str, fault: Fault) -> (Owed, Value) {
     let lock = debug_hap::exclusive();
-    let fixture = support::fixture("deploy-native-library");
+    let fixture = support::fixture(support::hdc_oracle::native_current::fixture_name());
+    support::hdc_oracle::native_current::assert_source(&fixture);
     let cases = support::document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
     let dispatch = Faulted {
@@ -116,10 +117,10 @@ fn owed_by(case: &str, mode: &str, fault: Fault) -> (Owed, Value) {
 }
 
 /// The oracle's `cleanupFailure` Job: a cleanup that removed nothing, owed
-/// by a Job that succeeded.
+/// by a known failed Job whose verified replacement remains deployed.
 fn owed() -> Owed {
     let (owed, status) = owed_by("cleanupFailure", "cleanupFailure", Fault::None);
-    assert_eq!(status["state"], "succeeded");
+    assert_eq!(status["state"], "failed");
     owed
 }
 

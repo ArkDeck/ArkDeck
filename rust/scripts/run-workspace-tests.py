@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Run every workspace test through Cargo, with two bounded macOS queues.
+"""Run every workspace test through Cargo with bound execution receipts.
 
-Cargo builds all default targets first. Only audited integration targets with
-unique temporary roots may overlap the conservative queue. New targets stay
-in the conservative queue. Cargo still owns test environments, feature
-unification, custom harnesses and doctests; no test executable is run directly.
+Catalog-selected per-target Cargo commands run serially: even fresh Cargo
+commands refresh shared sibling binary paths used by spawning tests. The
+legacy execute() scheduler retains its two audited macOS queues. Cargo still
+owns test environments, feature unification, custom harnesses and doctests;
+no test executable is run directly.
 
 With one worker (the Windows and Linux CI hosts) Cargo is asked for every
 default test target except the integration tests whose crate-level
@@ -27,6 +28,7 @@ import sys
 import tempfile
 import time
 import tomllib
+import catalog_test_views as catalog_views
 
 RUST = Path(__file__).resolve().parents[1]
 BASE = ["cargo", "test", "--workspace", "--no-fail-fast", "--locked"]
@@ -330,12 +332,76 @@ def verify_ran(plan: dict, metadata: dict, log: str) -> list[str]:
     return missing
 
 
+def artifact_bindings(messages: list[dict], metadata: dict) -> dict[str, dict]:
+    """Bind Cargo's actual built executable to its package and source target."""
+    packages = {p['id']: p for p in metadata['packages'] if p['id'] in metadata['workspace_members']}
+    result = {}
+    if not any(m.get('reason') == 'build-finished' and m.get('success') for m in messages):
+        raise ValueError('Cargo did not complete the workspace test build')
+    for message in messages:
+        if message.get('reason') != 'compiler-artifact' or message.get('package_id') not in packages:
+            continue
+        if not message.get('executable') or message.get('target', {}).get('kind') != ['test']:
+            continue
+        package = packages[message['package_id']]
+        target = message['target']
+        declared = [t for t in package['targets'] if t['kind'] == ['test'] and t['name'] == target['name']]
+        if len(declared) != 1 or Path(declared[0]['src_path']) != Path(target['src_path']):
+            raise ValueError('Cargo artifact source does not match declared target')
+        key = package['name'] + '/' + target['name']
+        if key in result:
+            raise ValueError('duplicate Cargo test executable binding')
+        result[key] = {'source': Path(target['src_path']).relative_to(Path(package['manifest_path']).parent).as_posix(),
+                       'executable': message['executable'], 'src_path': target['src_path']}
+    return result
+
+
+def running_sections(log: str, keys: list[str], bindings: dict[str, dict], cwd: Path) -> dict[str, str]:
+    """No case receipt is accepted outside its exact Cargo Running section."""
+    plain = '\n'.join(re.sub(r'\x1b\[[0-9;]*m', '', log).splitlines())
+    rows = list(re.finditer(r'^\s*Running (?:unittests )?(.+?) \((.+)\)\s*$', plain, re.M))
+    def executable(path):
+        value = Path(path)
+        return os.path.normcase(str(value if value.is_absolute() else cwd / value))
+    wanted = {}
+    for key in keys:
+        if key not in bindings:
+            raise ValueError(f'{key}: missing compiled Cargo target binding')
+        binding = bindings[key]
+        identity = (binding['source'], executable(binding['executable']))
+        if identity in wanted:
+            raise ValueError('ambiguous compiled Cargo target binding')
+        wanted[identity] = key
+    result = {}
+    for index, row in enumerate(rows):
+        identity = (row[1].replace('\\', '/'), executable(row[2]))
+        if identity not in wanted:
+            raise ValueError('Cargo Running source/executable belongs to another target')
+        key = wanted[identity]
+        if key in result:
+            raise ValueError('Cargo ran one selected target twice')
+        end = rows[index + 1].start() if index + 1 < len(rows) else len(plain)
+        result[key] = plain[row.end():end]
+    if set(result) != set(keys):
+        raise ValueError('Cargo did not run each exact selected source target')
+    return result
+
+
+def group_filters(names: dict[str, list[str]], selected: dict[str, list[str]]) -> list[str]:
+    union = sorted({name for values in selected.values() for name in values})
+    for key, values in names.items():
+        if set(values).intersection(union) != set(selected[key]):
+            raise ValueError('same-name targets have conflicting exact function routes')
+    return union
+
+
 def recorded(argv: list[str], directory: Path, label: str, cwd: Path) -> dict:
     started = time.monotonic()
     log = directory / f"{label}.log"
     print(f"+ [{label}] {' '.join(argv)}", flush=True)
-    with log.open("w") as output:
-        with subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as process:
+    with log.open("w", encoding="utf-8", newline="\n") as output:
+        with subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, encoding="utf-8", errors="strict") as process:
             for line in process.stdout:
                 output.write(line)
                 output.flush()
@@ -419,14 +485,217 @@ def host_selected(cwd: Path, directory: Path) -> int:
     return code
 
 
+PARITY_CONSUMERS = frozenset({'arkdeck-contract', 'arkdeck-cli'})
+
+
+def integration_groups(declared: dict, plan: dict, *, parity_consumers: bool = False) -> dict:
+    """A closed parity scope, retaining every same-name workspace sibling."""
+    scope = PARITY_CONSUMERS if parity_consumers else {key.split('/')[0] for key in declared}
+    selected_names = {target['name'] for package, target in plan['run'] if package in scope}
+    return {name: sorted(key for key, target in declared.items() if target['name'] == name)
+            for name in sorted(selected_names)}
+
+
+def catalog_selected(cwd: Path, workers: int, directory: Path, *, parity_consumers: bool = False) -> int:
+    """Execute exact source-pinned cases in their declared Catalog view.
+
+    Cargo still owns every environment and executable. Listing is never
+    counted as execution, and a skipped historical case is discharged only
+    by the separate mandatory historical view's receipt.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    metadata = json.loads(subprocess.check_output(
+        ["cargo", "metadata", "--no-deps", "--format-version", "1", "--locked"], cwd=cwd, text=True))
+    manifest = catalog_views.load(cwd, metadata)
+    digest = catalog_views.catalog(cwd)
+    if any(os.environ.get(name) for name in CFG_ENVIRONMENT):
+        raise ValueError("Catalog test views require the native host cfg")
+    plan = host_plan(metadata, host_cfg(cwd))
+    if plan is None:
+        raise ValueError("unclassified custom test harness or default target")
+    stages, receipts = [], []
+    report = {"schemaVersion": "arkdeck.catalog-test-execution/1", "catalogDigest": digest,
+              "manifestSHA256": catalog_views.sha((cwd / catalog_views.MANIFEST).read_bytes()),
+              "workers": 1, "requestedWorkers": workers,
+              "completed": False, "stages": stages, "targets": receipts,
+              "hostCfgExcluded": sorted(f"{p}/{t['name']}" for p, t in plan['excluded']),
+              "integrationPackages": sorted(PARITY_CONSUMERS) if parity_consumers else 'workspace'}
+    try:
+        # Each view builds its own sibling CLI/daemon images before any
+        # process fixture; neither a stale target nor another view may answer.
+        built = recorded(["cargo", "build", "--workspace", "--bins", "--locked"], directory, "bins", cwd)
+        stages.append(built)
+        if built['exitCode']:
+            return built['exitCode']
+        compile_ = recorded(plan['commands'][0][1] + ["--no-run", "--message-format=json"],
+                            directory, "compile", cwd)
+        stages.append(compile_)
+        if compile_['exitCode']:
+            return compile_['exitCode']
+        messages = [json.loads(line) for line in Path(compile_['log']).read_text(encoding='utf-8').splitlines()
+                    if line.startswith('{')]
+        bindings = artifact_bindings(messages, metadata)
+        custom = catalog_views.custom_harnesses(metadata)
+        declared = catalog_views.targets(metadata)
+        groups = integration_groups(declared, plan, parity_consumers=parity_consumers)
+        excluded = {f"{p}/{t['name']}" for p, t in plan['excluded']}
+        if sys.platform == 'win32' and not re.fullmatch(r'[A-Fa-f0-9]{40}', os.environ.get('ARKDECK_DEV_SIGNER_THUMBPRINT', '')):
+            raise ValueError('Windows signed process fixtures require the declared development signer')
+
+        def target_group(name):
+            keys = groups[name]
+            label = 'target-' + name
+            command = BASE + ['--test', name]
+            rows = {key: catalog_views.platform_row(manifest['targets'][key], sys.platform) for key in keys}
+            protocols = {key: custom[key][0] for key in keys if key in custom}
+            # The closed custom names are unique across packages. A collision
+            # must be reviewed before it can share any custom command protocol.
+            if protocols and len(keys) != 1:
+                raise ValueError('custom harness shares a target name with another package')
+            local_stages, names = [], {}
+            if protocols:
+                key = keys[0]
+                protocol, platforms = custom[key]
+                names[key] = sorted(rows[key]['customCases'].get(sys.platform, []))
+                if sys.platform not in platforms or protocol == 'fixture-entry':
+                    run = recorded(command, directory, label + '-execute', cwd)
+                    local_stages.append(run)
+                    sections = running_sections(Path(run['log']).read_text(encoding='utf-8'), keys, bindings, cwd)
+                    if run['exitCode'] or catalog_views.listed(sections[key]) or re.search(r'^test .* \.\.\.', sections[key], re.M):
+                        raise ValueError('inactive/helper custom entry produced unclassified test output')
+                    return local_stages, [{'target': key, 'completed': True, 'passed': 0, 'coverage': False,
+                                           'execution': 'fixture-entry' if protocol == 'fixture-entry' else 'host-cfg-excluded',
+                                           'cargoTarget': bindings[key]}]
+                if protocol == 'listed-summary':
+                    listing = recorded(command + ['--', '--list'], directory, label + '-list', cwd)
+                    local_stages.append(listing)
+                    sections = running_sections(Path(listing['log']).read_text(encoding='utf-8'), keys, bindings, cwd)
+                    if listing['exitCode'] or catalog_views.listed(sections[key]) != names[key]:
+                        raise ValueError('custom list differs from its closed host census')
+            else:
+                listing = recorded(command + ['--', '--list'], directory, label + '-list', cwd)
+                local_stages.append(listing)
+                sections = running_sections(Path(listing['log']).read_text(encoding='utf-8'), keys, bindings, cwd)
+                if listing['exitCode']:
+                    raise ValueError('libtest listing failed')
+                names = {key: catalog_views.listed(sections[key]) for key in keys}
+                module_excluded = {key for key in keys if catalog_views.module_host_cfg_excluded(
+                    key, rows[key], sys.platform)}
+                if module_excluded:
+                    if len(keys) != 1 or any(names[key] for key in module_excluded):
+                        raise ValueError('host-excluded module changed its target or case census')
+                    run = recorded(command, directory, label + '-execute', cwd)
+                    local_stages.append(run)
+                    sections = running_sections(Path(run['log']).read_text(encoding='utf-8'), keys, bindings, cwd)
+                    if run['exitCode']:
+                        raise ValueError('host-excluded module execution failed')
+                    key = keys[0]
+                    catalog_views.verify_host_cfg_empty(sections[key])
+                    return local_stages, [{'target': key, 'completed': True, 'passed': 0, 'coverage': False,
+                                           'execution': 'host-cfg-excluded', 'listed': [],
+                                           'modulePlatforms': rows[key]['modulePlatforms'],
+                                           'cargoTarget': bindings[key]}]
+                if any(not names[key] and key not in excluded for key in keys):
+                    raise ValueError('empty libtest list is not an audited host cfg exclusion')
+            selected = {key: catalog_views.selected(rows[key], names[key], digest)
+                        if not parity_consumers or key.split('/')[0] in PARITY_CONSUMERS else [] for key in keys}
+            known_ignored = {key: sorted(set(rows[key]['ignored']).intersection(names[key])) for key in keys}
+            if not protocols:
+                ignored_list = recorded(command + ['--', '--list', '--ignored'], directory, label + '-ignored-list', cwd)
+                local_stages.append(ignored_list)
+                sections = running_sections(Path(ignored_list['log']).read_text(encoding='utf-8'), keys, bindings, cwd)
+                if ignored_list['exitCode'] or any(catalog_views.listed(sections[key]) != known_ignored[key] for key in keys):
+                    raise ValueError('unclassified ignored function')
+            group_receipts = {key: {'target': key, 'listed': names[key], 'selected': selected[key],
+                                    'excludedByView': sorted(set(names[key]) - set(selected[key])),
+                                    'ignored': known_ignored[key], 'cargoTarget': bindings[key],
+                                    'completed': False, 'execution': 'other-view'} for key in keys}
+            filters = group_filters(names, selected)
+            if not filters:
+                return local_stages, list(group_receipts.values())
+            if protocols and protocol.startswith('default-'):
+                if selected[key] != names[key]:
+                    raise ValueError('default-only custom suite cannot be partially filtered')
+                arguments = []
+            else:
+                arguments = ['--', '--exact', *filters]
+            run = recorded(command + arguments, directory, label + '-execute', cwd)
+            local_stages.append(run)
+            sections = running_sections(Path(run['log']).read_text(encoding='utf-8'), keys, bindings, cwd)
+            for key in keys:
+                receipt = group_receipts[key]
+                try:
+                    if not selected[key]:
+                        # Cargo still runs same-name siblings. They must have
+                        # precisely zero selected cases, never borrowed cases.
+                        plain = sections[key]
+                        if re.search(r'^test [^\s]+ \.\.\.', plain, re.M) or not re.search(
+                                r'^test result: ok\. 0 passed; 0 failed; 0 ignored;', plain, re.M):
+                            raise ValueError('excluded sibling executed a test')
+                        continue
+                    if set(selected[key]).issubset(known_ignored[key]):
+                        verified = catalog_views.verify_audited_ignored_execution(
+                            sections[key], selected[key], known_ignored[key], names[key])
+                        if run['exitCode']:
+                            raise ValueError('Cargo returned failure despite ignored receipt')
+                        receipt.update(verified, execution='audited-ignored-only', substantivePassed=0)
+                        continue
+                    verified = (catalog_views.verify_custom_execution(sections[key], selected[key], protocols[key])
+                                if key in protocols else catalog_views.verify_execution(
+                                    sections[key], selected[key], sorted(set(selected[key]).intersection(known_ignored[key]))))
+                    if run['exitCode']:
+                        raise ValueError('Cargo returned failure despite test receipt')
+                    substantive, unavailable = catalog_views.substantive_cases(rows[key], selected[key], os.environ)
+                    if not substantive and not unavailable:
+                        raise ValueError('child/ignored-only selection cannot discharge coverage')
+                    receipt.update(verified, execution='actual' if substantive else 'optional-material-unavailable',
+                                   coverage=bool(substantive), substantivePassed=len(substantive),
+                                   unavailableOptionalCases=unavailable,
+                                   childEntries=sorted(set(selected[key]).intersection(rows[key].get('childEntries', []))))
+                except ValueError as error:
+                    receipt.update(completed=False, execution='failed', error=str(error))
+            return local_stages, list(group_receipts.values())
+
+        # Cargo can unlink and recopy un-hashed sibling binaries even when all
+        # compiler artifacts are fresh. Another target must not refresh those
+        # paths while a process fixture is spawning one of them.
+        results = [target_group(name) for name in groups]
+        for local_stages, group_receipts in results:
+            stages.extend(local_stages)
+            receipts.extend(group_receipts)
+        # Library, bin and documentation harnesses preserve their full default
+        # execution. Integration selectors alone are split by Catalog lineage.
+        default_flags = [flag for flag in ('--lib', '--bins') if flag in plan['commands'][0][1]]
+        if default_flags:
+            stages.append(recorded(BASE + default_flags, directory, 'unit-tests', cwd))
+        for name, argv in plan['commands'][1:]:
+            stages.append(recorded(argv, directory, name, cwd))
+        if catalog_views.load(cwd, metadata) != manifest:
+            raise ValueError('test source or frozen fixture changed during execution')
+        if sorted(receipt['target'] for receipt in receipts) != sorted(key for keys in groups.values() for key in keys):
+            raise ValueError('selected integration target receipt missing')
+        failed = any(stage['exitCode'] for stage in stages) or any(
+            receipt.get('error') for receipt in receipts)
+        report['completed'] = not failed
+        return 1 if failed else 0
+    finally:
+        (directory / 'catalog-execution.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+        print(f"Catalog execution receipt: {directory / 'catalog-execution.json'}", flush=True)
+
+
 def main() -> int:
+    if sys.argv[1:] not in ([], ['--parity-consumers']):
+        raise ValueError('unknown workspace test scope')
     workers = int(os.environ.get("ARKDECK_RUST_TEST_WORKERS", "1"))
     output = os.environ.get("ARKDECK_RUST_TEST_REPORT_DIR")
     # Checkout / published / candidate use separate reports as well as targets.
     name = os.environ.get("ARKDECK_RUST_TEST_VIEW", "checkout")
-    if name not in ("checkout", "published", "candidate"):
+    if name not in ("checkout", "published", "candidate", "historical"):
         raise ValueError("invalid Rust test view")
-    return execute(workers=workers, directory=Path(output) / name if output else None)
+    if workers not in (1, 2):
+        raise ValueError('workspace test workers must be 1 or 2')
+    directory = Path(output) / name if output else Path(tempfile.mkdtemp(prefix='arkdeck-catalog-tests-'))
+    return catalog_selected(RUST, workers, directory, parity_consumers=sys.argv[1:] == ['--parity-consumers'])
 
 
 if __name__ == "__main__":

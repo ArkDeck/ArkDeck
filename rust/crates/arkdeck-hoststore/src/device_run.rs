@@ -138,6 +138,9 @@ enum Stop {
     Unknown(String),
     /// `RuntimeArtifactPublicationFailure`, with its detail.
     Publication(String),
+    /// Native cleanup's device outcome is known, but exact debt persistence
+    /// could not be proved. Keep that failed outcome and park without replay.
+    NativeDebt(String),
     /// A cancellation reached a step boundary and was made durable.
     Cancelled,
     /// The lifecycle itself could not be completed.
@@ -520,6 +523,19 @@ impl JobRunner<'_> {
             }
             Err(Stop::Failed(reason)) => return self.fail(run, &reason),
             Err(Stop::Unknown(reason)) => return self.park(run, &reason),
+            Err(Stop::NativeDebt(reason)) => {
+                run.record.set_operation_failure(Some(failure(
+                    "executionFailed",
+                    "execution",
+                    "runtimeDecisionRequired",
+                    "inspectJob",
+                )));
+                let from = run.record.state.clone();
+                run.transition(&from, "waitingForRecovery", &reason)?;
+                run.record.set_outcome_unknown();
+                run.finish()?;
+                return run.persist(self.jobs);
+            }
             Err(Stop::Publication(detail)) => {
                 run.record.set_operation_failure(Some(failure(
                     "artifactPublicationFailed",
@@ -771,6 +787,20 @@ impl JobRunner<'_> {
                 {
                     self.owe_optional_hap_cleanup(run, descriptor, step, &mut skipped)?;
                 }
+                // A native replacement has already passed loader verification.
+                // Retain its failed cleanup outcome and exact residue debt, and
+                // close known failed without rolling that verified replacement
+                // back or declaring the executed cleanup skipped/successful.
+                Err(Stop::Failed(reason))
+                    if reference == device_steps::NATIVE
+                        && step.optional
+                        && device_steps::cleanup_residue(&action).is_some() =>
+                {
+                    let debt_reason = format!("failed({})", swift_string(&reason));
+                    let residue = device_steps::cleanup_residue(&action).unwrap();
+                    self.owe_native_cleanup(run, &step.step_id, &residue, &debt_reason, &action)?;
+                    return Err(Stop::Failed(reason));
+                }
                 // Optional steps are the partial-success surface: one that
                 // fails is skipped with its failure and the Job goes on. An
                 // unknown outcome is never tolerated. A cleanup that ran and
@@ -893,6 +923,49 @@ impl JobRunner<'_> {
         run.record
             .set_residues(i64::try_from(owed).unwrap_or(i64::MAX));
         let _ = run.persist(self.jobs);
+    }
+
+    /// Native cleanup can finalize only after its exact debt and residue
+    /// count are durable. An uncertain ledger never becomes a zero count.
+    fn owe_native_cleanup(
+        &self,
+        run: &mut Run,
+        step_id: &str,
+        residue: &Residue,
+        reason: &str,
+        action: &StepAction,
+    ) -> Result<(), Stop> {
+        let refused = || {
+            Stop::NativeDebt(format!(
+                "native cleanup debt persistence unconfirmed: {reason}"
+            ))
+        };
+        let (kind, arguments) = action.persisted();
+        let now = (self.now)().ok_or_else(refused)?;
+        cleanup_debt::record_compensation_debt(
+            self.artifacts,
+            &run.record.job_id,
+            step_id,
+            residue,
+            reason,
+            &json!({"kind": kind, "arguments": arguments}),
+            &now,
+        )
+        .map_err(|_| refused())?;
+        let debt = cleanup_debt::record(self.artifacts, &run.record.job_id, step_id)
+            .map_err(|_| refused())?
+            .ok_or_else(refused)?;
+        if debt.get("settledAtUTC").is_some() {
+            return Err(refused());
+        }
+        let owed =
+            cleanup_debt::outstanding(self.artifacts, &run.record.job_id).map_err(|_| refused())?;
+        if owed == 0 {
+            return Err(refused());
+        }
+        run.record
+            .set_residues(i64::try_from(owed).map_err(|_| refused())?);
+        run.persist(self.jobs).map_err(|_| refused())
     }
 
     /// Swift's `preflightHostStorage` step: the room the capture may take,

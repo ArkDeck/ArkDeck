@@ -150,8 +150,7 @@ class ReadOnlyImportExpectationTests(unittest.TestCase):
 
 
 class ReadOnlyMachineOutputTests(unittest.TestCase):
-    """The pinned leaves' machine output: `observedAt` read as its label, then byte-equal to
-    the committed fixtures, which the recorded macOS lane produced (TASK-XPA-002)."""
+    """Full fixture bytes, with the time label and verified source-view identity."""
 
     def run_matrix(self, directory: Path, outputs: dict, write: bool = False) -> None:
         rows = []
@@ -166,10 +165,11 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
         self.assertEqual(sorted(path.name for path in fixtures.iterdir() if path.suffix == ".jsonl"),
                          sorted(f"{name}.cli.jsonl" for name in readonly.MACHINE_OUTPUT_LEAVES))
         observed = {}
+        digest = readonly.catalog_test_views.catalog(readonly.ROOT / "rust")
         for name in readonly.MACHINE_OUTPUT_LEAVES:
             data = (fixtures / f"{name}.cli.jsonl").read_bytes()
-            observed[name] = data.replace(b'"observedAt":"<observedAt>"',
-                                          b'"observedAt":"2026-09-30T12:38:52Z"')
+            observed[name] = readonly.machine_output_fixture(name, data, digest).replace(
+                b'"observedAt":"<observedAt>"', b'"observedAt":"2026-09-30T12:38:52Z"')
         with tempfile.TemporaryDirectory() as temporary:
             self.run_matrix(Path(temporary), observed)
         for name, change in (("operations", (b'"availability":"unavailable"', b'"availability":"available"')),
@@ -195,6 +195,179 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
                              b'{"observedAt":"<observedAt>","n":"doctor"}\n')
             self.assertEqual((fixtures / "candidates.cli.jsonl").read_bytes(), b'{"n":"candidates"}\n')
 
+    def test_both_closed_views_change_only_the_single_catalog_field(self):
+        originals = {name: (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes()
+                     for name in readonly.MACHINE_OUTPUT_LEAVES}
+        old = readonly.catalog_test_views.OLD.encode()
+        current = readonly.catalog_test_views.CURRENT.encode()
+        for name, data in originals.items():
+            with self.subTest(name=name):
+                projected = readonly.machine_output_fixture(name, data, current.decode())
+                if name in ("doctor", "deep", "healthy"):
+                    self.assertEqual(data.count(old), 1)
+                    self.assertEqual(projected, data.replace(old, current, 1))
+                else:
+                    self.assertEqual(projected, data)
+                self.assertEqual(readonly.machine_output_fixture(name, projected, old.decode()), data)
+                self.assertEqual((readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes(), data)
+
+    def test_unknown_view_or_fixture_identity_is_rejected(self):
+        original = (readonly.MACHINE_OUTPUT / "doctor.cli.jsonl").read_bytes()
+        old = readonly.catalog_test_views.OLD
+        for digest in ("0" * 64, "", "future"):
+            with self.subTest(digest=digest), self.assertRaises(AssertionError):
+                readonly.machine_output_fixture("doctor", original, digest)
+        unknown = original.replace(old.encode(), b"0" * 64)
+        with self.assertRaises(AssertionError):
+            readonly.machine_output_fixture("doctor", unknown, old)
+
+    def test_changed_counts_or_duplicate_digest_are_rejected(self):
+        for name in ("doctor", "deep", "healthy"):
+            original = (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes()
+            malformed = (
+                original.replace(b'"operationCount":32', b'"operationCount":31', 1),
+                original.replace(b'"availableOperationCount":0', b'"availableOperationCount":1', 1),
+                original[:-2] + b',"extra":{"digest":"' +
+                readonly.catalog_test_views.OLD.encode() + b'"}}\n',
+            )
+            for data in malformed:
+                with self.subTest(name=name, data=data), self.assertRaises(AssertionError):
+                    readonly.machine_output_fixture(name, data, readonly.catalog_test_views.CURRENT)
+
+    def test_wrong_catalog_and_non_catalog_output_changes_still_fail(self):
+        digest = readonly.catalog_test_views.catalog(readonly.ROOT / "rust")
+        outputs = {name: readonly.machine_output_fixture(
+            name, (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes(), digest).replace(
+                b'"observedAt":"<observedAt>"', b'"observedAt":"2026-09-30T12:38:52Z"')
+            for name in readonly.MACHINE_OUTPUT_LEAVES}
+        other = readonly.catalog_test_views.OLD if digest == readonly.catalog_test_views.CURRENT \
+            else readonly.catalog_test_views.CURRENT
+        for name in ("doctor", "deep", "healthy"):
+            for before, after in ((digest.encode(), other.encode()),
+                                  (digest.encode(), b"0" * 64),
+                                  (b'"operationCount":32', b'"operationCount":31')):
+                changed = dict(outputs, **{name: outputs[name].replace(before, after, 1)})
+                self.assertNotEqual(changed, outputs)
+                with tempfile.TemporaryDirectory() as temporary, self.subTest(name=name, after=after), \
+                        self.assertRaises(AssertionError):
+                    self.run_matrix(Path(temporary), changed)
+
+    def test_unverified_source_view_refuses_before_reading_outputs(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(readonly.catalog_test_views, "catalog", side_effect=ValueError("source drift")), \
+                self.assertRaisesRegex(ValueError, "source drift"):
+            readonly.machine_output(Path(temporary), [], False)
+
+
+def candidate_execution_receipt(info):
+    """A synthetic producer receipt for isolated runner tests, never hardware evidence."""
+    return {
+        "schemaVersion": "arkdeck.catalog-test-execution/1",
+        "catalogDigest": info["catalogDigest"],
+        "completed": True,
+        "integrationPackages": ["arkdeck-cli", "arkdeck-contract"],
+        "targets": [
+            {"target": f"{package}/consumer", "execution": "actual", "completed": True,
+             "selected": ["consumer_case"], "functions": ["consumer_case"],
+             "passed": 1, "ignored": 0, "coverage": True, "substantivePassed": 1}
+            for package in ("arkdeck-cli", "arkdeck-contract")
+        ],
+    }
+
+
+class CandidateConsumerRoutingTests(unittest.TestCase):
+    """Candidate owner execution cannot bypass exact Catalog function routing."""
+
+    def test_drifted_candidate_uses_only_the_closed_router_and_preserves_host_checks(self):
+        view = Path("isolated-view")
+        commands = runner.commands(view, Path("output"), checkout_tested=True, candidate_inputs=True)
+        self.assertEqual(commands[0],
+                         ([sys.executable, str(view / "rust/scripts/run-workspace-tests.py"),
+                           "--parity-consumers"], view / "rust"))
+        self.assertFalse(any(argv[:2] == ["cargo", "test"] for argv, _ in commands))
+        self.assertEqual(commands[1][0][-1], "process-selftest")
+        self.assertEqual(commands[2][0], ["cargo", "build", "--workspace", "--bins", "--locked"])
+        self.assertEqual(commands[3][0][1], str(view / "rust/scripts/check-readonly.py"))
+
+    def run_candidate(self, root, receipt):
+        info = {"kind": "candidate", "inputDigest": "b" * 64, "catalogDigest": "c" * 64}
+        output = root / "output"
+        calls = []
+
+        def run(argv, *, cwd, env, check):
+            self.assertTrue(check)
+            self.assertEqual(env["ARKDECK_RUST_TEST_VIEW"], "candidate")
+            self.assertEqual(env["ARKDECK_RUST_TEST_REPORT_DIR"], str(output / "test-execution"))
+            calls.append(argv)
+            if receipt is not None and "--parity-consumers" in argv:
+                runner.write_json(output / "test-execution/candidate/catalog-execution.json", receipt)
+            return subprocess.CompletedProcess(argv, 0)
+
+        with patch.object(contract, "git", return_value=b"d" * 40), \
+                patch.object(runner, "rust_digest", return_value="e" * 64):
+            runner.run_view(root / "view", output, info,
+                            {"inputDigest": "a" * 64, "commit": "f" * 40}, run=run)
+        return output, calls
+
+    def test_exact_completed_consumer_receipt_is_pinned_in_provenance(self):
+        info = {"catalogDigest": "c" * 64}
+        with tempfile.TemporaryDirectory() as temporary:
+            output, calls = self.run_candidate(Path(temporary), candidate_execution_receipt(info))
+            receipt = output / "test-execution/candidate/catalog-execution.json"
+            provenance = json.loads((output / "provenance.json").read_bytes())
+            self.assertTrue(provenance["completed"])
+            self.assertEqual(provenance["result"], "pass")
+            self.assertEqual(provenance["candidateExecutionReceiptSHA256"], contract.sha(receipt.read_bytes()))
+            self.assertFalse(provenance["deviceAcceptance"])
+            self.assertEqual(len(calls), 4)
+
+    def test_absent_wrong_view_scope_and_nonexecution_receipts_refuse(self):
+        original = candidate_execution_receipt({"catalogDigest": "c" * 64})
+        negatives = [("absent", None)]
+        for field, value in (("catalogDigest", "0" * 64), ("completed", False),
+                             ("integrationPackages", "workspace"),
+                             ("integrationPackages", ["arkdeck-cli"]),
+                             ("integrationPackages", ["arkdeck-contract", "arkdeck-cli"])):
+            changed = copy.deepcopy(original)
+            changed[field] = value
+            negatives.append((f"wrong-{field}-{value}", changed))
+        for field, value in (("execution", "other-view"), ("execution", "optional-material-unavailable"),
+                             ("passed", 0), ("passed", True), ("passed", 2),
+                             ("ignored", 1), ("ignored", True), ("ignored", -1),
+                             ("completed", False), ("coverage", False),
+                             ("selected", []), ("selected", ["consumer_case", "consumer_case"]),
+                             ("selected", [""]), ("selected", [1]),
+                             ("functions", []), ("functions", ["different_case"]),
+                             ("substantivePassed", 0), ("substantivePassed", True),
+                             ("substantivePassed", 2), ("target", "arkdeck-cli"),
+                             ("target", "arkdeck-cli/"), ("target", None)):
+            changed = copy.deepcopy(original)
+            changed["targets"][0][field] = value
+            negatives.append((f"nonexecution-{field}-{value}", changed))
+        missing = copy.deepcopy(original)
+        missing["targets"].pop()
+        negatives.append(("missing-cli-or-contract", missing))
+        foreign = copy.deepcopy(original)
+        foreign["targets"].append({**foreign["targets"][0], "target": "arkdeck-agentd/foreign"})
+        negatives.append(("foreign-executed-owner", foreign))
+        for value in (None, {}, "not-a-list", [None], ["not-a-row"]):
+            changed = copy.deepcopy(original)
+            changed["targets"] = value
+            negatives.append((f"malformed-targets-{value}", changed))
+        missing_target = copy.deepcopy(original)
+        del missing_target["targets"][0]["target"]
+        negatives.append(("missing-actual-target", missing_target))
+        negatives.append(("malformed-document", []))
+        for label, receipt in negatives:
+            with tempfile.TemporaryDirectory() as temporary, self.subTest(label=label):
+                root = Path(temporary)
+                with self.assertRaises((OSError, ValueError)):
+                    self.run_candidate(root, receipt)
+                provenance = json.loads((root / "output/provenance.json").read_bytes())
+                self.assertFalse(provenance["completed"])
+                self.assertEqual(provenance["result"], "fail")
+                self.assertNotIn("candidateExecutionReceiptSHA256", provenance)
+
 
 class ContractChecksTests(unittest.TestCase):
     def setUp(self):
@@ -209,6 +382,11 @@ class ContractChecksTests(unittest.TestCase):
             # Rust formatting is exercised by the real generation check. These
             # tests isolate Git/input behavior and require no installed compiler.
             (contract, "formatted", lambda source: source),
+            # This class isolates Git/input snapshots using a minimal synthetic
+            # Catalog. The real immutable 32-operation reconstruction and full
+            # matrix/projection guards live in test_historical_catalog_views.py.
+            (runner, "historical_catalog_inputs", self.fake_historical_inputs),
+            (runner, "historical_review_projection", lambda source: source),
         ]:
             replacement = patch.object(module, key, value)
             replacement.start()
@@ -247,11 +425,22 @@ class ContractChecksTests(unittest.TestCase):
                  "commit", "-qm", "Published test inputs")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
         self.commit = self.git("rev-parse", "HEAD").decode().strip()
+        self.write("rust/tests/fixtures/catalog-lineage-c6-e4/catalogs.json",
+                   {"oldSourceCommit": self.commit})
         self.inputs, self.info, outputs = contract.checkout_outputs()
         for path, text in outputs.items():
             self.write(path.relative_to(self.root).as_posix(), text.encode())
         self.published = contract.published_inputs(self.commit)
         self.published_info = contract.baseline(self.published, self.commit)
+
+    def fake_historical_inputs(self, current):
+        historical = copy.deepcopy(current)
+        matrix = "Catalog/generated/effect-authorization-matrix.md"
+        data = b"Catalog digest: `" + runner.catalog_test_views.OLD.encode() + b"`\n"
+        historical.files[matrix] = data
+        historical.blobs[matrix] = runner.hashlib.sha1(
+            f"blob {len(data)}\0".encode() + data).hexdigest()
+        return historical
 
     def write(self, name, value):
         path = self.root / name
@@ -323,7 +512,7 @@ class ContractChecksTests(unittest.TestCase):
                 runner.check(self.root / "outputs")
 
     def test_check_summary_names_the_merge_base_as_the_published_baseline(self):
-        with patch.object(runner, "run_view", lambda view, output, info, published_info: None):
+        with patch.object(runner, "run_view", lambda view, output, info, published_info, **kwargs: None):
             output = runner.check(self.root / "outputs")
         summary = json.loads((output / "summary.json").read_bytes())
         self.assertEqual(summary["publishedBaselineCommit"], self.commit)
@@ -594,7 +783,10 @@ class ContractChecksTests(unittest.TestCase):
     def test_each_view_runs_the_complete_ordered_native_checks(self):
         view = self.root / "view"
         commands = runner.commands(view, self.root / "output")
-        self.assertEqual([argv[1] for argv, _ in commands[:4]], ["clippy", "test", "run", "build"])
+        self.assertEqual([argv[1] for argv, _ in commands[:4]],
+                         ["clippy", str(view / "rust/scripts/run-workspace-tests.py"), "run", "build"])
+        self.assertEqual(commands[1],
+                         ([sys.executable, str(view / "rust/scripts/run-workspace-tests.py")], view / "rust"))
         self.assertIn("--all-targets", commands[0][0])
         self.assertEqual(commands[0][0][-3:], ["--", "-D", "warnings"])
         self.assertEqual(commands[2][0][-1], "process-selftest")
@@ -621,9 +813,8 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual(identical["inputDigest"], self.published_info["inputDigest"])
         self.assertNotEqual(drifted["inputDigest"], self.published_info["inputDigest"])
         lint = ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"]
-        workspace_tests = ["cargo", "test", "--workspace", "--locked"]
-        contract_and_cli = ["cargo", "test", "--package", "arkdeck-contract",
-                            "--package", "arkdeck-cli", "--locked"]
+        workspace_tests = [sys.executable, str(self.root / "view/rust/scripts/run-workspace-tests.py")]
+        contract_and_cli = [*workspace_tests, "--parity-consumers"]
         for label, info, repeated in (
             ("candidate-of-published-inputs", identical, False),
             ("candidate-of-drifted-inputs", drifted, False),
@@ -634,6 +825,10 @@ class ContractChecksTests(unittest.TestCase):
 
                 def run(argv, *, cwd, env, check):
                     calls.append(argv)
+                    if "--parity-consumers" in argv:
+                        runner.write_json(self.root / "outputs" / label /
+                                          "test-execution/candidate/catalog-execution.json",
+                                          candidate_execution_receipt(info))
                     return subprocess.CompletedProcess(argv, 0)
 
                 runner.run_view(self.root / "view", self.root / "outputs" / label, info,
@@ -643,12 +838,11 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(
                     ["cargo", "test", "--package", "arkdeck-contract", "--locked"] in calls,
                     label == "candidate-of-published-inputs")
-                # Drifted candidate inputs test what reads the candidate kind,
-                # after building the binaries the CLI's process tests launch.
+                # The closed router builds the same-view sibling binaries and
+                # executes exact CLI/contract cases with workspace features.
                 self.assertEqual(contract_and_cli in calls, label == "candidate-of-drifted-inputs")
-                if contract_and_cli in calls:
-                    bins = ["cargo", "build", "--workspace", "--bins", "--locked"]
-                    self.assertLess(calls.index(bins), calls.index(contract_and_cli))
+                self.assertNotIn(["cargo", "test", "--package", "arkdeck-contract",
+                                  "--package", "arkdeck-cli", "--locked"], calls)
                 self.assertIn(["cargo", "build", "--workspace", "--bins", "--locked"], calls)
 
     def test_any_native_stage_failure_stops_that_view_and_is_preserved(self):
@@ -677,19 +871,19 @@ class ContractChecksTests(unittest.TestCase):
 
     def test_failure_in_either_view_cannot_leave_combined_check_green(self):
         self.drift_and_regenerate()
-        for failing_view in ("development", "candidate"):
+        for failing_view in ("development", "candidate", "historical"):
             with self.subTest(view=failing_view):
                 calls = []
 
-                def check_view(view, output, info, published_info):
-                    calls.append(info["kind"])
-                    if info["kind"] == failing_view:
+                def check_view(view, output, info, published_info, **kwargs):
+                    calls.append("historical" if kwargs.get("historical") else info["kind"])
+                    if calls[-1] == failing_view:
                         raise ValueError("expected test failure")
 
                 with patch.object(runner, "run_view", check_view):
                     with self.assertRaisesRegex(ValueError, "contract checks failed"):
                         runner.check(self.root / "outputs")
-                self.assertEqual(calls, ["development", "candidate"])
+                self.assertEqual(calls, ["development", "candidate", "historical"])
 
     def test_both_views_use_one_source_snapshot_and_report_concurrent_edits(self):
         self.drift_and_regenerate()
@@ -697,11 +891,13 @@ class ContractChecksTests(unittest.TestCase):
         source = self.root / "rust/scripts/check-readonly.py"
         original = source.read_bytes()
         projection = runner.review_projection()
+        generator = (self.root / "scripts/catalog_gen/generate.py").read_bytes()
 
-        def check_view(view, output, info, published_info):
-            calls.append(info["kind"])
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append("historical" if kwargs.get("historical") else info["kind"])
             self.assertEqual((view / "rust/scripts/check-readonly.py").read_bytes(), original)
             self.assertEqual((view / runner.REVIEW_PROJECTION).read_bytes(), projection)
+            self.assertEqual((view / "scripts/catalog_gen/generate.py").read_bytes(), generator)
             self.assertEqual((view / "rust/crates/arkdeck-contract/src/catalog_generated.rs").read_bytes(),
                              b"// test catalog\n")
             if info["kind"] == "development":
@@ -712,25 +908,31 @@ class ContractChecksTests(unittest.TestCase):
         with patch.object(runner, "run_view", check_view):
             with self.assertRaisesRegex(ValueError, "Rust sources changed.*App review projection changed.*Catalog generator changed"):
                 runner.check(self.root / "outputs")
-        self.assertEqual(calls, ["development", "candidate"])
+        self.assertEqual(calls, ["development", "candidate", "historical"])
 
     def test_identical_inputs_run_the_native_checks_once_and_record_the_coverage(self):
         calls = []
 
-        def check_view(view, output, info, published_info):
-            calls.append(info["kind"])
-            self.assertEqual(info["inputDigest"], published_info["inputDigest"])
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append("historical" if kwargs.get("historical") else info["kind"])
+            if kwargs.get("historical"):
+                self.assertEqual(info["catalogDigest"], runner.catalog_test_views.OLD)
+                self.assertNotEqual(info["inputDigest"], published_info["inputDigest"])
+            else:
+                self.assertEqual(info["inputDigest"], published_info["inputDigest"])
             write = runner.write_json
             write(output / "provenance.json", {"completed": True, "result": "pass"})
 
         outputs = self.root / "outputs"
         with patch.object(runner, "run_view", check_view):
             runner.check(outputs)
-        self.assertEqual(calls, ["candidate"])
+        self.assertEqual(calls, ["candidate", "historical"])
         (run,) = outputs.iterdir()
         summary = json.loads((run / "summary.json").read_bytes())
         self.assertTrue(summary["completed"])
         self.assertEqual(summary["publishedView"], "covered-by-candidate")
+        self.assertEqual(summary["historicalView"], "mandatory-run")
+        self.assertEqual(summary["historicalCatalogDigest"], runner.catalog_test_views.OLD)
         published = json.loads((run / "published/provenance.json").read_bytes())
         self.assertEqual(published["result"], "covered")
         self.assertEqual(published["coveredBy"], "candidate")
@@ -739,8 +941,22 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual(published["commands"], [])
         self.assertFalse(published["deviceAcceptance"])
 
+    def test_identical_inputs_still_require_the_actual_historical_view(self):
+        calls = []
+
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append(view.name)
+            if kwargs.get("historical"):
+                self.assertFalse(kwargs.get("workspace_covered"))
+                raise ValueError("expected mandatory historical failure")
+
+        with patch.object(runner, "run_view", check_view):
+            with self.assertRaisesRegex(ValueError, "historical.*mandatory historical failure"):
+                runner.check(self.root / "outputs")
+        self.assertEqual(calls, ["candidate", "historical"])
+
     def test_identical_inputs_still_fail_when_the_candidate_view_fails(self):
-        def check_view(view, output, info, published_info):
+        def check_view(view, output, info, published_info, **kwargs):
             raise ValueError("expected candidate failure")
 
         with patch.object(runner, "run_view", check_view):
@@ -751,14 +967,14 @@ class ContractChecksTests(unittest.TestCase):
         self.drift_and_regenerate()
         calls = []
 
-        def check_view(view, output, info, published_info):
-            calls.append(info["kind"])
+        def check_view(view, output, info, published_info, **kwargs):
+            calls.append("historical" if kwargs.get("historical") else info["kind"])
             runner.write_json(output / "provenance.json", {"completed": True, "result": "pass"})
 
         outputs = self.root / "outputs"
         with patch.object(runner, "run_view", check_view):
             runner.check(outputs)
-        self.assertEqual(calls, ["development", "candidate"])
+        self.assertEqual(calls, ["development", "candidate", "historical"])
         (run,) = outputs.iterdir()
         self.assertEqual(json.loads((run / "summary.json").read_bytes())["publishedView"], "run")
 
@@ -772,8 +988,8 @@ class ContractChecksTests(unittest.TestCase):
         visits = {}
         stamps = {}
 
-        def check_view(view, output, info, published_info):
-            name = "candidate" if info["kind"] == "candidate" else "published"
+        def check_view(view, output, info, published_info, **kwargs):
+            name = "historical" if kwargs.get("historical") else "candidate" if info["kind"] == "candidate" else "published"
             self.assertEqual(view, self.root / "rust/target/contract-check" / name)
             count = visits.get(name, 0)
             visits[name] = count + 1
@@ -802,7 +1018,7 @@ class ContractChecksTests(unittest.TestCase):
             runner.check(self.root / "outputs")
             self.drift_and_regenerate()
             runner.check(self.root / "outputs")
-        self.assertEqual(visits, {"published": 3, "candidate": 3})
+        self.assertEqual(visits, {"published": 3, "candidate": 3, "historical": 3})
 
     def test_parallel_view_keeps_native_checks_and_labels_its_own_timing_report(self):
         self.drift_and_regenerate()
@@ -814,17 +1030,20 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(env["ARKDECK_RUST_TEST_VIEW"], label)
                 self.assertEqual(env["CARGO_TARGET_DIR"], str(self.root / label / "rust/target"))
                 calls.append(argv)
+                if "--parity-consumers" in argv:
+                    runner.write_json(self.root / "outputs" / label /
+                                      "test-execution/candidate/catalog-execution.json",
+                                      candidate_execution_receipt(info))
                 return subprocess.CompletedProcess(argv, 0)
 
             with patch.dict(os.environ, {"ARKDECK_RUST_TEST_WORKERS": "2"}):
                 runner.run_view(self.root / label, self.root / "outputs" / label, info, self.published_info, run=run)
             if label == "candidate":
-                # The candidate is the lane's checkout: the binaries the CLI's
-                # process tests launch, then only its kind's tests.
-                self.assertEqual(calls[0], ["cargo", "build", "--workspace", "--bins", "--locked"])
-                self.assertEqual(calls[1][:2], ["cargo", "test"])
-                self.assertIn("arkdeck-cli", calls[1])
-                self.assertEqual([argv[1] for argv in calls[2:4]], ["run", "build"])
+                # Candidate integration cases use the closed router; normal
+                # platform process checks and sibling binary build stay present.
+                self.assertEqual(calls[0], [sys.executable,
+                    str(self.root / label / "rust/scripts/run-workspace-tests.py"), "--parity-consumers"])
+                self.assertEqual([argv[1] for argv in calls[1:3]], ["run", "build"])
                 continue
             self.assertEqual(calls[0][1], "clippy")
             self.assertEqual(calls[1], [sys.executable, str(self.root / label / "rust/scripts/run-workspace-tests.py")])

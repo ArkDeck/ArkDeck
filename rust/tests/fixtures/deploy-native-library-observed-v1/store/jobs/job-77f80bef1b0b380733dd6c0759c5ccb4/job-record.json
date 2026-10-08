@@ -1,0 +1,263 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "sendFile",
+    "runApprovedRemoteMutation",
+    "stopApplication",
+    "startApplication",
+    "verifyRemoteState",
+    "cleanupOwnedRemotePath"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "88e1a2acf6558faee4902f5757be34674979ffba672396edec63acd3a4b77418",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-DFD3FD5E0BCB588C679FF80DCBE78D465C442C01-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+      "planDigestSHA256" : "571766d1d74b0735f5513ab02af286ac574c2d11123ef9b724656683c81a611b",
+      "reservationID" : "idem-native-loaderFailure",
+      "stepSetDigestSHA256" : "bdd1fd683c1f677631dce99651aa8baba02de269163dfa4ea26761f188cdf2e0",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 2
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-77f80bef1b0b380733dd6c0759c5ccb4",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "571766d1d74b0735f5513ab02af286ac574c2d11123ef9b724656683c81a611b",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "deploy.native-library.app-owned@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-native-loaderFailure",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-native-loaderFailure",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-DFD3FD5E0BCB588C679FF80DCBE78D465C442C01-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-native-loaderFailure",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-native-loaderFailure",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+    "checkpointSeal" : {
+      "byteCount" : "21785",
+      "lastSequence" : 28,
+      "sha256" : "3bb23e86d13cd01d6da29c421146b9455837cbbb0b1ff1000498461ec910f3d2"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-77f80bef1b0b380733dd6c0759c5ccb4",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "87321",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "22168",
+      "lastSequence" : 29,
+      "sha256" : "30f8c08c474aafb43061d61bb86e11b733ffe161cdf41a8dbb60d1000ae1fcf7"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "11741",
+      "manifestSHA256" : "a91a8767f73f3954a98a71a5c65f4f653ada7606fe7dcfde9312e61b06dd3996",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "2",
+      "manifestSHA256" : "a91a8767f73f3954a98a71a5c65f4f653ada7606fe7dcfde9312e61b06dd3996",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-77f80bef1b0b380733dd6c0759c5ccb4",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-77f80bef1b0b380733dd6c0759c5ccb4",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "verify-elf-locally abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step verify-elf-locally",
+    "hash-library abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step hash-library",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "capability consumed before first mutation",
+    "intent send-to-staging",
+    "dispatched send-to-staging; awaiting readback",
+    "intent verify-remote-staging",
+    "verified verify-remote-staging [\"buildId\", \"remoteByteCount\", \"remoteSha256\"]",
+    "intent backup-current-version",
+    "verified backup-current-version [\"backupPath\", \"backupSha256\"]",
+    "native-readback backup-current-version {\"backupSha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"currentSha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"inputABI\":\"arm64-v8a\",\"inputBuildId\":\"00112233445566778899aabbccddeeff10213243\",\"inputSha256\":\"f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53\",\"phase\":\"backup\",\"schemaVersion\":\"arkdeck.native-library.readback\/1\"}",
+    "intent atomic-publish",
+    "verified atomic-publish [\"attestation\", \"buildId\", \"fsVerityDigest\", \"gid\", \"mode\", \"publishedSha256\", \"targetPath\", \"uid\"]",
+    "artifact publish-report.json -> ART-45d7310e1f94cb40f83b61bc27b56f70",
+    "intent restart-target",
+    "verified restart-target [\"stopped\"]",
+    "intent start-target",
+    "verified start-target [\"processIds\", \"started\"]",
+    "intent verify-loaded-library",
+    "failed verify-loaded-library: nativeLibraryNotLoaded: target process maps do not contain the published app-owned library",
+    "intent rollback-native-library",
+    "verified rollback-native-library [\"processIds\", \"restored\", \"restoredSha256\"]",
+    "native-readback rollback-native-library {\"backupSha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"inputABI\":\"arm64-v8a\",\"inputBuildId\":\"00112233445566778899aabbccddeeff10213243\",\"inputSha256\":\"f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53\",\"loaderPathSha256\":\"7438badb85601f9e76fb3a707b827b7343ea7036a9e1f7321eafef2fb724cf2d\",\"mappedProcessIds\":[4321],\"mapsByteCount\":70,\"mapsSha256\":\"4d70a3d7f6adb9beebc931c58f76edd94a6453b59f75a0773e8831f3e09fd5a4\",\"mapsVerified\":true,\"matchingMapLineCount\":1,\"phase\":\"rollback\",\"processIds\":[4321],\"restoredSha256\":\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\",\"schemaVersion\":\"arkdeck.native-library.readback\/1\"}",
+    "native deployment failure restored previous library",
+    "intent cleanup-native-library-compensation",
+    "verified cleanup-native-library-compensation [\"backupRetained\", \"cleaned\"]",
+    "native compensation cleanup complete",
+    "native deployment failed: nativeLibraryNotLoaded: target process maps do not contain the published app-owned library",
+    "running->finalizing",
+    "reason: nativeLibraryNotLoaded: target process maps do not contain the published app-owned library",
+    "finalizing->failed",
+    "reason: nativeLibraryNotLoaded: target process maps do not contain the published app-owned library"
+  ]
+}

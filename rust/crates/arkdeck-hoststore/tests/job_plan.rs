@@ -12,6 +12,9 @@ use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
+#[path = "support/catalog_lineage.rs"]
+mod catalog_lineage;
+
 const ROOT: &str = "/private/tmp/arkdeck-job-plan-oracle";
 const LOCK: &str = "/private/tmp/arkdeck-job-plan-oracle.lock";
 const SOURCE_JOB: &str = "job-oracle-source";
@@ -158,6 +161,23 @@ fn rust_plans_reproduce_the_swift_oracle() {
     let store = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
     let profile = AnalyzerProfile::crash_signature(&root.join("analyzer")).unwrap();
     let payload = source_payload(&root);
+    let lineage = catalog_lineage::Lineage::frozen().unwrap();
+    let provenance: Value =
+        serde_json::from_slice(&fs::read(fixture().join("provenance.json")).unwrap()).unwrap();
+    assert_eq!(
+        arkdeck_contract::sha256_hex(&fs::read(fixture().join("cases.json")).unwrap()),
+        "0ddb0b69f9c032147556b7144313ebab447a6c9ba55d37576db75a6216ec9892"
+    );
+    assert_eq!(
+        profile.executable_sha256.as_str(),
+        provenance["files"]["analyzer"].as_str().unwrap()
+    );
+    assert_eq!(
+        profile.fixed_arguments,
+        vec!["--analyze-crash-ledger".to_owned()]
+    );
+    assert_eq!(profile.timeout_seconds, 30);
+    assert_eq!(profile.analyzer_ref, "crash-signature@1");
     let mut planned = 0;
     let mut differences = Vec::new();
     for case in &cases {
@@ -201,6 +221,20 @@ fn rust_plans_reproduce_the_swift_oracle() {
                 digest,
                 "a06552647a3ebed582afc39bd534a856e40263d79623edd8b8bd85b1f476c509"
             );
+        }
+        if actual["ok"] == true {
+            let request: Value =
+                serde_json::from_str(params["requestJson"].as_str().unwrap()).unwrap();
+            let complete_plan = lineage
+                .crash_signature_plan(
+                    &request,
+                    &profile.executable_sha256,
+                    payload.to_str().unwrap(),
+                )
+                .unwrap();
+            actual = lineage
+                .historical_answer(&actual, expected, &complete_plan)
+                .unwrap();
         }
         let mut recorded = expected.clone();
         if let Some(error) = recorded.get_mut("error").and_then(Value::as_object_mut) {
