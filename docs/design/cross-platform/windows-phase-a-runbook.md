@@ -89,8 +89,13 @@ because this example uses `CN=ArkDeck Development`. The
 [2026-10-13 local run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/msix-development-signing-2026-10-13-run.md)
 reused the existing certificate with user-authorized temporary LocalMachine
 TrustedPeople trust, then found and tested a missing RC helper declaration
-repair. The temporary trust was removed. Its candidate result still needs
-review and a released rerun.
+repair. After maintainer merge, the
+[fresh protected-main rerun](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/msix-published-2026-10-13-run.md)
+passed all five installed App cases and the independent packaged-client probe.
+Both test packages and temporary trust were removed, and the original Runtime
+and all 57 complete Job items were preserved. This matching-package smoke does
+not replace mixed-installation qualification, production signing or update-feed
+acceptance.
 
 1. Create the certificate (normal terminal):
 
