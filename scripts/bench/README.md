@@ -319,9 +319,11 @@ so no lane can gate on one. What differs, and why:
   measured; `daemon.residentSet*` is the working set and `daemon.idleCpuPercent`
   the lifetime CPU share. `ipc.health` and `daemon.idleOpenFileDescriptorCount`
   remain rows, as gaps naming their Windows counterparts.
-- **Job store.** The Windows development root composes no Job store yet (G01):
-  nothing is seeded, `ipc.jobList`/`ipc.jobStatus` are gaps, and the recovery,
-  journal and artifact legs are refused before a run starts.
+- **Job store.** The Windows development root composes the Job, journal,
+  recovery and Artifact owners. The matching signed Rust soak seeds bounded
+  simulated-provider Jobs for `ipc.jobList`/`ipc.jobStatus`; recovery, journal
+  and artifact legs are opt-in as below. These private-root measurements do
+  not use the installed account or dispatch to a device.
 - **Host facts.** Clocks are `QueryInterruptTimePrecise` (continuous) and
   `QueryUnbiasedInterruptTimePrecise` (awake-work). Windows has no load
   average: the quiet-host figure is the CPUs kept busy over one second
