@@ -460,7 +460,7 @@ impl ProcessIdentity {
         }
         Ok(())
     }
-    pub(crate) fn require_server(&self, expected: &ServerIdentity) -> io::Result<()> {
+    pub(crate) fn require_server(&self, expected: &ServerIdentity) -> io::Result<ImagePin> {
         if !expected.executable.is_absolute()
             || self.path.canonicalize()? != expected.executable.canonicalize()?
         {
@@ -493,19 +493,24 @@ impl ProcessIdentity {
                 "pipe server lacks the installed package or trusted signing identity; zero frames sent",
             ));
         }
-        self.require_live()
+        self.require_live()?;
+        Ok(if signature_matches {
+            ImagePin::Signer
+        } else {
+            ImagePin::PackageFamily
+        })
     }
 }
 
-/// What vouches for an installed daemon image before it runs.
+/// What vouches for an installed daemon image or an authenticated live server.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ImagePin {
     /// The image's Authenticode signature satisfies a signing pin: the
     /// development signer's certificate SHA-256 or the production publisher
     /// identity (maintainer ruling 17).
     Signer,
-    /// A package family is pinned; only a running process has one, so it is
-    /// proved on the pipe server after the start, never before.
+    /// A package family is pinned. Before launch it remains to be proved;
+    /// an authenticated connection has proved it on the live pipe server.
     PackageFamily,
 }
 

@@ -265,16 +265,6 @@ pub struct ServiceStatus {
 pub fn inspect(target: &ServiceTarget) -> ServiceStatus {
     let mut diagnostics = Vec::new();
     let identity = &target.start.identity;
-    let image = match verify_daemon_image(identity) {
-        Ok(pin) => json!({"verified": true, "pin": match pin {
-            ImagePin::Signer => "signer",
-            ImagePin::PackageFamily => "packageFamily",
-        }}),
-        Err(error) => {
-            diagnostics.push(format!("installed daemon image refused: {error}"));
-            json!({"verified": false, "pin": null, "detail": error.to_string()})
-        }
-    };
     let mut root = Map::from_iter([
         (
             "kind".into(),
@@ -329,6 +319,30 @@ pub fn inspect(target: &ServiceTarget) -> ServiceStatus {
         Err(error) => {
             diagnostics.push(format!("the daemon's pipe cannot be looked at: {error}"));
             false
+        }
+    };
+    // A running packaged daemon can pin its WindowsApps namespace through its
+    // authenticated process even when this unpackaged caller cannot traverse
+    // it on its own. Reuse that exact live image proof, without control frames.
+    // An absent daemon still requires the ordinary pre-launch file check.
+    let image_pin = if socket_present {
+        connect_verified(
+            &target.start.endpoint,
+            identity,
+            Instant::now() + CONNECTION_TIMEOUT,
+        )
+        .and_then(|connection| connection.verified_server_image_pin())
+    } else {
+        verify_daemon_image(identity)
+    };
+    let image = match image_pin {
+        Ok(pin) => json!({"verified": true, "pin": match pin {
+            ImagePin::Signer => "signer",
+            ImagePin::PackageFamily => "packageFamily",
+        }}),
+        Err(error) => {
+            diagnostics.push(format!("installed daemon image refused: {error}"));
+            json!({"verified": false, "pin": null, "detail": error.to_string()})
         }
     };
     let ready = diagnostics.is_empty();
@@ -788,6 +802,15 @@ pub fn restart_leaf(
                 ),
             ));
         }
+        // Inspect may prove a live packaged image through its process token.
+        // Starting its replacement still needs this caller's ordinary file
+        // access. Refuse before stopping the predecessor if that is unavailable.
+        verify_daemon_image(&target.start.identity).map_err(|error| {
+            PlainFailure::new(
+                69,
+                format!("replacement daemon image refused before stopping the runtime: {error}"),
+            )
+        })?;
         let stopped = stop_serving(target, id, wait, "restart")?;
         let Stopped {
             pid: pid_before,

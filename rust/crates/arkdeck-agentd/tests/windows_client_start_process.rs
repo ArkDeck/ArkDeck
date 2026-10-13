@@ -32,8 +32,8 @@ use arkdeck_cli::runtime_service_windows::{self as service, ServiceTarget};
 use arkdeck_client::Client;
 use arkdeck_client::start::{StartRefusal, StartTarget, Started, ensure_running};
 use arkdeck_platform::{
-    GuardAcquisition, GuardObject, InstanceScope, LocalConnection, LocalEndpoint, ServerIdentity,
-    StateRoot, await_pipe_instance, pipe_present,
+    GuardAcquisition, GuardObject, ImagePin, InstanceScope, LocalConnection, LocalEndpoint,
+    ServerIdentity, StateRoot, await_pipe_instance, pipe_present,
 };
 use serde_json::{Map, Value};
 use std::ffi::OsString;
@@ -42,7 +42,7 @@ use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard, PoisonError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 static TURN: Mutex<()> = Mutex::new(());
 fn turn() -> MutexGuard<'static, ()> {
@@ -464,6 +464,13 @@ fn a_signed_daemon_is_started_once_verified_restarted_and_started_once_by_concur
     );
     let mut client = Client::connect(&target.endpoint, &identity, WAIT).unwrap();
     assert_eq!(client.health("start-health").unwrap()["status"], "ok");
+    let retained_identity =
+        arkdeck_client::start::connect_verified(&target.endpoint, &identity, Instant::now() + WAIT)
+            .unwrap();
+    assert_eq!(
+        retained_identity.verified_server_image_pin().unwrap(),
+        ImagePin::Signer
+    );
 
     // `verify` and `status` prove the running daemon and start nothing.
     let mut service = ServiceTarget::new(
@@ -489,6 +496,32 @@ fn a_signed_daemon_is_started_once_verified_restarted_and_started_once_by_concur
         .unwrap();
     assert_eq!(status["daemonHealth"]["status"], "ok", "{status}");
     assert_eq!(status["daemonService"]["socketPresent"], true);
+    assert_eq!(status["daemonService"]["ready"], true);
+    assert_eq!(status["daemonService"]["daemonImage"]["pin"], "signer");
+
+    // A live pipe is not an identity proof. Both service reads must refuse
+    // its real daemon when the configured signer differs, without starting
+    // or stopping a process or using health to excuse the failed identity.
+    let wrong_identity = ServerIdentity {
+        authenticode_sha256: Some("0".repeat(64)),
+        ..identity.clone()
+    };
+    let wrong_service =
+        ServiceTarget::new(None, Some(root.0.clone().into_os_string()), wrong_identity).unwrap();
+    let wrong_status = service::status_leaf(&wrong_service, "status-wrong-signer")
+        .document
+        .unwrap();
+    assert_eq!(wrong_status["daemonService"]["ready"], false);
+    assert_eq!(
+        wrong_status["daemonService"]["daemonImage"]["verified"],
+        false
+    );
+    assert_eq!(wrong_status["daemonHealth"]["status"], "unreachable");
+    let wrong_verify = service::verify_leaf(&wrong_service, "verify-wrong-signer", &Map::new());
+    assert_eq!(wrong_verify.failure.unwrap().exit_code, 69);
+    assert_eq!(wrong_verify.document.unwrap()["runtimeVerified"], false);
+    assert_eq!(root.instance()["pid"], first);
+    assert_eq!(client.health("after-wrong-signer").unwrap()["status"], "ok");
 
     // Restart: the stop request drains the daemon (the idle connection above
     // is ended), and the successor is a new, verified process.
@@ -509,6 +542,7 @@ fn a_signed_daemon_is_started_once_verified_restarted_and_started_once_by_concur
     assert_eq!(proof["jobOwner"], true, "{proof}");
     assert_eq!(document["daemonHealth"]["status"], "ok");
     assert_eq!(root.instance()["pid"], second);
+    drop(retained_identity);
 
     // No replay: the connection the restart ended fails; nothing it asked is
     // sent again, to the successor or anyone.
