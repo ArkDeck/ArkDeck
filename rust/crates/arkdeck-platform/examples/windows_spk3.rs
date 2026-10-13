@@ -45,11 +45,17 @@ fn run() -> io::Result<()> {
         }
         "process-selftest" => process_selftest(),
         #[cfg(windows)]
-        "server-auth" | "raw-connect" | "connection-pid" | "raw-squat" | "bind"
-        | "guard-server" => windows::run(command, &arguments[1..]),
+        "server-auth"
+        | "raw-connect"
+        | "connection-pid"
+        | "raw-squat"
+        | "bind"
+        | "guard-server"
+        | "peer-roundtrip-server"
+        | "peer-roundtrip-client" => windows::run(command, &arguments[1..]),
         _ => Err(io::Error::new(
             io::ErrorKind::InvalidInput,
-            "expected process-selftest or Windows probe command: server-auth, raw-connect, connection-pid, raw-squat, bind, guard-server",
+            "expected process-selftest or Windows probe command: server-auth, raw-connect, connection-pid, raw-squat, bind, guard-server, peer-roundtrip-server, peer-roundtrip-client",
         )),
     }
 }
@@ -120,6 +126,7 @@ fn process_selftest() -> io::Result<()> {
 mod windows {
     use super::*;
     use arkdeck_platform::{LocalConnection, LocalEndpoint, LocalListener, ServerIdentity};
+    use std::io::Read;
     use std::mem::size_of;
     use std::os::windows::ffi::OsStrExt;
     use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
@@ -157,6 +164,9 @@ mod windows {
     }
     pub(super) fn run(command: &str, arguments: &[OsString]) -> io::Result<()> {
         let endpoint = endpoint(arguments)?;
+        if matches!(command, "peer-roundtrip-server" | "peer-roundtrip-client") {
+            return peer_roundtrip(command, endpoint, arguments);
+        }
         if command == "raw-squat" {
             return squat(endpoint);
         }
@@ -244,6 +254,83 @@ mod windows {
             "{}",
             json!({"probe":command,"connected":opened.is_ok(),"serverPidAvailable":pid_result,"serverPid":pid,"framesSent":0,"osError":opened.as_ref().err().and_then(io::Error::raw_os_error)})
         );
+        Ok(())
+    }
+
+    // Isolated OS authentication probe, never the account Runtime protocol.
+    // Both peers stay alive until the verified connection completes its fixed
+    // handshake, so a successful process exit cannot mask peer-liveness races.
+    fn peer_roundtrip(
+        command: &str,
+        endpoint: &OsString,
+        arguments: &[OsString],
+    ) -> io::Result<()> {
+        if !endpoint
+            .to_string_lossy()
+            .starts_with(r"\\.\pipe\arkdeck-spk3-")
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "peer roundtrip requires an isolated arkdeck-spk3-* endpoint",
+            ));
+        }
+        let server = command == "peer-roundtrip-server";
+        let mut connection = if server {
+            let mut listener = LocalListener::bind(&LocalEndpoint::new(endpoint))?;
+            println!(
+                "{}",
+                json!({"probe":"peer-roundtrip-ready", "pid":std::process::id()})
+            );
+            io::stdout().flush()?;
+            listener.accept()?
+        } else {
+            let executable = arguments.get(1).ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "missing server image")
+            })?;
+            let pin = arguments
+                .get(2)
+                .and_then(|value| value.to_str())
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "missing server signer pin")
+                })?;
+            let mut identity = ServerIdentity::new(executable);
+            identity.authenticode_sha256 = Some(pin.to_owned());
+            LocalConnection::connect(&LocalEndpoint::new(endpoint), &identity)?
+        };
+        connection.set_read_timeout(Some(Duration::from_secs(10)))?;
+        connection.set_write_timeout(Some(Duration::from_secs(10)))?;
+        let peer = connection.authenticated_peer_pid();
+        let mut bytes = [0u8; 4];
+        if server {
+            connection.read_exact(&mut bytes)?;
+            if &bytes != b"PING" {
+                return Err(io::Error::other("unexpected probe request"));
+            }
+            connection.write_all(b"PONG")?;
+            connection.read_exact(&mut bytes)?;
+            if &bytes != b"DONE" {
+                return Err(io::Error::other("unexpected probe completion"));
+            }
+        } else {
+            connection.write_all(b"PING")?;
+            connection.read_exact(&mut bytes)?;
+            if &bytes != b"PONG" {
+                return Err(io::Error::other("unexpected probe reply"));
+            }
+            connection.write_all(b"DONE")?;
+        }
+        println!(
+            "{}",
+            json!({"probe":"peer-roundtrip", "server":server, "peerPid":peer, "packageFamily":client_package_family(), "authenticated":true, "deviceDispatchCount":0})
+        );
+        io::stdout().flush()?;
+        // The bounded parent harness releases both processes only after it
+        // reads both results. Neither peer exits under the other's live check.
+        let mut release = String::new();
+        io::stdin().read_line(&mut release)?;
+        if release.trim_end() != "release" {
+            return Err(io::Error::other("probe parent did not release the peer"));
+        }
         Ok(())
     }
 

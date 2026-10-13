@@ -98,8 +98,10 @@ record the actual limits without weakening the workload or threshold.
 The subsequent 24-hour soak stopped after four cycles when a native probe
 exposed ineffective ancestor-directory rename locks. Its partial metrics are
 retained without a pass claim. The [directory-lock repair](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-namespace-lock-20261013-run.md)
-needs review/publication before a new full-duration qualification run; it does
-not close the separate mixed MSIX/xcopy protected-directory access failure.
+was merged as #2637. A new full-duration qualification run remains required. The
+separate [packaged-peer repair](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-packaged-peer-locks-20261013-run.md)
+now passes isolated native roundtrips in both mixed MSIX/xcopy directions and
+retains wrong-signer refusal; published App qualification still follows review.
 
 ## Remaining acceptance and dependencies
 
@@ -118,21 +120,23 @@ The same 365-file RC was also promoted to the existing xcopy installation with
 the old App/launcher retained for rollback; the installed CLI health and a
 second real App UIA smoke passed. Native Windows PID/signature and isolated
 wrong-image/held-pipe/process checks passed with zero probe control frames;
-second-account, elevation, remote-host and packaged-client observations remain
-separate requirements.
+second-account, elevation and remote-host observations remain separate
+requirements. The separately registered SPK-3 packaged-client probe has since
+passed actual family/PID checks with zero control frames; that observation
+does not establish a full mixed-installation control exchange.
 
 The same existing account also installed and removed a signed development MSIX
 using the existing certificate and user-authorized temporary TrustedPeople
 trust, which was subsequently removed. That exposed missing CLI/daemon application
-declarations in the RC manifest. The packaging-only repair's candidate passed
-CLI doctor and the real App UIA smoke (1/1), including exact process package
-identity; all 57 account Job items were unchanged after restoring the original
-Runtime. Release acceptance waits for review and a protected-main package rerun.
-Mixed MSIX App/xcopy Runtime authentication failed at the protected system
-package-directory namespace lock and is not promoted. See the
-[local MSIX run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/msix-development-signing-2026-10-13-run.md).
-The independent SPK-3 packaged-probe row, formal update feed, clean host and
-production signing remain separate.
+declarations in the RC manifest. After #2634/#2635 were merged, a fresh clean
+protected-main package passed all five actual installed App identity and
+English/Chinese capture readback cases. All 57 complete Job items were unchanged
+after restoring the original Runtime. Both test packages and temporary trust
+were removed. See the
+[published MSIX run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/msix-published-2026-10-13-run.md).
+That run uses matching MSIX App/CLI/daemon; the earlier mixed-installation
+failure and its candidate repair remain separately qualified. Formal update
+feed, clean host and production signing remain open.
 
 GJ-5 also achieved `REAL_DEVICE_PASS` on that same source and Catalog on
 2026-10-13: the unchanged recorder verifies 210 criteria. One fixed-patch round

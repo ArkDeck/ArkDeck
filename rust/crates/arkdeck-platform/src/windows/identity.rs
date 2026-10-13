@@ -342,6 +342,82 @@ pub(crate) struct ProcessIdentity {
     _namespace: Vec<File>,
 }
 
+// A packaged peer can traverse WindowsApps while an unpackaged caller cannot.
+// This scope is used only to open the kernel-reported image and its full
+// namespace. No protocol, signature verification or caller code runs in it.
+struct PeerImageAccess {
+    _token: Token,
+    // Impersonation belongs to this thread, including during unwinding.
+    _thread_bound: std::marker::PhantomData<*mut ()>,
+}
+
+impl PeerImageAccess {
+    fn enter(process: HANDLE) -> io::Result<Self> {
+        let mut existing = null_mut();
+        // SAFETY: borrowed current-thread handle and valid output storage.
+        if unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, 1, &mut existing) } != 0 {
+            let _existing = Handle::new(existing)?;
+            return Err(denied("peer image access cannot replace a thread identity"));
+        }
+        let error = io::Error::last_os_error();
+        if error.raw_os_error() != Some(ERROR_NO_TOKEN as i32) {
+            return Err(error);
+        }
+        let mut token = null_mut();
+        // SAFETY: retained process handle; own the returned primary token.
+        // ImpersonateLoggedOnUser requires QUERY | DUPLICATE for this token.
+        bool_result(unsafe {
+            OpenProcessToken(process, TOKEN_QUERY | TOKEN_DUPLICATE, &mut token)
+        })?;
+        let token = Token(Handle::new(token)?);
+        let current = Token::current()?;
+        if !token.user()?.equals(&current.user()?) || token.elevated()? != current.elevated()? {
+            return Err(denied(
+                "peer image access requires the same user and elevation",
+            ));
+        }
+        // SAFETY: same-user/elevation primary token, retained through the scope.
+        // Failure returns before any file is opened in the peer's context.
+        bool_result(unsafe { ImpersonateLoggedOnUser(token.0.raw()) })?;
+        Ok(Self {
+            _token: token,
+            _thread_bound: std::marker::PhantomData,
+        })
+    }
+}
+
+impl Drop for PeerImageAccess {
+    fn drop(&mut self) {
+        // SAFETY: this thread entered the scope with no prior thread token.
+        // Continuing after a failed revert would leak the peer's authority to
+        // unrelated work. The OS contract requires terminating in that case.
+        if unsafe { RevertToSelf() } == 0 {
+            std::process::abort();
+        }
+    }
+}
+
+fn lock_process_image(process: HANDLE, path: &std::path::Path) -> io::Result<(Vec<File>, File)> {
+    let open = || -> io::Result<(Vec<File>, File)> {
+        Ok((
+            lock_namespace(path)?,
+            crate::process::open_locked_file(path)?,
+        ))
+    };
+    match open() {
+        Err(error)
+            if error.raw_os_error() == Some(ERROR_ACCESS_DENIED as i32)
+                && package_family(process).is_ok_and(|family| !family.is_empty()) =>
+        {
+            let _access = PeerImageAccess::enter(process)?;
+            // Keep every ancestor and the image locked with the same flags.
+            // The scope reverts before these retained handles reach the caller.
+            open()
+        }
+        result => result,
+    }
+}
+
 impl ProcessIdentity {
     pub(crate) fn open(pid: u32) -> io::Result<Self> {
         // SAFETY: query-only process access, owned handle is retained.
@@ -352,8 +428,7 @@ impl ProcessIdentity {
     }
     pub(crate) fn from_handle(process: Handle, pid: u32) -> io::Result<Self> {
         let path = process_image(process.raw())?.canonicalize()?;
-        let namespace = lock_namespace(&path)?;
-        let image = crate::process::open_locked_file(&path)?;
+        let (namespace, image) = lock_process_image(process.raw(), &path)?;
         let identity = Self {
             started: process_started(process.raw())?,
             process,
@@ -889,6 +964,88 @@ mod tests {
             .unwrap();
         let error = lock_namespace(&copy.0).unwrap_err();
         assert_eq!(error.raw_os_error(), Some(ERROR_SHARING_VIOLATION as i32));
+    }
+
+    fn thread_token() -> io::Result<Token> {
+        let mut token = null_mut();
+        // SAFETY: borrowed current-thread handle and valid output storage.
+        bool_result(unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, 1, &mut token) })?;
+        Ok(Token(Handle::new(token)?))
+    }
+
+    fn require_no_thread_token() {
+        let error = thread_token().err().expect("the thread must have reverted");
+        assert_eq!(error.raw_os_error(), Some(ERROR_NO_TOKEN as i32));
+    }
+
+    #[test]
+    fn peer_image_access_reverts_before_retained_namespace_handles_are_released() {
+        require_no_thread_token();
+        let copy = Copy::new("peer-image");
+        let held = {
+            // SAFETY: borrowed current-process pseudo-handle for this OS test.
+            let _access = PeerImageAccess::enter(unsafe { GetCurrentProcess() }).unwrap();
+            assert!(
+                thread_token()
+                    .unwrap()
+                    .user()
+                    .unwrap()
+                    .equals(&Token::current().unwrap().user().unwrap())
+            );
+            lock_namespace(&copy.0).unwrap()
+        };
+        require_no_thread_token();
+        let root = copy.0.parent().unwrap();
+        let moved = root.with_extension("moved");
+        assert_eq!(
+            std::fs::rename(root, &moved).unwrap_err().raw_os_error(),
+            Some(ERROR_SHARING_VIOLATION as i32)
+        );
+        drop(held);
+        std::fs::rename(root, &moved).unwrap();
+        std::fs::rename(&moved, root).unwrap();
+    }
+
+    #[test]
+    fn peer_image_access_refuses_to_replace_an_existing_thread_identity() {
+        require_no_thread_token();
+        {
+            // SAFETY: borrowed current-process pseudo-handle for this OS test.
+            let process = unsafe { GetCurrentProcess() };
+            let _access = PeerImageAccess::enter(process).unwrap();
+            let error = PeerImageAccess::enter(process)
+                .err()
+                .expect("nested impersonation must be refused");
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            assert!(
+                thread_token().is_ok(),
+                "the original thread token stays held"
+            );
+        }
+        require_no_thread_token();
+    }
+
+    #[test]
+    fn peer_image_access_reverts_after_open_failure_and_unwind() {
+        require_no_thread_token();
+        let copy = Copy::new("peer-image-failure");
+        let failed_open = || -> io::Result<()> {
+            // SAFETY: borrowed current-process pseudo-handle for this OS test.
+            let _access = PeerImageAccess::enter(unsafe { GetCurrentProcess() })?;
+            crate::process::open_locked_file(&copy.0.with_extension("missing"))?;
+            Ok(())
+        };
+        assert_eq!(failed_open().unwrap_err().kind(), io::ErrorKind::NotFound);
+        require_no_thread_token();
+        assert!(
+            std::panic::catch_unwind(|| {
+                // SAFETY: borrowed current-process pseudo-handle for this OS test.
+                let _access = PeerImageAccess::enter(unsafe { GetCurrentProcess() }).unwrap();
+                panic!("exercise peer image scope unwinding");
+            })
+            .is_err()
+        );
+        require_no_thread_token();
     }
 
     /// On NTFS the 128-bit file id is the 64-bit file index the older query
