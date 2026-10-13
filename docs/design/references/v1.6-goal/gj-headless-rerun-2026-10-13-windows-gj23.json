@@ -1,0 +1,1246 @@
+{
+  "schemaVersion": "arkdeck.gj-headless-rerun/1",
+  "date": "2026-10-13",
+  "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md",
+  "generator": "scripts/gj_record",
+  "host": {
+    "system": "Windows",
+    "osBuild": "10.0.26200"
+  },
+  "journeys": [
+    {
+      "date": "2026-10-13",
+      "goldenJourney": "GJ-2",
+      "state": "REAL_DEVICE_PASS",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+      "runtimeSourceRevision": "caec3e7f77a9bfd3c2f15e39e9716385987ae568",
+      "runtimeExecutableSHA256": "237caeff03302c51d021677d9ef2e8e5af859dbdd6c1139c8c8c47f04e477fc0",
+      "cliBuildIdentity": "sha256:886a3f273a8c930d46997a59cc3636567a4612621399972e4a0c3d17201ec995",
+      "hdcExecutableSHA256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+      "hdcVersion": "3.2.0g",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 1,
+      "executionIDs": [
+        "gj2-20261013",
+        "gj2-20261013-capture"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-2862d3e21751eb88666b7eec246af0a2",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-10-13T07:02:08Z",
+          "finishedAtUTC": "2026-10-13T07:02:19Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "stopApplication",
+            "uninstallPackage",
+            "cleanupOwnedRemotePath"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-c39bdd88911ed92fbe51c4ad57e19de7",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 14,
+          "startedAtUTC": "2026-10-13T07:02:58Z",
+          "finishedAtUTC": "2026-10-13T07:03:15Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "captureRemoteFile",
+            "receiveFile",
+            "cleanupOwnedRemotePath"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        }
+      ],
+      "zeroDispatchChecks": [],
+      "criteria": [
+        {
+          "criterion": "gj2-20261013: operation",
+          "holds": true,
+          "sources": [
+            "0020-gj2.status.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: execution state",
+          "holds": true,
+          "sources": [
+            "0020-gj2.status.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: terminalState",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: evidence status",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: inventory available",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: blockers",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: Artifact install-readback.json published",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: Artifact process-readback.json published",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: debug-hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: debug-hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0023-gj2.readback.a1.c1.json",
+            "0024-gj2.readback.a2.c1.json",
+            "0025-gj2.readback.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: install-readback.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: install-readback.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0023-gj2.readback.a1.c1.json",
+            "0024-gj2.readback.a2.c1.json",
+            "0025-gj2.readback.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: process-readback.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0022-gj2.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: process-readback.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0023-gj2.readback.a1.c1.json",
+            "0024-gj2.readback.a2.c1.json",
+            "0025-gj2.readback.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013: send-hap verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: send-hap reports stagedAt",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: install-hap dispatched and read back",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: package-readback verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: package-readback reports deployedArtifactSha256",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: package-readback reports installed",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: start-ability dispatched and read back",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: process-readback verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: process-readback reports running",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: stop-ability verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: stop-ability reports stopped",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: cleanup-remote-staging verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013: cleanup-remote-staging reports cleaned",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013-capture: operation",
+          "holds": true,
+          "sources": [
+            "0026-gj2-capture.status.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: execution state",
+          "holds": true,
+          "sources": [
+            "0026-gj2-capture.status.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: terminalState",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: evidence status",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: inventory available",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: blockers",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: advanced-dump.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: crash-index.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: crash-log.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: screenshot.jpeg missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: screenshot.png missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: ui-tree.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: Artifact hilog.txt published",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: Artifact ui-dump.json published",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: Artifact trace.htrace published",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: Artifact capture-summary.json published",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: application-liveness.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: application-liveness.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: artifact-index.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: artifact-index.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: capture-summary.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: capture-summary.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: capture.log bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: capture.log read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: markers.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: markers.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: trace.htrace bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: trace.htrace read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: ui-dump.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: ui-dump.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0029-gj2-capture.readback.a2.c1.json",
+            "0030-gj2-capture.readback.a3.c1.json",
+            "0031-gj2-capture.readback.a4.c1.json",
+            "0032-gj2-capture.readback.a5.c1.json",
+            "0033-gj2-capture.readback.a8.c1.json",
+            "0034-gj2-capture.readback.a9.c1.json",
+            "0035-gj2-capture.readback.a12.c1.json",
+            "0036-gj2-capture.readback.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: hilog.txt not empty",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: ui-dump.json not empty",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: trace.htrace not empty",
+          "holds": true,
+          "sources": [
+            "0028-gj2-capture.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj2-20261013-capture: capture completeness",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj2-20261013-capture: capture missingRequired",
+          "holds": true,
+          "sources": []
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "date": "2026-10-13",
+      "goldenJourney": "GJ-3",
+      "state": "REAL_DEVICE_PASS",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+      "runtimeSourceRevision": "caec3e7f77a9bfd3c2f15e39e9716385987ae568",
+      "runtimeExecutableSHA256": "237caeff03302c51d021677d9ef2e8e5af859dbdd6c1139c8c8c47f04e477fc0",
+      "cliBuildIdentity": "sha256:886a3f273a8c930d46997a59cc3636567a4612621399972e4a0c3d17201ec995",
+      "hdcExecutableSHA256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+      "hdcVersion": "3.2.0g",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 1,
+      "executionIDs": [
+        "gj3-20261013",
+        "gj3-20261013-rollback"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-c1010a6f98db4ce8a8b970c6aa8bd9ba",
+          "operationReference": "deploy.native-library.app-owned@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "startedAtUTC": "2026-10-13T07:05:19Z",
+          "finishedAtUTC": "2026-10-13T07:05:37Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "runApprovedRemoteMutation",
+            "stopApplication",
+            "startApplication",
+            "verifyRemoteState",
+            "cleanupOwnedRemotePath"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-1aaaf70175ad4ea335341910e9b286f4",
+          "operationReference": "deploy.native-library.app-owned@1",
+          "terminalState": "failed",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [
+            "artifactIntegrityFailed"
+          ],
+          "humanActions": [],
+          "artifactCount": 1,
+          "startedAtUTC": "2026-10-13T07:05:58Z",
+          "finishedAtUTC": "2026-10-13T07:06:21Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "runApprovedRemoteMutation",
+            "stopApplication",
+            "startApplication",
+            "cleanupOwnedRemotePath"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        }
+      ],
+      "zeroDispatchChecks": [],
+      "criteria": [
+        {
+          "criterion": "gj3-20261013: operation",
+          "holds": true,
+          "sources": [
+            "0011-gj3.status.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: execution state",
+          "holds": true,
+          "sources": [
+            "0011-gj3.status.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: terminalState",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: evidence status",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: inventory available",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: blockers",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: Artifact publish-report.json published",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: Artifact verification-report.json published",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: publish-report.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: publish-report.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-gj3.readback.a1.c1.json",
+            "0015-gj3.readback.a2.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: verification-report.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: verification-report.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-gj3.readback.a1.c1.json",
+            "0015-gj3.readback.a2.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013: verify-elf-locally checked ABI, build ID and hash",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: hash-library checked ABI, build ID and hash",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: send-to-staging dispatched and read back",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: verify-remote-staging verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: verify-remote-staging reports remoteSha256",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: backup-current-version verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: backup-current-version reports backupSha256",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: atomic-publish verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: atomic-publish reports publishedSha256",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: restart-target verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: restart-target reports stopped",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: start-target verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: start-target reports started",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: verify-loaded-library verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: verify-loaded-library reports loaderVerified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013: loaderVerified (hashProcessAndMaps)",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013-rollback: operation",
+          "holds": true,
+          "sources": [
+            "0016-gj3-rollback.status.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: terminalState",
+          "holds": true,
+          "sources": [
+            "0018-gj3-rollback.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0018-gj3-rollback.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0018-gj3-rollback.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: publish-report.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0018-gj3-rollback.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: publish-report.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0019-gj3-rollback.readback.a1.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture inspection uses the current typed projection",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture import and receipt identities match",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture receipt matches the imported content and binding",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture import committed",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture is the pinned rollback fixture",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture has a build ID",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture imported for this Target",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json",
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture imported at this binding revision",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json",
+            "0013-gj3.readback.result.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: fixture ABI is the Target's loaded ABI",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: the rollback Job consumed the fixture's lease",
+          "holds": true,
+          "sources": [
+            "0010-gj3.fixture.inspect.json",
+            "0017-gj3-rollback.readback.show.json"
+          ]
+        },
+        {
+          "criterion": "gj3-20261013-rollback: atomic-publish verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013-rollback: atomic-publish reports publishedSha256",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013-rollback: rollback-native-library verified",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013-rollback: rollback-native-library reports restored",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013-rollback: rollback-native-library reports restoredSha256",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013-rollback: the previous library was restored",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj3-20261013-rollback: no rollback failed closed",
+          "holds": true,
+          "sources": []
+        }
+      ],
+      "notes": ""
+    }
+  ],
+  "operationRealDeviceCoverage": {
+    "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+    "canonicalOperationCount": 31,
+    "realDevicePass": 3,
+    "operations": [
+      {
+        "operationReference": "analyzer.analyze-trace@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "analyzer.extract-crash-signature@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "analyzer.summarize-hilog@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "analyzer.summarize-trace@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "capture.diagnostic-session@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "capture.diagnostics@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-c39bdd88911ed92fbe51c4ad57e19de7"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "capture.screen-sequence@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "debug.hap@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-2862d3e21751eb88666b7eec246af0a2"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "debug.template@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "deploy.native-library.app-owned@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-c1010a6f98db4ce8a8b970c6aa8bd9ba"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "flash.full-restore@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_not_registered"
+        ]
+      },
+      {
+        "operationReference": "input.keyboard@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.long-press@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.swipe@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.tap@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "observe.device@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "port-forward.create@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "port-forward.remove@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.apply-patch@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.build-openharmony@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.create-checkpoint@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-diff@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-git-status@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-source@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "workspace.prepare-isolated-copy@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.read-source-range@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.revert-patch@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.run-tests@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.sign-openharmony-hap@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "workspace_preset_unavailable"
+        ]
+      },
+      {
+        "operationReference": "workspace.sweep-isolated-copies@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.symbolize-crash@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "workspace_preset_unavailable"
+        ]
+      }
+    ]
+  }
+}
