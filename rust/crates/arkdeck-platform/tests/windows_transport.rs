@@ -220,6 +220,11 @@ fn rapid_disconnect_does_not_poison_listener_and_completed_reads_have_exact_coun
     }
     let mut client = connect();
     let mut server = listener.accept().unwrap();
+    assert_eq!(
+        server.verified_server_image_pin().unwrap_err().kind(),
+        io::ErrorKind::PermissionDenied,
+        "accepting a client must not create a verified server image proof"
+    );
     client.write_all(b"exact-count").unwrap();
     let mut buffer = [0; 32];
     assert_eq!(server.read(&mut buffer).unwrap(), 11);

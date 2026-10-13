@@ -387,7 +387,7 @@ impl LocalListener {
                 format!("pipe client authentication refused: {error}"),
             )
         })?;
-        Ok(Some(LocalConnection::new(connected, peer)))
+        Ok(Some(LocalConnection::new(connected, peer, None)))
     }
 }
 
@@ -468,16 +468,19 @@ pub struct LocalConnection {
     closed: Arc<AtomicBool>,
     // Pins the connection's original process object and immutable image file.
     peer: ProcessIdentity,
+    // Only a client connection authenticates a server against installation pins.
+    server_image_pin: Option<ImagePin>,
     read_timeout: Mutex<Option<Duration>>,
     write_timeout: Mutex<Option<Duration>>,
 }
 
 impl LocalConnection {
-    fn new(pipe: Handle, peer: ProcessIdentity) -> Self {
+    fn new(pipe: Handle, peer: ProcessIdentity, server_image_pin: Option<ImagePin>) -> Self {
         Self {
             pipe,
             closed: Arc::new(AtomicBool::new(false)),
             peer,
+            server_image_pin,
             read_timeout: Mutex::new(Some(Duration::from_secs(10))),
             write_timeout: Mutex::new(Some(Duration::from_secs(10))),
         }
@@ -502,11 +505,11 @@ impl LocalConnection {
         // outcome. Until such a reviewed boundary decision, send zero frames.
         let pid = connection_pid(pipe.raw(), true)?;
         let peer = ProcessIdentity::open(pid)?;
-        peer.require_server(expected)?;
+        let pin = peer.require_server(expected)?;
         if connection_pid(pipe.raw(), true)? != pid {
             return Err(denied("pipe server PID changed during authentication"));
         }
-        Ok(Self::new(pipe, peer))
+        Ok(Self::new(pipe, peer, Some(pin)))
     }
     /// A second handle that ends this connection from another thread.
     pub fn closer(&self) -> io::Result<ConnectionCloser> {
@@ -598,6 +601,16 @@ impl LocalConnection {
     /// The process ID returned for this exact pipe instance, retained for SPK-3.
     pub fn authenticated_peer_pid(&self) -> u32 {
         self.peer.pid
+    }
+    /// The installation pin proved for this connection's live server. The
+    /// retained process, image and ancestor handles keep that proof bound to
+    /// the authenticated generation. This sends no control frames and cannot
+    /// substitute for the separate image check before launching a process.
+    /// A server-side accepted client connection has no server image proof.
+    pub fn verified_server_image_pin(&self) -> io::Result<ImagePin> {
+        self.peer.require_live()?;
+        self.server_image_pin
+            .ok_or_else(|| denied("this connection has no authenticated server image pin"))
     }
     /// Whether this connection's client is the foreground console
     /// (maintainer ruling 2026-10-04, `console_origin.rs`): the daemon's own

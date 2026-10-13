@@ -100,8 +100,15 @@ exposed ineffective ancestor-directory rename locks. Its partial metrics are
 retained without a pass claim. The [directory-lock repair](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-namespace-lock-20261013-run.md)
 was merged as #2637. A new full-duration qualification run remains required. The
 separate [packaged-peer repair](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-packaged-peer-locks-20261013-run.md)
-now passes isolated native roundtrips in both mixed MSIX/xcopy directions and
-retains wrong-signer refusal; published App qualification still follows review.
+passed isolated native roundtrips in both mixed MSIX/xcopy directions and
+retained wrong-signer refusal, then merged as #2638. Its fresh published package
+passed six actual App cases but exposed a service-status image-check failure
+for an unpackaged caller of the packaged Runtime. The
+[service inspection repair and retained run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-service-image-status-20261013-run.md)
+reuse the authenticated live image proof while retaining the separate image
+check before restart stops its predecessor. The new 24-hour soak was stopped
+after 31 cycles before compiling that repair; it is incomplete and requires
+a fresh full-duration published run.
 
 ## Remaining acceptance and dependencies
 
@@ -134,9 +141,12 @@ English/Chinese capture readback cases. All 57 complete Job items were unchanged
 after restoring the original Runtime. Both test packages and temporary trust
 were removed. See the
 [published MSIX run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/msix-published-2026-10-13-run.md).
-That run uses matching MSIX App/CLI/daemon; the earlier mixed-installation
-failure and its candidate repair remain separately qualified. Formal update
-feed, clean host and production signing remain open.
+That run uses matching MSIX App/CLI/daemon. After #2638, the fresh mixed run
+passed packaged App-to-xcopy Runtime (1/1) and matching packaged captures
+(5/5), but stopped before the reverse App case on the service-status defect
+recorded above. The original Runtime and all 57 Job items were restored and
+temporary trust/package removed. Full mixed qualification, formal update feed,
+clean host and production signing remain open.
 
 GJ-5 also achieved `REAL_DEVICE_PASS` on that same source and Catalog on
 2026-10-13: the unchanged recorder verifies 210 criteria. One fixed-patch round

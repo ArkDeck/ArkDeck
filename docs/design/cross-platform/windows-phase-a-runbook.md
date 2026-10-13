@@ -97,6 +97,14 @@ and all 57 complete Job items were preserved. This matching-package smoke does
 not replace mixed-installation qualification, production signing or update-feed
 acceptance.
 
+The [subsequent mixed run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-service-image-status-20261013-run.md)
+on released #2638 passed six App cases, then exposed a service-status refusal
+when an unpackaged caller inspected a packaged Runtime. For mixed acceptance,
+check both `runtime service status` and `runtime service verify`, full Job
+preservation and the actual App connection in each direction. A successful
+doctor call alone does not establish the complete result. Restart must still
+validate the replacement image before stopping the current Runtime.
+
 1. Create the certificate (normal terminal):
 
    ```powershell
