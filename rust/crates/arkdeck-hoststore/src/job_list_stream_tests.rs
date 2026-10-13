@@ -258,6 +258,74 @@ fn same_lists(store: &JobStore, params: Value, answered: bool) {
 }
 
 #[test]
+fn simultaneous_history_and_inspector_reads_each_return_a_complete_page() {
+    let root = Root::new();
+    drop(JobStore::open(&root.0).unwrap());
+    root.seed_many(100);
+    let store = JobStore::open(&root.0).unwrap();
+    let start = std::sync::Barrier::new(3);
+    std::thread::scope(|threads| {
+        let readers = (0..3)
+            .map(|reader| {
+                let store = &store;
+                let start = &start;
+                threads.spawn(move || {
+                    let (method, params, count) = if reader == 2 {
+                        ("job.timeline", json!({"jobId":"job-00000"}), 2)
+                    } else {
+                        ("job.list", json!({}), 100)
+                    };
+                    let pages = (0..8)
+                        .map(|_| {
+                            start.wait();
+                            store.handle_resource(method, params.as_object().unwrap())
+                        })
+                        .collect::<Vec<_>>();
+                    (method, count, pages)
+                })
+            })
+            .collect::<Vec<_>>();
+        for reader in readers {
+            let (method, count, pages) = reader.join().unwrap();
+            for result in pages {
+                let page = result.unwrap();
+                arkdeck_contract::validate_method_value(method, "result", &page).unwrap();
+                assert_eq!(page["items"].as_array().unwrap().len(), count);
+                assert_eq!(page["hasMore"], false);
+            }
+        }
+    });
+}
+
+#[test]
+fn a_foreign_snapshot_lock_returns_the_published_conflict_without_writing() {
+    let root = Root::new();
+    drop(JobStore::open(&root.0).unwrap());
+    root.seed_many(1);
+    let store = JobStore::open(&root.0).unwrap();
+    let snapshots = root.0.join("cli-job-snapshots");
+    let owner = HostDirectory::open(&snapshots).unwrap();
+    let lock = owner.lock_document(".snapshots.lock").unwrap();
+    let before = std::fs::read_dir(&snapshots).unwrap().count();
+    for (method, params) in [
+        ("job.list", json!({})),
+        ("job.timeline", json!({"jobId":"job-00000"})),
+    ] {
+        let error = store
+            .handle_resource(method, params.as_object().unwrap())
+            .unwrap_err();
+        assert_eq!(error.code, "conflict");
+        assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
+        arkdeck_contract::validate_method_value(method, "errorCode", &json!(error.code)).unwrap();
+        arkdeck_contract::validate_method_value(method, "errorDetails", &json!(error.details))
+            .unwrap();
+    }
+    assert_eq!(std::fs::read_dir(&snapshots).unwrap().count(), before);
+    drop(lock);
+    assert!(store.handle_resource("job.list", &Map::new()).is_ok());
+}
+
+#[test]
 fn a_streamed_list_is_the_list_that_collected_every_row() {
     let root = Root::new();
     drop(JobStore::open(&root.0).unwrap());

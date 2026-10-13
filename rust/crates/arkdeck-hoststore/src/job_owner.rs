@@ -63,6 +63,10 @@ pub struct JobStore {
     path: PathBuf,
     root: HostDirectory,
     activity: std::sync::Mutex<()>,
+    /// History and the Job Inspector may read concurrently in one Runtime.
+    /// Serialize their shared snapshot store before its nonblocking file lock;
+    /// a different process must still be refused by that native lock.
+    snapshot_reads: std::sync::Mutex<()>,
     /// Serializes explicit unbound publication retries across their fresh read,
     /// proposal and marker persistence. Separate from `activity` (persist locks it).
     publication_retry: std::sync::Mutex<()>,
@@ -247,6 +251,7 @@ impl JobStore {
             path: path.into(),
             root,
             activity: std::sync::Mutex::new(()),
+            snapshot_reads: std::sync::Mutex::new(()),
             publication_retry: std::sync::Mutex::new(()),
             hdc_lifecycle: std::sync::RwLock::new(()),
             hdc_recomposition: std::sync::atomic::AtomicBool::new(false),
@@ -776,6 +781,7 @@ impl JobStore {
             }
             "job.timeline" => {
                 let (size, cursor) = pagination(params, MALFORMED_SNAPSHOT_CURSOR)?;
+                let _snapshot = self.snapshot_reads.lock().map_err(unreadable)?;
                 SnapshotPager::open(&self.path.join("cli-job-snapshots"))
                     .map_err(unreadable)?
                     .page_filtered(
@@ -913,6 +919,7 @@ impl JobStore {
                 None => Ok(()),
             }
         };
+        let _snapshot = self.snapshot_reads.lock().map_err(unreadable)?;
         SnapshotPager::open(&self.path.join("cli-job-snapshots"))
             .map_err(unreadable)?
             .page_streamed("job.list", &filters, order, size, cursor, rows)
@@ -934,12 +941,18 @@ fn pre_admission(mut error: WireError) -> WireError {
 
 /// A refusal of the shared snapshot pager (the ones it stamps as its own) as
 /// the Job read handler answers it; the rows' own refusals pass unchanged.
-fn pager_refusal(error: WireError) -> WireError {
+fn pager_refusal(mut error: WireError) -> WireError {
     let stamped = error
         .details
         .as_ref()
         .is_some_and(|details| details.get("phase") == Some(&json!("sessionOwner")));
     if stamped {
+        // Job reads publish `conflict`, unlike the Session pager's internal
+        // `resourceConflict`. Preserve the refusal instead of failing wire
+        // validation and hiding the lock contention behind `internalError`.
+        if error.code == "resourceConflict" {
+            error.code = "conflict".into();
+        }
         pre_admission(WireError {
             details: None,
             ..error
