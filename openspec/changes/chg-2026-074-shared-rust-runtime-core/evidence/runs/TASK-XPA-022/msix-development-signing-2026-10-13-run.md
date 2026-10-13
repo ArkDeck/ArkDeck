@@ -1,8 +1,10 @@
 # TASK-XPA-022 — Existing-account development MSIX, 2026-10-13
 
 The existing Windows 11 x64 reference host and current non-elevated account can
-install a signed development MSIX. No new account, certificate, trust-store
-entry or system policy was needed. The installed package exposed a missing
+install a signed development MSIX using the existing certificate plus the
+user-authorized temporary trust of its public certificate in
+`LocalMachine/TrustedPeople`. The helper removed that trust after 15 minutes;
+no new account or certificate was created. The installed package exposed a missing
 CLI/daemon declaration; the packaging-only candidate fixed that failure and
 passed its real packaged App/Runtime smoke. It remains a candidate until review
 and a protected-main package rerun. This is host evidence, not device evidence,
@@ -16,8 +18,9 @@ production signing, a clean-host result or an installed update.
 - `package-rc.ps1 -SigningMode development -MsixPublisher
   'CN=ArkDeck Development Daemon (host-trusted only)' -MsixSignCommand
   <existing-signer-hook>` built and signed the package without `-AllowDirty`.
-  The existing host development certificate was already trusted. Its private
-  key was used only to sign these new local test packages.
+  Its existing CurrentUser Root trust validated Authenticode but did not
+  suffice for MSIX registration. The private key was used only to sign these
+  new local test packages; only the public certificate was temporarily trusted.
 - Initial package: `ArkDeck.App_0.1.0.0_x64.msix`, 73,667,260 bytes,
   SHA-256 `cfdd550933e72ec02614cc0488e40ab32a83c279c3d61c980bfabeb8f48128cd`.
   Signature status was `Valid`; publisher and signer subject matched.
@@ -39,8 +42,11 @@ connect keys, private signing material or user paths are copied into this run.
 
 ## Observations and repair
 
-1. Current-user `Add-AppxPackage` installed the initial signed package with the
-   existing trust configuration. Direct execution of its `bin/arkdeck.exe`
+1. The first current-user `Add-AppxPackage` refused with `0x800B0109`. After
+   the user explicitly authorized temporary trust and accepted UAC, a helper
+   added the exact public certificate to `LocalMachine/TrustedPeople` at
+   09:25:14 UTC. Current-user registration then installed the package.
+   Direct execution of its `bin/arkdeck.exe`
    failed at `CreateProcess` with Windows error 5, before any CLI control frame.
    The package contained both signed helpers but declared only `ArkDeck.exe`
    as an application.
@@ -69,6 +75,15 @@ connect keys, private signing material or user paths are copied into this run.
    was removed; the account had zero remaining ArkDeck MSIX registrations.
    The original xcopy App, account state and all raw records were preserved.
 
+The trust helper's lifecycle records `added: true`, `removed: true` and no
+error, from 09:25:14 to 09:40:14 UTC (`msix-trust-lifecycle.json`). A subsequent
+read confirmed the certificate absent from LocalMachine TrustedPeople and
+Root and CurrentUser TrustedPeople; its original CurrentUser Root entry
+remains. The registration subprocess records' `certificateStoreChanged:
+false` describes those subprocesses only; it does not describe the full
+installation workflow. The earlier statement that no trust entry was needed
+was incorrect and is superseded by this lifecycle evidence.
+
 `InstalledRcTests` now optionally requires the exact observed package identity
 with `ARKDECK_RC_PACKAGE_FULL_NAME`. Its existing connection checks still apply;
 being registered is not sufficient to pass. `ARKDECK_RC_DAEMON_PATH` permits an
@@ -76,6 +91,8 @@ explicit mixed-installation diagnostic while keeping the expected image pin.
 
 ## Retained failures and limits
 
+- The original missing-trust refusal remains in
+  `msix-install-current-account.json`; it is not an installation pass.
 - The initial package's CLI startup failure remains in `raw-msix-smoke`.
   That incomplete capture directory was retained. Restoration used a fresh
   `raw-msix-restore` directory and verified the original daemon and Job set.

@@ -90,6 +90,11 @@ change CLI feature counts or TASK-XPA-024's optional Viewer FFI boundary.
 The software checks use tiny correctness workloads. Quiet-host Windows reference
 capture, long soak, performance spread checks and baseline adoption remain Phase A
 acceptance work; no fixture result is hardware evidence or performance approval.
+Two default-scale captures on 2026-10-13 passed full-minute preflight, then
+stopped at the unchanged cold-start quiet-host gate as busy CPUs exceeded 4.
+Neither completed a run or produced a baseline. The
+[retained capture attempts](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/windows-quiet-capture-2026-10-13-run.md)
+record the actual limits without weakening the workload or threshold.
 
 ## Remaining acceptance and dependencies
 
@@ -112,7 +117,8 @@ second-account, elevation, remote-host and packaged-client observations remain
 separate requirements.
 
 The same existing account also installed and removed a signed development MSIX
-without adding certificate trust. That exposed missing CLI/daemon application
+using the existing certificate and user-authorized temporary TrustedPeople
+trust, which was subsequently removed. That exposed missing CLI/daemon application
 declarations in the RC manifest. The packaging-only repair's candidate passed
 CLI doctor and the real App UIA smoke (1/1), including exact process package
 identity; all 57 account Job items were unchanged after restoring the original
@@ -133,15 +139,15 @@ restored the existing signing configuration for the current daemon; no password
 was displayed and no signing store was directly edited. See the
 [GJ-5 and installed capture run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj5-app-readback-2026-10-13-run.md).
 
-Extended installed-App readback is `BLOCKED_BY_PRODUCT_DEFECT`: individual
-English/Chinese Diagnostics, Trace and Viewer checks passed, but the combined
-run exposed concurrent History/Job Inspector reads colliding on the shared Job
-snapshot lock. The unsupported `resourceConflict` response became
-`internalError`. This delivery serializes Job list/timeline snapshots within
-the owner and preserves native cross-process locking with the published
-`conflict` refusal. Its regression and opt-in App tests are included; the
-installed Runtime remains the released RC. Complete App readback requires a
-reviewed protected-main release of that fix and a fresh four-case run.
+Extended installed-App readback now passes **4/4, zero skips**, in both English
+and Chinese. The History snapshot fix was reviewed and released in #2633,
+protected main `aea6c663e8c79fe1501d5751a411a5b15021b3e6`. A fresh signed RC was
+installed after verifying all 365 files; the complete 57-Job account inventory
+was preserved. Concurrent History/Inspector reads now succeed, and actual
+Diagnostics/Trace and screenshot/tree readback verifies full Artifact hashes,
+historical context and unchanged Job inventories. Native cross-process locking
+and the published `conflict` refusal remain in force. See the
+[published installed readback run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-installed-readback-2026-10-13-run.md).
 
 The presently actionable CLI increments above are measured. Remaining generic
 leaves depend on AF-W1 and a trusted Windows ArkTrace distribution; service
