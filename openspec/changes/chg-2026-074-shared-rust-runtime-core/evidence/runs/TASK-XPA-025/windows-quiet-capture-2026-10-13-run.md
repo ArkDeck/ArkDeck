@@ -59,6 +59,26 @@ unchanged `capture/capture-failed-<id>.json` and `capture-samples-<id>.jsonl`.
 
 ## Local targeted checks
 
+### Interrupted 24-hour owner soak
+
+A separate default 86,400-second soak started at 10:30:50 UTC after a full quiet
+minute (1.0437 busy CPUs out of 16, no conflicting build process). It used the
+same signed binary above; Rust source was unchanged through protected main
+`db53c65dee316f58bf95746595f4ba9fb68d8a7d`. It was stopped at 10:47:19 UTC to fix
+the independently reproduced [ancestor directory lock defect](../TASK-XPA-002/windows-namespace-lock-20261013-run.md)
+before further qualification. No private-state process remained afterward.
+
+The last retained observation is cycle 4 at 916 seconds: 40 Jobs, 39 terminal,
+one intentional preflight Job for the next recovery cycle, no cleanup debt,
+RSS growth 1,183,744 bytes and handle growth -2. The record's phase remains
+`running`; termination is recorded separately as an intentional interruption.
+It is **not** a complete long soak, performance pass or hardware result. The
+raw `long-soak/` directory retains admission, process provenance, stdout/stderr,
+partial metrics, `interrupted.json` and `exit.json`; the private state is
+retained. A full-duration run on the reviewed repair is still required.
+
+### Capture checks
+
 - Official native release build: exit 0 in 154 seconds;
   `perf-soak-build-native.log` under the acceptance root. An earlier explicit
   native `--target` argument was refused by the runner before building;

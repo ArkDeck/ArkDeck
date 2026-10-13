@@ -101,7 +101,10 @@ pub(crate) fn lock_namespace(path: &std::path::Path) -> io::Result<Vec<File>> {
     let mut held = Vec::new();
     for parent in parents {
         let directory = std::fs::OpenOptions::new()
-            .access_mode(FILE_READ_ATTRIBUTES)
+            // Metadata-only opens do not participate in NTFS share access
+            // checks. Traverse access makes denying delete sharing actually
+            // block ancestor renames before the image itself is opened.
+            .access_mode(FILE_READ_ATTRIBUTES | FILE_TRAVERSE)
             .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE)
             .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
             .open(parent)?;
@@ -848,6 +851,44 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(self.0.parent().unwrap());
         }
+    }
+
+    #[test]
+    fn namespace_handles_block_each_ancestor_rename_without_an_image_handle() {
+        let copy = Copy::new("namespace");
+        let root = copy.0.parent().unwrap();
+        let middle = root.join("middle");
+        let leaf = middle.join("leaf");
+        std::fs::create_dir_all(&leaf).unwrap();
+        // Lock the namespace before opening the image: a retained image
+        // would itself block these renames and mask metadata-only handles.
+        let held = lock_namespace(&leaf.join("not-opened.exe")).unwrap();
+        for directory in [leaf.as_path(), middle.as_path(), root] {
+            let error = std::fs::rename(directory, directory.with_extension("moved"))
+                .expect_err("a retained ancestor must refuse rename");
+            assert_eq!(error.raw_os_error(), Some(ERROR_SHARING_VIOLATION as i32));
+        }
+        drop(held);
+        for directory in [leaf.as_path(), middle.as_path(), root] {
+            let moved = directory.with_extension("moved");
+            std::fs::rename(directory, &moved).unwrap();
+            std::fs::rename(&moved, directory).unwrap();
+        }
+    }
+
+    #[test]
+    fn namespace_lock_refuses_an_ancestor_already_open_for_delete() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let copy = Copy::new("namespace-delete");
+        let _deletable = std::fs::OpenOptions::new()
+            .access_mode(DELETE)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+            .custom_flags(FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT)
+            .open(copy.0.parent().unwrap())
+            .unwrap();
+        let error = lock_namespace(&copy.0).unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(ERROR_SHARING_VIOLATION as i32));
     }
 
     /// On NTFS the 128-bit file id is the 64-bit file index the older query

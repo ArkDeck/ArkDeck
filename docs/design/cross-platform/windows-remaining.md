@@ -95,6 +95,11 @@ stopped at the unchanged cold-start quiet-host gate as busy CPUs exceeded 4.
 Neither completed a run or produced a baseline. The
 [retained capture attempts](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/windows-quiet-capture-2026-10-13-run.md)
 record the actual limits without weakening the workload or threshold.
+The subsequent 24-hour soak stopped after four cycles when a native probe
+exposed ineffective ancestor-directory rename locks. Its partial metrics are
+retained without a pass claim. The [directory-lock repair](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-namespace-lock-20261013-run.md)
+needs review/publication before a new full-duration qualification run; it does
+not close the separate mixed MSIX/xcopy protected-directory access failure.
 
 ## Remaining acceptance and dependencies
 
