@@ -111,12 +111,25 @@ wrong-image/held-pipe/process checks passed with zero probe control frames;
 second-account, elevation, remote-host and packaged-client observations remain
 separate requirements.
 
-GJ-5's current host prerequisite is the existing signing credential's old
-daemon-image binding. Its registered signing preset is unresolved; the
-published migration/re-registration path is prepared and awaits specific user
-authorization for that persistent change. The crash-probe HAP, fixed patch,
-21-file source scope and build/test presets are present. No passwords were
-displayed and no signing store was directly edited.
+GJ-5 also achieved `REAL_DEVICE_PASS` on that same source and Catalog on
+2026-10-13: the unchanged recorder verifies 210 criteria. One fixed-patch round
+reproduced the crash, analyzed it, isolated and patched the source, built,
+tested, signed, deployed and observed a healthy process after the crash window.
+A stale-revision request was refused with zero new dispatch and an unchanged
+complete Job set. The user-authorized published SDK release maintenance path
+restored the existing signing configuration for the current daemon; no password
+was displayed and no signing store was directly edited. See the
+[GJ-5 and installed capture run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj5-app-readback-2026-10-13-run.md).
+
+Extended installed-App readback is `BLOCKED_BY_PRODUCT_DEFECT`: individual
+English/Chinese Diagnostics, Trace and Viewer checks passed, but the combined
+run exposed concurrent History/Job Inspector reads colliding on the shared Job
+snapshot lock. The unsupported `resourceConflict` response became
+`internalError`. This delivery serializes Job list/timeline snapshots within
+the owner and preserves native cross-process locking with the published
+`conflict` refusal. Its regression and opt-in App tests are included; the
+installed Runtime remains the released RC. Complete App readback requires a
+reviewed protected-main release of that fix and a fresh four-case run.
 
 The presently actionable CLI increments above are measured. Remaining generic
 leaves depend on AF-W1 and a trusted Windows ArkTrace distribution; service
@@ -191,13 +204,14 @@ user closed the external server before the Runtime started its own.
 GJ-3's released #2609 readback includes actual backup/restored whole hashes,
 PID/maps and reload facts. The 2026-10-13 Windows pass now covers its full
 forward/post-publication ghost failure/automatic rollback/reload chain;
-the Mac run remains separate. GJ-5 retains
+the Mac run remains separate. The earlier GJ-5 run retains
 nine independent checks: eight known-success Jobs, crash count 0→1, unhealthy
 reproduction then healthy verification, and a revision-conflict negative with
 zero new dispatch and identical adjacent 21-Job ledgers. Signing material and
-preset require the current daemon-binding preparation described above.
+preset were refreshed through the user-authorized published path described above.
 Released #2611 fixes the recorder's actual `result.status`
-projection; canonical paired GJ-5 still needs its own fresh full run.
+projection. The fresh canonical Windows GJ-5 run on 2026-10-13 now passes all
+210 criteria; the paired Mac run remains separate.
 
 The signed/notarized macOS RC build 4 is already downloadable from release run
 37461315601. Its protected-main ancestor has the same Catalog/contracts; reuse
@@ -214,6 +228,8 @@ and an acceptance JSON alone is not the release Bundle. The prepared published
 DAYU200 OpenHarmony 7.0.0.43 image has whole SHA-256
 `781d2eaebe2f8d10a25d13102a38259b134210480b2153786032a3bdea675fed`.
 The draft is one primary flash, 1800 seconds and 128 MiB, preserving protected
-partitions and overwriting userdata. Bundle/AF-W1 must first pass Runtime
-admission; the named destructive HardwareCampaign and user execution window
-authorization remain outstanding. No flash was dispatched.
+partitions and overwriting userdata. Bundle/AF-W1 must first pass protected-main
+Runtime admission using fresh trusted facts, the complete materialized plan
+and an exactly matching RuntimeCapability under `POL-AGENT-002`. No flash was
+dispatched; historical campaign or chat-confirmation fields do not replace
+that authority.

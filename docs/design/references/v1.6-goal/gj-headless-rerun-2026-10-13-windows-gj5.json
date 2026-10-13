@@ -1,0 +1,2112 @@
+{
+  "schemaVersion": "arkdeck.gj-headless-rerun/1",
+  "date": "2026-10-13",
+  "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md",
+  "generator": "scripts/gj_record",
+  "host": {
+    "system": "Windows",
+    "osBuild": "10.0.26200"
+  },
+  "journeys": [
+    {
+      "date": "2026-10-13",
+      "goldenJourney": "GJ-5",
+      "state": "REAL_DEVICE_PASS",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+      "runtimeSourceRevision": "caec3e7f77a9bfd3c2f15e39e9716385987ae568",
+      "runtimeExecutableSHA256": "237caeff03302c51d021677d9ef2e8e5af859dbdd6c1139c8c8c47f04e477fc0",
+      "cliBuildIdentity": "sha256:886a3f273a8c930d46997a59cc3636567a4612621399972e4a0c3d17201ec995",
+      "hdcExecutableSHA256": "c79518498aaf4e719733961216444e70c3eb53c8ba7006b933e6d7f2e1c6101e",
+      "hdcVersion": "3.2.0g",
+      "targetID": [
+        "TGT-958780b2ffb7",
+        "evolution-af4e2c81461641c9baff",
+        "project-6003c3cfab82ecaf72f5be6b"
+      ],
+      "bindingRevision": 1,
+      "executionIDs": [
+        "gj5-20261013-baseline",
+        "gj5-20261013-repro",
+        "gj5-20261013-repro-capture",
+        "gj5-20261013-analyze",
+        "gj5-20261013-isolate",
+        "gj5-20261013-patch",
+        "gj5-20261013-build",
+        "gj5-20261013-sign",
+        "gj5-20261013-verify",
+        "gj5-20261013-verify-capture",
+        "gj5-20261013-negative"
+      ],
+      "jobs": [
+        {
+          "jobID": "job-2e4a6abda37a038cbb461c07cb678036",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 14,
+          "startedAtUTC": "2026-10-13T07:49:05Z",
+          "finishedAtUTC": "2026-10-13T07:49:08Z",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteStdout"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-200c4b55ff6f210963fa4f334de9d030",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-10-13T07:49:12Z",
+          "finishedAtUTC": "2026-10-13T07:49:20Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "cleanupOwnedRemotePath"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-486e0b43742bf770a6f1f626ed95dd04",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 14,
+          "startedAtUTC": "2026-10-13T07:49:37Z",
+          "finishedAtUTC": "2026-10-13T07:49:39Z",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-6fa78d196ded8b695a1d1a8ac0b126d0",
+          "operationReference": "analyzer.extract-crash-signature@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 1,
+          "startedAtUTC": "2026-10-13T07:49:42Z",
+          "finishedAtUTC": "2026-10-13T07:49:43Z",
+          "actualEffect": "hostOnly",
+          "actualStepKinds": [
+            "runDeterministicAnalyzer"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": null
+        },
+        {
+          "jobID": "job-5ebfdcacd03401f49fd849aa52518497",
+          "operationReference": "workspace.prepare-isolated-copy@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 1,
+          "startedAtUTC": "2026-10-13T07:49:58Z",
+          "finishedAtUTC": "2026-10-13T07:50:00Z",
+          "actualEffect": "hostOnly",
+          "actualStepKinds": [
+            "prepareWorkspaceIsolation"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "project-6003c3cfab82ecaf72f5be6b",
+          "bindingRevision": null
+        },
+        {
+          "jobID": "job-88aa5cc9a852a2bfce551f38573c5aec",
+          "operationReference": "workspace.apply-patch@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 1,
+          "startedAtUTC": "2026-10-13T07:50:05Z",
+          "finishedAtUTC": "2026-10-13T07:50:07Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "applyWorkspacePatch"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": null
+        },
+        {
+          "jobID": "job-9ea5345f0c79dbbcc708d2e26364f5ab",
+          "operationReference": "workspace.build-openharmony@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "startedAtUTC": "2026-10-13T07:50:31Z",
+          "finishedAtUTC": "2026-10-13T07:51:31Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "buildWorkspaceOpenHarmony"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "evolution-af4e2c81461641c9baff",
+          "bindingRevision": null
+        },
+        {
+          "jobID": "job-556f44470e88385aa60c63a17d5a5904",
+          "operationReference": "workspace.sign-openharmony-hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "startedAtUTC": "2026-10-13T07:52:21Z",
+          "finishedAtUTC": "2026-10-13T07:52:25Z",
+          "actualEffect": "hostOnly",
+          "actualStepKinds": [
+            "signWorkspaceOpenHarmonyHap"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "evolution-af4e2c81461641c9baff",
+          "bindingRevision": null
+        },
+        {
+          "jobID": "job-a4a3706815ff67bc474caadff84af03f",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-10-13T07:52:45Z",
+          "finishedAtUTC": "2026-10-13T07:52:53Z",
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "cleanupOwnedRemotePath"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        },
+        {
+          "jobID": "job-e8d84f3c3859c45ad45d2eb69c90d422",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 14,
+          "startedAtUTC": "2026-10-13T07:53:09Z",
+          "finishedAtUTC": "2026-10-13T07:53:12Z",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout"
+          ],
+          "outstandingResidueCount": 0,
+          "targetID": "TGT-958780b2ffb7",
+          "bindingRevision": 1
+        }
+      ],
+      "zeroDispatchChecks": [
+        {
+          "criterion": "gj5-20261013-negative: newDispatchCount",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-negative: Job count unchanged",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-negative: Job set unchanged",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        }
+      ],
+      "criteria": [
+        {
+          "criterion": "gj5-20261013-baseline: operation",
+          "holds": true,
+          "sources": [
+            "0011-baseline.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: execution state",
+          "holds": true,
+          "sources": [
+            "0011-baseline.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: terminalState",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: evidence status",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: inventory available",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: blockers",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: advanced-dump.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: application-liveness.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: crash-log.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: screenshot.jpeg missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: screenshot.png missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: trace.htrace missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: ui-dump.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: ui-tree.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: Artifact crash-index.txt published",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: artifact-index.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: artifact-index.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-baseline.a3.c1.json",
+            "0015-baseline.a4.c1.json",
+            "0016-baseline.a5.c1.json",
+            "0017-baseline.a6.c1.json",
+            "0018-baseline.a8.c1.json",
+            "0019-baseline.a9.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: capture-summary.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: capture-summary.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-baseline.a3.c1.json",
+            "0015-baseline.a4.c1.json",
+            "0016-baseline.a5.c1.json",
+            "0017-baseline.a6.c1.json",
+            "0018-baseline.a8.c1.json",
+            "0019-baseline.a9.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: capture.log bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: capture.log read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-baseline.a3.c1.json",
+            "0015-baseline.a4.c1.json",
+            "0016-baseline.a5.c1.json",
+            "0017-baseline.a6.c1.json",
+            "0018-baseline.a8.c1.json",
+            "0019-baseline.a9.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: crash-index.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: crash-index.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-baseline.a3.c1.json",
+            "0015-baseline.a4.c1.json",
+            "0016-baseline.a5.c1.json",
+            "0017-baseline.a6.c1.json",
+            "0018-baseline.a8.c1.json",
+            "0019-baseline.a9.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-baseline.a3.c1.json",
+            "0015-baseline.a4.c1.json",
+            "0016-baseline.a5.c1.json",
+            "0017-baseline.a6.c1.json",
+            "0018-baseline.a8.c1.json",
+            "0019-baseline.a9.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: markers.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0013-baseline.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-baseline: markers.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0014-baseline.a3.c1.json",
+            "0015-baseline.a4.c1.json",
+            "0016-baseline.a5.c1.json",
+            "0017-baseline.a6.c1.json",
+            "0018-baseline.a8.c1.json",
+            "0019-baseline.a9.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: operation",
+          "holds": true,
+          "sources": [
+            "0022-repro.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: execution state",
+          "holds": true,
+          "sources": [
+            "0022-repro.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: terminalState",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: evidence status",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: inventory available",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: blockers",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: Artifact install-readback.json published",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: debug-hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: debug-hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0025-repro.a1.c1.json",
+            "0026-repro.a2.c1.json",
+            "0027-repro.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: install-readback.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: install-readback.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0025-repro.a1.c1.json",
+            "0026-repro.a2.c1.json",
+            "0027-repro.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: process-readback.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0024-repro.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro: process-readback.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0025-repro.a1.c1.json",
+            "0026-repro.a2.c1.json",
+            "0027-repro.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: operation",
+          "holds": true,
+          "sources": [
+            "0028-repro-capture.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: execution state",
+          "holds": true,
+          "sources": [
+            "0028-repro-capture.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: terminalState",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: evidence status",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: inventory available",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: blockers",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: advanced-dump.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: crash-log.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: screenshot.jpeg missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: screenshot.png missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: trace.htrace missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: ui-tree.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: Artifact application-liveness.json published",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: Artifact crash-index.txt published",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: application-liveness.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: application-liveness.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: artifact-index.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: artifact-index.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: capture-summary.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: capture-summary.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: capture.log bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: capture.log read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: crash-index.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: crash-index.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: markers.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: markers.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: ui-dump.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-repro-capture: ui-dump.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0031-repro-capture.a2.c1.json",
+            "0032-repro-capture.a3.c1.json",
+            "0033-repro-capture.a4.c1.json",
+            "0034-repro-capture.a5.c1.json",
+            "0035-repro-capture.a6.c1.json",
+            "0036-repro-capture.a8.c1.json",
+            "0037-repro-capture.a9.c1.json",
+            "0038-repro-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "repro: exactly one new crash-index entry",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "repro: liveness state",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "repro: liveness reasonCode",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj5-20261013-analyze: operation",
+          "holds": true,
+          "sources": [
+            "0040-analyze.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: execution state",
+          "holds": true,
+          "sources": [
+            "0040-analyze.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: terminalState",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: evidence status",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: inventory available",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: blockers",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: Artifact crash-signature.json published",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: crash-signature.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0042-analyze.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-analyze: crash-signature.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0043-analyze.a1.c1.json"
+          ]
+        },
+        {
+          "criterion": "analyze: crash signature derived Artifact wrapper",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "analyze: crash signature status",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "analyze: crash signature source provenance",
+          "holds": true,
+          "sources": [
+            "0030-repro-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: operation",
+          "holds": true,
+          "sources": [
+            "0044-isolate.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: execution state",
+          "holds": true,
+          "sources": [
+            "0044-isolate.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: terminalState",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: evidence status",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: inventory available",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: blockers",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: Artifact isolated-workspace.json published",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: isolated-workspace.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0046-isolate.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-isolate: isolated-workspace.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0047-isolate.a1.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: operation",
+          "holds": true,
+          "sources": [
+            "0050-patch.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: execution state",
+          "holds": true,
+          "sources": [
+            "0050-patch.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: terminalState",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: evidence status",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: inventory available",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: blockers",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: Artifact applied-patch.json published",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: applied-patch.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0052-patch.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-patch: applied-patch.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0053-patch.a1.c1.json"
+          ]
+        },
+        {
+          "criterion": "patch: previousWorkspaceRevision -> a new revision",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "patch: applied to the isolated copy's revision",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj5-20261013-build: operation",
+          "holds": true,
+          "sources": [
+            "0054-build.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: execution state",
+          "holds": true,
+          "sources": [
+            "0054-build.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: terminalState",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: evidence status",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: inventory available",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: blockers",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: Artifact build.log published",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: Artifact unsigned.hap published",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: build.log bytesVerified",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: build.log read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0057-build.a1.c1.json",
+            "0058-build.a2.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: unsigned.hap bytesVerified",
+          "holds": true,
+          "sources": [
+            "0056-build.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-build: unsigned.hap read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0057-build.a1.c1.json",
+            "0058-build.a2.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: operation",
+          "holds": true,
+          "sources": [
+            "0065-sign.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: execution state",
+          "holds": true,
+          "sources": [
+            "0065-sign.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: terminalState",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: evidence status",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: inventory available",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: blockers",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: Artifact signed.hap published",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: signed.hap bytesVerified",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: signed.hap read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0068-sign.a1.c1.json",
+            "0069-sign.a2.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: signing-report.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0067-sign.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-sign: signing-report.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0068-sign.a1.c1.json",
+            "0069-sign.a2.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: operation",
+          "holds": true,
+          "sources": [
+            "0073-verify.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: execution state",
+          "holds": true,
+          "sources": [
+            "0073-verify.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: terminalState",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: evidence status",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: inventory available",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: blockers",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: Artifact install-readback.json published",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: debug-hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: debug-hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0076-verify.a1.c1.json",
+            "0077-verify.a2.c1.json",
+            "0078-verify.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: install-readback.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: install-readback.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0076-verify.a1.c1.json",
+            "0077-verify.a2.c1.json",
+            "0078-verify.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: process-readback.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0075-verify.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify: process-readback.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0076-verify.a1.c1.json",
+            "0077-verify.a2.c1.json",
+            "0078-verify.a3.c1.json"
+          ]
+        },
+        {
+          "criterion": "verify: deployed bytes are the signed HAP",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: operation",
+          "holds": true,
+          "sources": [
+            "0079-verify-capture.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: execution state",
+          "holds": true,
+          "sources": [
+            "0079-verify-capture.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: terminalState",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: outcomeUnknown",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: evidence status",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: inventory available",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: blockers",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: missingRequiredArtifacts",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: outstandingResidueCount",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: advanced-dump.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: crash-log.txt missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: screenshot.jpeg missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: screenshot.png missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: trace.htrace missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: ui-tree.json missing declaration has no bytes",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: Artifact application-liveness.json published",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: Artifact crash-index.txt published",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: application-liveness.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: application-liveness.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: artifact-index.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: artifact-index.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: capture-summary.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: capture-summary.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: capture.log bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: capture.log read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: crash-index.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: crash-index.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: hilog.txt bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: hilog.txt read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: markers.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: markers.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: ui-dump.json bytesVerified",
+          "holds": true,
+          "sources": [
+            "0081-verify-capture.result.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-verify-capture: ui-dump.json read whole and digest-checked",
+          "holds": true,
+          "sources": [
+            "0082-verify-capture.a2.c1.json",
+            "0083-verify-capture.a3.c1.json",
+            "0084-verify-capture.a4.c1.json",
+            "0085-verify-capture.a5.c1.json",
+            "0086-verify-capture.a6.c1.json",
+            "0087-verify-capture.a8.c1.json",
+            "0088-verify-capture.a9.c1.json",
+            "0089-verify-capture.a13.c1.json"
+          ]
+        },
+        {
+          "criterion": "verify: liveness state after the crash window",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "verify: crash-index count unchanged since the repro",
+          "holds": true,
+          "sources": []
+        },
+        {
+          "criterion": "gj5-20261013-negative: named refusal",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-negative: refused for the superseded revision",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-negative: phase",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-negative: newDispatchCount",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-negative: Job count unchanged",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        },
+        {
+          "criterion": "gj5-20261013-negative: Job set unchanged",
+          "holds": true,
+          "sources": [
+            "0091-negative.json"
+          ]
+        }
+      ],
+      "notes": ""
+    }
+  ],
+  "operationRealDeviceCoverage": {
+    "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+    "canonicalOperationCount": 31,
+    "realDevicePass": 8,
+    "operations": [
+      {
+        "operationReference": "analyzer.analyze-trace@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "analyzer.extract-crash-signature@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-6fa78d196ded8b695a1d1a8ac0b126d0"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "analyzer.summarize-hilog@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "analyzer.summarize-trace@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "capture.diagnostic-session@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "capture.diagnostics@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-2e4a6abda37a038cbb461c07cb678036",
+          "job-486e0b43742bf770a6f1f626ed95dd04",
+          "job-e8d84f3c3859c45ad45d2eb69c90d422"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "capture.screen-sequence@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "debug.hap@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-200c4b55ff6f210963fa4f334de9d030",
+          "job-a4a3706815ff67bc474caadff84af03f"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "debug.template@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "deploy.native-library.app-owned@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "flash.full-restore@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_not_registered"
+        ]
+      },
+      {
+        "operationReference": "input.keyboard@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.long-press@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.swipe@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "input.tap@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "observe.device@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "port-forward.create@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "port-forward.remove@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.apply-patch@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-88aa5cc9a852a2bfce551f38573c5aec"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.build-openharmony@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-9ea5345f0c79dbbcc708d2e26364f5ab"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.create-checkpoint@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-diff@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-git-status@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.inspect-source@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "provider_tool_unavailable"
+        ]
+      },
+      {
+        "operationReference": "workspace.prepare-isolated-copy@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-5ebfdcacd03401f49fd849aa52518497"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.read-source-range@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.revert-patch@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.run-tests@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-c11c82f564fe180faede65bd3a908eae"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.sign-openharmony-hap@1",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-556f44470e88385aa60c63a17d5a5904"
+        ],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.sweep-isolated-copies@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "available"
+      },
+      {
+        "operationReference": "workspace.symbolize-crash@1",
+        "state": "notExercised",
+        "jobIDs": [],
+        "availability": "unavailable",
+        "reasonCodes": [
+          "workspace_preset_unavailable"
+        ]
+      }
+    ]
+  }
+}
