@@ -26,9 +26,10 @@ Build mode (default), from one recorded checkout:
   5. Builds the MSIX form (r12 decision 10) with the same layout (daemon and helper bundle at
      the package root, CLI in `bin\`), write virtualization off (ruling 8), identity
      `CN=ArkDeck Development`
-     (ruling 12) unless -MsixPublisher names the signing certificate's subject: the package is
-     then built from a copy of windows/App/Package.appxmanifest with that Publisher (the
-     tracked manifest is never rewritten). It is signed only through -MsixSignCommand (see
+     (ruling 12) unless -MsixPublisher names the signing certificate's subject. A copy of
+     windows/App/Package.appxmanifest declares the bundled CLI and daemon as hidden full-trust
+     applications, so Windows can start them; the tracked App-only manifest is never rewritten.
+     It is signed only through -MsixSignCommand (see
      below); its SHA-256 goes into the manifest.
   6. With -FeedBaseUri, writes the App Installer feed `ArkDeck.appinstaller` beside the MSIX,
      from the MSIX this run built (package name, publisher, version and architecture read from
@@ -190,6 +191,34 @@ function Test-MsixPublisher([string]$Value) {
     if (-not $name -or $Value.Length -gt 8192 -or $Value -match '[\x00-\x1f]' -or $Value -notmatch '(^|,\s*)CN=') {
         throw "-MsixPublisher must be the signing certificate's subject as a distinguished name with a CN=: $Value"
     }
+}
+
+function New-RcMsixManifest([string]$Source, [string]$Destination, [string]$Publisher) {
+    [xml]$manifest = Get-Content -LiteralPath $Source -Raw
+    if ($Publisher) { $manifest.Package.Identity.SetAttribute('Publisher', $Publisher) }
+    $foundation = $manifest.DocumentElement.NamespaceURI
+    $uap = 'http://schemas.microsoft.com/appx/manifest/uap/windows10'
+    $applications = $manifest.Package.Applications
+    $visuals = $applications.Application.GetElementsByTagName('VisualElements', $uap)[0]
+    # Windows only permits an unpackaged caller to start a bundled executable when the
+    # package declares its application identity. A normal App-only build carries neither
+    # helper, so these hidden entries belong to the RC manifest that ships both binaries.
+    foreach ($helper in @(
+        @{ Id = 'Cli'; Executable = 'bin\arkdeck.exe'; DisplayName = 'ArkDeck CLI' },
+        @{ Id = 'Daemon'; Executable = 'arkdeck-agentd.exe'; DisplayName = 'ArkDeck Runtime' }
+    )) {
+        $application = $manifest.CreateElement('Application', $foundation)
+        $application.SetAttribute('Id', $helper.Id)
+        $application.SetAttribute('Executable', $helper.Executable)
+        $application.SetAttribute('EntryPoint', 'Windows.FullTrustApplication')
+        $hidden = $visuals.CloneNode($false)
+        $hidden.SetAttribute('DisplayName', $helper.DisplayName)
+        $hidden.SetAttribute('Description', $helper.DisplayName)
+        $hidden.SetAttribute('AppListEntry', 'none')
+        [void]$application.AppendChild($hidden)
+        [void]$applications.AppendChild($application)
+    }
+    $manifest.Save($Destination)
 }
 
 function Get-SubjectOrganization([string]$Subject) {
@@ -362,16 +391,12 @@ function New-RcBuild {
         $msixDirectory = Join-Path $output 'msix'
         $package = @('publish', $appProject, '-c', 'Release', '-p:Platform=x64', '-p:GenerateAppxPackageOnBuild=true',
             "-p:AppxPackageDir=$msixDirectory\", "-p:ArkDeckRuntimeDirectory=$runtimeStage", '--nologo')
-        if ($MsixPublisher) {
-            # The signing certificate's subject as the package publisher, in a copy of the
-            # tracked manifest: nothing in the checkout changes.
-            $manifestCopy = Join-Path $output 'msix-manifest\Package.appxmanifest'
-            [void](New-Item -ItemType Directory -Path (Split-Path -Parent $manifestCopy))
-            [xml]$source = Get-Content -LiteralPath (Join-Path $repository 'windows/App/Package.appxmanifest') -Raw
-            $source.Package.Identity.SetAttribute('Publisher', $MsixPublisher)
-            $source.Save($manifestCopy)
-            $package += "-p:ArkDeckPackageManifest=$manifestCopy"
-        }
+        # The RC declares its bundled CLI and daemon as hidden applications. The source
+        # manifest remains App-only for ordinary builds. The publisher override is optional.
+        $manifestCopy = Join-Path $output 'msix-manifest\Package.appxmanifest'
+        [void](New-Item -ItemType Directory -Path (Split-Path -Parent $manifestCopy))
+        New-RcMsixManifest (Join-Path $repository 'windows/App/Package.appxmanifest') $manifestCopy $MsixPublisher
+        $package += "-p:ArkDeckPackageManifest=$manifestCopy"
         Write-Host "dotnet $($package -join ' ')"
         & $dotnet @package | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "dotnet publish (MSIX) exited $LASTEXITCODE" }
@@ -397,6 +422,12 @@ function New-RcBuild {
             if ($inside[$file] -ne (Get-Sha256 (Join-Path $runtimeStage $file))) { throw "The MSIX's $file is not the runtime build's." }
         }
         if ($inside[(Split-Path -Leaf $HelperPath)] -ne (Get-Sha256 (Join-Path $runtimeStage $HelperPath))) { throw "The MSIX's code-sign helper is not the runtime package's." }
+        foreach ($executable in @("bin\$CliName", $DaemonName)) {
+            $declared = @($appx.Package.Applications.Application | Where-Object { $_.Executable -eq $executable })
+            if ($declared.Count -ne 1 -or $declared[0].EntryPoint -ne 'Windows.FullTrustApplication' -or $declared[0].VisualElements.AppListEntry -ne 'none') {
+                throw "The MSIX must declare $executable as one hidden full-trust application."
+            }
+        }
         $identity = $appx.Package.Identity
         # The signing hook: the maintainer's command signs the package in place.
         $msixSigning = [ordered]@{ signed = $false; installable = $false; note = 'Unsigned: Windows installs only a signed MSIX (the development certificate of ruling 12, or the production publisher).' }

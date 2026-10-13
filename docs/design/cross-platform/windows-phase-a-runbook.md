@@ -82,6 +82,14 @@ changes and signing credentials.
 Needed for the packaged-client SPK-3 row (§3), SPK-4 (d), and a packaged smoke of the
 development MSIX.
 
+An existing trusted development code-signing certificate can be reused: pass
+its exact subject as `-MsixPublisher` and verify the final signature and actual
+current-user registration. Do not create or import another certificate merely
+because this example uses `CN=ArkDeck Development`. The
+[2026-10-13 local run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/msix-development-signing-2026-10-13-run.md)
+installed with existing trust, then found and tested a missing RC helper
+declaration repair. Its candidate result still needs review and a released rerun.
+
 1. Create the certificate (normal terminal):
 
    ```powershell
@@ -139,9 +147,12 @@ development MSIX.
    (decision 11: the App does not start it), then launch *ArkDeck* from Start. **Expected:**
    doctor `ok: true`; the App shows the doctor report and protocol 1.0.0, and no recovery
    banner.
-5. Record the package family. It is not the daemon pin: a CLI-started daemon has no package
-   identity, so the MSIX daemon is pinned like the xcopy one, by the signer here and by the
-   publisher identity in production (delegated minor decision, see
+5. Record the App's actual process package identity, not just its registration.
+   The corrected RC manifest declares the CLI and daemon as hidden full-trust
+   applications; use the CLI, daemon and App from the same registered package.
+   Do not assume a CLI-started MSIX process is unpackaged. Keep the daemon pinned
+   by its exact image and the signer here, or publisher identity in production
+   (delegated minor decision, see
    `runs/TASK-XPA-007/clientkit-publisher-pin-run.md`). Remove the package with
    `Remove-AppxPackage <PackageFullName>` and the user variable when done.
 6. **Record:** `runs/TASK-XPA-022/msix-development-signing-<date>-run.md`. Include the package

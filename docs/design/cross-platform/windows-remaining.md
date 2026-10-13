@@ -111,6 +111,18 @@ wrong-image/held-pipe/process checks passed with zero probe control frames;
 second-account, elevation, remote-host and packaged-client observations remain
 separate requirements.
 
+The same existing account also installed and removed a signed development MSIX
+without adding certificate trust. That exposed missing CLI/daemon application
+declarations in the RC manifest. The packaging-only repair's candidate passed
+CLI doctor and the real App UIA smoke (1/1), including exact process package
+identity; all 57 account Job items were unchanged after restoring the original
+Runtime. Release acceptance waits for review and a protected-main package rerun.
+Mixed MSIX App/xcopy Runtime authentication failed at the protected system
+package-directory namespace lock and is not promoted. See the
+[local MSIX run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/msix-development-signing-2026-10-13-run.md).
+The independent SPK-3 packaged-probe row, formal update feed, clean host and
+production signing remain separate.
+
 GJ-5 also achieved `REAL_DEVICE_PASS` on that same source and Catalog on
 2026-10-13: the unchanged recorder verifies 210 criteria. One fixed-patch round
 reproduced the crash, analyzed it, isolated and patched the source, built,
