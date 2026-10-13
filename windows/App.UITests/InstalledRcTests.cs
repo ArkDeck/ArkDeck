@@ -1,3 +1,7 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
+
 namespace ArkDeck.App.UITests;
 
 /// <summary>
@@ -10,6 +14,9 @@ namespace ArkDeck.App.UITests;
 /// banner. Run by the smoke, which sets <c>ARKDECK_RC_APP</c>, <c>ARKDECK_RC_ENDPOINT</c> and
 /// <c>ARKDECK_RC_SIGNER_SHA256</c> or <c>ARKDECK_RC_PUBLISHER_ORGANIZATION</c> with
 /// <c>ARKDECK_RC_PUBLISHER_EKU</c>; skipped otherwise.
+/// For a registered MSIX, <c>ARKDECK_RC_PACKAGE_FULL_NAME</c> additionally requires the
+/// running process to carry that exact package identity. <c>ARKDECK_RC_DAEMON_PATH</c>
+/// can select the CLI's explicit installation path for a mixed-package connection check.
 /// </summary>
 [TestClass]
 public sealed class InstalledRcTests
@@ -38,6 +45,10 @@ public sealed class InstalledRcTests
         Assert.IsTrue(File.Exists(Path.Combine(Path.GetDirectoryName(exe)!, "arkdeck-agentd.exe")), "the daemon is installed beside the App");
 
         var environment = new Dictionary<string, string> { ["ARKDECK_ENDPOINT"] = endpoint! };
+        if (Environment.GetEnvironmentVariable("ARKDECK_RC_DAEMON_PATH") is { Length: > 0 } daemonPath)
+        {
+            environment["ARKDECK_DAEMON_PATH"] = daemonPath;
+        }
         if (publisher)
         {
             environment["ARKDECK_DAEMON_PUBLISHER_ORGANIZATION"] = organization!;
@@ -48,6 +59,17 @@ public sealed class InstalledRcTests
             environment["ARKDECK_DAEMON_SIGNER_SHA256"] = pin!;
         }
         using var app = AppSession.Launch(exe!, ["--language", "en-US"], environment);
+        if (Environment.GetEnvironmentVariable("ARKDECK_RC_PACKAGE_FULL_NAME") is { Length: > 0 } expectedPackage)
+        {
+            using var process = Process.GetProcessById(app.ProcessId);
+            uint length = 0;
+            Assert.AreEqual(122, GetPackageFullName(process.Handle, ref length, null),
+                "the installed App process has a package identity (ERROR_INSUFFICIENT_BUFFER)");
+            var name = new StringBuilder(checked((int)length));
+            Assert.AreEqual(0, GetPackageFullName(process.Handle, ref length, name));
+            Assert.AreEqual(expectedPackage, name.ToString(), "the running App is the registered MSIX");
+            TestContext.WriteLine("package: " + name);
+        }
         Assert.IsNull(app.TryFind("app.testTransport", TimeSpan.FromSeconds(1)), "no test transport");
         string overall;
         try
@@ -68,4 +90,7 @@ public sealed class InstalledRcTests
         Assert.IsNull(app.TryFind("app.recovery.retry", TimeSpan.FromMilliseconds(500)), "no recovery banner while the daemon answers");
         foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
     }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    private static extern int GetPackageFullName(IntPtr process, ref uint length, StringBuilder? packageFullName);
 }
