@@ -1,9 +1,10 @@
-# Windows: what remains (2026-10-07 App coverage increment)
+# Windows: what remains (2026-10-13 device acceptance)
 
 Source: the official `cli-feature-coverage.json` generator and its exact Windows
-App source/fixture mapping. The App increment is pending maintainer review and
-protected-main publication; this census does not claim those changes are in the
-currently installed Runtime.
+App source/fixture mapping. The App increment is published on protected main
+`caec3e7f77a9bfd3c2f15e39e9716385987ae568` (#2631). The 2026-10-13 clean signed
+development RC uses that source; implementation counts and actual acceptance
+results remain distinct.
 
 The 162 Windows CLI features remain unchanged: 149 `implemented`, 11 `partial`
 and 2 `notImplemented`. The 68 App capabilities are separately Windows-required
@@ -92,6 +93,31 @@ acceptance work; no fixture result is hardware evidence or performance approval.
 
 ## Remaining acceptance and dependencies
 
+The 2026-10-13 Windows account Runtime achieved `REAL_DEVICE_PASS` for GJ-1,
+GJ-2 and GJ-3 on Catalog
+`e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7`.
+The unchanged recorder verifies 88, 70 and 54 criteria respectively. This
+includes physical HAR recovery, whole Artifact readback across restart,
+app-scoped HiLog/UI/Trace, and native forward publication followed by the
+accepted post-publication failure and automatic rollback fixture. The real
+installed-RC App UIA smoke passed 1/1 without a test transport. See the
+[current run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj123-2026-10-13-run.md)
+and its unchanged generated records. This does not promote platform conformance,
+production release signing, clean-host installation or MSIX updates.
+The same 365-file RC was also promoted to the existing xcopy installation with
+the old App/launcher retained for rollback; the installed CLI health and a
+second real App UIA smoke passed. Native Windows PID/signature and isolated
+wrong-image/held-pipe/process checks passed with zero probe control frames;
+second-account, elevation, remote-host and packaged-client observations remain
+separate requirements.
+
+GJ-5's current host prerequisite is the existing signing credential's old
+daemon-image binding. Its registered signing preset is unresolved; the
+published migration/re-registration path is prepared and awaits specific user
+authorization for that persistent change. The crash-probe HAP, fixed patch,
+21-file source scope and build/test presets are present. No passwords were
+displayed and no signing store was directly edited.
+
 The presently actionable CLI increments above are measured. Remaining generic
 leaves depend on AF-W1 and a trusted Windows ArkTrace distribution; service
 install/update keep their existing closed decision.
@@ -135,8 +161,8 @@ the run note is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-gj1-2026-10-06-run.md`.
 The earlier user-skipped window remains historical truth.
 
-GJ-2/3/5 remain incomplete, but their signing payloads are prepared. Maintainer
-review and protected-main publication of #2606 adopted the exact same-HAP pair,
+Maintainer-reviewed, protected-main PR #2606 adopted the GJ-2/3 signing payloads
+used by the new pass: the exact same-HAP pair,
 signed ARMv7 forward library and signed ghost rollback baseline in
 `scripts/gj_record/baselines/gj-pair-armv7-20261006/manifest.json`. The HAP digest
 is `ec5ce24958a16047c784a4af0f2197db86009abe1a3fbb193363a8bdd825e4bf`;
@@ -149,7 +175,8 @@ CRLF representations; Raw bytes and whole hashes are retained. Production
 release-library checks over all four saved real outputs pass, and tampered,
 mixed-line-ending and truncated inputs still refuse. Binary Trace validation is
 unchanged. Complete HiLog/UI/Trace, typed service restart and durable Job/Artifact
-readback still require a fresh successful device run; old Raw is never joined.
+readback are now covered by the 2026-10-13 GJ-2 pass; historical Raw was not
+joined into its record.
 
 The installed protected-main Runtime `f245a1d9c34c6deb56d9f50236db0a5284cc062b`
 was exercised in the retained account. Its native startup exits 69 because an
@@ -157,16 +184,19 @@ unknown-owner HDC listener occupies the registered endpoint. The retained exit,
 stdout/stderr and absent/present/absent pipe observation establish this failure;
 POL-HDC-001 forbids adopting or stopping that listener. #2614 preserves this
 child's exit when readiness loses its pipe, and #2615 documents the existing
-packaged CLI warm-up before the connect-only App. Both are software fixes,
-pending maintainer approval, not a waiver of that ownership gate.
+packaged CLI warm-up before the connect-only App. Both fixes are included in
+the current main; the ownership gate remains in force. In the new window the
+user closed the external server before the Runtime started its own.
 
 GJ-3's released #2609 readback includes actual backup/restored whole hashes,
-PID/maps and reload facts. Its new full forward/post-publication ghost failure/
-automatic rollback/reload runs on both hosts await paired GJ-2. GJ-5 retains
+PID/maps and reload facts. The 2026-10-13 Windows pass now covers its full
+forward/post-publication ghost failure/automatic rollback/reload chain;
+the Mac run remains separate. GJ-5 retains
 nine independent checks: eight known-success Jobs, crash count 0→1, unhealthy
 reproduction then healthy verification, and a revision-conflict negative with
 zero new dispatch and identical adjacent 21-Job ledgers. Signing material and
-preset are present. Released #2611 fixes the recorder's actual `result.status`
+preset require the current daemon-binding preparation described above.
+Released #2611 fixes the recorder's actual `result.status`
 projection; canonical paired GJ-5 still needs its own fresh full run.
 
 The signed/notarized macOS RC build 4 is already downloadable from release run
