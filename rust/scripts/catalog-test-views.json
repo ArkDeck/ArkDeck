@@ -764,7 +764,7 @@
     "crates/arkdeck-platform/src/windows/host_session_removal.rs": "9ffca619f68db710194a4c7e1a16e892054e6de79b2360ac695ba85af800e3aa",
     "crates/arkdeck-platform/src/windows/host_store.rs": "d539157f344dae50f9dc3afe47ca4860e94c5f208513c9d6a25b299d53e090bf",
     "crates/arkdeck-platform/src/windows/host_trace_removal.rs": "66573e0d4bb4d66791eca0c973ba02bd2929ed601d7850608e441919fa9e269e",
-    "crates/arkdeck-platform/src/windows/identity.rs": "5dd46a05cf4b4572e053b1a348fc04499488fdbbcd01c7f00eea434b2356df50",
+    "crates/arkdeck-platform/src/windows/identity.rs": "0c2fb60f055e121119813d45a58396766d1ec9ccba94cf74a191fb0ac4b980ae",
     "crates/arkdeck-platform/src/windows/inflate.rs": "a444a45628281e17a424c26bf1674454d162d689094645aa791b84dd5f029808",
     "crates/arkdeck-platform/src/windows/inspected_directory.rs": "42ba8a33aed14e4d34fade36537fa29fdd93925a4536d9b991e17ac12ae7b586",
     "crates/arkdeck-platform/src/windows/junction.rs": "b8f520b6b74795214dfc9bfcbf614da3ded5e09a3a8f317e3be1f3516d09e8e3",
