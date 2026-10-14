@@ -1,4 +1,4 @@
-# Windows: what remains (2026-10-13 device acceptance)
+# Windows: what remains (2026-10-14 installed acceptance)
 
 Source: the official `cli-feature-coverage.json` generator and its exact Windows
 App source/fixture mapping. The App increment is published on protected main
@@ -112,7 +112,13 @@ a fresh full-duration published run.
 The #2639 published run subsequently failed with `control deadline exceeded`
 after eight completed cycles; its partial metrics and private state are retained
 in the [published follow-up](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-service-image-published-20261014-run.md).
-No long soak is currently running and no full-duration pass is claimed.
+The [#2641 published qualification](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-clientkit-published-20261014-run.md)
+again passed a full-minute idle-host preflight, then its default performance
+capture stopped at the unchanged cold-start phase load gate (4.2146 against 4).
+No capture run or baseline completed. After all App/build work, a separate new
+24-hour soak started at `2026-10-14T01:09:47.702Z`, with a fresh private root,
+unchanged defaults and passive host-load diagnostics. It is still running;
+no full-duration pass is claimed, and the earlier failure remains retained.
 
 ## Remaining acceptance and dependencies
 
@@ -153,15 +159,25 @@ That run uses matching MSIX App/CLI/daemon. After #2638, the fresh mixed run
 passed packaged App-to-xcopy Runtime (1/1) and matching packaged captures
 (5/5), but stopped before the reverse App case on the service-status defect
 recorded above. The original Runtime and all 57 Job items were restored and
-temporary trust/package removed. Full mixed qualification, formal update feed,
-clean host and production signing remain open.
+temporary trust/package removed. Full mixed qualification was still open at
+that point; formal update feed, clean host and production signing remain open.
 On released #2639, all four CLI readback combinations now pass. The actual
 App retry again passed those six cases but the reverse App case failed in
 ClientKit's older namespace-access implementation. The
 [ClientKit repair](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-clientkit-peer-image-20261014-run.md)
-ports the reviewed Rust locking and packaged-peer access behavior; a fresh
-protected-main package must still pass the complete mixed-App workflow before
-installation promotion.
+ports the reviewed Rust locking and packaged-peer access behavior. Its
+[published #2641 package](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-clientkit-published-20261014-run.md)
+now passes all four CLI combinations and all seven actual App cases, zero
+skips. Restart refuses the replacement before stopping its predecessor; the
+subsequent authenticated cleanup proves the exact same live instance remained.
+The local wrapper's erroneous JSON parsing of that plain refusal is retained
+as exit 1, with an independent read-only review of all actual predicates and
+49 unchanged raw inputs. Trust/package cleanup and all 57 Job items passed.
+The verified 365-file package is now installed with the previous App retained.
+All five installed App smoke/capture tests pass in English and Chinese with
+zero skips and unchanged complete Job items. This closes this account's
+mixed-installation check; the separate release, clean-host and update-feed
+requirements remain open.
 
 GJ-5 also achieved `REAL_DEVICE_PASS` on that same source and Catalog on
 2026-10-13: the unchanged recorder verifies 210 criteria. One fixed-patch round
