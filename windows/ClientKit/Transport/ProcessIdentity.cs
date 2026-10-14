@@ -43,8 +43,7 @@ internal sealed class ProcessIdentity : IDisposable
         try
         {
             var path = FileIdentity.Canonicalize(ProcessImage(process));
-            held = FileIdentity.LockNamespace(path);
-            image = FileIdentity.OpenLocked(path);
+            (held, image) = LockProcessImage(process, path);
             var identity = new ProcessIdentity(process, image, held, pid, ProcessStarted(process), path);
             identity.RequireLive();
             return identity;
@@ -55,6 +54,21 @@ internal sealed class ProcessIdentity : IDisposable
             held?.ForEach(h => h.Dispose());
             process.Dispose();
             throw;
+        }
+    }
+
+    private static (List<SafeFileHandle> Namespace, SafeFileHandle Image) LockProcessImage(SafeProcessHandle process, string path)
+    {
+        try
+        {
+            return FileIdentity.LockImage(path);
+        }
+        catch (Win32Exception error) when (error.NativeErrorCode == Native.ERROR_ACCESS_DENIED && PackageFamily(process) is { Length: > 0 })
+        {
+            // Only the kernel-reported image and its full namespace are opened in the
+            // packaged peer's context. Revert before signature checks or protocol work.
+            using var access = PeerImageAccess.Enter(process);
+            return FileIdentity.LockImage(path);
         }
     }
 
@@ -144,6 +158,20 @@ internal sealed class ProcessIdentity : IDisposable
 /// no path spelling or rename changes.</summary>
 internal readonly record struct FileIdentity(ulong Volume, UInt128 Index)
 {
+    internal static (List<SafeFileHandle> Namespace, SafeFileHandle Image) LockImage(string path)
+    {
+        var held = LockNamespace(path);
+        try
+        {
+            return (held, OpenLocked(path));
+        }
+        catch
+        {
+            held.ForEach(h => h.Dispose());
+            throw;
+        }
+    }
+
     public static unsafe FileIdentity Of(SafeFileHandle file)
     {
         if (!Native.GetFileInformationByHandleEx(file, Native.FileIdInfo, out var info, (uint)sizeof(Native.FILE_ID_INFO)))
@@ -238,7 +266,9 @@ internal readonly record struct FileIdentity(ulong Volume, UInt128 Index)
 
     private static SafeFileHandle OpenDirectory(string directory)
     {
-        var handle = Native.CreateFile(directory, Native.FILE_READ_ATTRIBUTES, Native.FILE_SHARE_READ | Native.FILE_SHARE_WRITE,
+        // Metadata-only access does not enforce NTFS delete-sharing locks. Traversal
+        // access makes every ancestor non-replaceable for the connection's lifetime.
+        var handle = Native.CreateFile(directory, Native.FILE_READ_ATTRIBUTES | Native.FILE_TRAVERSE, Native.FILE_SHARE_READ | Native.FILE_SHARE_WRITE,
             IntPtr.Zero, Native.OPEN_EXISTING, Native.FILE_FLAG_BACKUP_SEMANTICS | Native.FILE_FLAG_OPEN_REPARSE_POINT, IntPtr.Zero);
         if (handle.IsInvalid) throw new Win32Exception(Marshal.GetLastPInvokeError());
         if (!Native.GetFileInformationByHandle(handle, out var info)

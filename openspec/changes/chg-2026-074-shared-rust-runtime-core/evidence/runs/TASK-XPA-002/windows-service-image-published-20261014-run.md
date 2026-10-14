@@ -51,10 +51,14 @@ An independent default doctor on the restored predecessor also passed in
 20.17 seconds. These observations do not establish a new service-image
 regression or a performance qualification.
 
-The fresh mixed attempt confirms health before doctor, preserves a separate raw
-directory and uses the same package bytes and unchanged CLI timeout. It remains
-pending the next actual desktop UAC confirmation; mixed App qualification and
-promotion over the existing installation are not claimed by this record.
+The fresh mixed attempt confirmed health before doctor, preserved a separate raw
+directory and used the same package bytes and unchanged CLI timeout. Its actual
+UAC confirmation and subsequent result are recorded in the
+[ClientKit follow-up](windows-clientkit-peer-image-20261014-run.md): all four CLI
+readback combinations and six App cases passed; the reverse App case failed
+with `InstanceMismatch: Access is denied`. All 57 complete Job items were again
+preserved after restoring the original Runtime and removing the package and
+temporary trust. Mixed App qualification and installation promotion remain open.
 
 ## Long soak
 
@@ -62,8 +66,13 @@ A fresh default 24-hour run on the released source began at
 2026-10-13 23:40:59 UTC after 60.37 seconds of quiet-host observation: 1.131 busy
 CPUs on 16 logical CPUs, below the unchanged limit of 4, with no conflicting
 build commands. It retains the 86,400-second duration, 300-second restart
-interval, ten jobs per cycle and 32 MiB/16-handle growth limits. The run is still
-in progress and is not a completed soak or hardware acceptance result.
+interval, ten jobs per cycle and 32 MiB/16-handle growth limits. It exited 1 at
+2026-10-14 00:21:52 UTC with `control deadline exceeded`. The last completed
+metrics describe eight cycles, 79 terminal Jobs, one active Job, zero cleanup
+debt, 1,966,080 bytes of resident-set growth and -2 handles. Those metrics precede
+the failing cycle; their retained `running` phase is not a live-process claim.
+The original state and logs are retained. This is neither a completed soak nor
+a hardware acceptance result; the deadline failure still needs diagnosis.
 
 ## Local targeted checks
 
@@ -88,8 +97,8 @@ Raw records remain outside Git under
   `service-status-account-diagnosis-restoration.json`).
 - Predecessor default-doctor control: exit 0, 20.17 seconds
   (`original-doctor-control.json`, `raw-original-doctor-control`).
-- Default long soak: running (`long-soak-service-status-released`); no final
-  pass is claimed.
+- Default long soak: exit 1 (`long-soak-service-status-released/exit.json`,
+  `stderr.log`, `runtime-soak-metrics.json`); no final pass is claimed.
 - `sh scripts/check-sdd.sh`: exit 0, zero errors/warnings and 121 acceptance
   IDs (`service-status-published-sdd.log`); `git diff --check`: exit 0.
 - No production source, contract or App source changed in this follow-up;
