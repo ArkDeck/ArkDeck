@@ -127,8 +127,12 @@ The same 365-file RC was also promoted to the existing xcopy installation with
 the old App/launcher retained for rollback; the installed CLI health and a
 second real App UIA smoke passed. Native Windows PID/signature and isolated
 wrong-image/held-pipe/process checks passed with zero probe control frames;
-second-account, elevation and remote-host observations remain separate
-requirements. The separately registered SPK-3 packaged-client probe has since
+second-account and remote-host observations remain separate requirements.
+The [published service-image verification](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-service-image-published-20261014-run.md)
+on released #2639 now passes both the equal-elevation control and actual
+same-account UAC-elevation refusal: zero frames sent in both cases and zero
+frame-consumer entries for the refused client. The separately registered
+SPK-3 packaged-client probe has since
 passed actual family/PID checks with zero control frames; that observation
 does not establish a full mixed-installation control exchange.
 

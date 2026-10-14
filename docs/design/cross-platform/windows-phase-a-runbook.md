@@ -105,6 +105,12 @@ preservation and the actual App connection in each direction. A successful
 doctor call alone does not establish the complete result. Restart must still
 validate the replacement image before stopping the current Runtime.
 
+The [published #2639 follow-up](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-service-image-published-20261014-run.md)
+also records an actual same-account elevated-client refusal before any frame
+consumer entry, paired with an equal-elevation positive control. That proves
+the local elevation observation only; second-account, remote-host and full
+mixed-App observations retain their separate requirements.
+
 1. Create the certificate (normal terminal):
 
    ```powershell
