@@ -149,7 +149,23 @@ fn private_path_in(text: &str, source_path: &str) -> bool {
             candidate.contains(source_path)
                 || contains_file_uri_token(&candidate)
                 || contains_absolute_path_token(&candidate)
+                || (cfg!(windows) && contains_windows_path_token(&candidate))
         })
+}
+
+/// Windows only, beyond Swift's solidus rule (which keeps macOS verdicts
+/// identical): a drive-letter path (`C:\`, `C:/`) whose letter does not end an
+/// identifier, or a UNC/device prefix (`\\server`, `\\?\`, `\\.\`).
+fn contains_windows_path_token(text: &str) -> bool {
+    let scalars: Vec<char> = text.chars().collect();
+    (0..scalars.len()).any(|index| {
+        let starts_token = index == 0 || !semantic_identifier(scalars[index - 1]);
+        let drive = scalars[index].is_ascii_alphabetic()
+            && scalars.get(index + 1) == Some(&':')
+            && matches!(scalars.get(index + 2), Some('\\' | '/'));
+        let unc = scalars[index] == '\\' && scalars.get(index + 1) == Some(&'\\');
+        starts_token && (drive || unc)
+    })
 }
 
 fn ascii_identifier_byte(byte: u8) -> bool {
@@ -708,5 +724,40 @@ mod tests {
             }
         }
         assert!(differences.is_empty(), "{}", differences.join("\n"));
+    }
+
+    #[test]
+    fn windows_path_tokens_are_drive_and_unc_prefixes_only() {
+        for leaked in [
+            r"C:\Users\someone\trace.htrace",
+            r"d:\x",
+            "D:/x",
+            r"open C:\Temp",
+            r"\\server\share\t",
+            r"\\?\C:\long",
+            r"\\.\pipe\p",
+            r"(C:\x)",
+        ] {
+            assert!(contains_windows_path_token(leaked), "{leaked}");
+        }
+        for clean in [
+            "C:",
+            "ratio 3:1",
+            r"abc:\x",
+            "trace_streamer",
+            r"a\b",
+            r"process\thread",
+            "",
+        ] {
+            assert!(!contains_windows_path_token(clean), "{clean}");
+        }
+    }
+
+    #[test]
+    fn a_windows_drive_path_is_private_only_on_windows() {
+        let value = Value::String(r"C:\Users\someone\trace.htrace".to_owned());
+        assert_eq!(contains_private_path(&value, "unrelated"), cfg!(windows));
+        let unc = Value::String(r"\\server\share\trace".to_owned());
+        assert_eq!(contains_private_path(&unc, "unrelated"), cfg!(windows));
     }
 }
