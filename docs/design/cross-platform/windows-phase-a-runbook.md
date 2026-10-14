@@ -108,8 +108,17 @@ validate the replacement image before stopping the current Runtime.
 The [published #2639 follow-up](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-service-image-published-20261014-run.md)
 also records an actual same-account elevated-client refusal before any frame
 consumer entry, paired with an equal-elevation positive control. That proves
-the local elevation observation only; second-account, remote-host and full
-mixed-App observations retain their separate requirements.
+the local elevation observation only; second-account and remote-host
+observations retain their separate requirements.
+
+The [published #2641 mixed-App run](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-clientkit-published-20261014-run.md)
+passes all four CLI combinations and all seven actual App tests with no skips.
+Its restart refusal is followed by an authenticated cleanup of the exact same
+live instance. The record preserves the local wrapper's plain-stderr parsing
+failure and the separate read-only verification; it does not relabel that
+wrapper as successful. All 57 Job items and the original trust state survive.
+Production signing, clean-host installation and the higher-version update feed
+remain separate acceptance requirements.
 
 1. Create the certificate (normal terminal):
 
