@@ -348,7 +348,7 @@
     "crates/arkdeck-hoststore/src/arktrace_envelope.rs": "14c65fccfb208e7ace49a99d4d3465a6efd493dcd4fcd308c73fa9fb7447ebca",
     "crates/arkdeck-hoststore/src/arktrace_pins.rs": "c1764c01e5c5df010f7b1bfd80e83e6bb5a5a173db43e9a34c9ec693ce951746",
     "crates/arkdeck-hoststore/src/arktrace_profile.rs": "3a35ef1fbd51110a73619319dcaae8a0dee1da0a4c25b9cbdf8e145f51623c30",
-    "crates/arkdeck-hoststore/src/arktrace_summary.rs": "3008b5305349c23c588c7f0dd3720e593ba4f7392adc44678f3a69e992841d5d",
+    "crates/arkdeck-hoststore/src/arktrace_summary.rs": "5536f4f973849ca29fa0e8c9f7d833a46f346baabf18cd1fdee87af4a621247a",
     "crates/arkdeck-hoststore/src/arktrace_trust.rs": "76289fe9ac76398d2bf7e6068eef921bbd62b91a1f325e31cb789e0791c0e9cd",
     "crates/arkdeck-hoststore/src/artifact_export.rs": "92e8cefbf4116102e5b5f4251c3d79557b39225729e93d8351224b7ff6d87654",
     "crates/arkdeck-hoststore/src/artifact_payload_cache.rs": "c0659a06ccb392bfa8790e77c79ff1ffb096bc2410a1704c7797435f2a34a34c",
