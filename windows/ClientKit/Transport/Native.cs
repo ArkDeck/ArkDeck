@@ -11,6 +11,7 @@ internal static partial class Native
     internal const uint GENERIC_WRITE = 0x40000000;
     internal const uint READ_CONTROL = 0x00020000;
     internal const uint FILE_READ_ATTRIBUTES = 0x0080;
+    internal const uint FILE_TRAVERSE = 0x0020;
     internal const uint FILE_SHARE_READ = 0x1;
     internal const uint FILE_SHARE_WRITE = 0x2;
     internal const uint FILE_SHARE_DELETE = 0x4;
@@ -29,8 +30,13 @@ internal static partial class Native
     internal const uint OWNER_SECURITY_INFORMATION = 0x1;
     internal const int ERROR_SUCCESS = 0;
     internal const int ERROR_INSUFFICIENT_BUFFER = 122;
+    internal const int ERROR_ACCESS_DENIED = 5;
+    internal const int ERROR_NO_TOKEN = 1008;
     internal const uint TOKEN_QUERY = 0x0008;
+    internal const uint TOKEN_DUPLICATE = 0x0002;
+    internal const int TokenUser = 1;
     internal const int TokenGroups = 2;
+    internal const int TokenElevation = 20;
     internal const uint SE_GROUP_LOGON_ID = 0xC0000000;
     internal const int FileIdInfo = 0x12;
 
@@ -122,6 +128,29 @@ internal static partial class Native
     [LibraryImport("advapi32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool OpenProcessToken(IntPtr process, uint access, out SafeAccessTokenHandle token);
+
+    [LibraryImport("advapi32.dll", EntryPoint = "OpenProcessToken", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool OpenProcessToken(SafeProcessHandle process, uint access, out SafeAccessTokenHandle token);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool OpenThreadToken(IntPtr thread, uint access, [MarshalAs(UnmanagedType.Bool)] bool openAsSelf,
+        out SafeAccessTokenHandle token);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ImpersonateLoggedOnUser(SafeAccessTokenHandle token);
+
+    [LibraryImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool RevertToSelf();
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial IntPtr GetCurrentThread();
+
+    [LibraryImport("kernel32.dll")]
+    internal static partial uint GetCurrentThreadId();
 
     [LibraryImport("kernel32.dll")]
     internal static partial IntPtr GetCurrentProcess();

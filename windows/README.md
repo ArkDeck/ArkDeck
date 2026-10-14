@@ -46,6 +46,11 @@ holds no runtime semantics: everything it shows is a projection read from the lo
   signer (SHA-256 of the certificate DER) or by the pinned publisher (ruling 17), or running in
   the installed MSIX package family, and the
   PID must not change; the image file and its ancestor directories are held for the connection.
+  Ancestor handles include traversal access so NTFS enforces the no-delete-sharing lock. If
+  Windows denies access to a packaged peer's namespace, only the image opens temporarily use
+  that process's token, after proving the same user and elevation and no existing thread token.
+  The scope restores the caller before signature verification or any protocol work; failed
+  restoration terminates the process. All path, file, package/signer and PID checks remain.
 - **Failures are typed.** `ControlFailureKind.DaemonUnavailable` (with a `DaemonUnavailableReason`)
   means nothing ran; the UI shows `ControlFailure.Banner`, the daemon-unavailable recovery banner,
   instead of any data. `OutcomeUnknown` means a business frame may have been processed; read the

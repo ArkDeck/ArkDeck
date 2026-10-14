@@ -109,6 +109,10 @@ reuse the authenticated live image proof while retaining the separate image
 check before restart stops its predecessor. The new 24-hour soak was stopped
 after 31 cycles before compiling that repair; it is incomplete and requires
 a fresh full-duration published run.
+The #2639 published run subsequently failed with `control deadline exceeded`
+after eight completed cycles; its partial metrics and private state are retained
+in the [published follow-up](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-service-image-published-20261014-run.md).
+No long soak is currently running and no full-duration pass is claimed.
 
 ## Remaining acceptance and dependencies
 
@@ -151,6 +155,13 @@ passed packaged App-to-xcopy Runtime (1/1) and matching packaged captures
 recorded above. The original Runtime and all 57 Job items were restored and
 temporary trust/package removed. Full mixed qualification, formal update feed,
 clean host and production signing remain open.
+On released #2639, all four CLI readback combinations now pass. The actual
+App retry again passed those six cases but the reverse App case failed in
+ClientKit's older namespace-access implementation. The
+[ClientKit repair](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/windows-clientkit-peer-image-20261014-run.md)
+ports the reviewed Rust locking and packaged-peer access behavior; a fresh
+protected-main package must still pass the complete mixed-App workflow before
+installation promotion.
 
 GJ-5 also achieved `REAL_DEVICE_PASS` on that same source and Catalog on
 2026-10-13: the unchanged recorder verifies 210 criteria. One fixed-patch round

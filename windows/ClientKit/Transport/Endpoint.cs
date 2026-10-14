@@ -88,7 +88,21 @@ internal static class ProcessToken
         return new SecurityIdentifier(sid);
     }
 
-    private static SafeAccessTokenHandle Open()
+    internal static SecurityIdentifier User(SafeAccessTokenHandle token) =>
+        WithInformation(token, Native.TokenUser, (buffer, length) =>
+        {
+            if (length < 2 * IntPtr.Size) throw Denied("truncated token user");
+            return CopySid(Marshal.ReadIntPtr(buffer));
+        });
+
+    internal static bool Elevated(SafeAccessTokenHandle token) =>
+        WithInformation(token, Native.TokenElevation, (buffer, length) =>
+        {
+            if (length < sizeof(uint)) throw Denied("truncated token elevation");
+            return Marshal.ReadInt32(buffer) != 0;
+        });
+
+    internal static SafeAccessTokenHandle Open()
     {
         if (!Native.OpenProcessToken(Native.GetCurrentProcess(), Native.TOKEN_QUERY, out var token))
         {
