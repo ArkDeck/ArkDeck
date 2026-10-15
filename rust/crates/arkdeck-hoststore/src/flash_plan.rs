@@ -82,6 +82,20 @@ impl FlashPlanning {
         }
     }
 
+    /// The standing host checks used by Flash planning, in the same order.
+    /// Discovery must retain a missing campaign, changed tool or unavailable
+    /// dispatcher instead of claiming that the provider was never registered.
+    pub(crate) fn runtime_unavailable_reason(&self) -> Option<String> {
+        self.unavailable
+            .clone()
+            .or_else(|| (self.dispatch_unavailable)())
+            .or_else(|| {
+                self.toolchain_sha256
+                    .is_none()
+                    .then(|| "ArkForge lane is not configured".into())
+            })
+    }
+
     /// Swift `declaredRuntimeBuildVersion`: the version the leased archive's
     /// system image declares, read once per exact lease and digest.
     pub(crate) fn build_version(&self, lease: &str, leased: &LeasedArtifact) -> Option<String> {

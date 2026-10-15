@@ -192,6 +192,8 @@ fn assert_rows(frames: &mut Frames, workspace: &WorkspaceComposition) {
         mutation_owner: true,
         code_sign_helper: false,
         workspace: Some(workspace),
+        flash_planning: None,
+        flash_execution: false,
     };
     let mut rows = 0;
     for row in frame["result"].as_array().unwrap() {

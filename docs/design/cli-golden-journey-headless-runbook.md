@@ -267,26 +267,23 @@ arkdeck job evidence --job <job-id> --output json
 arkdeck flash device-access --output json
 arkdeck flash bootloader-status --output json
 arkdeck flash prerequisites --target <TGT> --device-profile dayu200 --output json
-arkdeck flash install-binding --output json
+arkdeck flash bind-loader --target <TGT> --expected-binding-revision <n> --output json
 arkdeck artifact import flash-bundle --import-request-id gj4-<date> --target <TGT> \
   --file inputs/<selected-image>.tar.gz --device-profile dayu200 --output json
 arkdeck flash lane-preview --target <TGT> --device-profile dayu200 \
   --archive-sha256 <selected-archive-sha256> --output json
-arkdeck flash bind-loader --target <TGT> --expected-binding-revision <n> --output json
 ```
 
-`flash install-binding` 建立首次接管所需的 durable cross-mode binding。已存在有效 binding
-时保留它，先读回核对。2026-09-07 曾因缺少该前置停在 `waitingForRecovery`、
-`outcomeUnknown`，daemon 侧的原话是
-`Rockchip binding requires Runtime Loader onboarding: storeFailure("previous target binding
-lineage is missing or ambiguous")`。Job 没有记录 step kind 不证明零执行。
+`flash bind-loader` 由 Runtime 读取 fresh USB facts 并维护 durable binding。首次接管只接受
+已 adopted、revision 1、精确匹配的 **hdc-normal** Target；已有 binding 保留并核对，不由
+Agent 调用 CLI 本地 `install-binding` 写入事实。caller 只提供 Target 与当前 revision。
 
-它必须在板子处于 **hdc-normal** 时执行：cross-mode 别名的两半都描述 hdc-normal 人格，而
-DAYU200 在两种模式下 serial 与 IOKit topology 都可能不同。板子若已在 Loader，
-`install-binding` 会拒绝并报 `durable binding differs from the only connected Loader;
-explicit rebind is required`。保留原 binding 与拒绝结果；不得用 `--rebind` 覆盖缺失的
-identity/lineage 证明或解除 unknown。首次接管需要人工物理动作时，按 Runtime 发布的
-human action 完成后 `agent resume`；没有可用产品路径时记录 `BLOCKED_BY_PRODUCT_DEFECT`。
+首次 normal binding 不证明 Loader 人格已经关联：DAYU200 两种模式的 serial 可能不同。
+若切换后出现 `waitingForRecovery` / `outcomeUnknown`，保留原 execution、Job、binding、
+capability use 与日志，先执行 `job reconcile` 读取 Runtime 结论。不得靠推进 binding、重试
+原 execution、改 campaign 或重置记录绕过 unknown；没有完整 identity/lineage 与恢复证明时
+新 destructive dispatch 必须为 0。首次接管需要人工物理动作时，按 Runtime 发布的 human
+action 完成后 `agent resume`；没有可用产品路径时记录 `BLOCKED_BY_PRODUCT_DEFECT`。
 
 `gj4.json`：
 
@@ -301,8 +298,8 @@ human action 完成后 `agent resume`；没有可用产品路径时记录 `BLOCK
 
 先读取 `runtime service status` 的已验证 ArkForge bundle 配置与 `operation list`。
 若仅因空 campaign 报 `hardwareGated`，在已获授权的本轮硬件验收中可以使用已有发布配置面：
-先确认没有正在派发或等待人工动作后继续的工作；update 会重启 daemon，所有已 durable
-的 unknown 记录必须保留。
+先确认没有正在派发、等待人工动作后继续或未关闭的 unknown 工作；update 会重启 daemon，
+不得绕过 Runtime 的 lifecycle 拒绝。以下 service update 命令适用于 macOS 已发布 helper：
 
 ```text
 arkdeck runtime service update --daemon <absolute-verified-published-helper.app> \
