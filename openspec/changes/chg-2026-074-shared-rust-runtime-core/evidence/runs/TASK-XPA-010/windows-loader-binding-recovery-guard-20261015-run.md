@@ -57,8 +57,12 @@ Logs are local at
 `D:/src/ArkDeck-wt/tools/arkdeck-loader-guard-final-checks-20261015/`, and
 `D:/src/ArkDeck-wt/tools/arkdeck-loader-guard-sdd-20261015.log`.
 
-CI: this increment is the next layer after
-[PR #2648](https://github.com/ArkDeck/ArkDeck/pull/2648). At submission, the
-parent's SDD Guard run `38727952433` passed and Swift CI run `38727828575` was
-in progress. This layer's PR and CI run will be assigned after push; neither
-pending run is counted as a pass.
+CI: [PR #2649](https://github.com/ArkDeck/ArkDeck/pull/2649), head
+`448f1604c1c44c5066c2244327d9cb03867fa9cc`, passed Swift CI run
+[`38728853540`](https://github.com/ArkDeck/ArkDeck/actions/runs/38728853540)
+and SDD Guard run `38728853702`. All selected Linux, Windows and macOS workspace
+and published-consumer contract checks passed; required `guard` and `swift`
+were successful. Its direct parent, [PR #2648](https://github.com/ArkDeck/ArkDeck/pull/2648),
+also passed run `38727828575` and both required checks. Results are recorded in
+a follow-up commit without changing either tested head. CI success does not
+establish hardware recovery proof or release the installed unknown Job.
