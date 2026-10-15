@@ -308,6 +308,7 @@ impl Scene {
                 .ok_or(RegistryUnavailable::Matching)
         })
         .with_rockusb(self.rockusb.clone())
+        .with_normal_identity_observer(fixture_normal_identity)
         .with_loader_observer(Box::new(self.loader.clone()));
         let host = crate::host::Host::from_environment().with_lane_plan_preview(
             (composition != "noLane").then(|| {
@@ -346,6 +347,23 @@ impl Scene {
 
 fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/flash-host-facts")
+}
+
+/// This historical oracle uses a descriptive Loader serial. Supply only its
+/// synthetic observation; the real facts owner still persists and checks it.
+fn fixture_normal_identity(
+    _: &dyn arkdeck_provider_hdc::HdcDispatch,
+    _: &dyn arkdeck_provider_hdc::UsbProbe,
+    key: &str,
+) -> Result<arkdeck_provider_hdc::NormalHardwareIdentity, &'static str> {
+    Ok(arkdeck_provider_hdc::NormalHardwareIdentity {
+        normal_identity_sha256: arkdeck_contract::sha256_hex(key.as_bytes()),
+        hardware_serial_sha256: arkdeck_contract::sha256_hex(b"loader-serial-0451"),
+        usb_topology: "18874368".into(),
+        connector_identity_sha256: "d".repeat(64),
+        stdout_sha256: arkdeck_contract::sha256_hex(b"synthetic-hardware-observation"),
+        stdout_byte_count: b"synthetic-hardware-observation".len(),
+    })
 }
 
 fn call(control: &Control<crate::host::Host>, id: u64, method: &str, params: Value) -> Value {
@@ -535,8 +553,30 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
     #[cfg(windows)]
     assert_eq!(unprobed, 19, "the exchanges that reached the fake HDC");
     assert_eq!(reached_lane, 8, "the previews that reached the lane");
-    // The reads wrote nothing: the Application Support root holds what the
-    // setup last wrote, byte for byte and in its mode, and nothing else.
+    // Existing binding/target/alias bytes remain immutable. The only new
+    // product is the private, content-addressed Normal identity observation.
+    let records = root.0.join("normal-loader-identity");
+    let records: Vec<_> = fs::read_dir(records).unwrap().map(Result::unwrap).collect();
+    assert!(!records.is_empty());
+    for entry in records {
+        let bytes = fs::read(entry.path()).unwrap();
+        assert_eq!(
+            entry.file_name().to_str().unwrap(),
+            format!("{}.json", arkdeck_contract::sha256_hex(&bytes))
+        );
+        assert_eq!(oracle_mode(&entry.path(), "600"), "600");
+        let record: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            record["recordKind"],
+            "normalLoaderHardwareIdentityObservation"
+        );
+        assert!(record["bindingRevision"].as_i64().unwrap() > 0);
+        assert!(
+            !std::str::from_utf8(&bytes)
+                .unwrap()
+                .contains("loader-serial-0451")
+        );
+    }
     let mut left: Vec<String> = fs::read_dir(&root.0)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().into_string().unwrap())
@@ -546,7 +586,7 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
         .iter()
         .filter(|(_, input)| input.is_some())
         .map(|(path, _)| host_path(path.split('/').next().unwrap()))
-        .chain(["state".to_owned()])
+        .chain(["state".to_owned(), "normal-loader-identity".to_owned()])
         .collect();
     expected.sort();
     expected.dedup();

@@ -507,7 +507,32 @@ pub(crate) fn admission_blocker(facts: &RockchipFacts) -> Option<String> {
             facts.target_id
         ));
     }
+    if !normal_loader_identity_ready(facts) {
+        return Some(format!(
+            "flash.normalLoaderIdentityUnproven: {}. Normal USB identity alone cannot prove the bound Loader; no mode transition is permitted",
+            facts
+                .server_facts
+                .get("dayu200NormalLoaderHardwareIdentity")
+                .map(String::as_str)
+                .unwrap_or("normalLoaderIdentity.hardwareProofMissing")
+        ));
+    }
     None
+}
+
+pub(crate) fn normal_loader_identity_ready(facts: &RockchipFacts) -> bool {
+    !(facts.device_mode == "hdc"
+        && (facts
+            .server_facts
+            .get("dayu200NormalLoaderHardwareIdentity")
+            .map(String::as_str)
+            != Some("satisfied")
+            || facts.server_facts.get("dayu200NormalHardwareSerialSHA256")
+                != Some(&facts.identity_sha256)
+            || !facts
+                .server_facts
+                .get("dayu200NormalHardwareObservationSHA256")
+                .is_some_and(|value| lowercase_sha256(value))))
 }
 
 /// Swift `journalStep`'s arguments for the two steps `arkforged` performs:
@@ -720,6 +745,71 @@ fn journal_arguments(kind: &str, action: &RockchipAction) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normal_admission_requires_matching_durable_hardware_proof() {
+        let identity = "a".repeat(64);
+        let mut facts = RockchipFacts {
+            target_id: "TGT-PROOF".into(),
+            binding_revision: 1,
+            identity_sha256: identity.clone(),
+            tool_sha256: "c".repeat(64),
+            execution_connect_key: "normal-key".into(),
+            device_mode: "hdc".into(),
+            build_fingerprint: None,
+            profile_id: "dayu200".into(),
+            server_facts: BTreeMap::from([
+                (CROSS_MODE.into(), "satisfied".into()),
+                (ALIAS_IDENTITY.into(), sha256_hex(b"normal-key")),
+                (ALIAS_TOPOLOGY.into(), "42".into()),
+                (
+                    "dayu200NormalLoaderHardwareIdentity".into(),
+                    "satisfied".into(),
+                ),
+                ("dayu200NormalHardwareSerialSHA256".into(), identity),
+                (
+                    "dayu200NormalHardwareObservationSHA256".into(),
+                    "b".repeat(64),
+                ),
+            ]),
+        };
+        assert_eq!(admission_blocker(&facts), None);
+        for (field, invalid) in [
+            ("dayu200NormalLoaderHardwareIdentity", "".into()),
+            (
+                "dayu200NormalLoaderHardwareIdentity",
+                "normalLoaderIdentity.observationPersistenceFailed".into(),
+            ),
+            ("dayu200NormalHardwareSerialSHA256", "d".repeat(64)),
+            (
+                "dayu200NormalHardwareObservationSHA256",
+                "not-a-record".into(),
+            ),
+        ] {
+            let mut denied = facts.clone();
+            denied.server_facts.insert(field.into(), invalid);
+            assert!(
+                admission_blocker(&denied)
+                    .unwrap()
+                    .starts_with("flash.normalLoaderIdentityUnproven")
+            );
+            denied.server_facts.remove(field);
+            assert!(
+                admission_blocker(&denied)
+                    .unwrap()
+                    .starts_with("flash.normalLoaderIdentityUnproven")
+            );
+        }
+        facts.device_mode = "loader".into();
+        facts
+            .server_facts
+            .remove("dayu200NormalHardwareObservationSHA256");
+        assert_eq!(
+            admission_blocker(&facts),
+            None,
+            "an already observed Loader needs no Normal transition"
+        );
+    }
 
     /// A record root not spelled as its components rebuild it is refused
     /// before anything is created; each parent here does not exist, so a

@@ -54,7 +54,7 @@ pub use flash_plan::{
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use flash_plan::{
     PARTITIONS as DAYU200_PARTITIONS, admission_blocker, canonical_inputs, delegated_arguments,
-    is_flash, plan_completion_arguments,
+    is_flash, normal_loader_identity_ready, plan_completion_arguments,
 };
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use workspace_plan::WorkspaceMaterialization;

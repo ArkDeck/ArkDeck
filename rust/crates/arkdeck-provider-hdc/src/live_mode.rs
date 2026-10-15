@@ -169,6 +169,14 @@ pub trait LoaderObserver {
 /// discoverDevices`), so this is a port; the callers discard or quote the
 /// reason a lookup refuses with, as Swift does.
 pub trait UsbProbe {
+    /// Independently resolve one current attachment to its physical USB
+    /// connector. Different speed personalities may use companion ports.
+    /// A port without this observation cannot prove a mode transition.
+    fn connector_identity(&self, usb_topology: &str) -> Result<String, String> {
+        let _ = usb_topology;
+        Err("physical USB connector observation is unavailable".into())
+    }
+
     /// `singleLoader(stableIdentitySHA256:)`: exactly one RockUSB Loader
     /// whose serial digest is the given identity.
     fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String>;

@@ -36,6 +36,10 @@ use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Component, Path, PathBuf};
 
+#[path = "rockchip_records/normal_identity.rs"]
+mod normal_identity;
+pub(crate) use normal_identity::{NormalIdentitySubject, persist_normal_hardware_identity};
+
 /// Swift's record size bound.
 const MAXIMUM_RECORD_BYTES: u64 = 1_048_576;
 

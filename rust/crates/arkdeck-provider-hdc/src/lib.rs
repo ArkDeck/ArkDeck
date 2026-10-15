@@ -29,6 +29,7 @@ mod port_forward;
 mod presence;
 mod provider;
 mod rockchip_hdc;
+mod rockchip_identity;
 mod rockchip_loader;
 mod semantic;
 #[cfg(any(target_os = "macos", windows))]
@@ -104,6 +105,10 @@ pub use rockchip_hdc::{
     RockchipHdcFailure, RockchipHdcObserver, SystemClock, VerifiedBuild, WaitBudget,
     bound_reconnect_summary, hdc_normal_usb_summary, hdc_state_summary, output_excerpt,
     parse_build_properties,
+};
+pub use rockchip_identity::{
+    NORMAL_HARDWARE_IDENTITY_SOURCE, NormalHardwareIdentity, NormalHardwareIdentityObserver,
+    normal_hardware_identity_plan, observe_normal_hardware_identity,
 };
 pub use rockchip_loader::{
     ENTER_LOADER_TIMEOUT, FlashRuntimeDiagnostic, LoaderTransition, LoaderTransitionFailure,

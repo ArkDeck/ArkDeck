@@ -136,6 +136,20 @@ impl Fakes {
             );
             server.insert("dayu200HDCNormalAliasUSBTopology".into(), topology);
         }
+        server.extend([
+            (
+                "dayu200NormalLoaderHardwareIdentity".into(),
+                "satisfied".into(),
+            ),
+            (
+                "dayu200NormalHardwareSerialSHA256".into(),
+                arkdeck_contract::sha256_hex(CONNECT_KEY.as_bytes()),
+            ),
+            (
+                "dayu200NormalHardwareObservationSHA256".into(),
+                "b".repeat(64),
+            ),
+        ]);
         Ok(RockchipFacts {
             target_id: target_id.to_owned(),
             binding_revision: script.binding_revision,
