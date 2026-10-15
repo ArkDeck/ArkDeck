@@ -148,6 +148,7 @@ pub(crate) fn materialize(
     let public_observation =
         select(&observations, &binding.usb_topology).map_err(observation_failure)?;
     let input = |observation_id, key, state, detail| MaterializeInput {
+        intent: "fullRestore",
         artifact_id: &artifact.sha256,
         profile_id: &artifact.profile_id,
         device_id: observation_id,

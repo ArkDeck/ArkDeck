@@ -1,7 +1,8 @@
 //! The system tools a Windows Runtime trusts for workspace operations
 //! (TASK-XPA-011, maintainer ruling 69): `tar` is `System32\tar.exe`, the
 //! Microsoft-signed bsdtar, and `git` is Git for Windows'
-//! `Git\mingw64\bin\git.exe` under the Program Files Known Folder (the real
+//! `Git\ucrt64\bin\git.exe` (or the older `Git\mingw64\bin\git.exe`)
+//! under the Program Files Known Folder (the real
 //! git, not the `cmd\git.exe` launcher, which would start a second image no
 //! pin covers). Each is trusted by its registered absolute path and its
 //! Authenticode publisher, never through `PATH` or an environment variable.
@@ -75,7 +76,7 @@ const MICROSOFT_ROOT_2011_SHA256: &str =
 pub enum SystemTool {
     /// `System32\tar.exe`, the Microsoft-signed bsdtar.
     Tar,
-    /// Git for Windows' `Git\mingw64\bin\git.exe` under Program Files.
+    /// Git for Windows' registered UCRT64 or MINGW64 image under Program Files.
     Git,
 }
 
@@ -147,11 +148,24 @@ pub(crate) const GIT_FOR_WINDOWS: Publisher = Publisher {
 pub fn trusted_system_tool(tool: SystemTool) -> io::Result<TrustedSystemTool> {
     match tool {
         SystemTool::Tar => trusted_at(&system_directory()?, &["tar.exe"], &MICROSOFT_WINDOWS),
-        SystemTool::Git => trusted_at(
-            &program_files()?,
-            &["Git", "mingw64", "bin", "git.exe"],
-            &GIT_FOR_WINDOWS,
-        ),
+        SystemTool::Git => trusted_git(&program_files()?, &GIT_FOR_WINDOWS),
+    }
+}
+
+/// Git for Windows 2.56 moved the real x64 image to UCRT64. Both
+/// registered layouts receive exactly the same path, ownership and signer
+/// checks. Only an absent modern layout permits trying the legacy path;
+/// a present but unsafe image or directory fails closed, without fallback.
+fn trusted_git(root: &Path, publisher: &Publisher) -> io::Result<TrustedSystemTool> {
+    select_git_layout(|layout| {
+        trusted_at_if_present(root, &["Git", layout, "bin", "git.exe"], publisher)
+    })
+}
+
+fn select_git_layout<T>(mut verify: impl FnMut(&str) -> io::Result<Option<T>>) -> io::Result<T> {
+    match verify("ucrt64")? {
+        Some(answer) => Ok(answer),
+        None => verify("mingw64")?.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound)),
     }
 }
 
@@ -205,9 +219,30 @@ pub(crate) fn trusted_at(
     relative: &[&str],
     publisher: &Publisher,
 ) -> io::Result<TrustedSystemTool> {
+    trusted_at_if_present(root, relative, publisher)?
+        .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))
+}
+
+fn opened_if_present<T>(opened: io::Result<T>) -> io::Result<Option<T>> {
+    match opened {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        answer => answer.map(Some),
+    }
+}
+
+/// Only a missing entry while opening the registered path is absence.
+/// Every opened ancestor is validated before the next entry is inspected;
+/// signature, ACL, spelling and measurement failures are never absence.
+fn trusted_at_if_present(
+    root: &Path,
+    relative: &[&str],
+    publisher: &Publisher,
+) -> io::Result<Option<TrustedSystemTool>> {
     // The root as the system spells what it names; it may not itself be a
     // reparse point.
-    let root_directory = open_directory(root)?;
+    let Some(root_directory) = opened_if_present(open_directory(root))? else {
+        return Ok(None);
+    };
     system_directory_entry(&root_directory)?;
     let reported = host_fs::final_path(&root_directory, false)?;
     let spelled = reported
@@ -222,14 +257,18 @@ pub(crate) fn trusted_at(
     let mut held = vec![root_directory];
     for directory in directories {
         path.push(directory);
-        let opened = open_directory(&path)?;
+        let Some(opened) = opened_if_present(open_directory(&path))? else {
+            return Ok(None);
+        };
         host_fs::canonical(&path, &opened)
             .map_err(|_| denied("a system tool directory is not its registered spelling"))?;
         system_directory_entry(&opened)?;
         held.push(opened);
     }
     path.push(name);
-    let file = crate::process::open_locked_file(&path)?;
+    let Some(file) = opened_if_present(crate::process::open_locked_file(&path))? else {
+        return Ok(None);
+    };
     host_fs::canonical(&path, &file)
         .map_err(|_| denied("a system tool is not at its registered path"))?;
     let before = Stat::of(&file)?;
@@ -266,10 +305,10 @@ pub(crate) fn trusted_at(
         return Err(denied("a system tool changed while it was measured"));
     }
     drop(held);
-    Ok(TrustedSystemTool {
+    Ok(Some(TrustedSystemTool {
         path,
         sha256: format!("{:x}", hasher.finalize()),
-    })
+    }))
 }
 
 /// Whether `WinVerifyTrust` accepts the held image and its verified chain
@@ -423,13 +462,62 @@ mod tests {
     }
 
     #[test]
+    fn git_layout_falls_back_only_when_the_modern_image_is_absent() {
+        let mut calls = Vec::new();
+        let answer = select_git_layout(|layout| {
+            calls.push(layout.to_owned());
+            if layout == "ucrt64" {
+                Ok(None)
+            } else {
+                Ok(Some(42))
+            }
+        })
+        .unwrap();
+        assert_eq!(answer, 42);
+        assert_eq!(calls, ["ucrt64", "mingw64"]);
+        for kind in [
+            io::ErrorKind::NotFound,
+            io::ErrorKind::PermissionDenied,
+            io::ErrorKind::InvalidData,
+            io::ErrorKind::Other,
+        ] {
+            let mut calls = Vec::new();
+            let answer: io::Result<()> = select_git_layout(|layout| {
+                calls.push(layout.to_owned());
+                Err(io::Error::from(kind))
+            });
+            assert_eq!(answer.unwrap_err().kind(), kind);
+            assert_eq!(calls, ["ucrt64"]);
+        }
+        let mut calls = Vec::new();
+        assert_eq!(
+            select_git_layout(|layout| {
+                calls.push(layout.to_owned());
+                Ok(Some(43))
+            })
+            .unwrap(),
+            43
+        );
+        assert_eq!(calls, ["ucrt64"]);
+        let absent: io::Result<()> = select_git_layout(|_| Ok(None));
+        assert_eq!(absent.unwrap_err().kind(), io::ErrorKind::NotFound);
+        let scratch = Scratch::new("missing-unsafe");
+        let error =
+            trusted_at_if_present(&scratch.0, &["missing.exe"], &GIT_FOR_WINDOWS).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+    }
+
+    #[test]
     fn git_is_git_for_windows_itself_not_its_launcher() {
         let git = trusted_system_tool(SystemTool::Git).unwrap();
-        let expected = program_files().unwrap().join(r"Git\mingw64\bin\git.exe");
+        let root = program_files().unwrap();
         assert!(
-            git.path
-                .as_os_str()
-                .eq_ignore_ascii_case(expected.as_os_str())
+            [r"Git\ucrt64\bin\git.exe", r"Git\mingw64\bin\git.exe"]
+                .iter()
+                .any(|path| git
+                    .path
+                    .as_os_str()
+                    .eq_ignore_ascii_case(root.join(path).as_os_str()))
         );
         assert_eq!(git.sha256, digest(&git.path));
         let launcher = program_files().unwrap().join(r"Git\cmd\git.exe");
@@ -445,12 +533,7 @@ mod tests {
             tar.to_string(),
             "a system tool is not signed by its publisher"
         );
-        let git = trusted_at(
-            &program_files().unwrap(),
-            &["Git", "mingw64", "bin", "git.exe"],
-            &MICROSOFT_WINDOWS,
-        )
-        .unwrap_err();
+        let git = trusted_git(&program_files().unwrap(), &MICROSOFT_WINDOWS).unwrap_err();
         assert_eq!(
             git.to_string(),
             "a system tool is not signed by its publisher"
@@ -486,7 +569,7 @@ mod tests {
         let scratch = Scratch::new("copy");
         let system = system_directory().unwrap();
         std::fs::copy(system.join("tar.exe"), scratch.0.join("tar.exe")).unwrap();
-        let git = program_files().unwrap().join(r"Git\mingw64\bin\git.exe");
+        let git = trusted_system_tool(SystemTool::Git).unwrap().path;
         std::fs::copy(&git, scratch.0.join("git.exe")).unwrap();
         // The copies are still signed (the catalog lists tar.exe's hash, and
         // git.exe's signature is embedded) ...
@@ -519,8 +602,7 @@ mod tests {
             error.to_string(),
             "a system tool carries no signature that verifies under the trust policy"
         );
-        let mut git =
-            std::fs::read(program_files().unwrap().join(r"Git\mingw64\bin\git.exe")).unwrap();
+        let mut git = std::fs::read(trusted_system_tool(SystemTool::Git).unwrap().path).unwrap();
         let middle = git.len() / 2;
         git[middle] ^= 0xff;
         let tampered = scratch.0.join("git.exe");

@@ -66,6 +66,7 @@ impl PlanSource for Port {
         &mut self,
         input: &MaterializeInput<'_>,
     ) -> Result<MaterializePlanResponse, String> {
+        assert_eq!(input.intent, "fullRestore");
         let mut script = self.script.lock().unwrap();
         script.calls.push(format!(
             "materialize:{}:{}",

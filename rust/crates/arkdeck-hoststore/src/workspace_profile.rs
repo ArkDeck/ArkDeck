@@ -1830,7 +1830,11 @@ mod windows_tests {
             assert!(preset.argument_zero.is_none() && preset.fixed_arguments.is_empty());
         }
         assert!(tar.executable.path.ends_with(r"\System32\tar.exe"));
-        assert!(git.executable.path.ends_with(r"\Git\mingw64\bin\git.exe"));
+        assert!(
+            [r"\Git\ucrt64\bin\git.exe", r"\Git\mingw64\bin\git.exe"]
+                .iter()
+                .any(|path| git.executable.path.ends_with(path))
+        );
         assert!(version(&tar).starts_with("bsdtar "), "{}", version(&tar));
         assert!(
             version(&git).starts_with("git version "),
