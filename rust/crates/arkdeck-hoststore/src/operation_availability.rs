@@ -17,6 +17,10 @@ pub struct OperationAvailabilityContext<'a> {
     /// The workspace provider the host composed over its registered
     /// projects, if it composed one.
     pub workspace: Option<&'a crate::WorkspaceComposition>,
+    /// The same Flash configuration used by planning and admission.
+    pub flash_planning: Option<&'a crate::FlashPlanning>,
+    /// The executable lane and its target/facts ports are composed.
+    pub flash_execution: bool,
 }
 
 /// The executable operations that mutate a device: each consumes a Runtime
@@ -64,6 +68,11 @@ pub fn operation_unavailability(
         return context
             .workspace
             .map(|workspace| workspace_unavailability(reference, workspace, context));
+    }
+    if context.planning_owner && provider == "arkforge" {
+        return context
+            .flash_planning
+            .map(|flash| flash_unavailability(reference, flash, context));
     }
     if !context.planning_owner
         || !["hdc", "analyzer"].contains(&provider)
@@ -131,6 +140,41 @@ pub fn operation_unavailability(
     Some(reasons)
 }
 
+/// Flash discovery reports the composed host's readiness without resolving a
+/// target, materializing an archive, or reserving a capability.
+fn flash_unavailability(
+    reference: &str,
+    flash: &crate::FlashPlanning,
+    context: &OperationAvailabilityContext<'_>,
+) -> Vec<(&'static str, String)> {
+    if !matches!(reference, "flash.full-restore@1" | "flash.dayu200") {
+        return vec![(
+            "operation_not_supported",
+            format!("Rust arkforge provider has no complete production executor for {reference}"),
+        )];
+    }
+    let mut reasons = Vec::new();
+    if let Some(reason) = flash.runtime_unavailable_reason() {
+        reasons.push(("provider_tool_unavailable", reason));
+    }
+    for (present, reason) in [
+        (context.flash_execution, "runtime.flashExecutorUnavailable"),
+        (context.mutation_owner, "runtime.mutationOwnerUnavailable"),
+        (context.job_owner, "runtime.jobOwnerUnavailable"),
+    ] {
+        if !present {
+            reasons.push(("provider_tool_unavailable", reason.into()));
+        }
+    }
+    if !context.artifacts {
+        reasons.push((
+            "artifact_store_unavailable",
+            "runtime.artifactStoreUnavailable".into(),
+        ));
+    }
+    reasons
+}
+
 /// Swift `RuntimeJobEngine.operationAvailability` for a workspace
 /// operation: the registered provider's answer (`WorkspaceProvider` and the
 /// operations provider over the start-up profiles), then the workspace
@@ -182,7 +226,7 @@ fn workspace_unavailability(
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn context() -> OperationAvailabilityContext<'static> {
+    fn context<'a>() -> OperationAvailabilityContext<'a> {
         OperationAvailabilityContext {
             planning_owner: true,
             job_owner: true,
@@ -193,7 +237,119 @@ mod tests {
             mutation_owner: false,
             code_sign_helper: true,
             workspace: None,
+            flash_planning: None,
+            flash_execution: false,
         }
+    }
+
+    #[test]
+    fn flash_discovery_reports_the_composed_lane_and_keeps_missing_owners_closed() {
+        let flash = crate::FlashPlanning::new(None, || None, Some("a".repeat(64)));
+        let mut c = context();
+        assert_eq!(
+            operation_unavailability("flash.full-restore@1", "arkforge", &c),
+            None
+        );
+        c.flash_planning = Some(&flash);
+        c.flash_execution = true;
+        c.mutation_owner = true;
+        for reference in ["flash.full-restore@1", "flash.dayu200"] {
+            assert_eq!(
+                operation_unavailability(reference, "arkforge", &c),
+                Some(vec![])
+            );
+        }
+        assert_eq!(
+            operation_unavailability("flash.unreviewed@1", "arkforge", &c).unwrap()[0].0,
+            "operation_not_supported"
+        );
+        c.flash_execution = false;
+        c.mutation_owner = false;
+        c.job_owner = false;
+        c.artifacts = false;
+        assert_eq!(
+            operation_unavailability("flash.full-restore@1", "arkforge", &c).unwrap(),
+            vec![
+                (
+                    "provider_tool_unavailable",
+                    "runtime.flashExecutorUnavailable".into()
+                ),
+                (
+                    "provider_tool_unavailable",
+                    "runtime.mutationOwnerUnavailable".into()
+                ),
+                (
+                    "provider_tool_unavailable",
+                    "runtime.jobOwnerUnavailable".into()
+                ),
+                (
+                    "artifact_store_unavailable",
+                    "runtime.artifactStoreUnavailable".into()
+                ),
+            ]
+        );
+        c.planning_owner = false;
+        assert_eq!(
+            operation_unavailability("flash.full-restore@1", "arkforge", &c),
+            None
+        );
+    }
+
+    #[test]
+    fn flash_discovery_preserves_qualification_and_rechecks_dispatcher_identity() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let configured = crate::FlashPlanning::new(
+            Some("hardwareGated: no named acceptance campaign".into()),
+            || panic!("an unavailable provider must not probe the dispatcher"),
+            Some("a".repeat(64)),
+        );
+        let mut c = context();
+        c.flash_planning = Some(&configured);
+        c.flash_execution = true;
+        c.mutation_owner = true;
+        assert_eq!(
+            operation_unavailability("flash.full-restore@1", "arkforge", &c).unwrap(),
+            vec![(
+                "provider_tool_unavailable",
+                "hardwareGated: no named acceptance campaign".into()
+            )]
+        );
+
+        let current = Arc::new(AtomicBool::new(true));
+        let observed = current.clone();
+        let flash = crate::FlashPlanning::new(
+            None,
+            move || {
+                (!observed.load(Ordering::SeqCst))
+                    .then(|| "configured ArkForge executable changed".into())
+            },
+            Some("a".repeat(64)),
+        );
+        c.flash_planning = Some(&flash);
+        assert_eq!(
+            operation_unavailability("flash.full-restore@1", "arkforge", &c),
+            Some(vec![])
+        );
+        current.store(false, Ordering::SeqCst);
+        assert_eq!(
+            operation_unavailability("flash.full-restore@1", "arkforge", &c).unwrap(),
+            vec![(
+                "provider_tool_unavailable",
+                "configured ArkForge executable changed".into()
+            )]
+        );
+        let no_toolchain = crate::FlashPlanning::new(None, || None, None);
+        c.flash_planning = Some(&no_toolchain);
+        assert_eq!(
+            operation_unavailability("flash.full-restore@1", "arkforge", &c).unwrap(),
+            vec![(
+                "provider_tool_unavailable",
+                "ArkForge lane is not configured".into()
+            )]
+        );
     }
     #[test]
     fn only_executors_are_available_and_missing_owners_keep_their_actual_reason() {

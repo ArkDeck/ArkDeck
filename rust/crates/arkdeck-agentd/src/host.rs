@@ -1899,6 +1899,10 @@ impl HostServices for Host {
                     false
                 },
                 workspace: self.workspace.as_deref(),
+                flash_planning: self.flash_planning.as_deref(),
+                flash_execution: self.flash_runtime.is_some()
+                    && self.flash_facts.is_some()
+                    && self.targets.is_some(),
             },
         )
     }
