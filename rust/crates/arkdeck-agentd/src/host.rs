@@ -671,6 +671,13 @@ impl Host {
     /// tuple is registered, so there is no resolver and no executable lane is
     /// installed (`arkforge_execution::install`).
     #[cfg(any(target_os = "macos", windows))]
+    pub(crate) fn rockchip_target_store(
+        &self,
+    ) -> Option<std::sync::Arc<arkdeck_hoststore::TargetStore>> {
+        self.targets.clone()
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn rockchip_hdc_resolver(&self) -> Option<Box<arkdeck_hoststore::HdcResolver>> {
         let dispatch = self.hdc.clone()?;
         Some(Box::new(move || {
@@ -3760,6 +3767,19 @@ impl HostServices for Host {
             target_id,
             expected_binding_revision,
         )
+    }
+    #[cfg(any(target_os = "macos", windows))]
+    fn flash_adopt_current_loader(&self) -> Result<serde_json::Value, WireError> {
+        let (Some(binding), Some(targets), Some(jobs)) =
+            (&self.loader_binding, &self.targets, &self.jobs)
+        else {
+            return Err(WireError {
+                code: "internalError".into(),
+                message: "Rockchip Loader adoption and Job census are not configured".into(),
+                details: None,
+            });
+        };
+        binding.adopt_current_loader(targets, jobs)
     }
     #[cfg(any(target_os = "macos", windows))]
     fn flash_bootloader_status(&self) -> Result<serde_json::Value, WireError> {

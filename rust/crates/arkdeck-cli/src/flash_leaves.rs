@@ -77,6 +77,17 @@ pub(crate) fn configure(
         // Both name a Target and the revision the caller saw; Swift sends
         // the revision as an integer.
         "flash.reconcile-alias" | "flash.bind-loader" => {
+            if command == "flash.bind-loader" && fields.contains_key("adoptCurrentLoader") {
+                if fields.get("adoptCurrentLoader") != Some(&json!(true))
+                    || fields.contains_key("targetId")
+                    || fields.contains_key("expectedBindingRevision")
+                {
+                    return Err(invalid(
+                        "flash bind-loader --adopt cannot accompany --target or --expected-binding-revision",
+                    ));
+                }
+                return Ok(());
+            }
             let leaf = if command == "flash.bind-loader" {
                 "flash bind-loader"
             } else {

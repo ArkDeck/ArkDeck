@@ -462,6 +462,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 "--rebind" => {
                     method_options.insert("rebind".into(), json!(true));
                 }
+                "--adopt" => {
+                    method_options.insert("adoptCurrentLoader".into(), json!(true));
+                }
                 "--require-healthy" => require_healthy = true,
                 "--allow-sensitive" => {
                     method_options.insert("allowSensitive".into(), json!(true));
@@ -1185,7 +1188,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ],
         "ui-dump.inspect" => &["jobId"],
         "ui-dump.hit-test" => &["jobId", "x", "y", "rootPath"],
-        "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
+        "flash.reconcile-alias" => &["targetId", "expectedBindingRevision"],
+        "flash.bind-loader" => &["targetId", "expectedBindingRevision", "adoptCurrentLoader"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
         "flash.install-binding" => &["rebind"],
@@ -2159,6 +2163,33 @@ pub fn render(value: &Value) -> Result<Vec<u8>, ContractError> {
 mod tests {
     use super::{CliError, human_rendering, reported};
     use serde_json::json;
+
+    #[test]
+    fn loader_first_adoption_is_an_exclusive_targetless_cli_mode() {
+        let parse = |args: &[&str]| {
+            crate::parse(&args.iter().map(|arg| (*arg).to_owned()).collect::<Vec<_>>())
+        };
+        let invocation = parse(&["flash", "bind-loader", "--adopt"]).unwrap();
+        assert_eq!(invocation.method, "flash.bind-current-loader");
+        assert_eq!(
+            serde_json::Value::Object(invocation.params.unwrap()),
+            serde_json::json!({"adoptCurrentLoader": true})
+        );
+        for args in [
+            vec!["flash", "bind-loader"],
+            vec!["flash", "bind-loader", "--adopt", "--target", "TGT-A"],
+            vec![
+                "flash",
+                "bind-loader",
+                "--adopt",
+                "--expected-binding-revision",
+                "1",
+            ],
+            vec!["flash", "bind-loader", "--target", "TGT-A"],
+        ] {
+            assert!(parse(&args).is_err(), "{args:?}");
+        }
+    }
 
     /// Swift `RuntimeCLI.humanRendering(of:)`, whose nested renderings keep
     /// their inner indentation: only the spaces at their two ends are trimmed.

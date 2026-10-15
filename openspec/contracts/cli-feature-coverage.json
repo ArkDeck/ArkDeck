@@ -2614,7 +2614,7 @@
       ],
       "source": "daemon:flash.bind-current-loader",
       "targetClassification": "direct",
-      "targetCommand": "arkdeck flash bind-loader --target <target-id> --expected-binding-revision <n>"
+      "targetCommand": "arkdeck flash bind-loader (--adopt | --target <target-id>) (--adopt | --expected-binding-revision <n>)"
     },
     {
       "classification": "direct",

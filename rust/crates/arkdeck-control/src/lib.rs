@@ -467,6 +467,14 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// First adoption from a fresh Loader, with no caller-supplied identity.
+    fn flash_adopt_current_loader(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Rockchip Loader adoption is not configured".into(),
+            details: None,
+        })
+    }
     /// `flash.prerequisites` once its target and a supported profile were
     /// read. A host without the prerequisite observer answers as Swift's
     /// daemon without it does.
@@ -1446,6 +1454,20 @@ impl<H: HostServices> Control<H> {
             },
             // As Swift's handler: its two parameters, a string and a positive
             // integer, before its owner.
+            "flash.bind-current-loader" if params.contains_key("adoptCurrentLoader") => {
+                if params.len() == 1 && params.get("adoptCurrentLoader") == Some(&json!(true)) {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: self.host.flash_adopt_current_loader(),
+                    }
+                } else {
+                    Response::failure(
+                        &request.id,
+                        "invalidParams",
+                        "adoptCurrentLoader must be true and cannot accompany target or revision fields",
+                    )
+                }
+            }
             "flash.bind-current-loader" => match (
                 params.get("targetId").and_then(Value::as_str),
                 params

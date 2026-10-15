@@ -101,9 +101,9 @@ pub use presence::{
 };
 pub use provider::HdcReadOnlyProvider;
 pub use rockchip_hdc::{
-    BuildReadback, Clock, POST_FLASH_BUILD_PROPERTIES_COMMAND, ReconnectExpectation,
-    RockchipHdcFailure, RockchipHdcObserver, SystemClock, VerifiedBuild, WaitBudget,
-    bound_reconnect_summary, hdc_normal_usb_summary, hdc_state_summary, output_excerpt,
+    BuildReadback, Clock, LoaderReconnectExpectation, POST_FLASH_BUILD_PROPERTIES_COMMAND,
+    ReconnectExpectation, RockchipHdcFailure, RockchipHdcObserver, SystemClock, VerifiedBuild,
+    WaitBudget, bound_reconnect_summary, hdc_normal_usb_summary, hdc_state_summary, output_excerpt,
     parse_build_properties,
 };
 pub use rockchip_identity::{

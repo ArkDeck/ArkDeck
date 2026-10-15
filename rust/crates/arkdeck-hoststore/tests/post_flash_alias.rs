@@ -64,6 +64,7 @@ fn record_from(value: &Value) -> PostFlashBinding {
         binding_revision: value["bindingRevision"].as_i64().unwrap(),
         stable_loader_identity_sha256: text(value, "stableLoaderIdentitySHA256"),
         previous_hdc_identity_sha256: text(value, "previousHDCIdentitySHA256"),
+        loader_hardware_proof: None,
         hdc_identity_sha256: text(value, "hdcIdentitySHA256"),
         hdc_connect_key: text(value, "hdcConnectKey"),
         usb_topology: text(value, "usbTopology"),

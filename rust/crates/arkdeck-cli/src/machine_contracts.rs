@@ -1414,6 +1414,24 @@ fn argv_document(leaf: &Value) -> Value {
             cases.push(("devecoSocket", with(&with(&path, &deveco), &socket)));
             cases.push(("hdcSocketRefused", with(&valid, &socket)));
         }
+        if command == "flash.bind-loader" {
+            cases.push((
+                "selectedTarget",
+                with(
+                    &path,
+                    &["--target", "sample", "--expected-binding-revision", "1"],
+                ),
+            ));
+            cases.push((
+                "adoptionWithTargetRefused",
+                with(&valid, &["--target", "sample"]),
+            ));
+            cases.push((
+                "adoptionWithRevisionRefused",
+                with(&valid, &["--expected-binding-revision", "1"]),
+            ));
+            cases.push(("duplicateOption", with(&valid, &["--adopt"])));
+        }
         match parsed(&valid) {
             Ok(Accepted::Dispatch {
                 command: dispatched,

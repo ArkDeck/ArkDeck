@@ -458,6 +458,58 @@ impl TargetStore {
         })?;
         adopted.ok_or_else(|| unreadable(""))
     }
+    /// The Loader owner has already proved one physical observation and
+    /// checked all unsettled Flash obligations under the admission interlock.
+    /// Recheck that observation inside the Target publication lock. No wire
+    /// caller can supply any of these identity fields.
+    #[cfg(any(target_os = "macos", windows))]
+    pub(crate) fn adopt_loader_identity(
+        &self,
+        identity: &str,
+        serial: &str,
+        now: &str,
+        revalidate: impl Fn() -> Result<(), WireError>,
+    ) -> Result<crate::target_observation::Adopted, WireError> {
+        let mut adopted = None;
+        self.publishing("loaderAdoption", |targets, _| {
+            revalidate()?;
+            if !crate::target_document::sha(identity)
+                || arkdeck_contract::sha256_hex(serial.as_bytes()) != identity
+                || targets
+                    .targets
+                    .iter()
+                    .any(|target| target.identity == identity || target.connect_key == serial)
+            {
+                return Err(failure(
+                    "resourceConflict",
+                    "Loader adoption identity changed or already has an owner",
+                    "loaderAdoption",
+                ));
+            }
+            let (record, created) = targets
+                .materialize_adoption(identity, serial, "arkforge.native-rockusb", now)
+                .map_err(|message| failure("internalError", &message, "loaderAdoption"))?;
+            if !created || record.identity != identity || record.binding_revision != 1 {
+                return Err(failure(
+                    "resourceConflict",
+                    "Loader adoption does not identify a unique new Target",
+                    "loaderAdoption",
+                ));
+            }
+            adopted = Some(crate::target_observation::Adopted {
+                target_id: record.target_id,
+                binding_revision: record.binding_revision,
+            });
+            Ok((
+                Value::Null,
+                vec![Publication::Targets(
+                    targets.encode().map_err(|_| unreadable("loaderAdoption"))?,
+                )],
+            ))
+        })?;
+        adopted.ok_or_else(|| unreadable("loaderAdoption"))
+    }
+
     /// Resolve only existing durable Target authority for a new Import intent.
     /// No wire input supplies a binding, route, observation or inspected fact.
     /// Its one consumer is the Import owner.

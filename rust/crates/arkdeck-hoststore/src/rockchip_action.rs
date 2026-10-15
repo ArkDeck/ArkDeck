@@ -11,6 +11,7 @@
 use crate::artifact_read_owner::swift_string;
 use arkdeck_contract::sha256_hex;
 use arkdeck_provider_arkforge::HostAction;
+use arkdeck_provider_hdc::LoaderReconnectExpectation;
 use serde_json::{Map, Value, json};
 
 /// Swift `RockchipHDCReconnectExpectation`: the bound HDC route a reconnect
@@ -104,10 +105,20 @@ pub enum RockchipAction {
     RebootToNormal(String),
     WaitForHdcReconnect(String),
     WaitForBoundHdcReconnect(Expectation),
+    WaitForLoaderHdc(LoaderReconnectExpectation),
     VerifyBoundBuild {
         expectation: Expectation,
         product_model: String,
         build_version: String,
+    },
+    VerifyLoaderBuild {
+        expectation: LoaderReconnectExpectation,
+        product_model: String,
+        build_version: String,
+    },
+    CaptureLoaderPostFlashDiagnostics {
+        expectation: LoaderReconnectExpectation,
+        request: CaptureRequest,
     },
     CapturePostFlashDiagnostics {
         connect_key: String,
@@ -140,7 +151,12 @@ impl RockchipAction {
             Self::RebootToNormal(_) => "rockchip.rockusb.reboot-normal.v1",
             Self::WaitForHdcReconnect(_) => "rockchip.hdc.wait-reconnect.v1",
             Self::WaitForBoundHdcReconnect(_) => "rockchip.hdc.wait-bound-reconnect.v1",
+            Self::WaitForLoaderHdc(_) => "rockchip.hdc.wait-loader-hardware.v1",
             Self::VerifyBoundBuild { .. } => "rockchip.hdc.verify-bound-build.v1",
+            Self::VerifyLoaderBuild { .. } => "rockchip.hdc.verify-loader-build.v1",
+            Self::CaptureLoaderPostFlashDiagnostics { .. } => {
+                "rockchip.hdc.capture-loader-post-flash-hilog.v1"
+            }
             Self::CapturePostFlashDiagnostics { .. } => "rockchip.hdc.capture-post-flash-hilog.v1",
         }
     }
@@ -153,6 +169,12 @@ impl RockchipAction {
                 "previousConnectKey": expectation.previous_connect_key,
                 "previousIdentitySha256": expectation.previous_identity_sha256,
                 "usbTopology": expectation.usb_topology,
+            })
+        };
+        let loader_expectation = |expectation: &LoaderReconnectExpectation| {
+            json!({
+                "hardwareSerialSha256": expectation.hardware_serial_sha256,
+                "connectorSha256": expectation.connector_sha256,
             })
         };
         let (kind, arguments) = match self {
@@ -180,6 +202,29 @@ impl RockchipAction {
             }
             Self::WaitForBoundHdcReconnect(bound) => {
                 ("rockchip.waitForBoundHDCReconnect", expectation(bound))
+            }
+            Self::WaitForLoaderHdc(bound) => {
+                ("rockchip.waitForLoaderHDC", loader_expectation(bound))
+            }
+            Self::VerifyLoaderBuild {
+                expectation: bound,
+                product_model,
+                build_version,
+            } => {
+                let mut arguments = loader_expectation(bound);
+                arguments["expectedProductModel"] = json!(product_model);
+                arguments["expectedBuildVersion"] = json!(build_version);
+                ("rockchip.verifyLoaderBuild", arguments)
+            }
+            Self::CaptureLoaderPostFlashDiagnostics {
+                expectation: bound,
+                request,
+            } => {
+                let mut arguments = loader_expectation(bound);
+                arguments["durationSeconds"] = json!(request.duration_seconds);
+                arguments["filters"] = json!(request.filters);
+                arguments["byteBudget"] = json!(request.byte_budget);
+                ("rockchip.captureLoaderPostFlashDiagnostics", arguments)
             }
             Self::VerifyBoundBuild {
                 expectation: bound,
@@ -270,6 +315,12 @@ impl RockchipAction {
             | Self::VerifyBoundBuild { expectation, .. } => {
                 expectation.previous_connect_key == descriptor.connect_key
             }
+            Self::WaitForLoaderHdc(expectation)
+            | Self::VerifyLoaderBuild { expectation, .. }
+            | Self::CaptureLoaderPostFlashDiagnostics { expectation, .. } => {
+                expectation.validate().is_ok()
+                    && expectation.hardware_serial_sha256 == descriptor.expected_identity_sha256
+            }
         }
     }
 
@@ -336,6 +387,14 @@ impl RockchipAction {
             )),
             "rockchip.rebootToNormal" => Ok(Self::RebootToNormal(string("stableIdentitySha256")?)),
             "rockchip.waitForHDCReconnect" => Ok(Self::WaitForHdcReconnect(string("connectKey")?)),
+            "rockchip.waitForLoaderHDC" => {
+                Ok(Self::WaitForLoaderHdc(loader_expectation(arguments)?))
+            }
+            "rockchip.verifyLoaderBuild" => Ok(Self::VerifyLoaderBuild {
+                expectation: loader_expectation(arguments)?,
+                product_model: string("expectedProductModel")?,
+                build_version: string("expectedBuildVersion")?,
+            }),
             "rockchip.waitForBoundHDCReconnect" => {
                 Ok(Self::WaitForBoundHdcReconnect(expectation()?))
             }
@@ -348,8 +407,8 @@ impl RockchipAction {
                 product_model: string("expectedProductModel")?,
                 build_version: string("expectedBuildVersion")?,
             }),
-            "rockchip.capturePostFlashDiagnostics" => {
-                let connect_key = string("connectKey")?;
+            "rockchip.capturePostFlashDiagnostics"
+            | "rockchip.captureLoaderPostFlashDiagnostics" => {
                 let duration = integer("durationSeconds")?;
                 let filters = arguments
                     .get("filters")
@@ -363,16 +422,42 @@ impl RockchipAction {
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 let budget = integer("byteBudget")?;
-                Ok(Self::CapturePostFlashDiagnostics {
-                    connect_key,
-                    request: CaptureRequest::new(duration, filters, budget)?,
-                })
+                let request = CaptureRequest::new(duration, filters, budget)?;
+                if kind == "rockchip.captureLoaderPostFlashDiagnostics" {
+                    Ok(Self::CaptureLoaderPostFlashDiagnostics {
+                        expectation: loader_expectation(arguments)?,
+                        request,
+                    })
+                } else {
+                    Ok(Self::CapturePostFlashDiagnostics {
+                        connect_key: string("connectKey")?,
+                        request,
+                    })
+                }
             }
             _ => Err(format!(
                 "persisted typed provider action kind {kind} is unknown"
             )),
         }
     }
+}
+
+fn loader_expectation(
+    arguments: &Map<String, Value>,
+) -> Result<LoaderReconnectExpectation, String> {
+    let text = |key: &str| {
+        arguments
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| format!("Loader-first action is missing {key}"))
+    };
+    let expectation = LoaderReconnectExpectation {
+        hardware_serial_sha256: text("hardwareSerialSha256")?,
+        connector_sha256: text("connectorSha256")?,
+    };
+    expectation.validate().map_err(|error| error.to_string())?;
+    Ok(expectation)
 }
 
 /// Swift's interpolation of `HDCE0RequestError.outOfBounds`.

@@ -42,6 +42,9 @@ pub struct DeviceBinding {
     pub target_id: String,
     pub binding_revision: i64,
     pub usb_topology: String,
+    /// Present only when the admitted plan starts from a first Loader
+    /// adoption. It pins the connector for hardware-proved first HDC boot.
+    pub loader_first_connector_sha256: Option<String>,
 }
 
 /// Swift `RuntimeArkForgeLaneExecution`: the durable join between one

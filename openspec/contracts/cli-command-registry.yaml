@@ -15038,13 +15038,19 @@
       - - "--output"
         - "--json"
     "options":
+      - "form": "flag"
+        "name": "--adopt"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "adopt one fresh Loader without a previous Normal target"
       - "form": "value"
         "grammar":
           "kind": "opaque"
         "name": "--target"
         "placeholder": "target-id"
         "published": true
-        "required": true
+        "required": false
         "stability": "standard"
         "summary": "durable target identity"
       - "form": "value"
@@ -15054,7 +15060,7 @@
         "name": "--expected-binding-revision"
         "placeholder": "n"
         "published": true
-        "required": true
+        "required": false
         "stability": "standard"
         "summary": "revision the caller expects; a drift fails closed"
       - "form": "value"
@@ -15103,8 +15109,12 @@
       - "bind-loader"
     "positionals": []
     "replacementArgvPattern": null
-    "requiresExactlyOneOf": []
-    "summary": "bind the currently attached Loader to this target, CAS on its revision"
+    "requiresExactlyOneOf":
+      - - "--adopt"
+        - "--target"
+      - - "--adopt"
+        - "--expected-binding-revision"
+    "summary": "bind the selected target and revision, or adopt one fresh Loader with --adopt"
   - "catalogOperation": null
     "command": "flash.plan"
     "connectsToRuntime": false

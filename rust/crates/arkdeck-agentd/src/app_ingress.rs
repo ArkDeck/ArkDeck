@@ -416,7 +416,7 @@ fn closed_parameters(request: &Request) -> bool {
         // The App selects an adopted Target and the revision it saw; every
         // identity and port is read afresh by the Runtime, which writes only
         // its own binding and the Target's lineage.
-        "flash.bind-current-loader" => &["targetId", "expectedBindingRevision"],
+        "flash.bind-current-loader" => &["targetId", "expectedBindingRevision", "adoptCurrentLoader"],
         "history.filter.delete" => &["expectedGeneration"],
         "history.filter.save" => &[
             "expectedGeneration",

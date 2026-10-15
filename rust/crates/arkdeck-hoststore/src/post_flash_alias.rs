@@ -13,6 +13,15 @@ use std::fmt;
 
 /// Swift `RockchipPostFlashHDCBinding.currentSchemaVersion`.
 pub const SCHEMA_VERSION: &str = "1.0.0";
+pub const LOADER_FIRST_SCHEMA_VERSION: &str = "2.0.0";
+
+/// The Runtime's fixed kernel read proved a Loader's first HDC personality.
+/// There was no previous HDC alias; the private observation is content-addressed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoaderHardwareProof {
+    pub observation_sha256: String,
+    pub connector_sha256: String,
+}
 
 /// The one error family the store raises: Swift
 /// `RockchipFlashExecutionError.productionConfigurationUnavailable(detail)`.
@@ -52,6 +61,7 @@ pub struct PostFlashBinding {
     pub binding_revision: i64,
     pub stable_loader_identity_sha256: String,
     pub previous_hdc_identity_sha256: String,
+    pub loader_hardware_proof: Option<LoaderHardwareProof>,
     pub hdc_identity_sha256: String,
     pub hdc_connect_key: String,
     pub usb_topology: String,
@@ -70,6 +80,7 @@ impl PostFlashBinding {
             && self.binding_revision == other.binding_revision
             && self.stable_loader_identity_sha256 == other.stable_loader_identity_sha256
             && self.previous_hdc_identity_sha256 == other.previous_hdc_identity_sha256
+            && self.loader_hardware_proof == other.loader_hardware_proof
             && self.hdc_identity_sha256 == other.hdc_identity_sha256
             && self.hdc_connect_key == other.hdc_connect_key
             && self.usb_topology == other.usb_topology
@@ -81,11 +92,22 @@ impl PostFlashBinding {
     /// Swift `RockchipPostFlashHDCBindingStore.validate`: the closed shape,
     /// one message for every failure.
     pub fn validate(&self) -> Result<(), PostFlashAliasError> {
-        let valid = self.schema_version == SCHEMA_VERSION
+        let origin_valid = match &self.loader_hardware_proof {
+            None => {
+                self.schema_version == SCHEMA_VERSION
+                    && is_sha256(&self.previous_hdc_identity_sha256)
+            }
+            Some(proof) => {
+                self.schema_version == LOADER_FIRST_SCHEMA_VERSION
+                    && self.previous_hdc_identity_sha256.is_empty()
+                    && is_sha256(&proof.observation_sha256)
+                    && is_sha256(&proof.connector_sha256)
+            }
+        };
+        let valid = origin_valid
             && !self.target_id.is_empty()
             && self.binding_revision > 0
             && is_sha256(&self.stable_loader_identity_sha256)
-            && is_sha256(&self.previous_hdc_identity_sha256)
             && is_sha256(&self.hdc_identity_sha256)
             && !self.hdc_connect_key.is_empty()
             && self.hdc_connect_key.len() <= 1_024
@@ -132,6 +154,16 @@ impl PostFlashBinding {
         for (key, text) in fields {
             object.insert(key.to_owned(), Value::String(text.to_owned()));
         }
+        if let Some(proof) = &self.loader_hardware_proof {
+            object.remove("previousHDCIdentitySHA256");
+            object.insert(
+                "loaderHardwareProof".into(),
+                serde_json::json!({
+                    "observationSHA256": proof.observation_sha256,
+                    "connectorSHA256": proof.connector_sha256,
+                }),
+            );
+        }
         object.insert(
             "bindingRevision".to_owned(),
             Value::from(self.binding_revision),
@@ -164,12 +196,37 @@ impl PostFlashBinding {
                 .map(str::to_owned)
                 .ok_or_else(undecodable)
         };
+        let loader_hardware_proof = if let Some(proof) = object.get("loaderHardwareProof") {
+            let proof = proof.as_object().ok_or_else(undecodable)?;
+            if proof.len() != 2 || object.contains_key("previousHDCIdentitySHA256") {
+                return Err(undecodable());
+            }
+            Some(LoaderHardwareProof {
+                observation_sha256: proof
+                    .get("observationSHA256")
+                    .and_then(Value::as_str)
+                    .ok_or_else(undecodable)?
+                    .into(),
+                connector_sha256: proof
+                    .get("connectorSHA256")
+                    .and_then(Value::as_str)
+                    .ok_or_else(undecodable)?
+                    .into(),
+            })
+        } else {
+            None
+        };
         Ok(Self {
             schema_version: text("schemaVersion")?,
             target_id: text("targetID")?,
             binding_revision: integer(object.get("bindingRevision")).ok_or_else(undecodable)?,
             stable_loader_identity_sha256: text("stableLoaderIdentitySHA256")?,
-            previous_hdc_identity_sha256: text("previousHDCIdentitySHA256")?,
+            previous_hdc_identity_sha256: if loader_hardware_proof.is_some() {
+                String::new()
+            } else {
+                text("previousHDCIdentitySHA256")?
+            },
+            loader_hardware_proof,
             hdc_identity_sha256: text("hdcIdentitySHA256")?,
             hdc_connect_key: text("hdcConnectKey")?,
             usb_topology: text("usbTopology")?,
@@ -242,7 +299,8 @@ pub fn admit(
     expected_previous_hdc_identity_sha256: &str,
 ) -> Result<(), PostFlashAliasError> {
     candidate.validate()?;
-    if !is_sha256(expected_previous_hdc_identity_sha256)
+    if candidate.loader_hardware_proof.is_some()
+        || !is_sha256(expected_previous_hdc_identity_sha256)
         || candidate.previous_hdc_identity_sha256 != expected_previous_hdc_identity_sha256
     {
         return Err(PostFlashAliasError::new(
@@ -322,6 +380,11 @@ pub fn reissue(
     observed: &ObservedHdc<'_>,
     now_utc: &str,
 ) -> Option<PostFlashBinding> {
+    if existing.loader_hardware_proof.is_some() {
+        // The v2 proof names its original Target revision. An old counter
+        // cannot silently reissue that hardware observation at another one.
+        return None;
+    }
     if existing.binding_revision <= target.binding_revision {
         return None;
     }
@@ -355,6 +418,7 @@ mod tests {
             binding_revision: revision,
             stable_loader_identity_sha256: "a".repeat(64),
             previous_hdc_identity_sha256: sha256_hex(key.as_bytes()),
+            loader_hardware_proof: None,
             hdc_identity_sha256: sha256_hex(key.as_bytes()),
             hdc_connect_key: key.to_owned(),
             usb_topology: "42".to_owned(),

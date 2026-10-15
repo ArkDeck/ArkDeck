@@ -53,6 +53,32 @@ pub struct ReconnectExpectation {
     pub usb_topology: String,
 }
 
+/// A board first observed in Loader has no previous HDC route. Its exact
+/// hardware serial and physical connector are pinned before any mutation.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LoaderReconnectExpectation {
+    pub hardware_serial_sha256: String,
+    pub connector_sha256: String,
+}
+
+impl LoaderReconnectExpectation {
+    pub fn validate(&self) -> Result<(), RockchipHdcFailure> {
+        let digest = |value: &str| {
+            value.len() == 64
+                && value
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        };
+        if digest(&self.hardware_serial_sha256) && digest(&self.connector_sha256) {
+            Ok(())
+        } else {
+            Err(failed(
+                "Loader-first postflight hardware expectation is malformed",
+            ))
+        }
+    }
+}
+
 /// How long a wait may take: the deadline of the whole wait, the budget of
 /// each `list targets -v`, and the pause between reads. Swift hardcodes the
 /// three; the callers pass one of the named budgets.
@@ -216,6 +242,121 @@ pub struct RockchipHdcObserver<'a> {
 impl<'a> RockchipHdcObserver<'a> {
     pub fn new(hdc: &'a dyn HdcDispatch, usb: &'a dyn UsbProbe, clock: &'a dyn Clock) -> Self {
         Self { hdc, usb, clock }
+    }
+
+    /// A returning endpoint is only a candidate until the exact, fixed kernel
+    /// read proves the Loader's hardware serial on its original connector.
+    /// Raw CPU information is consumed by the identity parser, never returned.
+    pub fn wait_for_loader_hdc(
+        &self,
+        expectation: &LoaderReconnectExpectation,
+        budget: &WaitBudget,
+    ) -> Result<(HdcIdentity, crate::NormalHardwareIdentity, Vec<Receipt>), RockchipHdcFailure>
+    {
+        expectation.validate()?;
+        let deadline = self.clock.now() + budget.deadline;
+        let mut receipts = Vec::new();
+        let mut last_malformed = None;
+        while self.clock.now() < deadline {
+            let receipt = self.read(target_list_plan(budget.command_timeout))?;
+            receipts.push(receipt.clone());
+            match parse_host_target_list(
+                &receipt.stdout,
+                target_list_version(self.hdc),
+                receipt.truncated,
+            ) {
+                Ok(rows) => {
+                    if let Ok(identity) = self
+                        .usb
+                        .single_hdc_normal_on_connector(&expectation.connector_sha256)
+                        && connected_rows(&rows, &identity.connect_key) == 1
+                    {
+                        let hardware = self.verify_loader_hardware(&identity, expectation)?;
+                        return Ok((identity, hardware, receipts));
+                    }
+                }
+                Err(error) => keep_polling_or_fail(error, &mut last_malformed)?,
+            }
+            self.clock.sleep(budget.poll);
+        }
+        Err(failed(
+            "Loader-first HDC hardware identity was not established before the deadline",
+        ))
+    }
+
+    pub fn verify_loader_hardware(
+        &self,
+        identity: &HdcIdentity,
+        expectation: &LoaderReconnectExpectation,
+    ) -> Result<crate::NormalHardwareIdentity, RockchipHdcFailure> {
+        expectation.validate()?;
+        if identity.serial_digest_sha256 != sha256_hex(identity.connect_key.as_bytes())
+            || self
+                .usb
+                .single_hdc_normal_on_connector(&expectation.connector_sha256)
+                .as_ref()
+                != Ok(identity)
+        {
+            return Err(failed(
+                "Loader-first HDC attachment is inconsistent or changed",
+            ));
+        }
+        let hardware =
+            crate::observe_normal_hardware_identity(self.hdc, self.usb, &identity.connect_key)
+                .map_err(failed)?;
+        if hardware.hardware_serial_sha256 != expectation.hardware_serial_sha256
+            || hardware.connector_identity_sha256 != expectation.connector_sha256
+            || hardware.normal_identity_sha256 != identity.serial_digest_sha256
+            || hardware.usb_topology != identity.topology
+        {
+            return Err(failed(
+                "returning HDC hardware does not match the admitted Loader",
+            ));
+        }
+        Ok(hardware)
+    }
+
+    pub fn verify_loader_build(
+        &self,
+        expectation: &LoaderReconnectExpectation,
+        expected_product_model: &str,
+        expected_build_version: &str,
+        budget: &WaitBudget,
+    ) -> Result<(VerifiedBuild, crate::NormalHardwareIdentity), RockchipHdcFailure> {
+        if expected_product_model.is_empty() || expected_build_version.is_empty() {
+            return Err(failed(
+                "Loader-first build verification is not fully configured",
+            ));
+        }
+        let (identity, hardware, mut receipts) = self.wait_for_loader_hdc(expectation, budget)?;
+        let properties = self.read(build_properties_plan(&identity.connect_key))?;
+        let readback = parse_build_properties(&properties.stdout)?;
+        if readback.product_model != expected_product_model
+            || readback.build_version != expected_build_version
+        {
+            return Err(failed(
+                "Loader-first build or model does not match the published artifact",
+            ));
+        }
+        if self
+            .usb
+            .single_hdc_normal_on_connector(&expectation.connector_sha256)
+            .as_ref()
+            != Ok(&identity)
+        {
+            return Err(failed(
+                "Loader-first HDC attachment changed during build verification",
+            ));
+        }
+        receipts.push(properties);
+        Ok((
+            VerifiedBuild {
+                identity,
+                readback,
+                receipts,
+            },
+            hardware,
+        ))
     }
 
     /// Swift `observeHDCNormalUSB`: exactly one HDC-normal USB device whose
@@ -813,6 +954,17 @@ mod tests {
     }
 
     impl UsbProbe for UsbScript {
+        fn connector_identity(&self, _: &str) -> Result<String, String> {
+            Ok("d".repeat(64))
+        }
+
+        fn single_hdc_normal_on_connector(&self, connector: &str) -> Result<HdcIdentity, String> {
+            if connector != "d".repeat(64) || self.at.len() != 1 {
+                return Err("connector unavailable or ambiguous".into());
+            }
+            Ok(self.at.values().next().unwrap().clone())
+        }
+
         fn single_loader(&self, _: &str) -> Result<LoaderIdentity, String> {
             Err("DAYU200 target unavailable".to_owned())
         }
@@ -870,6 +1022,125 @@ mod tests {
             Err(RockchipHdcFailure::Failed(detail)) => detail,
             other => panic!("expected a failed step, got {other:?}"),
         }
+    }
+
+    fn loader_expectation() -> LoaderReconnectExpectation {
+        LoaderReconnectExpectation {
+            hardware_serial_sha256: sha256_hex(b"0123456789abcdef"),
+            connector_sha256: "d".repeat(64),
+        }
+    }
+
+    #[test]
+    fn loader_first_postflight_proves_new_hdc_route_and_exact_artifact_build() {
+        let hdc = Scripted::new(vec![
+            Answer::Out(row(KEY)),
+            Answer::Out("Serial: 0123456789abcdef\n".into()),
+            Answer::Out("published-build\nrk3568\n".into()),
+        ]);
+        let usb = UsbScript::default()
+            .at(identity(KEY, "42"))
+            .digest(KEY, "42");
+        let clock = FakeClock::new();
+        let (verified, hardware) = RockchipHdcObserver::new(&hdc, &usb, &clock)
+            .verify_loader_build(
+                &loader_expectation(),
+                "rk3568",
+                "published-build",
+                &budget(1),
+            )
+            .unwrap();
+        assert_eq!(verified.identity.connect_key, KEY);
+        assert_eq!(
+            hardware.hardware_serial_sha256,
+            loader_expectation().hardware_serial_sha256
+        );
+        assert_ne!(
+            hardware.hardware_serial_sha256,
+            hardware.normal_identity_sha256
+        );
+        assert_eq!(hdc.reads(), 3);
+        assert_eq!(
+            hdc.plans()[1].arguments,
+            ["-t", KEY, "shell", "cat", "/proc/cpuinfo"]
+        );
+        assert_eq!(verified.receipts.len(), 2);
+        assert!(
+            verified
+                .receipts
+                .iter()
+                .all(|receipt| !String::from_utf8_lossy(&receipt.stdout)
+                    .contains("0123456789abcdef"))
+        );
+    }
+
+    #[test]
+    fn loader_first_postflight_rejects_wrong_missing_duplicate_or_incomplete_hardware() {
+        for answer in [
+            Answer::Out("Serial: fedcba9876543210\n".into()),
+            Answer::Out("processor: 0\n".into()),
+            Answer::Out("Serial: 0123456789abcdef\nSerial: 0123456789abcdef\n".into()),
+            Answer::Truncated("Serial: 0123456789abcdef\n".into()),
+        ] {
+            let hdc = Scripted::new(vec![Answer::Out(row(KEY)), answer]);
+            let usb = UsbScript::default()
+                .at(identity(KEY, "42"))
+                .digest(KEY, "42");
+            let clock = FakeClock::new();
+            let error = detail(
+                RockchipHdcObserver::new(&hdc, &usb, &clock)
+                    .wait_for_loader_hdc(&loader_expectation(), &budget(1)),
+            );
+            assert!(!error.contains("0123456789abcdef"));
+            assert_eq!(hdc.reads(), 2);
+        }
+    }
+
+    #[test]
+    fn loader_first_postflight_never_probes_another_or_ambiguous_connector() {
+        for ambiguous in [false, true] {
+            let hdc = Scripted::new(vec![Answer::Out(row(KEY))]);
+            let mut usb = UsbScript::default()
+                .at(identity(KEY, "42"))
+                .digest(KEY, "42");
+            let mut expected = loader_expectation();
+            if ambiguous {
+                usb = usb.at(identity("other-device", "43"));
+            } else {
+                expected.connector_sha256 = "e".repeat(64);
+            }
+            let clock = FakeClock::new();
+            assert!(
+                RockchipHdcObserver::new(&hdc, &usb, &clock)
+                    .wait_for_loader_hdc(&expected, &budget(1))
+                    .is_err()
+            );
+            assert_eq!(hdc.reads(), 1);
+        }
+    }
+
+    #[test]
+    fn loader_first_postflight_rejects_a_different_artifact_build() {
+        let hdc = Scripted::new(vec![
+            Answer::Out(row(KEY)),
+            Answer::Out("Serial: 0123456789abcdef\n".into()),
+            Answer::Out("old-build\nrk3568\n".into()),
+        ]);
+        let usb = UsbScript::default()
+            .at(identity(KEY, "42"))
+            .digest(KEY, "42");
+        let clock = FakeClock::new();
+        assert!(
+            detail(
+                RockchipHdcObserver::new(&hdc, &usb, &clock).verify_loader_build(
+                    &loader_expectation(),
+                    "rk3568",
+                    "published-build",
+                    &budget(1)
+                )
+            )
+            .contains("published artifact")
+        );
     }
 
     /// The registered Windows tuple's own listings (CHG-2026-078, the c2

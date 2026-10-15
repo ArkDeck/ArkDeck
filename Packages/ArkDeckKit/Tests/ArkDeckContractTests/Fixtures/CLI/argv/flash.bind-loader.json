@@ -4,20 +4,14 @@
       "argv": [
         "flash",
         "bind-loader",
-        "--target",
-        "sample",
-        "--expected-binding-revision",
-        "1"
+        "--adopt"
       ],
       "expected": {
         "command": "flash.bind-loader",
         "handlerArguments": [
           "flash",
           "bind-loader",
-          "--target",
-          "sample",
-          "--expected-binding-revision",
-          "1"
+          "--adopt"
         ],
         "outcome": "dispatch"
       },
@@ -39,10 +33,7 @@
       "argv": [
         "flash",
         "bind-loader",
-        "--target",
-        "sample",
-        "--expected-binding-revision",
-        "1",
+        "--adopt",
         "--no-such-option"
       ],
       "expected": {
@@ -53,26 +44,6 @@
         "outcome": "failure"
       },
       "name": "unknownOption"
-    },
-    {
-      "argv": [
-        "flash",
-        "bind-loader",
-        "--target",
-        "sample",
-        "--expected-binding-revision",
-        "1",
-        "--target",
-        "sample"
-      ],
-      "expected": {
-        "category": "usage",
-        "code": "invalidOption",
-        "command": "flash.bind-loader",
-        "exitCode": 64,
-        "outcome": "failure"
-      },
-      "name": "duplicateOption"
     },
     {
       "argv": [
@@ -92,10 +63,7 @@
       "argv": [
         "flash",
         "bind-loader",
-        "--target",
-        "sample",
-        "--expected-binding-revision",
-        "1",
+        "--adopt",
         "--output",
         "jsonl"
       ],
@@ -112,12 +80,31 @@
       "argv": [
         "flash",
         "bind-loader",
+        "--adopt",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.bind-loader",
+        "handlerArguments": [
+          "flash",
+          "bind-loader",
+          "--adopt",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
         "--target",
         "sample",
         "--expected-binding-revision",
-        "1",
-        "--socket",
-        "sample"
+        "1"
       ],
       "expected": {
         "command": "flash.bind-loader",
@@ -127,13 +114,61 @@
           "--target",
           "sample",
           "--expected-binding-revision",
-          "1",
-          "--socket",
-          "sample"
+          "1"
         ],
         "outcome": "dispatch"
       },
-      "name": "macosCompatibilityOption"
+      "name": "selectedTarget"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--adopt",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.bind-loader",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "adoptionWithTargetRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--adopt",
+        "--expected-binding-revision",
+        "1"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.bind-loader",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "adoptionWithRevisionRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "bind-loader",
+        "--adopt",
+        "--adopt"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.bind-loader",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
     }
   ],
   "cliVersion": "0.1.0",

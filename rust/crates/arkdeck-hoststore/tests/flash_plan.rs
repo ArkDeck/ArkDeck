@@ -15,7 +15,7 @@
 mod fixture_fs;
 
 use arkdeck_hoststore::{
-    ArtifactReadStore, FlashPlanner, FlashPlanning, ImportUploadStore, JobPlanner,
+    ArtifactReadStore, FlashPlanner, FlashPlanning, ImportBinding, ImportUploadStore, JobPlanner,
     NativeRockUsbIdentity, RockchipFacts, rockchip_dispatch_unavailable,
 };
 use serde_json::{Value, json};
@@ -158,6 +158,125 @@ fn facts(setup: &Value, target: &str) -> Result<RockchipFacts, String> {
             ])
             .collect::<BTreeMap<_, _>>(),
     })
+}
+
+#[test]
+fn loader_first_full_restore_materializes_without_a_prior_hdc_alias() {
+    let cases: Value =
+        serde_json::from_slice(&fs::read(fixtures().join("cases.json")).unwrap()).unwrap();
+    let root = Root::new();
+    let loader_serial = "0123456789abcdef";
+    let loader_identity = arkdeck_contract::sha256_hex(loader_serial.as_bytes());
+    directory(&root.0.join("artifacts"));
+    let artifacts = ArtifactReadStore::open(&root.0.join("artifacts")).unwrap();
+    let imports = ImportUploadStore::open(&root.0.join("artifacts")).unwrap();
+    let state = root.0.join("state");
+    directory(&state);
+    let target = cases["targetId"].as_str().unwrap();
+    let exchange = cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["name"] == "canonical.full")
+        .unwrap();
+    let mut request: Value =
+        serde_json::from_str(exchange["requestJson"].as_str().unwrap()).unwrap();
+    let source_lease: Vec<&str> = request["inputs"]["artifactLease"]
+        .as_str()
+        .unwrap()
+        .split(':')
+        .collect();
+    let bytes = fs::read(
+        fixtures()
+            .join("inputs/artifacts")
+            .join(source_lease[1])
+            .join(source_lease[2]),
+    )
+    .unwrap();
+    let now = "2026-09-25T00:00:00Z";
+    let binding = |intent: &arkdeck_contract::ImportIntent| {
+        Ok(ImportBinding {
+            target_id: intent.target_id.clone(),
+            binding_revision: Some(intent.binding_revision),
+            stable_identity_sha256: Some(loader_identity.clone()),
+        })
+    };
+    let digest = arkdeck_contract::sha256_hex(&bytes);
+    let begun = imports
+        .handle_resource(
+            "artifact.import.begin",
+            json!({"schemaVersion":"arkdeck.import-intent/1","importRequestId":"loader-first-plan",
+            "kind":"flash-bundle","targetId":target,"bindingRevision":"1",
+            "deviceProfile":"dayu200","name":"images.tar.gz",
+            "byteCount":bytes.len().to_string(),"sha256":digest})
+            .as_object()
+            .unwrap(),
+            now,
+            false,
+            binding,
+        )
+        .unwrap();
+    let import_id = begun["importId"].as_str().unwrap();
+    imports
+        .handle_resource(
+            "artifact.import.append",
+            json!({"importId":import_id,"generation":"1","offset":"0",
+            "byteCount":bytes.len().to_string(),"sha256":digest,
+            "base64":arkdeck_contract::encode_import_chunk(&bytes).unwrap()})
+            .as_object()
+            .unwrap(),
+            now,
+            false,
+            binding,
+        )
+        .unwrap();
+    let committed = imports
+        .commit(
+            json!({"importId":import_id,"generation":"1"})
+                .as_object()
+                .unwrap(),
+            now,
+            false,
+            &artifacts,
+            1024 * 1024,
+            binding,
+        )
+        .unwrap();
+    request["inputs"]["artifactLease"] = committed["receipt"]["lease"].clone();
+    let flash = planning(&exchange["setup"]);
+    let mut loader = facts(&exchange["setup"], target).unwrap();
+    loader.device_mode = "loader".into();
+    loader.execution_connect_key = loader_serial.into();
+    loader.identity_sha256 = loader_identity;
+    loader.server_facts.retain(|key, _| {
+        !key.starts_with("dayu200HDCNormalAlias") && !key.starts_with("dayu200Normal")
+    });
+    loader.server_facts.extend([
+        ("dayu200LoaderFirstPostflight".into(), "satisfied".into()),
+        ("dayu200LoaderFirstConnectorSHA256".into(), "d".repeat(64)),
+        ("dayu200LoaderFirstUSBTopology".into(), "42".into()),
+    ]);
+    let port = |_: &str| Ok(loader.clone());
+    let planner = FlashPlanner {
+        planner: JobPlanner {
+            artifacts: Some(&artifacts),
+            imports: Some(&imports),
+            analyzer: None,
+            state_root: &state,
+            hdc: None,
+            workspace: None,
+        },
+        flash: Some(&flash),
+        facts: Some(&port),
+    };
+    let plan = planner
+        .plan(&serde_json::to_vec(&request).unwrap())
+        .unwrap();
+    assert_eq!(plan["providerAdmissionBlocker"], Value::Null, "{plan}");
+    assert_eq!(plan["jobAdmitted"], false);
+    assert_eq!(plan["effectiveEffect"], "destructive");
+    assert_eq!(plan["stableIdentitySha256"], loader.identity_sha256);
+    assert_eq!(plan["steps"], exchange["answer"]["result"]["steps"]);
 }
 
 #[test]

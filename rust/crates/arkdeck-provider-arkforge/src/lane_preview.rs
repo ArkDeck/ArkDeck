@@ -77,6 +77,7 @@ impl LanePlanPreview for LanePreviewHost {
             ),
             binding_revision: 1,
             usb_topology: usb_topology.into(),
+            loader_first_connector_sha256: None,
         };
         match lane_plan::materialize(
             &mut *controller,
