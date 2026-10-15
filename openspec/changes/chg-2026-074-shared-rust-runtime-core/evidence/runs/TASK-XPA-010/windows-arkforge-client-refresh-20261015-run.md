@@ -47,3 +47,31 @@ jobs. Log paths below are private local filenames, with no device identifiers.
 Pending the PR's `guard` and `swift` checks. macOS and the routed historical
 contract checks are left to their existing CI lanes. No real-device execution
 or hardware-support promotion is claimed by this software increment.
+
+## Windows CI prerequisite discovered during integration
+
+Run `38713739746` passed the Linux, macOS and Windows contract-parity lanes but failed the
+Windows workspace lane because the registered `Git/mingw64/bin/git.exe` no longer exists on runner image
+`windows-2025-vs2026/20261007.264.1` (Git `2.56.0.windows.2`). The failure was a deterministic
+installed-layout mismatch, not a load-related invalid run. Git for Windows documents the
+[2.56 UCRT64 migration](https://github.com/git-for-windows/build-extra/blob/main/ReleaseNotes.md).
+
+The Windows system-tool resolver now checks the registered `Git/ucrt64/bin/git.exe`, then the
+older MINGW64 layout only if a path entry is absent. Every ancestor, executable, ACL, signature,
+publisher and digest still receives the existing verification. A verification error, including
+an error categorized as NotFound after the file opened, never becomes layout fallback. The
+launcher, PATH, arbitrary locations and unsigned copies remain inadmissible. This repairs a
+prerequisite exposed by the integration's required CI without changing destructive policy.
+
+Local targeted checks: the final source matches the fixed-cache mirror used by
+`arkdeck-git-layout-checks-2`. Batched workspace formatting and workspace clippy with
+`--all-targets -- -D warnings` both exited 0. The platform system-tool tests passed 9/9;
+hoststore Windows workspace-profile tests passed 5/5; agentd's
+`windows_workspace_provider_process` passed 4/4. Logs are retained locally in that directory
+as `fmt.log`, `clippy.log`, `system-tool.log`, `workspace-tools.log` and `workspace-process.log`.
+The local host exercises the signed MINGW64 installation; CI exercises the current runner
+image. The UCRT64/legacy selection, no-fallback-on-verification-error and unsafe-directory
+cases are also covered independently. No local unified gate was run.
+
+CI: PR #2644's replacement head will rerun the required `guard` and `swift` checks. The failed
+run above is retained; no assertion was relaxed and it was not reclassified as a load flake.
