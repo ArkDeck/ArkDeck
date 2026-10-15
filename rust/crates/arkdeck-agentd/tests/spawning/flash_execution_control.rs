@@ -200,6 +200,46 @@ fn flash_unknown_outcome_reconciles_passively_without_replay() {
     flash_execution_fixture("unknown");
 }
 
+#[test]
+fn missing_real_normal_hardware_proof_refuses_before_admission_or_dispatch() {
+    let _turn = crate::turn();
+    let root = Root::new();
+    let fakes = execution_fakes::Fakes::default();
+    let host = flash_host(&root, &fakes);
+    #[cfg(windows)]
+    let executable = root.0.join("arkforged.exe");
+    #[cfg(unix)]
+    let executable = root.0.join("fixture-hdc");
+    let rockusb = NativeRockUsbIdentity::configured(
+        Some(executable.to_string_lossy().into_owned()),
+        Some(arkdeck_contract::sha256_hex(
+            &fs::read(&executable).unwrap(),
+        )),
+    );
+    // Retain the production observer: this old fake board supplies no kernel
+    // serial, so its USB identity and durable binding alone must be refused.
+    let control = control(
+        host.with_flash_host_facts(FlashHostFacts::new(&root.0, census).with_rockusb(rockusb)),
+    );
+    let request = request("canonical.full");
+    let plan = call(&control, "job.plan", &request);
+    assert_eq!(plan["ok"], true, "{plan}");
+    assert!(
+        plan["result"]["providerAdmissionBlocker"]
+            .as_str()
+            .unwrap()
+            .starts_with("flash.normalLoaderIdentityUnproven")
+    );
+    let submitted = call(&control, "job.submit", &request);
+    assert_eq!(submitted["ok"], false, "{submitted}");
+    assert!(
+        submitted
+            .to_string()
+            .contains("flash.normalLoaderIdentityUnproven")
+    );
+    assert_eq!(fakes.calls(), (Vec::new(), Vec::new()));
+}
+
 fn flash_execution_fixture(outcome: &str) {
     let _turn = crate::turn();
     let root = ChildRoot::new();
@@ -379,7 +419,11 @@ esac
         )
         .with_development_mutation_root(root.0.join("jobs"))
         .with_development_hdc(Some(arkdeck_provider_hdc::ProcessDispatch::new(tool, None)))
-        .with_flash_host_facts(FlashHostFacts::new(&root.0, census).with_rockusb(rockusb))
+        .with_flash_host_facts(
+            FlashHostFacts::new(&root.0, census)
+                .with_rockusb(rockusb)
+                .with_normal_identity_observer(fixture_normal_identity),
+        )
         .with_flash_planning(FlashPlanning::new(
             None,
             || None,
@@ -490,7 +534,11 @@ pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::
             Arc::new(ScriptedHdc::default()),
             &arkdeck_contract::sha256_hex(b"fixture hdc"),
         )
-        .with_flash_host_facts(FlashHostFacts::new(&root.0, census).with_rockusb(rockusb))
+        .with_flash_host_facts(
+            FlashHostFacts::new(&root.0, census)
+                .with_rockusb(rockusb)
+                .with_normal_identity_observer(fixture_normal_identity),
+        )
         .with_flash_planning(FlashPlanning::new(
             None,
             || None,
@@ -501,4 +549,23 @@ pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::
             Arc::new(FakeHost(fakes.clone())),
             "org.openharmony.dayu200@1.0.0".into(),
         )
+}
+
+/// The old oracle's synthetic hardware observation. Its literal identity is
+/// not a real kernel serial. The production parser/USB/tool boundaries are
+/// tested with canonical serials in provider-hdc; this port preserves the
+/// original complete Flash owner requests and their no-replay assertions.
+fn fixture_normal_identity(
+    _: &dyn arkdeck_provider_hdc::HdcDispatch,
+    _: &dyn arkdeck_provider_hdc::UsbProbe,
+    key: &str,
+) -> Result<arkdeck_provider_hdc::NormalHardwareIdentity, &'static str> {
+    Ok(arkdeck_provider_hdc::NormalHardwareIdentity {
+        normal_identity_sha256: arkdeck_contract::sha256_hex(key.as_bytes()),
+        hardware_serial_sha256: arkdeck_contract::sha256_hex(b"150100424a544e4600"),
+        usb_topology: "42".into(),
+        connector_identity_sha256: "d".repeat(64),
+        stdout_sha256: arkdeck_contract::sha256_hex(b"synthetic-hardware-observation"),
+        stdout_byte_count: b"synthetic-hardware-observation".len(),
+    })
 }

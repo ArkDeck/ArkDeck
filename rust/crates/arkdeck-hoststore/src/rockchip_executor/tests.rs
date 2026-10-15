@@ -13,7 +13,7 @@ const NEXT_KEY: &str = "device-2";
 const PROVIDER: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 fn identity() -> String {
-    "a".repeat(64)
+    sha256_hex(b"0123456789abcdef")
 }
 
 /// Swift's `ProbeCommandRunner`: one scripted answer per command, every plan
@@ -43,8 +43,15 @@ impl Hdc {
 }
 
 impl HdcDispatch for Hdc {
+    fn mutation_identity_current(&self) -> bool {
+        true
+    }
+
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
         self.plans.lock().unwrap().push(plan.clone());
+        if plan.arguments == ["-t", KEY, "shell", "cat", "/proc/cpuinfo"] {
+            return out("Serial: 0123456789abcdef\n");
+        }
         self.answers
             .lock()
             .unwrap()
@@ -75,6 +82,7 @@ struct Usb {
     loader_misses: AtomicUsize,
     loader_reads: AtomicUsize,
     normal: Option<LoaderIdentity>,
+    initial_normal_reads: AtomicUsize,
     at: BTreeMap<String, HdcIdentity>,
 }
 
@@ -86,6 +94,7 @@ impl Usb {
                 topology: "42".to_owned(),
             }),
             loader_misses: AtomicUsize::new(misses),
+            initial_normal_reads: AtomicUsize::new(if misses > 0 { 3 } else { 0 }),
             ..Self::default()
         }
     }
@@ -122,6 +131,9 @@ fn unavailable() -> String {
 }
 
 impl UsbProbe for Usb {
+    fn connector_identity(&self, _: &str) -> Result<String, String> {
+        Ok("d".repeat(64))
+    }
     fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
         self.loader_reads.fetch_add(1, Ordering::SeqCst);
         if self
@@ -140,6 +152,18 @@ impl UsbProbe for Usb {
     }
 
     fn single_hdc_normal(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
+        if self
+            .initial_normal_reads
+            .try_update(Ordering::SeqCst, Ordering::SeqCst, |left| {
+                left.checked_sub(1)
+            })
+            .is_ok()
+        {
+            return Ok(LoaderIdentity {
+                serial_digest_sha256: sha256_hex(KEY.as_bytes()),
+                topology: "42".into(),
+            });
+        }
         self.normal
             .clone()
             .filter(|normal| normal.serial_digest_sha256 == stable_identity_sha256)
@@ -196,6 +220,7 @@ impl Clock for SharedClock {
 }
 
 struct Fixture {
+    root: Root,
     hdc: Arc<Hdc>,
     usb: Arc<Usb>,
     clock: Arc<TestClock>,
@@ -206,6 +231,9 @@ struct Fixture {
 struct SharedUsb(Arc<Usb>);
 
 impl UsbProbe for SharedUsb {
+    fn connector_identity(&self, topology: &str) -> Result<String, String> {
+        self.0.connector_identity(topology)
+    }
     fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
         self.0.single_loader(stable_identity_sha256)
     }
@@ -236,6 +264,7 @@ fn fixture(hdc: Arc<Hdc>, usb: Usb, loader: Option<&str>) -> Fixture {
         Box::new(SharedClock(Arc::clone(&clock))),
     );
     Fixture {
+        root: Root::new(),
         hdc,
         usb,
         clock,
@@ -256,7 +285,7 @@ fn run(
 ) -> Result<ExecutionResult, LaneFailure> {
     fixture
         .executor
-        .execute(action, &descriptor(action, step), Path::new("/unused"))
+        .execute(action, &descriptor(action, step), &fixture.root.0)
 }
 
 fn map(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
@@ -336,7 +365,7 @@ fn one_managed_control_attempt_reuses_one_transition_observation() {
     .unwrap();
 
     assert_eq!(entered.summary["transition"], "normal-to-loader");
-    assert_eq!(entered.subprocess_count, 1);
+    assert_eq!(entered.subprocess_count, 2);
     assert_eq!(
         disconnected.summary,
         map(&[
@@ -364,7 +393,13 @@ fn one_managed_control_attempt_reuses_one_transition_observation() {
         ])
     );
     assert_eq!(fixture.usb.loader_reads.load(Ordering::SeqCst), 2);
-    assert_eq!(fixture.hdc.arguments(), [reboot_loader()]);
+    assert_eq!(
+        fixture.hdc.arguments(),
+        [
+            arkdeck_provider_hdc::normal_hardware_identity_plan(KEY).arguments,
+            reboot_loader()
+        ]
+    );
 
     // The rebind consumed the observation: a repeat reads the Loader afresh.
     let again = run(
@@ -456,7 +491,7 @@ fn a_transition_the_normal_readback_disproves_carries_its_diagnostic() {
             .execute(
                 &action,
                 &descriptor(&action, "enter-loader"),
-                Path::new("/unused"),
+                &fixture.root.0,
             )
             .unwrap_err();
         let LaneFailure::ConfirmedNotExecutedWithDiagnostic { reason, diagnostic } = failure else {
@@ -479,7 +514,10 @@ fn a_timed_out_transition_without_either_readback_stays_unknown() {
         Hdc::answering(vec![Err(DispatchFailure::Unobservable(
             "process timed out before completion".to_owned(),
         ))]),
-        Usb::default(),
+        Usb {
+            initial_normal_reads: AtomicUsize::new(3),
+            ..Usb::default()
+        },
         None,
     );
     let executor = fixture.executor.with_enter_loader_readback(ReadbackBudget {
@@ -491,7 +529,7 @@ fn a_timed_out_transition_without_either_readback_stays_unknown() {
         executor.execute(
             &action,
             &descriptor(&action, "enter-loader"),
-            Path::new("/unused")
+            &fixture.root.0
         ),
         Err(LaneFailure::OutcomeUnknown(
             "process timed out before completion".into()
@@ -639,7 +677,7 @@ fn the_bound_reconnect_route_is_reused_by_the_build_verification_that_publishes_
             "2026-08-08T01:02:03Z".to_owned()
         });
     let execute = |action: &RockchipAction, step: &str| {
-        executor.execute(action, &descriptor(action, step), Path::new("/unused"))
+        executor.execute(action, &descriptor(action, step), &fixture.root.0)
     };
     let next = sha256_hex(NEXT_KEY.as_bytes());
     let reconnected = execute(

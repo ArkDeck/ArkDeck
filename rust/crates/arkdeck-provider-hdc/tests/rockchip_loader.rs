@@ -21,6 +21,7 @@ use std::time::Duration;
 /// board's real refusal in `refuse` mode; everything else unregistered.
 const ANSWERS: &str = r#"key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 case "$*" in
+"-t $key shell cat /proc/cpuinfo") printf 'Serial: 0123456789abcdef\n'; exit 0 ;;
 "-t $key shell reboot loader")
   case "$mode" in
   refuse) printf '[Fail]Not match target and connect key\nretry later\n' >&2; exit 1 ;;
@@ -34,7 +35,15 @@ esac
 
 const REBOOT_LINE: &[u8] =
     b"-t\x1faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1fshell\x1freboot\x1floader\x1f\n";
-const STABLE: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const STABLE: &str = "9f9f5111f7b27a781f1f1ddde5ebc2dd2b796bfc7365c9c28b548e564176929f";
+
+fn expected_invocations() -> Vec<u8> {
+    [
+        b"-t\x1faaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1fshell\x1fcat\x1f/proc/cpuinfo\x1f\n".as_slice(),
+        REBOOT_LINE,
+    ]
+    .concat()
+}
 
 fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
@@ -49,6 +58,9 @@ struct Board {
 }
 
 impl UsbProbe for Board {
+    fn connector_identity(&self, _: &str) -> Result<String, String> {
+        Ok("d".repeat(64))
+    }
     fn single_loader(&self, _: &str) -> Result<LoaderIdentity, String> {
         let left = self.refusals.get();
         if left > 0 {
@@ -120,18 +132,20 @@ fn a_clean_reboot_loader_is_proved_by_the_loader_readback() {
     let fake = SharedFake::with_answers(ANSWERS, None);
     let board = Board {
         refusals: Cell::new(2),
-        normal: false,
+        normal: true,
     };
     let transition =
         RockchipLoaderTransition::new(&fake.dispatch, &board, &Confirming, &SystemClock)
-            .enter_loader(&request(), &budget(Duration::from_secs(10)))
+            .enter_loader(&request(), &budget(Duration::from_secs(10)), |_| {
+                Ok("e".repeat(64))
+            })
             .unwrap();
     assert_eq!(transition.transition, Transition::NormalToLoader);
     assert_eq!(transition.loader.topology, "42");
     assert_eq!(transition.receipts.len(), 1);
     assert_eq!(transition.receipts[0].exit_status, 0);
     assert!(transition.receipts[0].stderr.is_empty());
-    assert_eq!(fake.invocations(), REBOOT_LINE);
+    assert_eq!(fake.invocations(), expected_invocations());
     assert_eq!(transition.summary()["transition"], "normal-to-loader");
 }
 
@@ -146,7 +160,7 @@ fn a_refused_reboot_loader_is_confirmed_not_executed_with_its_stderr() {
         normal: true,
     };
     let failure = RockchipLoaderTransition::new(&fake.dispatch, &board, &Confirming, &SystemClock)
-        .enter_loader(&request(), &budget(Duration::ZERO))
+        .enter_loader(&request(), &budget(Duration::ZERO), |_| Ok("e".repeat(64)))
         .unwrap_err();
     assert_eq!(
         failure,
@@ -159,5 +173,5 @@ fn a_refused_reboot_loader_is_confirmed_not_executed_with_its_stderr() {
             diagnostic: FlashRuntimeDiagnostic::EnterLoaderHdcNoCleanReceipt,
         }
     );
-    assert_eq!(fake.invocations(), REBOOT_LINE);
+    assert_eq!(fake.invocations(), expected_invocations());
 }

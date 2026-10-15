@@ -18,13 +18,15 @@ use crate::post_flash_alias_store::PostFlashAliasStore;
 use crate::rockchip_binding::{
     BindingError, BindingEvidence, BindingSnapshot, BoundTarget, RockchipBindingStore,
 };
+use crate::rockchip_records::{NormalIdentitySubject, persist_normal_hardware_identity};
 use crate::strict_json::swift_quoted;
 use crate::target_owner::TargetStore;
 use arkdeck_contract::{WireError, sha256_hex};
 use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
 use arkdeck_provider_hdc::{
-    HdcDispatch, HdcIdentity, LiveModeProbe, LoaderIdentity, LoaderObserver, UsbProbe,
-    is_dayu200_hdc_normal, is_dayu200_loader, registered_dayu200_devices,
+    HdcDispatch, HdcIdentity, LiveModeProbe, LoaderIdentity, LoaderObserver,
+    NormalHardwareIdentityObserver, UsbProbe, is_dayu200_hdc_normal, is_dayu200_loader,
+    observe_normal_hardware_identity, registered_dayu200_devices,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -238,6 +240,11 @@ impl RockchipUsbProbe {
 }
 
 impl UsbProbe for RockchipUsbProbe {
+    fn connector_identity(&self, usb_topology: &str) -> Result<String, String> {
+        arkdeck_provider_arkforge::host_topology_digest(usb_topology)
+            .ok_or_else(|| "physical USB connector observation is unavailable".into())
+    }
+
     fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
         let device = self.single(|device| {
             is_dayu200_loader(device)
@@ -403,6 +410,8 @@ pub struct FlashHostFacts {
     census: Arc<Census>,
     rockusb: NativeRockUsbIdentity,
     loader: Box<dyn LoaderObserver + Send + Sync>,
+    normal_identity_records: PathBuf,
+    normal_identity_observer: NormalHardwareIdentityObserver,
 }
 
 impl FlashHostFacts {
@@ -418,6 +427,8 @@ impl FlashHostFacts {
             census: Arc::new(census),
             rockusb: NativeRockUsbIdentity::unconfigured(),
             loader: Box::new(NoArkForgeLane),
+            normal_identity_records: application_support_root.join("normal-loader-identity"),
+            normal_identity_observer: observe_normal_hardware_identity,
         }
     }
 
@@ -430,6 +441,17 @@ impl FlashHostFacts {
     /// The lane's dual-source Loader observation.
     pub fn with_loader_observer(mut self, loader: Box<dyn LoaderObserver + Send + Sync>) -> Self {
         self.loader = loader;
+        self
+    }
+
+    /// Runtime-owned observation composition, allowing synthetic ports to
+    /// exercise the same persistence and admission. Production retains the
+    /// fixed reader; callers cannot select an observer or import an observation.
+    pub fn with_normal_identity_observer(
+        mut self,
+        observer: NormalHardwareIdentityObserver,
+    ) -> Self {
+        self.normal_identity_observer = observer;
         self
     }
 
@@ -565,7 +587,8 @@ impl FlashHostFacts {
             .server_facts
             .get(CROSS_MODE_BINDING)
             .map(String::as_str)
-            == Some("satisfied");
+            == Some("satisfied")
+            && crate::job_plan::normal_loader_identity_ready(&facts);
         let statuses: [&str; 4] = match facts.device_mode.as_str() {
             "loader" if ready => ["satisfied", "satisfied", "satisfied", "unknown"],
             "loader" => ["unknown", "unsatisfied", "unknown", "unknown"],
@@ -644,6 +667,51 @@ impl FlashHostFacts {
         let (device_mode, build_fingerprint, profile_id, usb_topology) =
             self.live_facts(hdc, &execution_connect_key, &target.identity);
         let execution_identity = sha256_hex(execution_connect_key.as_bytes());
+        if device_mode == "hdc" {
+            let observed = hdc
+                .ok_or("normalLoaderIdentity.hardwareReadUnavailable")
+                .and_then(|hdc| {
+                    (self.normal_identity_observer)(
+                        hdc,
+                        &RockchipUsbProbe(Arc::clone(&self.census)),
+                        &execution_connect_key,
+                    )
+                });
+            let status = match observed {
+                Ok(observation) => {
+                    let persisted = persist_normal_hardware_identity(
+                        &self.normal_identity_records,
+                        &NormalIdentitySubject {
+                            target_id: &target.target_id,
+                            binding_revision: target.binding_revision,
+                            stable_identity_sha256: &target.identity,
+                            provider_executable_sha256: &tool_sha256,
+                            job_id: None,
+                            step_id: None,
+                        },
+                        &observation,
+                    );
+                    match persisted {
+                        Ok(record) => {
+                            server_facts
+                                .insert("dayu200NormalHardwareObservationSHA256".into(), record);
+                            server_facts.insert(
+                                "dayu200NormalHardwareSerialSHA256".into(),
+                                observation.hardware_serial_sha256.clone(),
+                            );
+                            if observation.hardware_serial_sha256 == target.identity {
+                                "satisfied"
+                            } else {
+                                "normalLoaderIdentity.boundLoaderIdentityMismatch"
+                            }
+                        }
+                        Err(_) => "normalLoaderIdentity.observationPersistenceFailed",
+                    }
+                }
+                Err(reason) => reason,
+            };
+            server_facts.insert("dayu200NormalLoaderHardwareIdentity".into(), status.into());
+        }
         // A cable move keeps the alias's connect key and identity but changes
         // its port: a fresh HDC observation of that very alias names the port
         // for this read only; nothing durable is rewritten.

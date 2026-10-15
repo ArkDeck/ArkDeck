@@ -140,6 +140,22 @@ fn facts(setup: &Value, target: &str) -> Result<RockchipFacts, String> {
             .unwrap()
             .iter()
             .map(|(key, value)| (key.clone(), value.as_str().unwrap().to_owned()))
+            // The historical oracle predates the Normal hardware gate. These
+            // independent trusted facts satisfy the new execution prerequisite.
+            .chain([
+                (
+                    "dayu200NormalLoaderHardwareIdentity".into(),
+                    "satisfied".into(),
+                ),
+                (
+                    "dayu200NormalHardwareSerialSHA256".into(),
+                    facts["deviceIdentitySha256"].as_str().unwrap().into(),
+                ),
+                (
+                    "dayu200NormalHardwareObservationSHA256".into(),
+                    "b".repeat(64),
+                ),
+            ])
             .collect::<BTreeMap<_, _>>(),
     })
 }

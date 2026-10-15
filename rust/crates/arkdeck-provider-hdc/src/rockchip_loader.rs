@@ -14,6 +14,7 @@
 use crate::live_mode::{LoaderIdentity, LoaderObserver, UsbProbe, sha256_hex};
 use crate::rockchip_hdc::Clock;
 use crate::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt};
+use crate::{NormalHardwareIdentity, observe_normal_hardware_identity};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::time::Duration;
@@ -142,12 +143,13 @@ pub struct LoaderTransition {
     pub transition: Transition,
     pub loader: LoaderIdentity,
     pub receipts: Vec<Receipt>,
+    pub identity_observation_sha256: Option<String>,
 }
 
 impl LoaderTransition {
     /// `enterLoader`'s receipt summary.
     pub fn summary(&self) -> BTreeMap<String, String> {
-        summary([
+        let mut fields = summary([
             ("transition", self.transition.as_str()),
             ("transitionEvidence", "exact-bound-loader-readback"),
             (
@@ -155,7 +157,11 @@ impl LoaderTransition {
                 self.loader.serial_digest_sha256.as_str(),
             ),
             ("usbTopology", self.loader.topology.as_str()),
-        ])
+        ]);
+        if let Some(record) = &self.identity_observation_sha256 {
+            fields.insert("pretransitionIdentityRecordSHA256".into(), record.clone());
+        }
+        fields
     }
 }
 
@@ -231,6 +237,7 @@ impl<'a> RockchipLoaderTransition<'a> {
         &self,
         request: &TransitionRequest<'_>,
         budget: &ReadbackBudget,
+        persist_identity: impl FnOnce(&NormalHardwareIdentity) -> Result<String, String>,
     ) -> Result<LoaderTransition, LoaderTransitionFailure> {
         if let Ok(loader) = self.exact_loader_identity(request.stable_identity_sha256) {
             let confirmed = self.confirm_loader(
@@ -243,7 +250,53 @@ impl<'a> RockchipLoaderTransition<'a> {
                 transition: Transition::AlreadyLoader,
                 loader: confirmed,
                 receipts: Vec::new(),
+                identity_observation_sha256: None,
             });
+        }
+
+        let capture_started = self.clock.now();
+        let identity = observe_normal_hardware_identity(self.hdc, self.usb, request.connect_key)
+            .map_err(|reason| LoaderTransitionFailure::Failed(reason.into()))?;
+        let identity_record = persist_identity(&identity).map_err(|_| {
+            LoaderTransitionFailure::Failed(
+                "normalLoaderIdentity.observationPersistenceFailed; no Loader command dispatched"
+                    .into(),
+            )
+        })?;
+        if identity_record.len() != 64
+            || !identity_record
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(LoaderTransitionFailure::Failed(
+                "normalLoaderIdentity.observationPersistenceFailed; no Loader command dispatched"
+                    .into(),
+            ));
+        }
+        if identity.hardware_serial_sha256 != request.stable_identity_sha256 {
+            return Err(LoaderTransitionFailure::Failed(
+                "normalLoaderIdentity.boundLoaderIdentityMismatch; no Loader command dispatched"
+                    .into(),
+            ));
+        }
+        let fresh = self
+            .clock
+            .now()
+            .checked_duration_since(capture_started)
+            .is_some_and(|age| age <= Duration::from_secs(30));
+        let unchanged = self
+            .usb
+            .single_hdc_normal(&identity.normal_identity_sha256)
+            .is_ok_and(|normal| {
+                normal.serial_digest_sha256 == identity.normal_identity_sha256
+                    && normal.topology == identity.usb_topology
+                    && self.usb.connector_identity(&normal.topology).as_ref()
+                        == Ok(&identity.connector_identity_sha256)
+            });
+        if !fresh || !unchanged || !self.hdc.mutation_identity_current() {
+            return Err(LoaderTransitionFailure::Failed(
+                "normalLoaderIdentity.preDispatchFactsChanged; no Loader command dispatched".into(),
+            ));
         }
 
         let mut hdc_receipt = None;
@@ -274,10 +327,18 @@ impl<'a> RockchipLoaderTransition<'a> {
         if let Ok(loader) =
             self.wait_for_loader(request.stable_identity_sha256, &post_transition, budget)
         {
+            if self.usb.connector_identity(&loader.topology).as_ref()
+                != Ok(&identity.connector_identity_sha256)
+            {
+                return Err(LoaderTransitionFailure::OutcomeUnknown(
+                    "normalLoaderIdentity.loaderConnectorMismatch; original transition is not replayed".into(),
+                ));
+            }
             return Ok(LoaderTransition {
                 transition: Transition::NormalToLoader,
                 loader,
                 receipts: hdc_receipt.into_iter().collect(),
+                identity_observation_sha256: Some(identity_record),
             });
         }
         let evidence = transition_evidence_summary(hdc_receipt.as_ref(), unresolved.as_ref());
@@ -473,7 +534,11 @@ mod tests {
     use std::time::Instant;
 
     const KEY: &str = "device-1";
-    const STABLE: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const STABLE: &str = "9f9f5111f7b27a781f1f1ddde5ebc2dd2b796bfc7365c9c28b548e564176929f";
+
+    fn save_identity(_: &NormalHardwareIdentity) -> Result<String, String> {
+        Ok("b".repeat(64))
+    }
 
     fn request() -> TransitionRequest<'static> {
         TransitionRequest {
@@ -507,6 +572,8 @@ mod tests {
     struct Scripted {
         answers: RefCell<VecDeque<Answer>>,
         plans: RefCell<Vec<ProcessPlan>>,
+        identity_stdout: Option<Vec<u8>>,
+        current_tool: Cell<bool>,
     }
 
     impl Scripted {
@@ -514,6 +581,8 @@ mod tests {
             Self {
                 answers: RefCell::new(answers.into()),
                 plans: RefCell::new(Vec::new()),
+                identity_stdout: Some(b"Serial: 0123456789abcdef\n".to_vec()),
+                current_tool: Cell::new(true),
             }
         }
 
@@ -523,8 +592,22 @@ mod tests {
     }
 
     impl HdcDispatch for Scripted {
+        fn mutation_identity_current(&self) -> bool {
+            self.current_tool.get()
+        }
+
         fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
             self.plans.borrow_mut().push(plan.clone());
+            if plan == &crate::normal_hardware_identity_plan(KEY) {
+                return self
+                    .identity_stdout
+                    .as_ref()
+                    .map(|stdout| Receipt {
+                        stdout: stdout.clone(),
+                        ..receipt(0, b"", false)
+                    })
+                    .ok_or_else(|| DispatchFailure::Refused("identity read unavailable".into()));
+            }
             match self
                 .answers
                 .borrow_mut()
@@ -563,9 +646,21 @@ mod tests {
         refuse_loader: Cell<usize>,
         loader_lookups: Cell<usize>,
         hdc_normal: Option<LoaderIdentity>,
+        normal_before_transition: bool,
+        normal_lookups: Cell<usize>,
+        connector: RefCell<Option<String>>,
+        changed_connector_after_normal_read: Option<usize>,
+        changed_connector_in_loader: bool,
     }
 
     impl UsbScript {
+        fn normal_then_disconnected() -> Self {
+            Self {
+                normal_before_transition: true,
+                ..Self::default()
+            }
+        }
+
         fn loader(mut self, identity: LoaderIdentity) -> Self {
             self.loader = Some(identity);
             self
@@ -586,6 +681,21 @@ mod tests {
     }
 
     impl UsbProbe for UsbScript {
+        fn connector_identity(&self, _: &str) -> Result<String, String> {
+            if self
+                .changed_connector_after_normal_read
+                .is_some_and(|read| self.normal_lookups.get() >= read)
+                || (self.changed_connector_in_loader && self.loader_lookups.get() > 1)
+            {
+                return Ok("e".repeat(64));
+            }
+            Ok(self
+                .connector
+                .borrow()
+                .clone()
+                .unwrap_or_else(|| "c".repeat(64)))
+        }
+
         fn single_loader(&self, _: &str) -> Result<LoaderIdentity, String> {
             self.loader_lookups.set(self.loader_lookups.get() + 1);
             let refusals = self.refuse_loader.get();
@@ -602,6 +712,14 @@ mod tests {
             &self,
             stable_identity_sha256: &str,
         ) -> Result<LoaderIdentity, String> {
+            let lookup = self.normal_lookups.get();
+            self.normal_lookups.set(lookup + 1);
+            if self.normal_before_transition && lookup < 3 {
+                return Ok(LoaderIdentity {
+                    serial_digest_sha256: sha256_hex(KEY.as_bytes()),
+                    topology: "42".into(),
+                });
+            }
             match &self.hdc_normal {
                 Some(identity) if identity.serial_digest_sha256 == stable_identity_sha256 => {
                     Ok(identity.clone())
@@ -683,7 +801,7 @@ mod tests {
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         let transition = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-            .enter_loader(&request(), &ReadbackBudget::DEFAULT)
+            .enter_loader(&request(), &ReadbackBudget::DEFAULT, save_identity)
             .unwrap();
         assert_eq!(
             transition,
@@ -691,6 +809,7 @@ mod tests {
                 transition: Transition::AlreadyLoader,
                 loader: loader("42"),
                 receipts: Vec::new(),
+                identity_observation_sha256: None,
             }
         );
         assert!(hdc.plans().is_empty());
@@ -718,24 +837,27 @@ mod tests {
     fn a_clean_command_is_believed_only_by_the_exact_loader_readback() {
         let hdc = Scripted::new(vec![Answer::Exit(0)]);
         // Not in Loader before the command; in Loader on the second readback.
-        let usb = UsbScript::default().loader(loader("42")).loader_after(2);
+        let usb = UsbScript::normal_then_disconnected()
+            .loader(loader("42"))
+            .loader_after(2);
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         let transition = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-            .enter_loader(&request(), &ReadbackBudget::DEFAULT)
+            .enter_loader(&request(), &ReadbackBudget::DEFAULT, save_identity)
             .unwrap();
         assert_eq!(transition.transition, Transition::NormalToLoader);
         assert_eq!(transition.loader, loader("42"));
         assert_eq!(transition.receipts, [receipt(0, b"", false)]);
         assert_eq!(transition.summary()["transition"], "normal-to-loader");
         let plans = hdc.plans();
-        assert_eq!(plans.len(), 1);
+        assert_eq!(plans.len(), 2);
+        assert_eq!(plans[0], crate::normal_hardware_identity_plan(KEY));
         assert_eq!(
-            plans[0].arguments,
+            plans[1].arguments,
             ["-t", "device-1", "shell", "reboot", "loader"]
         );
-        assert_eq!(plans[0].timeout, Duration::from_secs(20));
-        assert_eq!(plans[0].capture_bytes, 64 * 1024);
+        assert_eq!(plans[1].timeout, Duration::from_secs(20));
+        assert_eq!(plans[1].capture_bytes, 64 * 1024);
         assert_eq!(clock.pauses.get(), 1);
         assert_eq!(usb.loader_lookups.get(), 3);
         assert_eq!(
@@ -749,11 +871,13 @@ mod tests {
         let hdc = Scripted::new(vec![Answer::Fail(DispatchFailure::Unobservable(
             "process timed out before completion".to_owned(),
         ))]);
-        let usb = UsbScript::default().loader(loader("42")).loader_after(1);
+        let usb = UsbScript::normal_then_disconnected()
+            .loader(loader("42"))
+            .loader_after(1);
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         let transition = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-            .enter_loader(&request(), &ReadbackBudget::DEFAULT)
+            .enter_loader(&request(), &ReadbackBudget::DEFAULT, save_identity)
             .unwrap();
         assert_eq!(transition.transition, Transition::NormalToLoader);
         // The timed-out command left no receipt.
@@ -771,11 +895,11 @@ mod tests {
             b"[Fail]Not match target and connect key\nretry later",
             false,
         ))]);
-        let usb = UsbScript::default().hdc_normal(KEY, "42");
+        let usb = UsbScript::normal_then_disconnected().hdc_normal(KEY, "42");
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         let failure = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-            .enter_loader(&request(), &budget(0))
+            .enter_loader(&request(), &budget(0), save_identity)
             .unwrap_err();
         assert_eq!(
             failure,
@@ -798,11 +922,11 @@ mod tests {
     #[test]
     fn a_clean_command_without_a_loader_is_confirmed_not_executed_by_the_normal_readback() {
         let hdc = Scripted::new(vec![Answer::Exit(0)]);
-        let usb = UsbScript::default().hdc_normal(KEY, "42");
+        let usb = UsbScript::normal_then_disconnected().hdc_normal(KEY, "42");
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         let failure = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-            .enter_loader(&request(), &budget(2))
+            .enter_loader(&request(), &budget(2), save_identity)
             .unwrap_err();
         assert_eq!(
             failure,
@@ -831,9 +955,9 @@ mod tests {
         let clock = FakeClock::new();
 
         let hdc = signalled();
-        let normal = UsbScript::default().hdc_normal(KEY, "42");
+        let normal = UsbScript::normal_then_disconnected().hdc_normal(KEY, "42");
         let failure = RockchipLoaderTransition::new(&hdc, &normal, &arkforge, &clock)
-            .enter_loader(&request(), &budget(0))
+            .enter_loader(&request(), &budget(0), save_identity)
             .unwrap_err();
         let LoaderTransitionFailure::ConfirmedNotExecuted { detail, diagnostic } = &failure else {
             panic!("{failure:?}");
@@ -853,10 +977,10 @@ mod tests {
         // Without the normal readback, the unresolved failure is rethrown as
         // it was, evidence-free.
         let hdc = signalled();
-        let nothing = UsbScript::default();
+        let nothing = UsbScript::normal_then_disconnected();
         assert_eq!(
             RockchipLoaderTransition::new(&hdc, &nothing, &arkforge, &clock)
-                .enter_loader(&request(), &budget(0))
+                .enter_loader(&request(), &budget(0), save_identity)
                 .unwrap_err(),
             LoaderTransitionFailure::OutcomeUnknown(signal_death(6))
         );
@@ -867,12 +991,12 @@ mod tests {
         let hdc = Scripted::new(vec![Answer::Fail(DispatchFailure::Unobservable(
             "process timed out before completion".to_owned(),
         ))]);
-        let usb = UsbScript::default();
+        let usb = UsbScript::normal_then_disconnected();
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         assert_eq!(
             RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-                .enter_loader(&request(), &budget(1))
+                .enter_loader(&request(), &budget(1), save_identity)
                 .unwrap_err(),
             LoaderTransitionFailure::OutcomeUnknown("process timed out before completion".into())
         );
@@ -881,11 +1005,11 @@ mod tests {
     #[test]
     fn a_clean_command_with_nothing_observed_is_unknown_with_its_evidence() {
         let hdc = Scripted::new(vec![Answer::Exit(0)]);
-        let usb = UsbScript::default();
+        let usb = UsbScript::normal_then_disconnected();
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         let failure = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-            .enter_loader(&request(), &budget(1))
+            .enter_loader(&request(), &budget(1), save_identity)
             .unwrap_err();
         assert_eq!(
             failure,
@@ -903,18 +1027,139 @@ mod tests {
         let hdc = Scripted::new(vec![Answer::Fail(DispatchFailure::Refused(
             "dispatch refused: budget".to_owned(),
         ))]);
-        let usb = UsbScript::default().loader(loader("42")).loader_after(9);
+        let usb = UsbScript::normal_then_disconnected()
+            .loader(loader("42"))
+            .loader_after(9);
         let arkforge = LoaderScript::default();
         let clock = FakeClock::new();
         assert_eq!(
             RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
-                .enter_loader(&request(), &ReadbackBudget::DEFAULT)
+                .enter_loader(&request(), &ReadbackBudget::DEFAULT, save_identity)
                 .unwrap_err(),
             LoaderTransitionFailure::Failed("dispatch refused: budget".into())
         );
         // Only the already-loader check looked at the port; no readback ran.
         assert_eq!(usb.loader_lookups.get(), 1);
         assert_eq!(clock.pauses.get(), 0);
+    }
+
+    #[test]
+    fn missing_mismatched_or_unpersisted_identity_never_sends_reboot() {
+        for case in [
+            "missing",
+            "ambiguous",
+            "mismatch",
+            "persist",
+            "record",
+            "stale",
+            "port",
+            "tool",
+        ] {
+            let mut hdc = Scripted::new(vec![Answer::Exit(0)]);
+            if case == "missing" {
+                hdc.identity_stdout = None;
+            }
+            if case == "ambiguous" {
+                hdc.identity_stdout =
+                    Some(b"Serial: 0123456789abcdef\nSerial: 0123456789abcdef\n".to_vec());
+            }
+            if case == "mismatch" {
+                hdc.identity_stdout = Some(b"Serial: fedcba9876543210\n".to_vec());
+            }
+            let usb = UsbScript::normal_then_disconnected();
+            let arkforge = LoaderScript::default();
+            let clock = FakeClock::new();
+            let persisted = Cell::new(false);
+            let result = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock).enter_loader(
+                &request(),
+                &budget(0),
+                |_| {
+                    persisted.set(true);
+                    if case == "persist" {
+                        return Err("disk full".into());
+                    }
+                    if case == "record" {
+                        return Ok(String::new());
+                    }
+                    if case == "stale" {
+                        clock.sleep(Duration::from_secs(31));
+                    }
+                    if case == "port" {
+                        *usb.connector.borrow_mut() = Some("d".repeat(64));
+                    }
+                    if case == "tool" {
+                        hdc.current_tool.set(false);
+                    }
+                    Ok("b".repeat(64))
+                },
+            );
+            assert!(
+                matches!(result, Err(LoaderTransitionFailure::Failed(_))),
+                "{case}: {result:?}"
+            );
+            assert_eq!(persisted.get(), !matches!(case, "missing" | "ambiguous"));
+            assert!(
+                hdc.plans()
+                    .iter()
+                    .all(|plan| plan == &crate::normal_hardware_identity_plan(KEY)),
+                "{case}"
+            );
+        }
+    }
+
+    #[test]
+    fn durable_identity_precedes_the_first_mode_change() {
+        let hdc = Scripted::new(vec![Answer::Exit(0)]);
+        let usb = UsbScript::normal_then_disconnected()
+            .loader(loader("42"))
+            .loader_after(1);
+        let arkforge = LoaderScript::default();
+        let clock = FakeClock::new();
+        let transition = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
+            .enter_loader(&request(), &budget(1), |identity| {
+                assert_eq!(hdc.plans(), [crate::normal_hardware_identity_plan(KEY)]);
+                assert_eq!(identity.hardware_serial_sha256, STABLE);
+                assert_ne!(
+                    identity.normal_identity_sha256,
+                    identity.hardware_serial_sha256
+                );
+                Ok("b".repeat(64))
+            })
+            .unwrap();
+        assert_eq!(transition.identity_observation_sha256, Some("b".repeat(64)));
+        assert_eq!(hdc.plans().len(), 2);
+    }
+
+    #[test]
+    fn connector_drift_during_capture_blocks_and_drift_after_dispatch_stays_unknown() {
+        for after_dispatch in [false, true] {
+            let hdc = Scripted::new(vec![Answer::Exit(0)]);
+            let mut usb = UsbScript::normal_then_disconnected()
+                .loader(loader("42"))
+                .loader_after(1);
+            usb.changed_connector_in_loader = after_dispatch;
+            usb.changed_connector_after_normal_read = (!after_dispatch).then_some(2);
+            let arkforge = LoaderScript::default();
+            let clock = FakeClock::new();
+            let failure = RockchipLoaderTransition::new(&hdc, &usb, &arkforge, &clock)
+                .enter_loader(&request(), &budget(1), save_identity)
+                .unwrap_err();
+            if after_dispatch {
+                assert!(matches!(
+                    failure,
+                    LoaderTransitionFailure::OutcomeUnknown(_)
+                ));
+                assert_eq!(hdc.plans().len(), 2);
+            } else {
+                assert_eq!(
+                    failure,
+                    LoaderTransitionFailure::Failed(
+                        "normalLoaderIdentity.normalIdentityChanged".into()
+                    )
+                );
+                assert_eq!(hdc.plans(), [crate::normal_hardware_identity_plan(KEY)]);
+            }
+        }
     }
 
     #[test]

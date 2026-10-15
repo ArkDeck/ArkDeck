@@ -17,6 +17,27 @@ native ArkForge route. Destructive execution remains gated by the protected Runt
 exact `RuntimeCapability`, fresh target/binding/tool facts, artifact lease, durable
 reservation, and complete-overwrite/recovery rules.
 
+Before Normal-to-Loader admission, Runtime reads the exact USB-bound HDC target's
+`/proc/cpuinfo` through the measured HDC provider. Exactly one canonical, nonzero
+16-digit lowercase hexadecimal `Serial` must hash to the already bound Loader
+identity. Normal USB serial, model/build and connector location alone are not
+cross-mode hardware proof. Unsupported kernels, vendor Loader serials that do not
+match this source and Normal-only CID bindings remain blocked.
+
+Runtime persists an owner-only, content-addressed observation with target/revision,
+provider digest, Normal USB and hardware serial digests, connector digest and source
+output digest/count. It reads back the canonical record before reporting readiness.
+The transition repeats this capture and durable readback in its action directory,
+then checks the 30-second freshness bound, exact Normal attachment and current tool
+before `reboot loader`. Loader confirmation requires the same serial digest and
+physical connector. CPU output and raw serials are not copied into receipts.
+
+This producer guard does not backfill earlier Jobs or rebind an unknown target.
+An old unknown intent remains immutable and cannot be replayed. A recovery still
+requires all `POL-RECOVERY-001` proofs; new observations alone cannot establish
+historical lineage or reset its automation budget. See
+[CHG-2026-082](../../changes/chg-2026-082-normal-loader-hardware-proof/proposal.md).
+
 ## Retired external-tool profiles
 
 The former RockUSB discovery registry and HDC-to-Loader characterization registry

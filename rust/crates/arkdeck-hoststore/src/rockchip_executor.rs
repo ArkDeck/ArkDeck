@@ -22,6 +22,7 @@ use crate::post_flash_alias::{PostFlashBinding, SCHEMA_VERSION};
 use crate::post_flash_alias_store::PostFlashAliasStore;
 use crate::rockchip_action::{Expectation, RockchipAction};
 use crate::rockchip_records::{ExecutionResult, RockchipActionExecutor};
+use crate::rockchip_records::{NormalIdentitySubject, persist_normal_hardware_identity};
 use crate::session_graphemes::graphemes;
 use arkdeck_provider_arkforge::{HostAction, LaneFailure};
 use arkdeck_provider_hdc::{
@@ -157,7 +158,7 @@ impl RockchipActionExecutor for RockchipExecutor {
         &self,
         action: &RockchipAction,
         descriptor: &HostAction,
-        _action_directory: &Path,
+        action_directory: &Path,
     ) -> Result<ExecutionResult, LaneFailure> {
         let hdc = ResolvedHdc {
             resolver: &*self.hdc,
@@ -179,10 +180,30 @@ impl RockchipActionExecutor for RockchipExecutor {
                             step_id: &descriptor.step_id,
                         },
                         &self.enter_loader_readback,
+                        |identity| {
+                            persist_normal_hardware_identity(
+                                action_directory,
+                                &NormalIdentitySubject {
+                                    target_id: &descriptor.target_id,
+                                    binding_revision: descriptor.binding_revision,
+                                    stable_identity_sha256: &descriptor.expected_identity_sha256,
+                                    provider_executable_sha256: &descriptor
+                                        .provider_executable_sha256,
+                                    job_id: Some(&descriptor.job_id),
+                                    step_id: Some(&descriptor.step_id),
+                                },
+                                identity,
+                            )
+                        },
                     )
                     .map_err(transition_failure)?;
                 self.remember_loader(descriptor, 1, &proven.loader);
-                Ok(result(proven.summary(), proven.receipts))
+                let mut executed = result(proven.summary(), proven.receipts);
+                // The fixed identity read is recorded privately by digest;
+                // count it without copying raw hardware identifiers to output.
+                executed.subprocess_count +=
+                    usize::from(proven.identity_observation_sha256.is_some());
+                Ok(executed)
             }
             // The probe's own refusal, not a dispatch failure, as Swift
             // rethrows it.
