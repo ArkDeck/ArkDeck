@@ -49,4 +49,12 @@ No fixture or assertion was weakened. Logs are retained under
 
 CI: predecessor PRs #2644, #2645 and #2647 passed runs `38718774710`,
 `38718846712` and `38718893727`, respectively, before native stack merge.
-This follow-up's CI is pending publication.
+[PR #2648](https://github.com/ArkDeck/ArkDeck/pull/2648), head
+`22f9ccce22015eb17f26e611726e149c9b925e9d`, passed Swift CI run
+[`38727828575`](https://github.com/ArkDeck/ArkDeck/actions/runs/38727828575)
+and SDD Guard run `38727952433`. All selected Linux, Windows and macOS workspace
+and published-consumer contract checks passed; required `guard` and `swift`
+were successful. This completes the checks that the local host could not finish
+under its historical Catalog view and occupied account-daemon guard. The existing
+hardware blocker above remains unchanged. Results are recorded in a follow-up
+commit without changing the tested head.
