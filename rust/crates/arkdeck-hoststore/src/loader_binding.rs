@@ -27,7 +27,9 @@ use crate::strict_json::swift_quoted;
 use crate::target_owner::TargetStore;
 use arkdeck_contract::{WireError, sha256_hex};
 use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
-use arkdeck_provider_hdc::{LoaderObserver, is_dayu200_loader, registered_dayu200_devices};
+use arkdeck_provider_hdc::{
+    LoaderObserver, is_dayu200_hdc_normal, is_dayu200_loader, registered_dayu200_devices,
+};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -195,6 +197,81 @@ impl LoaderBinding {
         }))
     }
 
+    /// Bootstrap only an already adopted, exact HDC-normal revision-1 Target.
+    /// The caller provides no identity, port, evidence or capability. Existing
+    /// bindings, including incomplete historical bindings, are never upgraded.
+    fn install_initial(
+        &self,
+        targets: &TargetStore,
+        target: &Target,
+        expected: i64,
+        identity: &UsbHostDevice,
+    ) -> Result<Receipt, String> {
+        let absent = || configuration("durable Rockchip binding is not installed");
+        let current = sha256_hex(identity.serial.as_bytes());
+        if !is_dayu200_hdc_normal(identity)
+            || expected != 1
+            || target.revision != 1
+            || target.identity != current
+            || sha256_hex(target.connect_key.as_bytes()) != current
+        {
+            return Err(absent());
+        }
+        authorize(identity)?;
+        // Re-read both sources before exclusive publication. Replug, another
+        // registered device, another Target owner or a revision change refuses.
+        let fresh = registered_dayu200_devices(
+            (self.census)().map_err(|_| admission("USB registry unavailable"))?,
+        );
+        let records = list(targets)?;
+        if fresh.as_slice() != [identity.clone()]
+            || !unique(&records, &target.id, 1, &current)
+            || !records.iter().any(|record| {
+                record.id == target.id
+                    && record.revision == 1
+                    && record.identity == current
+                    && record.connect_key == target.connect_key
+            })
+        {
+            return Err(admission("selected initial target changed before binding"));
+        }
+        let selection = selection_digest(&target.id, 1, 1, &current, &current, &identity.topology);
+        let candidate = BindingSnapshot {
+            revision: 1,
+            serial: identity.serial.clone(),
+            usb_topology: identity.topology.clone(),
+            evidence: vec![
+                HDC_NORMAL_READBACK.into(),
+                CROSS_MODE_USB.into(),
+                format!("identity:serial-sha256={current}"),
+                format!("binding:selected-target-id={}", target.id),
+                format!("rebind:user-selection-sha256={selection}"),
+            ],
+        };
+        // install(false) is exclusive under the binding lock. A concurrent
+        // identical install is an idempotent retry; any other document stays
+        // byte-for-byte intact and cannot be treated as this selection.
+        let (stored, updated) = self.store.install(&candidate, false).map_err(swift)?;
+        if stored != candidate
+            || !stored
+                .covers_runtime_target(&target.bound())
+                .map_err(swift)?
+            || !stored
+                .matches_confirmed_live_identity(identity)
+                .map_err(swift)?
+        {
+            return Err(configuration(
+                "initial target binding readback did not match selection",
+            ));
+        }
+        Ok(Receipt {
+            previous: 1,
+            current: 1,
+            updated,
+            selection,
+        })
+    }
+
     fn receipt(
         &self,
         targets: &TargetStore,
@@ -244,7 +321,9 @@ impl LoaderBinding {
                 )));
             }
         }
-        let existing = self.store.load_existing().map_err(swift)?;
+        let Some(existing) = self.store.load_if_present().map_err(swift)? else {
+            return self.install_initial(targets, &target, expected, identity);
+        };
         let existing_identity = existing.identity();
         let bound = target.bound();
 
@@ -660,3 +739,7 @@ fn unique(records: &[Target], target_id: &str, revision: i64, identity: &str) ->
         .collect();
     matching == [target_id]
 }
+
+#[cfg(test)]
+#[path = "loader_binding_initial_tests.rs"]
+mod initial_tests;
