@@ -52,6 +52,7 @@ pub use lane::{
 pub use lane_host::{ExecutionClient, LaneConnections, LaneHost, PlanConnections};
 pub use lane_plan::{AssessmentFailure, AssessmentSource, PlanSource};
 pub use loader::{
-    LOADER_OBSERVATION_TIMEOUT, SelectionFailure, confirm_loader, select, topology_digest,
-    usable_loader,
+    LOADER_OBSERVATION_TIMEOUT, SelectionFailure, TopologyResolver, confirm_loader,
+    confirm_loader_with_resolver, host_topology_digest, select, select_with_resolver,
+    topology_digest, usable_loader,
 };

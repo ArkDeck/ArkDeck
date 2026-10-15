@@ -282,6 +282,7 @@ pub struct ArkForgeLoader {
     census: Arc<Census>,
     runtime_directory: PathBuf,
     timeout: Duration,
+    resolve_topology: arkdeck_provider_arkforge::TopologyResolver,
 }
 
 impl ArkForgeLoader {
@@ -299,7 +300,17 @@ impl ArkForgeLoader {
             census,
             runtime_directory: runtime_directory.to_path_buf(),
             timeout: arkdeck_provider_arkforge::LOADER_OBSERVATION_TIMEOUT,
+            resolve_topology: arkdeck_provider_arkforge::host_topology_digest,
         }
+    }
+
+    /// Explicit observation port for a synthetic census in tests.
+    pub fn with_topology_resolver(
+        mut self,
+        resolve: arkdeck_provider_arkforge::TopologyResolver,
+    ) -> Self {
+        self.resolve_topology = resolve;
+        self
     }
 }
 
@@ -340,10 +351,11 @@ impl LoaderObserver for ArkForgeLoader {
                 identity.topology
             ));
         }
-        arkdeck_provider_arkforge::confirm_loader(
+        arkdeck_provider_arkforge::confirm_loader_with_resolver(
             &self.runtime_directory,
             self.timeout,
             &identity.topology,
+            self.resolve_topology,
         )?;
         Ok(identity.clone())
     }

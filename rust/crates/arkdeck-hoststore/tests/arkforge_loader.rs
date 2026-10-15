@@ -160,11 +160,9 @@ fn observe(
     devices: Vec<UsbHostDevice>,
     admitted: Option<&str>,
 ) -> Result<LoaderIdentity, String> {
-    ArkForgeLoader::new(move || Ok(devices.clone()), &root.0).observe_loader(
-        &sha256_hex(SERIAL.as_bytes()),
-        admitted,
-        "live-mode-1",
-    )
+    ArkForgeLoader::new(move || Ok(devices.clone()), &root.0)
+        .with_topology_resolver(arkdeck_provider_arkforge::topology_digest)
+        .observe_loader(&sha256_hex(SERIAL.as_bytes()), admitted, "live-mode-1")
 }
 
 #[test]

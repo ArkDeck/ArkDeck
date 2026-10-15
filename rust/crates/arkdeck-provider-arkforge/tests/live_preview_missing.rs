@@ -50,6 +50,9 @@ struct Connections {
     inspections: Arc<AtomicUsize>,
 }
 impl PlanConnections for Connections {
+    fn topology_resolver(&self) -> arkdeck_provider_arkforge::TopologyResolver {
+        arkdeck_provider_arkforge::topology_digest
+    }
     fn controller(&self) -> Result<Box<dyn PlanSource>, String> {
         let client =
             ControllerClient::connect_with_read_timeout(&self.runtime, Duration::from_secs(5))

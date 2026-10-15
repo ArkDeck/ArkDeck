@@ -122,7 +122,7 @@ fn accepting() -> Performer {
 }
 
 fn authority() -> ExecutionAuthority {
-    ExecutionAuthority::new(
+    ExecutionAuthority::with_topology_resolver(
         ApprovedPlan {
             job_id: "JOB-1".into(),
             plan_id: "PLAN-1".into(),
@@ -139,6 +139,7 @@ fn authority() -> ExecutionAuthority {
             permit_lifetime_ms: PERMIT_LIFETIME_MS,
         },
         ControllerPairingSecret::new(PairingEpoch(1), b"session-secret".to_vec()),
+        crate::topology_digest,
         || 1_000_100,
     )
 }

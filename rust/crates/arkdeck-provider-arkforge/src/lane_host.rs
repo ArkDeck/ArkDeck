@@ -44,6 +44,9 @@ impl ExecutionClient for arkforge_client::ControllerClient {
 /// Inspection and materialization over the one owned daemon generation.
 /// Tests replace these external ports; production uses the pinned SDK.
 pub trait PlanConnections: Send + Sync {
+    fn topology_resolver(&self) -> crate::TopologyResolver {
+        crate::host_topology_digest
+    }
     fn controller(&self) -> Result<Box<dyn PlanSource>, String>;
     fn public(&self) -> Result<Box<dyn AssessmentSource>, String>;
 }
@@ -178,6 +181,7 @@ impl LaneHost {
                 binding,
                 purpose,
                 &self.support,
+                self.connections.topology_resolver(),
             )
             .map_err(|error| error.detail)?;
             Ok((client, materialized))
@@ -231,7 +235,7 @@ impl LaneHost {
         })?;
         let identity = digest_bytes(&binding.stable_identity_sha256)
             .ok_or_else(|| unknown("bound identity digest is malformed"))?;
-        let mut authority = ExecutionAuthority::new(
+        let mut authority = ExecutionAuthority::with_topology_resolver(
             ApprovedPlan {
                 job_id: execution.arkdeck_job_id.clone(),
                 plan_id: execution.plan_id.clone(),
@@ -249,6 +253,7 @@ impl LaneHost {
                 permit_lifetime_ms: PERMIT_LIFETIME_MS,
             },
             self.secret.clone(),
+            self.connections.topology_resolver(),
             || {
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)

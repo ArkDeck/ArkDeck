@@ -295,6 +295,16 @@ pub fn usb_device_node_census() -> Result<Vec<UsbHostDevice>, crate::RegistryUna
     setupapi::census(|node| UsbHostDevice::from_device_node(node))
 }
 
+/// Find exactly one current attachment before resolving its physical hub.
+/// This keeps the established attachment topology and identity rules intact.
+#[cfg(windows)]
+pub(crate) fn connector_device(topology: &str) -> std::io::Result<(UsbHostDevice, u32)> {
+    if !unconfirmed_census_fields().is_empty() {
+        return Err(std::io::Error::other("USB census mapping is unconfirmed"));
+    }
+    setupapi::connector_device(topology)
+}
+
 #[cfg(windows)]
 mod setupapi {
     use super::{DeviceNode, NodeProperty, NodeValue};
@@ -443,6 +453,31 @@ mod setupapi {
 
     pub(super) fn census<T>(
         mut read: impl FnMut(&dyn DeviceNode) -> Option<T>,
+    ) -> Result<Vec<T>, RegistryUnavailable> {
+        native_census(|node| read(node))
+    }
+
+    pub(super) fn connector_device(topology: &str) -> std::io::Result<(crate::UsbHostDevice, u32)> {
+        let candidates = native_census(|node| {
+            let device = crate::UsbHostDevice::from_device_node(node)?;
+            (device.topology == topology).then_some((device, node.data.DevInst))
+        })
+        .map_err(std::io::Error::other)?;
+        let [candidate] = candidates.as_slice() else {
+            return Err(std::io::Error::other(
+                "USB attachment is absent or ambiguous",
+            ));
+        };
+        if candidate.0.registry_entry_id.is_none() {
+            return Err(std::io::Error::other(
+                "USB attachment lifetime is unavailable",
+            ));
+        }
+        Ok(candidate.clone())
+    }
+
+    fn native_census<T>(
+        mut read: impl FnMut(&Node<'_>) -> Option<T>,
     ) -> Result<Vec<T>, RegistryUnavailable> {
         let enumerator: Vec<u16> = "USB\0".encode_utf16().collect();
         // SAFETY: a nul-terminated enumerator and no class or window; the
