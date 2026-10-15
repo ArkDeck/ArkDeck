@@ -2,8 +2,9 @@
 //! Swift's: Swift's handler settles a DAYU200 flash Job whose enter-Loader
 //! transition awaits the binding, after binding; this Runtime does not settle
 //! it yet, so such a Job refuses the binding before anything is written, and
-//! the Job's intent stays unresolved. A Job that awaits another Target or
-//! revision, or is not parked at that intent, does not stand in the way.
+//! intent stays unresolved. Other unsettled Flash work on the same Target,
+//! including a delegated plan or a terminal unknown at an older revision,
+//! must also preserve the binding until its recovery obligation is proved.
 //!
 //! On Windows (TASK-XPA-010) the root is a plain-spelled directory below the
 //! temporary directory, every level of it the store's private directory, and
@@ -212,10 +213,10 @@ fn a_job_awaiting_the_binding_refuses_it_before_anything_is_written() {
 }
 
 #[test]
-fn a_job_awaiting_something_else_does_not_stand_in_the_way() {
+fn an_unsettled_job_on_another_target_does_not_stand_in_the_way() {
     let (root, targets, binding) = scene();
     let jobs = JobStore::open_owner(&root.0.canonicalize().unwrap().join("jobs-state")).unwrap();
-    // Another Target, another revision, another state, another intent.
+    // Another Target does not share this binding's recovery obligation.
     park(
         &jobs,
         "job-00000000000000000000000000000b01",
@@ -224,33 +225,197 @@ fn a_job_awaiting_something_else_does_not_stand_in_the_way() {
         "waitingForRecovery",
         "enter-loader-mode",
     );
-    park(
-        &jobs,
-        "job-00000000000000000000000000000b02",
-        TARGET,
-        2,
-        "waitingForRecovery",
-        "enter-loader-mode",
-    );
-    park(
-        &jobs,
-        "job-00000000000000000000000000000b03",
-        TARGET,
-        1,
-        "running",
-        "enter-loader-mode",
-    );
-    park(
-        &jobs,
-        "job-00000000000000000000000000000b04",
-        TARGET,
-        1,
-        "waitingForRecovery",
-        "flash-partitions",
-    );
     let receipt: Value = binding.bind(&targets, Some(&jobs), TARGET, 1).unwrap();
     assert_eq!(receipt["updated"], true);
     assert_eq!(receipt["previousBindingRevision"], 1);
     assert_eq!(receipt["bindingRevision"], 2);
     assert_eq!(receipt["settledJobId"], Value::Null);
+}
+
+#[test]
+fn unsettled_flash_keeps_the_binding_even_outside_the_enter_loader_boundary() {
+    for (revision, expected, state, step, unknown, residues) in [
+        (1, 1, "waitingForRecovery", "flash-partitions", true, 0),
+        (1, 1, "running", "enter-loader-mode", false, 0),
+        (1, 1, "preflight", "flash-partitions", false, 0),
+        (1, 1, "failed", "flash-partitions", true, 0),
+        (1, 1, "failed", "flash-partitions", false, 1),
+        (1, 2, "waitingForRecovery", "flash-partitions", true, 0),
+        (2, 1, "waitingForRecovery", "flash-partitions", true, 0),
+    ] {
+        let (root, targets, binding) = scene();
+        let jobs =
+            JobStore::open_owner(&root.0.canonicalize().unwrap().join("jobs-state")).unwrap();
+        let id = "job-00000000000000000000000000000c01";
+        park(&jobs, id, TARGET, revision, state, step);
+        let mut current = jobs.read_snapshot(id).unwrap().value().unwrap();
+        current["outcomeUnknown"] = json!(unknown);
+        current["outstandingResidueCount"] = json!(residues);
+        jobs.persist(
+            &JobRecord::decode(&serde_json::to_vec(&current).unwrap()).unwrap(),
+            "2026-09-25T00:00:00Z",
+        )
+        .unwrap();
+        let before = files(&root);
+        let record = jobs.read_snapshot(id).unwrap().value().unwrap();
+        let refused = binding
+            .bind(&targets, Some(&jobs), TARGET, expected)
+            .unwrap_err();
+        assert_eq!(refused.code, "rejected");
+        assert!(
+            refused.message.contains("retains unsettled Flash state"),
+            "{}",
+            refused.message
+        );
+        assert_eq!(files(&root), before);
+        assert_eq!(jobs.read_snapshot(id).unwrap().value().unwrap(), record);
+        assert!(!root.0.join(".rockchip-binding.lock").exists());
+    }
+}
+
+#[test]
+fn a_confirmed_terminal_flash_does_not_block_binding() {
+    let (root, targets, binding) = scene();
+    let jobs = JobStore::open_owner(&root.0.canonicalize().unwrap().join("jobs-state")).unwrap();
+    let id = "job-00000000000000000000000000000d01";
+    park(&jobs, id, TARGET, 1, "succeeded", "flash-partitions");
+    let mut value = jobs.read_snapshot(id).unwrap().value().unwrap();
+    value["outcomeUnknown"] = json!(false);
+    value["outstandingResidueCount"] = json!(0);
+    value.as_object_mut().unwrap().remove("recoveryStepID");
+    value
+        .as_object_mut()
+        .unwrap()
+        .remove("recoveryIntentEventID");
+    let settled = JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
+    jobs.persist(&settled, "2026-09-25T00:00:00Z").unwrap();
+    assert_eq!(
+        binding.bind(&targets, Some(&jobs), TARGET, 1).unwrap()["updated"],
+        true
+    );
+}
+
+#[test]
+fn binding_publication_excludes_new_admission_until_its_readback_finishes() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    };
+    let (root, targets, _) = scene();
+    let jobs =
+        Arc::new(JobStore::open_owner(&root.0.canonicalize().unwrap().join("jobs-state")).unwrap());
+    let admitted = JobRecord::decode(
+        &fs::read(support::fixture(
+            "job-reconcile-analyzer/before/jobs/job-082b8363fce0462b4571a62147751099/job-record.json",
+        )).unwrap(),
+    ).unwrap();
+    let pending = admitted.clone();
+    let observed = Arc::new(AtomicBool::new(false));
+    let attempted = Arc::clone(&observed);
+    let racing_jobs = Arc::clone(&jobs);
+    let binding = LoaderBinding::new(
+        &root.0,
+        move || {
+            let error = racing_jobs.admit(&pending, &"a".repeat(64)).unwrap_err();
+            assert!(format!("{error:?}").contains("currently blocks new Job admission"));
+            attempted.store(true, Ordering::SeqCst);
+            Ok(vec![UsbHostDevice {
+                serial: LOADER.into(),
+                vendor_id: 0x2207,
+                product_id: 0x350a,
+                topology: "17956864".into(),
+                product_name: None,
+                registry_entry_id: None,
+            }])
+        },
+        Confirmed,
+    );
+    assert_eq!(
+        binding.bind(&targets, Some(&jobs), TARGET, 1).unwrap()["updated"],
+        true
+    );
+    assert!(observed.load(Ordering::SeqCst));
+    jobs.admit(&admitted, &"a".repeat(64)).unwrap();
+}
+
+#[test]
+fn only_a_supersession_on_the_records_own_binding_releases_its_unknown() {
+    use arkdeck_hoststore::{
+        RecoveryEpochDraft, RecoverySource, SupersededIntent, append_recovery_epoch,
+    };
+    use arkdeck_platform::HostDirectory;
+    for (identity_matches, revision, released) in
+        [(true, 1, true), (false, 1, false), (true, 2, false)]
+    {
+        let (root, targets, binding) = scene();
+        let path = root.0.canonicalize().unwrap().join("jobs-state");
+        let jobs = JobStore::open_owner(&path).unwrap();
+        let id = "job-00000000000000000000000000000e01";
+        park(
+            &jobs,
+            id,
+            TARGET,
+            1,
+            "waitingForRecovery",
+            "flash-partitions",
+        );
+        let identity = sha256_hex(HDC.as_bytes());
+        let mut record = jobs.read_snapshot(id).unwrap().value().unwrap();
+        record["materializedStableTargetIdentitySHA256"] = json!(identity);
+        record["materializedBindingRevision"] = json!(1);
+        record["outstandingResidueCount"] = json!(0);
+        jobs.persist(
+            &JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap(),
+            "2026-09-25T00:00:00Z",
+        )
+        .unwrap();
+        let digest = "a".repeat(64);
+        // This is an isolated store fixture, never hardware evidence.
+        append_recovery_epoch(
+            &HostDirectory::open(&path).unwrap(),
+            &RecoveryEpochDraft {
+                source: RecoverySource::DistinctRecoveryExecution,
+                stable_target_identity_sha256: if identity_matches {
+                    identity
+                } else {
+                    "b".repeat(64)
+                },
+                binding_revision: revision,
+                covered_intents: vec![SupersededIntent {
+                    job_id: id.into(),
+                    intent_event_id: "intent-flash-partitions".into(),
+                    operation_reference: "flash.full-restore@1".into(),
+                    profile_reference: "dayu200".into(),
+                    observed_at_utc: "2026-09-25T00:00:00Z".into(),
+                    possible_effects: vec!["partition:system".into()],
+                }],
+                uncertain_effect_set_sha256: sha256_hex(b"partition:system"),
+                coverage_contract_version: "test-complete-overwrite/1".into(),
+                covered_effect_set_sha256: sha256_hex(b"partition:system"),
+                recovery_job_id: "job-00000000000000000000000000000e02".into(),
+                recovery_intent_event_id: "intent-recovery".into(),
+                operation_reference: "flash.full-restore@1".into(),
+                profile_reference: "dayu200".into(),
+                materialized_plan_digest_sha256: digest.clone(),
+                artifact_sha256: digest.clone(),
+                provider_executable_sha256: digest.clone(),
+                confirmed_step_ids: vec![
+                    "flash-partitions".into(),
+                    "verify-flash-readback".into(),
+                    "reboot-device".into(),
+                    "rebind-and-verify-build".into(),
+                ],
+                resulting_target_epoch_sha256: digest,
+                established_at_utc: "2026-09-25T00:10:00Z".into(),
+            },
+        )
+        .unwrap();
+        let before = files(&root);
+        let result = binding.bind(&targets, Some(&jobs), TARGET, 1);
+        assert_eq!(result.is_ok(), released, "{result:?}");
+        if !released {
+            assert_eq!(files(&root), before);
+        }
+        assert_eq!(jobs.read_snapshot(id).unwrap().value().unwrap(), record);
+    }
 }

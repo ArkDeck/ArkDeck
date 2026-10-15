@@ -645,6 +645,84 @@ impl JobStore {
         Ok(jobs)
     }
 
+    /// Keep a binding's final census and publication ahead of any new Job
+    /// admission. An already admitted Job remains visible to the census.
+    pub(crate) fn loader_binding_interlock(
+        &self,
+    ) -> Result<std::sync::RwLockWriteGuard<'_, ()>, WireError> {
+        let guard = self
+            .hdc_lifecycle
+            .try_write()
+            .map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => failure(
+                    "resourceConflict",
+                    "a lifecycle action or Job admission currently blocks Loader binding",
+                ),
+                std::sync::TryLockError::Poisoned(_) => failure(
+                    "internalError",
+                    "the Loader binding admission interlock is unavailable",
+                ),
+            })?;
+        if self
+            .hdc_recomposition
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            return Err(failure(
+                "resourceConflict",
+                "HDC tool selection requires Runtime recomposition before Loader binding",
+            ));
+        }
+        Ok(guard)
+    }
+
+    /// Unknown delegated plans are recorded at `flash-partitions`, not at
+    /// `enter-loader-mode`. Moving this Target to another identity/revision
+    /// would hide them from recovery's exact-binding census. Read terminal
+    /// rows too, and do not let a caller's new revision exclude old work.
+    pub(crate) fn unsettled_flash_jobs_for_binding(
+        &self,
+        target_id: &str,
+    ) -> Result<Vec<String>, WireError> {
+        let rows = self.repository.rows(None).map_err(unreadable)?;
+        let mut jobs = Vec::new();
+        for row in &rows {
+            let record = self
+                .resident(&row.id)
+                .map(Ok)
+                .unwrap_or_else(|| JobRecord::from_row(row))?;
+            if record.dayu200_flash()
+                && record.request["target"]["targetId"].as_str() == Some(target_id)
+                && (!crate::job_record::terminal(&record.state)
+                    || record.outcome_unknown()
+                    || record.residues().unwrap_or(0) > 0)
+            {
+                // A proved supersession releases the old target lane without
+                // rewriting the original unknown. It must cover this record's
+                // own materialized binding, never the caller's new revision.
+                let superseded = record.outcome_unknown()
+                    && (record.state == "waitingForRecovery"
+                        || crate::job_record::terminal(&record.state))
+                    && record.residues().unwrap_or(0) == 0
+                    && match (
+                        record.materialized_identity(),
+                        record.materialized_binding(),
+                    ) {
+                        (Some(identity), Some(binding)) => self
+                            .superseded_jobs(identity, binding)
+                            .map_err(unreadable)?
+                            .contains(&record.job_id),
+                        _ => false,
+                    };
+                if superseded {
+                    continue;
+                }
+                jobs.push(record.job_id.clone());
+            }
+        }
+        jobs.sort();
+        Ok(jobs)
+    }
+
     pub fn read_snapshot(&self, id: &str) -> Result<JobRecord, WireError> {
         if !identifier(id) {
             return Err(failure(
