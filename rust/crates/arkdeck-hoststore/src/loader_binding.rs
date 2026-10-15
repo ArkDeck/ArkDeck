@@ -14,8 +14,10 @@
 //! - or the Target's binding moves along its HDC-to-Loader lineage
 //!   (`replace`), and the Target advances to the published edge.
 //!
-//! A retry of any of these answers the committed edge without writing. Every
-//! refusal is Swift's error as its daemon interpolates it. Nothing here
+//! A retry of any of these answers the committed edge without writing once
+//! the selected Target has no unsettled Flash obligation. The binding rules
+//! retain Swift's errors and additionally close the delegated-plan recovery
+//! gap before any binding write. Nothing here
 //! reaches a device: the census reads the host's I/O Registry, and ArkForge's
 //! half is a read of its public socket.
 use crate::job_owner::JobStore;
@@ -155,8 +157,10 @@ impl LoaderBinding {
     /// enter-Loader transition awaits this binding, and settles that Job
     /// after the bind. This Runtime does not settle it yet, so a Job awaiting
     /// the binding refuses it before anything is written, and the Job's
-    /// intent stays unresolved for a Runtime that can; with none,
-    /// `settledJobId` is null, as Swift's.
+    /// intent stays unresolved for a Runtime that can. Any other unsettled
+    /// Flash on the selected Target also prevents a binding change: a new
+    /// identity/revision cannot make the recovery census forget old effects.
+    /// With no unsettled Flash, `settledJobId` is null, as Swift's.
     pub fn bind(
         &self,
         targets: &TargetStore,
@@ -164,6 +168,7 @@ impl LoaderBinding {
         target_id: &str,
         expected_binding_revision: i64,
     ) -> Result<Value, WireError> {
+        let _admission = jobs.map(JobStore::loader_binding_interlock).transpose()?;
         if let Some(jobs) = jobs {
             let awaiting =
                 jobs.loader_transitions_awaiting_binding(target_id, expected_binding_revision)?;
@@ -182,6 +187,12 @@ impl LoaderBinding {
                         "multiple unresolved Loader transitions cover target {target_id}"
                     )));
                 }
+            }
+            if let Some(job) = jobs.unsettled_flash_jobs_for_binding(target_id)?.first() {
+                return Err(not_runnable(&format!(
+                    "Job {job} retains unsettled Flash state for target {target_id}; \
+                     changing the binding cannot release its recovery obligation; nothing was written"
+                )));
             }
         }
         let receipt = self
