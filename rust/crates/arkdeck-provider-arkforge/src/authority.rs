@@ -10,7 +10,7 @@
 //! bytes rather than deriving them again (ArkForge `architecture.md` 8.3,
 //! 8.6).
 
-use crate::loader::topology_digest;
+use crate::loader::{TopologyResolver, host_topology_digest};
 use arkdeck_contract::{CborValue, canonical_cbor};
 use arkforge_authority_api::authority_side::mint_integrity_tag;
 use arkforge_authority_api::{ControllerPairingSecret, PermitIntegrityTag, StepPermit};
@@ -148,6 +148,7 @@ pub struct ExecutionAuthority {
     plan: ApprovedPlan,
     secret: ControllerPairingSecret,
     now: Box<dyn Fn() -> u64 + Send + Sync>,
+    resolve_topology: TopologyResolver,
     /// Permit id → the exact bytes signed, so a retransmission replays.
     issued: HashMap<String, SignedPermit>,
     /// The job `arkforged` assigned, adopted once at `startExecution`.
@@ -165,14 +166,28 @@ impl ExecutionAuthority {
         secret: ControllerPairingSecret,
         now: impl Fn() -> u64 + Send + Sync + 'static,
     ) -> Self {
+        Self::with_topology_resolver(plan, secret, host_topology_digest, now)
+    }
+
+    pub fn with_topology_resolver(
+        plan: ApprovedPlan,
+        secret: ControllerPairingSecret,
+        resolve_topology: TopologyResolver,
+        now: impl Fn() -> u64 + Send + Sync + 'static,
+    ) -> Self {
         let mut approved_topology_by_mode = HashMap::new();
-        if let Some(digest) = plan.usb_topology.as_deref().and_then(topology_bytes) {
+        if let Some(digest) = plan
+            .usb_topology
+            .as_deref()
+            .and_then(|topology| topology_bytes(topology, resolve_topology))
+        {
             approved_topology_by_mode.insert("hdc-normal".to_owned(), digest);
         }
         Self {
             plan,
             secret,
             now: Box::new(now),
+            resolve_topology,
             issued: HashMap::new(),
             daemon_job_id: None,
             approved_topology_by_mode,
@@ -195,7 +210,7 @@ impl ExecutionAuthority {
         let (Some(mode), Some(topology)) = (facts.get("mode"), facts.get("usbTopology")) else {
             return;
         };
-        if let Some(digest) = topology_bytes(topology) {
+        if let Some(digest) = topology_bytes(topology, self.resolve_topology) {
             self.approved_topology_by_mode
                 .insert(canonical_mode(mode), digest);
         }
@@ -205,7 +220,12 @@ impl ExecutionAuthority {
     /// observation this authority selected and asked ArkForge to seal, for a
     /// recovery that starts with the board already in Loader.
     pub fn record_materialized_observation_mode(&mut self, mode: &str) {
-        if let Some(digest) = self.plan.usb_topology.as_deref().and_then(topology_bytes) {
+        if let Some(digest) = self
+            .plan
+            .usb_topology
+            .as_deref()
+            .and_then(|topology| topology_bytes(topology, self.resolve_topology))
+        {
             self.approved_topology_by_mode
                 .insert(canonical_mode(mode), digest);
         }
@@ -460,8 +480,8 @@ fn has_raw_device_facts(snapshot: &StepAdmissionSnapshot) -> bool {
 
 /// The topology digest of `topology` as raw bytes, or `None` when it is not a
 /// USB location id.
-fn topology_bytes(topology: &str) -> Option<Vec<u8>> {
-    hex_to_bytes(&topology_digest(topology)?)
+fn topology_bytes(topology: &str, resolve: TopologyResolver) -> Option<Vec<u8>> {
+    hex_to_bytes(&resolve(topology)?)
 }
 
 fn hex_to_bytes(hex: &str) -> Option<Vec<u8>> {

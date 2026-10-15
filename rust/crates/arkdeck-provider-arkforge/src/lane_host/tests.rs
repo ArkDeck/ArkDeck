@@ -18,6 +18,7 @@ struct Script {
     start_failure: bool,
     poll_failure: bool,
     outcome: String,
+    connector_fixture: bool,
 }
 
 struct Port {
@@ -241,6 +242,16 @@ impl ControlPerformer for NeverPerform {
 
 struct Connections(Arc<Mutex<Script>>);
 impl super::PlanConnections for Connections {
+    fn topology_resolver(&self) -> crate::TopologyResolver {
+        if self.0.lock().unwrap().connector_fixture {
+            |attachment| {
+                (attachment == "18446744073709551000")
+                    .then(|| crate::topology_digest("17956864").unwrap())
+            }
+        } else {
+            crate::topology_digest
+        }
+    }
     fn controller(&self) -> Result<Box<dyn PlanSource>, String> {
         Ok(Box::new(Port {
             script: Arc::clone(&self.0),
@@ -287,6 +298,37 @@ fn fixture(campaign: &str) -> (LaneHost, Arc<Mutex<Script>>, LaneArtifact, Devic
         usb_topology: "17956864".into(),
     };
     (lane, script, artifact, binding)
+}
+
+#[test]
+fn materialization_uses_the_host_connector_without_replacing_the_attachment_binding() {
+    let (lane, script, artifact, mut binding) = fixture("fixture-campaign");
+    script.lock().unwrap().connector_fixture = true;
+    binding.usb_topology = "18446744073709551000".into();
+    let execution = lane
+        .prepare("JOB-1", &artifact, &binding, "primaryFlash")
+        .unwrap();
+    assert_eq!(execution.usb_topology, binding.usb_topology);
+    assert_eq!(
+        execution.stable_identity_sha256,
+        binding.stable_identity_sha256
+    );
+
+    let (lane, script, artifact, mut binding) = fixture("fixture-campaign");
+    script.lock().unwrap().connector_fixture = true;
+    binding.usb_topology = "18446744073709551001".into();
+    assert!(matches!(
+        lane.prepare("JOB-1", &artifact, &binding, "primaryFlash"),
+        Err(LaneFailure::ConfirmedNotExecuted(_))
+    ));
+    assert!(
+        !script
+            .lock()
+            .unwrap()
+            .calls
+            .iter()
+            .any(|call| call.starts_with("materialize:") || call.starts_with("start"))
+    );
 }
 
 #[test]

@@ -3,7 +3,7 @@
 //! This is the lane's materialization policy, not a second IPC codec.
 
 use crate::authority_support::{self, Configuration, Seal};
-use crate::{DeviceBinding, LaneArtifact, LanePreview, select};
+use crate::{DeviceBinding, LaneArtifact, LanePreview, TopologyResolver, select_with_resolver};
 use arkforge_client::{DeviceObservationView, MaterializeInput};
 use arkforge_ipc::messages::{Assessment, ExecutablePlan, MaterializePlanResponse};
 use std::collections::BTreeMap;
@@ -136,6 +136,7 @@ pub(crate) fn materialize(
     binding: &DeviceBinding,
     purpose: &str,
     support: &Configuration,
+    resolve: TopologyResolver,
 ) -> Result<(ExecutablePlan, String), MaterializationFailure> {
     let identity = digest_bytes(&binding.stable_identity_sha256).ok_or_else(|| {
         unusable(
@@ -145,8 +146,8 @@ pub(crate) fn materialize(
     })?;
     public.inspect(&artifact.sha256)?;
     let observations = public.discover()?;
-    let public_observation =
-        select(&observations, &binding.usb_topology).map_err(observation_failure)?;
+    let public_observation = select_with_resolver(&observations, &binding.usb_topology, resolve)
+        .map_err(observation_failure)?;
     let input = |observation_id, key, state, detail| MaterializeInput {
         intent: "fullRestore",
         artifact_id: &artifact.sha256,
@@ -185,7 +186,8 @@ pub(crate) fn materialize(
 
     let observations = controller.discover()?;
     let controller_observation =
-        select(&observations, &binding.usb_topology).map_err(observation_failure)?;
+        select_with_resolver(&observations, &binding.usb_topology, resolve)
+            .map_err(observation_failure)?;
     if !same_observation(public_observation, controller_observation) {
         return Err(unusable(
             "public and controller sessions did not observe the same bound device facts",

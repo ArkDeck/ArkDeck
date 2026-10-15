@@ -38,10 +38,26 @@ pub fn topology_digest(usb_topology: &str) -> Option<String> {
     Some(digest_in_domain(Domain::UsbTopology, &location.to_be_bytes()).to_hex())
 }
 
+/// Runtime-owned observation port; fixture callers must supply their own.
+pub type TopologyResolver = fn(&str) -> Option<String>;
+
+/// Resolve the host's current attachment to ArkForge's physical connector.
+/// Windows attachment hashes are not macOS 32-bit USB location identifiers.
+pub fn host_topology_digest(usb_topology: &str) -> Option<String> {
+    #[cfg(windows)]
+    {
+        let location = arkdeck_platform::usb_connector_location(usb_topology).ok()?;
+        Some(digest_in_domain(Domain::UsbTopology, &location.to_be_bytes()).to_hex())
+    }
+    #[cfg(not(windows))]
+    topology_digest(usb_topology)
+}
+
 /// Swift `ArkForgeObservationSelection.SelectionFailure`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SelectionFailure {
     UnusableTopology(String),
+    UnobservedConnector(String),
     NoObservationForBoundDevice {
         topology: String,
         observed: Vec<String>,
@@ -55,6 +71,10 @@ pub enum SelectionFailure {
 impl std::fmt::Display for SelectionFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::UnobservedConnector(topology) => write!(
+                f,
+                "the host could not independently resolve the current USB connector for attachment {topology}; no daemon observation can be selected"
+            ),
             Self::UnusableTopology(raw) => write!(
                 f,
                 "the bound device's usbTopology {}, which is not a USB location id; without it \
@@ -93,8 +113,21 @@ pub fn select<'a>(
     observations: &'a [DeviceObservationView],
     usb_topology: &str,
 ) -> Result<&'a DeviceObservationView, SelectionFailure> {
-    let Some(wanted) = topology_digest(usb_topology) else {
+    if topology_digest(usb_topology).is_none() {
         return Err(SelectionFailure::UnusableTopology(usb_topology.to_owned()));
+    }
+    select_with_resolver(observations, usb_topology, topology_digest)
+}
+
+pub fn select_with_resolver<'a>(
+    observations: &'a [DeviceObservationView],
+    usb_topology: &str,
+    resolve: TopologyResolver,
+) -> Result<&'a DeviceObservationView, SelectionFailure> {
+    let Some(wanted) = resolve(usb_topology) else {
+        return Err(SelectionFailure::UnobservedConnector(
+            usb_topology.to_owned(),
+        ));
     };
     let matches: Vec<&DeviceObservationView> = observations
         .iter()
@@ -164,11 +197,26 @@ pub fn confirm_loader(
     timeout: Duration,
     usb_topology: &str,
 ) -> Result<(), String> {
+    confirm_loader_with_resolver(
+        runtime_directory,
+        timeout,
+        usb_topology,
+        host_topology_digest,
+    )
+}
+
+pub fn confirm_loader_with_resolver(
+    runtime_directory: &Path,
+    timeout: Duration,
+    usb_topology: &str,
+    resolve: TopologyResolver,
+) -> Result<(), String> {
     let observations = discover(runtime_directory, timeout)
         .map_err(|error| format!("arkforged discoverDevices is unavailable: {error}"))?;
-    let observation = select(&observations, usb_topology).map_err(|failure| {
-        format!("arkforged did not uniquely observe the bound Loader: {failure}")
-    })?;
+    let observation =
+        select_with_resolver(&observations, usb_topology, resolve).map_err(|failure| {
+            format!("arkforged did not uniquely observe the bound Loader: {failure}")
+        })?;
     usable_loader(observation)
 }
 
@@ -244,6 +292,33 @@ mod tests {
         let mut upper = loader.clone();
         upper.topology_sha256 = upper.topology_sha256.to_uppercase();
         assert_eq!(select(std::slice::from_ref(&upper), "18874368"), Ok(&upper));
+    }
+
+    #[test]
+    fn attachment_resolution_stays_independent_and_requires_one_daemon_match() {
+        let attachment = "18446744073709551000";
+        let loader = observation("loader-on-connector", "3379333601");
+        let resolve = |value: &str| {
+            (value == "18446744073709551000").then(|| topology_digest("3379333601").unwrap())
+        };
+        assert_eq!(
+            select_with_resolver(std::slice::from_ref(&loader), attachment, resolve),
+            Ok(&loader)
+        );
+        assert!(matches!(
+            select_with_resolver(std::slice::from_ref(&loader), attachment, |_| None),
+            Err(SelectionFailure::UnobservedConnector(_))
+        ));
+        assert!(matches!(
+            select_with_resolver(std::slice::from_ref(&loader), attachment, |_| {
+                topology_digest("3379333602")
+            }),
+            Err(SelectionFailure::NoObservationForBoundDevice { .. })
+        ));
+        assert!(matches!(
+            select_with_resolver(&[loader.clone(), loader], attachment, resolve),
+            Err(SelectionFailure::Ambiguous { .. })
+        ));
     }
 
     #[test]

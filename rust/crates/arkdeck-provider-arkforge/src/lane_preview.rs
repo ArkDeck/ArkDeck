@@ -85,6 +85,7 @@ impl LanePlanPreview for LanePreviewHost {
             &binding,
             "primaryFlash",
             &self.support,
+            self.connections.topology_resolver(),
         ) {
             Ok((plan, observation_mode)) => LanePreview::Available {
                 plan_id: plan.plan_id,

@@ -64,7 +64,12 @@ fn with(change: impl FnOnce(&mut StepAdmissionSnapshot)) -> StepAdmissionSnapsho
 }
 
 fn authority_at(now: u64) -> ExecutionAuthority {
-    ExecutionAuthority::new(approved_plan(), secret(), move || now)
+    ExecutionAuthority::with_topology_resolver(
+        approved_plan(),
+        secret(),
+        crate::topology_digest,
+        move || now,
+    )
 }
 
 fn authority() -> ExecutionAuthority {
@@ -92,7 +97,7 @@ fn raw_loader_snapshot(step: &str, attempt: &str, topology: &str) -> StepAdmissi
         snapshot.step_id = step.into();
         snapshot.attempt_id = attempt.into();
         snapshot.observed_mode = "rockusb-loader".into();
-        snapshot.topology_sha256 = topology_bytes(topology).unwrap();
+        snapshot.topology_sha256 = topology_bytes(topology, crate::topology_digest).unwrap();
         snapshot.descriptor_sha256 = vec![0x77; 32];
         snapshot.serial_sha256 = vec![0x88; 32];
         snapshot.serial_evidence_kind = "descriptor".into();
@@ -140,12 +145,66 @@ fn a_loader_control_receipt_extends_the_exact_loader_admission_lineage() {
 }
 
 #[test]
+fn independent_connector_observations_bind_normal_and_loader_permits() {
+    let plan = ApprovedPlan {
+        usb_topology: Some("18446744073709551000".into()),
+        ..approved_plan()
+    };
+    let resolve = |attachment: &str| match attachment {
+        "18446744073709551000" | "18446744073709551001" => crate::topology_digest("3379333601"),
+        _ => None,
+    };
+    let mut authority =
+        ExecutionAuthority::with_topology_resolver(plan.clone(), secret(), resolve, || 1_000_100);
+    let mut normal = raw_loader_snapshot("STEP-NORMAL", "ATTEMPT-1", "3379333601");
+    normal.observed_mode = "hdc-normal".into();
+    normal.admitted_device_facts_sha256 = device_facts_digest(&normal);
+    signed(authority.admit(&normal));
+    let loader = raw_loader_snapshot("STEP-LOADER", "ATTEMPT-1", "3379333601");
+    assert_eq!(
+        refused(authority.admit(&loader)),
+        Refusal::DeviceFactsMismatch
+    );
+    authority.record_managed_control_facts(&BTreeMap::from([
+        ("mode".into(), "Loader".into()),
+        ("usbTopology".into(), "18446744073709551001".into()),
+    ]));
+    signed(authority.admit(&loader));
+    assert_eq!(
+        refused(authority.admit(&raw_loader_snapshot(
+            "STEP-OTHER",
+            "ATTEMPT-1",
+            "3379333602"
+        ))),
+        Refusal::DeviceFactsMismatch
+    );
+
+    let mut missing =
+        ExecutionAuthority::with_topology_resolver(plan, secret(), |_| None, || 1_000_100);
+    missing.record_materialized_observation_mode("rockusb-loader");
+    assert_eq!(
+        refused(missing.admit(&normal)),
+        Refusal::DeviceFactsMismatch
+    );
+    assert_eq!(
+        refused(missing.admit(&loader)),
+        Refusal::DeviceFactsMismatch
+    );
+    assert_eq!(missing.issued_count(), 0);
+}
+
+#[test]
 fn a_plan_materialized_while_already_in_loader_seeds_its_initial_mode_lineage() {
     let plan = ApprovedPlan {
         usb_topology: Some("17956864".into()),
         ..approved_plan()
     };
-    let mut authority = ExecutionAuthority::new(plan.clone(), secret(), || 1_000_100);
+    let mut authority = ExecutionAuthority::with_topology_resolver(
+        plan.clone(),
+        secret(),
+        crate::topology_digest,
+        || 1_000_100,
+    );
     let admission = raw_loader_snapshot("STEP-001", "ATTEMPT-1", "17956864");
     // Only the normal mode is approved until the materialized mode is.
     assert_eq!(
@@ -344,9 +403,12 @@ fn no_refusal_ever_produces_a_permit() {
 fn the_same_admission_twice_replays_the_same_bytes() {
     let clock = Arc::new(AtomicU64::new(1_000_100));
     let reader = Arc::clone(&clock);
-    let mut authority = ExecutionAuthority::new(approved_plan(), secret(), move || {
-        reader.load(Ordering::SeqCst)
-    });
+    let mut authority = ExecutionAuthority::with_topology_resolver(
+        approved_plan(),
+        secret(),
+        crate::topology_digest,
+        move || reader.load(Ordering::SeqCst),
+    );
     let first = signed(authority.admit(&snapshot()));
     // Time moves: a re-derived permit would carry another issue time.
     clock.store(1_030_000, Ordering::SeqCst);
@@ -359,9 +421,12 @@ fn the_same_admission_twice_replays_the_same_bytes() {
 fn a_retransmission_is_answered_even_after_the_snapshot_would_have_expired() {
     let clock = Arc::new(AtomicU64::new(1_000_100));
     let reader = Arc::clone(&clock);
-    let mut authority = ExecutionAuthority::new(approved_plan(), secret(), move || {
-        reader.load(Ordering::SeqCst)
-    });
+    let mut authority = ExecutionAuthority::with_topology_resolver(
+        approved_plan(),
+        secret(),
+        crate::topology_digest,
+        move || reader.load(Ordering::SeqCst),
+    );
     let first = signed(authority.admit(&snapshot()));
     clock.store(9_999_999, Ordering::SeqCst);
     assert_eq!(signed(authority.admit(&snapshot())), first);
@@ -382,9 +447,10 @@ fn a_different_attempt_is_a_different_permit() {
 fn the_epoch_travels_beside_the_bytes_rather_than_inside_them() {
     let sign_at = |epoch: u64| {
         signed(
-            ExecutionAuthority::new(
+            ExecutionAuthority::with_topology_resolver(
                 approved_plan(),
                 ControllerPairingSecret::new(PairingEpoch(epoch), b"s".to_vec()),
+                crate::topology_digest,
                 || 1_000_100,
             )
             .admit(&snapshot()),

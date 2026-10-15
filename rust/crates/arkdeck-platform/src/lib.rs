@@ -467,3 +467,10 @@ pub use usb_device_nodes::{
 };
 #[cfg(windows)]
 pub use usb_device_nodes::{usb_device_node_census, usb_host_devices};
+
+#[cfg(any(windows, test))]
+mod usb_connector;
+#[cfg(windows)]
+mod usb_connector_windows;
+#[cfg(windows)]
+pub use usb_connector_windows::usb_connector_location;
