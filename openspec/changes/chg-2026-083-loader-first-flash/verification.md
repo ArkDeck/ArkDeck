@@ -56,6 +56,9 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
 - `python rust/scripts/generate-contract.py --check`, command-registry copy check
   and contract digest check: exit 0. The new Control sample was recorded by the
   real Control handler over isolated synthetic host ports; original samples stay.
+- `python windows/scripts/generate-clientkit.py --check`: exit 0 after regenerating
+  the Windows client's hash for the extended Loader binding schema;
+  `loader-first-windows-clientkit-check.log`.
 - Catalog routing's 31 Python tests passed; `loader-first-test-routing.log`.
   Source inventory and the complete routing manifest validate against Cargo
   metadata; `loader-first-manifest-final.log`.
@@ -72,5 +75,8 @@ PR CI. Swift and App checks require macOS and were not run on this Windows host.
 
 ## CI
 
-Pending the PR head's selected GitHub lanes. CI success is not hardware acceptance
-and does not replace maintainer review.
+PR #2653: the initial `b038d5cd` run `38823975495` identified one stale generated
+Windows ClientKit schema pin. The generator now supplies that pin; no assertion
+or contract was relaxed. The selected lanes remain pending for the corrected head.
+SDD runs `38823975514` and `38824054453` passed on the initial head.
+CI success is not hardware acceptance and does not replace maintainer review.
