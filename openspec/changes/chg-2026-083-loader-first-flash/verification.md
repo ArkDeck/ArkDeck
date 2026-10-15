@@ -49,6 +49,12 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
 - `python rust/scripts/run-cargo.py test -p arkdeck-cli --test machine_contracts
   --test argv_fixtures`: exit 0, 15 passed;
   `loader-first-cli-contract-tests-final.log`.
+- `python rust/scripts/run-cargo.py test -p arkdeck-cli --test maintainer_contracts`:
+  exit 0, 7 Windows cases passed; `loader-first-maintainer-contracts-windows.log`.
+  Its targeted Clippy invocation passed with warnings denied;
+  `loader-first-maintainer-clippy.log`. The Unix historical export replay stays
+  in CI; only the declared regenerated Loader argv file joins its existing
+  compatibility mapping, while the retained recording remains byte-identical.
 - `python rust/scripts/run-cargo.py fmt --all --check`: exit 1 because Windows
   rejected the workspace command length (OS error 206); `loader-first-fmt-all.log`.
   Every changed Rust file passed `rustfmt --edition 2024 --config skip_children=true
@@ -79,4 +85,10 @@ PR #2653: the initial `b038d5cd` run `38823975495` identified one stale generate
 Windows ClientKit schema pin. The generator now supplies that pin; no assertion
 or contract was relaxed. The selected lanes remain pending for the corrected head.
 SDD runs `38823975514` and `38824054453` passed on the initial head.
+Run `38824361055` on `4d11c405` passed Windows ClientKit and the full Swift suite.
+Linux workspace and all three contract-parity views identified the same historical
+export hash mismatch for `fixtures/argv/flash.bind-loader.json`; no other exported
+file differed. The explicit compatibility mapping now includes that regenerated
+input, whose current bytes are independently pinned and replayed by CLI tests.
+The corrected head must complete all selected lanes before merge.
 CI success is not hardware acceptance and does not replace maintainer review.

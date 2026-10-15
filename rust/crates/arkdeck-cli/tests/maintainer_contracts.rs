@@ -447,12 +447,15 @@ fn current_bundle_case(recorded: &Value) -> Value {
         "fixtures/argv/job.archive.apply.json",
         "fixtures/argv/job.archive.preview.json",
     ];
-    const REGENERATED: [&str; 6] = [
+    const REGENERATED: [&str; 7] = [
         "contracts/app-product-capability-registry.yaml",
         "contracts/cli-command-registry.yaml",
         "contracts/cli-feature-coverage.json",
         "contracts/cli-result.schema.json",
         "contracts/runtime-control-plane.schema.json",
+        // Loader adoption adds an argv mode; machine_contracts and argv_fixtures
+        // verify its current pinned bytes. Keep the historical recording intact.
+        "fixtures/argv/flash.bind-loader.json",
         "fixtures/index.json",
     ];
     let mut expected = recorded.clone();
