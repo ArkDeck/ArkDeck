@@ -36,7 +36,8 @@ allow = [
     "arkdeck-rockchip-binding@0.1.0",
     "arkdeck-soak@0.1.0",
     # First-party ArkForge crates, from the one allowed git source below at
-    # the revision Package.swift pins; they carry no third-party dependency.
+    # the revision Cargo.toml pins; they carry no third-party dependency.
+    "arkforge-arkdeck-adapter@0.1.0",
     "arkforge-authority-api@0.1.0",
     "arkforge-client@0.1.0",
     "arkforge-core@0.1.0",
