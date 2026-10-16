@@ -12,8 +12,8 @@
 //!   recognized and its epoch appended, with nothing dispatched;
 //! - otherwise only the exact reviewed operation and profile, every covered
 //!   partition and full verification may be admitted as a distinct recovery,
-//!   within the shared four-hour budget (or an operator-named hardware
-//!   acceptance campaign) and sixteen epochs;
+//!   within the shared four-hour budget and sixteen epochs; acceptance
+//!   campaign metadata cannot extend that budget;
 //! - a distinct recovery that confirmed its write and every verification step
 //!   establishes the epoch that covers the unknown intents; their own
 //!   outcomes stay unknown.
@@ -45,7 +45,7 @@ const DURABLE_REFERENCES: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", 
 const DAYU200: &str = "dayu200";
 /// Swift `arkForgePlanCompletionSemanticCode`.
 const PLAN_COMPLETION_CODE: &str = "arkForgePlanCompletion";
-/// The shared unattended budget: four hours and sixteen epochs.
+/// The shared hard budget: four hours and sixteen epochs (POL-AGENT-002).
 const FOUR_HOURS: f64 = 4.0 * 60.0 * 60.0;
 const EPOCH_BUDGET: usize = 16;
 
@@ -144,12 +144,8 @@ impl RecoveryContext {
 pub(crate) enum OverwriteAdmission {
     /// Nothing on the binding is unresolved: an ordinary Flash.
     Ordinary,
-    /// A distinct recovery, and the campaign that stood in for the shared
-    /// four-hour budget, if one did.
-    Recovery {
-        context: RecoveryContext,
-        campaign: Option<String>,
-    },
+    /// A distinct recovery within the same hard budget as its unknown intents.
+    Recovery { context: RecoveryContext },
     /// A complete later recovery Flash already in history, whose epoch is now
     /// appended; nothing is dispatched for it.
     Recognized(Box<RecoveryEpoch>),
@@ -447,8 +443,8 @@ impl JobStore {
     /// Swift `completeOverwriteAdmission`: whether a destructive Flash of
     /// `reference` with `inputs` on this binding is ordinary, a distinct
     /// complete-overwrite recovery, or recognized in history. `now` is the
-    /// Runtime clock's reading and `campaign` the hardware acceptance
-    /// campaign the lane is bound to.
+    /// Runtime clock's reading. Legacy hardware acceptance campaign metadata
+    /// has no admission authority and cannot extend the shared hard budget.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn complete_overwrite_admission(
         &self,
@@ -458,7 +454,7 @@ impl JobStore {
         identity: &str,
         binding: i64,
         now: &str,
-        campaign: Option<&str>,
+        _campaign: Option<&str>,
     ) -> Result<OverwriteAdmission, OverwriteRefusal> {
         if identity.is_empty() || binding <= 0 {
             return Err(OverwriteRefusal::blocked(
@@ -537,11 +533,10 @@ impl JobStore {
         let expired =
             || OverwriteRefusal::blocked("completeOverwriteRecovery.sharedFourHourBudgetExpired");
         let now = date(now).ok_or_else(expired)?;
-        // An operator-named hardware acceptance campaign owns its window; an
-        // unattended invocation stays within the shared four hours.
-        let mut beyond_budget = None;
+        // POL-AGENT-002 gives every recovery the same hard window. A named
+        // campaign, including an empty legacy value, is never an extension.
         if now - started >= FOUR_HOURS {
-            beyond_budget = Some(campaign.ok_or_else(expired)?.to_owned());
+            return Err(expired());
         }
         let prior = epochs
             .iter()
@@ -571,7 +566,6 @@ impl JobStore {
                 profile_reference: profile.to_owned(),
                 destructive_epoch_ordinal: ordinal as i64,
             },
-            campaign: beyond_budget,
         })
     }
 
@@ -1087,4 +1081,85 @@ fn host_proof(
         }
     }
     Some((artifact.to_owned(), executable.to_owned()))
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+    use crate::test_private::{create_private_directory, plant_owner_only, temporary_root};
+    use std::path::PathBuf;
+
+    struct Root(PathBuf);
+
+    impl Drop for Root {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn a_named_campaign_cannot_extend_an_unknown_flash_recovery_budget() {
+        let root = Root(temporary_root().join(format!(
+            "arkdeck-recovery-budget-{:x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        )));
+        create_private_directory(&root.0);
+        let jobs = JobStore::open_owner(&root.0).unwrap();
+        let capability_root = root.0.join("capabilities");
+        create_private_directory(&capability_root);
+        let capabilities = CapabilityStore::open(&capability_root).unwrap();
+        let job = "job-7e4b6c8997b64ac9d4ab648851f2f3a5";
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/flash-run/stories/failures/files/store/jobs")
+            .join(job);
+        let directory = root.0.join("jobs").join(job);
+        create_private_directory(&directory);
+        let record_bytes = std::fs::read(fixture.join("job-record.json")).unwrap();
+        let journal_bytes = std::fs::read(fixture.join("journal.jsonl")).unwrap();
+        plant_owner_only(&directory.join("job-record.json"), &record_bytes);
+        plant_owner_only(&directory.join("journal.jsonl"), &journal_bytes);
+        let record = JobRecord::decode(&record_bytes).unwrap();
+        assert!(record.outcome_unknown());
+        for campaign in [None, Some(""), Some("new-hardware-acceptance")] {
+            for (now, expired) in [
+                ("2026-09-25T03:59:59Z", false),
+                ("2026-09-25T04:00:00Z", true),
+                ("2026-09-26T00:00:00Z", true),
+            ] {
+                let decision = jobs.complete_overwrite_admission(
+                    &capabilities,
+                    CANONICAL,
+                    &record.request["inputs"],
+                    record.materialized_identity().unwrap(),
+                    record.materialized_binding().unwrap(),
+                    now,
+                    campaign,
+                );
+                if expired {
+                    assert!(
+                        matches!(&decision, Err(OverwriteRefusal::Blocked(reason))
+                            if reason == "completeOverwriteRecovery.sharedFourHourBudgetExpired"),
+                        "campaign {campaign:?} at {now}: expected hard budget refusal"
+                    );
+                } else {
+                    assert!(
+                        matches!(&decision, Ok(OverwriteAdmission::Recovery { context, .. })
+                            if context.covered_intents.len() == 1
+                                && context.destructive_epoch_ordinal == 2),
+                        "campaign {campaign:?} at {now}: expected bounded recovery"
+                    );
+                }
+                assert_eq!(
+                    std::fs::read(directory.join("job-record.json")).unwrap(),
+                    record_bytes
+                );
+                assert_eq!(
+                    std::fs::read(directory.join("journal.jsonl")).unwrap(),
+                    journal_bytes
+                );
+                assert!(capabilities.lineage().unwrap().is_empty());
+                assert!(jobs.recovery_epochs().unwrap().is_empty());
+            }
+        }
+    }
 }

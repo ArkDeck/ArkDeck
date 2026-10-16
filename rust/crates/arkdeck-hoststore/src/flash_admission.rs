@@ -44,9 +44,8 @@ pub struct FlashAdmitter<'a> {
     /// and before anything is issued, so no Job is left waiting for a run
     /// that cannot come.
     pub executes: bool,
-    /// The operator-named hardware acceptance campaign the lane is bound to
-    /// (DEC-014), which may admit a recovery after the shared four-hour
-    /// budget (DEC-016).
+    /// Legacy hardware acceptance campaign metadata. It cannot extend a
+    /// recovery's shared hard budget or provide admission authority.
     pub campaign: Option<&'a str>,
 }
 
@@ -172,18 +171,12 @@ impl FlashAdmitter<'_> {
         );
         record.set_materialized(materialized.identity.clone(), materialized.binding_revision);
         match &recovery {
-            OverwriteAdmission::Recovery { context, campaign } => {
+            OverwriteAdmission::Recovery { context } => {
                 record.timeline.push(format!(
                     "complete-overwrite recovery classified epoch {}; covered intents {}",
                     context.destructive_epoch_ordinal,
                     context.covered_intents.len()
                 ));
-                if let Some(campaign) = campaign {
-                    record.timeline.push(format!(
-                        "complete-overwrite recovery admitted after the shared four-hour budget \
-                         under hardware acceptance campaign {campaign}"
-                    ));
-                }
             }
             OverwriteAdmission::Recognized(epoch) => record.timeline.push(format!(
                 "recognized durable complete-overwrite supersession {}; device dispatch 0",
