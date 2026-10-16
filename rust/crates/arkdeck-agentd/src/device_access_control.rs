@@ -226,7 +226,7 @@ fn refused_hello_is_a_typed_control_failure_before_any_request() {
     assert_eq!(reply["error"]["code"], "unsupportedProtocolVersion");
     assert_eq!(
         reply["error"]["message"],
-        format!("ArkForge PROTOCOL_REFUSED: {reason}")
+        format!("ArkForge PROTOCOL_REFUSED: The daemon refused the public session: {reason}")
     );
     assert!(server.join().unwrap().is_empty());
 }
