@@ -56,6 +56,14 @@ impl Root {
     /// One public session answering `discoverDevices` with these modes; the
     /// requests it received.
     fn serve(&self, modes: &'static [&'static str]) -> std::thread::JoinHandle<Vec<Api>> {
+        self.serve_with_refusal(modes, None)
+    }
+
+    fn serve_with_refusal(
+        &self,
+        modes: &'static [&'static str],
+        refusal: Option<&'static str>,
+    ) -> std::thread::JoinHandle<Vec<Api>> {
         // Bound on the serving thread (a pipe listener stays on the thread
         // that made it); this returns once it is bound.
         let (bound, ready) = std::sync::mpsc::channel();
@@ -70,18 +78,26 @@ impl Root {
             let mut stream = listener.accept().unwrap();
             let hello = Hello::decode(&read_frame(&mut stream).unwrap().unwrap()).unwrap();
             assert_eq!(hello.session_kind, SessionKind::Public);
+            assert_eq!((hello.protocol_major, hello.protocol_minor), (1, 0));
             let ack = HelloAck {
                 protocol_major: PROTOCOL_MAJOR,
                 protocol_minor: PROTOCOL_MINOR,
                 session_kind: SessionKind::Public,
                 daemon_version: "0.1.0".into(),
-                refusal: None,
+                refusal: refusal.map(str::to_owned),
                 execution_ready: false,
                 execution_blockers: vec!["NO_PAIRED_AUTHORITY".into()],
                 toolchain_id: String::new(),
                 toolchain_sha256: String::new(),
             };
             write_frame(&mut stream, &ack.encode()).unwrap();
+            if refusal.is_some() {
+                assert!(
+                    read_frame(&mut stream).unwrap().is_none(),
+                    "no request after refusal"
+                );
+                return Vec::new();
+            }
             let request = Request::decode(&read_frame(&mut stream).unwrap().unwrap()).unwrap();
             let mut payload = Vec::new();
             for (index, mode) in modes.iter().enumerate() {
@@ -199,4 +215,18 @@ fn each_answer_swifts_daemon_recorded_is_this_runtimes() {
     );
     assert_eq!(refused["error"]["code"], "invalidParams");
     assert!(listener.accept().is_err(), "no session was opened");
+}
+
+#[test]
+fn refused_hello_is_a_typed_control_failure_before_any_request() {
+    let root = Root::new();
+    let reason = "protocol major 2 is not compatible with 1";
+    let server = root.serve_with_refusal(&[], Some(reason));
+    let reply = answer(&control(&root), &json!({}));
+    assert_eq!(reply["error"]["code"], "unsupportedProtocolVersion");
+    assert_eq!(
+        reply["error"]["message"],
+        format!("ArkForge PROTOCOL_REFUSED: The daemon refused the public session: {reason}")
+    );
+    assert!(server.join().unwrap().is_empty());
 }

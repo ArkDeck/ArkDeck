@@ -37,14 +37,14 @@
     "crates/arkdeck-agentd/src/development_admission.rs": "cf037f0e2cf7fbafdcd8a8c00cf5dc7d834fde392a2c091393386f483b8a7387",
     "crates/arkdeck-agentd/src/development_mutation.rs": "2c9748e0cf60c88e221d15d16cfc4574db4fbfabf467bbaeb6c385849640ae17",
     "crates/arkdeck-agentd/src/development_usb.rs": "8b6e06916b0486101098fe5f1db2d602e86d73ff5f79671f50c2e9657f45c1ce",
-    "crates/arkdeck-agentd/src/device_access_control.rs": "c32c568751500bed98e9cf106a856441c28b1a2f21af88db11b0629305a055ac",
+    "crates/arkdeck-agentd/src/device_access_control.rs": "e68913780f38fd1a0449f4dd45727c98dfa55ccbd053dd923f8419d64877d75f",
     "crates/arkdeck-agentd/src/doctor_owner_tests.rs": "d7a779a082b884a2e6915441896d4bf355a9a53f27e050cdc460f603b6f09791",
     "crates/arkdeck-agentd/src/drain.rs": "042d0edf0822e9234977f3bfb86bfa9614b8b6b1884ad27d3a2b2a025107a877",
     "crates/arkdeck-agentd/src/flash_host_reads_control.rs": "7cc89de4844f9b9af8c6341407e3580d4069f2e08f4b04bfd04e32c28f63b2c2",
     "crates/arkdeck-agentd/src/flash_plan_control.rs": "c8f7f10aca7ccac915908b4d406dfda0b0f8b98161036bf2f190c60057e463cf",
     "crates/arkdeck-agentd/src/hdc_status_control.rs": "b11467b2f6cb2ff1d562d5298bfa9cb7be8bb2f6fa536ddd680822d25fbfda0c",
     "crates/arkdeck-agentd/src/hilog_summary_analyzer.rs": "c2be8a3ae986f61890470c7f2d99911459c0ffb7b3dc1c12b4c20126164c94fd",
-    "crates/arkdeck-agentd/src/host.rs": "e9b9b95c8d1d6dc03fc5ae5388c8939ae069b9cef851f2351126d207a60aca2b",
+    "crates/arkdeck-agentd/src/host.rs": "783c1601c60124edd7e445fc2626bdc026139d079fc30a444d1ffa1ae44ce4ef",
     "crates/arkdeck-agentd/src/host_tests.rs": "7d46c77f4479e17a254aa4f193b7fa029c106511b85941a443c21060b1bd2604",
     "crates/arkdeck-agentd/src/lib.rs": "bf962254b34c36f4de7a1fe97ddede3dd87f15cefe7ddd4c65c8c41d0750e857",
     "crates/arkdeck-agentd/src/loader_binding_control.rs": "e88ba38eb35e887d4482402c33ba1d4027c57966c14a41fed638773888b471ca",
@@ -821,7 +821,7 @@
     "crates/arkdeck-platform/tests/windows_tool_dispatch.rs": "37e5326e31602fdb00ed282e13e0165f1f774f96a4f17bcf09b6f805d0b6b07f",
     "crates/arkdeck-platform/tests/windows_transport.rs": "b805ccbcae47fd944d891b0ef50a732bc2372f990748119ed5fbf66e45e567b2",
     "crates/arkdeck-platform/tests/windows_verified_source.rs": "88408ae7d6bd8fabd77554a0a0012c604ed3c20037dae0ec52559a43e6a54468",
-    "crates/arkdeck-provider-arkforge/Cargo.toml": "dbf507ea1e05822c6d9250cb3bd96a439e8027285c7a8270493a6b82ad899de6",
+    "crates/arkdeck-provider-arkforge/Cargo.toml": "4c631c383c408a259840f3ec80792a1a97f92b13871cf5ecc306a18226145008",
     "crates/arkdeck-provider-arkforge/src/authority/tests.rs": "b4e708b7fb75dbace3e14149c8d7033db8761de042e26b46332009ac043a9184",
     "crates/arkdeck-provider-arkforge/src/authority.rs": "06ccc2f205a2e496ddf0c9aee38aa07f1770eea7eb3ad65a951c2433adf4e1f2",
     "crates/arkdeck-provider-arkforge/src/authority_support.rs": "c5ab1e37ca663426613bfe781b295166aec8a29719fe66e4511403204876d4f9",
@@ -838,6 +838,7 @@
     "crates/arkdeck-provider-arkforge/src/lib.rs": "5c606475f80081200cf93c67b466b4ed98ea41deeb60ff6c6bedaa1f31aaf52a",
     "crates/arkdeck-provider-arkforge/src/loader.rs": "f52da1e0dfd4ed8c93bbf485156fd751688e977153fda1ab3a8287e1c0d4c8eb",
     "crates/arkdeck-provider-arkforge/src/managed_control.rs": "0ed670cf6f5187ad53cfed4d176affa5e1878419419600ff35d033e8c8341ec6",
+    "crates/arkdeck-provider-arkforge/tests/consumer_contract.rs": "7d5203afd5d34fb2096800e356c457d44f5f24e6cdd4358fba499f7bb53c5440",
     "crates/arkdeck-provider-arkforge/tests/device_access.rs": "1516efe545858c04110ae3607e7c5fda97df059c7f326c6ddab03df9f26bd177",
     "crates/arkdeck-provider-arkforge/tests/digest_domain_vectors.rs": "807caecadd0cfa5f3c8baeaee459da6193a6618ab3f1dadc9b8483421b9deead",
     "crates/arkdeck-provider-arkforge/tests/lane.rs": "74039de5d14e4ed853b130cebb98b56f30589c9d08e74dd85d26071881e6bf6c",
@@ -10130,6 +10131,11 @@
       "ignored": []
     },
     "arkdeck-platform/windows_verified_source": {
+      "route": "both",
+      "functions": {},
+      "ignored": []
+    },
+    "arkdeck-provider-arkforge/consumer_contract": {
       "route": "both",
       "functions": {},
       "ignored": []

@@ -3848,8 +3848,18 @@ impl HostServices for Host {
                 "observationCount": modes.len(),
                 "observedModes": modes.iter().map(|mode| mode.as_str()).collect::<Vec<_>>(),
             })),
-            // As Swift's handler: one refusal for every failure, so that no
-            // socket path, provider diagnostic or USB identity is exported.
+            // A refused Hello is a compatibility error, not missing hardware.
+            // The SDK closes the connection before any request is sent.
+            Err(arkdeck_provider_arkforge::DeviceAccessFailure::Client { code, message })
+                if code == "PROTOCOL_REFUSED" =>
+            {
+                Err(WireError {
+                    code: "unsupportedProtocolVersion".into(),
+                    message: format!("ArkForge {code}: {message}"),
+                    details: None,
+                })
+            }
+            // Other transport failures may contain socket paths or USB identities.
             Err(_) => Err(WireError {
                 code: "rejected".into(),
                 message: "Rockchip device access observation failed".into(),
