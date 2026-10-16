@@ -31,6 +31,7 @@ mod provider;
 mod rockchip_hdc;
 mod rockchip_identity;
 mod rockchip_loader;
+mod rockchip_vendor_identity;
 mod semantic;
 #[cfg(any(target_os = "macos", windows))]
 mod status;
@@ -109,12 +110,14 @@ pub use rockchip_hdc::{
 pub use rockchip_identity::{
     NORMAL_HARDWARE_IDENTITY_SOURCE, NormalHardwareIdentity, NormalHardwareIdentityObserver,
     normal_hardware_identity_plan, observe_normal_hardware_identity,
+    observe_normal_loader_identity,
 };
 pub use rockchip_loader::{
     ENTER_LOADER_TIMEOUT, FlashRuntimeDiagnostic, LoaderTransition, LoaderTransitionFailure,
     ReadbackBudget, RockchipLoaderTransition, Transition, TransitionRequest, enter_loader_plan,
     loader_summary, rebind_summary, transition_evidence_summary,
 };
+pub use rockchip_vendor_identity::VendorSerialProof;
 pub use semantic::{CommandFailure, CommandOutcome, SemanticOutputParser};
 #[cfg(any(target_os = "macos", windows))]
 pub use status::{

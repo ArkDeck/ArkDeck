@@ -26,7 +26,7 @@ use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
 use arkdeck_provider_hdc::{
     HdcDispatch, HdcIdentity, LiveModeProbe, LoaderIdentity, LoaderObserver,
     NormalHardwareIdentityObserver, UsbProbe, is_dayu200_hdc_normal, is_dayu200_loader,
-    observe_normal_hardware_identity, registered_dayu200_devices,
+    observe_normal_loader_identity, registered_dayu200_devices,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -451,7 +451,7 @@ impl FlashHostFacts {
             rockusb: NativeRockUsbIdentity::unconfigured(),
             loader: Box::new(NoArkForgeLane),
             normal_identity_records: application_support_root.join("normal-loader-identity"),
-            normal_identity_observer: observe_normal_hardware_identity,
+            normal_identity_observer: observe_normal_loader_identity,
             resolve_topology: arkdeck_provider_arkforge::host_topology_digest,
         }
     }
@@ -735,6 +735,7 @@ impl FlashHostFacts {
                         hdc,
                         &RockchipUsbProbe(Arc::clone(&self.census)),
                         &execution_connect_key,
+                        &target.identity,
                     )
                 });
             let status = match observed {
@@ -759,7 +760,13 @@ impl FlashHostFacts {
                                 "dayu200NormalHardwareSerialSHA256".into(),
                                 observation.hardware_serial_sha256.clone(),
                             );
-                            if observation.hardware_serial_sha256 == target.identity {
+                            if observation.vendor_serial.is_some() {
+                                server_facts.insert(
+                                    "dayu200NormalLoaderSerialSHA256".into(),
+                                    observation.loader_serial_sha256().to_owned(),
+                                );
+                            }
+                            if observation.matches_loader(&target.identity) {
                                 "satisfied"
                             } else {
                                 "normalLoaderIdentity.boundLoaderIdentityMismatch"

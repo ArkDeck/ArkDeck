@@ -228,10 +228,17 @@ pub(super) fn validate(doc: &Object, host: bool, host_workspace: bool) -> Result
         .and_then(Value::as_str);
     let mut steps = BTreeMap::new();
     let mut descriptors = BTreeMap::new();
-    let revisions: BTreeSet<_> = array(doc, "bindingHistory")?
+    let mut revisions: BTreeSet<_> = array(doc, "bindingHistory")?
         .iter()
         .map(|v| object(v).and_then(|r| r["revision"].as_i64().ok_or(ManifestError::Invalid)))
         .collect::<Result<_>>()?;
+    if doc["originalTarget"]["kind"] == "unresolved" {
+        revisions.insert(
+            doc["originalTarget"]["identitySnapshot"]["bindingRevision"]
+                .as_i64()
+                .ok_or(ManifestError::Invalid)?,
+        );
+    }
     for value in array(doc, "steps")? {
         let row = object(value)?;
         execution(row)?;

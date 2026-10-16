@@ -12,7 +12,8 @@
 //! declared failure compensation, which stays waiting for its explicit
 //! continuation. Each Job's record then gains its recovery marker (never twice
 //! in a row) and is persisted, record file first and index row after, and a
-//! Job admitted under a runtime capability re-asserts its use's outcome. It
+//! Job admitted under a runtime capability re-asserts its use's outcome, except
+//! a retained-risk archive whose original capability lineage stays untouched. It
 //! never dispatches, resolves a fact, publishes a Session or changes
 //! authority.
 //!
@@ -136,9 +137,10 @@ pub fn recover_active_jobs(
 ///   `waitingForRecovery` for a Job whose outcome is unknown, `confirmed`
 ///   with its state for a terminal one (the same outcome recorded again
 ///   changes nothing; any other change is Swift's `outcomeConflict`).
-///   `capabilities` may be `None` only when no Job named is such a Job: one
-///   that is fails the whole call with an error naming it, before anything
-///   is written for any Job.
+///   A proven retained-risk archive only finishes its existing journal
+///   decision and never changes that lineage. Otherwise `capabilities` may be
+///   `None` only when no Job named is such a Job: one that is fails the whole
+///   call with an error naming it, before anything is written for any Job.
 /// - An unknown Job identity fails the call before anything is written.
 /// - A Job whose record a failed `job.reconcile` holds resident is skipped,
 ///   as Swift skips a Job its engine holds.
@@ -209,6 +211,11 @@ fn recover_rows(
                 .as_ref()
                 .and_then(JobRecord::admission_evidence)
                 .is_some_and(|evidence| evidence["kind"] == "runtimeCapability")
+            && !record
+                .as_ref()
+                .map(|record| archive_retains_lineage(jobs, record, &clock(now)?))
+                .transpose()?
+                .unwrap_or(false)
         {
             return Err(internal(format!(
                 "job {} settles a runtime capability use and no capability store was given; \
@@ -230,9 +237,31 @@ fn recover_rows(
         jobs.persist(&record, &clock(now)?)
             .map_err(|error| internal(format!("{error:?}")))?;
         result.statuses.push(record.status());
-        settle_capability(&record, capabilities, now)?;
+        if !archive_retains_lineage(jobs, &record, &clock(now)?)? {
+            settle_capability(&record, capabilities, now)?;
+        }
     }
     Ok(result)
+}
+
+fn archive_retains_lineage(
+    jobs: &JobStore,
+    record: &JobRecord,
+    at: &str,
+) -> Result<bool, RecoveryError> {
+    if !record.dayu200_flash() || !record.outcome_unknown() {
+        return Ok(false);
+    }
+    let directory = jobs
+        .job_directory(&record.job_id)
+        .map_err(|error| internal(format!("{error:?}")))?;
+    let facts = inspect_journal(&directory).map_err(|error| internal(format!("{error}")))?;
+    Ok(crate::job_archive::retains_capability_lineage(
+        record,
+        &facts,
+        &journal_events(jobs, &record.job_id)?,
+        at,
+    ))
 }
 
 /// Every complete record of the Job's journal, in order (Swift

@@ -37,7 +37,7 @@ pub(crate) fn persist_normal_hardware_identity(
         "stepID": subject.step_id,
         "observedAtUTC": observed_at,
         "summary": observation.summary(),
-        "matchesBoundLoaderIdentity": observation.hardware_serial_sha256 == subject.stable_identity_sha256,
+        "matchesBoundLoaderIdentity": observation.matches_loader(subject.stable_identity_sha256),
     });
     let bytes = crate::session_json::encode(&document)
         .map_err(|_| "normalLoaderIdentity.observationEncodingFailed")?;
@@ -93,6 +93,7 @@ mod tests {
             connector_identity_sha256: "d".repeat(64),
             stdout_sha256: sha256_hex(b"Serial: 0123456789abcdef\n"),
             stdout_byte_count: 25,
+            vendor_serial: None,
         }
     }
 
@@ -138,6 +139,47 @@ mod tests {
             record_bytes(&path).unwrap(),
             bytes,
             "later observations cannot rewrite history"
+        );
+    }
+
+    #[test]
+    fn factory_serial_record_preserves_the_distinct_cpu_and_bound_loader_subject() {
+        let root = Root::new();
+        let mut observation = observation();
+        let loader = sha256_hex(b"13579bdf2468ace0");
+        observation.vendor_serial = Some(arkdeck_provider_hdc::VendorSerialProof {
+            serial_sha256: loader.clone(),
+            source_sha256: "e".repeat(64),
+            source_byte_count: 456,
+        });
+        let provider = "c".repeat(64);
+        let subject = NormalIdentitySubject {
+            target_id: "TGT-PROOF",
+            binding_revision: 7,
+            stable_identity_sha256: &loader,
+            provider_executable_sha256: &provider,
+            job_id: Some("job-proof"),
+            step_id: Some("enter-loader"),
+        };
+        let digest = persist_normal_hardware_identity(&root.0, &subject, &observation).unwrap();
+        let bytes = record_bytes(&root.0.join(format!("{digest}.json"))).unwrap();
+        let document: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(document["matchesBoundLoaderIdentity"], true);
+        assert_eq!(document["stableIdentitySHA256"], loader);
+        assert_eq!(document["summary"]["loaderSerialSha256"], loader);
+        assert_eq!(
+            document["summary"]["hardwareSerialSha256"],
+            observation.hardware_serial_sha256
+        );
+        assert_ne!(
+            document["summary"]["hardwareSerialSha256"],
+            document["summary"]["loaderSerialSha256"]
+        );
+        assert_eq!(document["summary"]["vendorSourceSha256"], "e".repeat(64));
+        assert!(
+            !std::str::from_utf8(&bytes)
+                .unwrap()
+                .contains("13579bdf2468ace0")
         );
     }
 

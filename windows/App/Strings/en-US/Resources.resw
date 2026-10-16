@@ -5706,6 +5706,30 @@ SHA-256: %4$@</value>
     <value>This Job is waiting for a person to continue in its owning workflow.</value>
     <comment>history.recovery.waitingForHuman (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_archive_retainedDetail" xml:space="preserve">
+    <value>Archive preserves the original unknown result and evidence. Device risks, resource holds and the expired recovery budget remain. It does not replay the Job, recover the device, stop an unverified process or permit another flash.</value>
+    <comment>jobRecovery.archive.retainedDetail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_retainedConfirm" xml:space="preserve">
+    <value>Archive and retain risks</value>
+    <comment>jobRecovery.archive.retainedConfirm (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_retainedComplete" xml:space="preserve">
+    <value>Archived with the original unknown result and all risk holds retained. Conflicting device work stays blocked.</value>
+    <comment>jobRecovery.archive.retainedComplete (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_retainedPublicationPending" xml:space="preserve">
+    <value>Archive is recorded; Session publication is pending. Unknown effects and all risk holds remain. Review archive again to finish publishing.</value>
+    <comment>jobRecovery.archive.retainedPublicationPending (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_budget" xml:space="preserve">
+    <value>The original recovery budget has not expired or its timestamps cannot be verified. Archive with retained risks is unavailable.</value>
+    <comment>jobRecovery.archive.blocker.budget (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_lineage" xml:space="preserve">
+    <value>Original identity or capability records are missing or inconsistent. The archive cannot preserve a verifiable history.</value>
+    <comment>jobRecovery.archive.blocker.lineage (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
     <value>This Runtime cannot yet prove that a device-changing Job can release all its holds.</value>
     <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>

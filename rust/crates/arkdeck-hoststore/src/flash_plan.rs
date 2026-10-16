@@ -527,8 +527,15 @@ pub(crate) fn normal_loader_identity_ready(facts: &RockchipFacts) -> bool {
             .get("dayu200NormalLoaderHardwareIdentity")
             .map(String::as_str)
             != Some("satisfied")
-            || facts.server_facts.get("dayu200NormalHardwareSerialSHA256")
+            || facts
+                .server_facts
+                .get("dayu200NormalLoaderSerialSHA256")
+                .or_else(|| facts.server_facts.get("dayu200NormalHardwareSerialSHA256"))
                 != Some(&facts.identity_sha256)
+            || !facts
+                .server_facts
+                .get("dayu200NormalHardwareSerialSHA256")
+                .is_some_and(|value| lowercase_sha256(value))
             || !facts
                 .server_facts
                 .get("dayu200NormalHardwareObservationSHA256")
@@ -935,6 +942,24 @@ mod tests {
                     .unwrap()
                     .starts_with("flash.normalLoaderIdentityUnproven")
             );
+        }
+        // Factory SN and CPU identity stay distinct; neither can be omitted.
+        facts.server_facts.insert(
+            "dayu200NormalLoaderSerialSHA256".into(),
+            facts.identity_sha256.clone(),
+        );
+        facts
+            .server_facts
+            .insert("dayu200NormalHardwareSerialSHA256".into(), "d".repeat(64));
+        assert_eq!(admission_blocker(&facts), None);
+        for field in [
+            "dayu200NormalLoaderSerialSHA256",
+            "dayu200NormalHardwareSerialSHA256",
+            "dayu200NormalHardwareObservationSHA256",
+        ] {
+            let mut denied = facts.clone();
+            denied.server_facts.remove(field);
+            assert!(admission_blocker(&denied).is_some(), "missing {field}");
         }
         facts.device_mode = "loader".into();
         facts
