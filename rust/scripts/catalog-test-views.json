@@ -92,7 +92,7 @@
     "crates/arkdeck-agentd/tests/spawning/gj1_device_reads.rs": "81471780cc5a1d7ba53587d629376aab7d8f74fdbbbf73cce6447747a0a6116e",
     "crates/arkdeck-agentd/tests/spawning/gj1_inputs.rs": "d1986f815b0fba8710c8bb22d207fbae699a39138284f2267f0b6643f000578d",
     "crates/arkdeck-agentd/tests/spawning/gj23_replay.rs": "dd058550a16ed74ce89c3391ce0dba4939202c0d8ceb0a5a0487b4ff5024becd",
-    "crates/arkdeck-agentd/tests/spawning/job_archive_cli.rs": "2f1d9d653a4f047d8543dd8eac3a27160769c30950a22a005370c58fe2ca5df2",
+    "crates/arkdeck-agentd/tests/spawning/job_archive_cli.rs": "d084d06c5eed8f2ba05659862a08c02fee0bc3cfa92c9591c373ae61fdc4ae4d",
     "crates/arkdeck-agentd/tests/spawning/main.rs": "a030ef6d804be75f88d4f8fba7ab56c5151fa885f87b63c783cb6d1a5d47da5a",
     "crates/arkdeck-agentd/tests/spawning/managed_hdc_server.rs": "09383cb5ddec6e6ea2df8d10d3a6b9440c57a7d56598bec012c4b7be08c9c15f",
     "crates/arkdeck-agentd/tests/spawning/signed_daemon.rs": "88525261496fc1d5d028fb3db5e9a26cbaa57d4872b555f7cb62f40a93d28373",

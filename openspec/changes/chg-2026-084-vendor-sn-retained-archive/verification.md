@@ -91,10 +91,33 @@ jobs. No local unified gate or real device operation was run.
   -- -D warnings` after the postflight fix: exit 0;
   `vendor-sn-postflight-clippy.log`. The final SDD recheck uses
   `vendor-sn-postflight-sdd.log`.
+- The Windows archive CLI case was then run against both input views using
+  `test -p arkdeck-agentd --test spawning
+  job_archive_cli::a_quiescent_job_is_archived_over_the_signed_test_daemon
+  -- --exact`: each exit 0, 1 passed; `vendor-sn-published-archive-test.log` and
+  `vendor-sn-current-archive-test.log`. The published source was materialized by
+  `check-contracts.py` from immutable main `738e747f9901a7633e4d991f4dc117917ff5cd3f`,
+  selected through `ARKDECK_CARGO_SOURCE_ROOT`; both views reuse the same fixed
+  Cargo owner/cache/target. Each first ran `build -p arkdeck-cli --bin arkdeck`
+  successfully (`vendor-sn-published-cli-build.log`, `vendor-sn-current-cli-build.log`).
+- `clippy -p arkdeck-agentd --all-targets -- -D warnings` after the published-view
+  assertions: exit 0; `vendor-sn-published-assertion-clippy.log`. Per-file format,
+  source routing, generators, Manifest Schema and diff checks: each exit 0;
+  `vendor-sn-published-expectation-checks.log`.
 
 ## CI
 
-PR #2656 is open; selected CI must pass on the final postflight-fix head. No result
-is claimed before that run completes.
+PR #2656 is open; selected CI must pass on its final head. Run 38899583766 passed
+the Swift/App, Windows client, all workspace and Linux/macOS parity lanes, but
+its Windows published-input view failed
+`job_archive_cli::a_quiescent_job_is_archived_over_the_signed_test_daemon`.
+The older immutable response schema correctly refused the new retained-risk
+fields; that test still expected success. This was not a load-sensitive failure.
+The test now verifies the exact old-contract refusal and unchanged Job/Journal
+bytes with no Session. Current/candidate schemas must still execute every
+original archive round-trip assertion. Production validation is unchanged.
+The failed log is `D:/src/ArkDeck-wt/tools/vendor-sn-windows-parity-ci-failed.log`.
+
+No final result is claimed before the corrected head's run completes.
 Final run IDs and conclusions are recorded on the PR and in the delivery report;
 an already-green head is not amended solely to copy CI results into this file.
