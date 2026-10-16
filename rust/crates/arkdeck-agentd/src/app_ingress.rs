@@ -413,10 +413,17 @@ fn closed_parameters(request: &Request) -> bool {
         // for one Target and profile: a digest names the archive, never a
         // path, topology or plan of the App's own.
         "flash.lanePlanPreview" => &["targetId", "profileReference", "archiveSha256"],
-        // The App selects an adopted Target and the revision it saw; every
-        // identity and port is read afresh by the Runtime, which writes only
-        // its own binding and the Target's lineage.
-        "flash.bind-current-loader" => &["targetId", "expectedBindingRevision", "adoptCurrentLoader"],
+        // First adoption names no Target; the Runtime observes its identity
+        // and port. It cannot be combined with selected-Target parameters.
+        "flash.bind-current-loader" if params.contains_key("adoptCurrentLoader") => {
+            if params.get("adoptCurrentLoader").and_then(Value::as_bool) != Some(true) {
+                return false;
+            }
+            &["adoptCurrentLoader"]
+        }
+        // Existing adoption names only the selected Target and revision;
+        // the Runtime still reads every identity and port afresh.
+        "flash.bind-current-loader" => &["targetId", "expectedBindingRevision"],
         "history.filter.delete" => &["expectedGeneration"],
         "history.filter.save" => &[
             "expectedGeneration",

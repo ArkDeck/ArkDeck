@@ -1,7 +1,8 @@
 //! The App binds the Loader of the one attached board to a Target it
 //! selected, as ClientKit's `FlashApplicationFacade.bindCurrentLoader` does:
-//! it names that Target and the revision it saw, and nothing else. A
-//! recording host stands in for the coordinator: the boundary is under test
+//! it names that Target and the revision it saw, and nothing else. First
+//! adoption instead names only `adoptCurrentLoader: true`. A recording
+//! host stands in for the coordinator: the boundary is under test
 //! here, the binding itself is replayed by `loader_binding_control`. No
 //! signed peer, board or installed Runtime is represented.
 use super::*;
@@ -21,6 +22,17 @@ impl HostServices for Binding {
     }
     fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
         unreachable!("the Loader binding observes no candidates")
+    }
+    fn flash_adopt_current_loader(&self) -> Result<Value, WireError> {
+        self.calls.lock().unwrap().push("adopt".into());
+        Ok(json!({
+            "targetId": "TGT-3ba3f5f43b92",
+            "previousBindingRevision": 1,
+            "bindingRevision": 1,
+            "updated": true,
+            "selectionEvidenceSha256": "e".repeat(64),
+            "settledJobId": null,
+        }))
     }
     fn flash_bind_current_loader(
         &self,
@@ -88,6 +100,69 @@ fn the_app_binds_the_attached_loader_to_the_target_it_selected() {
         (refusal.code.as_str(), refusal.message.as_str()),
         ("internalError", "Rockchip Loader binding is not configured")
     );
+}
+
+#[test]
+fn the_app_adopts_the_attached_loader_without_supplying_a_target() {
+    let root = Root::new();
+    let (ingress, control, calls) = binding(&root);
+    let request = frame(
+        "flash.bind-current-loader",
+        json!({"adoptCurrentLoader": true}),
+    );
+    let reply = ingress.handle(&request, root.peer());
+    let receipt = result(&reply, "flash.bind-current-loader");
+    assert_eq!(receipt["targetId"], "TGT-3ba3f5f43b92");
+    assert_eq!(receipt["bindingRevision"], 1);
+    assert_eq!(receipt["settledJobId"], Value::Null);
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 1);
+    assert_eq!(calls.lock().unwrap().as_slice(), ["adopt"]);
+    assert_eq!(control.handle_frame(&request), reply);
+}
+
+#[test]
+fn loader_first_app_adoption_refuses_mixed_identity_and_untrusted_peers() {
+    let root = Root::new();
+    let (ingress, _control, calls) = binding(&root);
+    for params in [
+        json!({"adoptCurrentLoader": false}),
+        json!({"adoptCurrentLoader": "true"}),
+        json!({"adoptCurrentLoader": true, "targetId": "TGT-1"}),
+        json!({"adoptCurrentLoader": true, "expectedBindingRevision": 1}),
+        json!({"adoptCurrentLoader": true, "targetId": "TGT-1", "expectedBindingRevision": 1}),
+        json!({"adoptCurrentLoader": true, "serial": "loader-serial-0451"}),
+        json!({"adoptCurrentLoader": true, "usbTopology": "17956864"}),
+        json!({"adoptCurrentLoader": true, "selectionEvidenceSha256": "e"}),
+        json!({"adoptCurrentLoader": true, "peerEUID": root.peer().euid}),
+    ] {
+        let reply = ingress.handle(
+            &frame("flash.bind-current-loader", params.clone()),
+            root.peer(),
+        );
+        assert_eq!(code(&reply), "invalidParams", "{params}");
+    }
+    let valid = frame(
+        "flash.bind-current-loader",
+        json!({"adoptCurrentLoader": true}),
+    );
+    for peer in [
+        PeerOrigin {
+            euid: root.peer().euid.wrapping_add(1),
+            ..root.peer()
+        },
+        PeerOrigin {
+            pid: 1,
+            ..root.peer()
+        },
+        PeerOrigin {
+            foreground_console: true,
+            ..root.peer()
+        },
+    ] {
+        assert_eq!(code(&ingress.handle(&valid, peer)), "rejected");
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+    assert!(calls.lock().unwrap().is_empty());
 }
 
 #[test]

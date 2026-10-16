@@ -161,7 +161,7 @@ fn call(control: &Control<crate::host::Host>, id: usize, params: Value) -> Value
 fn loader_first_control_adoption_records_its_typed_receipt() {
     let root = Root::new();
     let targets = TargetStore::open(&root.0.canonicalize().unwrap().join("state/targets")).unwrap();
-    let jobs_root = root.0.join("jobs-state");
+    let jobs_root = root.0.canonicalize().unwrap().join("jobs-state");
     arkdeck_platform::HostDirectory::open_or_create_private(&jobs_root).unwrap();
     let jobs = arkdeck_hoststore::JobStore::open_owner(&jobs_root).unwrap();
     let control = Control::new(

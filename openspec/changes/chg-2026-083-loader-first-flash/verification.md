@@ -37,6 +37,13 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
   then `--lib`: exit 0; 760 passed, 4 existing ignored;
   `loader-first-library-tests-final.log`. Agentd `--lib --bin arkdeck-agentd`:
   exit 0, 44 passed; `loader-first-agentd-units-final.log`.
+- The macOS CI fixes also passed the Windows agentd library and binary units:
+  exit 0, 44 passed; `loader-first-ingress-agentd-units.log`. The additional
+  macOS App ingress cases exercise exclusive first adoption, selected-Target
+  compatibility and rejection of mixed parameters, caller identities and
+  untrusted peers; they require the macOS CI lane.
+  `clippy -p arkdeck-agentd -p arkdeck-bootstrap --all-targets -- -D warnings`
+  also passed (exit 0; `loader-first-ingress-clippy.log`).
 - `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --test
   loader_binding_jobs --test post_flash_alias`: exit 0, 9 passed;
   `loader-first-binding-alias-tests-final.log`.
@@ -68,8 +75,13 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
 - Catalog routing's 31 Python tests passed; `loader-first-test-routing.log`.
   Source inventory and the complete routing manifest validate against Cargo
   metadata; `loader-first-manifest-final.log`.
+  The final ingress source pins validate with the complete manifest too;
+  `loader-first-ingress-manifest.log`. All three Rust files in that fix passed
+  the direct rustfmt check.
 - `sh scripts/check-sdd.sh` through Git Bash and the repository Python environment:
   exit 0; `loader-first-sdd.log` (0 errors, 0 warnings).
+  The ingress fix passed again: exit 0, 0 errors and 0 warnings;
+  `loader-first-ingress-sdd.log`.
 
 The earlier broad local Cargo invocation stopped at two existing account-daemon
 process tests because the installed production Runtime owns its singleton. Its
@@ -90,5 +102,11 @@ Linux workspace and all three contract-parity views identified the same historic
 export hash mismatch for `fixtures/argv/flash.bind-loader.json`; no other exported
 file differed. The explicit compatibility mapping now includes that regenerated
 input, whose current bytes are independently pinned and replayed by CLI tests.
+Run `38825448370` on `146a1f16` passed Swift, Windows ClientKit, Rust host checks,
+Linux workspace and Linux contract parity. Its macOS workspace found two defects:
+App ingress required both exclusive Loader request shapes at once, and the new
+JobStore test used macOS's noncanonical `/tmp` spelling. The ingress now admits
+either complete shape, with new negative coverage; the test opens its canonical
+private directory without relaxing production storage validation.
 The corrected head must complete all selected lanes before merge.
 CI success is not hardware acceptance and does not replace maintainer review.
