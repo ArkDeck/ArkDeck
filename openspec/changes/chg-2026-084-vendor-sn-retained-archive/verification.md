@@ -104,6 +104,18 @@ jobs. No local unified gate or real device operation was run.
   assertions: exit 0; `vendor-sn-published-assertion-clippy.log`. Per-file format,
   source routing, generators, Manifest Schema and diff checks: each exit 0;
   `vendor-sn-published-expectation-checks.log`.
+- Synced main `b7adfd2d0cbcf6b06b57cf1ddf1e7549980bf4c0` (PR #2657, ArkForge SDK
+  consumer pin) without conflicts. All 308 published contract input files and
+  their directory membership are byte-identical to the preceding published view.
+  The combined tree passes clippy for provider-hdc, hoststore, agentd and soak
+  with `--all-targets -- -D warnings` (exit 0; `vendor-sn-main-sync-clippy.log`).
+  `test -p arkdeck-hoststore --lib`: exit 0, 396 passed and 4 existing ignored
+  (`vendor-sn-main-sync-hoststore.log`). `test -p arkdeck-provider-arkforge
+  --test consumer_contract`: exit 0, 1 passed (`vendor-sn-main-sync-consumer.log`).
+  After rebuilding the matching CLI (exit 0; `vendor-sn-main-sync-cli-build.log`),
+  the exact archive CLI case again passes (exit 0, 1 passed;
+  `vendor-sn-main-sync-archive-cli.log`). Input/generator/schema/routing checks
+  and SDD also pass; `vendor-sn-main-sync-checks.log`, `vendor-sn-main-sync-sdd.log`.
 
 ## CI
 
