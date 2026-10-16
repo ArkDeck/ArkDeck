@@ -157,6 +157,59 @@ fn call(control: &Control<crate::host::Host>, id: usize, params: Value) -> Value
     }
 }
 
+#[test]
+fn loader_first_control_adoption_records_its_typed_receipt() {
+    let root = Root::new();
+    let targets = TargetStore::open(&root.0.canonicalize().unwrap().join("state/targets")).unwrap();
+    let jobs_root = root.0.canonicalize().unwrap().join("jobs-state");
+    arkdeck_platform::HostDirectory::open_or_create_private(&jobs_root).unwrap();
+    let jobs = arkdeck_hoststore::JobStore::open_owner(&jobs_root).unwrap();
+    let control = Control::new(
+        crate::host::Host::from_environment()
+            .with_targets(targets)
+            .with_jobs(jobs)
+            .with_loader_binding(LoaderBinding::new(
+                &root.0,
+                || {
+                    Ok(vec![UsbHostDevice {
+                        serial: "0123456789abcdef".into(),
+                        vendor_id: 0x2207,
+                        product_id: 0x350a,
+                        topology: "17956864".into(),
+                        product_name: None,
+                        registry_entry_id: Some(42),
+                    }])
+                },
+                Observation(Arc::new(Mutex::new(Script::Confirm))),
+            )),
+    )
+    .unwrap();
+    let params = json!({"adoptCurrentLoader": true});
+    let first = call(&control, 1, params.clone());
+    assert_eq!(first["ok"], true, "{first}");
+    assert_eq!(first["result"]["bindingRevision"], 1);
+    let retry = call(&control, 2, params.clone());
+    assert_eq!(retry["result"]["updated"], false, "{retry}");
+    assert_eq!(retry["result"]["targetId"], first["result"]["targetId"]);
+    let mixed = call(
+        &control,
+        3,
+        json!({"adoptCurrentLoader":true,"targetId":"TGT-CALLER"}),
+    );
+    assert_eq!(mixed["error"]["code"], "invalidParams", "{mixed}");
+    if let Some(path) = std::env::var_os("ARKDECK_RECORD_LOADER_FIRST_CONTROL") {
+        let mut frame = first;
+        frame["protocolVersion"] = json!(PROTOCOL_VERSION);
+        frame["method"] = json!(METHOD);
+        frame["params"] = params;
+        fs::write(
+            path,
+            format!("{}\n", serde_json::to_string(&frame).unwrap()),
+        )
+        .unwrap();
+    }
+}
+
 #[cfg(unix)]
 fn mode(text: &str) -> u32 {
     u32::from_str_radix(text, 8).unwrap()

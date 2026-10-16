@@ -296,6 +296,7 @@ fn fixture(campaign: &str) -> (LaneHost, Arc<Mutex<Script>>, LaneArtifact, Devic
         target_id: "TGT-1".into(),
         binding_revision: 4,
         usb_topology: "17956864".into(),
+        loader_first_connector_sha256: None,
     };
     (lane, script, artifact, binding)
 }

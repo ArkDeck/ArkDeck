@@ -17,7 +17,11 @@ pub(crate) fn install(
     application_support: &Path,
     census: impl Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable> + Send + Sync + 'static,
 ) -> Host {
-    let (Ok(lane), Some(hdc)) = (&composed.lane, host.rockchip_hdc_resolver()) else {
+    let (Ok(lane), Some(hdc), Some(targets)) = (
+        &composed.lane,
+        host.rockchip_hdc_resolver(),
+        host.rockchip_target_store(),
+    ) else {
         return host;
     };
     let census = Arc::new(census);
@@ -32,6 +36,7 @@ pub(crate) fn install(
         )),
         Box::new(arkdeck_provider_hdc::SystemClock),
     )
+    .with_target_store(targets)
     .with_post_flash_aliases(PostFlashAliasStore::new(application_support), || {
         arkdeck_hoststore::runtime_now().unwrap_or_default()
     });
@@ -55,6 +60,7 @@ pub(crate) fn install(
                     stable_identity_sha256: binding.stable_identity_sha256.clone(),
                     usb_topology: binding.usb_topology.clone(),
                     provider_executable_sha256: provider_digest.clone(),
+                    loader_first_connector_sha256: binding.loader_first_connector_sha256.clone(),
                 },
                 actions.clone(),
                 Box::new(ArkForgeLoader::new(move || census(), &directory)),

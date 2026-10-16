@@ -43,6 +43,7 @@ const LOADER_READBACK: &str = "product:e0-iokit-single-loader-readback";
 /// Swift `"usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),…"`: the
 /// RockUSB vendor `0x2207`, which Swift interpolates as a decimal `UInt16`.
 const CROSS_MODE_USB: &str = "usb:vendor=8711,profile=dayu200-cross-mode";
+pub(crate) const LOADER_FIRST: &str = "binding:initial-mode=loader";
 
 /// The owner over one Application Support root: its binding, the Runtime's
 /// records below it, the census and ArkForge's Loader observation.
@@ -68,6 +69,7 @@ struct Target {
     identity: String,
     revision: i64,
     connect_key: String,
+    loader_adoption: bool,
 }
 
 impl Target {
@@ -148,6 +150,200 @@ impl LoaderBinding {
                 &application_support_root.join("Agentd/rockchip-runtime"),
             ),
         }
+    }
+
+    /// First contact in Loader. Neither an old Normal identity nor a caller
+    /// assertion is used to associate this board with a prior Target.
+    pub fn adopt_current_loader(
+        &self,
+        targets: &TargetStore,
+        jobs: &JobStore,
+    ) -> Result<Value, WireError> {
+        let _admission = jobs.loader_binding_interlock()?;
+        if let Some(job) = jobs.unsettled_flash_jobs_for_loader_adoption()?.first() {
+            return Err(refusal(admission(&format!(
+                "Job {job} retains unsettled Flash state; first Loader adoption cannot \
+                 create a different Target around an unproved physical association; nothing was written"
+            ))));
+        }
+        let identity = self.fresh_initial_loader().map_err(refusal)?;
+        let current = sha256_hex(identity.serial.as_bytes());
+        let records = list(targets).map_err(refusal)?;
+        let matching: Vec<&Target> = records
+            .iter()
+            .filter(|target| target.identity == current)
+            .collect();
+        let target_id = match matching.as_slice() {
+            [target]
+                if target.loader_adoption
+                    && target.revision == 1
+                    && target.connect_key == identity.serial =>
+            {
+                target.id.clone()
+            }
+            [] => {
+                let now = crate::format_time::utc_now().ok_or_else(|| {
+                    refusal(configuration("Loader adoption clock is unavailable"))
+                })?;
+                targets
+                    .adopt_loader_identity(&current, &identity.serial, &now, || {
+                        self.revalidate_initial_loader(&identity).map_err(refusal)
+                    })?
+                    .target_id
+            }
+            _ => {
+                return Err(refusal(admission(
+                    "the Loader identity already belongs to a Target; select that Target and its exact revision",
+                )));
+            }
+        };
+        self.revalidate_initial_loader(&identity).map_err(refusal)?;
+        let receipt = self
+            .publish_initial_loader(targets, &target_id, &identity)
+            .map_err(refusal)?;
+        Ok(json!({
+            "targetId": target_id,
+            "previousBindingRevision": receipt.previous,
+            "bindingRevision": receipt.current,
+            "updated": receipt.updated,
+            "selectionEvidenceSha256": receipt.selection,
+            "settledJobId": null,
+        }))
+    }
+
+    fn fresh_initial_loader(&self) -> Result<UsbHostDevice, String> {
+        let devices = registered_dayu200_devices(
+            (self.census)().map_err(|_| admission("USB registry unavailable"))?,
+        );
+        let [device] = devices.as_slice() else {
+            return Err(admission(
+                "exactly one registered Loader is required for first adoption",
+            ));
+        };
+        // This initial path supports the bounded hardware serial source used
+        // by postflight. Other Loader serial formats need their own profile.
+        if !is_dayu200_loader(device)
+            || device.serial.len() != 16
+            || !device
+                .serial
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || device.serial.bytes().all(|b| b == b'0')
+            || device.serial.bytes().all(|b| b == b'f')
+        {
+            return Err(admission(
+                "first adoption requires an exact Loader with a supported hardware serial",
+            ));
+        }
+        authorize(device)?;
+        let current = sha256_hex(device.serial.as_bytes());
+        let confirmed = self
+            .observer
+            .observe_loader(&current, Some(&device.topology), "adopt-current-loader")
+            .map_err(|_| admission("ArkForge could not confirm the exact Loader for adoption"))?;
+        if confirmed.serial_digest_sha256 != current || confirmed.topology != device.topology {
+            return Err(admission("Loader sources disagree during adoption"));
+        }
+        Ok(device.clone())
+    }
+
+    fn revalidate_initial_loader(&self, expected: &UsbHostDevice) -> Result<(), String> {
+        if self.fresh_initial_loader()? != *expected {
+            return Err(admission("Loader attachment changed during adoption"));
+        }
+        Ok(())
+    }
+
+    fn publish_initial_loader(
+        &self,
+        targets: &TargetStore,
+        target_id: &str,
+        identity: &UsbHostDevice,
+    ) -> Result<Receipt, String> {
+        let current = sha256_hex(identity.serial.as_bytes());
+        let records = list(targets)?;
+        let target = records
+            .iter()
+            .find(|target| target.id == target_id)
+            .ok_or_else(|| admission("adopted Loader Target is missing"))?;
+        if !unique(&records, target_id, 1, &current)
+            || !target.loader_adoption
+            || target.connect_key != identity.serial
+        {
+            return Err(admission("adopted Loader Target changed before binding"));
+        }
+        let existing = self.store.load_if_present().map_err(swift)?;
+        if let Some(existing) = &existing
+            && existing.identity() == current
+        {
+            if existing.revision != 1
+                || !existing.evidence.iter().any(|entry| entry == LOADER_FIRST)
+                || existing.covers_runtime_target(&target.bound()) != Ok(true)
+                || existing.matches_confirmed_live_identity(identity) != Ok(true)
+            {
+                return Err(admission(
+                    "an existing binding cannot be converted to first Loader adoption",
+                ));
+            }
+            return self.receipt(targets, target_id, 1);
+        }
+        let selection = selection_digest(target_id, 1, 1, &current, &current, &identity.topology);
+        let mut evidence = vec![
+            LOADER_READBACK.into(),
+            CROSS_MODE_USB.into(),
+            LOADER_FIRST.into(),
+            format!("identity:serial-sha256={current}"),
+            format!("binding:selected-target-id={target_id}"),
+            format!("rebind:user-selection-sha256={selection}"),
+        ];
+        if let Some(existing) = &existing {
+            evidence.push(format!(
+                "binding:replaced-active-revision={}",
+                existing.revision
+            ));
+            evidence.push(format!(
+                "identity:replaced-active-serial-sha256={}",
+                existing.identity()
+            ));
+        }
+        let candidate = BindingSnapshot {
+            revision: 1,
+            serial: identity.serial.clone(),
+            usb_topology: identity.topology.clone(),
+            evidence,
+        };
+        // The Target publication can survive a crash before this write. It
+        // has no runnable Flash binding until an exact fresh retry completes.
+        self.revalidate_initial_loader(identity)?;
+        let stored = match existing {
+            Some(existing) => self
+                .store
+                .activate_selected_initial_target(
+                    existing.revision,
+                    &existing.identity(),
+                    &candidate,
+                )
+                .map_err(swift)?,
+            None => self.store.install(&candidate, false).map_err(swift)?.0,
+        };
+        if stored != candidate
+            || !stored
+                .covers_runtime_target(&target.bound())
+                .map_err(swift)?
+            || !stored
+                .matches_confirmed_live_identity(identity)
+                .map_err(swift)?
+        {
+            return Err(configuration(
+                "first Loader binding readback did not match adoption",
+            ));
+        }
+        Ok(Receipt {
+            previous: 1,
+            current: 1,
+            updated: true,
+            selection,
+        })
     }
 
     /// `flash.bind-current-loader` once its parameters were read: the
@@ -735,6 +931,7 @@ fn list(targets: &TargetStore) -> Result<Vec<Target>, String> {
                 identity: record["stablePhysicalIdentitySHA256"].as_str()?.to_owned(),
                 revision: record["bindingRevision"].as_i64()?,
                 connect_key: record["connectKey"].as_str()?.to_owned(),
+                loader_adoption: record["toolVersion"].as_str() == Some("arkforge.native-rockusb"),
             })
         })
         .collect())

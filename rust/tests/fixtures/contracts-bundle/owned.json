@@ -70,7 +70,7 @@
   "fixtures/argv/diagnostics.session.status.json": "09da98f8b430185f10b1298ede2b21ead5491ad5c480d8c73b9e751407b6769f",
   "fixtures/argv/diagnostics.session.stop.json": "6b1ec1f0c51a49a8e114d1c5a6ee67381d4776e11ea26de38ecc181360a88d9f",
   "fixtures/argv/doctor.json": "4f5362596fa36f5c47f7df4565bb7f54b49f9ff79b1cdc7345d59b53fa27b1c8",
-  "fixtures/argv/flash.bind-loader.json": "25ba7ab124cbc20fef2552aaab0ffeab838387ecf9f5d142f44fd969602aeb1e",
+  "fixtures/argv/flash.bind-loader.json": "b90acd145a746a3896d729fc59f472af72965a44fbd26371b47b25aaa7a913b3",
   "fixtures/argv/flash.bootloader-status.json": "5031e2edd1fac258376d3c1466ac9f3c8f704da48039427e5b912fae6d741bb8",
   "fixtures/argv/flash.continue.json": "2cba0554d2b7bd3a9987bbdca30695e83075fbe177e79c44a110fb7c8a81b0d2",
   "fixtures/argv/flash.device-access.json": "9e38a984983f606047c3cdc7eb2c2fc433e3c6bb2c520b85f4d520aa70965b7a",

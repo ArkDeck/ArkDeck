@@ -166,6 +166,38 @@ fn files(root: &Root) -> (Vec<u8>, Vec<u8>) {
 }
 
 #[test]
+fn loader_first_adoption_cannot_hide_an_unsettled_flash_under_a_new_target() {
+    for state in ["waitingForRecovery", "failed"] {
+        let (root, targets, _) = scene();
+        let jobs =
+            JobStore::open_owner(&root.0.canonicalize().unwrap().join("jobs-state")).unwrap();
+        let id = "job-00000000000000000000000000000f01";
+        park(
+            &jobs,
+            id,
+            "TGT-UNPROVED-NORMAL",
+            4,
+            state,
+            "flash-partitions",
+        );
+        let binding = LoaderBinding::new(
+            &root.0,
+            || panic!("unsettled census must precede USB observation"),
+            Confirmed,
+        );
+        let before = files(&root);
+        let job = jobs.read_snapshot(id).unwrap().value().unwrap();
+        let error = binding.adopt_current_loader(&targets, &jobs).unwrap_err();
+        assert!(
+            error.message.contains("first Loader adoption cannot"),
+            "{error:?}"
+        );
+        assert_eq!(files(&root), before);
+        assert_eq!(jobs.read_snapshot(id).unwrap().value().unwrap(), job);
+    }
+}
+
+#[test]
 fn a_job_awaiting_the_binding_refuses_it_before_anything_is_written() {
     let (root, targets, binding) = scene();
     let jobs = JobStore::open_owner(&root.0.canonicalize().unwrap().join("jobs-state")).unwrap();

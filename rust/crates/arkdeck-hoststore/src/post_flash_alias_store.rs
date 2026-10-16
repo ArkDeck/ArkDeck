@@ -72,6 +72,41 @@ impl PostFlashAliasStore {
         }
     }
 
+    /// Establish a first HDC route only from the executor's persisted hardware
+    /// proof. A historical alias, including another Target's, is never replaced
+    /// by this initial-publication path.
+    pub fn publish_loader_first(
+        &self,
+        candidate: &PostFlashBinding,
+    ) -> Result<PostFlashBinding, PostFlashAliasError> {
+        candidate.validate()?;
+        if candidate.loader_hardware_proof.is_none() {
+            return Err(failure("first Loader alias has no hardware proof"));
+        }
+        let root = self.prepare_root()?;
+        let _lock = Self::lock(&root)?;
+        match Self::load(&root)? {
+            None => Self::commit(&root, candidate),
+            Some(existing)
+                if existing.same_proof(candidate) || {
+                    let same_connector = existing
+                        .loader_hardware_proof
+                        .as_ref()
+                        .zip(candidate.loader_hardware_proof.as_ref())
+                        .is_some_and(|(a, b)| a.connector_sha256 == b.connector_sha256);
+                    let mut compared = existing.clone();
+                    compared.loader_hardware_proof = candidate.loader_hardware_proof.clone();
+                    same_connector && compared.same_proof(candidate)
+                } =>
+            {
+                Ok(existing)
+            }
+            Some(_) => Err(failure(
+                "an existing HDC alias cannot be replaced by first Loader adoption",
+            )),
+        }
+    }
+
     /// Swift `reconcileReissuedLineage`: under the lock, a stored alias ahead
     /// of the live Target that agrees with it and with the observed device on
     /// every identity fact is archived and republished at the live revision;

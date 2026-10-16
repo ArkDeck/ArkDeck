@@ -164,6 +164,7 @@ fn performer(
             stable_identity_sha256: IDENTITY.into(),
             usb_topology: TOPOLOGY.into(),
             provider_executable_sha256: PROVIDER.into(),
+            loader_first_connector_sha256: None,
         },
         Arc::new(DurableRockchipHost::new(
             Arc::clone(executor),
@@ -190,6 +191,53 @@ fn facts(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         .iter()
         .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
         .collect()
+}
+
+#[test]
+fn loader_first_callbacks_use_hardware_bound_postflight_without_normal_fallback() {
+    let store = Store::new();
+    let executor = Arc::new(Recording::default());
+    let mut performer = performer(&store, &executor, None);
+    performer.binding.loader_first_connector_sha256 = Some("d".repeat(64));
+    let absent = performer
+        .perform(&request(
+            "REQ-loader-absent",
+            ManagedControlAction::EnterUpdater,
+        ))
+        .unwrap();
+    assert!(!absent.accepted);
+    assert_eq!(executor.count(), 0);
+    for (id, action) in [
+        ("REQ-loader-reconnect", ManagedControlAction::RebootToNormal),
+        ("REQ-loader-product", ManagedControlAction::ReadProductFacts),
+        ("REQ-loader-build", ManagedControlAction::ReadBuildFacts),
+    ] {
+        let mut request = request(id, action);
+        request.expected_facts = vec![
+            KeyValue {
+                key: "const.product.model".into(),
+                value: "rk3568".into(),
+            },
+            KeyValue {
+                key: "const.ohos.fullname".into(),
+                value: "published-build".into(),
+            },
+        ];
+        assert!(performer.perform(&request).unwrap().accepted);
+    }
+    let actions = executor.executed.lock().unwrap();
+    assert_eq!(actions.len(), 3);
+    assert!(
+        matches!(&actions[0].0, RockchipAction::WaitForLoaderHdc(expectation)
+        if expectation.hardware_serial_sha256 == IDENTITY && expectation.connector_sha256 == "d".repeat(64))
+    );
+    for (action, descriptor) in &actions[1..] {
+        assert!(
+            matches!(action, RockchipAction::VerifyLoaderBuild { expectation, product_model, build_version }
+            if expectation.hardware_serial_sha256 == IDENTITY && product_model == "rk3568" && build_version == "published-build")
+        );
+        assert_eq!(descriptor.action_sha256, action.sha256());
+    }
 }
 
 /// Swift `testEnterUpdaterRunsAllFiveActionsThroughTheValidatingHost`: the

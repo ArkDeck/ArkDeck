@@ -406,10 +406,13 @@ jobs:
     # whole-job limit cancelled cleanup. #2629 run 37639573364 reached that
     # same limit during the historical default unit tests, with no assertion
     # failure. The complete routed workload needs room for all views and
-    # evidence finalization: Windows and macOS get 50 minutes, Linux 30.
+    # evidence finalization. #2653 run 38831173671 completed the published
+    # and candidate Windows views, then reached 50 minutes in the historical
+    # view with no assertion failure. Allow 75 minutes for all three Windows
+    # views and finalization; macOS keeps 50 minutes and Linux 30.
     # Test/Runtime/operation deadlines, coverage and failure aggregation stay
     # unchanged; every selected check and isolated view must still complete.
-    timeout-minutes: ${{ (startsWith(matrix.os, 'xcode') || matrix.os == 'windows-latest') && 50 || 30 }}
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 75 || startsWith(matrix.os, 'xcode') && 50 || 30 }}
     defaults:
       run:
         shell: bash

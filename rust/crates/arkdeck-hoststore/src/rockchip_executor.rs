@@ -18,7 +18,9 @@
 //! - each arm's receipt summary;
 //! - the retired direct reset.
 use crate::flash_facts::post_flash;
-use crate::post_flash_alias::{PostFlashBinding, SCHEMA_VERSION};
+use crate::post_flash_alias::{
+    LOADER_FIRST_SCHEMA_VERSION, LoaderHardwareProof, PostFlashBinding, SCHEMA_VERSION,
+};
 use crate::post_flash_alias_store::PostFlashAliasStore;
 use crate::rockchip_action::{Expectation, RockchipAction};
 use crate::rockchip_records::{ExecutionResult, RockchipActionExecutor};
@@ -51,6 +53,7 @@ pub struct RockchipExecutor {
     loader: Box<dyn LoaderObserver + Send + Sync>,
     clock: Box<dyn Clock + Send + Sync>,
     aliases: Option<PostFlashAliasStore>,
+    targets: Option<Arc<crate::TargetStore>>,
     now_utc: Box<dyn Fn() -> String + Send + Sync>,
     enter_loader_readback: ReadbackBudget,
     reuse: Mutex<ReuseCache>,
@@ -73,6 +76,7 @@ impl RockchipExecutor {
             loader,
             clock,
             aliases: None,
+            targets: None,
             now_utc: Box::new(|| crate::format_time::utc_now().unwrap_or_default()),
             enter_loader_readback: ReadbackBudget::DEFAULT,
             reuse: Mutex::new(ReuseCache::default()),
@@ -88,6 +92,11 @@ impl RockchipExecutor {
     ) -> Self {
         self.aliases = Some(store);
         self.now_utc = Box::new(now_utc);
+        self
+    }
+
+    pub fn with_target_store(mut self, targets: Arc<crate::TargetStore>) -> Self {
+        self.targets = Some(targets);
         self
     }
 
@@ -297,6 +306,147 @@ impl RockchipActionExecutor for RockchipExecutor {
                 self.remember_bound(bound_key(descriptor, &expectation), &identity);
                 Ok(result(bound_reconnect_summary(&identity), receipts))
             }
+            RockchipAction::WaitForLoaderHdc(expectation) => {
+                let (identity, hardware, receipts) = observer
+                    .wait_for_loader_hdc(expectation, &WaitBudget::BOUND_RECONNECT)
+                    .map_err(hdc_failure)?;
+                let record = persist_postflight_hardware(action_directory, descriptor, &hardware)?;
+                let mut summary = bound_reconnect_summary(&identity);
+                summary.extend(hardware.summary());
+                summary.insert("hardwareObservationSha256".into(), record);
+                let mut executed = result(summary, receipts);
+                executed.subprocess_count += 1;
+                Ok(executed)
+            }
+            RockchipAction::VerifyLoaderBuild {
+                expectation,
+                product_model,
+                build_version,
+            } => {
+                let aliases = self.aliases.as_ref().ok_or_else(|| {
+                    LaneFailure::Failed("Loader-first alias publication is not configured".into())
+                })?;
+                let (verified, hardware) = observer
+                    .verify_loader_build(
+                        expectation,
+                        product_model,
+                        build_version,
+                        &WaitBudget::BOUND_RECONNECT,
+                    )
+                    .map_err(hdc_failure)?;
+                let record = persist_postflight_hardware(action_directory, descriptor, &hardware)?;
+                let binding = PostFlashBinding {
+                    schema_version: LOADER_FIRST_SCHEMA_VERSION.into(),
+                    target_id: descriptor.target_id.clone(),
+                    binding_revision: descriptor.binding_revision,
+                    stable_loader_identity_sha256: descriptor.expected_identity_sha256.clone(),
+                    previous_hdc_identity_sha256: String::new(),
+                    loader_hardware_proof: Some(LoaderHardwareProof {
+                        observation_sha256: record.clone(),
+                        connector_sha256: expectation.connector_sha256.clone(),
+                    }),
+                    hdc_identity_sha256: verified.identity.serial_digest_sha256.clone(),
+                    hdc_connect_key: verified.identity.connect_key.clone(),
+                    usb_topology: verified.identity.topology.clone(),
+                    product_model: verified.readback.product_model.clone(),
+                    build_version: verified.readback.build_version.clone(),
+                    job_id: descriptor.job_id.clone(),
+                    established_at_utc: (self.now_utc)(),
+                };
+                let targets = self.targets.as_ref().ok_or_else(|| {
+                    LaneFailure::Failed("first Loader alias publication has no Target owner".into())
+                })?;
+                if targets
+                    .has_conflicting_hdc_alias_owner(
+                        &binding.target_id,
+                        &binding.hdc_connect_key,
+                        &binding.hdc_identity_sha256,
+                        &binding.job_id,
+                    )
+                    .map_err(LaneFailure::Failed)?
+                {
+                    return Err(LaneFailure::Failed(
+                        "verified first Loader HDC identity is owned by another Target".into(),
+                    ));
+                }
+                aliases.publish_loader_first(&binding).map_err(|error| {
+                    LaneFailure::Failed(format!(
+                        "verified first Loader HDC alias could not be persisted: {}",
+                        post_flash(error)
+                    ))
+                })?;
+                let mut summary = verified.summary();
+                summary.extend(hardware.summary());
+                summary.insert("hardwareObservationSha256".into(), record);
+                let mut executed = result(summary, verified.receipts);
+                executed.subprocess_count += 1;
+                Ok(executed)
+            }
+            RockchipAction::CaptureLoaderPostFlashDiagnostics {
+                expectation,
+                request,
+            } => {
+                let binding = self
+                    .aliases
+                    .as_ref()
+                    .ok_or_else(|| {
+                        LaneFailure::Failed("Loader-first alias store is unavailable".into())
+                    })?
+                    .load_if_present()
+                    .map_err(|error| LaneFailure::Failed(post_flash(error)))?
+                    .filter(|binding| {
+                        binding.target_id == descriptor.target_id
+                            && binding.binding_revision == descriptor.binding_revision
+                            && binding.stable_loader_identity_sha256
+                                == descriptor.expected_identity_sha256
+                            && binding.job_id == descriptor.job_id
+                            && binding.loader_hardware_proof.as_ref().is_some_and(|proof| {
+                                proof.connector_sha256 == expectation.connector_sha256
+                            })
+                    })
+                    .ok_or_else(|| {
+                        LaneFailure::Failed(
+                            "this Job has no verified first Loader HDC route".into(),
+                        )
+                    })?;
+                let identity = HdcIdentity {
+                    connect_key: binding.hdc_connect_key,
+                    serial_digest_sha256: binding.hdc_identity_sha256,
+                    topology: binding.usb_topology,
+                };
+                let hardware = observer
+                    .verify_loader_hardware(&identity, expectation)
+                    .map_err(hdc_failure)?;
+                persist_postflight_hardware(action_directory, descriptor, &hardware)?;
+                let receipt = observer
+                    .capture_post_flash_hilog(
+                        &identity.connect_key,
+                        &request.filters,
+                        Duration::from_secs(u64::try_from(request.duration_seconds).unwrap_or(0)),
+                        usize::try_from(request.byte_budget).unwrap_or(0),
+                    )
+                    .map_err(hdc_failure)?;
+                if self
+                    .usb
+                    .single_hdc_normal_on_connector(&expectation.connector_sha256)
+                    .as_ref()
+                    != Ok(&identity)
+                {
+                    return Err(LaneFailure::Failed(
+                        "Loader-first HDC attachment changed during diagnostics".into(),
+                    ));
+                }
+                let mut executed = result(
+                    summary([
+                        ("byteCount", &receipt.stdout.len().to_string()),
+                        ("debugRuntime", "ready"),
+                        ("verification", "full"),
+                    ]),
+                    vec![receipt],
+                );
+                executed.subprocess_count += 1;
+                Ok(executed)
+            }
             RockchipAction::VerifyBoundBuild {
                 expectation,
                 product_model,
@@ -328,6 +478,7 @@ impl RockchipActionExecutor for RockchipExecutor {
                     binding_revision: descriptor.binding_revision,
                     stable_loader_identity_sha256: descriptor.expected_identity_sha256.clone(),
                     previous_hdc_identity_sha256: expectation.previous_identity_sha256.clone(),
+                    loader_hardware_proof: None,
                     hdc_identity_sha256: verified.identity.serial_digest_sha256.clone(),
                     hdc_connect_key: verified.identity.connect_key.clone(),
                     usb_topology: verified.identity.topology.clone(),
@@ -372,6 +523,31 @@ impl RockchipActionExecutor for RockchipExecutor {
             }
         }
     }
+}
+
+fn persist_postflight_hardware(
+    directory: &Path,
+    descriptor: &HostAction,
+    hardware: &arkdeck_provider_hdc::NormalHardwareIdentity,
+) -> Result<String, LaneFailure> {
+    if hardware.hardware_serial_sha256 != descriptor.expected_identity_sha256 {
+        return Err(LaneFailure::Failed(
+            "postflight hardware differs from the admitted Loader".into(),
+        ));
+    }
+    persist_normal_hardware_identity(
+        directory,
+        &NormalIdentitySubject {
+            target_id: &descriptor.target_id,
+            binding_revision: descriptor.binding_revision,
+            stable_identity_sha256: &descriptor.expected_identity_sha256,
+            provider_executable_sha256: &descriptor.provider_executable_sha256,
+            job_id: Some(&descriptor.job_id),
+            step_id: Some(&descriptor.step_id),
+        },
+        hardware,
+    )
+    .map_err(LaneFailure::Failed)
 }
 
 /// The descriptor-bound HDC of one action: Swift's `resolveHDC()`, resolved

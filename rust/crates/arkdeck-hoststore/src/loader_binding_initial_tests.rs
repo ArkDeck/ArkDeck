@@ -31,6 +31,11 @@ impl Root {
     fn bytes(&self) -> Option<Vec<u8>> {
         std::fs::read(self.0.join(RockchipBindingStore::FILE_NAME)).ok()
     }
+    fn jobs(&self) -> JobStore {
+        let path = self.0.join("jobs-state");
+        HostDirectory::open_or_create_private(&path).unwrap();
+        JobStore::open_owner(&path).unwrap()
+    }
 }
 impl Drop for Root {
     fn drop(&mut self) {
@@ -62,7 +67,7 @@ impl LoaderObserver for Observer {
     ) -> Result<LoaderIdentity, String> {
         Ok(LoaderIdentity {
             serial_digest_sha256: identity.into(),
-            topology: topology.unwrap().into(),
+            topology: topology.unwrap_or("17956864").into(),
         })
     }
 }
@@ -80,6 +85,198 @@ fn owner(root: &Root, devices: Vec<Vec<UsbHostDevice>>) -> LoaderBinding {
         },
         Observer,
     )
+}
+
+fn initial_loader() -> UsbHostDevice {
+    UsbHostDevice {
+        serial: "0123456789abcdef".into(),
+        product_id: 0x350a,
+        product_name: None,
+        ..device()
+    }
+}
+
+#[test]
+fn loader_first_adoption_creates_a_durable_target_without_a_normal_alias() {
+    let root = Root::new();
+    let targets = root.targets(vec![]);
+    let jobs = root.jobs();
+    let loader = initial_loader();
+    let owner = owner(&root, vec![vec![loader.clone()]]);
+    let first = owner.adopt_current_loader(&targets, &jobs).unwrap();
+    assert_eq!(first["updated"], true);
+    assert_eq!(first["bindingRevision"], 1);
+    let records = targets.records().unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["targetID"], first["targetId"]);
+    assert_eq!(records[0]["connectKey"], loader.serial);
+    assert_eq!(records[0]["toolVersion"], "arkforge.native-rockusb");
+    assert_eq!(
+        records[0]["stablePhysicalIdentitySHA256"],
+        sha256_hex(loader.serial.as_bytes())
+    );
+    let bytes = root.bytes().unwrap();
+    let binding = owner.store.load_existing().unwrap();
+    assert!(binding.evidence.iter().any(|entry| entry == LOADER_FIRST));
+    assert!(
+        binding
+            .evidence
+            .iter()
+            .any(|entry| entry == LOADER_READBACK)
+    );
+    assert!(
+        !binding
+            .evidence
+            .iter()
+            .any(|entry| entry == HDC_NORMAL_READBACK)
+    );
+    assert!(
+        !root
+            .0
+            .join(crate::post_flash_alias_store::PostFlashAliasStore::FILE_NAME)
+            .exists()
+    );
+    let reopened = TargetStore::open(&root.0.join("targets")).unwrap();
+    let retry = owner.adopt_current_loader(&reopened, &jobs).unwrap();
+    assert_eq!(retry["targetId"], first["targetId"]);
+    assert_eq!(retry["updated"], false);
+    assert_eq!(
+        retry["selectionEvidenceSha256"],
+        first["selectionEvidenceSha256"]
+    );
+    assert_eq!(root.bytes().unwrap(), bytes);
+    assert_eq!(reopened.records().unwrap(), records);
+}
+
+#[test]
+fn loader_first_adoption_refuses_ambiguous_unsupported_and_changed_devices() {
+    for case in 0..7 {
+        let root = Root::new();
+        let targets = root.targets(vec![]);
+        let jobs = root.jobs();
+        let first = initial_loader();
+        let mut changed = first.clone();
+        let observations = match case {
+            0 => vec![vec![]],
+            1 => vec![vec![first.clone(), first]],
+            2 => vec![vec![device()]],
+            3 => {
+                changed.serial = "0000000000000000".into();
+                vec![vec![changed]]
+            }
+            4 => {
+                changed.serial = "fedcba9876543210".into();
+                vec![vec![first], vec![changed]]
+            }
+            5 => {
+                changed.topology = "17956865".into();
+                vec![vec![first], vec![changed]]
+            }
+            6 => {
+                changed.registry_entry_id = Some(43);
+                vec![vec![first], vec![changed]]
+            }
+            _ => unreachable!(),
+        };
+        assert!(
+            owner(&root, observations)
+                .adopt_current_loader(&targets, &jobs)
+                .is_err(),
+            "case {case}"
+        );
+        assert!(targets.records().unwrap().is_empty(), "case {case}");
+        assert!(root.bytes().is_none(), "case {case}");
+    }
+}
+
+#[test]
+fn loader_first_adoption_can_finish_a_target_publication_after_restart() {
+    let root = Root::new();
+    let loader = initial_loader();
+    let mut record = target("TGT-RESTART", &loader.serial, 1);
+    record["toolVersion"] = json!("arkforge.native-rockusb");
+    let targets = root.targets(vec![record]);
+    let before = targets.records().unwrap();
+    let jobs = root.jobs();
+    let first = owner(&root, vec![vec![loader]])
+        .adopt_current_loader(&targets, &jobs)
+        .unwrap();
+    assert_eq!(first["targetId"], "TGT-RESTART");
+    assert_eq!(first["updated"], true);
+    assert_eq!(targets.records().unwrap(), before);
+}
+
+#[test]
+fn loader_first_adoption_cannot_relabel_an_existing_normal_target() {
+    let root = Root::new();
+    let loader = initial_loader();
+    let targets = root.targets(vec![target("TGT-NORMAL", &loader.serial, 1)]);
+    let before = targets.records().unwrap();
+    let jobs = root.jobs();
+    assert!(
+        owner(&root, vec![vec![loader]])
+            .adopt_current_loader(&targets, &jobs)
+            .is_err()
+    );
+    assert_eq!(targets.records().unwrap(), before);
+    assert!(root.bytes().is_none());
+}
+
+struct EmptyHdc;
+impl arkdeck_provider_hdc::HdcDispatch for EmptyHdc {
+    fn dispatch(
+        &self,
+        plan: &arkdeck_provider_hdc::ProcessPlan,
+    ) -> Result<arkdeck_provider_hdc::Receipt, arkdeck_provider_hdc::DispatchFailure> {
+        assert_eq!(plan.arguments, ["list", "targets", "-v"]);
+        Ok(arkdeck_provider_hdc::Receipt {
+            exit_status: 0,
+            stdout: b"[Empty]\n".to_vec(),
+            stderr: vec![],
+            truncated: false,
+            duration: std::time::Duration::ZERO,
+        })
+    }
+}
+
+#[test]
+fn loader_first_facts_require_the_runtime_binding_and_fresh_connector() {
+    use crate::flash_facts::{
+        FlashHostFacts, LOADER_FIRST_CONNECTOR, LOADER_FIRST_POSTFLIGHT, NativeRockUsbIdentity,
+    };
+    let root = Root::new();
+    let targets = root.targets(vec![]);
+    let jobs = root.jobs();
+    let loader = initial_loader();
+    let binding = owner(&root, vec![vec![loader.clone()]]);
+    let adopted = binding.adopt_current_loader(&targets, &jobs).unwrap();
+    let target = adopted["targetId"].as_str().unwrap();
+    let executable = std::env::current_exe().unwrap();
+    let rockusb = NativeRockUsbIdentity::configured(
+        Some(executable.to_string_lossy().into_owned()),
+        Some(sha256_hex(&std::fs::read(&executable).unwrap())),
+    );
+    let facts = FlashHostFacts::new(&root.0, move || Ok(vec![loader.clone()]))
+        .with_rockusb(rockusb)
+        .with_loader_observer(Box::new(Observer))
+        .with_topology_resolver(|_| Some("d".repeat(64)));
+    let current = facts
+        .current_facts(&targets, Some(&EmptyHdc), target)
+        .unwrap();
+    assert_eq!(current.device_mode, "loader");
+    assert_eq!(current.server_facts[LOADER_FIRST_POSTFLIGHT], "satisfied");
+    assert_eq!(current.server_facts[LOADER_FIRST_CONNECTOR], "d".repeat(64));
+    assert!(
+        !current
+            .server_facts
+            .contains_key("dayu200HDCNormalAliasSHA256")
+    );
+    assert_eq!(current.server_facts["dayu200CrossModeBinding"], "satisfied");
+    let unavailable = facts.with_topology_resolver(|_| None);
+    let current = unavailable
+        .current_facts(&targets, Some(&EmptyHdc), target)
+        .unwrap();
+    assert!(!current.server_facts.contains_key(LOADER_FIRST_POSTFLIGHT));
 }
 
 #[test]

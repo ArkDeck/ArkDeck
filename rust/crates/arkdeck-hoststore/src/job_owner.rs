@@ -683,6 +683,18 @@ impl JobStore {
         &self,
         target_id: &str,
     ) -> Result<Vec<String>, WireError> {
+        self.unsettled_flash_jobs(Some(target_id))
+    }
+
+    /// A first Loader adoption has no proven relation to previous Normal
+    /// targets. It must not create a new lane around any unresolved Flash.
+    pub(crate) fn unsettled_flash_jobs_for_loader_adoption(
+        &self,
+    ) -> Result<Vec<String>, WireError> {
+        self.unsettled_flash_jobs(None)
+    }
+
+    fn unsettled_flash_jobs(&self, target_id: Option<&str>) -> Result<Vec<String>, WireError> {
         let rows = self.repository.rows(None).map_err(unreadable)?;
         let mut jobs = Vec::new();
         for row in &rows {
@@ -691,7 +703,9 @@ impl JobStore {
                 .map(Ok)
                 .unwrap_or_else(|| JobRecord::from_row(row))?;
             if record.dayu200_flash()
-                && record.request["target"]["targetId"].as_str() == Some(target_id)
+                && target_id.is_none_or(|target_id| {
+                    record.request["target"]["targetId"].as_str() == Some(target_id)
+                })
                 && (!crate::job_record::terminal(&record.state)
                     || record.outcome_unknown()
                     || record.residues().unwrap_or(0) > 0)

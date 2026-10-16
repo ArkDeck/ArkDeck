@@ -190,8 +190,8 @@
     },
     "flash.bind-current-loader": {
       "errors": 4,
-      "requests": 5,
-      "successes": 1
+      "requests": 6,
+      "successes": 2
     },
     "flash.bootloader-status": {
       "errors": 2,
@@ -556,15 +556,15 @@
   },
   "corpusRecordCounts": {
     "errors": 475,
-    "requests": 1080,
-    "successes": 605
+    "requests": 1081,
+    "successes": 606
   },
   "directoryDigests": {
     "Catalog/operations": "1fcc3c4891428c4ae44903f4c60270deffe786483278d1a655cbcd22261de3c4",
     "Catalog/profiles": "b385e1efc8f3a3af52770c02d8885340e2cf4b206e84ad6fe3f7903f10cebd80",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "a0a16fc2f4d7d0c46f9efeee79d9c779ac084bb64858ed82d7c1786d1f40b52c",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "0facbec35a5eba56e0e87bcc23d2f24d5d627c5ece4345d3bd53b1887453c015",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "79e91ff30ccd5fbcaf53074a7717249bcfb47cbaf3f45da7a385f8a447fd0fc6"
+    "spec/control/methods": "9eb70cd696650f6b87681107e01dcade0af312d1dd7361c63f39bf453d473641"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -896,8 +896,8 @@
       "sha256": "b1e50f3140518a9b6a22c49709ec46b90e9c7be171c843cbc4cc97a434d319ac"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.bind-current-loader.jsonl": {
-      "blob": "32e36e5aaad9ec2af0714c6be90482ad95481e5f",
-      "sha256": "975ac0f45ba3caaf912756d22ece8173831581d7e42cf045a4d016c9cb1fafbd"
+      "blob": "62f5d1866ef96d06d3689c20939c811368a3dec0",
+      "sha256": "d1b850cc07304cd9268a530707f73fefbf6a0b850f59897fb41c4110e584dadc"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.bootloader-status.jsonl": {
       "blob": "9190ac0098e8fec0eadfe1784b1b59ccddf4b67d",
@@ -1508,8 +1508,8 @@
       "sha256": "ef9eb96d40cc88aab71251ecd44e003fd96c31c607915df45624bb0f5814b623"
     },
     "spec/control/methods/flash.bind-current-loader.json": {
-      "blob": "d7d4fa0093e270c85548f2996059ecc93e5793a9",
-      "sha256": "27755ad3999001bdaa412aec57bc2ee1c8675d8560e62db350e1195edea7d572"
+      "blob": "d49fc2da9ac97e9c78548fb2cb18afa7754ecb64",
+      "sha256": "f74e21515cdd87e4597587e1f5535e22792f83277aea321c37e79245e2a6e2b9"
     },
     "spec/control/methods/flash.bootloader-status.json": {
       "blob": "e8450234c5cec45239d866267ec0eb0a669009b0",
@@ -1800,7 +1800,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "39adc93ba5e29a99d8241eddd8488e51312cd42439c654985fd35a4c5c460b53",
+  "inputDigest": "872c7d3669e567025687fcf17dca777dae72cee59d370034472502a898c68e1e",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

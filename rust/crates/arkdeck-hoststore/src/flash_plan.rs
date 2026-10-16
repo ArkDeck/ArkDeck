@@ -500,7 +500,7 @@ pub(crate) fn admission_blocker(facts: &RockchipFacts) -> Option<String> {
             .is_some_and(|topology| {
                 !topology.is_empty() && topology.bytes().all(|b| b.is_ascii_digit())
             });
-    if !routed {
+    if !routed && loader_first_expectation(facts).is_none() {
         return Some(format!(
             "flash.postFlashHDCBindingUnprepared: target {} has no trusted HDC identity and USB \
              topology for postflight",
@@ -533,6 +533,31 @@ pub(crate) fn normal_loader_identity_ready(facts: &RockchipFacts) -> bool {
                 .server_facts
                 .get("dayu200NormalHardwareObservationSHA256")
                 .is_some_and(|value| lowercase_sha256(value))))
+}
+
+fn loader_first_expectation(
+    facts: &RockchipFacts,
+) -> Option<arkdeck_provider_hdc::LoaderReconnectExpectation> {
+    if facts.device_mode != "loader"
+        || facts
+            .server_facts
+            .get(crate::flash_facts::LOADER_FIRST_POSTFLIGHT)
+            .map(String::as_str)
+            != Some("satisfied")
+        || facts.server_facts.contains_key(ALIAS_IDENTITY)
+        || facts.server_facts.contains_key(ALIAS_TOPOLOGY)
+    {
+        return None;
+    }
+    let expectation = arkdeck_provider_hdc::LoaderReconnectExpectation {
+        hardware_serial_sha256: facts.identity_sha256.clone(),
+        connector_sha256: facts
+            .server_facts
+            .get(crate::flash_facts::LOADER_FIRST_CONNECTOR)?
+            .clone(),
+    };
+    expectation.validate().ok()?;
+    Some(expectation)
 }
 
 /// Swift `journalStep`'s arguments for the two steps `arkforged` performs:
@@ -590,6 +615,7 @@ impl FlashPlanning {
     /// Swift `ArkForgeFlashProviderAdapter.action(for:…)` for a step the
     /// Rockchip host runs, over the canonical inputs and the step's facts,
     /// each refusal its `DeviceProviderError` description.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn host_step(
         &self,
         step: &str,
@@ -598,10 +624,33 @@ impl FlashPlanning {
         facts: &RockchipFacts,
         lease: &str,
         leased: &LeasedArtifact,
+        job_id: &str,
     ) -> Result<HostStep, String> {
-        let action = action(step, kind, inputs, facts, || {
-            self.build_version(lease, leased)
-        })?;
+        let action = if step == "capture-post-flash-diagnostics"
+            && facts
+                .server_facts
+                .get(crate::flash_facts::LOADER_FIRST_VERIFIED_JOB)
+                .map(String::as_str)
+                == Some(job_id)
+        {
+            let expectation = arkdeck_provider_hdc::LoaderReconnectExpectation {
+                hardware_serial_sha256: facts.identity_sha256.clone(),
+                connector_sha256: facts
+                    .server_facts
+                    .get(crate::flash_facts::LOADER_FIRST_VERIFIED_CONNECTOR)
+                    .ok_or("first Loader postflight connector is missing")?
+                    .clone(),
+            };
+            expectation.validate().map_err(|error| error.to_string())?;
+            RockchipAction::CaptureLoaderPostFlashDiagnostics {
+                expectation,
+                request: CaptureRequest::new(30, Vec::new(), 16 * 1024 * 1024)?,
+            }
+        } else {
+            action(step, kind, inputs, facts, || {
+                self.build_version(lease, leased)
+            })?
+        };
         let persisted = action.persisted();
         let action_sha256 = sha256_hex(
             &session_json::encode(&persisted).map_err(|_| "the action cannot be encoded")?,
@@ -664,9 +713,10 @@ fn action(
             Ok(RockchipAction::RebindLoader(identity.clone()))
         }
         ("reboot-device", "rebootDevice") => Ok(RockchipAction::RebootToNormal(identity.clone())),
-        ("wait-for-hdc", "waitForReconnect") => {
-            Ok(RockchipAction::WaitForBoundHdcReconnect(expectation()?))
-        }
+        ("wait-for-hdc", "waitForReconnect") => match loader_first_expectation(facts) {
+            Some(expectation) => Ok(RockchipAction::WaitForLoaderHdc(expectation)),
+            None => Ok(RockchipAction::WaitForBoundHdcReconnect(expectation()?)),
+        },
         ("rebind-and-verify-build", "probeDevice") => {
             flash_bundle(inputs)?;
             let Some(version) = build_version().filter(|version| !version.is_empty()) else {
@@ -676,18 +726,32 @@ fn action(
                         .into(),
                 );
             };
-            Ok(RockchipAction::VerifyBoundBuild {
-                expectation: expectation()?,
-                product_model: PRODUCT_MODEL.to_owned(),
-                build_version: version,
-            })
+            match loader_first_expectation(facts) {
+                Some(expectation) => Ok(RockchipAction::VerifyLoaderBuild {
+                    expectation,
+                    product_model: PRODUCT_MODEL.to_owned(),
+                    build_version: version,
+                }),
+                None => Ok(RockchipAction::VerifyBoundBuild {
+                    expectation: expectation()?,
+                    product_model: PRODUCT_MODEL.to_owned(),
+                    build_version: version,
+                }),
+            }
         }
         ("capture-post-flash-diagnostics", "captureRemoteStdout") => {
-            Ok(RockchipAction::CapturePostFlashDiagnostics {
-                connect_key: key.clone(),
-                // The catalog's bounded HiLog: 30 s, no filters, 16 MiB.
-                request: CaptureRequest::new(30, Vec::new(), 16 * 1024 * 1024)?,
-            })
+            // The catalog's bounded HiLog: 30 s, no filters, 16 MiB.
+            let request = CaptureRequest::new(30, Vec::new(), 16 * 1024 * 1024)?;
+            match loader_first_expectation(facts) {
+                Some(expectation) => Ok(RockchipAction::CaptureLoaderPostFlashDiagnostics {
+                    expectation,
+                    request,
+                }),
+                None => Ok(RockchipAction::CapturePostFlashDiagnostics {
+                    connect_key: key.clone(),
+                    request,
+                }),
+            }
         }
         _ => Err(format!("{step} has no registered Rockchip runtime action")),
     }
@@ -745,6 +809,78 @@ fn journal_arguments(kind: &str, action: &RockchipAction) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn loader_first_plan_pins_hardware_postflight_without_inventing_a_normal_identity() {
+        let mut facts = RockchipFacts {
+            target_id: "TGT-LOADER".into(),
+            binding_revision: 1,
+            identity_sha256: sha256_hex(b"0123456789abcdef"),
+            tool_sha256: "c".repeat(64),
+            execution_connect_key: "0123456789abcdef".into(),
+            device_mode: "loader".into(),
+            build_fingerprint: None,
+            profile_id: "dayu200".into(),
+            server_facts: BTreeMap::from([
+                (CROSS_MODE.into(), "satisfied".into()),
+                (
+                    crate::flash_facts::LOADER_FIRST_POSTFLIGHT.into(),
+                    "satisfied".into(),
+                ),
+                (
+                    crate::flash_facts::LOADER_FIRST_CONNECTOR.into(),
+                    "d".repeat(64),
+                ),
+                (
+                    crate::flash_facts::LOADER_FIRST_TOPOLOGY.into(),
+                    "42".into(),
+                ),
+            ]),
+        };
+        let inputs = json!({"deviceProfileRef":"dayu200","artifactLease":"lease-fixture","intent":"fullRestore"});
+        assert_eq!(admission_blocker(&facts), None);
+        for (step, kind) in [
+            ("wait-for-hdc", "waitForReconnect"),
+            ("rebind-and-verify-build", "probeDevice"),
+            ("capture-post-flash-diagnostics", "captureRemoteStdout"),
+        ] {
+            let action = action(step, kind, inputs.as_object().unwrap(), &facts, || {
+                Some("published-build".into())
+            })
+            .unwrap();
+            assert!(matches!(
+                &action,
+                RockchipAction::WaitForLoaderHdc(_)
+                    | RockchipAction::VerifyLoaderBuild { .. }
+                    | RockchipAction::CaptureLoaderPostFlashDiagnostics { .. }
+            ));
+            assert_eq!(
+                RockchipAction::from_persisted(&action.persisted()).unwrap(),
+                action
+            );
+            let encoded = action.persisted().to_string();
+            assert!(encoded.contains(&facts.identity_sha256));
+            assert!(encoded.contains(&"d".repeat(64)));
+            assert!(!encoded.contains("previousHDC"));
+        }
+        facts
+            .server_facts
+            .remove(crate::flash_facts::LOADER_FIRST_CONNECTOR);
+        assert!(
+            admission_blocker(&facts)
+                .unwrap()
+                .contains("postFlashHDCBindingUnprepared")
+        );
+        facts.server_facts.insert(
+            crate::flash_facts::LOADER_FIRST_CONNECTOR.into(),
+            "d".repeat(64),
+        );
+        facts.device_mode = "hdc".into();
+        assert!(
+            admission_blocker(&facts).is_some(),
+            "the Loader origin cannot authorize an unproved Normal route"
+        );
+    }
 
     #[test]
     fn normal_admission_requires_matching_durable_hardware_proof() {

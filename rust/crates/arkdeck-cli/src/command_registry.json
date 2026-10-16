@@ -20182,6 +20182,14 @@
       ],
       "options": [
         {
+          "form": "flag",
+          "name": "--adopt",
+          "published": true,
+          "required": false,
+          "stability": "standard",
+          "summary": "adopt one fresh Loader without a previous Normal target"
+        },
+        {
           "form": "value",
           "grammar": {
             "kind": "opaque"
@@ -20189,7 +20197,7 @@
           "name": "--target",
           "placeholder": "target-id",
           "published": true,
-          "required": true,
+          "required": false,
           "stability": "standard",
           "summary": "durable target identity"
         },
@@ -20202,7 +20210,7 @@
           "name": "--expected-binding-revision",
           "placeholder": "n",
           "published": true,
-          "required": true,
+          "required": false,
           "stability": "standard",
           "summary": "revision the caller expects; a drift fails closed"
         },
@@ -20267,8 +20275,17 @@
       ],
       "positionals": [],
       "replacementArgvPattern": null,
-      "requiresExactlyOneOf": [],
-      "summary": "bind the currently attached Loader to this target, CAS on its revision"
+      "requiresExactlyOneOf": [
+        [
+          "--adopt",
+          "--target"
+        ],
+        [
+          "--adopt",
+          "--expected-binding-revision"
+        ]
+      ],
+      "summary": "bind the selected target and revision, or adopt one fresh Loader with --adopt"
     },
     {
       "catalogOperation": null,
@@ -22632,12 +22649,12 @@
           "summary": "durable job identity"
         },
         {
-          "name": "--marker-id",
           "form": "value",
           "grammar": {
             "kind": "pattern",
             "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
           },
+          "name": "--marker-id",
           "placeholder": "id",
           "published": true,
           "required": true,
@@ -22645,12 +22662,12 @@
           "summary": "unique marker identity; repeats with the same label are idempotent"
         },
         {
-          "name": "--label",
           "form": "value",
           "grammar": {
             "kind": "pattern",
             "pattern": "^[A-Za-z0-9 ._-]{1,64}$"
           },
+          "name": "--label",
           "placeholder": "text",
           "published": true,
           "required": false,

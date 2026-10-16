@@ -245,6 +245,22 @@ impl UsbProbe for RockchipUsbProbe {
             .ok_or_else(|| "physical USB connector observation is unavailable".into())
     }
 
+    fn single_hdc_normal_on_connector(
+        &self,
+        connector_sha256: &str,
+    ) -> Result<HdcIdentity, String> {
+        let device = self.single(|device| {
+            is_dayu200_hdc_normal(device)
+                && arkdeck_provider_arkforge::host_topology_digest(&device.topology).as_deref()
+                    == Some(connector_sha256)
+        })?;
+        Ok(HdcIdentity {
+            serial_digest_sha256: sha256_hex(device.serial.as_bytes()),
+            connect_key: device.serial,
+            topology: device.topology,
+        })
+    }
+
     fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
         let device = self.single(|device| {
             is_dayu200_loader(device)
@@ -402,6 +418,12 @@ pub struct RockchipFacts {
 const CROSS_MODE_BINDING: &str = "dayu200CrossModeBinding";
 const ALIAS_IDENTITY: &str = "dayu200HDCNormalAliasSHA256";
 const ALIAS_TOPOLOGY: &str = "dayu200HDCNormalAliasUSBTopology";
+pub(crate) const LOADER_FIRST_POSTFLIGHT: &str = "dayu200LoaderFirstPostflight";
+pub(crate) const LOADER_FIRST_CONNECTOR: &str = "dayu200LoaderFirstConnectorSHA256";
+pub(crate) const LOADER_FIRST_TOPOLOGY: &str = "dayu200LoaderFirstUSBTopology";
+pub(crate) const LOADER_FIRST_VERIFIED_JOB: &str = "dayu200LoaderFirstVerifiedJob";
+pub(crate) const LOADER_FIRST_VERIFIED_CONNECTOR: &str =
+    "dayu200LoaderFirstVerifiedConnectorSHA256";
 
 /// The owner of the Rockchip facts over one Application Support root.
 pub struct FlashHostFacts {
@@ -412,6 +434,7 @@ pub struct FlashHostFacts {
     loader: Box<dyn LoaderObserver + Send + Sync>,
     normal_identity_records: PathBuf,
     normal_identity_observer: NormalHardwareIdentityObserver,
+    resolve_topology: arkdeck_provider_arkforge::TopologyResolver,
 }
 
 impl FlashHostFacts {
@@ -429,6 +452,7 @@ impl FlashHostFacts {
             loader: Box::new(NoArkForgeLane),
             normal_identity_records: application_support_root.join("normal-loader-identity"),
             normal_identity_observer: observe_normal_hardware_identity,
+            resolve_topology: arkdeck_provider_arkforge::host_topology_digest,
         }
     }
 
@@ -452,6 +476,15 @@ impl FlashHostFacts {
         observer: NormalHardwareIdentityObserver,
     ) -> Self {
         self.normal_identity_observer = observer;
+        self
+    }
+
+    /// Host connector observation port. The control surface cannot provide it.
+    pub fn with_topology_resolver(
+        mut self,
+        resolve: arkdeck_provider_arkforge::TopologyResolver,
+    ) -> Self {
+        self.resolve_topology = resolve;
         self
     }
 
@@ -648,6 +681,16 @@ impl FlashHostFacts {
                         alias = self.route(targets, &target, &binding, &routed, alias)?;
                         if routed.binding_revision == target.binding_revision {
                             execution_connect_key = routed.hdc_connect_key.clone();
+                            if let Some(proof) = &routed.loader_hardware_proof {
+                                server_facts.insert(
+                                    LOADER_FIRST_VERIFIED_JOB.into(),
+                                    routed.job_id.clone(),
+                                );
+                                server_facts.insert(
+                                    LOADER_FIRST_VERIFIED_CONNECTOR.into(),
+                                    proof.connector_sha256.clone(),
+                                );
+                            }
                         }
                     }
                     if let Some((identity, topology)) = alias {
@@ -666,6 +709,23 @@ impl FlashHostFacts {
         );
         let (device_mode, build_fingerprint, profile_id, usb_topology) =
             self.live_facts(hdc, &execution_connect_key, &target.identity);
+        if device_mode == "loader"
+            && !server_facts.contains_key(ALIAS_IDENTITY)
+            && let Some(binding) = &covered_binding
+            && binding.revision == 1
+            && binding
+                .evidence
+                .iter()
+                .any(|entry| entry == crate::loader_binding::LOADER_FIRST)
+            && binding.values("binding:selected-target-id=") == [target.target_id.as_str()]
+            && usb_topology.as_deref() == Some(binding.usb_topology.as_str())
+            && let Some(connector) = (self.resolve_topology)(&binding.usb_topology)
+            && crate::rockchip_binding::canonical_sha256(&connector)
+        {
+            server_facts.insert(LOADER_FIRST_POSTFLIGHT.into(), "satisfied".into());
+            server_facts.insert(LOADER_FIRST_CONNECTOR.into(), connector);
+            server_facts.insert(LOADER_FIRST_TOPOLOGY.into(), binding.usb_topology.clone());
+        }
         let execution_identity = sha256_hex(execution_connect_key.as_bytes());
         if device_mode == "hdc" {
             let observed = hdc

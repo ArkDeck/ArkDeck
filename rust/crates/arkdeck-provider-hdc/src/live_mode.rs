@@ -190,6 +190,17 @@ pub trait UsbProbe {
         let _ = usb_topology;
         Err("topology-bound HDC observation is unavailable".to_owned())
     }
+
+    /// First boot from Loader has no previous HDC alias. Only an independently
+    /// resolved physical connector may supply the candidate for a hardware
+    /// identity read; the connector by itself never proves the board.
+    fn single_hdc_normal_on_connector(
+        &self,
+        connector_sha256: &str,
+    ) -> Result<HdcIdentity, String> {
+        let _ = connector_sha256;
+        Err("connector-bound HDC observation is unavailable".to_owned())
+    }
 }
 
 /// Swift `FoundationRockchipLiveModeProbe`, over an [`HdcDispatch`] and the two

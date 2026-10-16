@@ -38,6 +38,26 @@ requires all `POL-RECOVERY-001` proofs; new observations alone cannot establish
 historical lineage or reset its automation budget. See
 [CHG-2026-082](../../changes/chg-2026-082-normal-loader-hardware-proof/proposal.md).
 
+A board first attached in Loader can be adopted with `arkdeck flash bind-loader
+--adopt`. Runtime requires one fresh registered Loader, the supported hardware
+serial format and agreement between host USB and ArkForge; no caller supplies an
+identity, connector or proof. The resulting revision-1 Target records Loader as
+its initial mode and has no invented Normal identity. Before adopting, Runtime
+checks all retained Flash obligations: an unsettled or unknown previous Flash
+blocks a new Target when its physical association cannot be proved.
+
+The initial full-restore plan pins that Loader identity and connector. After the
+native ArkForge plan boots the image, Runtime finds one HDC candidate on that
+connector, reads its kernel hardware serial through the fixed bounded provider
+operation, and requires it to match the initial Loader. Exact artifact build and
+product-model readback are also required before publishing the first HDC alias.
+Its schema `2.0.0` records the immutable hardware observation and connector digest
+instead of a previous HDC identity. Repeated callbacks of that same Job preserve
+the first alias; another Job, Target, route or connector cannot replace it through
+initial publication. Diagnostics use only the verified route for that Job and
+repeat the hardware check. Existing schema `1.0.0` aliases retain their encoding.
+See [CHG-2026-083](../../changes/chg-2026-083-loader-first-flash/proposal.md).
+
 ## Retired external-tool profiles
 
 The former RockUSB discovery registry and HDC-to-Loader characterization registry

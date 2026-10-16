@@ -1282,9 +1282,20 @@ impl FlashRunner<'_> {
         if facts.execution_connect_key.is_empty() {
             return Err(Stop::Refused(uncertain()));
         }
+        let loader_first_connector_sha256 = facts
+            .server_facts
+            .get(crate::flash_facts::LOADER_FIRST_CONNECTOR)
+            .cloned();
         let Some(topology) = facts
             .server_facts
             .get("dayu200HDCNormalAliasUSBTopology")
+            .or_else(|| {
+                loader_first_connector_sha256.as_ref().and_then(|_| {
+                    facts
+                        .server_facts
+                        .get(crate::flash_facts::LOADER_FIRST_TOPOLOGY)
+                })
+            })
             .filter(|topology| !topology.is_empty())
         else {
             return Err(Stop::Refused(uncertain()));
@@ -1307,6 +1318,7 @@ impl FlashRunner<'_> {
                 .to_owned(),
             binding_revision: revision,
             usb_topology: topology.clone(),
+            loader_first_connector_sha256,
         };
         let purpose = if run
             .record
@@ -1635,6 +1647,7 @@ impl FlashRunner<'_> {
                 facts,
                 &resolved.lease,
                 &resolved.leased,
+                &run.record.job_id,
             )
             .map_err(|_| HostStop::NoAction)?;
         let Some(revision) = run.record.request["target"]["expectedBindingRevision"].as_i64()

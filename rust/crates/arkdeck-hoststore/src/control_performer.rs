@@ -40,6 +40,7 @@ pub struct ControlBinding {
     pub usb_topology: String,
     /// The measured `arkforged` every descriptor names.
     pub provider_executable_sha256: String,
+    pub loader_first_connector_sha256: Option<String>,
 }
 
 /// Swift `ArkForgeControlPerformer`.
@@ -74,6 +75,13 @@ impl ArkForgeControlPerformer {
         }
     }
 
+    fn loader_expectation(&self) -> Option<arkdeck_provider_hdc::LoaderReconnectExpectation> {
+        Some(arkdeck_provider_hdc::LoaderReconnectExpectation {
+            hardware_serial_sha256: self.binding.stable_identity_sha256.clone(),
+            connector_sha256: self.binding.loader_first_connector_sha256.clone()?,
+        })
+    }
+
     /// Swift `enterUpdater(request:)`. The board may already be at the
     /// requested postcondition; both independent read-only sources confirm
     /// that before HDC is touched. Otherwise the five actions run in order,
@@ -98,6 +106,12 @@ impl ArkForgeControlPerformer {
                 ]),
                 observed_disconnect: true,
                 observed_unique_loader_rebind: true,
+                ..Observation::default()
+            };
+        }
+        if self.binding.loader_first_connector_sha256.is_some() {
+            return Observation {
+                failure_reason: "the admitted initial Loader is no longer present; no Normal transition is permitted".into(),
                 ..Observation::default()
             };
         }
@@ -196,7 +210,10 @@ impl ControlPerformer for ArkForgeControlPerformer {
         Ok(match request.action {
             ManagedControlAction::EnterUpdater => self.enter_updater(request),
             ManagedControlAction::RebootToNormal => self.run(
-                RockchipAction::WaitForBoundHdcReconnect(self.reconnect_expectation()),
+                match self.loader_expectation() {
+                    Some(expectation) => RockchipAction::WaitForLoaderHdc(expectation),
+                    None => RockchipAction::WaitForBoundHdcReconnect(self.reconnect_expectation()),
+                },
                 request,
                 0,
             ),
@@ -211,10 +228,17 @@ impl ControlPerformer for ArkForgeControlPerformer {
                         .unwrap_or_default()
                 };
                 self.run(
-                    RockchipAction::VerifyBoundBuild {
-                        expectation: self.reconnect_expectation(),
-                        product_model: expected("const.product.model"),
-                        build_version: expected("const.ohos.fullname"),
+                    match self.loader_expectation() {
+                        Some(expectation) => RockchipAction::VerifyLoaderBuild {
+                            expectation,
+                            product_model: expected("const.product.model"),
+                            build_version: expected("const.ohos.fullname"),
+                        },
+                        None => RockchipAction::VerifyBoundBuild {
+                            expectation: self.reconnect_expectation(),
+                            product_model: expected("const.product.model"),
+                            build_version: expected("const.ohos.fullname"),
+                        },
                     },
                     request,
                     0,

@@ -174,7 +174,7 @@ public static class ControlContract
         ["diagnostic.session.status"] = "84a14b6a84389c750b928facce6183d8014c8c46594951c2d4846d53a6c0c90f",
         ["diagnostic.session.stop"] = "ff3e52de39df3ca016ae3b3c5924c05e0c9279c16cb486af21a788429e7cfa83",
         ["doctor"] = "ef9eb96d40cc88aab71251ecd44e003fd96c31c607915df45624bb0f5814b623",
-        ["flash.bind-current-loader"] = "27755ad3999001bdaa412aec57bc2ee1c8675d8560e62db350e1195edea7d572",
+        ["flash.bind-current-loader"] = "f74e21515cdd87e4597587e1f5535e22792f83277aea321c37e79245e2a6e2b9",
         ["flash.bootloader-status"] = "956189f2bac807cf7025f56734010b0081adb85741b6b792812156730fff546f",
         ["flash.device-access"] = "1e0576c4d090fdad34ab64c5a61a658724a6d8bae2f6af7bd4b3e0d6331f3184",
         ["flash.lanePlanPreview"] = "bc23692a07e07cb3bdcdc416cd3be6fe269084fdf6f960bf0dc688729703261c",

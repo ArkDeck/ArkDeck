@@ -134,6 +134,13 @@ impl UsbProbe for Usb {
     fn connector_identity(&self, _: &str) -> Result<String, String> {
         Ok("d".repeat(64))
     }
+
+    fn single_hdc_normal_on_connector(&self, connector: &str) -> Result<HdcIdentity, String> {
+        if connector != "d".repeat(64) || self.at.len() != 1 {
+            return Err(unavailable());
+        }
+        Ok(self.at.values().next().unwrap().clone())
+    }
     fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
         self.loader_reads.fetch_add(1, Ordering::SeqCst);
         if self
@@ -231,6 +238,10 @@ struct Fixture {
 struct SharedUsb(Arc<Usb>);
 
 impl UsbProbe for SharedUsb {
+    fn single_hdc_normal_on_connector(&self, connector: &str) -> Result<HdcIdentity, String> {
+        self.0.single_hdc_normal_on_connector(connector)
+    }
+
     fn connector_identity(&self, topology: &str) -> Result<String, String> {
         self.0.connector_identity(topology)
     }
@@ -654,6 +665,114 @@ impl Drop for Root {
     }
 }
 
+#[test]
+fn loader_first_alias_requires_hardware_and_build_then_routes_only_this_jobs_diagnostics() {
+    let root = Root::new();
+    let target_root = root.0.join("targets");
+    arkdeck_platform::HostDirectory::open_or_create_private(&target_root).unwrap()
+        .publish_document("targets.json", &serde_json::to_vec(&serde_json::json!({
+            "schemaVersion":"1.0.0", "targets":[{
+                "targetID":"TGT-HOST", "bindingRevision":7, "connectKey":"0123456789abcdef",
+                "stablePhysicalIdentitySHA256":identity(), "toolVersion":"arkforge.native-rockusb",
+                "adoptedAtUTC":"2026-10-15T00:00:00Z"
+            }]
+        })).unwrap(), 4 * 1024 * 1024).unwrap();
+    let owner = Arc::new(crate::TargetStore::open(&target_root).unwrap());
+    let mut usb = Usb::bound(KEY, "42", "42");
+    usb.normal = Usb::normal(KEY).normal;
+    let fixture = fixture(
+        Hdc::answering(vec![
+            targets(KEY),
+            targets(KEY),
+            out("published-build\nrk3568\n"),
+            targets(KEY),
+            out("published-build\nrk3568\n"),
+            out("verified diagnostic line\n"),
+        ]),
+        usb,
+        None,
+    );
+    let alias_root = root.0.join("aliases");
+    let executor = fixture
+        .executor
+        .with_post_flash_aliases(PostFlashAliasStore::new(&alias_root), || {
+            "2026-10-15T00:00:00Z".into()
+        })
+        .with_target_store(owner);
+    let expectation = arkdeck_provider_hdc::LoaderReconnectExpectation {
+        hardware_serial_sha256: identity(),
+        connector_sha256: "d".repeat(64),
+    };
+    let wait = RockchipAction::WaitForLoaderHdc(expectation.clone());
+    let waited = executor
+        .execute(&wait, &descriptor(&wait, "wait"), &fixture.root.0)
+        .unwrap();
+    assert_eq!(waited.subprocess_count, 2);
+    assert!(
+        PostFlashAliasStore::new(&alias_root)
+            .load_if_present()
+            .unwrap()
+            .is_none()
+    );
+    let verify = RockchipAction::VerifyLoaderBuild {
+        expectation: expectation.clone(),
+        product_model: "rk3568".into(),
+        build_version: "published-build".into(),
+    };
+    let verified = executor
+        .execute(
+            &verify,
+            &descriptor(&verify, "verify-product"),
+            &fixture.root.0,
+        )
+        .unwrap();
+    assert_eq!(verified.subprocess_count, 3);
+    assert!(!String::from_utf8_lossy(&verified.stdout).contains("0123456789abcdef"));
+    let bytes = std::fs::read(alias_root.join(PostFlashAliasStore::FILE_NAME)).unwrap();
+    let alias = PostFlashAliasStore::new(&alias_root)
+        .load_if_present()
+        .unwrap()
+        .unwrap();
+    assert_eq!(alias.schema_version, LOADER_FIRST_SCHEMA_VERSION);
+    assert_eq!(alias.hdc_connect_key, KEY);
+    assert!(alias.previous_hdc_identity_sha256.is_empty());
+    assert!(alias.loader_hardware_proof.is_some());
+    let document: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(document.get("previousHDCIdentitySHA256").is_none());
+    executor
+        .execute(
+            &verify,
+            &descriptor(&verify, "verify-build"),
+            &fixture.root.0,
+        )
+        .unwrap();
+    assert_eq!(
+        std::fs::read(alias_root.join(PostFlashAliasStore::FILE_NAME)).unwrap(),
+        bytes
+    );
+    let capture = RockchipAction::CaptureLoaderPostFlashDiagnostics {
+        expectation,
+        request: CaptureRequest::new(30, vec![], 16 * 1024 * 1024).unwrap(),
+    };
+    let mut wrong = descriptor(&capture, "capture");
+    wrong.job_id = "job-other".into();
+    let calls = fixture.hdc.arguments().len();
+    assert!(executor.execute(&capture, &wrong, &fixture.root.0).is_err());
+    assert_eq!(fixture.hdc.arguments().len(), calls);
+    let captured = executor
+        .execute(&capture, &descriptor(&capture, "capture"), &fixture.root.0)
+        .unwrap();
+    assert_eq!(captured.stdout, b"verified diagnostic line\n");
+    assert_eq!(captured.subprocess_count, 2);
+    assert!(
+        fixture
+            .hdc
+            .arguments()
+            .iter()
+            .all(|argv| argv.get(1).is_none_or(|key| key != "0123456789abcdef"))
+    );
+}
+
 /// Swift `testPostFlashHDCSerialRotationUsesBoundTopologyAndPublishesOnlyAfterExactBuild`:
 /// the bound reconnect finds the rotated serial at the recorded topology and
 /// publishes nothing; the verification reuses that route after a fresh
@@ -735,6 +854,7 @@ fn the_bound_reconnect_route_is_reused_by_the_build_verification_that_publishes_
             binding_revision: 7,
             stable_loader_identity_sha256: identity(),
             previous_hdc_identity_sha256: sha256_hex(KEY.as_bytes()),
+            loader_hardware_proof: None,
             hdc_identity_sha256: next,
             hdc_connect_key: NEXT_KEY.into(),
             usb_topology: "42".into(),
