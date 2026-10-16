@@ -1,5 +1,5 @@
-//! Bounded Normal-mode evidence of the SoC serial shared with a Rockchip
-//! Loader. The Normal USB serial can be an eMMC CID; it is not this serial.
+//! Bounded CPU identity and evidence linking Normal to an already bound Loader.
+//! The Normal USB CID, CPU serial and factory Loader SN remain separate facts.
 //! Only a fixed, target-scoped kernel read is accepted. No property supplied
 //! by a caller, model/build match, topology alone or old receipt proves it.
 use crate::{HdcDispatch, ProcessPlan, Receipt, UsbProbe, device_arguments};
@@ -21,16 +21,29 @@ pub struct NormalHardwareIdentity {
     pub connector_identity_sha256: String,
     pub stdout_sha256: String,
     pub stdout_byte_count: usize,
+    /// A factory serial is a cross-mode locator, not the CPU serial. This
+    /// proof is produced only by the fixed vendor reader over this attachment.
+    pub vendor_serial: Option<crate::rockchip_vendor_identity::VendorSerialProof>,
 }
 
 /// Runtime composition port, like `LoaderObserver`. No control-protocol input
 /// selects it; production uses the fixed kernel reader below.
 pub type NormalHardwareIdentityObserver =
-    fn(&dyn HdcDispatch, &dyn UsbProbe, &str) -> Result<NormalHardwareIdentity, &'static str>;
+    fn(&dyn HdcDispatch, &dyn UsbProbe, &str, &str) -> Result<NormalHardwareIdentity, &'static str>;
 
 impl NormalHardwareIdentity {
+    pub fn loader_serial_sha256(&self) -> &str {
+        self.vendor_serial
+            .as_ref()
+            .map_or(&self.hardware_serial_sha256, |proof| &proof.serial_sha256)
+    }
+
+    pub fn matches_loader(&self, expected: &str) -> bool {
+        self.loader_serial_sha256() == expected
+    }
+
     pub fn summary(&self) -> BTreeMap<String, String> {
-        BTreeMap::from([
+        let mut summary = BTreeMap::from([
             (
                 "identitySource".into(),
                 NORMAL_HARDWARE_IDENTITY_SOURCE.into(),
@@ -53,7 +66,11 @@ impl NormalHardwareIdentity {
                 "sourceStdoutByteCount".into(),
                 self.stdout_byte_count.to_string(),
             ),
-        ])
+        ]);
+        if let Some(proof) = &self.vendor_serial {
+            summary.extend(proof.summary());
+        }
+        summary
     }
 }
 
@@ -114,7 +131,36 @@ pub fn observe_normal_hardware_identity(
         connector_identity_sha256,
         stdout_sha256: sha256_hex(&receipt.stdout),
         stdout_byte_count: receipt.stdout.len(),
+        vendor_serial: None,
     })
+}
+
+/// Preserve the kernel-serial route. Boards whose Loader uses a factory SN
+/// need independent agreement with the bootloader's bounded vendor record,
+/// the boot device tree and a repeated CPU/USB observation.
+pub fn observe_normal_loader_identity(
+    hdc: &dyn HdcDispatch,
+    usb: &dyn UsbProbe,
+    connect_key: &str,
+    expected_loader_sha256: &str,
+) -> Result<NormalHardwareIdentity, &'static str> {
+    let started = std::time::Instant::now();
+    let mut before = observe_normal_hardware_identity(hdc, usb, connect_key)?;
+    if before.matches_loader(expected_loader_sha256) {
+        return Ok(before);
+    }
+    let proof = crate::rockchip_vendor_identity::observe(
+        hdc,
+        connect_key,
+        expected_loader_sha256,
+        started,
+    )?;
+    let after = observe_normal_hardware_identity(hdc, usb, connect_key)?;
+    if before != after || started.elapsed() > Duration::from_secs(30) {
+        return Err("normalLoaderIdentity.vendorCaptureChangedOrExpired");
+    }
+    before.vendor_serial = Some(proof);
+    Ok(before)
 }
 
 fn hardware_serial(receipt: &Receipt) -> Result<String, &'static str> {

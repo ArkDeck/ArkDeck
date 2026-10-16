@@ -1036,6 +1036,21 @@ fn observed_at(record: &JobRecord) -> String {
         .to_owned()
 }
 
+/// Archival uses exactly the recovery clock anchor and never rewrites it.
+/// Expiry permits only a retained-risk terminal audit, not another epoch.
+pub(crate) fn expired_for_retained_archive(record: &JobRecord, now: &str) -> bool {
+    match (
+        date(&observed_at(record)),
+        date(now),
+        date(record.created()),
+    ) {
+        (Some(observed), Some(now), Some(created)) => {
+            created <= observed && now >= observed + FOUR_HOURS
+        }
+        _ => false,
+    }
+}
+
 /// Swift `historicalHostProof`: the exact Artifact and daemon tool a
 /// recovery's capability evidence retains, and each required step's
 /// confirmed plan-completion outcome, correlated to its intent, carrying the

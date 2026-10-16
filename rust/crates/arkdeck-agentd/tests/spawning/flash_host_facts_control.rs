@@ -355,6 +355,7 @@ fn fixture_normal_identity(
     _: &dyn arkdeck_provider_hdc::HdcDispatch,
     _: &dyn arkdeck_provider_hdc::UsbProbe,
     key: &str,
+    _: &str,
 ) -> Result<arkdeck_provider_hdc::NormalHardwareIdentity, &'static str> {
     Ok(arkdeck_provider_hdc::NormalHardwareIdentity {
         normal_identity_sha256: arkdeck_contract::sha256_hex(key.as_bytes()),
@@ -363,6 +364,7 @@ fn fixture_normal_identity(
         connector_identity_sha256: "d".repeat(64),
         stdout_sha256: arkdeck_contract::sha256_hex(b"synthetic-hardware-observation"),
         stdout_byte_count: b"synthetic-hardware-observation".len(),
+        vendor_serial: None,
     })
 }
 

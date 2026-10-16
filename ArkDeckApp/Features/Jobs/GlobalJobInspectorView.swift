@@ -131,7 +131,11 @@ private final class GlobalJobInspectorModel {
       archivingJobID = nil
       switch result {
       case .archived(let published):
-        archiveMessage = jobsText(published ? "jobRecovery.archive.complete" : "jobRecovery.archive.publicationPending")
+        if review.retainsRisks {
+          archiveMessage = jobsText(published ? "jobRecovery.archive.retainedComplete" : "jobRecovery.archive.retainedPublicationPending")
+        } else {
+          archiveMessage = jobsText(published ? "jobRecovery.archive.complete" : "jobRecovery.archive.publicationPending")
+        }
       case .refused: archiveMessage = jobsText("jobRecovery.archive.unavailable")
       case .unconfirmed: archiveMessage = jobsText("jobRecovery.action.unconfirmed")
       }
@@ -914,8 +918,9 @@ private struct JobArchiveReviewSheet: View {
       Text(jobsText("jobRecovery.archive.title")).font(.title2).accessibilityAddTraits(.isHeader)
       ScrollView {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.blockGap) {
-          Text(jobsText("jobRecovery.archive.detail"))
+          Text(jobsText(review.retainsRisks ? "jobRecovery.archive.retainedDetail" : "jobRecovery.archive.detail"))
             .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("jobRecovery.archive.detail")
           WorkspaceFactGrid {
             GridRow { Text(jobsText("jobInspector.fact.job")); Text(review.job.id).textSelection(.enabled) }
             GridRow { Text(jobsText("jobInspector.fact.target")); Text(review.job.targetID).textSelection(.enabled) }
@@ -938,7 +943,8 @@ private struct JobArchiveReviewSheet: View {
       HStack {
         Spacer()
         Button(jobsText("jobRecovery.archive.dismiss"), action: onDismiss).keyboardShortcut(.cancelAction)
-        Button(jobsText(review.mode == "archive" ? "jobRecovery.archive.confirm" : "jobRecovery.archive.finish"), action: onConfirm)
+        Button(jobsText(review.mode == "archiveWithHazards" ? "jobRecovery.archive.retainedConfirm"
+          : review.mode == "archive" ? "jobRecovery.archive.confirm" : "jobRecovery.archive.finish"), action: onConfirm)
           .disabled(!review.canArchive)
           .accessibilityIdentifier("jobRecovery.archive.confirm")
       }
@@ -953,6 +959,9 @@ private struct JobArchiveReviewSheet: View {
     case "mutationArchiveProofUnavailable", "capabilityLineageMustRemainHeld": "jobRecovery.archive.blocker.mutation"
     case "unresolvedHazardsMustRemainHeld": "jobRecovery.archive.blocker.hazards"
     case "managedProcessOrCompensationProofUnavailable": "jobRecovery.archive.blocker.process"
+    case "compensationArchiveProofUnavailable": "jobRecovery.archive.blocker.process"
+    case "retainedArchiveRequiresExpiredRecoveryBudget": "jobRecovery.archive.blocker.budget"
+    case "retainedArchiveLineageUnavailable": "jobRecovery.archive.blocker.lineage"
     case "jobHeldByActiveRuntime": "jobRecovery.archive.blocker.active"
     case "sessionPublicationUnavailable": "jobRecovery.archive.blocker.storage"
     default: "jobRecovery.archive.blocker.refresh"

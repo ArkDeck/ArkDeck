@@ -14,7 +14,7 @@
 use crate::live_mode::{LoaderIdentity, LoaderObserver, UsbProbe, sha256_hex};
 use crate::rockchip_hdc::Clock;
 use crate::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt};
-use crate::{NormalHardwareIdentity, observe_normal_hardware_identity};
+use crate::{NormalHardwareIdentity, observe_normal_loader_identity};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::time::Duration;
@@ -255,8 +255,13 @@ impl<'a> RockchipLoaderTransition<'a> {
         }
 
         let capture_started = self.clock.now();
-        let identity = observe_normal_hardware_identity(self.hdc, self.usb, request.connect_key)
-            .map_err(|reason| LoaderTransitionFailure::Failed(reason.into()))?;
+        let identity = observe_normal_loader_identity(
+            self.hdc,
+            self.usb,
+            request.connect_key,
+            request.stable_identity_sha256,
+        )
+        .map_err(|reason| LoaderTransitionFailure::Failed(reason.into()))?;
         let identity_record = persist_identity(&identity).map_err(|_| {
             LoaderTransitionFailure::Failed(
                 "normalLoaderIdentity.observationPersistenceFailed; no Loader command dispatched"
@@ -273,7 +278,7 @@ impl<'a> RockchipLoaderTransition<'a> {
                     .into(),
             ));
         }
-        if identity.hardware_serial_sha256 != request.stable_identity_sha256 {
+        if !identity.matches_loader(request.stable_identity_sha256) {
             return Err(LoaderTransitionFailure::Failed(
                 "normalLoaderIdentity.boundLoaderIdentityMismatch; no Loader command dispatched"
                     .into(),
@@ -1097,7 +1102,10 @@ mod tests {
                 matches!(result, Err(LoaderTransitionFailure::Failed(_))),
                 "{case}: {result:?}"
             );
-            assert_eq!(persisted.get(), !matches!(case, "missing" | "ambiguous"));
+            assert_eq!(
+                persisted.get(),
+                !matches!(case, "missing" | "ambiguous" | "mismatch")
+            );
             assert!(
                 hdc.plans()
                     .iter()

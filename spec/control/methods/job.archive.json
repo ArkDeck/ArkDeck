@@ -74,6 +74,15 @@
           ],
           "type": "object"
         },
+        "resourceReleaseAuthorized": {
+          "type": "boolean"
+        },
+        "retainedHazards": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "sessionId": {
           "type": "string"
         },
@@ -91,6 +100,8 @@
         "jobId",
         "outcomeUnknown",
         "publication",
+        "resourceReleaseAuthorized",
+        "retainedHazards",
         "sessionId",
         "sessionPublished",
         "state",
@@ -108,7 +119,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 3,
-    "result": 2
+    "request": 5,
+    "result": 4
   }
 }

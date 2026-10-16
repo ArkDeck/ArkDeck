@@ -246,3 +246,37 @@ pub fn abandon_outcome(envelope: &Envelope, intent: &str) -> Value {
         }),
     ))
 }
+
+/// End only the host task lifecycle. Unknown effects, process uncertainty and
+/// all device/resource holds remain explicit; this grants no recovery authority.
+pub(crate) fn retained_archive_intent(
+    envelope: &Envelope,
+    confirmation: &str,
+    last_step: Option<&str>,
+    hazards: &[String],
+) -> Value {
+    Value::Object(record(
+        envelope,
+        "abandonIntent",
+        json!({
+            "userConfirmationId": confirmation, "lastConfirmedStep": last_step,
+            "outcomeCertainty": "outcomeUnknown", "managedProcessState": "unknown",
+            "deviceHazards": hazards,
+        }),
+    ))
+}
+
+pub(crate) fn retained_archive_outcome(
+    envelope: &Envelope,
+    intent: &str,
+    hazards: &[String],
+) -> Value {
+    Value::Object(record(
+        envelope,
+        "abandonOutcome",
+        json!({
+            "correlatesToAbandonIntentEventId": intent, "result": "archivedWithHazards",
+            "releaseAuthorized": false, "unresolvedHazards": hazards,
+        }),
+    ))
+}
