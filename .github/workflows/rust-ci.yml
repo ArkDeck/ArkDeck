@@ -116,7 +116,7 @@ jobs:
       # revision rust/Cargo.toml pins (the Swift SDK pin was deleted with the
       # Swift Runtime), and ArkForge's own wire and StepPermit vectors must
       # still hold at it (from the checkout the fetch above cached).
-      - name: One ArkForge revision, and its published vectors
+      - name: Pinned ArkForge consumer contracts and published vectors
         working-directory: .
         run: python rust/scripts/check-arkforge-pin.py --run-vectors
 

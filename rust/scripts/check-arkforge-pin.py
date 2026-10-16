@@ -110,6 +110,8 @@ def run_vectors(root: Path) -> None:
     checkout = arkforge_checkout(root)
     environment = dict(os.environ, CARGO_TARGET_DIR=str(root / "rust/target/arkforge-vectors"))
     for package, test in (
+        ("arkforge-ipc", "consumer_contract"),
+        ("arkforge-arkdeck-adapter", "consumer_contract"),
         ("arkforge-ipc", "swift_sdk_vectors"),
         ("arkforge-authority-api", "permit_vectors"),
     ):
