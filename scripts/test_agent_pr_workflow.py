@@ -756,7 +756,7 @@ RUST_WORKSPACE_TOKENS = (
 # The published and candidate contract views: once per host, in the
 # `contracts` matrix beside `workspace`, since they read none of its products.
 RUST_CONTRACTS_TOKENS = (
-    "    timeout-minutes: ${{ (startsWith(matrix.os, 'xcode') || matrix.os == 'windows-latest') && 50 || 30 }}\n",
+    "    timeout-minutes: ${{ matrix.os == 'windows-latest' && 75 || startsWith(matrix.os, 'xcode') && 50 || 30 }}\n",
     'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"',
     'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-contract-test-timings" >> "$GITHUB_ENV"',
     "        working-directory: .\n"
@@ -1561,6 +1561,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             rust.replace(workspace_timeout, ""),
             rust.replace(contracts_timeout, ""),
             rust.replace(workspace_timeout, workspace_timeout.replace("&& 40", "&& 41")),
+            rust.replace(contracts_timeout, contracts_timeout.replace("&& 75", "&& 76")),
             rust.replace(contracts_timeout, contracts_timeout.replace("&& 50", "&& 51")),
             rust.replace(workspace_timeout, contracts_timeout),
             rust.replace(contracts_timeout, workspace_timeout),

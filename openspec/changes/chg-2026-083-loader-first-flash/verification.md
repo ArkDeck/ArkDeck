@@ -99,6 +99,10 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
   one Windows CRLF fixture failure and two skips (29 cases total);
   `loader-first-ci-plan-tests-owned-temp.log` and
   `loader-first-ci-execution-tests-owned-temp.log`. Neither test source changed.
+  The workflow's exact contract pin was synchronized with the new CI deadline;
+  its negative cases still reject independent Windows and macOS deadline drift.
+  `python scripts/test_agent_pr_workflow.py`: exit 0, 18 passed;
+  `loader-first-ci-budget-workflow-tests.log`.
 
 The earlier broad local Cargo invocation stopped at two existing account-daemon
 process tests because the installed production Runtime owns its singleton. Its
@@ -144,5 +148,8 @@ contains no failed assertion, panic or failed test summary;
 `loader-first-windows-parity-failure.log`. Only that CI job's Windows deadline
 is raised to 75 minutes so all three views and finalization can finish. Test,
 Runtime and operation deadlines, selected cases and failure aggregation stay.
+Run `38837233358` on `5442f670` stopped in the planner because its workflow
+contract test still pinned the old deadline. The pin and its Windows drift case
+now match the reviewed configuration; none of the compiled lanes ran in that run.
 The corrected head must complete all selected lanes before merge.
 CI success is not hardware acceptance and does not replace maintainer review.
