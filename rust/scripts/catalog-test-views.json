@@ -14,7 +14,7 @@
     "crates/arkdeck-agentd/src/app_ingress/imports.rs": "5c62adc6bd574238d75259ca173b089fb5699587293a3e3ba68997897912e8fb",
     "crates/arkdeck-agentd/src/app_ingress/job_tests.rs": "7fea1858a11d8a576dd42f28416a4e586950719536a4262e9aa12dfbf7b8ce9b",
     "crates/arkdeck-agentd/src/app_ingress/jobs.rs": "a03f16ade9a53ce0e2595559e1038082fd1278d586a23961cf9b2cc825b4f157",
-    "crates/arkdeck-agentd/src/app_ingress/loader_binding_tests.rs": "e7df7426a51ea0a78c2eadea3189b458f547e7ed961670251fbc8a6cc19e516f",
+    "crates/arkdeck-agentd/src/app_ingress/loader_binding_tests.rs": "3b7f4f52e941f3d5fd742ee47cf28ab9d8eb46303d7c4c1a1e6daba453742a05",
     "crates/arkdeck-agentd/src/app_ingress/production_tests.rs": "69d63b1d0dd07677ca4a18ff9154fddb0f7bc5989056c7bcebc376f5540aa6fa",
     "crates/arkdeck-agentd/src/app_ingress/read_tests.rs": "3b4e130053ba259f9fa2466ddf7eb1120bd27494ceccf4ec401fd84c43c8b27b",
     "crates/arkdeck-agentd/src/app_ingress/recovery_tests.rs": "7969d342718f6c342841bb0f409f66bd021dbbb0ba9bc65388d45c8a4eb86397",

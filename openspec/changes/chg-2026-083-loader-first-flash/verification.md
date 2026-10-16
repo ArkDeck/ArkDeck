@@ -44,6 +44,11 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
   untrusted peers; they require the macOS CI lane.
   `clippy -p arkdeck-agentd -p arkdeck-bootstrap --all-targets -- -D warnings`
   also passed (exit 0; `loader-first-ingress-clippy.log`).
+  The published-schema expectation fix repeated these 44 Windows unit cases
+  and Clippy successfully (exit 0; `loader-first-published-ingress-units.log`
+  and `loader-first-published-ingress-clippy.log`). Its macOS-only assertion
+  is verified in CI; direct rustfmt and the complete routing manifest passed
+  locally (`loader-first-published-ingress-manifest.log`).
 - `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --test
   loader_binding_jobs --test post_flash_alias`: exit 0, 9 passed;
   `loader-first-binding-alias-tests-final.log`.
@@ -82,6 +87,8 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
   exit 0; `loader-first-sdd.log` (0 errors, 0 warnings).
   The ingress fix passed again: exit 0, 0 errors and 0 warnings;
   `loader-first-ingress-sdd.log`.
+  The published-schema test correction also passed with 0 errors and warnings;
+  `loader-first-published-ingress-sdd.log`.
 
 The earlier broad local Cargo invocation stopped at two existing account-daemon
 process tests because the installed production Runtime owns its singleton. Its
@@ -108,5 +115,15 @@ App ingress required both exclusive Loader request shapes at once, and the new
 JobStore test used macOS's noncanonical `/tmp` spelling. The ingress now admits
 either complete shape, with new negative coverage; the test opens its canonical
 private directory without relaxing production storage validation.
+Run `38827489809` on `c4d1fe81` passed all three workspace lanes, Swift,
+Windows ClientKit and Linux contract parity. The macOS published-contract view
+correctly rejected `adoptCurrentLoader` under the merge base's older closed
+schema, but the new App test incorrectly expected success in that view too.
+That test now verifies the exact refusal and zero owner dispatch only when the
+embedded inputs identify a published baseline whose schema lacks the field.
+The current schema must still complete adoption; its success and the other
+three Loader regression cases executed successfully in the macOS workspace.
+Raw CI logs: `loader-first-macos-parity-failure.log` and
+`loader-first-macos-workspace-success.log`.
 The corrected head must complete all selected lanes before merge.
 CI success is not hardware acceptance and does not replace maintainer review.

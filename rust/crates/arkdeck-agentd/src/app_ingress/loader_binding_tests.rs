@@ -111,6 +111,42 @@ fn the_app_adopts_the_attached_loader_without_supplying_a_target() {
         json!({"adoptCurrentLoader": true}),
     );
     let reply = ingress.handle(&request, root.peer());
+    let (_, schema) = arkdeck_contract::METHOD_SCHEMAS
+        .iter()
+        .find(|(name, _)| *name == "flash.bind-current-loader")
+        .unwrap();
+    let schema: Value = serde_json::from_str(schema).unwrap();
+    if schema["$defs"]["request"]["properties"]
+        .get("adoptCurrentLoader")
+        .is_none()
+    {
+        // The published compatibility view compiles this code against the
+        // merge base's closed schema. It must reject a parameter that old
+        // schema does not publish, without entering the owner. The current
+        // checkout has no baseline commit marker and cannot take this path.
+        let inputs =
+            arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+        assert_eq!(inputs["kind"], "development");
+        assert!(inputs.get("commit").is_some());
+        let error = decode_response(
+            reply.trim_ascii_end(),
+            "request-1",
+            "flash.bind-current-loader",
+        )
+        .unwrap()
+        .outcome
+        .unwrap_err();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            (
+                "invalidParams",
+                "App request requires its complete closed parameters"
+            )
+        );
+        assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+        assert!(calls.lock().unwrap().is_empty());
+        return;
+    }
     let receipt = result(&reply, "flash.bind-current-loader");
     assert_eq!(receipt["targetId"], "TGT-3ba3f5f43b92");
     assert_eq!(receipt["bindingRevision"], 1);
