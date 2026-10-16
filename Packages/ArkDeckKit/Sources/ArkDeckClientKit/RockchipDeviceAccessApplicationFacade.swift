@@ -68,6 +68,12 @@ enum RockchipDeviceAccessResponseDecoding {
   private struct Envelope: Decodable {
     let ok: Bool
     let result: Payload?
+    let error: RemoteFailure?
+  }
+
+  private struct RemoteFailure: Decodable {
+    let code: String
+    let message: String
   }
 
   private struct Payload: Decodable {
@@ -85,6 +91,9 @@ enum RockchipDeviceAccessResponseDecoding {
       return unavailable("runtime_device_access_malformed", verdict: .malformedOutput)
     }
     guard envelope.ok else {
+      if let error = envelope.error, error.code == "unsupportedProtocolVersion" {
+        return unavailable("\(error.code): \(error.message)", verdict: .protocolBlocked)
+      }
       return unavailable("runtime_device_access_unavailable", verdict: .probeFailed)
     }
     guard let payload = envelope.result,

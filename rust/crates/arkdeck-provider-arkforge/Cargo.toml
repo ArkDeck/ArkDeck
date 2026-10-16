@@ -18,6 +18,7 @@ arkforge-core.workspace = true
 arkforge-ipc.workspace = true
 
 [dev-dependencies]
+arkforge-arkdeck-adapter.workspace = true
 serde_json.workspace = true
 
 # The Windows stand-in `arkforged` serves ArkForge's own named pipes, as
