@@ -89,6 +89,16 @@ with `CARGO_BUILD_JOBS=2`. No local unified gate or device mutation was used.
   `loader-first-ingress-sdd.log`.
   The published-schema test correction also passed with 0 errors and warnings;
   `loader-first-published-ingress-sdd.log`.
+- The Windows CI deadline edit passed YAML parsing and checks that the three-OS
+  matrix, failure aggregation and non-Windows deadlines are unchanged.
+  Configuration check: exit 0; `loader-first-ci-budget-config.log`. SDD passed
+  with 0 errors and warnings (exit 0; `loader-first-ci-budget-sdd.log`).
+  The aggregate-status regression passed with Git Bash on PATH (exit 0;
+  `loader-first-ci-aggregate-targeted.log`). The initial full planner run could
+  not find `sh`; its other cases passed. The existing CI workspace tests had
+  one Windows CRLF fixture failure and two skips (29 cases total);
+  `loader-first-ci-plan-tests-owned-temp.log` and
+  `loader-first-ci-execution-tests-owned-temp.log`. Neither test source changed.
 
 The earlier broad local Cargo invocation stopped at two existing account-daemon
 process tests because the installed production Runtime owns its singleton. Its
@@ -125,5 +135,14 @@ The current schema must still complete adoption; its success and the other
 three Loader regression cases executed successfully in the macOS workspace.
 Raw CI logs: `loader-first-macos-parity-failure.log` and
 `loader-first-macos-workspace-success.log`.
+Run `38831173671` on `a1f0da46` passed Swift, Windows ClientKit, all workspace
+lanes, and Linux/macOS contract parity. The macOS parity log confirms the Loader
+test passed in all three views (`loader-first-macos-parity-success.log`).
+Windows completed its published and candidate views but the 50-minute job limit
+cancelled the historical view while process tests were still passing. The log
+contains no failed assertion, panic or failed test summary;
+`loader-first-windows-parity-failure.log`. Only that CI job's Windows deadline
+is raised to 75 minutes so all three views and finalization can finish. Test,
+Runtime and operation deadlines, selected cases and failure aggregation stay.
 The corrected head must complete all selected lanes before merge.
 CI success is not hardware acceptance and does not replace maintainer review.
