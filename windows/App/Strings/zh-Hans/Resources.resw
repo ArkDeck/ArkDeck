@@ -5706,6 +5706,30 @@ SHA-256：%4$@</value>
     <value>此 Job 正等待人工在其所属工作流中继续处理。</value>
     <comment>history.recovery.waitingForHuman (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_archive_retainedDetail" xml:space="preserve">
+    <value>归档保留原始未知结果和证据，设备风险、资源占用及已过期恢复预算继续保留。此操作不会重放任务、恢复设备、停止状态不明的进程或允许再次刷机。</value>
+    <comment>jobRecovery.archive.retainedDetail (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_retainedConfirm" xml:space="preserve">
+    <value>保留风险并归档</value>
+    <comment>jobRecovery.archive.retainedConfirm (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_retainedComplete" xml:space="preserve">
+    <value>已归档，原始未知结果与全部风险占用仍保留，冲突的设备操作继续被阻断。</value>
+    <comment>jobRecovery.archive.retainedComplete (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_retainedPublicationPending" xml:space="preserve">
+    <value>归档决策已记录，Session 尚未发布。未知副作用与全部风险占用仍保留，请再次检查归档条件以完成发布。</value>
+    <comment>jobRecovery.archive.retainedPublicationPending (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_budget" xml:space="preserve">
+    <value>原恢复预算尚未过期，或时间戳无法核对，暂不具备保留风险归档的条件。</value>
+    <comment>jobRecovery.archive.blocker.budget (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_archive_blocker_lineage" xml:space="preserve">
+    <value>原始身份或能力记录缺失或不一致，当前无法生成可核对的归档记录。</value>
+    <comment>jobRecovery.archive.blocker.lineage (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="jobRecovery_archive_blocker_mutation" xml:space="preserve">
     <value>当前 Runtime 尚不能证明设备变更任务可安全释放全部占用。</value>
     <comment>jobRecovery.archive.blocker.mutation (JobsLocalizable.xcstrings)</comment>

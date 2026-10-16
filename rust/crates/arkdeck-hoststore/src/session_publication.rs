@@ -332,7 +332,8 @@ impl SessionPublisher<'_> {
         marker.insert(
             "proposal".into(),
             json!({"manifestSHA256": digest, "manifestByteCount": manifest.len().to_string(),
-                "terminalStatus": record.state, "outcomeCertainty": "confirmed",
+                "terminalStatus": record.state,
+                "outcomeCertainty": if replay.retained_risk_archive { "outcomeUnknown" } else { "confirmed" },
                 "completedAtUTC": completed}),
         );
         let job =
@@ -355,7 +356,11 @@ impl SessionPublisher<'_> {
                     &envelope,
                     &record.state,
                     &digest,
-                    "confirmed",
+                    if journal.facts().retained_risk_archive {
+                        "outcomeUnknown"
+                    } else {
+                        "confirmed"
+                    },
                 ))
                 .map_err(|error| storage(error.to_string()))?;
         }
@@ -795,15 +800,23 @@ fn compose_with_workspace(
     workspace: Option<WorkspaceSessionContext<'_>>,
 ) -> Result<Vec<u8>, Stop> {
     let status = record.state.as_str();
+    let retained = status == "interrupted"
+        && record.dayu200_flash()
+        && record.actual_effect() == Some("destructive")
+        && record.outcome_unknown()
+        && replay.retained_risk_archive
+        && !replay.resource_release_authorized
+        && !replay.required_abandonment_hazards.is_empty();
     if !["succeeded", "failed", "cancelled", "interrupted"].contains(&status) {
         return Err(stop(
             "contractViolation",
             format!("terminal state {status} has no current Manifest status"),
         ));
     }
-    if record.outcome_unknown()
-        || !replay.outstanding_intents.is_empty()
-        || !replay.unknown_outcomes.is_empty()
+    if !retained
+        && (record.outcome_unknown()
+            || !replay.outstanding_intents.is_empty()
+            || !replay.unknown_outcomes.is_empty())
     {
         return Err(stop(
             "contractViolation",
@@ -822,17 +835,24 @@ fn compose_with_workspace(
             "the Job Journal does not open with its own creation facts",
         ));
     };
-    let steps = manifest_steps(events)?;
-    let compensations = manifest_compensations(events)?;
+    let steps = manifest_steps(events, retained)?;
+    let compensations = manifest_compensations(events, retained)?;
     let host_workspace = workspace_context(record, events, replay, mode, workspace)?;
-    let device = if host_workspace.is_some() {
+    let device = if retained {
+        Some(retained_device_context(record, events)?)
+    } else if host_workspace.is_some() {
         None
     } else {
         device_context(record, events, replay, mode)?
     };
-    let mut bindings = manifest_bindings(events);
+    let mut bindings = if retained {
+        Vec::new()
+    } else {
+        manifest_bindings(events)
+    };
     if let Some(device) = &device
         && bindings.is_empty()
+        && !device.binding.is_null()
     {
         bindings = vec![device.binding.clone()];
     }
@@ -862,7 +882,7 @@ fn compose_with_workspace(
         "schemaVersion": "1.0.0", "appVersion": APP_VERSION, "coreSpecBaseline": baseline,
         "platformProfile": PLATFORM_PROFILE, "sessionId": format!("session-{}", record.job_id),
         "jobId": record.job_id, "status": status, "executionMode": mode,
-        "executionAuthority": authority, "outcomeCertainty": "confirmed",
+        "executionAuthority": authority, "outcomeCertainty": if retained { "outcomeUnknown" } else { "confirmed" },
         "sessionDisposition": "finalized", "createdAt": record.created(),
         "completedAt": completed, "archivedAt": null,
         "originalTarget": target, "bindingHistory": bindings, "toolchain": toolchain,
@@ -879,8 +899,13 @@ fn compose_with_workspace(
             .rev()
             .find(|event| {
                 event["kind"] == "abandonOutcome"
-                    && event["payload"]["result"] == "archivedInterrupted"
-                    && event["payload"]["releaseAuthorized"] == true
+                    && event["payload"]["result"]
+                        == if retained {
+                            "archivedWithHazards"
+                        } else {
+                            "archivedInterrupted"
+                        }
+                    && event["payload"]["releaseAuthorized"] == !retained
             })
             .ok_or_else(|| {
                 stop(
@@ -900,15 +925,16 @@ fn compose_with_workspace(
                     "the archive outcome has no original user decision",
                 )
             })?;
-        if !replay.resource_release_authorized
-            || intent["payload"]["outcomeCertainty"] != "confirmed"
-            || intent["payload"]["managedProcessState"] != "notRunning"
-            || !intent["payload"]["deviceHazards"]
-                .as_array()
-                .is_some_and(Vec::is_empty)
-            || !outcome["payload"]["unresolvedHazards"]
-                .as_array()
-                .is_some_and(Vec::is_empty)
+        if !retained
+            && (!replay.resource_release_authorized
+                || intent["payload"]["outcomeCertainty"] != "confirmed"
+                || intent["payload"]["managedProcessState"] != "notRunning"
+                || !intent["payload"]["deviceHazards"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty)
+                || !outcome["payload"]["unresolvedHazards"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty))
         {
             return Err(stop(
                 "contractViolation",
@@ -917,15 +943,37 @@ fn compose_with_workspace(
         }
         use crate::recovery_manifest::{
             RecoveryManifest, RecoveryManifestAbandonConfirmation, RecoveryManifestDeviceMode,
-            RecoveryManifestGuide,
+            RecoveryManifestGuide, RecoveryManifestHazard,
         };
+        let retained_hazards = outcome["payload"]["unresolvedHazards"]
+            .as_array()
+            .ok_or_else(|| stop("sourceIntegrityFailed", "archive hazards are unavailable"))?;
+        if retained
+            && (intent["payload"]["outcomeCertainty"] != "outcomeUnknown"
+                || intent["payload"]["managedProcessState"] != "unknown"
+                || intent["payload"]["deviceHazards"] != outcome["payload"]["unresolvedHazards"]
+                || !replay
+                    .required_abandonment_hazards
+                    .iter()
+                    .all(|hazard| retained_hazards.contains(&json!(hazard))))
+        {
+            return Err(stop(
+                "contractViolation",
+                "retained-risk archive lost an original uncertainty",
+            ));
+        }
         let recovery = RecoveryManifest {
             needs_attention: true,
             interrupted_reason: Some(
                 "User archived the interrupted Job; no recovery or device cleanup was performed"
                     .into(),
             ),
-            device_hazards: vec![],
+            device_hazards: retained_hazards.iter().map(|hazard| RecoveryManifestHazard {
+                code: "archive.retainedHazard".into(),
+                summary: hazard.as_str().unwrap_or_default().into(),
+                severity: "blocking".into(),
+                outcome_certainty: "outcomeUnknown".into(),
+            }).collect(),
             abandon_audit_event_ids: vec![
                 intent["eventId"].as_str().unwrap_or_default().into(),
                 outcome["eventId"].as_str().unwrap_or_default().into(),
@@ -934,11 +982,15 @@ fn compose_with_workspace(
                 .as_str()
                 .map(str::to_owned),
             last_device_mode: RecoveryManifestDeviceMode::Unknown,
-            managed_host_process_state: "notRunning".into(),
+            managed_host_process_state: if retained { "stillRunningUnknown" } else { "notRunning" }.into(),
             recovery_guide: RecoveryManifestGuide {
                 provider_identity: record.provider().into(),
                 automatic_recovery_available: false,
-                summary: "This Session records an interrupted Job, not successful recovery".into(),
+                summary: if retained {
+                    "Original unknown effects, recovery budget and all resource holds remain; conflicting device work stays blocked"
+                } else {
+                    "This Session records an interrupted Job, not successful recovery"
+                }.into(),
                 steps: vec![
                     "Inspect the retained Journal and Artifacts before starting independent work"
                         .into(),
@@ -1005,7 +1057,7 @@ fn compose_with_workspace(
 
 /// Swift `manifestSteps`: each intent's typed declaration with the tuple its
 /// correlated outcome proves; a retried Step keeps its latest row.
-fn manifest_steps(events: &[Value]) -> Result<Vec<Value>, Stop> {
+fn manifest_steps(events: &[Value], unknown_unfinished: bool) -> Result<Vec<Value>, Stop> {
     let outcomes = correlated(events, "stepOutcome");
     let mut steps: Vec<Value> = Vec::new();
     let mut seen = BTreeSet::new();
@@ -1029,7 +1081,7 @@ fn manifest_steps(events: &[Value]) -> Result<Vec<Value>, Stop> {
             ));
         };
         let (disposition, certainty, result) =
-            execution_tuple(outcomes.get(event_id).copied(), step_id)?;
+            execution_tuple(outcomes.get(event_id).copied(), step_id, unknown_unfinished)?;
         let mut row = step.clone();
         row.insert("argumentsHash".into(), json!(hash));
         row.insert("sourceStepId".into(), Value::Null);
@@ -1049,7 +1101,7 @@ fn manifest_steps(events: &[Value]) -> Result<Vec<Value>, Stop> {
 }
 
 /// Swift `manifestCompensations`.
-fn manifest_compensations(events: &[Value]) -> Result<Vec<Value>, Stop> {
+fn manifest_compensations(events: &[Value], unknown_unfinished: bool) -> Result<Vec<Value>, Stop> {
     let outcomes = correlated(events, "compensationOutcome");
     let mut records: Vec<Value> = Vec::new();
     for event in events
@@ -1068,7 +1120,8 @@ fn manifest_compensations(events: &[Value]) -> Result<Vec<Value>, Stop> {
             ));
         };
         let outcome = outcomes.get(event_id).copied();
-        let (disposition, certainty, result) = execution_tuple(outcome, descriptor_id)?;
+        let (disposition, certainty, result) =
+            execution_tuple(outcome, descriptor_id, unknown_unfinished)?;
         let mut identities = vec![json!(event_id)];
         if let Some(outcome) = outcome {
             identities.push(outcome["eventId"].clone());
@@ -1102,13 +1155,17 @@ fn correlated<'a>(events: &'a [Value], kind: &str) -> BTreeMap<&'a str, &'a Valu
         .collect()
 }
 
-/// Swift `executionTuple`: derived only from a recorded outcome; a Step with
-/// no outcome did not execute.
+/// Swift `executionTuple`: derived only from a recorded outcome. A retained
+/// unknown archive preserves an unfinished intent as unknown.
 fn execution_tuple(
     outcome: Option<&Value>,
     context: &str,
+    unknown_unfinished: bool,
 ) -> Result<(&'static str, &'static str, &'static str), Stop> {
     let Some(outcome) = outcome else {
+        if unknown_unfinished {
+            return Ok(("outcomeUnknown", "outcomeUnknown", "unknown"));
+        }
         return Ok(("skipped", "notApplicable", "notRun"));
     };
     let (Some(result), Some(certainty)) = (
@@ -1168,6 +1225,68 @@ fn lowercase_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// A retained unknown is an audit of the original obligation. It is not a
+/// current device observation. Missing model, transport and tool facts stay
+/// unavailable instead of being reconstructed from today's board.
+pub(crate) fn retained_archive_lineage_valid(record: &JobRecord, events: &[Value]) -> bool {
+    retained_device_context(record, events).is_ok()
+}
+
+fn retained_device_context(record: &JobRecord, events: &[Value]) -> Result<DeviceContext, Stop> {
+    let refused = || {
+        stop(
+            "sourceIntegrityFailed",
+            "retained archive has inconsistent original target or capability lineage",
+        )
+    };
+    if !record.dayu200_flash() || record.provider() != "arkforge" {
+        return Err(refused());
+    }
+    let target = record.request["target"]["targetId"]
+        .as_str()
+        .ok_or_else(refused)?;
+    let identity = record
+        .materialized_identity()
+        .filter(|value| lowercase_sha256(value))
+        .ok_or_else(refused)?;
+    let revision = record
+        .materialized_binding()
+        .filter(|revision| *revision > 0)
+        .ok_or_else(refused)?;
+    for intent in events.iter().filter(|event| {
+        event["kind"] == "stepIntent"
+            && event["payload"]["step"]["bindingRequirement"] == "confirmedDevice"
+    }) {
+        if intent["bindingRevision"] != revision
+            || intent["payload"]["target"]["targetId"] != target
+            || intent["payload"]["target"]["identitySnapshotHash"] != identity
+        {
+            return Err(refused());
+        }
+    }
+    let mut authority = record
+        .evidence_fields()
+        .remove("authority")
+        .ok_or_else(refused)?;
+    let audit = authority.as_object_mut().ok_or_else(refused)?;
+    audit.remove("recoveryEpoch");
+    if audit.get("kind") != Some(&json!("runtimeCapability"))
+        || audit.get("planDigest").and_then(Value::as_str) != record.materialized_plan()
+        || audit.get("reference") != record.request["authorization"].get("capabilityId")
+    {
+        return Err(refused());
+    }
+    Ok(DeviceContext {
+        target: json!({"kind":"unresolved", "connectKey":null, "transport":"unknown",
+            "identitySnapshot":{"source":"originalUnknownJob", "targetId":target,
+                "stableIdentitySHA256":identity, "bindingRevision":revision}}),
+        binding: Value::Null,
+        toolchain: json!({"kind":"unavailable", "providerIdentity":record.provider(),
+            "profileIdentifier":record.operation(), "reason":"archiveHasNoFreshDeviceOrToolProof"}),
+        authority,
+    })
 }
 
 /// Swift `deviceContext`: a Job whose Journal holds an intent that can touch

@@ -263,6 +263,9 @@
           ]
         },
         "else": {
+        "if": {"properties": {"originalTarget": {"properties": {"kind": {"const": "unresolved"}}, "required": ["kind"]}}},
+        "then": {"$ref": "#/$defs/retainedRiskArchive"},
+        "else": {
         "properties": {
           "originalTarget": {
             "allOf": [
@@ -298,6 +301,7 @@
               { "properties": { "kind": { "enum": ["hdc", "runtimeProvider"] } } }
             ]
           }
+        }
         }
         }
       }
@@ -494,7 +498,7 @@
     },
     {
       "if": {
-        "properties": {"toolchain": {"properties": {"kind": {"const": "runtimeProvider"}}, "required": ["kind"]}},
+        "properties": {"toolchain": {"properties": {"kind": {"enum": ["runtimeProvider", "unavailable"]}}, "required": ["kind"]}},
         "required": ["toolchain"]
       },
       "then": {
@@ -536,9 +540,50 @@
         "if": {"required": ["runtimeAuthority"]},
         "then": {"$ref": "#/$defs/hostWorkspaceMutation"}
       }
+    },
+    {
+      "if": {"properties": {"toolchain": {"properties": {"kind": {"const": "unavailable"}}, "required": ["kind"]}}},
+      "then": {"$ref": "#/$defs/retainedRiskArchive"}
     }
   ],
   "$defs": {
+    "retainedRiskArchive": {
+      "required": ["runtimeAuthority"],
+      "properties": {
+        "status": {"const": "interrupted"},
+        "executionMode": {"const": "execute"},
+        "outcomeCertainty": {"const": "outcomeUnknown"},
+        "sessionDisposition": {"const": "archived"},
+        "originalTarget": {"properties": {
+          "kind": {"const": "unresolved"}, "connectKey": {"type": "null"}, "transport": {"const": "unknown"},
+          "identitySnapshot": {
+            "type": "object", "additionalProperties": false,
+            "required": ["source", "targetId", "stableIdentitySHA256", "bindingRevision"],
+            "properties": {
+              "source": {"const": "originalUnknownJob"}, "targetId": {"$ref": "#/$defs/id"},
+              "stableIdentitySHA256": {"$ref": "#/$defs/sha256"}, "bindingRevision": {"type": "integer", "minimum": 1}
+            }
+          }
+        }},
+        "bindingHistory": {"maxItems": 0},
+        "toolchain": {"properties": {"kind": {"const": "unavailable"}}},
+        "workflow": {"properties": {
+          "kind": {"enum": ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"]},
+          "providerIdentity": {"const": "arkforge"}
+        }},
+        "steps": {
+          "items": {"properties": {"compensationDescriptors": {"maxItems": 0}}},
+          "contains": {"properties": {"effect": {"const": "destructive"}, "outcomeCertainty": {"const": "outcomeUnknown"}}, "required": ["effect", "outcomeCertainty"]}
+        },
+        "compensations": {"maxItems": 0},
+        "runtimeAuthority": {"type": "object", "properties": {"kind": {"const": "runtimeCapability"}}},
+        "recovery": {"type": "object", "properties": {
+          "needsAttention": {"const": true}, "managedHostProcessState": {"const": "stillRunningUnknown"},
+          "deviceHazards": {"minItems": 1, "items": {"properties": {"severity": {"const": "blocking"}, "outcomeCertainty": {"const": "outcomeUnknown"}}}},
+          "recoveryGuide": {"properties": {"automaticRecoveryAvailable": {"const": false}}}
+        }}
+      }
+    },
     "hostWorkspaceMutation": {
       "required": [
         "runtimeAuthority"
@@ -910,9 +955,9 @@
       "additionalProperties": false,
       "required": ["kind", "connectKey", "transport", "identitySnapshot"],
       "properties": {
-        "kind": { "enum": ["real", "synthetic", "host"] },
+        "kind": { "enum": ["real", "synthetic", "host", "unresolved"] },
         "connectKey": { "type": ["string", "null"] },
-        "transport": { "enum": ["usb", "tcp", "uart", "synthetic", "host"] },
+        "transport": { "enum": ["usb", "tcp", "uart", "synthetic", "host", "unknown"] },
         "identitySnapshot": {
           "type": "object",
           "minProperties": 1
@@ -944,7 +989,7 @@
       "anyOf": [
       {
       "properties": {
-        "toolchain": {"properties": {"kind": {"const": "runtimeProvider"}}, "required": ["kind"]},
+        "toolchain": {"properties": {"kind": {"enum": ["runtimeProvider", "unavailable"]}}, "required": ["kind"]},
         "runtimeAuthority": {"type": "object", "properties": {"kind": {"const": "runtimeCapability"}}, "required": ["kind"]}
       },
       "required": ["toolchain", "runtimeAuthority"]
@@ -1018,6 +1063,15 @@
     },
     "toolchain": {
       "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "providerIdentity", "profileIdentifier", "reason"],
+          "properties": {
+            "kind": {"const": "unavailable"}, "providerIdentity": {"const": "arkforge"},
+            "profileIdentifier": {"enum": ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"]},
+            "reason": {"const": "archiveHasNoFreshDeviceOrToolProof"}
+          }
+        },
         {
           "type": "object",
           "additionalProperties": false,

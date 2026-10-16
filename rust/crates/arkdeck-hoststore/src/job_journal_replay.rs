@@ -350,6 +350,8 @@ pub struct ReplayFacts {
     pub last_confirmed_step_id: Option<String>,
     pub last_reconcile_outcome_certainty: Option<String>,
     pub resource_release_authorized: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub retained_risk_archive: bool,
     pub requires_unknown_finalized_outcome: bool,
     pub pending_abandonment: Option<AbandonmentFact>,
     pub finalized: bool,
@@ -388,11 +390,16 @@ pub struct ReplayState {
     active_abandon: Option<(String, Vec<String>, String)>,
     pending_abandon: Option<(String, String)>,
     resource_release_authorized: bool,
+    retained_risk_archive: bool,
     requires_unknown_finalized_outcome: bool,
     compensation: Compensation,
     /// Whether a step intent declared a destructive effect, whatever became
     /// of it.
     destructive_step_intent: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 /// One snapshot's replay: complete records validated in order, and whether
@@ -688,6 +695,18 @@ impl ReplayState {
                 if !linked || state != Some("userAbandonRequested") {
                     return Err("abandon outcome has no durable intent");
                 }
+                if payload["result"] == "archivedWithHazards"
+                    && (payload["releaseAuthorized"] != false
+                        || self.required_hazards().is_empty()
+                        || self
+                            .active_abandon
+                            .as_ref()
+                            .is_none_or(|(_, _, certainty)| certainty != "outcomeUnknown"))
+                {
+                    return Err(
+                        "retained-risk archive must preserve an unknown device hazard without releasing resources",
+                    );
+                }
             }
             "finalized" => {
                 let Some(current) = state.filter(|state| terminal(state)) else {
@@ -696,7 +715,10 @@ impl ReplayState {
                 if payload["terminalStatus"].as_str() != Some(current) {
                     return Err("finalized status does not match Job state");
                 }
-                if outstanding && !(current == "interrupted" && self.resource_release_authorized) {
+                if outstanding
+                    && !(current == "interrupted"
+                        && (self.resource_release_authorized || self.retained_risk_archive))
+                {
                     return Err("finalized cannot hide an unresolved external-effect intent");
                 }
                 if (outstanding
@@ -736,7 +758,7 @@ impl ReplayState {
             "stateTransition" => {
                 let to = payload["to"].as_str();
                 if self.authorizes_interrupted(to, payload["triggerEventId"].as_str()) {
-                    self.resource_release_authorized = true;
+                    self.resource_release_authorized = !self.retained_risk_archive;
                     if self
                         .active_abandon
                         .as_ref()
@@ -838,7 +860,8 @@ impl ReplayState {
                 if let Some(correlation) = payload["correlatesToAbandonIntentEventId"].as_str() {
                     self.completed_abandon_intents.insert(correlation.into());
                 }
-                let next = if payload["releaseAuthorized"] == true {
+                self.retained_risk_archive = payload["result"] == "archivedWithHazards";
+                let next = if payload["releaseAuthorized"] == true || self.retained_risk_archive {
                     "interrupted"
                 } else {
                     "waitingForRecovery"
@@ -888,7 +911,9 @@ impl ReplayState {
                         intent_event_id: intent.clone(),
                         phase: "outcomeDurable".into(),
                         outcome_event_id: Some(outcome.clone()),
-                        release_authorized: Some(next == "interrupted"),
+                        release_authorized: Some(
+                            next == "interrupted" && !self.retained_risk_archive,
+                        ),
                         device_hazards: hazards.clone(),
                         outcome_certainty: certainty.clone(),
                     },
@@ -930,6 +955,7 @@ impl ReplayState {
             last_confirmed_step_id: self.last_confirmed_step_id.clone(),
             last_reconcile_outcome_certainty: self.last_reconcile_certainty.clone(),
             resource_release_authorized: self.resource_release_authorized,
+            retained_risk_archive: self.retained_risk_archive,
             requires_unknown_finalized_outcome: self.requires_unknown_finalized_outcome,
             pending_abandonment,
             finalized: self.finalized,

@@ -669,7 +669,16 @@ fn validate(value: &Value) -> Result<()> {
                 &[],
             )?;
             string(p, "correlatesToAbandonIntentEventId")?;
-            let result = choice(p, "result", &["archivedInterrupted", "deferred", "failed"])?;
+            let result = choice(
+                p,
+                "result",
+                &[
+                    "archivedInterrupted",
+                    "archivedWithHazards",
+                    "deferred",
+                    "failed",
+                ],
+            )?;
             require(p["releaseAuthorized"].as_bool() == Some(result == "archivedInterrupted"))?;
             strings(p, "unresolvedHazards", 0)?;
         }

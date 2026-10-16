@@ -1431,6 +1431,12 @@ public static class UiStrings
     public const string HistoryRecoveryReadOnly = "history.recovery.readOnly";
     public const string HistoryRecoveryResidue = "history.recovery.residue";
     public const string HistoryRecoveryWaitingForHuman = "history.recovery.waitingForHuman";
+    public const string JobRecoveryArchiveRetainedDetail = "jobRecovery.archive.retainedDetail";
+    public const string JobRecoveryArchiveRetainedConfirm = "jobRecovery.archive.retainedConfirm";
+    public const string JobRecoveryArchiveRetainedComplete = "jobRecovery.archive.retainedComplete";
+    public const string JobRecoveryArchiveRetainedPublicationPending = "jobRecovery.archive.retainedPublicationPending";
+    public const string JobRecoveryArchiveBlockerBudget = "jobRecovery.archive.blocker.budget";
+    public const string JobRecoveryArchiveBlockerLineage = "jobRecovery.archive.blocker.lineage";
     public const string JobRecoveryArchiveBlockerMutation = "jobRecovery.archive.blocker.mutation";
     public const string JobRecoveryArchiveUnavailable = "jobRecovery.archive.unavailable";
     public const string JobRecoveryArchiveTitle = "jobRecovery.archive.title";
@@ -3210,6 +3216,12 @@ public static class UiStrings
         HistoryRecoveryReadOnly,
         HistoryRecoveryResidue,
         HistoryRecoveryWaitingForHuman,
+        JobRecoveryArchiveRetainedDetail,
+        JobRecoveryArchiveRetainedConfirm,
+        JobRecoveryArchiveRetainedComplete,
+        JobRecoveryArchiveRetainedPublicationPending,
+        JobRecoveryArchiveBlockerBudget,
+        JobRecoveryArchiveBlockerLineage,
         JobRecoveryArchiveBlockerMutation,
         JobRecoveryArchiveUnavailable,
         JobRecoveryArchiveTitle,

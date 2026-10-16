@@ -177,6 +177,7 @@ fn manifests(directory: &Path) -> Vec<PathBuf> {
 #[test]
 fn a_quiescent_job_is_archived_over_the_signed_test_daemon() {
     let _turn = crate::turn();
+    assert_cli_coverage();
     let scratch = temporary("job-archive");
     let Some((executable, pin)) = signed_copy(&scratch.join("signed-bin")) else {
         return;
@@ -197,18 +198,62 @@ fn a_quiescent_job_is_archived_over_the_signed_test_daemon() {
     );
     let previews = frames("job.archive.preview");
     let archives = frames("job.archive");
+    let expected_preview = recorded(&previews, |frame| {
+        frame["result"]["mode"] == "archive"
+            && frame["result"]["lastConfirmedStepId"] == "extract-crash-signature"
+    });
+    let record_path = root
+        .join("jobs-state/jobs")
+        .join(ID)
+        .join("job-record.json");
+    let journal_path = root.join("jobs-state/jobs").join(ID).join("journal.jsonl");
+    let original_record = std::fs::read(&record_path).unwrap();
+    let original_journal = std::fs::read(&journal_path).unwrap();
 
     // The preview: archivable, its last confirmed step the host-only one.
     let (status, preview) = daemon.cli(&["job", "archive", "preview", "--job", ID]);
+    let mut current_shape = expected_preview["result"].clone();
+    current_shape["retainedHazards"] = json!([]);
+    current_shape["resourceReleaseAuthorized"] = json!(false);
+    if arkdeck_contract::validate_method_value("job.archive.preview", "result", &current_shape)
+        .is_err()
+    {
+        // Published views compile current Rust against the merge base's
+        // immutable schemas. An older schema must refuse the new fields;
+        // the candidate and every schema that includes them must take the
+        // complete successful round trip below, never this refusal path.
+        let inputs =
+            arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+        assert_eq!(inputs["kind"], "development");
+        assert!(inputs["commit"].as_str().is_some());
+        arkdeck_contract::validate_method_value(
+            "job.archive.preview",
+            "result",
+            &expected_preview["result"],
+        )
+        .unwrap();
+        assert_eq!(status, Some(75), "{preview}");
+        assert_eq!(preview["ok"], false);
+        assert_eq!(
+            preview["error"],
+            json!({
+                "attentionRequired": true,
+                "code": "outcomeUnknown",
+                "controlRequestRetryable": false,
+                "details": {"method": "job.archive.preview", "wireCode": "internalError"},
+                "message": "the result does not conform to the current contract"
+            })
+        );
+        assert_eq!(std::fs::read(&record_path).unwrap(), original_record);
+        assert_eq!(std::fs::read(&journal_path).unwrap(), original_journal);
+        assert!(manifests(&root.join("sessions")).is_empty());
+        daemon.stop();
+        let _ = std::fs::remove_dir_all(&scratch);
+        return;
+    }
     assert_eq!(status, Some(0), "{preview}");
     assert_eq!(preview["command"], "job.archive.preview", "{preview}");
-    assert_macos(
-        &preview["result"],
-        &recorded(&previews, |frame| {
-            frame["result"]["mode"] == "archive"
-                && frame["result"]["lastConfirmedStepId"] == "extract-crash-signature"
-        }),
-    );
+    assert_macos(&preview["result"], &expected_preview);
     let review = preview["result"]["reviewSha256"]
         .as_str()
         .unwrap()
@@ -291,7 +336,9 @@ fn a_quiescent_job_is_archived_over_the_signed_test_daemon() {
     assert_refused(status, &absent, &missing);
     daemon.stop();
     let _ = std::fs::remove_dir_all(&scratch);
+}
 
+fn assert_cli_coverage() {
     let product = arkdeck_cli::machine_contracts::contract_products()
         .into_iter()
         .find(|product| product.relative_path == "cli-feature-coverage.json")

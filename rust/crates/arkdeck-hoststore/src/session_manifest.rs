@@ -167,16 +167,45 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         &["kind", "connectKey", "transport", "identitySnapshot"],
         &[],
     )?;
-    let target_kind = choice(target, "kind", &["real", "synthetic", "host"])?;
+    let target_kind = choice(target, "kind", &["real", "synthetic", "host", "unresolved"])?;
     let transport = choice(
         target,
         "transport",
-        &["usb", "tcp", "uart", "synthetic", "host"],
+        &["usb", "tcp", "uart", "synthetic", "host", "unknown"],
     )?;
     let connect = nullable_text(target, "connectKey")?;
     require(!object(&target["identitySnapshot"])?.is_empty())?;
     let host = target_kind == "host";
-    if simulated {
+    let unresolved = target_kind == "unresolved";
+    if unresolved {
+        require(
+            mode == "execute"
+                && status == "interrupted"
+                && certainty == "outcomeUnknown"
+                && disposition == "archived"
+                && transport == "unknown"
+                && connect.is_none(),
+        )?;
+        let snapshot = object(&target["identitySnapshot"])?;
+        keys(
+            snapshot,
+            &[
+                "source",
+                "targetId",
+                "stableIdentitySHA256",
+                "bindingRevision",
+            ],
+            &[],
+        )?;
+        require(
+            text(snapshot, "source")? == "originalUnknownJob"
+                && identifier(text(snapshot, "targetId")?)
+                && hash(text(snapshot, "stableIdentitySHA256")?)
+                && snapshot["bindingRevision"]
+                    .as_i64()
+                    .is_some_and(|revision| revision > 0),
+        )?;
+    } else if simulated {
         require(target_kind == "synthetic" && transport == "synthetic" && connect.is_none())?;
     } else if host {
         require(transport == "host" && connect.is_none())?;
@@ -188,7 +217,7 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         )?;
     }
     let bindings = array(doc, "bindingHistory")?;
-    require(host == bindings.is_empty())?;
+    require((host || unresolved) == bindings.is_empty())?;
     let mut previous = 0_i64;
     for row in bindings {
         let row = object(row)?;
@@ -247,9 +276,22 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
     let kind = choice(
         tool,
         "kind",
-        &["hdc", "hostTool", "runtimeProvider", "none"],
+        &["hdc", "hostTool", "runtimeProvider", "none", "unavailable"],
     )?;
+    require(unresolved == (kind == "unavailable"))?;
     match kind {
+        "unavailable" => {
+            keys(
+                tool,
+                &["kind", "providerIdentity", "profileIdentifier", "reason"],
+                &[],
+            )?;
+            require(
+                text(tool, "providerIdentity")? == "arkforge"
+                    && text(tool, "reason")? == "archiveHasNoFreshDeviceOrToolProof",
+            )?;
+            nonempty(tool, "profileIdentifier")?;
+        }
         "none" => {
             keys(tool, &["kind"], &[])?;
             require(simulated || host)?;
@@ -325,7 +367,7 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
     if host_workspace {
         validate_host_workspace(doc)?;
     }
-    if kind == "runtimeProvider" || host_workspace {
+    if kind == "runtimeProvider" || host_workspace || unresolved {
         require(mode == "execute" && (host_workspace || !host))?;
         let authority = doc.get("runtimeAuthority").ok_or(ManifestError::Invalid)?;
         let audit = if authority.is_null() {
@@ -344,7 +386,7 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         } else {
             let audit = object(authority)?;
             validate_runtime_audit(audit)?;
-            if host_workspace {
+            if host_workspace || unresolved {
                 require(text(audit, "kind")? == "runtimeCapability")?;
             }
             Some(audit)
@@ -375,6 +417,23 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
     )?;
     for key in ["kind", "profileVersion", "providerIdentity"] {
         nonempty(workflow, key)?;
+    }
+    if unresolved {
+        require(
+            ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"]
+                .contains(&text(workflow, "kind")?)
+                && text(workflow, "providerIdentity")? == "arkforge"
+                && text(tool, "profileIdentifier")? == text(workflow, "kind")?
+                && array(doc, "compensations")?.is_empty()
+                && array(doc, "steps")?.iter().all(|step| {
+                    step["compensationDescriptors"]
+                        .as_array()
+                        .is_some_and(Vec::is_empty)
+                })
+                && array(doc, "steps")?.iter().any(|step| {
+                    step["effect"] == "destructive" && step["outcomeCertainty"] == "outcomeUnknown"
+                }),
+        )?;
     }
     for key in ["fixtureIdentity", "scenarioIdentity"] {
         let value = if workflow.contains_key(key) {
@@ -423,6 +482,17 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
                     && !array(recovery, "abandonAuditEventIds")?.is_empty()
                     && !recovery["userConfirmation"].is_null(),
             )?;
+            if unresolved {
+                require(
+                    text(recovery, "managedHostProcessState")? == "stillRunningUnknown"
+                        && !array(recovery, "deviceHazards")?.is_empty()
+                        && array(recovery, "deviceHazards")?.iter().all(|hazard| {
+                            hazard["severity"] == "blocking"
+                                && hazard["outcomeCertainty"] == "outcomeUnknown"
+                        })
+                        && recovery["recoveryGuide"]["automaticRecoveryAvailable"] == false,
+                )?;
+            }
         }
         _ => return Err(ManifestError::Invalid),
     }

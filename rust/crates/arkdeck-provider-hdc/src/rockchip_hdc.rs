@@ -53,8 +53,10 @@ pub struct ReconnectExpectation {
     pub usb_topology: String,
 }
 
-/// A board first observed in Loader has no previous HDC route. Its exact
-/// hardware serial and physical connector are pinned before any mutation.
+/// A board first observed in Loader has no previous HDC route. Its exact Loader
+/// USB serial and physical connector are pinned before any mutation. The
+/// persisted `hardware_serial_sha256` name can denote a validated factory SN;
+/// the independent kernel CPU digest is never replaced with that locator.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LoaderReconnectExpectation {
     pub hardware_serial_sha256: String,
@@ -301,10 +303,14 @@ impl<'a> RockchipHdcObserver<'a> {
                 "Loader-first HDC attachment is inconsistent or changed",
             ));
         }
-        let hardware =
-            crate::observe_normal_hardware_identity(self.hdc, self.usb, &identity.connect_key)
-                .map_err(failed)?;
-        if hardware.hardware_serial_sha256 != expectation.hardware_serial_sha256
+        let hardware = crate::observe_normal_loader_identity(
+            self.hdc,
+            self.usb,
+            &identity.connect_key,
+            &expectation.hardware_serial_sha256,
+        )
+        .map_err(failed)?;
+        if !hardware.matches_loader(&expectation.hardware_serial_sha256)
             || hardware.connector_identity_sha256 != expectation.connector_sha256
             || hardware.normal_identity_sha256 != identity.serial_digest_sha256
             || hardware.usb_topology != identity.topology

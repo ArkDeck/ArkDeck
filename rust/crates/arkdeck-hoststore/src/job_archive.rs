@@ -1,7 +1,7 @@
 //! A user archive is a durable abandonment decision, never recovery authority.
-//! This writer only closes proven, quiescent host/read-only Jobs. Unknown
-//! outcomes, mutations, retained hazards and unproved process lifetimes stay
-//! parked. It has no transport or capability-store reference.
+//! Quiescent host/read-only Jobs can release their resources. An expired,
+//! unknown Flash can only archive with every risk and resource hold retained.
+//! This writer has no transport or capability-store reference.
 use crate::job_journal_events::{self as events, Envelope};
 use crate::job_journal_replay::{ReplayFacts, ReplayState};
 use crate::job_journal_writer::JournalWriter;
@@ -44,6 +44,30 @@ struct Snapshot {
     confirmation: Option<String>,
 }
 
+fn retains_risk(record: &JobRecord, facts: &ReplayFacts) -> bool {
+    record.dayu200_flash()
+        && record.actual_effect() == Some("destructive")
+        && record.outcome_unknown()
+        && !facts.required_abandonment_hazards.is_empty()
+}
+
+fn retained_hazards(record: &JobRecord, facts: &ReplayFacts) -> Vec<String> {
+    if !retains_risk(record, facts) {
+        return Vec::new();
+    }
+    let mut hazards = facts.required_abandonment_hazards.clone();
+    hazards.extend([
+        "runtimeCapabilityLineageRetained".into(),
+        "managedHostProcessStateUnknown".into(),
+    ]);
+    if record.residues().unwrap_or(0) > 0 {
+        hazards.push("cleanupResiduesRetained".into());
+    }
+    hazards.sort();
+    hazards.dedup();
+    hazards
+}
+
 /// No child can remain from these synchronous, fully journaled steps once
 /// their outcomes are confirmed. Do not widen this list for detached work,
 /// build/signing processes, or a remote process starter without a new proof.
@@ -81,8 +105,36 @@ fn process_closed(step: &Value) -> bool {
 
 /// Shared by the live decision and restart completion. A missing fact is a
 /// blocker; absence of a writer lock alone is never process-lifetime proof.
-fn proof_blockers(record: &JobRecord, facts: &ReplayFacts, events: &[Value]) -> Vec<&'static str> {
+fn proof_blockers(
+    record: &JobRecord,
+    facts: &ReplayFacts,
+    events: &[Value],
+    at: &str,
+) -> Vec<&'static str> {
     let mut blockers = Vec::new();
+    if facts.has_torn_tail {
+        blockers.push("journalNeedsRecovery");
+    }
+    if retains_risk(record, facts) {
+        if !crate::job_owner::flash_recovery::expired_for_retained_archive(record, at) {
+            blockers.push("retainedArchiveRequiresExpiredRecoveryBudget");
+        }
+        if !crate::session_publication::retained_archive_lineage_valid(record, events) {
+            blockers.push("retainedArchiveLineageUnavailable");
+        }
+        // This addition covers the fixed Flash workflow. A compensation
+        // lifetime needs its own archive projection, not an omitted descriptor.
+        if events.iter().any(|event| {
+            event["kind"] == "compensationIntent"
+                || (event["kind"] == "stepIntent"
+                    && event["payload"]["step"]["compensationDescriptors"]
+                        .as_array()
+                        .is_none_or(|items| !items.is_empty()))
+        }) {
+            blockers.push("compensationArchiveProofUnavailable");
+        }
+        return blockers;
+    }
     // These operations use the synchronous step runner. A future host-only
     // delegated worker is not quiescent merely because its journal is empty.
     if ![
@@ -116,9 +168,6 @@ fn proof_blockers(record: &JobRecord, facts: &ReplayFacts, events: &[Value]) -> 
     if record.residues().unwrap_or(0) != 0 || !facts.required_abandonment_hazards.is_empty() {
         blockers.push("unresolvedHazardsMustRemainHeld");
     }
-    if facts.has_torn_tail {
-        blockers.push("journalNeedsRecovery");
-    }
     if events.iter().any(|event| {
         event["kind"] == "compensationIntent"
             || (event["kind"] == "stepIntent" && {
@@ -143,25 +192,48 @@ fn archive_intent<'a>(events: &'a [Value], facts: &ReplayFacts) -> Option<&'a Va
     }
     let outcome = events.iter().rev().find(|event| {
         event["kind"] == "abandonOutcome"
-            && event["payload"]["result"] == "archivedInterrupted"
-            && event["payload"]["releaseAuthorized"] == true
+            && ((event["payload"]["result"] == "archivedInterrupted"
+                && event["payload"]["releaseAuthorized"] == true)
+                || (event["payload"]["result"] == "archivedWithHazards"
+                    && event["payload"]["releaseAuthorized"] == false))
     })?;
     events.iter().find(|event| {
         event["kind"] == "abandonIntent"
             && event["eventId"] == outcome["payload"]["correlatesToAbandonIntentEventId"]
     })
 }
-fn valid_intent(intent: &Value) -> bool {
+fn valid_intent(intent: &Value, record: &JobRecord, facts: &ReplayFacts) -> bool {
     intent["kind"] == "abandonIntent"
-        && intent["payload"]["outcomeCertainty"] == "confirmed"
-        && intent["payload"]["managedProcessState"] == "notRunning"
-        && intent["payload"]["deviceHazards"]
-            .as_array()
-            .is_some_and(Vec::is_empty)
+        && if retains_risk(record, facts) {
+            intent["payload"]["outcomeCertainty"] == "outcomeUnknown"
+                && intent["payload"]["managedProcessState"] == "unknown"
+                && intent["payload"]["deviceHazards"] == json!(retained_hazards(record, facts))
+        } else {
+            intent["payload"]["outcomeCertainty"] == "confirmed"
+                && intent["payload"]["managedProcessState"] == "notRunning"
+                && intent["payload"]["deviceHazards"]
+                    .as_array()
+                    .is_some_and(Vec::is_empty)
+        }
         && intent["payload"]["userConfirmationId"]
             .as_str()
             .is_some_and(|id| !id.is_empty())
 }
+
+/// This historical decision preserves capability lineage. Startup may finish
+/// its journal projection without recording a new capability use or outcome.
+pub(crate) fn retains_capability_lineage(
+    record: &JobRecord,
+    facts: &ReplayFacts,
+    events: &[Value],
+    at: &str,
+) -> bool {
+    retains_risk(record, facts)
+        && (facts.pending_abandonment.is_some() || facts.retained_risk_archive)
+        && proof_blockers(record, facts, events, at).is_empty()
+        && archive_intent(events, facts).is_some_and(|intent| valid_intent(intent, record, facts))
+}
+
 fn envelope(id: &str, facts: &ReplayFacts, at: &str) -> Result<Envelope, WireError> {
     let random = arkdeck_platform::random_bytes::<16>().map_err(internal)?;
     Ok(Envelope {
@@ -194,17 +266,21 @@ fn complete_pending_with(
     append: &mut impl FnMut(&mut JournalWriter, &Value) -> Result<(), WireError>,
 ) -> Result<bool, WireError> {
     let mut facts = writer.facts();
-    if facts.pending_abandonment.is_none() && !facts.resource_release_authorized {
+    if facts.pending_abandonment.is_none()
+        && !facts.resource_release_authorized
+        && !facts.retained_risk_archive
+    {
         return Ok(false);
     }
-    if !proof_blockers(record, &facts, events).is_empty()
-        || archive_intent(events, &facts).is_none_or(|intent| !valid_intent(intent))
+    if !proof_blockers(record, &facts, events, at).is_empty()
+        || archive_intent(events, &facts).is_none_or(|intent| !valid_intent(intent, record, &facts))
     {
         return Err(refused(
             "rejected",
-            "the durable archive decision lacks quiescence proof",
+            "the durable archive decision lacks its required safety proof",
         ));
     }
+    let retained = retains_risk(record, &facts);
     for _ in 0..3 {
         let Some(pending) = facts.pending_abandonment.clone() else {
             break;
@@ -215,16 +291,34 @@ fn complete_pending_with(
                 &env,
                 "waitingForRecovery",
                 "userAbandonRequested",
-                "user requested archive of a confirmed quiescent Job",
+                if retained {
+                    "user requested terminal archive with all risks and holds retained"
+                } else {
+                    "user requested archive of a confirmed quiescent Job"
+                },
                 Some(&pending.intent_event_id),
             ),
+            "requested" if retained => events::retained_archive_outcome(
+                &env,
+                &pending.intent_event_id,
+                &pending.device_hazards,
+            ),
             "requested" => events::abandon_outcome(&env, &pending.intent_event_id),
-            "outcomeDurable" if pending.release_authorized == Some(true) => {
+            "outcomeDurable"
+                if pending.release_authorized == Some(true)
+                    || (retained
+                        && facts.retained_risk_archive
+                        && pending.release_authorized == Some(false)) =>
+            {
                 events::state_transition(
                     &env,
                     "userAbandonRequested",
                     "interrupted",
-                    "durable archive outcome authorizes resource release",
+                    if retained {
+                        "durable archive closes the task; all device risks and resource holds remain"
+                    } else {
+                        "durable archive outcome authorizes resource release"
+                    },
                     pending.outcome_event_id.as_deref(),
                 )
             }
@@ -238,22 +332,27 @@ fn complete_pending_with(
         append(writer, &event)?;
         facts = writer.facts();
     }
-    if facts.current_state.as_deref() != Some("interrupted") || !facts.resource_release_authorized {
+    if facts.current_state.as_deref() != Some("interrupted")
+        || !(facts.resource_release_authorized || (retained && facts.retained_risk_archive))
+    {
         return Err(refused(
             "rejected",
             "the archive decision is not durably terminal",
         ));
     }
     record.state = "interrupted".into();
-    if record.finished_at().is_none() {
+    // The original finished/created timestamp anchors the shared recovery
+    // budget. Archival must not move that clock, even if it was absent.
+    if !retained && record.finished_at().is_none() {
         record.finish(at);
     }
-    if record.timeline.last().is_none_or(|entry| {
-        entry != "archived: user decision; no recovery or device cleanup performed"
-    }) {
-        record
-            .timeline
-            .push("archived: user decision; no recovery or device cleanup performed".into());
+    let message = if retained {
+        "archived with risks retained: original unknown, budget, capability lineage and all resource holds unchanged"
+    } else {
+        "archived: user decision; no recovery or device cleanup performed"
+    };
+    if record.timeline.last().is_none_or(|entry| entry != message) {
+        record.timeline.push(message.into());
     }
     Ok(true)
 }
@@ -276,7 +375,8 @@ impl JobArchiver<'_> {
             .map(serde_json::from_slice)
             .collect::<Result<_, _>>()
             .map_err(internal)?;
-        let mut blockers = proof_blockers(&record, &facts, &events);
+        let at = (self.now)().ok_or_else(|| internal("clock unavailable"))?;
+        let mut blockers = proof_blockers(&record, &facts, &events, &at);
         if self.sessions.is_none() {
             blockers.push("sessionPublicationUnavailable");
         }
@@ -288,10 +388,10 @@ impl JobArchiver<'_> {
             blockers.push("recordProjectionNotDurable");
         }
         let intent = archive_intent(&events, &facts);
-        let continuing = intent.is_some_and(valid_intent)
+        let continuing = intent.is_some_and(|intent| valid_intent(intent, &record, &facts))
             && (facts.pending_abandonment.is_some()
                 || (facts.current_state.as_deref() == Some("interrupted")
-                    && facts.resource_release_authorized));
+                    && (facts.resource_release_authorized || facts.retained_risk_archive)));
         if !continuing
             && (record.state != "waitingForRecovery"
                 || facts.current_state.as_deref() != Some("waitingForRecovery")
@@ -299,7 +399,7 @@ impl JobArchiver<'_> {
         {
             blockers.push("jobNotWaitingForRecovery");
         }
-        if intent.is_some_and(|intent| !valid_intent(intent)) {
+        if intent.is_some_and(|intent| !valid_intent(intent, &record, &facts)) {
             blockers.push("archiveDecisionNotProven");
         }
         let confirmation = intent
@@ -332,8 +432,11 @@ impl JobArchiver<'_> {
             "unavailable"
         } else if snapshot.facts.pending_abandonment.is_some() {
             "finishAudit"
-        } else if snapshot.facts.resource_release_authorized {
+        } else if snapshot.facts.resource_release_authorized || snapshot.facts.retained_risk_archive
+        {
             "finishPublication"
+        } else if retains_risk(&snapshot.record, &snapshot.facts) {
+            "archiveWithHazards"
         } else {
             "archive"
         };
@@ -342,6 +445,8 @@ impl JobArchiver<'_> {
             "state":snapshot.record.state, "targetId":snapshot.record.request["target"]["targetId"],
             "outcomeUnknown":snapshot.record.outcome_unknown(), "reviewSha256":snapshot.hash,
             "canArchive":snapshot.blockers.is_empty(), "mode":mode, "blockers":snapshot.blockers,
+            "retainedHazards":retained_hazards(&snapshot.record, &snapshot.facts),
+            "resourceReleaseAuthorized":snapshot.facts.resource_release_authorized,
             "userConfirmationId":snapshot.confirmation, "sessionId":format!("session-{}",snapshot.record.job_id),
             "lastConfirmedStepId":snapshot.facts.last_confirmed_step_id}),
         )
@@ -396,11 +501,20 @@ impl JobArchiver<'_> {
         let at = (self.now)().ok_or_else(|| internal("clock unavailable"))?;
         if snapshot.confirmation.is_none() {
             let env = envelope(id, &snapshot.facts, &at)?;
-            let intent = events::abandon_intent(
-                &env,
-                confirmation,
-                snapshot.facts.last_confirmed_step_id.as_deref(),
-            );
+            let intent = if retains_risk(&snapshot.record, &snapshot.facts) {
+                events::retained_archive_intent(
+                    &env,
+                    confirmation,
+                    snapshot.facts.last_confirmed_step_id.as_deref(),
+                    &retained_hazards(&snapshot.record, &snapshot.facts),
+                )
+            } else {
+                events::abandon_intent(
+                    &env,
+                    confirmation,
+                    snapshot.facts.last_confirmed_step_id.as_deref(),
+                )
+            };
             writer.append(&intent).map_err(internal)?;
             snapshot.events.push(intent);
         }
@@ -413,7 +527,9 @@ impl JobArchiver<'_> {
         snapshot.record.set_session_publication(marker.clone());
         self.jobs.persist(&snapshot.record, &at).map_err(internal)?;
         Ok(
-            json!({"jobId":id, "state":"interrupted", "outcomeUnknown":false,
+            json!({"jobId":id, "state":"interrupted", "outcomeUnknown":snapshot.record.outcome_unknown(),
+            "retainedHazards":retained_hazards(&snapshot.record, &writer.facts()),
+            "resourceReleaseAuthorized":writer.facts().resource_release_authorized,
             "sessionId":format!("session-{id}"), "sessionPublished":marker["phase"] == "catalogPublished",
             "publication":{"phase":marker["phase"], "failureCode":marker["failure"]["code"],
                 "manifestSha256":marker["receipt"]["manifestSHA256"]}, "userConfirmationId":confirmation}),
@@ -450,7 +566,7 @@ mod tests {
         fn new() -> Self {
             Self::with_step(false)
         }
-        fn with_step(with_step: bool) -> Self {
+        fn empty() -> Self {
             // Session settings use the same canonical local-drive spelling as
             // the production owner; std::canonicalize is verbatim on Windows.
             let base = crate::session_owner::canonical_path(&std::env::temp_dir())
@@ -470,6 +586,18 @@ mod tests {
             let jobs = JobStore::open_owner(&base.join("jobs-state")).unwrap();
             let sessions =
                 SessionStore::open(&base.join("session-owner"), &base.join("Sessions")).unwrap();
+            Self {
+                _removed: Removed(base.clone()),
+                path: base,
+                jobs,
+                sessions,
+                claims: StorageClaims::default(),
+            }
+        }
+        fn with_step(with_step: bool) -> Self {
+            let fixture = Self::empty();
+            let jobs = &fixture.jobs;
+            let base = &fixture.path;
             let bytes = include_bytes!(
                 "../../../tests/fixtures/job-reconcile-analyzer/before/jobs/job-082b8363fce0462b4571a62147751099/job-record.json"
             );
@@ -543,13 +671,58 @@ mod tests {
                 .unwrap();
             record.state = "waitingForRecovery".into();
             jobs.persist(&record, AT).unwrap();
-            Self {
-                _removed: Removed(base.clone()),
-                path: base,
-                jobs,
-                sessions,
-                claims: StorageClaims::default(),
+            fixture
+        }
+        fn unknown_flash(outstanding: bool) -> Self {
+            let fixture = Self::empty();
+            let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/flash-run/stories/failures/files/store/jobs/job-7e4b6c8997b64ac9d4ab648851f2f3a5");
+            let original = "job-7e4b6c8997b64ac9d4ab648851f2f3a5";
+            let bytes = fs::read_to_string(source.join("job-record.json"))
+                .unwrap()
+                .replace(original, ID);
+            let record = JobRecord::decode(bytes.as_bytes()).unwrap();
+            fixture.jobs.admit(&record, &"a".repeat(64)).unwrap();
+            let directory = fixture.jobs.job_directory(ID).unwrap();
+            crate::test_private::create_private_directories(&directory);
+            let journal = fs::read_to_string(source.join("journal.jsonl"))
+                .unwrap()
+                .replace(original, ID);
+            let mut writer = JournalWriter::open(&directory, true).unwrap();
+            for line in journal.lines() {
+                let mut event: Value = serde_json::from_str(line).unwrap();
+                if outstanding
+                    && event["kind"] == "stepOutcome"
+                    && event["payload"]["outcomeCertainty"] == "outcomeUnknown"
+                {
+                    continue;
+                }
+                if !outstanding
+                    && event["kind"] == "stateTransition"
+                    && event["payload"]["to"] == "waitingForRecovery"
+                {
+                    let facts = writer.facts();
+                    let intent = &facts.outstanding_intents[0];
+                    let at = event["timestamp"].as_str().unwrap();
+                    writer
+                        .append(&events::step_outcome(
+                            &envelope(ID, &facts, at).unwrap(),
+                            &intent.step_id,
+                            intent.attempt,
+                            &intent.event_id,
+                            "failed",
+                            "outcomeUnknown",
+                            None,
+                            None,
+                        ))
+                        .unwrap();
+                }
+                event["sequence"] =
+                    json!(writer.facts().last_durable_sequence.map_or(0, |n| n + 1));
+                writer.append(&event).unwrap();
             }
+            fixture.jobs.persist(&record, AT).unwrap();
+            fixture
         }
         fn publisher(&self) -> SessionPublisher<'_> {
             SessionPublisher {
@@ -693,7 +866,7 @@ mod tests {
         let facts = archive.snapshot(ID).unwrap().facts;
         record.set_admission_evidence(json!({"kind":"runtimeCapability"}));
         assert!(
-            proof_blockers(&record, &facts, &f.journal())
+            proof_blockers(&record, &facts, &f.journal(), AT)
                 .contains(&"capabilityLineageMustRemainHeld")
         );
         f.jobs.hold_resident(f.jobs.read_snapshot(ID).unwrap());
@@ -922,5 +1095,363 @@ mod tests {
         assert_eq!(blocked["canArchive"], false);
         assert!(archive.archive(&decision(&preview)).is_err());
         assert_eq!(fs::read(&path).unwrap(), before);
+    }
+
+    #[test]
+    fn expired_unknown_archive_preserves_every_obligation_and_never_unlocks_flash() {
+        for outstanding in [false, true] {
+            let f = Fixture::unknown_flash(outstanding);
+            let before = f.jobs.read_snapshot(ID).unwrap();
+            let capability_root = f.path.join("capabilities");
+            crate::test_private::create_private_directory(&capability_root);
+            let capabilities =
+                crate::capability_store::CapabilityStore::open(&capability_root).unwrap();
+            let admission = |campaign| {
+                f.jobs.complete_overwrite_admission(
+                    &capabilities,
+                    "flash.full-restore@1",
+                    &before.request["inputs"],
+                    before.materialized_identity().unwrap(),
+                    before.materialized_binding().unwrap(),
+                    AT,
+                    campaign,
+                )
+            };
+            for campaign in [None, Some("new-after-archive")] {
+                assert!(matches!(admission(campaign),
+                    Err(crate::job_owner::flash_recovery::OverwriteRefusal::Blocked(reason))
+                    if reason == "completeOverwriteRecovery.sharedFourHourBudgetExpired"));
+            }
+            let journal = f.jobs.journal_bytes(ID).unwrap();
+            let publisher = f.publisher();
+            let archive = JobArchiver {
+                jobs: &f.jobs,
+                now,
+                sessions: Some(&publisher),
+            };
+            let preview = archive.preview(&params()).unwrap();
+            assert_eq!(preview["canArchive"], true, "{preview}");
+            assert_eq!(preview["mode"], "archiveWithHazards");
+            assert_eq!(preview["resourceReleaseAuthorized"], false);
+            assert!(preview["retainedHazards"].as_array().unwrap().len() >= 3);
+            record_frame("job.archive.preview", &params(), &preview);
+            let request = decision(&preview);
+            let result = archive.archive(&request).unwrap();
+            f.assert_published(&result);
+            assert_eq!(result["outcomeUnknown"], true);
+            assert_eq!(result["resourceReleaseAuthorized"], false);
+            record_frame("job.archive", &request, &result);
+            let after = f.jobs.read_snapshot(ID).unwrap();
+            let mut original = before.value().unwrap();
+            let mut changed = after.value().unwrap();
+            for key in ["state", "timeline", "sessionPublicationRecord"] {
+                original.as_object_mut().unwrap().remove(key);
+                changed.as_object_mut().unwrap().remove(key);
+            }
+            assert_eq!(
+                original, changed,
+                "archive cannot change old lineage, outcome or budget"
+            );
+            let sealed = f.jobs.journal_bytes(ID).unwrap();
+            assert!(sealed.starts_with(&journal));
+            let replay = ReplayState::replay(&sealed).unwrap().state.facts(false);
+            assert!(replay.retained_risk_archive && replay.requires_unknown_finalized_outcome);
+            assert!(!replay.resource_release_authorized);
+            assert_eq!(replay.outstanding_intents.len(), usize::from(outstanding));
+            assert_eq!(replay.unknown_outcomes.len(), usize::from(!outstanding));
+            let manifest: Value = serde_json::from_slice(
+                &fs::read(
+                    f.path
+                        .join("Sessions/2026/09")
+                        .join(format!("session-{ID}/manifest.json")),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+            assert_eq!(manifest["outcomeCertainty"], "outcomeUnknown");
+            if let Some(path) = std::env::var_os("ARKDECK_ARCHIVE_CONTRACT_RECORD") {
+                fs::write(
+                    PathBuf::from(path).join(format!("retained-{outstanding}.manifest.json")),
+                    serde_json::to_vec_pretty(&manifest).unwrap(),
+                )
+                .unwrap();
+            }
+            assert_eq!(
+                after.session_publication().unwrap()["proposal"]["outcomeCertainty"],
+                "outcomeUnknown"
+            );
+            assert_eq!(manifest["originalTarget"]["kind"], "unresolved");
+            assert_eq!(manifest["toolchain"]["kind"], "unavailable");
+            assert_eq!(manifest["steps"][0]["disposition"], "outcomeUnknown");
+            for (field, value) in [
+                ("/status", json!("succeeded")),
+                ("/outcomeCertainty", json!("confirmed")),
+                ("/sessionDisposition", json!("finalized")),
+                (
+                    "/originalTarget/connectKey",
+                    json!("invented-current-route"),
+                ),
+                ("/originalTarget/transport", json!("usb")),
+                ("/runtimeAuthority", Value::Null),
+                ("/workflow/kind", json!("observe.device@1")),
+                ("/toolchain/profileIdentifier", json!("other-profile")),
+                ("/recovery/deviceHazards", json!([])),
+                ("/recovery/managedHostProcessState", json!("notRunning")),
+                (
+                    "/recovery/recoveryGuide/automaticRecoveryAvailable",
+                    json!(true),
+                ),
+            ] {
+                let mut forged = manifest.clone();
+                *forged.pointer_mut(field).unwrap() = value;
+                assert!(
+                    crate::session_manifest::decode_manifest(&serde_json::to_vec(&forged).unwrap())
+                        .is_err(),
+                    "archive cannot claim fresh or settled authority: {field}"
+                );
+            }
+            assert_eq!(
+                manifest["recovery"]["managedHostProcessState"],
+                "stillRunningUnknown"
+            );
+            assert_eq!(
+                manifest["recovery"]["deviceHazards"]
+                    .as_array()
+                    .unwrap()
+                    .len(),
+                preview["retainedHazards"].as_array().unwrap().len()
+            );
+            assert_eq!(
+                f.journal().last().unwrap()["payload"]["outcomeCertainty"],
+                "outcomeUnknown"
+            );
+            assert!(
+                f.jobs
+                    .current_jobs()
+                    .unwrap()
+                    .iter()
+                    .any(|job| job.job_id == ID
+                        && job.outcome_unknown
+                        && job.state == "interrupted")
+            );
+            assert_eq!(
+                f.jobs.unsettled_flash_jobs_for_loader_adoption().unwrap(),
+                [ID]
+            );
+            assert_eq!(
+                f.jobs
+                    .unsettled_flash_jobs_for_binding(
+                        before.request["target"]["targetId"].as_str().unwrap()
+                    )
+                    .unwrap(),
+                [ID]
+            );
+            assert!(crate::job_owner::flash_recovery::expired_for_retained_archive(&after, AT));
+            for campaign in [None, Some("new-after-archive")] {
+                assert!(
+                    matches!(admission(campaign), Err(crate::job_owner::flash_recovery::OverwriteRefusal::Blocked(reason))
+                    if reason == "completeOverwriteRecovery.explicitCancellationPending")
+                );
+            }
+            assert!(capabilities.lineage().unwrap().is_empty());
+            assert!(f.jobs.recovery_epochs().unwrap().is_empty());
+            let again = archive.preview(&params()).unwrap();
+            assert_eq!(again["mode"], "finishPublication");
+            let mut different = decision(&again);
+            different.insert("userConfirmationId".into(), json!("another-decision"));
+            assert!(archive.archive(&different).is_err());
+            f.assert_published(&archive.archive(&decision(&again)).unwrap());
+            assert_eq!(f.jobs.journal_bytes(ID).unwrap(), sealed);
+        }
+    }
+
+    #[test]
+    fn retained_archive_rechecks_holds_review_and_original_lineage_before_writing() {
+        for case in ["resident", "writer", "changedReview", "torn", "lineage"] {
+            let f = Fixture::unknown_flash(true);
+            let publisher = f.publisher();
+            let archive = JobArchiver {
+                jobs: &f.jobs,
+                now,
+                sessions: Some(&publisher),
+            };
+            let preview = archive.preview(&params()).unwrap();
+            let directory = f.jobs.job_directory(ID).unwrap();
+            let mut held = None;
+            match case {
+                "resident" => f.jobs.hold_resident(f.jobs.read_snapshot(ID).unwrap()),
+                "writer" => {
+                    let (ready, opened) = std::sync::mpsc::channel();
+                    let (release, waiting) = std::sync::mpsc::channel();
+                    let thread = std::thread::spawn(move || {
+                        let _lock = arkdeck_platform::HostJournal::open(&directory).unwrap();
+                        ready.send(()).unwrap();
+                        let _ = waiting.recv();
+                    });
+                    opened
+                        .recv_timeout(std::time::Duration::from_secs(5))
+                        .unwrap();
+                    held = Some((release, thread));
+                }
+                "changedReview" => f.edit(|value| {
+                    value["timeline"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(json!("new durable risk observation"));
+                }),
+                "lineage" => {
+                    let mut value: Value =
+                        serde_json::from_slice(&f.jobs.record_bytes(ID).unwrap()).unwrap();
+                    value["materializedStableTargetIdentitySHA256"] = json!("f".repeat(64));
+                    crate::test_private::plant_owner_only(
+                        &directory.join("job-record.json"),
+                        &serde_json::to_vec(&value).unwrap(),
+                    );
+                }
+                "torn" => {
+                    use std::io::Write;
+                    fs::OpenOptions::new()
+                        .append(true)
+                        .open(directory.join("journal.jsonl"))
+                        .unwrap()
+                        .write_all(b"{torn")
+                        .unwrap();
+                }
+                _ => unreachable!(),
+            }
+            let before = f.jobs.journal_bytes(ID).unwrap();
+            let result = archive.archive(&decision(&preview));
+            if let Some((release, thread)) = held {
+                release.send(()).unwrap();
+                thread.join().unwrap();
+            }
+            assert!(result.is_err(), "{case}");
+            assert_eq!(f.jobs.journal_bytes(ID).unwrap(), before, "{case}");
+        }
+    }
+
+    #[test]
+    fn retained_archive_requires_expiry_and_keeps_a_missing_clock_anchor_missing() {
+        fn active() -> Option<String> {
+            Some("2026-09-25T03:59:59Z".into())
+        }
+        fn invalid() -> Option<String> {
+            Some("invalid".into())
+        }
+        for clock in [active as fn() -> Option<String>, invalid] {
+            let f = Fixture::unknown_flash(true);
+            let publisher = f.publisher();
+            let archive = JobArchiver {
+                jobs: &f.jobs,
+                now: clock,
+                sessions: Some(&publisher),
+            };
+            let before = f.jobs.journal_bytes(ID).unwrap();
+            let preview = archive.preview(&params()).unwrap();
+            assert_eq!(preview["canArchive"], false);
+            assert!(archive.archive(&decision(&preview)).is_err());
+            assert_eq!(f.jobs.journal_bytes(ID).unwrap(), before);
+        }
+        let f = Fixture::unknown_flash(true);
+        f.edit(|value| {
+            value.as_object_mut().unwrap().remove("finishedAtUTC");
+        });
+        let publisher = f.publisher();
+        let archive = JobArchiver {
+            jobs: &f.jobs,
+            now,
+            sessions: Some(&publisher),
+        };
+        archive
+            .archive(&decision(&archive.preview(&params()).unwrap()))
+            .unwrap();
+        assert!(f.jobs.read_snapshot(ID).unwrap().finished_at().is_none());
+    }
+
+    #[test]
+    fn every_retained_archive_append_boundary_restarts_without_release_or_new_effects() {
+        for cut in 0..=3 {
+            let f = Fixture::unknown_flash(true);
+            let directory = f.jobs.job_directory(ID).unwrap();
+            let before = f.jobs.journal_bytes(ID).unwrap();
+            let mut writer = JournalWriter::open(&directory, false).unwrap();
+            let mut record = f.jobs.read_snapshot(ID).unwrap();
+            let facts = writer.facts();
+            writer
+                .append(&events::retained_archive_intent(
+                    &envelope(ID, &facts, AT).unwrap(),
+                    "user-archive-fixture",
+                    facts.last_confirmed_step_id.as_deref(),
+                    &retained_hazards(&record, &facts),
+                ))
+                .unwrap();
+            let mut count = 0;
+            let result = complete_pending_with(
+                &mut record,
+                &mut writer,
+                &f.journal(),
+                AT,
+                &mut |writer, event| {
+                    if count == cut {
+                        return Err(internal("injected archive append failure"));
+                    }
+                    count += 1;
+                    writer.append(event).map_err(internal)
+                },
+            );
+            assert_eq!(result.is_ok(), cut == 3);
+            assert!(!writer.facts().resource_release_authorized);
+            drop(writer);
+            crate::recover_active_jobs(&f.jobs, None, now).unwrap();
+            let recovered = f.jobs.read_snapshot(ID).unwrap();
+            assert_eq!(recovered.state, "interrupted");
+            assert!(recovered.outcome_unknown());
+            assert_eq!(recovered.finished_at(), Some("2026-09-25T00:00:00Z"));
+            assert!(f.jobs.journal_bytes(ID).unwrap().starts_with(&before));
+            let events = f.journal();
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event["kind"] == "abandonIntent")
+                    .count(),
+                1
+            );
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event["kind"] == "abandonOutcome")
+                    .count(),
+                1
+            );
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event["kind"] == "stepIntent")
+                    .count(),
+                1
+            );
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| event["kind"] == "stepOutcome")
+                    .count(),
+                0
+            );
+            let publisher = f.publisher();
+            let archive = JobArchiver {
+                jobs: &f.jobs,
+                now,
+                sessions: Some(&publisher),
+            };
+            f.assert_published(
+                &archive
+                    .archive(&decision(&archive.preview(&params()).unwrap()))
+                    .unwrap(),
+            );
+            assert_eq!(
+                f.jobs.unsettled_flash_jobs_for_loader_adoption().unwrap(),
+                [ID]
+            );
+        }
     }
 }

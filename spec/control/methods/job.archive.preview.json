@@ -61,6 +61,15 @@
         "outcomeUnknown": {
           "type": "boolean"
         },
+        "resourceReleaseAuthorized": {
+          "type": "boolean"
+        },
+        "retainedHazards": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "reviewSha256": {
           "type": "string"
         },
@@ -88,6 +97,8 @@
         "mode",
         "operation",
         "outcomeUnknown",
+        "resourceReleaseAuthorized",
+        "retainedHazards",
         "reviewSha256",
         "sessionId",
         "state",
@@ -106,7 +117,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 7,
-    "result": 6
+    "request": 9,
+    "result": 8
   }
 }
