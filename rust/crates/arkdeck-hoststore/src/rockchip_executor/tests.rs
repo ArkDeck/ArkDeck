@@ -10,6 +10,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 const KEY: &str = "device-1";
 const NEXT_KEY: &str = "device-2";
+const FACTORY_KEY: &str = "fedcba9876543210fedcba9876543210";
+const FACTORY_CPU: &str = "13579bdf2468ace0";
 const PROVIDER: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 fn identity() -> String {
@@ -22,13 +24,48 @@ fn identity() -> String {
 struct Hdc {
     answers: Mutex<VecDeque<Result<Receipt, DispatchFailure>>>,
     plans: Mutex<Vec<ProcessPlan>>,
+    factory_files: BTreeMap<&'static str, Vec<u8>>,
 }
 
 impl Hdc {
     fn answering(answers: Vec<Result<Receipt, DispatchFailure>>) -> Arc<Self> {
         Arc::new(Self {
             answers: Mutex::new(answers.into()),
-            plans: Mutex::default(),
+            ..Self::default()
+        })
+    }
+
+    fn factory_answering(answers: Vec<Result<Receipt, DispatchFailure>>) -> Arc<Self> {
+        // One synthetic vendor slot selects the bound Loader SN. The CPU
+        // serial and the Normal eMMC CID are deliberately different identities.
+        let base = 7168 * 512;
+        let mut disk = vec![0; base + 4 * 64 * 1024];
+        disk[base..base + 4].copy_from_slice(&0x524b5644u32.to_le_bytes());
+        disk[base + 4..base + 8].copy_from_slice(&7u32.to_le_bytes());
+        for (at, value) in [(8, 1u16), (10, 1), (12, 64), (14, 64440)] {
+            disk[base + at..base + at + 2].copy_from_slice(&value.to_le_bytes());
+        }
+        disk[base + 16..base + 24].copy_from_slice(&[1, 0, 0, 0, 16, 0, 0, 0]);
+        disk[base + 1024..base + 1040].copy_from_slice(b"0123456789abcdef");
+        disk[base + 65532..base + 65536].copy_from_slice(&7u32.to_le_bytes());
+        Arc::new(Self {
+            answers: Mutex::new(answers.into()),
+            factory_files: BTreeMap::from([
+                ("/dev/block/mmcblk0", disk),
+                (
+                    "/proc/device-tree/compatible",
+                    b"rockchip,rk3568-toybrick-dev-linux-x0\0rockchip,rk3568\0".to_vec(),
+                ),
+                (
+                    "/sys/class/block/mmcblk0/device/cid",
+                    format!("{FACTORY_KEY}\n").into_bytes(),
+                ),
+                (
+                    "/proc/device-tree/serial-number",
+                    b"0123456789abcdef\0".to_vec(),
+                ),
+            ]),
+            ..Self::default()
         })
     }
 
@@ -49,6 +86,27 @@ impl HdcDispatch for Hdc {
 
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
         self.plans.lock().unwrap().push(plan.clone());
+        if !self.factory_files.is_empty()
+            && plan.arguments == ["-t", FACTORY_KEY, "shell", "cat", "/proc/cpuinfo"]
+        {
+            return out(&format!("Serial: {FACTORY_CPU}\n"));
+        }
+        if plan.arguments.get(3).is_some_and(|arg| arg == "od") {
+            assert_eq!(
+                &plan.arguments[..8],
+                ["-t", FACTORY_KEY, "shell", "od", "-An", "-v", "-tx1", "-j"]
+            );
+            assert_eq!(plan.arguments[9], "-N");
+            let offset: usize = plan.arguments[8].parse().unwrap();
+            let count: usize = plan.arguments[10].parse().unwrap();
+            let bytes = &self.factory_files[plan.arguments[11].as_str()];
+            let end = (offset + count).min(bytes.len());
+            let hex: String = bytes[offset..end]
+                .iter()
+                .map(|byte| format!("{byte:02x} "))
+                .collect();
+            return out(&hex);
+        }
         if plan.arguments == ["-t", KEY, "shell", "cat", "/proc/cpuinfo"] {
             return out("Serial: 0123456789abcdef\n");
         }
@@ -667,6 +725,16 @@ impl Drop for Root {
 
 #[test]
 fn loader_first_alias_requires_hardware_and_build_then_routes_only_this_jobs_diagnostics() {
+    verify_loader_first_route(false);
+}
+
+#[test]
+fn factory_serial_postflight_preserves_cpu_identity_through_alias_and_diagnostics() {
+    verify_loader_first_route(true);
+}
+
+fn verify_loader_first_route(factory: bool) {
+    let key = if factory { FACTORY_KEY } else { KEY };
     let root = Root::new();
     let target_root = root.0.join("targets");
     arkdeck_platform::HostDirectory::open_or_create_private(&target_root).unwrap()
@@ -678,17 +746,22 @@ fn loader_first_alias_requires_hardware_and_build_then_routes_only_this_jobs_dia
             }]
         })).unwrap(), 4 * 1024 * 1024).unwrap();
     let owner = Arc::new(crate::TargetStore::open(&target_root).unwrap());
-    let mut usb = Usb::bound(KEY, "42", "42");
-    usb.normal = Usb::normal(KEY).normal;
+    let mut usb = Usb::bound(key, "42", "42");
+    usb.normal = Usb::normal(key).normal;
+    let answers = vec![
+        targets(key),
+        targets(key),
+        out("published-build\nrk3568\n"),
+        targets(key),
+        out("published-build\nrk3568\n"),
+        out("verified diagnostic line\n"),
+    ];
     let fixture = fixture(
-        Hdc::answering(vec![
-            targets(KEY),
-            targets(KEY),
-            out("published-build\nrk3568\n"),
-            targets(KEY),
-            out("published-build\nrk3568\n"),
-            out("verified diagnostic line\n"),
-        ]),
+        if factory {
+            Hdc::factory_answering(answers)
+        } else {
+            Hdc::answering(answers)
+        },
         usb,
         None,
     );
@@ -708,6 +781,26 @@ fn loader_first_alias_requires_hardware_and_build_then_routes_only_this_jobs_dia
         .execute(&wait, &descriptor(&wait, "wait"), &fixture.root.0)
         .unwrap();
     assert_eq!(waited.subprocess_count, 2);
+    if factory {
+        assert_eq!(waited.summary["loaderSerialSha256"], identity());
+        assert_eq!(
+            waited.summary["hardwareSerialSha256"],
+            sha256_hex(FACTORY_CPU.as_bytes())
+        );
+        let observation = std::fs::read(fixture.root.0.join(format!(
+            "{}.json",
+            waited.summary["hardwareObservationSha256"]
+        )))
+        .unwrap();
+        let document: serde_json::Value = serde_json::from_slice(&observation).unwrap();
+        assert_eq!(document["matchesBoundLoaderIdentity"], true);
+        assert_eq!(document["summary"]["loaderSerialSha256"], identity());
+        assert_eq!(
+            document["summary"]["hardwareSerialSha256"],
+            sha256_hex(FACTORY_CPU.as_bytes())
+        );
+        assert!(!String::from_utf8_lossy(&observation).contains(FACTORY_CPU));
+    }
     assert!(
         PostFlashAliasStore::new(&alias_root)
             .load_if_present()
@@ -734,7 +827,7 @@ fn loader_first_alias_requires_hardware_and_build_then_routes_only_this_jobs_dia
         .unwrap()
         .unwrap();
     assert_eq!(alias.schema_version, LOADER_FIRST_SCHEMA_VERSION);
-    assert_eq!(alias.hdc_connect_key, KEY);
+    assert_eq!(alias.hdc_connect_key, key);
     assert!(alias.previous_hdc_identity_sha256.is_empty());
     assert!(alias.loader_hardware_proof.is_some());
     let document: serde_json::Value = serde_json::from_slice(&bytes).unwrap();

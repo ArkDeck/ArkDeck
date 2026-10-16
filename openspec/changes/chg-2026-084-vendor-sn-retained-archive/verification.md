@@ -9,6 +9,9 @@ evidence and do not mark this change or a platform approved/verified.
   digest must agree with both boot and current vendor SN before persisted proof
   permits a mode transition. Invalid metadata, changed observations and refused
   persistence dispatch no transition. Existing CPU-serial tests remain valid.
+- The executor also accepts the factory proof during postflight reconnect, exact
+  build verification, first-alias publication and this Job's diagnostics, while
+  retaining the separate CPU digest in its immutable observation.
 - Both an explicit unknown outcome and a missing outcome publish as unknown.
   Original journal bytes remain a prefix; protected record fields, recovery clock,
   resource holds and capability lineage remain unchanged. Repeated decisions and
@@ -74,9 +77,24 @@ jobs. No local unified gate or real device operation was run.
 - Swift's `RuntimeJobArchiveApplicationFacadeTests` and App build-for-testing
   could not run on this Windows host (no Swift/Xcode). They require the selected
   macOS PR CI; no local native App acceptance is claimed.
+- The new executor regression reproduced the old CPU-only postflight rejection:
+  `test -p arkdeck-hoststore --lib
+  rockchip_executor::tests::factory_serial_postflight_preserves_cpu_identity_through_alias_and_diagnostics
+  -- --exact` exited 101 before the fix; `vendor-sn-postflight-before.log`.
+  After the fix, `test -p arkdeck-hoststore --lib rockchip_executor::` exited 0,
+  all 15 passed; `vendor-sn-postflight-final.log`. The test uses mutually distinct
+  synthetic CPU, factory SN and Normal CID values and keeps the privacy assertions.
+- The final postflight increment passed per-file rustfmt, source/target inventory,
+  contract/ClientKit/string generation, Manifest Schema checks and `git diff
+  --check`, each exit 0; `vendor-sn-postflight-contracts.log`.
+- `clippy -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-soak --all-targets
+  -- -D warnings` after the postflight fix: exit 0;
+  `vendor-sn-postflight-clippy.log`. The final SDD recheck uses
+  `vendor-sn-postflight-sdd.log`.
 
 ## CI
 
-Pending PR creation and selected CI. No result is claimed before the run completes.
+PR #2656 is open; selected CI must pass on the final postflight-fix head. No result
+is claimed before that run completes.
 Final run IDs and conclusions are recorded on the PR and in the delivery report;
 an already-green head is not amended solely to copy CI results into this file.

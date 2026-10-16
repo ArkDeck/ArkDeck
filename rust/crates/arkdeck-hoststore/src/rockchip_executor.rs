@@ -530,7 +530,7 @@ fn persist_postflight_hardware(
     descriptor: &HostAction,
     hardware: &arkdeck_provider_hdc::NormalHardwareIdentity,
 ) -> Result<String, LaneFailure> {
-    if hardware.hardware_serial_sha256 != descriptor.expected_identity_sha256 {
+    if !hardware.matches_loader(&descriptor.expected_identity_sha256) {
         return Err(LaneFailure::Failed(
             "postflight hardware differs from the admitted Loader".into(),
         ));
