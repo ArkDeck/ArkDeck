@@ -1086,7 +1086,9 @@ fn host_proof(
 #[cfg(test)]
 mod budget_tests {
     use super::*;
-    use crate::test_private::{create_private_directory, plant_owner_only, temporary_root};
+    use crate::test_private::{
+        create_private_directories, create_private_directory, plant_owner_only, temporary_root,
+    };
     use std::path::PathBuf;
 
     struct Root(PathBuf);
@@ -1113,7 +1115,7 @@ mod budget_tests {
             .join("../../tests/fixtures/flash-run/stories/failures/files/store/jobs")
             .join(job);
         let directory = root.0.join("jobs").join(job);
-        create_private_directory(&directory);
+        create_private_directories(&directory);
         let record_bytes = std::fs::read(fixture.join("job-record.json")).unwrap();
         let journal_bytes = std::fs::read(fixture.join("journal.jsonl")).unwrap();
         plant_owner_only(&directory.join("job-record.json"), &record_bytes);

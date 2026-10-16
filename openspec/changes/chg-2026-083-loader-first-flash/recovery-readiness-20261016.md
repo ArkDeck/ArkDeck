@@ -87,3 +87,16 @@ The preceding implementation PR #2653 merged at the protected-main revision
 above after run `38837439367` passed. This follow-up's selected PR checks remain
 pending until its own head has completed CI. No green head will be amended merely
 to record its later CI result.
+
+PR #2654's first run, `38848072985`, found a setup error in the new regression on
+macOS: its store does not eagerly create the `jobs/` directory. The test now uses
+the existing recursive owner-only directory helper for the retained fixture's
+parent path. Its budget boundaries and preservation assertions are unchanged.
+The failure is attributable to this PR and is fixed in code, not treated as an
+invalid load-sensitive run.
+
+After that setup repair, the three-crate Clippy check and library tests passed
+again locally (396 passed, four existing ignored; both exit 0). The changed file's
+rustfmt check and SDD also passed. Logs are `recovery-budget-macos-setup-*.log` in
+the local tools directory above. Git Bash's first sandboxed SDD launch failed to
+initialize; the controlled elevated retry passed. macOS execution remains in CI.
