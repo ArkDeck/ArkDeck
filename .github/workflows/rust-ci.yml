@@ -60,11 +60,15 @@ jobs:
           git init .
           # Contract/corpus digests are over repository bytes on every host.
           git config core.autocrlf false
+          # Same materialization as actions/checkout with lfs: true. Fixture
+          # inventory hashes the large oracle files and trace bytes.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+${ARKDECK_CI_BASE}:refs/remotes/origin/main" \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
+          git lfs pull
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Set up Python for contract validation
@@ -219,11 +223,15 @@ jobs:
           git init .
           # Contract/corpus digests are over repository bytes on every host.
           git config core.autocrlf false
+          # Same materialization as actions/checkout with lfs: true. Fixture
+          # inventory hashes the large oracle files and trace bytes.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+${ARKDECK_CI_BASE}:refs/remotes/origin/main" \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
+          git lfs pull
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Set up Python for contract validation
@@ -434,11 +442,15 @@ jobs:
           git init .
           # Contract/corpus digests are over repository bytes on every host.
           git config core.autocrlf false
+          # Same materialization as actions/checkout with lfs: true. Fixture
+          # inventory hashes the large oracle files and trace bytes.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+${ARKDECK_CI_BASE}:refs/remotes/origin/main" \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
+          git lfs pull
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Set up Python for contract validation

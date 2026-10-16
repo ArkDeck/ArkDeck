@@ -20,8 +20,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="协议：MIT"></a>
 </p>
 
-<!-- TODO: 截图占位——有应用截图后放在这里，
-     例如 <p align="center"><img src="docs/assets/app-debug.png" width="760" alt="ArkDeck Debug 工作区"></p> -->
+<p align="center"><em>仓库里还没有产品截图。</em></p>
 
 ArkDeck 是一个面向真实 OpenHarmony 开发板的本地优先工作台。macOS 应用、CLI 和用户级守护进程共用同一套运行时，用于接管一台确定的设备、执行版本化操作、持久保存任务历史并采集产物。当前操作目录覆盖 HAP 调试、诊断、native 库部署和 DAYU200 恢复刷机。
 
@@ -36,11 +35,12 @@ ArkDeck 是一个面向真实 OpenHarmony 开发板的本地优先工作台。ma
 - 用已验证的镜像包刷写 DAYU200（RK3568），随后重新绑定设备并验证刷机后的系统。
 - 让外部 agent 闭合带预算的调试循环：分析产物、在 Runtime 持有的隔离工作区打补丁、重建、签名、重新部署并复验——每个副作用与其他调用方走同一条 typed admission。
 
-三个入口共用同一个运行时：
+这些入口共用同一个运行时：
 
 | 入口 | 是什么 |
 | --- | --- |
-| macOS 应用 | Overview 与设备视图，以及 Flash、Debug、UI Dump、Trace、Automation 和 History 工作区；应用设置位于标准 Settings 窗口 |
+| macOS 应用 | Overview 与设备视图，以及 Flash、Debug、UI Dump、Trace、Automation 和 History 工作区；应用设置位于标准 Settings 窗口。这是目前受支持的桌面客户端 |
+| Windows 应用 | [`windows/`](./windows/) 里的 WinUI 3 客户端（Windows 11 x64，开发中）。它通过 ArkDeck.ClientKit 投影本地 Rust 守护进程，自身不持有运行时语义 |
 | `arkdeck` | 配置守护进程与签名、接管设备、控制操作与作业、访问产物、发起类型化 Agent 运行 |
 | `arkdeck-agentd` | 用户级本地守护进程：负责实际执行、故障恢复和私有控制 socket |
 
@@ -59,9 +59,11 @@ ArkDeck 是一个面向真实 OpenHarmony 开发板的本地优先工作台。ma
 
 ArkDeck 目前是早期预览版（`0.1.0`）。已知的边界：
 
-- 唯一支持的宿主环境是 Apple 芯片上的 macOS 27。
+- 目前受支持的产品宿主是 Apple 芯片上的 macOS 27。发布包安装的是 macOS 应用、CLI 和用户级守护进程。
 - 刷机目前只支持一块板子：DAYU200（RK3568）。
-- Windows 和 Linux 端口尚未开始；首个稳定版发布前，接口、目录 schema 和配置步骤都可能变化。
+- Windows 11 x64 的 WinUI 3 客户端正在 [`windows/`](./windows/) 中开发，还不是受支持的发布宿主。
+- Linux 没有桌面客户端。共享 Rust workspace 会在 Linux CI 上构建和测试；Linux 产品端口尚未开始。
+- 首个稳定版发布前，接口、目录 schema 和配置步骤都可能变化。
 
 进度以五条必须在真机上跑通的旅程来衡量（仓库里称为 Golden Journey）：设备观察、HAP 调试、native 库部署、刷机恢复、自主 AI 调试循环。Mock 和模拟器都不算数。定义与状态规则见 [PRODUCT-LOOP.md](./PRODUCT-LOOP.md)。
 
@@ -148,12 +150,21 @@ SwiftPM 直接生成的可执行文件只用于开发，不能作为生产 Launc
 
 ## 仓库结构
 
-- [`ArkDeckApp/`](./ArkDeckApp/) — SwiftUI 桌面应用
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — 运行时、Provider、存储、守护进程与 CLI
+- [`ArkDeck.xcodeproj/`](./ArkDeck.xcodeproj/) — 共享的 Xcode 工程与 scheme
+- [`ArkDeckApp/`](./ArkDeckApp/) — SwiftUI macOS 应用
+- [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — macOS 应用的 XCUITest
+- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package：运行时、Provider、存储、守护进程与 CLI
+- [`rust/`](./rust/) — 共享 Rust workspace，13 个 crate：`arkdeck-agentd`、`arkdeck-bootstrap`、`arkdeck-cli`、`arkdeck-client`、`arkdeck-contract`、`arkdeck-control`、`arkdeck-hoststore`、`arkdeck-platform`、`arkdeck-provider-arkforge`、`arkdeck-provider-hdc`、`arkdeck-provider-workspace`、`arkdeck-rockchip-binding`、`arkdeck-soak`
+- [`windows/`](./windows/) — Windows 11 x64 的 WinUI 3 客户端、ArkDeck.ClientKit 及其测试（开发中）
 - [`Catalog/`](./Catalog/) — 已发布的操作、Profile 与 Schema
-- [`docs/`](./docs/) — 架构笔记、ADR 与产品设计
+- [`spec/`](./spec/) — Rust 与 Windows 实现读取的语言中立控制面与恢复契约
 - [`openspec/`](./openspec/) — 产品契约、安全不变量与变更历史
-- [`scripts/`](./scripts/) — 仓库检查与工具脚本
+- [`docs/`](./docs/) — 架构笔记、ADR 与产品设计
+- [`scripts/`](./scripts/) — 仓库检查、CI 与工具脚本
+- [`tests/`](./tests/) — 宿主侧产品 demo，包括 WaterFlowTraceDemo
+- [`evidence/`](./evidence/) — 已完成任务的运行记录
+- [`.design-sync/`](./.design-sync/) — `@arkdeck/ds` token 工作的 design-sync 笔记
+- [`.github/`](./.github/) — GitHub Actions 工作流与 CODEOWNERS
 
 ## 参与贡献
 

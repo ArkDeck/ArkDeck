@@ -20,8 +20,7 @@
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 </p>
 
-<!-- TODO: screenshot placeholder — add a capture of the app here once one exists,
-     e.g. <p align="center"><img src="docs/assets/app-debug.png" width="760" alt="ArkDeck Debug workspace"></p> -->
+<p align="center"><em>A product screenshot is not in the repository yet.</em></p>
 
 ArkDeck is a local-first workbench for real OpenHarmony development boards. Its macOS app, CLI and per-user daemon share one runtime for adopting a specific device, running versioned operations, keeping durable job history and collecting artifacts. The current catalog covers HAP debugging, diagnostics, native-library deployment and DAYU200 recovery flashing.
 
@@ -36,11 +35,12 @@ Callers cannot submit arbitrary `hdc` or shell command strings, executable paths
 - Flashes a DAYU200 (RK3568) from a verified image bundle, then rebinds the device and verifies the resulting system.
 - Lets an external agent close a budgeted debug loop: it analyzes artifacts, patches a runtime-owned isolated workspace, rebuilds, signs, redeploys and verifies — every side effect through the same typed admission as any other caller.
 
-Three surfaces drive the same runtime:
+These surfaces drive the same runtime:
 
 | Surface | What it is |
 | --- | --- |
-| macOS app | Overview and device views, plus Flash, Debug, UI Dump, Trace, Automation and History workspaces; app settings live in the standard Settings window |
+| macOS app | Overview and device views, plus Flash, Debug, UI Dump, Trace, Automation and History workspaces; app settings live in the standard Settings window. This is the supported desktop client |
+| Windows app | WinUI 3 client in [`windows/`](./windows/) (Windows 11 x64, in development). It projects the local Rust daemon through ArkDeck.ClientKit and does not own runtime semantics |
 | `arkdeck` | Daemon and signing setup, device adoption, operation and job control, artifact access, typed agent runs and bounded debug tasks |
 | `arkdeck-agentd` | The per-user daemon that owns execution, recovery, and the private control socket |
 
@@ -59,9 +59,11 @@ Raw artifacts stay on your machine and are immutable once written; exporting any
 
 ArkDeck is an early preview (`0.1.0`). Current limitations:
 
-- macOS 27 on Apple silicon is the only supported host.
+- macOS 27 on Apple silicon is the supported product host. A release installs the macOS app, the CLI, and the per-user daemon.
 - Flashing supports exactly one board today: the DAYU200 (RK3568).
-- Windows and Linux ports have not started, and interfaces, catalog schemas and setup steps may change before a first stable release.
+- Windows 11 x64 has a WinUI 3 client under active development in [`windows/`](./windows/). It is not a supported release host yet.
+- Linux has no desktop client. The shared Rust workspace is built and tested on Linux in CI; a Linux product port has not started.
+- Interfaces, catalog schemas, and setup steps may change before a first stable release.
 
 Progress is measured by five journeys that must pass on a physical board (the repo calls them Golden Journeys): device observation, HAP debugging, native library deployment, flash recovery, and an autonomous AI debug loop. Mocks and simulators don't count. Their definitions and status rules live in [PRODUCT-LOOP.md](./PRODUCT-LOOP.md).
 
@@ -224,12 +226,21 @@ Then check that everything is wired up:
 
 ## Repository map
 
-- [`ArkDeckApp/`](./ArkDeckApp/) — the SwiftUI desktop app
-- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — runtime, providers, storage, daemon and CLI
-- [`Catalog/`](./Catalog/) — published operations, profiles and schemas
-- [`docs/`](./docs/) — architecture notes, ADRs and product design
-- [`openspec/`](./openspec/) — product contracts, safety invariants and change history
-- [`scripts/`](./scripts/) — repository checks and tooling
+- [`ArkDeck.xcodeproj/`](./ArkDeck.xcodeproj/) — shared Xcode project and schemes
+- [`ArkDeckApp/`](./ArkDeckApp/) — the SwiftUI macOS app
+- [`ArkDeckAppUITests/`](./ArkDeckAppUITests/) — XCUITest bundle for the macOS app
+- [`Packages/ArkDeckKit/`](./Packages/ArkDeckKit/) — Swift package: runtime, providers, storage, daemon, and CLI
+- [`rust/`](./rust/) — shared Rust workspace, 13 crates: `arkdeck-agentd`, `arkdeck-bootstrap`, `arkdeck-cli`, `arkdeck-client`, `arkdeck-contract`, `arkdeck-control`, `arkdeck-hoststore`, `arkdeck-platform`, `arkdeck-provider-arkforge`, `arkdeck-provider-hdc`, `arkdeck-provider-workspace`, `arkdeck-rockchip-binding`, `arkdeck-soak`
+- [`windows/`](./windows/) — Windows 11 x64 WinUI 3 client, ArkDeck.ClientKit, and its tests (in development)
+- [`Catalog/`](./Catalog/) — published operations, profiles, and schemas
+- [`spec/`](./spec/) — language-neutral control and recovery contracts read by the Rust and Windows implementations
+- [`openspec/`](./openspec/) — product contracts, safety invariants, and change history
+- [`docs/`](./docs/) — architecture notes, ADRs, and product design
+- [`scripts/`](./scripts/) — repository checks, CI, and tooling
+- [`tests/`](./tests/) — host-side product demos, including WaterFlowTraceDemo
+- [`evidence/`](./evidence/) — checked-in run records for completed tasks
+- [`.design-sync/`](./.design-sync/) — design-sync notes for the `@arkdeck/ds` token work
+- [`.github/`](./.github/) — GitHub Actions workflows and CODEOWNERS
 
 ## Contributing
 
