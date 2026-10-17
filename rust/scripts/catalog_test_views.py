@@ -1,4 +1,4 @@
-"""Closed test-only c6/e4 routing; frozen authority is never transplanted.
+"""Closed test-only c6/e4/maintenance routing; frozen authority is never transplanted.
 
 The source inventory closes additions to tests and target declarations. Mixed
 targets use exact libtest names. Receipts require execution of every selected
@@ -200,11 +200,11 @@ def load(rust: Path, metadata: dict) -> dict:
     custom = custom_harnesses(metadata)
     for key, row in value['targets'].items():
         fields = set(row) - {'platformFunctions', 'customCases', 'childEntries', 'optionalMaterial', 'modulePlatforms'}
-        if fields != {'route', 'functions', 'ignored'} or row['route'] not in ('both', 'current', 'historical', 'mixed'):
+        if fields != {'route', 'functions', 'ignored'} or row['route'] not in ('both', 'current', 'historical', 'lineage', 'mixed'):
             raise ValueError('unknown test target route')
         if (row['route'] == 'mixed') != bool(row['functions']):
             raise ValueError('mixed target requires explicit function routes')
-        if any(not re.fullmatch(r'[A-Za-z0-9_:]+', name) or route not in ('both', 'current', 'historical') for name, route in row['functions'].items()):
+        if any(not re.fullmatch(r'[A-Za-z0-9_:]+', name) or route not in ('both', 'current', 'historical', 'lineage') for name, route in row['functions'].items()):
             raise ValueError('unknown test function route')
         if not isinstance(row['ignored'], list) or len(row['ignored']) != len(set(row['ignored'])) or any(
                 not re.fullmatch(r'[A-Za-z0-9_:]+', name) for name in row['ignored']):
@@ -250,12 +250,13 @@ def listed(text: str) -> list[str]:
 def selected(row: dict, names: list[str], digest: str) -> list[str]:
     if digest not in (OLD, CURRENT, MAINTENANCE):
         raise ValueError('unknown test execution Catalog')
-    view = 'historical' if digest == OLD else 'current'
+    view = {OLD: 'historical', CURRENT: 'current', MAINTENANCE: 'maintenance'}[digest]
+    allowed = (view, 'both', 'lineage') if digest in (OLD, CURRENT) else (view, 'both')
     if row['route'] == 'mixed':
         if set(row['functions']) != set(names):
             raise ValueError('unclassified mixed-target function')
-        return [name for name in names if row['functions'][name] in (view, 'both')]
-    return names if row['route'] in (view, 'both') else []
+        return [name for name in names if row['functions'][name] in allowed]
+    return names if row['route'] in allowed else []
 
 
 def platform_row(row: dict, platform: str) -> dict:

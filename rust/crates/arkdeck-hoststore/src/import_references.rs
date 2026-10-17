@@ -5,12 +5,15 @@ use crate::operation_catalog::CatalogOperation;
 use crate::operation_request::OperationRequest;
 use std::collections::{BTreeMap, BTreeSet};
 
-// Read-side input-schema compatibility only. Neither this pair nor its
+// Read-side input-schema compatibility only. Neither this closed set nor its
 // descriptor lookup grants execution, facts or capability authority.
 const HISTORICAL_INPUT_CATALOG: &str =
     "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036";
 const OBSERVED_INPUT_CATALOG: &str =
     "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7";
+
+const MAINTENANCE_INPUT_CATALOG: &str =
+    "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ImportReference {
@@ -185,7 +188,11 @@ impl JobStore {
                 let current = arkdeck_contract::CATALOG_DIGEST;
                 let compatible = record.catalog_digest() == current
                     || (record.catalog_digest() == HISTORICAL_INPUT_CATALOG
-                        && matches!(current, HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG));
+                        && matches!(current, HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG))
+                    || (current == MAINTENANCE_INPUT_CATALOG
+                        && matches!(record.catalog_digest(), HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG)
+                        // The two new operations never existed in either source Catalog.
+                        && !matches!(request.reference().as_str(), "flash.verify@1" | "flash.restore-boot-loop@1"));
                 if !compatible {
                     return Err(unreadable(()));
                 }

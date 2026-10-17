@@ -28,6 +28,15 @@ class CoverageReceipts(unittest.TestCase):
         self.assertEqual(views.selected(row, names, views.CURRENT),
                          ['current_refusal', 'shared::guard'])
 
+    def test_maintenance_does_not_relabel_frozen_e4_execution(self):
+        row = {'route': 'mixed', 'functions': {
+            'old': 'historical', 'e4': 'current', 'frozen': 'lineage', 'new_guard': 'both'}}
+        names = sorted(row['functions'])
+        self.assertEqual(views.selected(row, names, views.MAINTENANCE), ['new_guard'])
+        self.assertEqual(views.selected(row, names, views.CURRENT), ['e4', 'frozen', 'new_guard'])
+        self.assertEqual(views.selected(row, names, views.OLD), ['frozen', 'new_guard', 'old'])
+        self.assertEqual(views.selected({'route': 'lineage', 'functions': {}}, names, views.MAINTENANCE), [])
+
     def test_new_or_missing_mixed_function_fails_closed(self):
         row = {'route': 'mixed', 'functions': {'old': 'historical'}}
         for names in ([], ['old', 'new']):

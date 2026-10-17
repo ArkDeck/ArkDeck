@@ -420,7 +420,7 @@
     "crates/arkdeck-hoststore/src/human_action.rs": "99c8bb1d93c39419372650b8c1790f6d409dfc580cffa5f96759643cfc04cdec",
     "crates/arkdeck-hoststore/src/import_lifecycle.rs": "00d341dc3e50030fcaed0c61157b78ca4e92ee326587c0b7e43db29513b71c0a",
     "crates/arkdeck-hoststore/src/import_publication.rs": "77021352681f8e67d0c6f495ee923ef5cc5e8066d3fe95128e81c612a57e6013",
-    "crates/arkdeck-hoststore/src/import_references.rs": "e5abeefd76e370f5584525431416b52c6218d132a991cb8198c5294f6dda1c47",
+    "crates/arkdeck-hoststore/src/import_references.rs": "0f0ef1c32625e025b0948c17cda34ce0582c95b2707e40453f8498810797f249",
     "crates/arkdeck-hoststore/src/import_refusal_oracle_tests.rs": "52f99f0f437ed5a955739637f1dbf10bdcacaea6a65fd335d6c369ea32a4b5d8",
     "crates/arkdeck-hoststore/src/import_upload.rs": "d755a81b6bc987cdc1c55f6327a6bb3e2bd55469af49f1ccddbf00cce56ba6f8",
     "crates/arkdeck-hoststore/src/job_admission.rs": "9311a2fd9c1d51043218fd8581d887dd1958d6d98ed2cd2865f9d98270109373",
@@ -642,7 +642,7 @@
     "crates/arkdeck-hoststore/tests/support/reconcile.rs": "a7b1e073422bcfd3e266e3c03f30d7d20a4ddafbb7b8b66dbd816ac4ba1dc86d",
     "crates/arkdeck-hoststore/tests/support/workspace_publication_retry.rs": "d5d93d58b6a4e9562bdf590c89350da63fa23d3c8f9e699482147fdb33e5883a",
     "crates/arkdeck-hoststore/tests/target_adoption.rs": "ac4399a0d8eae0efb504140de3197c319dc36ee4f43acc0ab23d8bcfaf65a55b",
-    "crates/arkdeck-hoststore/tests/terminal_publication_retry.rs": "29f024262d65334eb2848225dfff5358b12512aa111a520bdc7c8040159dd162",
+    "crates/arkdeck-hoststore/tests/terminal_publication_retry.rs": "76560c2a691b1aa6eff0be7e1aa0dbb8b41e56eb700bbc06ce588bf56f45e19a",
     "crates/arkdeck-hoststore/tests/tool_list_native.rs": "7f237ce96d648c83f1732b7b885bc9317c1251e49279367e0a4553c6b87aaf66",
     "crates/arkdeck-hoststore/tests/tool_macho.rs": "ba3ca1d467b7b99b605233d747e8c99a55b2016000480cab0a9f62563efdd274",
     "crates/arkdeck-hoststore/tests/tool_retirement_native.rs": "707918f49dcb32999d0c5a206867e5dda0c2cb50534547255f9ae8051f23c7ed",
@@ -8811,7 +8811,7 @@
       ]
     },
     "arkdeck-hoststore/debug_hap_current_oracle": {
-      "route": "both",
+      "route": "lineage",
       "functions": {},
       "ignored": [
         "record_current_hap_oracle"
@@ -9271,7 +9271,7 @@
       "ignored": []
     },
     "arkdeck-hoststore/native_library_current_oracle": {
-      "route": "both",
+      "route": "lineage",
       "functions": {},
       "ignored": [
         "record_current_native_oracle"

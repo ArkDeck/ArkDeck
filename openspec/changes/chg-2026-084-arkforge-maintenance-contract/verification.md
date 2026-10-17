@@ -57,6 +57,12 @@ Local targeted checks for this implementation:
   envelopes; no HDC configured. Log: `/private/tmp/arkdeck-maintenance-readonly.log`.
 - Historical Catalog and routing Python tests passed; the new exact Catalog view
   removes only the two declared maintenance additions when reproducing c6.
+  Fixed e4 plan/Job oracles retain a separate required execution view (or the
+  complete published e4 workspace receipt), without relabeling their authority.
+  The routing, input/provenance and pinned-view Python tests passed.
+- Historical Import reference compatibility: nine terminal-publication tests
+  passed, including refusal when an old Catalog record claims a new operation.
+  This compatibility affects read-only input retention, not execution authority.
 - Windows decoder tests added; no local .NET executable. Windows execution is
   pending the Windows CI lane. Cross-platform CI is still pending this PR's head.
 

@@ -86,6 +86,18 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.assertEqual(actual_info['catalogDigest'], views.OLD)
         self.assertNotEqual(actual_info['inputDigest'], runner.contract.baseline(before)['inputDigest'])
 
+    def test_pinned_observed_view_preserves_all_32_e4_descriptors(self):
+        before = copy.deepcopy(self.inputs)
+        observed = runner.pinned_catalog_inputs(self.inputs, views.CURRENT)
+        self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row
+                          for row in self.operation_paths(observed).values()}, self.new)
+        self.assertEqual(runner.contract.baseline(observed)['catalogDigest'], views.CURRENT)
+        self.assertEqual(self.inputs, before)
+        self.assertEqual(runner.historical_review_projection(self.projection, views.CURRENT),
+                         self.projection.replace(self.projection_digest.encode(), views.CURRENT.encode()))
+        with self.assertRaises(ValueError):
+            runner.pinned_catalog_inputs(self.inputs, views.MAINTENANCE)
+
     def test_maintenance_descriptors_cannot_drift_under_the_declared_view(self):
         paths = self.operation_paths(self.inputs)
         path = next(path for path, row in paths.items() if row['id'] == 'flash.restore-boot-loop')
@@ -210,6 +222,31 @@ class HistoricalCatalogInputs(unittest.TestCase):
                       self.projection + views.OLD.encode()]:
             with self.subTest(value_length=len(value)), self.assertRaises(ValueError):
                 runner.historical_review_projection(value)
+
+
+class ObservedCoverageReceipts(unittest.TestCase):
+    def test_only_a_completed_full_e4_workspace_receipt_can_cover_the_pinned_view(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = root / 'published/test-execution/published/catalog-execution.json'
+            with self.assertRaises(OSError):
+                runner.record_published_e4_coverage(root, 'a' * 64)
+            receipt.parent.mkdir(parents=True)
+            valid = {'catalogDigest': views.CURRENT, 'completed': True, 'integrationPackages': 'workspace',
+                     'targets': [{'execution': 'actual', 'passed': 1}]}
+            for change in ({'catalogDigest': views.MAINTENANCE}, {'completed': False},
+                           {'integrationPackages': ['arkdeck-cli']}, {'targets': []},
+                           {'targets': [{'execution': 'listed', 'passed': 1}]}):
+                receipt.write_text(json.dumps(valid | change))
+                with self.assertRaises(ValueError):
+                    runner.record_published_e4_coverage(root, 'a' * 64)
+                self.assertFalse((root / 'observed/provenance.json').exists())
+            receipt.write_text(json.dumps(valid))
+            runner.record_published_e4_coverage(root, 'a' * 64)
+            proof = json.loads((root / 'observed/provenance.json').read_text())
+            self.assertEqual(proof['coveredBy'], 'published')
+            self.assertEqual(proof['observedExecutionReceiptSHA256'], runner.contract.sha(receipt.read_bytes()))
+            self.assertFalse(proof['deviceAcceptance'])
 
 
 if __name__ == '__main__':

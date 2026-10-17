@@ -72,3 +72,16 @@ Both Flash workspaces select a source Job from the selected target's history.
 Verification needs no new image; restoration uses the explicitly selected original
 archive. The result shows source IDs, counts and each partition's sealed range,
 expected/observed digest, verification strength and typed skip/failure reason.
+
+## Historical input compatibility
+
+The maintenance Catalog leaves the complete input schemas of all 32 prior
+operations unchanged. Read-only Import reference census may therefore parse
+unfinalized c6/e4 Jobs with those same descriptors under the exact maintenance
+Catalog digest. The two new operations are rejected when claimed by an old
+Catalog record. This preserves retention and inspection, grants no plan or
+capability authority, and does not replay or repair the source Job.
+
+The immutable e4 software oracles run in their own mandatory pinned Catalog
+view, alongside c6 and the candidate view. Their stored plan hashes, receipts
+and complete file inventories remain unchanged.
