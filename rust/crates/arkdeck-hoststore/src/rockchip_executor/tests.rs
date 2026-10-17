@@ -90,13 +90,24 @@ fn recommission_hardware_drift_prevents_the_loader_command_and_expiry_reads_noth
 
 #[test]
 fn recommission_postflight_verifies_the_chain_without_publishing_an_early_alias() {
+    assert_recommission_postflight(Hdc::factory_answering(vec![
+        targets(FACTORY_KEY),
+        out("published-build\nrk3568\n"),
+    ]));
+}
+
+#[cfg(windows)]
+#[test]
+fn recommission_postflight_uses_the_pinned_windows_target_grammar() {
+    let mut hdc = Hdc::factory_answering(vec![out("published-build\nrk3568\n")]);
+    Arc::get_mut(&mut hdc).unwrap().windows = true;
+    assert_recommission_postflight(hdc);
+}
+
+fn assert_recommission_postflight(hdc: Arc<Hdc>) {
     let mut usb = Usb::bound(FACTORY_KEY, "42", "42");
     usb.normal = Usb::normal(FACTORY_KEY).normal;
-    let fixture = fixture(
-        Hdc::factory_answering(vec![targets(FACTORY_KEY), out("published-build\nrk3568\n")]),
-        usb,
-        None,
-    );
+    let fixture = fixture(hdc, usb, None);
     let alias_root = fixture.root.0.join("aliases");
     let executor = fixture
         .executor
@@ -145,6 +156,16 @@ fn recommission_postflight_verifies_the_chain_without_publishing_an_early_alias(
             .unwrap()
             .is_none()
     );
+    assert_eq!(
+        fixture
+            .hdc
+            .arguments()
+            .iter()
+            .filter(|arguments| arguments.as_slice() == ["list", "targets", "-v"])
+            .count(),
+        1,
+        "the connected USB target must not be polled as a malformed row"
+    );
 }
 
 fn identity() -> String {
@@ -158,6 +179,7 @@ struct Hdc {
     answers: Mutex<VecDeque<Result<Receipt, DispatchFailure>>>,
     plans: Mutex<Vec<ProcessPlan>>,
     factory_files: BTreeMap<&'static str, Vec<u8>>,
+    windows: bool,
 }
 
 impl Hdc {
@@ -213,12 +235,24 @@ impl Hdc {
 }
 
 impl HdcDispatch for Hdc {
+    fn registered_windows_tuple(&self) -> Option<&'static arkdeck_provider_hdc::WindowsHdcTuple> {
+        self.windows
+            .then(|| arkdeck_provider_hdc::WINDOWS_HDC_TUPLES.first())
+            .flatten()
+    }
+
     fn mutation_identity_current(&self) -> bool {
         true
     }
 
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
         self.plans.lock().unwrap().push(plan.clone());
+        if self.windows && plan.arguments == ["list", "targets", "-v"] {
+            return out(&format!(
+                "{FACTORY_KEY}\t\tUSB\tConnected\tlocalhost\thdc\n\
+                 COM1\t\tUART\tReady\tunknown...\thdc\n"
+            ));
+        }
         if !self.factory_files.is_empty()
             && plan.arguments == ["-t", FACTORY_KEY, "shell", "cat", "/proc/cpuinfo"]
         {
