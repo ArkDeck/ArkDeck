@@ -268,7 +268,75 @@ dependency boundary. Its pure contract-only edge is now registered; arbitrary
 ArkForge transport edges remain forbidden. Fresh CI on these corrections is
 required.
 
-CI success cannot replace maintainer review.
-The change remains proposed; same-board acceptance starts only after approval
-and protected-main publication. macOS production recommissioning stays unavailable
-until the historical process-lifetime guarantee is provable.
+The final integrated Swift CI run
+[39019397279](https://github.com/ArkDeck/ArkDeck/actions/runs/39019397279) and
+SDD Guard run
+[39024094616](https://github.com/ArkDeck/ArkDeck/actions/runs/39024094616) passed.
+The maintainer merged PR #2660 into protected `main` at `2026-10-17T10:16:21Z`,
+publishing `0afda1acf643886bbdf9302772f61468626f20cd`. The approval basis is the
+maintainer's merge under the enforcement policy; the PR has no separate
+`APPROVED` review event. CI success alone does not replace maintainer approval.
+macOS production recommissioning stays unavailable until the historical
+process-lifetime guarantee is provable.
+
+## Published Windows preflight: Job-state composition
+
+The same-board headless preflight on the published Runtime refused before
+authorization with `recommission.stateUnavailable`; no new device dispatch,
+recommission allocation or Job was created. The account composition passed its
+ArkForge lane root to the recommission reader, while the allocation ledger and
+source Jobs belong to its private `jobs-state` child. The account root also
+grants SYSTEM access and therefore cannot satisfy the private host-store reader.
+The isolated development layout happened to use the same path for both owners.
+
+The Windows composition now obtains the same canonical private child as the
+Job owner. Lane storage, capability admission and immutable history rules are
+unchanged. The regression exercises both layouts with synthetic observations:
+an invalid decoy ledger at the lane root is ignored, an absent actual ledger
+does not allocate anything, and a malformed actual ledger still fails closed.
+This is a product fix within the published scope, not hardware acceptance.
+The full write, readback, reboot and identity sequence remains
+`BLOCKED_BY_PRODUCT_DEFECT` until the fix is reviewed and published.
+
+### Local targeted checks
+
+- The new Windows layout regression fails with the original root wiring
+  (exit 101, `recommission.allocationLedgerMalformed`) and passes with the fix
+  (exit 0, one case). Logs: `recommission-job-state-expected-red-20261017.log`
+  and `recommission-job-state-fixed-green-20261017.log`.
+- `python rust/scripts/run-cargo.py clippy -p arkdeck-agentd --all-targets --
+  -D warnings` exits 0; `recommission-job-state-clippy-20261017.log`.
+- `python rust/scripts/run-cargo.py fmt --all --check` encounters the existing
+  Windows OS error 206, exit 1; `recommission-job-state-fmt-20261017.log`.
+  `rustfmt --edition 2024 --check
+  rust/crates/arkdeck-agentd/src/windows_lifecycle.rs` exits 0;
+  `recommission-job-state-fmt-file-20261017.log`.
+- The closed Catalog census passes with 945 source files, 6,499 unchanged
+  fixtures and 335 targets, exit 0;
+  `recommission-job-state-catalog-inventory-20261017.log`. Only the changed
+  source digest is refreshed; historical routes and fixtures are unchanged.
+- `python rust/scripts/run-cargo.py test -p arkdeck-agentd` exits 101;
+  `recommission-job-state-tests-20261017.log`. The 43 binary unit tests pass.
+  The spawning target reports 47 passes, three child-fixture ignores and seven
+  failures: two account tests conflict with this session's live acceptance
+  Runtime, and five existing replay cases require the retained Catalog views
+  specified by the unchanged routing manifest. The latter are not claimed as
+  passing under a raw current-Catalog invocation; CI must replay their assigned
+  views without changing their assertions.
+- After draining only this session's Runtime through the published service
+  command, `python rust/scripts/run-cargo.py test -p arkdeck-agentd --test
+  spawning account_tool_selection::` passes all three cases, exit 0;
+  `recommission-job-state-account-tests-20261017.log`. The existing
+  `--test windows_flash_lane_process` suite also passes all three cases,
+  exit 0; `recommission-job-state-flash-tests-20261017.log`.
+  The same published Runtime and acceptance configuration were then restored;
+  all 106 protected files and 60 original Job records remain byte-identical.
+- `sh scripts/check-sdd.sh` through the installed Git Bash exits 0 with zero
+  errors, zero warnings and 121 acceptance IDs;
+  `recommission-job-state-sdd-20261017.log`. Swift and App code are unchanged;
+  their native checks are not run on this Windows host.
+
+### CI
+
+The follow-up fix requires its own PR CI and maintainer publication. The earlier
+green runs cover PR #2660, not this fix. No `REAL_DEVICE_PASS` is claimed.

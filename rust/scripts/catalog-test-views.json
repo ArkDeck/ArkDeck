@@ -61,7 +61,7 @@
     "crates/arkdeck-agentd/src/tool_selection_startup_tests.rs": "dfe4e04a4a57e154676b2ad21c6047a1e0da10077731d4ed9a4a346917b50d2d",
     "crates/arkdeck-agentd/src/windows_hdc_gate.rs": "d6b83784be6dea033d9e9057dba576116930d71a1ce805c9972924038117a7e2",
     "crates/arkdeck-agentd/src/windows_hdc_restart_tests.rs": "4565b2e4b2c2f789e2e14c87721537ebcc4d4c6bd79dbc8a2173f693a4d216ba",
-    "crates/arkdeck-agentd/src/windows_lifecycle.rs": "31624081e5fb971a16b38baf27cf49eeeeb714c1edbc493dc047084b211d8fce",
+    "crates/arkdeck-agentd/src/windows_lifecycle.rs": "682a1b2e2c48020ec2c9cad617e322efc040426d4cdf904b723e17c0c9ada157",
     "crates/arkdeck-agentd/src/workspace_project_control.rs": "38a0c0ca06d996b3958305904b6669eeb8775d65b46613c45556f8dace8ba01c",
     "crates/arkdeck-agentd/tests/agent_run_cli_process.rs": "4e2edc8197d91111c404d5f1215e06bef535b43d9c2509003e9330a3ddcf7c52",
     "crates/arkdeck-agentd/tests/app_ingress_startup.rs": "c764383ccb5b7310c31a23831976939082dd1936a39998078b8e9a1eb236c720",
