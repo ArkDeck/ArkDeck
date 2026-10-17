@@ -37,6 +37,26 @@ class CoverageReceipts(unittest.TestCase):
         self.assertEqual(views.selected(row, names, views.OLD), ['frozen', 'new_guard', 'old'])
         self.assertEqual(views.selected({'route': 'lineage', 'functions': {}}, names, views.MAINTENANCE), [])
 
+    def test_windows_process_oracles_keep_their_exact_catalog_views(self):
+        manifest = json.loads(Path(__file__).with_name('catalog-test-views.json').read_text())
+        row = views.platform_row(manifest['targets']['arkdeck-agentd/spawning'], 'win32')
+        names = sorted(row['functions'])
+        frozen = {
+            'gj1_device_leaves::agent_resume_completes_a_paused_execution_over_the_signed_test_daemon',
+            'gj23_replay::the_real_cli_debug_hap_leaf_runs_the_swift_oracle_s_job',
+            'gj23_replay::the_real_cli_runs_every_swift_debug_hap_through_the_signed_test_daemon',
+            'gj23_replay::the_real_cli_runs_every_swift_native_deployment_through_the_signed_test_daemon',
+        }
+        for digest in (views.OLD, views.CURRENT):
+            self.assertTrue(frozen.issubset(views.selected(row, names, digest)))
+        selected = views.selected(row, names, views.MAINTENANCE)
+        self.assertTrue(frozen.isdisjoint(selected))
+        self.assertIn('signed_daemon::the_real_cli_drives_the_signed_test_daemon_over_its_pipe', selected)
+        current_native = 'gj23_replay::the_real_cli_debug_native_deploy_leaf_runs_the_swift_oracle_s_job'
+        self.assertIn(current_native, views.selected(row, names, views.CURRENT))
+        self.assertNotIn(current_native, views.selected(row, names, views.OLD))
+        self.assertNotIn(current_native, selected)
+
     def test_new_or_missing_mixed_function_fails_closed(self):
         row = {'route': 'mixed', 'functions': {'old': 'historical'}}
         for names in ([], ['old', 'new']):
