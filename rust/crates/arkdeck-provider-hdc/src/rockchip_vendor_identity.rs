@@ -254,6 +254,26 @@ pub(crate) fn observe(
     expected: &str,
     started: Instant,
 ) -> Result<VendorSerialProof, &'static str> {
+    observe_expected(hdc, connect_key, Some(expected), started)
+}
+
+/// Discovery is reserved for Runtime recommissioning. It still requires the
+/// independent boot-tree and current vendor-slot sources to agree; no caller
+/// chooses a serial, path, slot or offset.
+pub(crate) fn discover(
+    hdc: &dyn HdcDispatch,
+    connect_key: &str,
+    started: Instant,
+) -> Result<VendorSerialProof, &'static str> {
+    observe_expected(hdc, connect_key, None, started)
+}
+
+fn observe_expected(
+    hdc: &dyn HdcDispatch,
+    connect_key: &str,
+    expected: Option<&str>,
+    started: Instant,
+) -> Result<VendorSerialProof, &'static str> {
     if connect_key.len() != 32
         || !connect_key
             .bytes()
@@ -288,7 +308,7 @@ pub(crate) fn observe(
     }
     let tree = reader.hex("/proc/device-tree/serial-number", 0, 18)?;
     let tree_serial = canonical_serial(&tree)?;
-    if sha256_hex(tree_serial) != expected {
+    if expected.is_some_and(|expected| sha256_hex(tree_serial) != expected) {
         return Err("normalLoaderIdentity.boundLoaderIdentityMismatch");
     }
     let slots = reader.slots()?;
@@ -714,5 +734,87 @@ mod tests {
         assert!(identity.vendor_serial.is_none());
         assert_eq!(device.cpu_reads.get(), 1);
         assert!(device.disk_reads.borrow().is_empty());
+    }
+
+    #[test]
+    fn recommission_discovers_an_independent_factory_chain_without_mutation() {
+        let device = Device::new("");
+        let proof = crate::observe_recommission_identity(&device, &Usb::default(), KEY).unwrap();
+        assert_eq!(proof.normal_identity_sha256, sha256_hex(KEY.as_bytes()));
+        assert_eq!(proof.hardware_serial_sha256, sha256_hex(CPU.as_bytes()));
+        assert_eq!(proof.loader_serial_sha256(), sha256_hex(SN.as_bytes()));
+        assert!(proof.vendor_serial.is_some());
+        assert_eq!(device.cpu_reads.get(), 2);
+        assert_eq!(device.sn_reads.get(), 2);
+        assert!(!device.entered.get());
+        // Discovery does not relax the ordinary prebound-Loader observer.
+        assert!(
+            observe_normal_loader_identity(
+                &Device::new(""),
+                &Usb::default(),
+                KEY,
+                &sha256_hex(KEY.as_bytes())
+            )
+            .is_err()
+        );
+        for fault in [
+            "wrongTree",
+            "wrongVendor",
+            "wrongCID",
+            "wrongProfile",
+            "duplicateSlot",
+            "missingSN",
+            "duplicateID",
+            "overlap",
+            "oversizedSN",
+            "badFooter",
+            "shortRead",
+            "stderr",
+            "truncated",
+            "changedCPU",
+            "changedSN",
+        ] {
+            let device = Device::new(fault);
+            assert!(
+                crate::observe_recommission_identity(&device, &Usb::default(), KEY).is_err(),
+                "{fault}"
+            );
+            assert!(!device.entered.get(), "{fault}");
+        }
+        assert!(
+            crate::observe_recommission_identity(
+                &Device::new(""),
+                &Usb {
+                    changed: true,
+                    ..Default::default()
+                },
+                KEY
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn recommission_cannot_take_an_already_loader_shortcut() {
+        let device = Device::new("");
+        device.entered.set(true);
+        let transition =
+            crate::RockchipLoaderTransition::new(&device, &device, &device, &crate::SystemClock)
+                .requiring_normal_identity();
+        assert!(
+            transition
+                .enter_loader(
+                    &crate::TransitionRequest {
+                        connect_key: KEY,
+                        stable_identity_sha256: &sha256_hex(SN.as_bytes()),
+                        job_id: "job-recommission",
+                        step_id: "enter-loader",
+                    },
+                    &crate::ReadbackBudget::DEFAULT,
+                    |_| panic!("Normal observation is unavailable")
+                )
+                .is_err()
+        );
+        assert_eq!(device.cpu_reads.get(), 0);
     }
 }

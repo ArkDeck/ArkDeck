@@ -163,6 +163,27 @@ pub fn observe_normal_loader_identity(
     Ok(before)
 }
 
+/// Fresh chain for a Normal-only historical binding. Unlike the ordinary
+/// observer this never treats CPU equality as sufficient: both factory-SN
+/// sources must agree, the CID must match the exact HDC route, and CPU and USB
+/// attachment are sampled again before returning. This only observes; it does
+/// not rebind a Target or authorize a mode transition.
+pub fn observe_recommission_identity(
+    hdc: &dyn HdcDispatch,
+    usb: &dyn UsbProbe,
+    connect_key: &str,
+) -> Result<NormalHardwareIdentity, &'static str> {
+    let started = std::time::Instant::now();
+    let mut before = observe_normal_hardware_identity(hdc, usb, connect_key)?;
+    let proof = crate::rockchip_vendor_identity::discover(hdc, connect_key, started)?;
+    let after = observe_normal_hardware_identity(hdc, usb, connect_key)?;
+    if before != after || started.elapsed() > Duration::from_secs(30) {
+        return Err("normalLoaderIdentity.vendorCaptureChangedOrExpired");
+    }
+    before.vendor_serial = Some(proof);
+    Ok(before)
+}
+
 fn hardware_serial(receipt: &Receipt) -> Result<String, &'static str> {
     let invalid = "normalLoaderIdentity.hardwareSerialMissingOrMalformed";
     if receipt.exit_status != 0

@@ -41,6 +41,7 @@ pub struct ControlBinding {
     /// The measured `arkforged` every descriptor names.
     pub provider_executable_sha256: String,
     pub loader_first_connector_sha256: Option<String>,
+    pub recommission: Option<arkdeck_provider_arkforge::RecommissionBinding>,
 }
 
 /// Swift `ArkForgeControlPerformer`.
@@ -89,11 +90,13 @@ impl ArkForgeControlPerformer {
     /// have taken effect before the step that failed, and the daemon records
     /// the rest as unknown.
     fn enter_updater(&self, request: &ManagedControlRequest) -> Observation {
-        if let Ok(identity) = self.loader.observe_loader(
-            &self.binding.stable_identity_sha256,
-            Some(&self.binding.usb_topology),
-            &format!("{}-already-loader", request.request_id),
-        ) {
+        if self.binding.recommission.is_none()
+            && let Ok(identity) = self.loader.observe_loader(
+                &self.binding.stable_identity_sha256,
+                Some(&self.binding.usb_topology),
+                &format!("{}-already-loader", request.request_id),
+            )
+        {
             return Observation {
                 accepted: true,
                 facts: BTreeMap::from([
@@ -187,6 +190,16 @@ impl ArkForgeControlPerformer {
         index: usize,
     ) -> Result<ExecutionResult, LaneFailure> {
         let binding = &self.binding;
+        let wrapped;
+        let action = if let Some(proof) = &binding.recommission {
+            wrapped = RockchipAction::Recommission {
+                action: Box::new(action.clone()),
+                binding: proof.clone(),
+            };
+            &wrapped
+        } else {
+            action
+        };
         let descriptor = action.descriptor(
             &binding.job_id,
             &record_step_id(request, index),

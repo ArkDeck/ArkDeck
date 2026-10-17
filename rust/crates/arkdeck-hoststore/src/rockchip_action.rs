@@ -97,6 +97,12 @@ impl CaptureRequest {
 /// Swift `RockchipProviderAction`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RockchipAction {
+    /// Internal materialization only: exact identity and budget from the
+    /// Runtime's consumed recommission allocation, never from typed inputs.
+    Recommission {
+        action: Box<RockchipAction>,
+        binding: arkdeck_provider_arkforge::RecommissionBinding,
+    },
     EnterLoader(String),
     ObserveHdcNormalUsb(String),
     WaitForHdcDisconnect(String),
@@ -131,6 +137,7 @@ impl RockchipAction {
     /// device; every other action only reads.
     pub fn effect(&self) -> &'static str {
         match self {
+            Self::Recommission { action, .. } => action.effect(),
             Self::EnterLoader(_) | Self::RebootToNormal(_) => "deviceMutation",
             _ => "readOnly",
         }
@@ -143,6 +150,7 @@ impl RockchipAction {
     /// Swift `RockchipHostManagedActionCatalog.identifier(for:)`.
     pub fn identifier(&self) -> &'static str {
         match self {
+            Self::Recommission { .. } => "rockchip.recommission.control.v1",
             Self::EnterLoader(_) => "rockchip.hdc.enter-loader.v1",
             Self::ObserveHdcNormalUsb(_) => "rockchip.iokit.observe-hdc-normal.v1",
             Self::WaitForHdcDisconnect(_) => "rockchip.hdc.wait-disconnect.v1",
@@ -178,6 +186,15 @@ impl RockchipAction {
             })
         };
         let (kind, arguments) = match self {
+            Self::Recommission { action, binding } => (
+                "rockchip.recommissionControl",
+                json!({"action": action.persisted(),
+                    "normalIdentitySha256": binding.normal_identity_sha256,
+                    "hardwareSerialSha256": binding.hardware_serial_sha256,
+                    "connectorSha256": binding.connector_sha256,
+                    "reservedAtEpochMs": binding.reserved_at_epoch_ms,
+                    "expiresAtEpochMs": binding.expires_at_epoch_ms}),
+            ),
             Self::EnterLoader(key) => ("rockchip.enterLoader", json!({"connectKey": key})),
             Self::ObserveHdcNormalUsb(key) => {
                 ("rockchip.observeHDCNormalUSB", json!({"connectKey": key}))
@@ -301,6 +318,15 @@ impl RockchipAction {
             return false;
         }
         match self {
+            Self::Recommission { action, binding } => {
+                let mut inner = descriptor.clone();
+                inner.identifier = action.identifier().into();
+                !matches!(**action, Self::Recommission { .. })
+                    && valid_recommission_binding(binding)
+                    && binding.normal_identity_sha256
+                        == sha256_hex(descriptor.connect_key.as_bytes())
+                    && action.matches(&inner)
+            }
             Self::EnterLoader(key)
             | Self::ObserveHdcNormalUsb(key)
             | Self::WaitForHdcDisconnect(key)
@@ -373,6 +399,34 @@ impl RockchipAction {
             })
         };
         match kind {
+            "rockchip.recommissionControl" => {
+                let nested = arguments
+                    .get("action")
+                    .ok_or("recommission action missing")?;
+                if nested["kind"] == "rockchip.recommissionControl" {
+                    return Err("nested recommission action is forbidden".into());
+                }
+                let binding = arkdeck_provider_arkforge::RecommissionBinding {
+                    normal_identity_sha256: string("normalIdentitySha256")?,
+                    hardware_serial_sha256: string("hardwareSerialSha256")?,
+                    connector_sha256: string("connectorSha256")?,
+                    reserved_at_epoch_ms: arguments
+                        .get("reservedAtEpochMs")
+                        .and_then(Value::as_u64)
+                        .ok_or("recommission budget missing")?,
+                    expires_at_epoch_ms: arguments
+                        .get("expiresAtEpochMs")
+                        .and_then(Value::as_u64)
+                        .ok_or("recommission deadline missing")?,
+                };
+                if !valid_recommission_binding(&binding) {
+                    return Err("recommission identity or budget malformed".into());
+                }
+                Ok(Self::Recommission {
+                    action: Box::new(Self::from_persisted(nested)?),
+                    binding,
+                })
+            }
             "rockchip.enterLoader" => Ok(Self::EnterLoader(string("connectKey")?)),
             "rockchip.observeHDCNormalUSB" => Ok(Self::ObserveHdcNormalUsb(string("connectKey")?)),
             "rockchip.waitForHDCDisconnect" => {
@@ -470,6 +524,30 @@ fn out_of_bounds(field: &str, detail: &str) -> String {
 }
 
 /// Exactly 64 lowercase hexadecimal characters.
+pub(crate) fn valid_recommission_binding(
+    binding: &arkdeck_provider_arkforge::RecommissionBinding,
+) -> bool {
+    [
+        &binding.normal_identity_sha256,
+        &binding.hardware_serial_sha256,
+        &binding.connector_sha256,
+    ]
+    .iter()
+    .all(|value| lowercase_sha256(value))
+        && binding.reserved_at_epoch_ms.checked_add(1_800_000) == Some(binding.expires_at_epoch_ms)
+}
+
+pub(crate) fn recommission_budget_current(
+    binding: &arkdeck_provider_arkforge::RecommissionBinding,
+) -> bool {
+    valid_recommission_binding(binding)
+        && crate::runtime_precise_now()
+            .and_then(|now| crate::format_time::precise_utc_millis(&now))
+            .is_some_and(|now| {
+                now >= binding.reserved_at_epoch_ms && now < binding.expires_at_epoch_ms
+            })
+}
+
 fn lowercase_sha256(value: &str) -> bool {
     value.len() == 64
         && value

@@ -1,5 +1,5 @@
 {
-  "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+  "catalogDigest": "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07",
   "contractIdentity": "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2",
   "corpusFileCount": 110,
   "corpusMethodCounts": {
@@ -560,16 +560,16 @@
     "successes": 608
   },
   "directoryDigests": {
-    "Catalog/operations": "1fcc3c4891428c4ae44903f4c60270deffe786483278d1a655cbcd22261de3c4",
-    "Catalog/profiles": "b385e1efc8f3a3af52770c02d8885340e2cf4b206e84ad6fe3f7903f10cebd80",
+    "Catalog/operations": "6492a0bd1d6e9975f59e5867e273e7826957442c63825131733ef87c30fb4915",
+    "Catalog/profiles": "d6af79aba410071f043d882ff3d9153fa5a491896ed99ad887c11fbea9bf745f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "0620896cf60b26c367b62219d4c0eede7e029ef42e66612366820747539eb410",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "e2a7ef2a05838f5e6091d6c1273615b8d6e580d4534afb40bb1182a059b9f366"
+    "spec/control/methods": "c53d782e8d7ecef20d09be97bc873f97d15d820b6c9de050b9577ffdaa996e04"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
-      "blob": "9f04a401105eccdafb1fbbd66b0cec80808c1ff0",
-      "sha256": "94b426dfd5117ccce51b897240be576e89c84195df735f3507ac996342643b30"
+      "blob": "230036af382da8275cb6b1cbaf649d4bb9fdfc30",
+      "sha256": "5fc2c40db0ec83ffb1a41785a1a858810842e0b63361e8b751923123319644ca"
     },
     "Catalog/operations/analyzer.analyze-trace.v1.json": {
       "blob": "0a12b2f04854bc18c4b98381d4cc0bc1a6115c3e",
@@ -618,6 +618,10 @@
     "Catalog/operations/flash.full-restore.v1.json": {
       "blob": "956e73b327c4625dbabeba37881619c1a2874038",
       "sha256": "3b0f2a3b97926d52c99bbcbac9bddfd5d41c2eb76fb0fb30da442d509e55b783"
+    },
+    "Catalog/operations/flash.recommission.v1.json": {
+      "blob": "37100a6821e8b826803e85da597f36ad0a71836b",
+      "sha256": "9a456d3569d6fcb007a6b811f263918e2a0c48feb02299111a50201c334a1275"
     },
     "Catalog/operations/input.keyboard.v1.json": {
       "blob": "2b683b03a34ca8515f8dab0a5f84c4e3b1114335",
@@ -700,8 +704,8 @@
       "sha256": "1da682d53aa2a8b6ebe9e441c6ffb8bb25434d476b6b031cb372eb0c4ff95133"
     },
     "Catalog/profiles/dayu200.json": {
-      "blob": "a81b47864f1d792fed03c1abe6e0623a43a8a10f",
-      "sha256": "cf4d8e53b507d837fea6b57dcc3dfcfc9d7e82b119a4013a343d30a1f595b29b"
+      "blob": "d0c359328b8e10ed00544dfa12b5532ff9e2a69a",
+      "sha256": "e2d1de69c69f2a6705c44ea67443a98d2f07a5a13cfd0dd823c4e6c641eefd0a"
     },
     "Catalog/profiles/openharmony-standard.v1.json": {
       "blob": "4295f2da60d029a8fa6d76624d5baf3e3fc42cd6",
@@ -1616,8 +1620,8 @@
       "sha256": "05e9959917e601ac46f2303a873b9910b04e0e1da9cc6393c7e0d4d33c33ed42"
     },
     "spec/control/methods/operation.describe.json": {
-      "blob": "f09436b34650dcc196889ca4e3db5a68b51550c9",
-      "sha256": "48b993574d193741dfcc0e0176f7a87d337096608e91be538715b71ef8ffe046"
+      "blob": "6aabcbef62e79e5530324b89d03c31e927ff0c99",
+      "sha256": "b4e247d0ac9e2a14b52f8bf803f5e568fbb06689e1f2af28a3452588a056e2fb"
     },
     "spec/control/methods/operation.list.json": {
       "blob": "c5ea9305384c22622c8f6e92d1d20dee6dd293a2",
@@ -1800,7 +1804,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "5eda42d40ae40b1d713535f0b8d6f3c4f06053be0e098c66e0d230312147e343",
+  "inputDigest": "abcc6090c713320ab8216b726b9a5f8a8ff5dbd7b3c8c7253db1ba5020283b5b",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

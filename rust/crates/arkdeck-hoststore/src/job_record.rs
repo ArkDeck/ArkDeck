@@ -529,7 +529,12 @@ impl JobRecord {
     /// is one of `ArkForgeFlashOperation`'s durable references (the canonical
     /// one, its compatibility alias, or the pre-singleton `@1` alias).
     pub(crate) fn dayu200_flash(&self) -> bool {
-        const DURABLE: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+        const DURABLE: [&str; 4] = [
+            "flash.full-restore@1",
+            "flash.dayu200",
+            "flash.dayu200@1",
+            "flash.recommission@1",
+        ];
         let operation = &self.request["operation"];
         let reference = match (operation["id"].as_str(), operation["version"].as_i64()) {
             (Some(id), Some(version)) => format!("{id}@{version}"),
@@ -957,7 +962,7 @@ impl JobRecord {
         // versioned spelling among them.
         if matches!(
             self.operation.as_str(),
-            "flash.full-restore@1" | "flash.dayu200" | "flash.dayu200@1"
+            "flash.full-restore@1" | "flash.dayu200" | "flash.dayu200@1" | "flash.recommission@1"
         ) {
             return Some("flash");
         }

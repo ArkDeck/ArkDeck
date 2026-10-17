@@ -634,6 +634,7 @@ impl Authority {
                     arkdeck_platform::usb_host_devices,
                 )
                 .with_rockusb(composed.rockusb())
+                .with_recommission_state(&state)
                 .with_arkforge_loader(&composed.runtime_directory),
             )
             .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(

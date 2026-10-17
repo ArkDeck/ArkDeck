@@ -31,6 +31,7 @@
     "deploy.native-library.app-owned@1",
     "flash.dayu200",
     "flash.full-restore@1",
+    "flash.recommission@1",
     "port-forward.create@1",
     "port-forward.remove@1",
     "input.keyboard@1",

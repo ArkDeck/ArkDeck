@@ -53,8 +53,8 @@ pub use flash_plan::{
 };
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use flash_plan::{
-    PARTITIONS as DAYU200_PARTITIONS, admission_blocker, canonical_inputs, delegated_arguments,
-    is_flash, normal_loader_identity_ready, plan_completion_arguments,
+    PARTITIONS as DAYU200_PARTITIONS, canonical_inputs, delegated_arguments, is_flash,
+    normal_loader_identity_ready, operation_admission_blocker, plan_completion_arguments,
 };
 #[cfg(any(target_os = "macos", windows))]
 pub(crate) use workspace_plan::WorkspaceMaterialization;
@@ -393,6 +393,7 @@ pub(crate) struct Materialized<'a> {
     pub(crate) artifact_facts: BTreeMap<String, String>,
     pub(crate) identity: Option<String>,
     pub(crate) binding_revision: Option<i64>,
+    pub(crate) recommission: Option<crate::job_owner::flash_recommission::IdentityChain>,
 }
 
 /// Swift's Job lifecycle `requestJSON()`: exactly one non-empty `requestJson`
@@ -582,6 +583,7 @@ impl<'a> JobPlanner<'a> {
             (self.materialize(request, descriptor)?, BTreeMap::new())
         };
         Ok(Materialized {
+            recommission: None,
             _import_use: hold,
             _workspace_use: workspace_use,
             digest,
@@ -796,6 +798,7 @@ impl<'a> JobPlanner<'a> {
         });
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(Materialized {
+            recommission: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts: BTreeMap::new(),

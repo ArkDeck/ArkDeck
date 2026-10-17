@@ -45,6 +45,17 @@ pub struct DeviceBinding {
     /// Present only when the admitted plan starts from a first Loader
     /// adoption. It pins the connector for hardware-proved first HDC boot.
     pub loader_first_connector_sha256: Option<String>,
+    /// Runtime-only proof/budget for the independent recommission operation.
+    pub recommission: Option<RecommissionBinding>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecommissionBinding {
+    pub normal_identity_sha256: String,
+    pub hardware_serial_sha256: String,
+    pub connector_sha256: String,
+    pub reserved_at_epoch_ms: u64,
+    pub expires_at_epoch_ms: u64,
 }
 
 /// Swift `RuntimeArkForgeLaneExecution`: the durable join between one
@@ -120,6 +131,11 @@ pub enum Terminal {
 
 /// Swift `RuntimeJobEngine.ArkForgeLane`.
 pub trait FlashLane: Send + Sync {
+    /// Fresh read-only census of the owned Provider. Unknown/missing support
+    /// is a blocker, never evidence that an earlier writer has stopped.
+    fn recommission_quiescent(&self, _source: &Execution) -> Result<(), String> {
+        Err("recommission.providerQuiescenceUnavailable".into())
+    }
     /// The exact backend digest the lane was composed against, which every
     /// StepPermit binds.
     fn toolchain_sha256(&self) -> &str;

@@ -110,7 +110,7 @@ pub use rockchip_hdc::{
 pub use rockchip_identity::{
     NORMAL_HARDWARE_IDENTITY_SOURCE, NormalHardwareIdentity, NormalHardwareIdentityObserver,
     normal_hardware_identity_plan, observe_normal_hardware_identity,
-    observe_normal_loader_identity,
+    observe_normal_loader_identity, observe_recommission_identity,
 };
 pub use rockchip_loader::{
     ENTER_LOADER_TIMEOUT, FlashRuntimeDiagnostic, LoaderTransition, LoaderTransitionFailure,

@@ -224,9 +224,17 @@ impl FlashAdmitter<'_> {
         let Some(authority) = admitter.authority else {
             return Err(unserved());
         };
-        authority
-            .require_state(admitter.jobs)
-            .map_err(|error| refused("admissionDenied", error.message))?;
+        if reference == crate::job_owner::flash_recommission::OPERATION {
+            let source = request
+                .inputs
+                .get("retainedJobId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| refused("admissionDenied", "recommission.sourceRequired"))?;
+            authority.require_recommission_state(admitter.jobs, source, &admitter.clock()?)
+        } else {
+            authority.require_state(admitter.jobs)
+        }
+        .map_err(|error| refused("admissionDenied", error.message))?;
         let client = request
             .client_context
             .as_ref()
@@ -269,27 +277,6 @@ impl FlashAdmitter<'_> {
                 format!("{reference} is not executed by the Rust Runtime yet"),
             ));
         }
-        let recovery = admitter
-            .jobs
-            .complete_overwrite_admission(
-                authority.capabilities,
-                &reference,
-                &Value::Object(request.inputs.clone()),
-                &identity,
-                binding,
-                &admitter.clock()?,
-                self.campaign,
-            )
-            .map_err(|refusal| match refusal {
-                OverwriteRefusal::Blocked(reason) => refused(
-                    "admissionDenied",
-                    format!(
-                        "non-overridable recovery blocker: {}",
-                        OverwriteRefusal::blocker(&reason)
-                    ),
-                ),
-                OverwriteRefusal::Failed(_) => uncertain(),
-            })?;
         if policy == "runtimeCapability" {
             if request.capability_id.is_some() {
                 return Err(refused(
@@ -306,8 +293,51 @@ impl FlashAdmitter<'_> {
         } else {
             return Err(unserved());
         }
+        if reference == crate::job_owner::flash_recommission::OPERATION {
+            let source = request
+                .inputs
+                .get("retainedJobId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| refused("admissionDenied", "recommission.sourceRequired"))?;
+            let execution = admitter
+                .jobs
+                .recommission_source_execution(source)
+                .map_err(|reason| refused("admissionDenied", reason))?;
+            self.flash
+                .ok_or_else(unserved)?
+                .require_recommission_quiescence(&execution)
+                .map_err(|reason| refused("admissionDenied", reason))?;
+        }
+        let recovery = if reference == crate::job_owner::flash_recommission::OPERATION {
+            admitter.jobs.recommission_admission(
+                authority.capabilities,
+                request,
+                materialized,
+                &admitter.clock()?,
+            )
+        } else {
+            admitter.jobs.complete_overwrite_admission(
+                authority.capabilities,
+                &reference,
+                &Value::Object(request.inputs.clone()),
+                &identity,
+                binding,
+                &admitter.clock()?,
+                self.campaign,
+            )
+        }
+        .map_err(|refusal| match refusal {
+            OverwriteRefusal::Blocked(reason) => refused(
+                "admissionDenied",
+                format!(
+                    "non-overridable recovery blocker: {}",
+                    OverwriteRefusal::blocker(&reason)
+                ),
+            ),
+            OverwriteRefusal::Failed(_) => uncertain(),
+        })?;
         let context = match &recovery {
-            OverwriteAdmission::Recovery { context, .. } => Some(context),
+            OverwriteAdmission::Recovery { context, .. } => Some(context.as_ref()),
             _ => None,
         };
         // The lineage check lists the epochs again, a recognized one among

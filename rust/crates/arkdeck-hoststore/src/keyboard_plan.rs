@@ -90,6 +90,7 @@ impl<'a> JobPlanner<'a> {
             "inputs":request.inputs, "targetID":request.target_id, "stableTargetIdentitySHA256":facts.identity,
             "bindingRevision":facts.binding_revision, "providerID":descriptor.provider, "steps":steps});
         Ok(Materialized {
+            recommission: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts,

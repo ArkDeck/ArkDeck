@@ -14,7 +14,8 @@ and `device candidates` must equal the recorded fixtures in
 `rust/tests/fixtures/readonly-machine-output` byte for byte on every host that runs the
 matrix (TASK-XPA-002: Windows output byte-equal to the macOS fixtures), once the one
 wall-clock member, `observedAt`, reads as its label. The closed c6/e4 source views
-also select their own Catalog digest; every other fixture byte remains exact.
+select their own Catalog digest. The closed recommission view additionally has
+one unavailable operation and counts of 33; all other fixture bytes stay exact.
 Rewrite them from a run with
 `--write-machine-output` after a change that legitimately moves them; every host's lane
 then has to reproduce the new bytes.
@@ -382,13 +383,23 @@ def validate_spk3(directory: Path) -> None:
 
 
 def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
-    """Derive only the Catalog identity for the two fully verified source views.
+    """Project only the exact declared delta for fully verified source views.
 
-    This changes no recording or fixture. Operation counts and every byte outside
-    the single Catalog digest still have to equal the pinned machine output.
+    This changes no recording or fixture. The additive recommission view adds
+    exactly one unavailable operation; every other machine-output byte is pinned.
     """
-    assert digest in (catalog_test_views.OLD, catalog_test_views.CURRENT), "unknown Catalog view"
+    assert digest in catalog_test_views.CATALOGS, "unknown Catalog view"
     assert name in MACHINE_OUTPUT_LEAVES, "unknown machine-output leaf"
+    if name == 'operations' and digest == catalog_test_views.RECOMMISSION:
+        rows = json.loads(data)['result']
+        assert len(rows) == 32 and not any(row['reference'] == 'flash.recommission@1' for row in rows)
+        source = [row for row in rows if row['reference'] == 'flash.full-restore@1']
+        assert len(source) == 1 and source[0]['availability'] == 'unavailable'
+        added = dict(source[0], reference='flash.recommission@1', canonicalReference='flash.recommission@1')
+        encode = lambda row: json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+        original = encode(source[0])
+        assert data.count(original) == 1, 'exact original Flash list entry required'
+        return data.replace(original, original + b',' + encode(added), 1)
     if name not in ("doctor", "deep", "healthy"):
         return data
     document = json.loads(data)
@@ -402,7 +413,14 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
         "unknown fixture Catalog"
     original = b'"digest":"' + declared["digest"].encode("ascii") + b'"'
     assert data.count(original) == 1, "machine-output Catalog digest must occur once"
-    return data.replace(original, b'"digest":"' + digest.encode("ascii") + b'"', 1)
+    result = data.replace(original, b'"digest":"' + digest.encode("ascii") + b'"', 1)
+    if digest == catalog_test_views.RECOMMISSION:
+        encode = lambda row: json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+        before = encode(declared)
+        assert data.count(before) == 1, 'exact Catalog summary required'
+        added = dict(declared, digest=digest, operationCount=33, unavailableOperationCount=33)
+        result = data.replace(before, encode(added), 1)
+    return result
 
 
 def machine_output(directory: Path, rows: list, write: bool) -> None:

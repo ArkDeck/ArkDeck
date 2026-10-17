@@ -100,22 +100,28 @@ def catalog_rust(inputs, info: dict, generator=None) -> str:
     return contract.formatted(generator.generate_rust(operations, info["catalogDigest"]))
 
 
-def historical_catalog_inputs(current):
-    """Current protocol/source, plus the exact immutable c6 Catalog input.
+def historical_catalog_inputs(current, digest=catalog_test_views.OLD):
+    """Current protocol/source, plus one exact immutable c6/e4 Catalog input.
 
     This route remains mandatory after the merge-base itself becomes e4.
     It neither edits persisted authority nor imports an older implementation.
     """
     old, new = catalog_test_views.catalogs(ROOT / "rust")
+    if digest not in (catalog_test_views.OLD, catalog_test_views.CURRENT):
+        raise ValueError('unknown historical Catalog input')
+    selected = old if digest == catalog_test_views.OLD else new
     operation_paths = {path: json.loads(data) for path, data in current.files.items()
                        if path.startswith("Catalog/operations/") and path.endswith(".json")}
     actual = {f"{row['id']}@{row.get('version', 0)}": row for row in operation_paths.values()}
-    if len(operation_paths) != 32 or actual not in (old, new):
-        raise ValueError("unclassified complete Catalog for historical test view")
+    actual_digest = catalog_test_views.catalog_table_digest(ROOT / "rust", list(operation_paths.values()))
     files, blobs = dict(current.files), dict(current.blobs)
     for path, row in operation_paths.items():
         reference = f"{row['id']}@{row.get('version', 0)}"
-        data = (json.dumps(old[reference], indent=2, ensure_ascii=True, sort_keys=True) + "\n").encode()
+        if reference == 'flash.recommission@1':
+            del files[path]
+            del blobs[path]
+            continue
+        data = (json.dumps(selected[reference], indent=2, ensure_ascii=True, sort_keys=True) + "\n").encode()
         files[path] = data
         # ContractInputs records real Git blob identities, even for this
         # synthetic isolated input tree; no old authority/source ID is reused.
@@ -124,27 +130,38 @@ def historical_catalog_inputs(current):
     profiles = [json.loads(data) for path, data in current.files.items()
                 if path.startswith("Catalog/profiles/") and path.endswith(".json")]
     matrix_path = "Catalog/generated/effect-authorization-matrix.md"
-    actual_digest = catalog_test_views.OLD if actual == old else catalog_test_views.CURRENT
     expected_matrix = generator.generate_matrix(list(actual.values()), profiles, actual_digest)
     if current.files[matrix_path].decode().replace("\r\n", "\n") != expected_matrix:
         raise ValueError("historical input requires the full official Catalog matrix")
-    matrix = generator.generate_matrix(list(old.values()), profiles, catalog_test_views.OLD).encode()
+    if actual_digest == catalog_test_views.RECOMMISSION:
+        for path in list(files):
+            if path.startswith('Catalog/profiles/') and path.endswith('.json'):
+                profile = json.loads(files[path])
+                if 'flash.recommission@1' in profile.get('supportedOperations', []):
+                    profile['supportedOperations'].remove('flash.recommission@1')
+                    data = (json.dumps(profile, indent=2, ensure_ascii=True) + '\n').encode()
+                    files[path] = data
+                    blobs[path] = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+        profiles = [json.loads(data) for path, data in files.items()
+                    if path.startswith('Catalog/profiles/') and path.endswith('.json')]
+    matrix = generator.generate_matrix(list(selected.values()), profiles, digest).encode()
     files[matrix_path] = matrix
     blobs[matrix_path] = hashlib.sha1(f"blob {len(matrix)}\0".encode() + matrix).hexdigest()
     return contract.ContractInputs(files, blobs, set(current.directories))
 
 
-def historical_review_projection(current: bytes) -> bytes:
+def historical_review_projection(current: bytes, digest=catalog_test_views.OLD) -> bytes:
     """The complete unchanged Flash projection with its proved c6 digest."""
+    if digest not in (catalog_test_views.OLD, catalog_test_views.CURRENT):
+        raise ValueError('unknown historical review Catalog')
     old, new = catalog_test_views.catalogs(ROOT / "rust")
     for key in old:
         if key.startswith("flash.") and old[key] != new[key]:
             raise ValueError("historical Flash descriptor drift")
-    if current.count(catalog_test_views.OLD.encode()) == 1 and catalog_test_views.CURRENT.encode() not in current:
-        return current
-    if current.count(catalog_test_views.CURRENT.encode()) != 1 or catalog_test_views.OLD.encode() in current:
+    present = [digest for digest in catalog_test_views.CATALOGS if digest.encode() in current]
+    if len(present) != 1 or current.count(present[0].encode()) != 1:
         raise ValueError("exact current Flash projection Catalog required")
-    return current.replace(catalog_test_views.CURRENT.encode(), catalog_test_views.OLD.encode())
+    return current.replace(present[0].encode(), digest.encode())
 
 
 def historical_workspace_covers(published, historical) -> bool:
@@ -344,8 +361,10 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
                   "generatedRustSourceDigest": rust_digest(view / "rust"),
                   "deviceAcceptance": False, "completed": False, "commands": []}
     if historical:
+        if info['catalogDigest'] not in (catalog_test_views.OLD, catalog_test_views.CURRENT):
+            raise ValueError('unknown pinned historical execution Catalog')
         provenance['testView'] = 'pinned-historical-catalog'
-        provenance['historicalCatalogDigest'] = catalog_test_views.OLD
+        provenance['historicalCatalogDigest'] = info['catalogDigest']
         provenance['nonCatalogInputSource'] = provenance['sourceRevision']
     if workspace_covered:
         provenance['workspaceCoveredBy'] = 'historical'
@@ -384,7 +403,7 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
         if historical:
             receipt = output / 'test-execution/historical/catalog-execution.json'
             value = json.loads(receipt.read_bytes())
-            if (value.get('catalogDigest') != catalog_test_views.OLD
+            if (value.get('catalogDigest') != info['catalogDigest']
                     or value.get('completed') is not True
                     or not any(row.get('execution') == 'actual' and row.get('passed', 0) > 0
                                for row in value['targets'])):
@@ -466,6 +485,11 @@ def check(output_root: Path) -> Path:
         (ROOT / 'rust/tests/fixtures/catalog-lineage-c6-e4/catalogs.json').read_bytes())['oldSourceCommit'])
     if historical_info['catalogDigest'] != catalog_test_views.OLD:
         raise ValueError('mandatory historical input did not reproduce c6')
+    observed = (historical_catalog_inputs(current, catalog_test_views.CURRENT)
+                if current_info['catalogDigest'] == catalog_test_views.RECOMMISSION else None)
+    observed_info = contract.baseline(observed) if observed is not None else None
+    if observed_info is not None and observed_info['catalogDigest'] != catalog_test_views.CURRENT:
+        raise ValueError('mandatory observed input did not reproduce e4')
     published_companions = (published_catalog_companions(published_commit)
                             if published_info["catalogDigest"] != current_info["catalogDigest"]
                             else None)
@@ -478,6 +502,8 @@ def check(output_root: Path) -> Path:
     catalogs = {"published": catalog_rust(published, published_info, catalog_generator),
                 "candidate": catalog_rust(current, current_info, catalog_generator),
                 "historical": catalog_rust(historical, historical_info, catalog_generator)}
+    if observed is not None:
+        catalogs['observed'] = catalog_rust(observed, observed_info, catalog_generator)
     catalog = ROOT / "rust/crates/arkdeck-contract/src/catalog_generated.rs"
     if catalog.read_bytes() != catalogs["candidate"].encode():
         raise ValueError("candidate Catalog generated input drift")
@@ -496,6 +522,7 @@ def check(output_root: Path) -> Path:
     # tests the lane already ran (see commands()). Any drift keeps both views
     # complete: that is the case the published view exists for.
     published_covered = current_info["inputDigest"] == published_info["inputDigest"]
+    observed_covered = observed is not None and historical_workspace_covers(published, observed)
     # A short task-owned path also bounds Cargo's native Windows build paths.
     temporary_root = ROOT / "rust/target/contract-check"
     temporary_root.mkdir(parents=True, exist_ok=True)
@@ -515,10 +542,22 @@ def check(output_root: Path) -> Path:
                 "deviceAcceptance": False, "completed": True, "result": "covered",
                 "coveredBy": "candidate", "commands": []})
         views.append(('historical', historical, historical_info))
+        if observed_covered:
+            write_json(output / 'observed/provenance.json', {
+                'schemaVersion': 'arkdeck.rust-contract-check/1', 'kind': 'host-test',
+                'catalogDigest': catalog_test_views.CURRENT,
+                'inputDigest': observed_info['inputDigest'], 'completed': True,
+                'result': 'covered', 'coveredBy': 'candidate' if published_covered else 'published',
+                'deviceAcceptance': False, 'commands': []})
+        elif observed is not None:
+            views.append(('observed', observed, observed_info))
         for name, inputs, info in views:
             view = Path(directory) / name
             try:
-                review = historical_review_projection(review_source) if name == 'historical' else review_source
+                pinned = name in ('historical', 'observed')
+                review = (historical_review_projection(review_source) if name == 'historical'
+                          else historical_review_projection(review_source, catalog_test_views.CURRENT)
+                          if name == 'observed' else review_source)
                 materialize(view, inputs, info, published_info, rust_source, catalogs[name], review,
                             catalog_companions=published_companions if name == "published" else None,
                             catalog_generator_source=catalog_bytes)
@@ -526,7 +565,7 @@ def check(output_root: Path) -> Path:
                     stable = temporary_root / name
                     ci_workspace.sync_tree(view, stable, preserve=(("rust", "target"),))
                     view = stable
-                run_view(view, output / name, info, published_info, historical=name == 'historical',
+                run_view(view, output / name, info, published_info, historical=pinned,
                          workspace_covered=name == 'published' and historical_workspace_covers(published, historical))
             except (OSError, ValueError, subprocess.CalledProcessError) as error:
                 failures.append({"view": name, "error": str(error)})
@@ -551,6 +590,8 @@ def check(output_root: Path) -> Path:
         "publishedView": "covered-by-candidate" if published_covered else "run",
         "historicalCatalogDigest": historical_info['catalogDigest'],
         "historicalView": "mandatory-run",
+        "observedCatalogDigest": observed_info['catalogDigest'] if observed_info else None,
+        "observedView": ("covered-by-published" if observed_covered else "mandatory-run") if observed else "not-needed",
         "completed": not failures, "failures": failures,
     })
     if failures:

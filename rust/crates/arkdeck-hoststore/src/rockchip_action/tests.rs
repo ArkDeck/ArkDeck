@@ -81,6 +81,63 @@ fn every_action_round_trips_through_its_persisted_form() {
 }
 
 #[test]
+fn recommission_actions_pin_the_exact_identity_and_budget_without_nesting() {
+    let binding = arkdeck_provider_arkforge::RecommissionBinding {
+        normal_identity_sha256: sha256_hex(KEY.as_bytes()),
+        hardware_serial_sha256: "a".repeat(64),
+        connector_sha256: "b".repeat(64),
+        reserved_at_epoch_ms: 1_000,
+        expires_at_epoch_ms: 1_801_000,
+    };
+    let action = RockchipAction::Recommission {
+        action: Box::new(RockchipAction::EnterLoader(KEY.into())),
+        binding: binding.clone(),
+    };
+    assert_eq!(
+        RockchipAction::from_persisted(&action.persisted()).unwrap(),
+        action
+    );
+    let descriptor = action.descriptor(
+        "job-1",
+        "step-1",
+        "TGT-1",
+        1,
+        KEY,
+        &"c".repeat(64),
+        &"d".repeat(64),
+    );
+    assert!(action.matches(&descriptor));
+    let mut moved = descriptor.clone();
+    moved.connect_key = "another-CID".into();
+    assert!(!action.matches(&moved));
+    for field in [
+        "normalIdentitySha256",
+        "hardwareSerialSha256",
+        "connectorSha256",
+    ] {
+        let mut malformed = action.persisted();
+        malformed["arguments"][field] = json!("bad");
+        assert!(RockchipAction::from_persisted(&malformed).is_err());
+    }
+    let mut expired = action.persisted();
+    expired["arguments"]["expiresAtEpochMs"] = json!(1_801_001);
+    assert!(RockchipAction::from_persisted(&expired).is_err());
+    let nested = RockchipAction::Recommission {
+        action: Box::new(action.clone()),
+        binding: binding.clone(),
+    };
+    assert!(RockchipAction::from_persisted(&nested.persisted()).is_err());
+    let changed = RockchipAction::Recommission {
+        action: Box::new(RockchipAction::EnterLoader(KEY.into())),
+        binding: arkdeck_provider_arkforge::RecommissionBinding {
+            hardware_serial_sha256: "e".repeat(64),
+            ..binding
+        },
+    };
+    assert_ne!(action.sha256(), changed.sha256());
+}
+
+#[test]
 fn the_catalog_and_the_effects_are_swifts() {
     let identifiers: Vec<(&str, &str)> = every_action()
         .iter()

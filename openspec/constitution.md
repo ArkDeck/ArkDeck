@@ -118,6 +118,17 @@ operation/profile/target/binding/input/plan/archive/artifact/tool/freshness/rese
 该 recovery 若再次 unknown，后续 epoch 必须重新覆盖所有旧与新增 uncertain effects，并
 继续计入同一预算。
 
+仅 `flash.recommission@1` MAY 对一个已过期、完整发布 retained-risk archive 的 DAYU200
+revision-1 Normal-only unknown Flash 请求一次独立重新接纳。该路径 SHALL 保留原 invocation
+预算、unknown、record/journal 和 binding snapshot 不变；Runtime SHALL 证明原 Normal CID、
+fresh CPU serial、boot-tree 与 vendor-slot SN 双源一致、同一 USB connector、旧执行主体结束、
+无其他未闭合 Job，以及 `POL-RECOVERY-001` 要求的完整覆盖和验证。Runtime SHALL 将源历史
+摘要、新 Job/plan/Artifact 和身份链绑定到不可续期的独立 allocation：一个 epoch、并发一、
+自 reserve 起最多 1,800 秒。同一原 Normal identity 只可分配一次；换请求 ID、重启、归档、
+失败或新 unknown SHALL NOT 再分配。到期后不得签发新 Provider step permit。只有完整写入、
+readback/reboot/postflight 均成功且身份链不变，才可追加 supersession 与新 binding lineage。
+此窄路径不扩大普通恢复预算，不允许 replay，也不以用户确认代替任何证明。
+
 只有成功的 `SupersedingRecoveryEpoch` 才可使已覆盖的 uncertain intents 不再阻断 target
 lane；它 SHALL NOT 修改原始 outcome 或声称原 Job succeeded。已有 durable 后续 Flash
 history 仅在相同 identity、时序、完整覆盖、逐项 outcome 与 postflight 均可验证时 MAY

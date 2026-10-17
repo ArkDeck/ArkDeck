@@ -162,6 +162,44 @@ impl Fakes {
             server_facts: server,
         })
     }
+
+    pub fn recommission_quiescent(&self, source: &Execution) -> Result<(), String> {
+        assert!(!source.daemon_job_id.is_empty());
+        if self.current().prepare == "sourceBusy" {
+            Err("recommission.providerHasUnclosedJob".into())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn recommission_facts(&self, target_id: &str) -> Result<RockchipFacts, String> {
+        use arkdeck_contract::sha256_hex;
+        let mut facts = self.facts(target_id)?;
+        facts.execution_connect_key = CONNECT_KEY.into();
+        facts.server_facts.insert(
+            "dayu200HDCNormalAliasSHA256".into(),
+            facts.identity_sha256.clone(),
+        );
+        facts.server_facts.insert(
+            "dayu200RecommissionObservationSHA256".into(),
+            "e".repeat(64),
+        );
+        let drifted = self.current().cross_mode == "cpuDrift";
+        if drifted {
+            facts
+                .server_facts
+                .insert("dayu200CrossModeBinding".into(), "satisfied".into());
+        }
+        facts.server_facts.insert("dayu200RecommissionIdentityChain".into(), serde_json::json!({
+            "targetId": target_id, "bindingRevision": 1,
+            "normalIdentitySha256": facts.identity_sha256,
+            "hardwareSerialSha256": sha256_hex(if drifted { b"other-cpu" } else { b"same--cpu" }),
+            "loaderSerialSha256": sha256_hex(b"factory-loader-serial"),
+            "connectorSha256": "d".repeat(64), "usbTopology": "42",
+            "providerSha256": facts.tool_sha256, "bindingSnapshotSha256": "f".repeat(64),
+        }).to_string());
+        Ok(facts)
+    }
 }
 
 /// The ArkForge lane as the oracle scripts it. Its cache of completed plans
@@ -226,6 +264,9 @@ pub fn receipt(execution: &Execution, canonical: bool) -> ActionReceipt {
 }
 
 impl FlashLane for FakeLane {
+    fn recommission_quiescent(&self, source: &Execution) -> Result<(), String> {
+        self.fakes.recommission_quiescent(source)
+    }
     fn toolchain_sha256(&self) -> &str {
         TOOLCHAIN
     }
@@ -353,6 +394,9 @@ impl FlashLane for FakeLane {
             _ => {
                 let completed = receipt(execution, true);
                 self.remember(&execution.arkdeck_job_id, &completed);
+                if self.fakes.current().perform == "postflightIdentityDrift" {
+                    self.fakes.shared().script.cross_mode = "cpuDrift".into();
+                }
                 Ok(completed)
             }
         }

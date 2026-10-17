@@ -256,7 +256,7 @@ fn loader_first_full_restore_materializes_without_a_prior_hdc_alias() {
         ("dayu200LoaderFirstConnectorSHA256".into(), "d".repeat(64)),
         ("dayu200LoaderFirstUSBTopology".into(), "42".into()),
     ]);
-    let port = |_: &str| Ok(loader.clone());
+    let port = |_: &str, _: bool| Ok(loader.clone());
     let planner = FlashPlanner {
         planner: JobPlanner {
             artifacts: Some(&artifacts),
@@ -295,7 +295,7 @@ fn every_flash_plan_is_swifts() {
     for exchange in exchanges {
         let name = exchange["name"].as_str().unwrap();
         let flash = planning(&exchange["setup"]);
-        let port = |_: &str| facts(&exchange["setup"], target);
+        let port = |_: &str, _: bool| facts(&exchange["setup"], target);
         let planner = FlashPlanner {
             planner: JobPlanner {
                 artifacts: Some(&artifacts),

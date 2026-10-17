@@ -23,6 +23,8 @@
 //! platform wrote it (`AsSwift`) before it is compared; nothing else is.
 #![cfg(any(target_os = "macos", windows))]
 
+#[path = "flash_run/recommission.rs"]
+mod recommission;
 mod support;
 
 use arkdeck_hoststore::{
@@ -282,7 +284,11 @@ impl Owners {
             holds: DeviceHolds::default(),
             // Swift's lane may flash, its dispatcher has no reason to refuse,
             // and the lane's toolchain is the oracle's.
-            flash: FlashPlanning::new(None, || None, Some(TOOLCHAIN.into())),
+            flash: FlashPlanning::new(None, || None, Some(TOOLCHAIN.into()))
+                .with_recommission_quiescence({
+                    let fakes = fakes.clone();
+                    move |source| fakes.recommission_quiescent(source)
+                }),
         }
     }
 
@@ -303,8 +309,25 @@ impl Owners {
 
     /// One exchange's answer, as the daemon's control layer answers it.
     fn answer(&self, fakes: &Fakes, method: &str, params: &Map<String, Value>) -> Value {
+        self.answer_with_clock(fakes, method, params, now, precise_now)
+    }
+
+    fn answer_with_clock(
+        &self,
+        fakes: &Fakes,
+        method: &str,
+        params: &Map<String, Value>,
+        now: fn() -> Option<String>,
+        precise_now: fn() -> Option<String>,
+    ) -> Value {
         let state_root = self.state_root();
-        let facts = |target: &str| fakes.facts(target);
+        let facts = |target: &str, recommission: bool| {
+            if recommission {
+                fakes.recommission_facts(target)
+            } else {
+                fakes.facts(target)
+            }
+        };
         match method {
             "job.plan" => {
                 let planner = FlashPlanner {

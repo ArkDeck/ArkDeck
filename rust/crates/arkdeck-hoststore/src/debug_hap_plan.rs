@@ -21,6 +21,7 @@ impl<'a> JobPlanner<'a> {
         self.refuse_debug_permit(request)?;
         let now = (self.hdc.ok_or_else(internal_failure)?.now)().ok_or_else(internal_failure)?;
         Ok(Materialized {
+            recommission: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts,

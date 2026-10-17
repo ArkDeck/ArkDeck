@@ -58,6 +58,7 @@ pub const PERMIT_LIFETIME_MS: u64 = 60_000;
 /// Swift `Refusal`: each a distinct fact that failed to match.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Refusal {
+    DispatchBudgetExpired,
     UnknownJob {
         asked: String,
         approved: String,
@@ -84,6 +85,10 @@ pub enum Refusal {
 impl std::fmt::Display for Refusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::DispatchBudgetExpired => write!(
+                f,
+                "the independent recovery dispatch budget is expired or invalid"
+            ),
             Self::UnknownJob { asked, approved } => write!(
                 f,
                 "admission names job {asked}; this authority approved {approved}"
@@ -155,6 +160,9 @@ pub struct ExecutionAuthority {
     daemon_job_id: Option<String>,
     /// Mode → topology digest, confirmed independently by ArkDeck.
     approved_topology_by_mode: HashMap<String, Vec<u8>>,
+    dispatch_window: Option<(u64, u64)>,
+    latest_clock: u64,
+    dispatch_budget_failed: bool,
 }
 
 impl ExecutionAuthority {
@@ -191,7 +199,39 @@ impl ExecutionAuthority {
             issued: HashMap::new(),
             daemon_job_id: None,
             approved_topology_by_mode,
+            dispatch_window: None,
+            latest_clock: 0,
+            dispatch_budget_failed: false,
         }
+    }
+
+    /// Supplied only by the Runtime's consumed independent allocation. No
+    /// caller or daemon request can extend this window.
+    pub fn set_dispatch_window(&mut self, started: u64, expires: u64) {
+        self.dispatch_window = Some(match self.dispatch_window {
+            Some((old_start, old_end)) => (old_start.max(started), old_end.min(expires)),
+            None => (started, expires),
+        });
+    }
+
+    pub fn dispatch_budget_current(&mut self) -> bool {
+        let now = (self.now)();
+        self.dispatch_budget_at(now)
+    }
+
+    fn dispatch_budget_at(&mut self, now: u64) -> bool {
+        let Some((started, expires)) = self.dispatch_window else {
+            return true;
+        };
+        let valid = started < expires
+            && expires - started <= 1_800_000
+            && now >= started
+            && now < expires
+            && now >= self.latest_clock
+            && !self.dispatch_budget_failed;
+        self.latest_clock = self.latest_clock.max(now);
+        self.dispatch_budget_failed |= !valid;
+        valid
     }
 
     /// Swift `adoptDaemonJob(_:)`: records the job the daemon assigned; an
@@ -234,9 +274,20 @@ impl ExecutionAuthority {
     /// Swift `admit(_:)`: one admission answered, deterministically in its
     /// inputs.
     pub fn admit(&mut self, snapshot: &StepAdmissionSnapshot) -> Decision {
+        // Even retransmission cannot deliver usable authority past the hard
+        // budget. Issued permit expirations are clipped to the same deadline.
+        if !self.dispatch_budget_current() {
+            return Decision::Refuse(Refusal::DispatchBudgetExpired);
+        }
         let permit_id = permit_id(snapshot);
         // Retransmission first: the bytes were already authorized.
         if let Some(already) = self.issued.get(&permit_id) {
+            if self.dispatch_window.is_some_and(|(_, expires)| {
+                StepPermit::from_canonical_bytes(&already.signing_body)
+                    .map_or(true, |permit| permit.expires_at_epoch_ms > expires)
+            }) {
+                return Decision::Refuse(Refusal::DispatchBudgetExpired);
+            }
             return Decision::Sign(already.clone());
         }
         if snapshot.step_id.is_empty() || snapshot.attempt_id.is_empty() {
@@ -273,6 +324,9 @@ impl ExecutionAuthority {
             return Decision::Refuse(Refusal::DeviceFactsMismatch);
         }
         let now = (self.now)();
+        if !self.dispatch_budget_at(now) {
+            return Decision::Refuse(Refusal::DispatchBudgetExpired);
+        }
         if snapshot.observed_at_epoch_ms > now {
             return Decision::Refuse(Refusal::SnapshotFromTheFuture {
                 observed_at_epoch_ms: snapshot.observed_at_epoch_ms,
@@ -342,7 +396,10 @@ impl ExecutionAuthority {
                 &snapshot.admitted_device_facts_sha256,
             )?,
             issued_at_epoch_ms: now,
-            expires_at_epoch_ms: now.saturating_add(self.plan.permit_lifetime_ms),
+            expires_at_epoch_ms: now.saturating_add(self.plan.permit_lifetime_ms).min(
+                self.dispatch_window
+                    .map_or(u64::MAX, |(_, expires)| expires),
+            ),
             // Never configurable: a permit that could be spent twice is not
             // one, and ArkForge refuses it outright.
             single_use: true,

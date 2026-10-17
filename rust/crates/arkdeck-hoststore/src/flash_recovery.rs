@@ -23,6 +23,7 @@
 //! answers as a non-overridable recovery blocker; anything else that fails is
 //! a store that cannot be read.
 use super::JobStore;
+use super::flash_recommission::{Allocation, OPERATION as RECOMMISSION};
 use crate::capability_store::{CapabilityStore, UseOutcome};
 use crate::job_record::JobRecord;
 use crate::recovery_epoch::{
@@ -39,7 +40,12 @@ use std::sync::OnceLock;
 /// Swift `ArkForgeFlashOperation.canonicalReference`.
 const CANONICAL: &str = "flash.full-restore@1";
 /// Swift `ArkForgeFlashOperation.containsDurableRecordReference`.
-const DURABLE_REFERENCES: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+const DURABLE_REFERENCES: [&str; 4] = [
+    "flash.full-restore@1",
+    "flash.dayu200",
+    "flash.dayu200@1",
+    RECOMMISSION,
+];
 /// Swift `RockchipFlashProfile.dayu200.catalogReference`, the one profile a
 /// canonical full restore resolves.
 const DAYU200: &str = "dayu200";
@@ -59,6 +65,7 @@ pub(crate) struct RecoveryContext {
     pub(crate) covered_effect_set_sha256: String,
     pub(crate) profile_reference: String,
     pub(crate) destructive_epoch_ordinal: i64,
+    pub(crate) recommission: Option<Allocation>,
 }
 
 fn intent_value(intent: &SupersededIntent) -> Value {
@@ -92,14 +99,18 @@ impl RecoveryContext {
     /// The context as the admission evidence keeps it (Swift's synthesized
     /// encoding).
     pub(crate) fn value(&self) -> Value {
-        json!({
+        let mut value = json!({
             "coveredIntents": self.covered_intents.iter().map(intent_value).collect::<Vec<_>>(),
             "uncertainEffectSetSHA256": self.uncertain_effect_set_sha256,
             "coverageContractVersion": self.coverage_contract_version,
             "coveredEffectSetSHA256": self.covered_effect_set_sha256,
             "profileReference": self.profile_reference,
             "destructiveEpochOrdinal": self.destructive_epoch_ordinal,
-        })
+        });
+        if let Some(allocation) = &self.recommission {
+            value["recommission"] = json!(allocation);
+        }
+        value
     }
 
     /// The context an admission evidence carries, if it carries one.
@@ -117,19 +128,28 @@ impl RecoveryContext {
             covered_effect_set_sha256: text("coveredEffectSetSHA256")?,
             profile_reference: text("profileReference")?,
             destructive_epoch_ordinal: value["destructiveEpochOrdinal"].as_i64()?,
+            recommission: value
+                .get("recommission")
+                .map(|value| serde_json::from_value(value.clone()))
+                .transpose()
+                .ok()?,
         })
     }
 
     /// Swift `automaticCapabilityPolicyFingerprint`'s recovery lines: a
     /// recovery's capability is its own policy identity.
     pub(crate) fn policy_lines(&self) -> String {
-        format!(
+        let mut lines = format!(
             "{}\n{}\n{}\n{}",
             self.uncertain_effect_set_sha256,
             self.coverage_contract_version,
             self.covered_effect_set_sha256,
             self.destructive_epoch_ordinal
-        )
+        );
+        if let Some(allocation) = &self.recommission {
+            lines.push_str(&format!("\nrecommission:{}", allocation.sha256()));
+        }
+        lines
     }
 
     /// The Jobs whose unknown intents this recovery covers.
@@ -145,7 +165,7 @@ pub(crate) enum OverwriteAdmission {
     /// Nothing on the binding is unresolved: an ordinary Flash.
     Ordinary,
     /// A distinct recovery within the same hard budget as its unknown intents.
-    Recovery { context: RecoveryContext },
+    Recovery { context: Box<RecoveryContext> },
     /// A complete later recovery Flash already in history, whose epoch is now
     /// appended; nothing is dispatched for it.
     Recognized(Box<RecoveryEpoch>),
@@ -235,12 +255,12 @@ impl Contract {
 
 /// Swift `ArkForgeFlashOperation.canonicalReference(for:)`.
 fn canonical(reference: &str) -> Option<&'static str> {
-    matches!(reference, CANONICAL | "flash.dayu200").then_some(CANONICAL)
+    matches!(reference, CANONICAL | "flash.dayu200" | RECOMMISSION).then_some(CANONICAL)
 }
 
 /// Swift `ArkForgeFlashRequest.profileReference`.
 fn flash_profile<'a>(operation: &str, inputs: &'a Value) -> Option<&'a str> {
-    let key = if operation == CANONICAL {
+    let key = if matches!(operation, CANONICAL | RECOMMISSION) {
         "deviceProfileRef"
     } else {
         "deviceProfile"
@@ -251,7 +271,7 @@ fn flash_profile<'a>(operation: &str, inputs: &'a Value) -> Option<&'a str> {
 /// Swift `flashPartitions`: a canonical full restore writes its profile's
 /// mapped partitions; any other Flash names its own.
 fn flash_partitions(operation: &str, inputs: &Value) -> Option<Vec<String>> {
-    if operation == CANONICAL {
+    if matches!(operation, CANONICAL | RECOMMISSION) {
         if inputs["intent"] != "fullRestore" || flash_profile(operation, inputs) != Some(DAYU200) {
             return None;
         }
@@ -271,7 +291,7 @@ fn flash_partitions(operation: &str, inputs: &Value) -> Option<Vec<String>> {
 
 /// Swift `flashVerification`: `full` unless a verification is named.
 fn flash_verification<'a>(operation: &str, inputs: &'a Value) -> &'a str {
-    let key = if operation == CANONICAL {
+    let key = if matches!(operation, CANONICAL | RECOMMISSION) {
         "verification"
     } else {
         "postFlashVerification"
@@ -336,9 +356,13 @@ fn loaded(directory: &Path) -> Option<JobRecord> {
 /// `contentsOfDirectory(options: .skipsHiddenFiles)`), or none when it
 /// cannot be listed.
 fn job_directories(jobs: &Path) -> Option<Vec<String>> {
-    let mut names: Vec<String> = std::fs::read_dir(jobs)
-        .ok()?
-        .filter_map(Result::ok)
+    let entries = match std::fs::read_dir(jobs) {
+        Ok(entries) => entries.collect::<Result<Vec<_>, _>>().ok()?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Some(Vec::new()),
+        Err(_) => return None,
+    };
+    let mut names: Vec<String> = entries
+        .into_iter()
         .map(|entry| entry.file_name().to_string_lossy().into_owned())
         .filter(|name| !name.starts_with('.'))
         .collect();
@@ -411,7 +435,7 @@ fn resulting_epoch(
 }
 
 impl JobStore {
-    fn jobs_path(&self) -> std::path::PathBuf {
+    pub(super) fn jobs_path(&self) -> std::path::PathBuf {
         self.path.join("jobs")
     }
 
@@ -456,6 +480,128 @@ impl JobStore {
         now: &str,
         _campaign: Option<&str>,
     ) -> Result<OverwriteAdmission, OverwriteRefusal> {
+        if reference == RECOMMISSION {
+            return Err(OverwriteRefusal::blocked(
+                "recommission.independentAdmissionRequired",
+            ));
+        }
+        self.overwrite_admission(
+            capabilities,
+            reference,
+            inputs,
+            identity,
+            binding,
+            now,
+            None,
+            None,
+        )
+    }
+
+    /// The independent operation requires the unchanged, completed source
+    /// archive and a fresh identity chain before any budget reservation exists.
+    pub(crate) fn recommission_admission(
+        &self,
+        capabilities: &CapabilityStore,
+        request: &crate::operation_request::OperationRequest,
+        materialized: &crate::job_plan::Materialized<'_>,
+        now: &str,
+    ) -> Result<OverwriteAdmission, OverwriteRefusal> {
+        let blocked = |reason: String| OverwriteRefusal::Blocked(reason);
+        let source = request
+            .inputs
+            .get("retainedJobId")
+            .and_then(Value::as_str)
+            .ok_or_else(|| OverwriteRefusal::blocked("recommission.sourceRequired"))?;
+        let chain = materialized
+            .recommission
+            .as_ref()
+            .ok_or_else(|| OverwriteRefusal::blocked("recommission.identityChainMissing"))?;
+        chain.validate().map_err(blocked)?;
+        if request.reference() != RECOMMISSION
+            || request.target_id != chain.target_id
+            || materialized.identity.as_deref() != Some(&chain.normal_identity_sha256)
+            || materialized.binding_revision != Some(chain.binding_revision)
+        {
+            return Err(OverwriteRefusal::blocked(
+                "recommission.identityChainDrifted",
+            ));
+        }
+        let source_sha256 = self
+            .recommission_source(source, &chain.normal_identity_sha256, now)
+            .map_err(blocked)?;
+        // Exclude only this exact, not-yet-consumed recovery Job from the
+        // historical census during its fresh pre-dispatch materialization.
+        let mut original = request.clone();
+        original.capability_id = None;
+        let fingerprint = original.fingerprint();
+        let job = format!(
+            "job-{}",
+            &sha256_hex(format!("{}\n{fingerprint}", request.idempotency_key).as_bytes())[..32]
+        );
+        let classified = self.overwrite_admission(
+            capabilities,
+            RECOMMISSION,
+            &Value::Object(request.inputs.clone()),
+            &chain.normal_identity_sha256,
+            chain.binding_revision,
+            now,
+            Some(source),
+            Some(&job),
+        )?;
+        let OverwriteAdmission::Recovery { mut context } = classified else {
+            return Err(OverwriteRefusal::blocked(
+                "recommission.exactUnresolvedSourceRequired",
+            ));
+        };
+        if context.covered_intents.is_empty()
+            || context
+                .covered_intents
+                .iter()
+                .any(|intent| intent.job_id != source)
+        {
+            return Err(OverwriteRefusal::blocked(
+                "recommission.additionalUncertainEffects",
+            ));
+        }
+        // Fingerprint the caller request, excluding the Runtime's own authority
+        // added between submit and run. The admission query pins that separately.
+        let allocation = Allocation {
+            source_job_id: source.into(),
+            source_sha256,
+            recovery_job_id: job,
+            request_fingerprint_sha256: fingerprint,
+            materialized_plan_sha256: materialized.digest.clone(),
+            artifact_sha256: materialized
+                .artifact_facts
+                .get("artifactSha256")
+                .cloned()
+                .ok_or_else(|| {
+                    OverwriteRefusal::blocked("recommission.immutableArtifactMissing")
+                })?,
+            uncertain_effect_set_sha256: context.uncertain_effect_set_sha256.clone(),
+            identity_chain: chain.clone(),
+            reserved_at_epoch_ms: 0,
+            expires_at_epoch_ms: 0,
+        };
+        context.recommission = Some(
+            self.reserve_recommission(allocation, now)
+                .map_err(blocked)?,
+        );
+        Ok(OverwriteAdmission::Recovery { context })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn overwrite_admission(
+        &self,
+        capabilities: &CapabilityStore,
+        reference: &str,
+        inputs: &Value,
+        identity: &str,
+        binding: i64,
+        now: &str,
+        retained_source: Option<&str>,
+        recommission_job: Option<&str>,
+    ) -> Result<OverwriteAdmission, OverwriteRefusal> {
         if identity.is_empty() || binding <= 0 {
             return Err(OverwriteRefusal::blocked(
                 "completeOverwriteRecovery.identityOrBindingMissing",
@@ -464,8 +610,14 @@ impl JobStore {
         let epochs = self
             .recovery_epochs()
             .map_err(|error| OverwriteRefusal::Failed(format!("{error:?}")))?;
-        let unresolved =
-            self.unresolved_destructive_intents(capabilities, identity, binding, &epochs)?;
+        let unresolved = self.unresolved_destructive_intents(
+            capabilities,
+            identity,
+            binding,
+            &epochs,
+            retained_source,
+            recommission_job,
+        )?;
         if unresolved.is_empty() {
             return Ok(OverwriteAdmission::Ordinary);
         }
@@ -516,16 +668,18 @@ impl JobStore {
                 "completeOverwriteRecovery.invalidHistoricalTimestamp",
             ));
         };
-        if let Some(historical) = self.historical_recovery(
-            &unresolved,
-            latest,
-            reference,
-            &contract,
-            profile,
-            &expected,
-            identity,
-            binding,
-        )? {
+        if retained_source.is_none()
+            && let Some(historical) = self.historical_recovery(
+                &unresolved,
+                latest,
+                reference,
+                &contract,
+                profile,
+                &expected,
+                identity,
+                binding,
+            )?
+        {
             let epoch = append_recovery_epoch(&self.root, &historical)
                 .map_err(|error| OverwriteRefusal::Failed(format!("{error:?}")))?;
             return Ok(OverwriteAdmission::Recognized(Box::new(epoch)));
@@ -535,7 +689,7 @@ impl JobStore {
         let now = date(now).ok_or_else(expired)?;
         // POL-AGENT-002 gives every recovery the same hard window. A named
         // campaign, including an empty legacy value, is never an extension.
-        if now - started >= FOUR_HOURS {
+        if retained_source.is_none() && now - started >= FOUR_HOURS {
             return Err(expired());
         }
         let prior = epochs
@@ -547,7 +701,11 @@ impl JobStore {
                         .is_some_and(|established| now - established < FOUR_HOURS)
             })
             .count();
-        let ordinal = unresolved.len() + prior + 1;
+        let ordinal = if retained_source.is_some() {
+            1
+        } else {
+            unresolved.len() + prior + 1
+        };
         if ordinal > EPOCH_BUDGET {
             return Err(OverwriteRefusal::blocked(
                 "completeOverwriteRecovery.sharedEpochBudgetExhausted",
@@ -558,14 +716,15 @@ impl JobStore {
             .flat_map(|intent| intent.possible_effects.iter().cloned())
             .collect();
         Ok(OverwriteAdmission::Recovery {
-            context: RecoveryContext {
+            context: Box::new(RecoveryContext {
                 uncertain_effect_set_sha256: effect_digest(&uncertain),
                 covered_intents: unresolved,
                 coverage_contract_version: contract.version.clone(),
                 covered_effect_set_sha256: effect_digest(covered),
                 profile_reference: profile.to_owned(),
                 destructive_epoch_ordinal: ordinal as i64,
-            },
+                recommission: None,
+            }),
         })
     }
 
@@ -581,11 +740,15 @@ impl JobStore {
         identity: &str,
         binding: i64,
         epochs: &[RecoveryEpoch],
+        retained_source: Option<&str>,
+        recommission_job: Option<&str>,
     ) -> Result<Vec<SupersededIntent>, OverwriteRefusal> {
         let jobs = self.jobs_path();
         let mut unresolved = Vec::new();
         let mut journaled: BTreeSet<String> = BTreeSet::new();
-        for name in job_directories(&jobs).unwrap_or_default() {
+        for name in job_directories(&jobs).ok_or_else(|| {
+            OverwriteRefusal::blocked("completeOverwriteRecovery.historicalCensusUnavailable")
+        })? {
             let directory = jobs.join(&name);
             // A record the scan cannot read is one it cannot clear.
             let record = match recorded(&directory) {
@@ -607,6 +770,26 @@ impl JobStore {
             if facts.has_torn_tail {
                 return Err(OverwriteRefusal::blocked(
                     "completeOverwriteRecovery.tornHistoricalJournal",
+                ));
+            }
+            if recommission_job == Some(record.job_id.as_str())
+                && facts.outstanding_intents.is_empty()
+                && facts.unknown_outcomes.is_empty()
+                && !record.outcome_unknown()
+            {
+                continue;
+            }
+            if retained_source.is_some()
+                && retained_source != Some(record.job_id.as_str())
+                && (!crate::job_record::terminal(&record.state)
+                    || facts
+                        .outstanding_intents
+                        .iter()
+                        .any(|intent| intent.effect != "readOnly" && intent.effect != "hostOnly")
+                    || !facts.unknown_outcomes.is_empty())
+            {
+                return Err(OverwriteRefusal::blocked(
+                    "recommission.additionalUnresolvedJob",
                 ));
             }
             let inputs = &record.request["inputs"];
@@ -634,14 +817,16 @@ impl JobStore {
                 continue;
             }
             journaled.insert(record.job_id.clone());
-            if events.iter().any(|event| {
-                event["kind"] == "stateTransition"
-                    && matches!(
-                        event["payload"]["to"].as_str(),
-                        Some("cancelRequested" | "userAbandonRequested")
-                    )
-                    && event["payload"]["from"].as_str().is_some()
-            }) {
+            if retained_source != Some(record.job_id.as_str())
+                && events.iter().any(|event| {
+                    event["kind"] == "stateTransition"
+                        && matches!(
+                            event["payload"]["to"].as_str(),
+                            Some("cancelRequested" | "userAbandonRequested")
+                        )
+                        && event["payload"]["from"].as_str().is_some()
+                })
+            {
                 return Err(OverwriteRefusal::blocked(
                     "completeOverwriteRecovery.explicitCancellationPending",
                 ));
@@ -875,6 +1060,14 @@ impl JobStore {
         };
         let evidence = record.admission_evidence().ok_or_else(lacking)?;
         let recovery = RecoveryContext::from_evidence(evidence).ok_or_else(lacking)?;
+        if let Some(allocation) = &recovery.recommission {
+            if record.operation() != RECOMMISSION || allocation.recovery_job_id != record.job_id {
+                return Err(lacking());
+            }
+            self.require_recommission_postflight(allocation)?;
+        } else if record.operation() == RECOMMISSION {
+            return Err(lacking());
+        }
         let contract = Contract::of(reference)
             .filter(|contract| contract.version == recovery.coverage_contract_version)
             .ok_or_else(lacking)?;
@@ -967,6 +1160,14 @@ impl JobStore {
         let Some(recovery) = RecoveryContext::from_evidence(evidence) else {
             return Ok(None);
         };
+        if record.operation() == RECOMMISSION
+            && recovery.recommission.as_ref().is_none_or(|allocation| {
+                allocation.recovery_job_id != record.job_id
+                    || self.require_recommission_postflight(allocation).is_err()
+            })
+        {
+            return Ok(None);
+        }
         let Some(contract) = Contract::of(record.operation())
             .filter(|contract| contract.version == recovery.coverage_contract_version)
         else {

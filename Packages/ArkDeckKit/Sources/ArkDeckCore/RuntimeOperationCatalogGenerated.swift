@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
+  public static let catalogDigest = "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -515,6 +515,59 @@ extension RuntimeOperationCatalog {
         CatalogFieldDescriptor(name: "deviceProfileRef", type: .string, isRequired: true, enumValues: ["dayu200"], summary: "Published device profile reference selected after target admission; DAYU200 is the currently published profile."),
         CatalogFieldDescriptor(name: "intent", type: .string, isRequired: true, enumValues: ["fullRestore"], summary: "Closed restore intent. It requests the profile's complete overwrite contract and cannot name partitions, addresses or tools."),
         CatalogFieldDescriptor(name: "verification", type: .string, isRequired: false, enumValues: ["basic", "full"], summary: "Post-restore verification depth. `full` additionally captures bounded diagnostics after required readback and rebind checks.", defaultValue: .string("full"))
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "flashReport", type: .artifactReference, isRequired: true),
+        CatalogFieldDescriptor(name: "postFlashFacts", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "verify-image-bundle", kind: .verifyArtifact, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "hash-images", kind: .hashFile, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "confirm-flash-intent", kind: .requestConfirmation, effect: .hostOnly, cancellation: .immediate, binding: .none, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "enter-loader-mode", kind: .enterUpdater, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "wait-loader-disconnect", kind: .waitForDisconnect, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "wait-loader-reconnect", kind: .waitForReconnect, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "rebind-loader-identity", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "flash-partitions", kind: .flashPartition, effect: .destructive, cancellation: .criticalNonInterruptible, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "verify-flash-readback", kind: .verifyRemoteState, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "reboot-device", kind: .rebootDevice, effect: .deviceMutation, cancellation: .atSafeBoundary, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "wait-for-hdc", kind: .waitForReconnect, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "rebind-and-verify-build", kind: .probeDevice, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "capture-post-flash-diagnostics", kind: .captureRemoteStdout, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: true, compensation: .none, actionReference: CatalogActionReference(catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")),
+        CatalogStepDescriptor(stepID: "finalize-session", kind: .finalizeSession, effect: .hostOnly, cancellation: .atSafeBoundary, binding: .none, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 1800,
+      outputByteBudget: 134217728,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "flash-report.json", role: .derived, mediaType: "application/json", privacy: .standard, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "post-flash-facts.json", role: .raw, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default),
+        CatalogArtifactDescriptor(name: "post-flash-hilog.txt", role: .raw, mediaType: "text/plain", privacy: .sensitive, isRequired: false, retentionClass: .default)
+      ],
+      profiles: ["dayu200"],
+      completeOverwriteRecovery: CatalogCompleteOverwriteRecoveryDescriptor(
+        contractVersion: "1.0.0",
+        profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200", coveredEffects: ["partition:uboot", "partition:resource", "partition:boot_linux", "partition:ramdisk", "partition:system", "partition:vendor", "partition:updater", "partition:chip_ckm", "partition:userdata"])],
+        overwriteStepID: "flash-partitions",
+        verificationStepIDs: ["verify-flash-readback", "reboot-device", "wait-for-hdc", "rebind-and-verify-build"])
+    ),
+    CatalogOperationDescriptor(
+      id: "flash.recommission",
+      version: 1,
+      title: "Recommission one expired archived unknown DAYU200 with an independent recovery budget and verified hardware identity chain",
+      provider: .arkforge,
+      minimumEffect: .destructive,
+      permittedEffects: [.destructive],
+      authorization: [.destructive: .runtimeCapability],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "artifactLease", type: .artifactLease, isRequired: true, summary: "Trusted full-restore image bundle lease; Runtime resolves immutable Artifact bytes before authorization."),
+        CatalogFieldDescriptor(name: "deviceProfileRef", type: .string, isRequired: true, enumValues: ["dayu200"], summary: "Published device profile reference selected after target admission; DAYU200 is the currently published profile."),
+        CatalogFieldDescriptor(name: "intent", type: .string, isRequired: true, enumValues: ["fullRestore"], summary: "Closed restore intent. It requests the profile's complete overwrite contract and cannot name partitions, addresses or tools."),
+        CatalogFieldDescriptor(name: "retainedJobId", type: .string, isRequired: true, summary: "One completed retained-risk archive. Runtime validates its unchanged history, expiry and complete uncertain-effect coverage; callers provide no proof or budget."),
+        CatalogFieldDescriptor(name: "verification", type: .string, isRequired: true, enumValues: ["full"], summary: "Full readback, reboot, build and hardware identity-chain verification are mandatory.", defaultValue: .string("full"))
       ],
       outputs: [
         CatalogFieldDescriptor(name: "flashReport", type: .artifactReference, isRequired: true),

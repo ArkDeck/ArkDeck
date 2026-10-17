@@ -35,6 +35,7 @@ struct RuntimeOperationCatalogTests {
         "deploy.native-library.app-owned@1",
         "flash.dayu200",
         "flash.full-restore@1",
+        "flash.recommission@1",
         "input.keyboard@1",
         "input.long-press@1",
         "input.swipe@1",
@@ -243,6 +244,9 @@ struct RuntimeOperationCatalogTests {
     #expect(!ArkForgeFlashOperation.contains("flash.dayu200@1"))
     #expect(
       ArkForgeFlashOperation.containsDurableRecordReference("flash.dayu200@1"))
+    XCTAssertTrue(ArkForgeFlashOperation.containsDurableRecordReference("flash.recommission@1"))
+    XCTAssertFalse(ArkForgeFlashOperation.contains("flash.recommission@1"))
+    XCTAssertNil(ArkForgeFlashOperation.canonicalReference(for: "flash.recommission@1"))
     #expect(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore@1") != nil)
     #expect(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore") == nil)
   }

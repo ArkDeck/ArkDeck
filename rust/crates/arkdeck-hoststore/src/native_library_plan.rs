@@ -57,6 +57,7 @@ impl<'a> JobPlanner<'a> {
         };
         let now = (hdc.now)().ok_or_else(internal_failure)?;
         Ok(Materialized {
+            recommission: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts,
@@ -388,10 +389,11 @@ mod tests {
                     "published inputs keep the full original Native plan"
                 );
             } else {
-                assert_eq!(
+                assert!(matches!(
                     CATALOG_DIGEST,
                     "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
-                );
+                        | "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07"
+                ));
                 assert_ne!(
                     current_digest, historical_digest,
                     "the original plan cannot authorize the new prefix"

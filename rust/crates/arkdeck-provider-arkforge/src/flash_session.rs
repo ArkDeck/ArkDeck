@@ -363,13 +363,15 @@ impl<'a> FlashSession<'a> {
         job_id: &str,
         cursor: u64,
     ) -> Result<(), SessionError> {
-        let observation = self
-            .performer
-            .perform(request)
-            .unwrap_or_else(|error| Observation {
-                failure_reason: format!("control action did not complete: {error}"),
-                ..Observation::default()
-            });
+        let observation = if self.authority.dispatch_budget_current() {
+            self.performer.perform(request)
+        } else {
+            Err("recommission.independentBudgetExpired".into())
+        }
+        .unwrap_or_else(|error| Observation {
+            failure_reason: format!("control action did not complete: {error}"),
+            ..Observation::default()
+        });
         let receipt =
             managed_control::receipt(job_id, &request.request_id, request.action, &observation)
                 .map_err(SessionError::Receipt)?;

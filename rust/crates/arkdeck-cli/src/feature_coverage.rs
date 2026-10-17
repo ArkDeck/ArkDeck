@@ -1024,6 +1024,10 @@ impl Entry {
     ///   the Windows daemon does not yet compose, or whose answer no Windows
     ///   run has yet measured end to end.
     fn implementation_status(&self, platform: &str) -> &'static str {
+        if platform == "macos" && self.feature == "flash.recommission@1" {
+            // The legacy process lifetime cannot yet be proved on macOS.
+            return "partial";
+        }
         match (platform, self.classification.as_str()) {
             ("macos", "blocked") => "partial",
             ("macos", _) => "implemented",
@@ -1221,6 +1225,11 @@ fn entries(methods: &[&str]) -> Vec<Entry> {
         };
         if let Some(alias) = alias {
             entry.note = Some(format!("alias of {alias}"));
+        }
+        if reference == "flash.recommission@1" {
+            entry.note = Some(
+                "Windows Runtime only; macOS lacks the historical process-lifetime proof".into(),
+            );
         }
         entries.push(entry);
     }
@@ -1508,11 +1517,30 @@ mod tests {
     #[test]
     fn app_mapping_does_not_change_any_non_app_platform_scope_or_status() {
         let document = document();
+        let recommission: Vec<_> = document["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == "flash.recommission@1")
+            .collect();
+        let added = arkdeck_contract::CATALOG_DIGEST
+            == "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07";
+        assert_eq!(recommission.len(), usize::from(added));
+        if let [entry] = recommission.as_slice() {
+            assert_eq!(entry["source"], "catalog:flash.recommission@1");
+            assert_eq!(entry["classification"], "generic");
+            assert_eq!(entry["requiredPlatforms"], json!(PLATFORMS));
+            assert_eq!(
+                entry["implementationStatusByPlatform"],
+                json!({"macos":"partial", "windows":"partial"})
+            );
+        }
         let rows: Vec<_> = document["entries"]
             .as_array()
             .unwrap()
             .iter()
             .filter(|entry| !entry["source"].as_str().unwrap().starts_with("app:"))
+            .filter(|entry| entry["feature"] != "flash.recommission@1")
             .map(|entry| {
                 json!({
                     "feature": entry["feature"],

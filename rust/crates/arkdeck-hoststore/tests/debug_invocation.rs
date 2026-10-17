@@ -292,7 +292,7 @@ impl Replay {
     fn answer(&self, setup: &Value, method: &str, params: &Map<String, Value>) -> Value {
         let target = self.cases["targetId"].as_str().unwrap();
         let flash = planning(setup);
-        let port = |_: &str| facts(setup, target);
+        let port = |_: &str, _: bool| facts(setup, target);
         let engine = self.root.0.join("engine");
         let planner = FlashPlanner {
             planner: JobPlanner {

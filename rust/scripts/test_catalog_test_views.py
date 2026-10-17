@@ -162,6 +162,27 @@ class CoverageReceipts(unittest.TestCase):
 
 
 class ClosedSources(unittest.TestCase):
+    def test_recommission_catalog_is_one_exact_addition_and_rejects_drift(self):
+        rust = Path(__file__).resolve().parents[1]
+        rows = [json.loads(path.read_bytes()) for path in sorted((rust.parent / 'Catalog/operations').glob('*.json'))]
+        self.assertEqual(views.catalog_table_digest(rust, rows), views.RECOMMISSION)
+        _, previous = views.catalogs(rust)
+        unchanged = [row for row in rows if row['id'] != 'flash.recommission']
+        self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row for row in unchanged}, previous)
+        for changed in (rows[:-1], rows + [rows[0]], copy.deepcopy(rows)):
+            if len(changed) == len(rows):
+                next(row for row in changed if row['id'] == 'flash.recommission')['retry']['mutationAttempts'] = 2
+            with self.assertRaises(ValueError):
+                views.catalog_table_digest(rust, changed)
+
+    def test_new_operation_cases_run_only_in_the_exact_catalog_that_declares_it(self):
+        row = {'route': 'mixed', 'functions': {'old': 'historical', 'shared': 'both',
+               'new': 'recommission', 'e4': 'current', 'frozen': 'legacy'}}
+        names = ['e4', 'frozen', 'new', 'old', 'shared']
+        self.assertEqual(views.selected(row, names, views.OLD), ['frozen', 'old', 'shared'])
+        self.assertEqual(views.selected(row, names, views.CURRENT), ['e4', 'frozen', 'shared'])
+        self.assertEqual(views.selected(row, names, views.RECOMMISSION), ['new', 'shared'])
+
     def setUp(self):
         self.base = Path(tempfile.mkdtemp(prefix='arkdeck-test-catalog-views-')).resolve()
         self.assertEqual(self.base.parent, Path(tempfile.gettempdir()).resolve())
@@ -174,7 +195,7 @@ class ClosedSources(unittest.TestCase):
             'manifest_path': str(self.rust / 'crates/demo/Cargo.toml'), 'targets': [{
                 'name': 'positive', 'kind': ['test'], 'test': True}]}]}
         self.manifest = {'schemaVersion': 'arkdeck.catalog-test-views/1',
-                         'catalogs': [views.OLD, views.CURRENT],
+                         'catalogs': views.CATALOGS,
                          'sources': views.source_inventory(self.rust),
                          'fixtures': views.fixture_inventory(self.rust),
                          'targets': {'demo/positive': {

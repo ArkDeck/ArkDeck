@@ -119,7 +119,8 @@ mod tests {
             "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036" => {
                 Ok(recorded.clone())
             }
-            "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7" => {
+            "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
+            | "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07" => {
                 let old = recorded["steps"]
                     .as_array()
                     .ok_or("historical Native steps")?;

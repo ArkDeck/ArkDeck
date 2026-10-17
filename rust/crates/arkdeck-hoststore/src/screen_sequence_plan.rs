@@ -48,6 +48,7 @@ impl<'a> JobPlanner<'a> {
             "stableTargetIdentitySHA256": facts.identity, "bindingRevision": facts.binding_revision,
             "providerID": descriptor.provider, "steps": steps});
         Ok(Materialized {
+            recommission: None,
             _import_use: None,
             _workspace_use: None,
             artifact_facts: BTreeMap::new(),

@@ -69,13 +69,13 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row
                           for row in operations.values()}, self.old)
         self.assertEqual(historical.directories, before.directories)
-        self.assertEqual(set(historical.files), set(before.files))
-        allowed = set(operations) | {MATRIX}
+        self.assertEqual(set(historical.files), set(before.files) - {"Catalog/operations/flash.recommission.v1.json"})
+        allowed = set(operations) | {MATRIX, "Catalog/profiles/dayu200.json", "Catalog/operations/flash.recommission.v1.json"}
         for path, data in before.files.items():
             if path not in allowed:
                 self.assertEqual(historical.files[path], data, path)
                 self.assertEqual(historical.blobs[path], before.blobs[path], path)
-        for path in allowed:
+        for path in allowed & historical.files.keys():
             self.assertEqual(historical.blobs[path], blob(historical.files[path]), path)
         self.assertEqual(self.inputs, before, 'the caller snapshot must remain immutable')
         actual_info = runner.contract.baseline(historical)
@@ -84,12 +84,27 @@ class HistoricalCatalogInputs(unittest.TestCase):
 
     def test_historical_matrix_is_the_full_official_generation(self):
         historical = runner.historical_catalog_inputs(self.inputs)
-        profiles = [json.loads(data) for path, data in self.inputs.files.items()
+        profiles = [json.loads(data) for path, data in historical.files.items()
                     if path.startswith('Catalog/profiles/') and path.endswith('.json')]
         generator = runner.load_module('historical_catalog_expected_generator',
                                       self.base / 'scripts/catalog_gen/generate.py')
         expected = generator.generate_matrix(list(self.old.values()), profiles, views.OLD).encode()
         self.assertEqual(historical.files[MATRIX], expected)
+
+    def test_e4_oracles_keep_their_exact_catalog_after_recommission_is_published(self):
+        observed = runner.historical_catalog_inputs(self.inputs, views.CURRENT)
+        operations = self.operation_paths(observed)
+        self.assertEqual(len(operations), 32)
+        self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row
+                          for row in operations.values()}, self.new)
+        self.assertEqual(runner.contract.baseline(observed)['catalogDigest'], views.CURRENT)
+        self.assertFalse(runner.historical_workspace_covers(self.inputs, observed))
+        self.assertTrue(runner.historical_workspace_covers(observed, observed))
+        self.assertEqual(runner.historical_catalog_inputs(observed, views.CURRENT), observed)
+        projected = runner.historical_review_projection(self.projection, views.CURRENT)
+        self.assertEqual(projected, self.projection.replace(views.RECOMMISSION.encode(), views.CURRENT.encode()))
+        with self.assertRaises(ValueError):
+            runner.historical_catalog_inputs(self.inputs, views.RECOMMISSION)
 
     def test_materialized_development_baseline_pins_its_actual_selected_bytes(self):
         historical = runner.historical_catalog_inputs(self.inputs)
@@ -184,15 +199,15 @@ class HistoricalCatalogInputs(unittest.TestCase):
 
     def test_projection_changes_only_its_single_exact_catalog_occurrence(self):
         result = runner.historical_review_projection(self.projection)
-        self.assertEqual(result, self.projection.replace(views.CURRENT.encode(), views.OLD.encode()))
+        self.assertEqual(result, self.projection.replace(views.RECOMMISSION.encode(), views.OLD.encode()))
         self.assertEqual(result.count(views.OLD.encode()), 1)
-        self.assertNotIn(views.CURRENT.encode(), result)
+        self.assertNotIn(views.RECOMMISSION.encode(), result)
         self.assertEqual(runner.historical_review_projection(result), result)
 
     def test_unknown_missing_duplicate_or_mixed_projection_catalog_refuses(self):
-        for value in [self.projection.replace(views.CURRENT.encode(), b'0' * 64),
-                      self.projection.replace(views.CURRENT.encode(), b''),
-                      self.projection + views.CURRENT.encode(),
+        for value in [self.projection.replace(views.RECOMMISSION.encode(), b'0' * 64),
+                      self.projection.replace(views.RECOMMISSION.encode(), b''),
+                      self.projection + views.RECOMMISSION.encode(),
                       self.projection + views.OLD.encode()]:
             with self.subTest(value_length=len(value)), self.assertRaises(ValueError):
                 runner.historical_review_projection(value)
