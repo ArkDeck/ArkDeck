@@ -40,8 +40,8 @@ pub use framing::{
 pub use job_state_preflight::{
     CutoverBlock, CutoverExecution, CutoverJob, CutoverUse, JOB_STATE_PREFLIGHT_TABLE,
     JobStateClass, LoaderTransition, MalformedCurrentJob, RestartPreflight, agent_execution_active,
-    capability_use_unsettled, classify_restart, cutover_job_class, cutover_preflight,
-    job_state_class, job_states,
+    capability_use_unsettled, classify_restart, classify_restart_with_archive_previews,
+    cutover_job_class, cutover_preflight, job_state_class, job_states,
 };
 pub use schema::validate_method_value;
 

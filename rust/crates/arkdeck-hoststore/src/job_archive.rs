@@ -1257,6 +1257,17 @@ mod tests {
             assert!(f.jobs.recovery_epochs().unwrap().is_empty());
             let again = archive.preview(&params()).unwrap();
             assert_eq!(again["mode"], "finishPublication");
+            let restart = arkdeck_contract::classify_restart_with_archive_previews(
+                &[after.status()],
+                &std::collections::BTreeMap::from([(ID.to_owned(), again.clone())]),
+            )
+            .unwrap();
+            assert!(restart.blocking_job_ids.is_empty());
+            assert_eq!(restart.preserved_unknown_job_ids, [ID]);
+            assert_eq!(
+                restart.preserved_archive_review_sha256s[ID],
+                again["reviewSha256"]
+            );
             let mut different = decision(&again);
             different.insert("userConfirmationId".into(), json!("another-decision"));
             assert!(archive.archive(&different).is_err());

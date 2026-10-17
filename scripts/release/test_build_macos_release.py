@@ -274,6 +274,14 @@ class Fixture(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.bin = self.root / "tools"
         self.bin.mkdir()
+        # git status on this checkout runs the LFS clean filter. The fixture
+        # PATH is only these stand-in tools plus /usr/bin, and the macOS runner
+        # keeps git-lfs outside /usr/bin. Expose that binary alone.
+        lfs = shutil.which("git-lfs")
+        if lfs:
+            shim = self.bin / "git-lfs"
+            shim.write_text("#!/bin/sh\nexec " + shlex.quote(lfs) + ' "$@"\n')
+            shim.chmod(0o700)
         self.tmp = self.root / "tmp"
         self.tmp.mkdir()
         (self.root / "state").mkdir()

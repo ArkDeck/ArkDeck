@@ -488,9 +488,17 @@ fn job_preflight(
             break;
         }
     }
-    arkdeck_contract::classify_restart(&current)
-        .map(Some)
-        .map_err(|_| PlainFailure::new(69, "daemon returned a malformed current Runtime Job"))
+    crate::runtime_service_preflight::classify(&current, |job_id| {
+        client
+            .request(
+                id,
+                "job.archive.preview",
+                Some(Map::from_iter([("jobId".into(), json!(job_id))])),
+            )
+            .map_err(|error| format!("Runtime archive proof unavailable: {error}"))
+    })
+    .map(Some)
+    .map_err(|error| PlainFailure::new(69, error))
 }
 
 // MARK: - Leaves
@@ -849,14 +857,10 @@ pub fn restart_leaf(
             ));
         }
         let jobs_after = job_preflight(&mut client, id)?;
-        let closed = |jobs: &Option<arkdeck_contract::RestartPreflight>| {
-            jobs.as_ref()
-                .map(|jobs| jobs.preserved_unknown_job_ids.clone())
-        };
         if jobs_after
             .as_ref()
             .is_some_and(|jobs| !jobs.blocking_job_ids.is_empty())
-            || closed(&jobs_after) != closed(&jobs_before)
+            || jobs_after != jobs_before
         {
             return Err(PlainFailure::new(
                 69,
@@ -899,7 +903,7 @@ pub fn restart_leaf(
                 "catalogDigestBefore": digest_before,
                 "catalogDigestAfter": digest_after,
                 "blockingJobCountBefore": 0,
-                "preservedUnknownJobIds": closed(&jobs_before).unwrap_or_default(),
+                "preservedUnknownJobIds": jobs_before.as_ref().map(|jobs| jobs.preserved_unknown_job_ids.clone()).unwrap_or_default(),
                 "jobOwner": jobs_before.is_some(),
             },
             "daemonService": after.document,

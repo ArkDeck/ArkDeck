@@ -26,9 +26,12 @@
 //! failed first; nothing installed is read or written.
 #![cfg(windows)]
 
-use arkdeck_hoststore::{JobRecord, JobStore};
+use arkdeck_hoststore::{
+    JobArchiver, JobRecord, JobStore, JournalWriter, SessionPublisher, SessionStore, StorageClaims,
+    SystemStorageProbe,
+};
 use arkdeck_platform::{HostDirectory, StateRoot};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -60,6 +63,65 @@ impl Root {
         let bytes = std::fs::read(self.0.join("instance.json")).ok()?;
         let instance: Value = serde_json::from_slice(&bytes).ok()?;
         u32::try_from(instance["pid"].as_u64()?).ok()
+    }
+    /// The real archive writer completes a synthetic expired Flash with an
+    /// outstanding intent before startup. The historical fixture has no live
+    /// capability store; its original unknown must never be re-admitted.
+    fn with_completed_retained_archive(self) -> Self {
+        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/flash-run/stories/failures/files/store/jobs")
+            .join(UNKNOWN_ID);
+        let state = self.0.join("jobs-state");
+        HostDirectory::open_or_create_private(&state).unwrap();
+        let store = JobStore::open_owner(&state).unwrap();
+        let record =
+            JobRecord::decode(&std::fs::read(source.join("job-record.json")).unwrap()).unwrap();
+        store.admit(&record, &"a".repeat(64)).unwrap();
+        let directory = state.join("jobs").join(UNKNOWN_ID);
+        HostDirectory::open_or_create_private(&state.join("jobs")).unwrap();
+        HostDirectory::open_or_create_private(&directory).unwrap();
+        let mut writer = JournalWriter::open(&directory, true).unwrap();
+        for line in std::fs::read_to_string(source.join("journal.jsonl"))
+            .unwrap()
+            .lines()
+        {
+            writer.append(&serde_json::from_str(line).unwrap()).unwrap();
+        }
+        drop(writer);
+        let at = || Some("2026-10-04T06:00:00Z".to_owned());
+        store.persist(&record, &at().unwrap()).unwrap();
+        for name in ["session-state", "sessions"] {
+            HostDirectory::open_or_create_private(&self.0.join(name)).unwrap();
+        }
+        let sessions =
+            SessionStore::open(&self.0.join("session-state"), &self.0.join("sessions")).unwrap();
+        let publisher = SessionPublisher {
+            sessions: &sessions,
+            claims: &StorageClaims::default(),
+            probe: &SystemStorageProbe,
+        };
+        let archive = JobArchiver {
+            jobs: &store,
+            now: at,
+            sessions: Some(&publisher),
+        };
+        let preview = archive
+            .preview(json!({"jobId":UNKNOWN_ID}).as_object().unwrap())
+            .unwrap();
+        assert_eq!(preview["mode"], "archiveWithHazards", "{preview}");
+        let receipt = archive
+            .archive(
+                json!({"jobId":UNKNOWN_ID,
+            "expectedReviewSha256":preview["reviewSha256"],
+            "userConfirmationId":"synthetic-original-decision"})
+                .as_object()
+                .unwrap(),
+            )
+            .unwrap();
+        assert_eq!(receipt["outcomeUnknown"], true);
+        assert_eq!(receipt["resourceReleaseAuthorized"], false);
+        assert_eq!(receipt["sessionPublished"], true, "{receipt}");
+        self
     }
     /// Swift's second start of its reconcile oracle: the Job store with its
     /// rows admitted and persisted to their recorded versions, and the
@@ -117,6 +179,80 @@ impl Root {
         }
         self
     }
+}
+
+const UNKNOWN_ID: &str = "job-7e4b6c8997b64ac9d4ab648851f2f3a5";
+
+#[test]
+fn archived_unknown_survives_real_service_restart_and_stop_with_all_bytes_preserved() {
+    let Some(thumbprint) = thumbprint() else {
+        return;
+    };
+    let _turn = turn();
+    let root = Root::new().with_completed_retained_archive();
+    let (daemon, pin) = signed_daemon(&root.0.join("signed-bin"), &thumbprint);
+    let directory = root.0.join("jobs-state/jobs").join(UNKNOWN_ID);
+    let record = std::fs::read(directory.join("job-record.json")).unwrap();
+    let journal = std::fs::read(directory.join("journal.jsonl")).unwrap();
+    let (status, preview) = cli(
+        &root,
+        &daemon,
+        &pin,
+        &["job", "archive", "preview", "--job", UNKNOWN_ID],
+    );
+    assert_eq!(status, Some(0), "{preview}");
+    assert_eq!(preview["result"]["mode"], "finishPublication", "{preview}");
+    let before = preview;
+    let previous_pid = root.instance_pid().unwrap();
+    let (status, restarted) = cli(&root, &daemon, &pin, &["runtime", "service", "restart"]);
+    assert_eq!(status, Some(0), "{restarted}");
+    assert_eq!(restarted["result"]["restart"]["stoppedPid"], previous_pid);
+    assert_ne!(root.instance_pid().unwrap(), previous_pid);
+    assert_eq!(
+        restarted["result"]["restartProof"]["preservedUnknownJobIds"],
+        json!([UNKNOWN_ID])
+    );
+    let (status, after) = cli(
+        &root,
+        &daemon,
+        &pin,
+        &["job", "archive", "preview", "--job", UNKNOWN_ID],
+    );
+    assert_eq!(status, Some(0), "{after}");
+    assert_eq!(
+        after["result"], before["result"],
+        "all hazards, archive lineage and review digest stay intact"
+    );
+    assert_eq!(
+        std::fs::read(directory.join("job-record.json")).unwrap(),
+        record,
+        "including the original expired budget"
+    );
+    assert_eq!(
+        std::fs::read(directory.join("journal.jsonl")).unwrap(),
+        journal,
+        "no replay or new intent"
+    );
+    let (status, stopped) = cli(&root, &daemon, &pin, &["runtime", "service", "uninstall"]);
+    assert_eq!(status, Some(0), "{stopped}");
+    let store = JobStore::open_owner(&root.0.join("jobs-state")).unwrap();
+    assert!(
+        store
+            .current_jobs()
+            .unwrap()
+            .iter()
+            .any(|job| job.job_id == UNKNOWN_ID
+                && job.outcome_unknown
+                && job.state == "interrupted")
+    );
+    assert_eq!(
+        std::fs::read(directory.join("job-record.json")).unwrap(),
+        record
+    );
+    assert_eq!(
+        std::fs::read(directory.join("journal.jsonl")).unwrap(),
+        journal
+    );
 }
 impl Drop for Root {
     fn drop(&mut self) {

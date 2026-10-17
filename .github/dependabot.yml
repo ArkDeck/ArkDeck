@@ -1,0 +1,48 @@
+# Version-update PRs. Secret scanning, push protection, and Dependabot
+# security updates are repository settings; this file does not enable them.
+# pip is omitted: the only pin file is scripts/requirements-sdd.txt, which
+# Dependabot's pip ecosystem does not scan (it looks for requirements.txt,
+# a Pipfile, or pyproject.toml).
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /rust
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: swift
+    directory: /Packages/ArkDeckKit
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: swift
+    directory: /ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: nuget
+    directory: /windows
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: nuget
+    directory: /windows/spikes/spk4
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: npm
+    directory: /docs/design/arkdeck-ds
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

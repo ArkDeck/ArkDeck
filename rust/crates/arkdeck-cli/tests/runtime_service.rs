@@ -1650,6 +1650,103 @@ fn restart_fails_when_the_current_job_closure_changes_across_it() {
     );
 }
 
+fn retained_archive(service: &Restartable) -> Value {
+    let mut row = closed_unknown("job-archived");
+    row["state"] = json!("interrupted");
+    row["operation"] = json!("flash.full-restore@1");
+    row["actualEffect"] = json!("destructive");
+    row["sessionPublication"] = json!({"state":"published", "manifestSha256":"b".repeat(64),
+        "catalogGeneration":"1", "reasonCode":null});
+    service.runtime.page("", page(vec![row], None));
+    json!({"jobId":"job-archived", "operation":"flash.full-restore@1",
+        "targetId":"TGT-PAGED-WIRE", "sessionId":"session-job-archived",
+        "state":"interrupted", "outcomeUnknown":true, "canArchive":true,
+        "mode":"finishPublication", "blockers":[], "resourceReleaseAuthorized":false,
+        "userConfirmationId":"original-archive-decision", "reviewSha256":"a".repeat(64),
+        "lastConfirmedStepId":null, "retainedHazards":["deviceOutcomeUnknown",
+            "managedHostProcessStateUnknown", "runtimeCapabilityLineageRetained"]})
+}
+
+#[test]
+fn restart_preserves_a_completed_archive_and_refuses_record_or_journal_drift() {
+    for drift in [false, true] {
+        let service = restartable();
+        let proof = retained_archive(&service);
+        service
+            .runtime
+            .answer("job.archive.preview", json!({"ok":true, "result":proof}));
+        if drift {
+            let previous = service.launchd.on_bootstrap.lock().unwrap().take().unwrap();
+            *service.launchd.on_bootstrap.lock().unwrap() = Some(Box::new({
+                let state = service.runtime.state.clone();
+                move || {
+                    previous();
+                    state
+                        .lock()
+                        .unwrap()
+                        .answers
+                        .get_mut("job.archive.preview")
+                        .unwrap()["result"]["reviewSha256"] = json!("c".repeat(64));
+                }
+            }));
+        }
+        let answer = service.restart(None);
+        if drift {
+            assert_eq!(
+                answer.failure,
+                Some(PlainFailure {
+                    exit_code: 69,
+                    message: "Runtime current Job closure changed across daemon restart".into()
+                })
+            );
+        } else {
+            assert_eq!(answer.failure, None);
+            assert_eq!(
+                answer.document.unwrap()["restartProof"]["preservedUnknownJobIds"],
+                json!(["job-archived"])
+            );
+        }
+        assert_eq!(
+            service
+                .runtime
+                .methods()
+                .iter()
+                .filter(|method| *method == "job.archive.preview")
+                .count(),
+            2
+        );
+        assert!(!service.runtime.methods().iter().any(|method| matches!(
+            method.as_str(),
+            "job.archive" | "job.reconcile" | "agent.run"
+        )));
+    }
+}
+
+#[test]
+fn restart_does_not_stop_the_service_without_a_complete_archive_proof() {
+    for (field, value) in [
+        ("mode", json!("finishAudit")),
+        ("canArchive", json!(false)),
+        ("resourceReleaseAuthorized", json!(true)),
+        ("retainedHazards", json!([])),
+    ] {
+        let service = restartable();
+        let mut proof = retained_archive(&service);
+        proof[field] = value;
+        service
+            .runtime
+            .answer("job.archive.preview", json!({"ok":true,"result":proof}));
+        let answer = service.restart(None);
+        assert_eq!(answer.failure.unwrap().exit_code, 75, "{field}");
+        assert!(
+            !service
+                .launchd_verbs()
+                .iter()
+                .any(|verb| matches!(verb.as_str(), "bootout" | "bootstrap"))
+        );
+    }
+}
+
 // MARK: - update, install and uninstall
 
 /// How a helper's daemon answers `--cutover-preflight`: Swift's refuses the
