@@ -1524,7 +1524,7 @@ mod tests {
             .filter(|entry| entry["feature"] == "flash.recommission@1")
             .collect();
         let added = arkdeck_contract::CATALOG_DIGEST
-            == "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07";
+            == "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080";
         assert_eq!(recommission.len(), usize::from(added));
         if let [entry] = recommission.as_slice() {
             assert_eq!(entry["source"], "catalog:flash.recommission@1");
@@ -1541,6 +1541,18 @@ mod tests {
             .iter()
             .filter(|entry| !entry["source"].as_str().unwrap().starts_with("app:"))
             .filter(|entry| entry["feature"] != "flash.recommission@1")
+            // Preserve the original non-App contract; maintenance adds two new leaves.
+            .filter(|entry| {
+                !matches!(
+                    entry["feature"].as_str(),
+                    Some(
+                        "flash.verify@1"
+                            | "flash.restore-boot-loop@1"
+                            | "flash.verify"
+                            | "flash.restore-boot-loop"
+                    )
+                )
+            })
             .map(|entry| {
                 json!({
                     "feature": entry["feature"],

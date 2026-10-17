@@ -690,7 +690,7 @@ def main() -> int:
     output = os.environ.get("ARKDECK_RUST_TEST_REPORT_DIR")
     # Checkout / published / candidate use separate reports as well as targets.
     name = os.environ.get("ARKDECK_RUST_TEST_VIEW", "checkout")
-    if name not in ("checkout", "published", "candidate", "historical"):
+    if name not in ("checkout", "published", "candidate", "historical", "observed"):
         raise ValueError("invalid Rust test view")
     if workers not in (1, 2):
         raise ValueError('workspace test workers must be 1 or 2')

@@ -56,6 +56,8 @@ class RealCatalogTests(unittest.TestCase):
                 "flash.dayu200",
                 "flash.full-restore@1",
                 "flash.recommission@1",
+                "flash.restore-boot-loop@1",
+                "flash.verify@1",
                 "input.keyboard@1",
                 "input.long-press@1",
                 "input.swipe@1",

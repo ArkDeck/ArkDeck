@@ -214,7 +214,7 @@ fixture 不连接 Runtime，不构成真机证明。真实运行与独立核验�
 - [Workspace chrome](../../ArkDeckApp/DesignSystem/WorkspaceChrome.swift)、[执行模式徽章](../../ArkDeckApp/DesignSystem/RuntimeExecutionModeBadge.swift)
 - [Device detail / trust](../../ArkDeckApp/Features/Devices/DeviceWorkspace.swift)
 - [Overview record](../../ArkDeckApp/Features/Overview/OverviewRecordView.swift)、[Resume sheet](../../ArkDeckApp/Features/Overview/OverviewResumeSheet.swift)、[HDC / impact](../../ArkDeckApp/Features/HDC/HDCStatusView.swift)
-- [Flash workspace](../../ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)
+- [Flash workspace](../../ArkDeckApp/Features/Flash/FlashWorkspaceView.swift)、[plan](../../ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift)、[runtime activity](../../ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift)、[maintenance controls](../../ArkDeckApp/Features/Flash/FlashMaintenanceView.swift)、[maintenance result](../../ArkDeckApp/Features/Flash/FlashMaintenanceResultView.swift)
 - [Debug 五标签与 sheets](../../ArkDeckApp/Features/Debug/DebugWorkspaceView.swift)
 - [Viewer 五 Inspector](../../ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift)
 - [Trace workspace](../../ArkDeckApp/Features/Trace/TraceWorkspaceView.swift)、[configuration](../../ArkDeckApp/Features/Trace/TraceConfigurationView.swift)、[artifacts](../../ArkDeckApp/Features/Trace/TraceProgressArtifactsView.swift)、[Viewer / Help / Trace Settings](../../ArkDeckApp/Features/Trace/TraceViewerWorkspaceView.swift)、[Trace 标记编辑器](../../ArkDeckApp/Features/Trace/TraceFlagDraftEditor.swift)、[标记标签编辑器](../../ArkDeckApp/Features/Trace/TraceFlagTagEditor.swift)

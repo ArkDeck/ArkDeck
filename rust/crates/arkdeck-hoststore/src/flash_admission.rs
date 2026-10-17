@@ -73,6 +73,44 @@ impl FlashAdmitter<'_> {
     pub fn submit(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
         let request = OperationRequest::decode(request_json)
             .map_err(|rejection| refused(rejection.code.wire_code(), rejection.message))?;
+        if request.reference() != "flash.restore-boot-loop@1" {
+            return self.submit_inner(request_json);
+        }
+        let descriptor = CatalogOperation::lookup(&request.operation_id, request.operation_version)
+            .ok_or_else(|| refused("operationUnavailable", "maintenance operation unavailable"))?;
+        JobPlanner::validate_inputs(&request, descriptor)?;
+        let stop = |id: String, message: String| {
+            refused(
+                "rejected",
+                format!("restoration stopped (exit 1); record {id}: {message}; no blind retry"),
+            )
+        };
+        if let Some((id, message)) = self
+            .admitter
+            .jobs
+            .maintenance_stop(&request, None)
+            .map_err(|_| uncertain())?
+        {
+            return Err(stop(id, message));
+        }
+        match self.submit_inner(request_json) {
+            Ok(value) => Ok(value),
+            Err(error) if error.proven => {
+                let (id, reason) = self
+                    .admitter
+                    .jobs
+                    .maintenance_stop(&request, Some(&error.message))
+                    .map_err(|_| uncertain())?
+                    .ok_or_else(uncertain)?;
+                Err(stop(id, reason))
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn submit_inner(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
+        let request = OperationRequest::decode(request_json)
+            .map_err(|rejection| refused(rejection.code.wire_code(), rejection.message))?;
         let Some(flash) = self.flash.filter(|_| is_flash(&request.reference())) else {
             return self.admitter.submit(request_json);
         };
@@ -155,8 +193,13 @@ impl FlashAdmitter<'_> {
             &sha256_hex(format!("{}\n{fingerprint}", request.idempotency_key).as_bytes())[..32]
         );
         let mut authorized = request.clone();
-        authorized.capability_id = Some(capability);
+        authorized.capability_id = (!capability.is_empty()).then_some(capability);
         let timestamp = admitter.clock()?;
+        let admission = if effect == "readOnly" {
+            Some(default_read_only(descriptor, &effect, &timestamp)?)
+        } else {
+            None
+        };
         let mut record = JobRecord::admitted(
             &job_id,
             authorized.canonical_value(),
@@ -166,7 +209,7 @@ impl FlashAdmitter<'_> {
             &descriptor.provider,
             &timestamp,
             &effect,
-            None,
+            admission,
             &materialized.digest,
         );
         record.set_materialized(materialized.identity.clone(), materialized.binding_revision);
@@ -249,6 +292,19 @@ impl FlashAdmitter<'_> {
                 &admitter.clock()?,
             )
             .map_err(|message| refused("resourceConflict", message))?;
+        if descriptor.reference() == "flash.verify@1" && effect == "readOnly" {
+            if !self.executes
+                || request.capability_id.is_some()
+                || descriptor.authorization.get("readOnly").map(String::as_str)
+                    != Some("defaultReadOnly")
+            {
+                return Err(refused(
+                    "admissionDenied",
+                    "read-only maintenance admission is unavailable",
+                ));
+            }
+            return Ok((String::new(), OverwriteAdmission::Ordinary));
+        }
         let Some(policy) = descriptor.authorization.get(effect) else {
             return Err(refused(
                 "admissionDenied",

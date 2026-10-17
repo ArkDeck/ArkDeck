@@ -13,7 +13,8 @@ use std::path::Path;
 
 pub const OLD: &str = "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036";
 pub const CURRENT: &str = "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7";
-const RECOMMISSION: &str = "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07";
+pub const RECOMMISSION: &str = "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080";
+pub const MAINTENANCE: &str = "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
 const PACKET_SHA: &str = "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab";
 const PACKET: &[u8] =
@@ -198,7 +199,7 @@ impl HapPlans {
         let catalog = actual["result"]["catalogDigest"]
             .as_str()
             .ok_or("HAP Catalog missing")?;
-        if ![CURRENT, RECOMMISSION].contains(&catalog) {
+        if ![CURRENT, MAINTENANCE, RECOMMISSION].contains(&catalog) {
             return Err("unknown HAP Catalog".into());
         }
         // The frozen capsule proves every old field before the exact additive
@@ -270,7 +271,7 @@ fn reference(operation: &Value) -> Result<String, String> {
 
 // Exactly scripts/catalog_gen/generate.py catalog_digest: sorted objects,
 // sorted operation id/version, compact JSON and ensure_ascii=True.
-fn catalog_bytes(operations: &[Value]) -> Result<Vec<u8>, String> {
+pub fn catalog_bytes(operations: &[Value]) -> Result<Vec<u8>, String> {
     let mut ordered = operations.to_vec();
     ordered.sort_by_key(|operation| {
         (
@@ -416,8 +417,22 @@ impl Lineage {
         directory: &Path,
         catalog_digest: &str,
     ) -> Result<(), String> {
+        if matches!(catalog_digest, MAINTENANCE | RECOMMISSION) {
+            let mut observed = Self::read_sources(directory)?;
+            let complete: Vec<_> = observed.values().cloned().collect();
+            if sha256_hex(&catalog_bytes(&complete)?) != catalog_digest
+                || (catalog_digest == RECOMMISSION
+                    && observed.remove("flash.recommission@1").is_none())
+                || observed.remove("flash.verify@1").is_none()
+                || observed.remove("flash.restore-boot-loop@1").is_none()
+                || observed != self.operations
+            {
+                return Err("Flash Catalog differs beyond its exact declared additions".into());
+            }
+            return Ok(());
+        }
         let expected = match catalog_digest {
-            CURRENT | RECOMMISSION => &self.operations,
+            CURRENT => &self.operations,
             OLD => &self.historical_operations,
             _ => return Err("unknown compiled Catalog view".into()),
         };
@@ -429,6 +444,13 @@ impl Lineage {
         directory: &Path,
         expected: &BTreeMap<String, Value>,
     ) -> Result<(), String> {
+        if &Self::read_sources(directory)? != expected {
+            return Err("current descriptor source drift".into());
+        }
+        Ok(())
+    }
+
+    fn read_sources(directory: &Path) -> Result<BTreeMap<String, Value>, String> {
         let mut observed = BTreeMap::new();
         for entry in fs::read_dir(directory).map_err(|_| "current Catalog source")? {
             let entry = entry.map_err(|_| "current Catalog entry")?;
@@ -447,22 +469,7 @@ impl Lineage {
                 return Err("duplicate source".into());
             }
         }
-        if &observed != expected {
-            if expected == &self.operations
-                && observed.len() == 33
-                && observed.contains_key("flash.recommission@1")
-                && expected
-                    .iter()
-                    .all(|(key, value)| observed.get(key) == Some(value))
-                && sha256_hex(&catalog_bytes(
-                    &observed.values().cloned().collect::<Vec<_>>(),
-                )?) == RECOMMISSION
-            {
-                return Ok(());
-            }
-            return Err("current descriptor source drift".into());
-        }
-        Ok(())
+        Ok(observed)
     }
 
     pub fn operation(&self, name: &str) -> Result<&Value, String> {
@@ -483,7 +490,7 @@ impl Lineage {
             .as_str()
             .ok_or("plan operation")?;
         self.operation(name)?;
-        if ![CURRENT, RECOMMISSION]
+        if ![CURRENT, MAINTENANCE, RECOMMISSION]
             .iter()
             .any(|digest| current_plan["catalogDigest"] == *digest)
         {
@@ -516,7 +523,7 @@ impl Lineage {
             || expected["ok"] != true
             || actual["result"]["schemaVersion"] != "arkdeck.job-plan/1"
             || expected["result"]["catalogDigest"] != OLD
-            || ![CURRENT, RECOMMISSION]
+            || ![CURRENT, MAINTENANCE, RECOMMISSION]
                 .iter()
                 .any(|digest| actual["result"]["catalogDigest"] == *digest)
             || actual["result"]["operation"] != current_plan["operationReference"]

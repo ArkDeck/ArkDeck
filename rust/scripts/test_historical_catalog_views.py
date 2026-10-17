@@ -34,6 +34,8 @@ class HistoricalCatalogInputs(unittest.TestCase):
         cls.packet = (cls.real_root / cls.packet_path).read_bytes()
         cls.generator = (cls.real_root / 'scripts/catalog_gen/generate.py').read_bytes()
         cls.projection = (cls.real_root / runner.REVIEW_PROJECTION).read_bytes()
+        cls.projection_digest = next(digest for digest in views.CATALOGS
+                                     if cls.projection.count(digest.encode()) == 1)
 
     def setUp(self):
         self.base = Path(tempfile.mkdtemp(prefix='arkdeck-historical-view-')).resolve()
@@ -69,10 +71,12 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row
                           for row in operations.values()}, self.old)
         self.assertEqual(historical.directories, before.directories)
-        self.assertEqual(set(historical.files), set(before.files) - {"Catalog/operations/flash.recommission.v1.json"})
-        allowed = set(operations) | {MATRIX, "Catalog/profiles/dayu200.json", "Catalog/operations/flash.recommission.v1.json"}
+        additions = {path for path, row in self.operation_paths(before).items()
+                     if f"{row['id']}@{row.get('version', 0)}" in views.ADDITIONAL_REFERENCES}
+        self.assertEqual(set(historical.files), set(before.files) - additions)
+        allowed = set(operations) | {MATRIX, "Catalog/profiles/dayu200.json"}
         for path, data in before.files.items():
-            if path not in allowed:
+            if path not in allowed | additions:
                 self.assertEqual(historical.files[path], data, path)
                 self.assertEqual(historical.blobs[path], before.blobs[path], path)
         for path in allowed & historical.files.keys():
@@ -81,6 +85,28 @@ class HistoricalCatalogInputs(unittest.TestCase):
         actual_info = runner.contract.baseline(historical)
         self.assertEqual(actual_info['catalogDigest'], views.OLD)
         self.assertNotEqual(actual_info['inputDigest'], runner.contract.baseline(before)['inputDigest'])
+
+    def test_pinned_observed_view_preserves_all_32_e4_descriptors(self):
+        before = copy.deepcopy(self.inputs)
+        observed = runner.pinned_catalog_inputs(self.inputs, views.CURRENT)
+        self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row
+                          for row in self.operation_paths(observed).values()}, self.new)
+        self.assertEqual(runner.contract.baseline(observed)['catalogDigest'], views.CURRENT)
+        self.assertEqual(self.inputs, before)
+        self.assertEqual(runner.historical_review_projection(self.projection, views.CURRENT),
+                         self.projection.replace(self.projection_digest.encode(), views.CURRENT.encode()))
+        with self.assertRaises(ValueError):
+            runner.pinned_catalog_inputs(self.inputs, views.MAINTENANCE)
+
+    def test_maintenance_descriptors_cannot_drift_under_the_declared_view(self):
+        paths = self.operation_paths(self.inputs)
+        path = next(path for path, row in paths.items() if row['id'] == 'flash.restore-boot-loop')
+        changed = copy.deepcopy(self.inputs)
+        row = copy.deepcopy(paths[path])
+        row['defaultPolicyIssuance'] = 'enabled'
+        changed.files[path] = json.dumps(row).encode()
+        with self.assertRaisesRegex(ValueError, 'Catalog descriptor drift'):
+            runner.historical_catalog_inputs(changed)
 
     def test_historical_matrix_is_the_full_official_generation(self):
         historical = runner.historical_catalog_inputs(self.inputs)
@@ -199,18 +225,43 @@ class HistoricalCatalogInputs(unittest.TestCase):
 
     def test_projection_changes_only_its_single_exact_catalog_occurrence(self):
         result = runner.historical_review_projection(self.projection)
-        self.assertEqual(result, self.projection.replace(views.RECOMMISSION.encode(), views.OLD.encode()))
+        self.assertEqual(result, self.projection.replace(self.projection_digest.encode(), views.OLD.encode()))
         self.assertEqual(result.count(views.OLD.encode()), 1)
         self.assertNotIn(views.RECOMMISSION.encode(), result)
         self.assertEqual(runner.historical_review_projection(result), result)
 
     def test_unknown_missing_duplicate_or_mixed_projection_catalog_refuses(self):
-        for value in [self.projection.replace(views.RECOMMISSION.encode(), b'0' * 64),
-                      self.projection.replace(views.RECOMMISSION.encode(), b''),
-                      self.projection + views.RECOMMISSION.encode(),
+        for value in [self.projection.replace(self.projection_digest.encode(), b'0' * 64),
+                      self.projection.replace(self.projection_digest.encode(), b''),
+                      self.projection + views.CURRENT.encode(),
                       self.projection + views.OLD.encode()]:
             with self.subTest(value_length=len(value)), self.assertRaises(ValueError):
                 runner.historical_review_projection(value)
+
+
+class ObservedCoverageReceipts(unittest.TestCase):
+    def test_only_a_completed_full_e4_workspace_receipt_can_cover_the_pinned_view(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = root / 'published/test-execution/published/catalog-execution.json'
+            with self.assertRaises(OSError):
+                runner.record_published_e4_coverage(root, 'a' * 64)
+            receipt.parent.mkdir(parents=True)
+            valid = {'catalogDigest': views.CURRENT, 'completed': True, 'integrationPackages': 'workspace',
+                     'targets': [{'execution': 'actual', 'passed': 1}]}
+            for change in ({'catalogDigest': views.MAINTENANCE}, {'completed': False},
+                           {'integrationPackages': ['arkdeck-cli']}, {'targets': []},
+                           {'targets': [{'execution': 'listed', 'passed': 1}]}):
+                receipt.write_text(json.dumps(valid | change))
+                with self.assertRaises(ValueError):
+                    runner.record_published_e4_coverage(root, 'a' * 64)
+                self.assertFalse((root / 'observed/provenance.json').exists())
+            receipt.write_text(json.dumps(valid))
+            runner.record_published_e4_coverage(root, 'a' * 64)
+            proof = json.loads((root / 'observed/provenance.json').read_text())
+            self.assertEqual(proof['coveredBy'], 'published')
+            self.assertEqual(proof['observedExecutionReceiptSHA256'], runner.contract.sha(receipt.read_bytes()))
+            self.assertFalse(proof['deviceAcceptance'])
 
 
 if __name__ == '__main__':

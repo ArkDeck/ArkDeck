@@ -15,8 +15,9 @@ publish an early alias. Provider cases reject unrelated or live historical jobs
 and clip new and cached step permits to the independent deadline.
 
 The additive Catalog is pinned as
-`d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07`.
-All 32 previous descriptors and historical request/authority fixtures remain
+`9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080`.
+After integrating main's maintenance operations from PR #2659, all 34 published
+descriptors and historical request/authority fixtures remain
 unchanged. Exact test routing retains their original Catalog views and executes
 the six new runner cases only in the Catalog that declares recommissioning.
 
@@ -153,6 +154,46 @@ No local unified gate or device operation is run.
 - Swift `RuntimeOperationCatalogTests` and native App verification require
   macOS CI; Swift/Xcode are unavailable on this Windows host.
 
+### Integration with the published maintenance operations
+
+- After merging main `1a32a7c8f`, 81 targeted Rust cases pass (each command
+  exits 0): `test -p arkdeck-hoststore --lib recommission` (10), `--lib
+  maintenance` (11), `--test flash_run recommission` (6), the exact ordinary
+  policy-refusal regression (1), CLI `--lib feature_coverage` (13), CLI
+  `--test flash_maintenance --test machine_contracts --test maintainer_contracts`
+  (17), Control's exact operation-list/doctor case (1), and hoststore
+  `--test catalog_lineage --test terminal_publication_retry` (22). Logs:
+  `merge-recommission-unit.log`, `merge-maintenance-unit.log`,
+  `merge-recommission-runner.log`, `merge-ordinary-admission.log`,
+  `merge-cli-coverage.log`, `merge-cli-contracts.log`, `merge-control-list.log`,
+  and `merge-history-compatibility.log`.
+- Historical input compatibility verifies all 34 published descriptors before
+  the single addition. Old Catalogs cannot declare recommission; malformed or
+  counterfeit source records preserve Jobs, capabilities and Imports unchanged.
+  All terminal-publication tests now run in every Catalog view.
+- `python -m unittest discover -s rust/scripts -p test_catalog_test_views.py`
+  and the corresponding `test_historical_catalog_views.py` command each exit 0
+  (35 and 14 cases); `merge-catalog-view-tests.log` and
+  `merge-historical-view-tests.log`. Catalog generation and Golden Journey
+  alias tests exit 0 (52 cases); `merge-generator-tests.log`.
+- The full `test_contract_checks.py` suite ran 75 cases: 73 passed, one
+  pre-existing platform skip, and the existing Windows POSIX-mode assertion
+  failed (`0777` versus `0700`); exit 1, `merge-contract-check-tests.log`.
+  No behavior assertion failed. Linux CI must execute the complete suite.
+- Official Catalog, CLI bundle, Swift review, and Windows review generation
+  retains the maintenance inputs. CLI export changes only the registry digest
+  and feature-coverage report; every other exported product is unchanged.
+  Catalog, Rust contract and Windows ClientKit generation checks each exit 0.
+  The closed census passes with 945 source files, 6,499 unchanged main fixture
+  files and 335 targets; `merge-catalog-inventory.log`.
+- The affected ten-crate `clippy --all-targets -- -D warnings` check exits 0;
+  `merge-clippy.log`. After the final read-side compatibility change, Clippy
+  on hoststore and its four direct consumers also exits 0;
+  `merge-clippy-final.log`. The workspace fmt command again exits 1 on Windows
+  OS error 206 (`merge-fmt-workspace.log`); all 63 changed Rust files pass
+  individual checks, exit 0 (`merge-fmt-files.log`). SDD exits 0 with no errors
+  or warnings and 121 acceptance IDs; `merge-sdd.log`.
+
 ## CI
 
 PR [#2660](https://github.com/ArkDeck/ArkDeck/pull/2660), base `main`.
@@ -201,6 +242,17 @@ admission-tree mismatch before the superseding push cancelled it. Run
 `39011187504` then stopped in the planner because the workflow-contract checker
 still pinned the previous job ceilings. Its exact token and negative mutations
 are now synchronized; all 18 workflow-contract tests pass locally.
+Full Swift CI [39011349133](https://github.com/ArkDeck/ArkDeck/actions/runs/39011349133)
+and SDD Guard [39011349209](https://github.com/ArkDeck/ArkDeck/actions/runs/39011349209)
+passed for `4025d5b20bd255b6d0b4c644f87a0d57eba765dd`, including all four
+contract execution views on all three hosts. Before delivery, main advanced to
+`1a32a7c8f06830dd8e4b4441c002784dd70dc177` (PR #2659), producing shared
+Catalog/Runtime conflicts. The merge retains maintenance behavior, adds explicit
+ordinary-mode arguments and empty recommission state to its new consumers, and
+regenerates the combined Catalog. The candidate preserves the published
+maintenance Catalog and both immutable c6/e4 replay views. Fresh CI on the
+integrated head is required; the earlier green run does not cover this merge.
+
 CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval
 and protected-main publication. macOS production recommissioning stays unavailable

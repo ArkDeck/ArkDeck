@@ -82,6 +82,8 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
                 ("input.keyboard", "deviceMutation"),
                 ("capture.diagnostic-session", "deviceMutation"),
                 ("flash.recommission", "destructive"),
+                ("flash.verify", "readOnly"),
+                ("flash.restore-boot-loop", "destructive"),
             ];
             let mut added = 0;
             for (id, effect) in additions {

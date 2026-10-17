@@ -14,6 +14,7 @@ pub use debug_read::{DebugInventory, DebugReadTemplate, debug_inventory};
 pub use diagnostic_trace::{DiagnosticTraceControl, run_diagnostic_trace};
 #[cfg(any(target_os = "macos", windows))]
 mod dispatch;
+mod flash_verification;
 mod host_diagnostics;
 #[cfg(any(target_os = "macos", windows))]
 mod lifecycle;
@@ -28,6 +29,7 @@ mod pointer_input;
 mod port_forward;
 mod presence;
 mod provider;
+pub use flash_verification::{PartitionHash, PartitionRange, read_flash_partition};
 mod rockchip_hdc;
 mod rockchip_identity;
 mod rockchip_loader;

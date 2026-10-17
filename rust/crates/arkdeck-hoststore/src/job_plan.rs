@@ -385,10 +385,10 @@ pub struct JobPlanner<'a> {
 // yet: no capability authority is composed on Windows).
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) struct Materialized<'a> {
-    _import_use: Option<crate::import_upload::ImportUse<'a>>,
+    pub(crate) _import_use: Option<crate::import_upload::ImportUse<'a>>,
     /// The registration a workspace Job materializes against, held until the
     /// plan or admission is done with it.
-    _workspace_use: Option<crate::WorkspaceUse<'a>>,
+    pub(crate) _workspace_use: Option<crate::WorkspaceUse<'a>>,
     pub(crate) digest: String,
     pub(crate) artifact_facts: BTreeMap<String, String>,
     pub(crate) identity: Option<String>,

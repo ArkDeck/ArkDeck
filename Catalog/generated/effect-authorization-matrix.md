@@ -3,7 +3,7 @@
 
 # Operation effect / authorization matrix
 
-Catalog digest: `d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07`
+Catalog digest: `9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080`
 
 | Operation | Provider | Effect (min → max) | Authorization | Default issuance | Binding | Concurrency | Timeout (s) | Output budget (bytes) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -20,6 +20,8 @@ Catalog digest: `d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd0
 | `flash.dayu200` | arkforge | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.full-restore@1` | arkforge | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
 | `flash.recommission@1` | arkforge | destructive | destructive: runtimeCapability | enabled | confirmedDevice | device-exclusive | 1800 | 134217728 |
+| `flash.restore-boot-loop@1` | arkforge | destructive | destructive: runtimeCapability | disabled | confirmedDevice | device-exclusive | 600 | 1048576 |
+| `flash.verify@1` | arkforge | readOnly | readOnly: defaultReadOnly | enabled | confirmedDevice | device-exclusive | 600 | 1048576 |
 | `input.keyboard@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 60 | 1048576 |
 | `input.long-press@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 60 | 1048576 |
 | `input.swipe@1` | hdc | deviceMutation | deviceMutation: standingCapability | enabled | confirmedDevice | device-exclusive | 60 | 1048576 |
@@ -45,6 +47,6 @@ Catalog digest: `d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd0
 
 | Profile | Provider | Supported operations |
 | --- | --- | --- |
-| `dayu200` | arkforge | `observe.device@1`, `capture.diagnostics@1`, `capture.diagnostic-session@1`, `capture.screen-sequence@1`, `debug.hap@1`, `debug.template@1`, `deploy.native-library.app-owned@1`, `flash.dayu200`, `flash.full-restore@1`, `flash.recommission@1`, `port-forward.create@1`, `port-forward.remove@1`, `input.keyboard@1`, `input.tap@1`, `input.long-press@1`, `input.swipe@1` |
+| `dayu200` | arkforge | `observe.device@1`, `capture.diagnostics@1`, `capture.diagnostic-session@1`, `capture.screen-sequence@1`, `debug.hap@1`, `debug.template@1`, `deploy.native-library.app-owned@1`, `flash.dayu200`, `flash.full-restore@1`, `flash.recommission@1`, `port-forward.create@1`, `port-forward.remove@1`, `input.keyboard@1`, `input.tap@1`, `input.long-press@1`, `input.swipe@1`, `flash.verify@1`, `flash.restore-boot-loop@1` |
 | `openharmony-standard@1` | hdc | `observe.device@1`, `capture.diagnostics@1`, `capture.diagnostic-session@1`, `capture.screen-sequence@1`, `debug.hap@1`, `debug.template@1`, `deploy.native-library.app-owned@1`, `port-forward.create@1`, `port-forward.remove@1`, `input.keyboard@1`, `input.tap@1`, `input.long-press@1`, `input.swipe@1` |
 | `workspace-host@1` | workspace | `workspace.inspect-source@1`, `workspace.apply-patch@1`, `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1`, `workspace.run-tests@1`, `workspace.symbolize-crash@1`, `workspace.revert-patch@1`, `analyzer.analyze-trace@1`, `analyzer.extract-crash-signature@1`, `analyzer.summarize-hilog@1`, `analyzer.summarize-trace@1`, `workspace.create-checkpoint@1`, `workspace.inspect-diff@1`, `workspace.inspect-git-status@1`, `workspace.prepare-isolated-copy@1`, `workspace.read-source-range@1`, `workspace.sweep-isolated-copies@1` |

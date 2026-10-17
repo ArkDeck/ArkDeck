@@ -1,7 +1,7 @@
 {
   "appCapabilityRegistrySchemaVersion": "arkdeck.app-product-capability-registry/1",
   "bundleVersion": "arkdeck.cli.contracts/1",
-  "catalogDigest": "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07",
+  "catalogDigest": "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080",
   "classificationVocabulary": [
     "direct",
     "generic",
@@ -2865,6 +2865,42 @@
     },
     {
       "classification": "direct",
+      "conformanceFixture": "argv/flash.restore-boot-loop.json",
+      "equivalentCommands": [],
+      "feature": "flash.restore-boot-loop@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:flash.restore-boot-loop@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash restore-boot-loop --request-file <path>"
+    },
+    {
+      "classification": "direct",
+      "conformanceFixture": "argv/flash.verify.json",
+      "equivalentCommands": [],
+      "feature": "flash.verify@1",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:flash.verify@1",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash verify --request-file <path>"
+    },
+    {
+      "classification": "direct",
       "conformanceFixture": "argv/runtime.health.json",
       "equivalentCommands": [],
       "feature": "health",
@@ -4973,7 +5009,7 @@
   "summary": {
     "blocked": [],
     "byClassification": {
-      "direct": 129,
+      "direct": 131,
       "generic": 3,
       "internal": 4,
       "local": 93,
@@ -4983,11 +5019,11 @@
     },
     "bySource": {
       "app": 68,
-      "catalog": 33,
+      "catalog": 35,
       "cli": 53,
       "daemon": 110
     },
-    "entries": 264,
+    "entries": 266,
     "fullFunction": true
   }
 }

@@ -136,6 +136,41 @@ pub trait FlashLane: Send + Sync {
     fn recommission_quiescent(&self, _source: &Execution) -> Result<(), String> {
         Err("recommission.providerQuiescenceUnavailable".into())
     }
+    fn perform_restoration(
+        &self,
+        execution: &Execution,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+        _deadline: std::time::Instant,
+    ) -> Result<ActionReceipt, LaneFailure> {
+        self.perform("restore-ramdisk", execution, artifact, binding)
+    }
+
+    fn maintenance_source(
+        &self,
+        _execution: &Execution,
+    ) -> Result<crate::maintenance::SourceRecords, String> {
+        Err("maintenance source storage is unavailable".into())
+    }
+    fn restoration_plan(
+        &self,
+        _artifact: &LaneArtifact,
+        _binding: &DeviceBinding,
+    ) -> Result<arkforge_ipc::messages::ExecutablePlan, String> {
+        Err("restoration materialization is unavailable".into())
+    }
+    fn prepare_restoration(
+        &self,
+        _job_id: &str,
+        _plan: &arkforge_ipc::messages::ExecutablePlan,
+        _artifact: &LaneArtifact,
+        _binding: &DeviceBinding,
+    ) -> Result<Execution, LaneFailure> {
+        Err(LaneFailure::Other(
+            "restoration execution is unavailable".into(),
+        ))
+    }
+
     /// The exact backend digest the lane was composed against, which every
     /// StepPermit binds.
     fn toolchain_sha256(&self) -> &str;

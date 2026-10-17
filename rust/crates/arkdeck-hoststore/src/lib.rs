@@ -865,3 +865,8 @@ pub use artifact_export::ArtifactExportRequest;
 mod catalog_review;
 #[cfg(any(target_os = "macos", windows))]
 pub use catalog_review::flash_catalog_review;
+
+#[cfg(any(target_os = "macos", windows))]
+mod flash_maintenance;
+#[cfg(any(target_os = "macos", windows))]
+pub use flash_maintenance::{MaintenanceContext, MaintenanceReads, NativeMaintenanceReads};

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "flash.verify",
+  "version": 1,
+  "title": "Verify sealed Flash partition ranges against independent full hashes",
+  "provider": "arkforge",
+  "effect": {
+    "minimum": "readOnly",
+    "permitted": [
+      "readOnly"
+    ]
+  },
+  "authorization": {
+    "readOnly": "defaultReadOnly"
+  },
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "sourceJobId": {
+        "type": "string",
+        "required": true,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+        "description": "Latest durable ArkDeck Flash Job for this exact bound target."
+      },
+      "budgetMs": {
+        "type": "integer",
+        "required": true,
+        "minimum": 1000,
+        "maximum": 600000,
+        "description": "Total maintenance execution budget in milliseconds."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "maintenanceResult": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "verify-flash-readback",
+      "kind": "verifyRemoteState",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 600,
+  "outputByteBudget": 1048576,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "artifacts": [
+    {
+      "name": "maintenance-result.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "sensitive",
+      "required": true
+    }
+  ],
+  "profiles": [
+    "dayu200"
+  ]
+}

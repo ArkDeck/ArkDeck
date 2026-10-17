@@ -280,6 +280,26 @@ pub fn validate_acceptance(value: &Value) -> Result<(), CliError> {
 /// unknown outcome exits 75, since it needs reconciliation and never a
 /// replay, and a failed, cancelled or interrupted Job exits 1.
 pub fn run_exit(status: &Value) -> Option<(u8, &'static str)> {
+    if let Some(result) = status.get("maintenanceResult") {
+        let command = match result["schema"].as_str() {
+            Some("arkforge.flash-verification/v1") => "flash.verify",
+            Some("arkforge.boot-loop-restoration/v1") => "flash.restore-boot-loop",
+            _ => return Some((7, "maintenance result is malformed")),
+        };
+        return match crate::flash_maintenance::exit_code(command, status) {
+            0 => None,
+            9 => Some((
+                9,
+                "verification contains typed skips; inspect each target reason",
+            )),
+            7 => Some((7, "flash verification failed")),
+            _ => Some((
+                1,
+                "restoration stopped; inspect the durable record, do not blindly retry",
+            )),
+        };
+    }
+
     if status["outcomeUnknown"] == true {
         return Some((
             75,

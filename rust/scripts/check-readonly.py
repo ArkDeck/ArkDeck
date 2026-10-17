@@ -386,20 +386,28 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
     """Project only the exact declared delta for fully verified source views.
 
     This changes no recording or fixture. The additive recommission view adds
-    exactly one unavailable operation; every other machine-output byte is pinned.
+    only the declared unavailable operations; every other machine-output byte is pinned.
     """
     assert digest in catalog_test_views.CATALOGS, "unknown Catalog view"
     assert name in MACHINE_OUTPUT_LEAVES, "unknown machine-output leaf"
-    if name == 'operations' and digest == catalog_test_views.RECOMMISSION:
-        rows = json.loads(data)['result']
-        assert len(rows) == 32 and not any(row['reference'] == 'flash.recommission@1' for row in rows)
+    additions = []
+    if digest in (catalog_test_views.MAINTENANCE, catalog_test_views.RECOMMISSION):
+        additions = [("flash.verify@1", "readOnly"), ("flash.restore-boot-loop@1", "destructive")]
+    if digest == catalog_test_views.RECOMMISSION:
+        additions.append(("flash.recommission@1", "destructive"))
+    if name == 'operations' and additions:
+        document = json.loads(data)
+        rows = document['result']
+        assert len(rows) == 32 and len({row['reference'] for row in rows}) == 32
         source = [row for row in rows if row['reference'] == 'flash.full-restore@1']
         assert len(source) == 1 and source[0]['availability'] == 'unavailable'
-        added = dict(source[0], reference='flash.recommission@1', canonicalReference='flash.recommission@1')
-        encode = lambda row: json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
-        original = encode(source[0])
-        assert data.count(original) == 1, 'exact original Flash list entry required'
-        return data.replace(original, original + b',' + encode(added), 1)
+        assert source[0]['binding'] == 'confirmedDevice'
+        assert source[0]['reasons'] == ['provider arkforge is not registered']
+        for reference, effect in additions:
+            assert not any(row['reference'] == reference for row in rows)
+            rows.append(dict(source[0], reference=reference, canonicalReference=reference, minimumEffect=effect))
+        rows.sort(key=lambda row: row['reference'])
+        return (json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(',', ':')) + '\n').encode()
     if name not in ("doctor", "deep", "healthy"):
         return data
     document = json.loads(data)
@@ -414,18 +422,19 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
     original = b'"digest":"' + declared["digest"].encode("ascii") + b'"'
     assert data.count(original) == 1, "machine-output Catalog digest must occur once"
     result = data.replace(original, b'"digest":"' + digest.encode("ascii") + b'"', 1)
-    if digest == catalog_test_views.RECOMMISSION:
+    if additions:
+        count = 32 + len(additions)
         encode = lambda row: json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
         before = encode(declared)
         assert data.count(before) == 1, 'exact Catalog summary required'
-        added = dict(declared, digest=digest, operationCount=33, unavailableOperationCount=33)
+        added = dict(declared, digest=digest, operationCount=count, unavailableOperationCount=count)
         result = data.replace(before, encode(added), 1)
         findings = [row for row in report['findings']
                     if row['code'] == 'catalog.unavailableOperations']
         assert len(findings) == 1 and findings[0]['details'] == {'unavailableOperationCount': 32}
         before_finding = encode(findings[0])
         assert result.count(before_finding) == 1, 'exact unavailable-operation finding required'
-        after_finding = dict(findings[0], details={'unavailableOperationCount': 33})
+        after_finding = dict(findings[0], details={'unavailableOperationCount': count})
         result = result.replace(before_finding, encode(after_finding), 1)
     return result
 

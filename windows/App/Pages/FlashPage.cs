@@ -87,6 +87,7 @@ public sealed partial class FlashPage() : SurfacePage<FlashState>(
             Ui.Card(CurrentDevice(state), "flash.workspace.currentDevice.card"),
             Ui.Card(_primary, "flash.workspace.primary")], [1, 2], minimumColumnWidth: 260, spacing: 24));
         body.Children.Add(_status);
+        body.Children.Add(Maintenance(state));
         RenderPrimary();
         // The macOS plain disclosure toggle: its title says what it will do.
         var details = Details(state);

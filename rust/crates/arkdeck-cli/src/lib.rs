@@ -20,6 +20,7 @@ pub mod domain_leaves;
 pub mod error_registry;
 mod feature_coverage;
 mod flash_leaves;
+pub mod flash_maintenance;
 pub mod runtime_update;
 pub mod support_bundle;
 mod trace_inspect;
@@ -159,6 +160,19 @@ impl CliError {
     /// code the registry does not have is an internal failure. A plain
     /// failure exits with its own status.
     pub fn exit_code(&self) -> u8 {
+        if self.command == Some("flash.restore-boot-loop") {
+            return if matches!(
+                self.code,
+                "invalidOption" | "invalidInput" | "invalidParams"
+            ) {
+                2
+            } else {
+                1
+            };
+        }
+        if self.command == Some("flash.verify") {
+            return 7;
+        }
         self.plain_exit.unwrap_or_else(|| {
             error_registry::category(self.code).map_or(70, error_registry::ExitCategory::exit_code)
         })
@@ -826,6 +840,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["flash", "prerequisites"] => "flash.prerequisites",
         ["flash", "lane-preview"] => "flash.lane-preview",
         ["flash", "run"] => "flash.run",
+        ["flash", "verify"] => "flash.verify",
+        ["flash", "restore-boot-loop"] => "flash.restore-boot-loop",
         ["recovery", "flash-invocation", "list"] => "recovery.flash-invocation.list",
         ["recovery", "flash-invocation", "start"] => "recovery.flash-invocation.start",
         ["recovery", "flash-invocation", "evaluate"] => "recovery.flash-invocation.evaluate",
@@ -1195,6 +1211,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
         "flash.install-binding" => &["rebind"],
+        "flash.verify" | "flash.restore-boot-loop" => &["requestFile", "timeout"],
         "recovery.flash-invocation.list" => &["pageSize", "cursor"],
         "recovery.flash-invocation.status" | "debug.status" => &["invocationId"],
         "recovery.flash-invocation.start" | "debug.start" => &["requestFile"],
@@ -1806,6 +1823,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     let diagnostics_timeout = diagnostics_resources::configure(command, &mut method_options, help)?;
     ui_dump::configure(command, &method_options, help)?;
     // Swift's parser names the leaf a refused option belongs to.
+    flash_maintenance::configure(command, &method_options, help)?;
     flash_leaves::configure(command, &mut method_options, help).map_err(|mut error| {
         error.command = Some(command);
         error
@@ -1823,7 +1841,15 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         .or(agent_timeout)
         .or(human_action_timeout)
         .or(hdc_timeout)
-        .or(continuation_timeout);
+        .or(continuation_timeout)
+        .or(if flash_maintenance::serves(command) {
+            method_options
+                .get("timeout")
+                .and_then(Value::as_str)
+                .and_then(read_only_resources::duration)
+        } else {
+            None
+        });
     Ok(Invocation {
         command,
         method: if command == "job.archive.apply" {
@@ -1875,7 +1901,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             // Swift's `runDevice` answers both legacy leaves with the target
             // list, without parameters.
             "target.list"
-        } else if domain_leaves::serves(command) {
+        } else if domain_leaves::serves(command) || flash_maintenance::serves(command) {
             // `runDomainOperation` maps every client error the executor throws
             // under this one method.
             "job.submit"
@@ -1958,6 +1984,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             || is_runtime_service(command)
             || signing_leaves::serves(command)
             || domain_leaves::serves(command)
+            || flash_maintenance::serves(command)
             || command.starts_with("maintainer.contracts.")
             || command.starts_with("runtime.support-bundle.")
             || matches!(

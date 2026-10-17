@@ -1,5 +1,5 @@
 {
-  "catalogDigest": "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07",
+  "catalogDigest": "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080",
   "contractIdentity": "12b56a3341f30493c38e61787b94336a951799a89fb4f314599a37eadd6379f2",
   "corpusFileCount": 110,
   "corpusMethodCounts": {
@@ -560,16 +560,16 @@
     "successes": 608
   },
   "directoryDigests": {
-    "Catalog/operations": "6492a0bd1d6e9975f59e5867e273e7826957442c63825131733ef87c30fb4915",
-    "Catalog/profiles": "d6af79aba410071f043d882ff3d9153fa5a491896ed99ad887c11fbea9bf745f",
+    "Catalog/operations": "2cf3873a73e2dde1875674abf9de6fcd053dc4a74a4e577c2d4bac93dcf5876f",
+    "Catalog/profiles": "b15c4106c7c80fb02c7c2b93787455c130ccf1e9edcb677b8ce2c02b87940d0a",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "0620896cf60b26c367b62219d4c0eede7e029ef42e66612366820747539eb410",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "c53d782e8d7ecef20d09be97bc873f97d15d820b6c9de050b9577ffdaa996e04"
+    "spec/control/methods": "19aa4de8c4cbe3c4f6f399561b37d61c7e5e76d4df7d1b6aeb908163b43a45e4"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
-      "blob": "230036af382da8275cb6b1cbaf649d4bb9fdfc30",
-      "sha256": "5fc2c40db0ec83ffb1a41785a1a858810842e0b63361e8b751923123319644ca"
+      "blob": "3331f641ca66549d3e7febcd1cd886515c9b9d1f",
+      "sha256": "1c421f64a5e1182ad94f820e9cc83c6309c4883c1d11d8f1795ed333f152dad7"
     },
     "Catalog/operations/analyzer.analyze-trace.v1.json": {
       "blob": "0a12b2f04854bc18c4b98381d4cc0bc1a6115c3e",
@@ -622,6 +622,14 @@
     "Catalog/operations/flash.recommission.v1.json": {
       "blob": "37100a6821e8b826803e85da597f36ad0a71836b",
       "sha256": "9a456d3569d6fcb007a6b811f263918e2a0c48feb02299111a50201c334a1275"
+    },
+    "Catalog/operations/flash.restore-boot-loop.v1.json": {
+      "blob": "9aa74a9201ff1257d38a8fbe7dfc5b7fa8077541",
+      "sha256": "718570cbf9655d7add35bcd68066f80ff864d2b1717171cff14879e5bc0c8541"
+    },
+    "Catalog/operations/flash.verify.v1.json": {
+      "blob": "34cb9f4df0149cd1fadc38f1b0751009daacede2",
+      "sha256": "69ac11406d3fdab475e2c5aad39aa00ff6155b8d6201e7b0f0cef7f7ffa41065"
     },
     "Catalog/operations/input.keyboard.v1.json": {
       "blob": "2b683b03a34ca8515f8dab0a5f84c4e3b1114335",
@@ -704,8 +712,8 @@
       "sha256": "1da682d53aa2a8b6ebe9e441c6ffb8bb25434d476b6b031cb372eb0c4ff95133"
     },
     "Catalog/profiles/dayu200.json": {
-      "blob": "d0c359328b8e10ed00544dfa12b5532ff9e2a69a",
-      "sha256": "e2d1de69c69f2a6705c44ea67443a98d2f07a5a13cfd0dd823c4e6c641eefd0a"
+      "blob": "9d5559041b66368ab715f42a1de9229681347092",
+      "sha256": "9df34a64757f521708e0eb0937aeb0cd0535e1c33c51546889cd5f8e18ed5b7a"
     },
     "Catalog/profiles/openharmony-standard.v1.json": {
       "blob": "4295f2da60d029a8fa6d76624d5baf3e3fc42cd6",
@@ -1584,32 +1592,32 @@
       "sha256": "2370d965c18b9030ae85b96a6023a042c119111c16d4aaa7b2a65e4a196d8046"
     },
     "spec/control/methods/job.list.json": {
-      "blob": "f37b19d398c5f9dd862ed1eff885e7c8721988c8",
-      "sha256": "770910b6b9c33bb7423f82561612b6d9c4f77ac4a92d3cb88378389da978a21f"
+      "blob": "a1661185c123928486b740830ed60273854f820a",
+      "sha256": "3d8ef3481dc6394ef020d31731cc3ecc44d8ffc61a8d1a6eeb159ea7f5a06357"
     },
     "spec/control/methods/job.plan.json": {
       "blob": "c62fb8f17e55c22f996af7c4a616065798696be3",
       "sha256": "e4b7c1b1659c1d94f3ca06d40b050a9024e609b08dcbd4aefea713693ad202b3"
     },
     "spec/control/methods/job.reconcile.json": {
-      "blob": "61231f4a84222f9c2602b2e807ba051f826f638f",
-      "sha256": "d8dc8b4db027887683cc2338c0d7f561864cee79be8c3a42a3eda6812f80d41a"
+      "blob": "d4dcd8f29bfef340e69ea42117221639b36ad04d",
+      "sha256": "de1e1882b4d9682f0670c9ab4429a1f5019844c2ffb9e0cb2d9def7d1ba8e686"
     },
     "spec/control/methods/job.result.json": {
-      "blob": "a637444669a38deef22746158dfd999104e4ca4f",
-      "sha256": "adc669fec3d9405ad674473e1cbd704b33da31a6d4dad843f2a1ed7c0b7f842d"
+      "blob": "21851b538846c9349d29e74d96665babb2b7c3e0",
+      "sha256": "55ae983d94190e39f7074e1bdaac9a4395decae9a9cc0911d125234ac60a3717"
     },
     "spec/control/methods/job.run.json": {
-      "blob": "76a5ff21d348e8295615e9e0775a2cd54c307433",
-      "sha256": "76c328f50fbb69e29a99c5cdb71a42d1326fdaf90ac660623ff203aa2853f868"
+      "blob": "05f9dff707a361dfaa4b2889acf6d99ade0133d0",
+      "sha256": "1a4c08bf83ca8e3c77437744d6a030acc163ea10272aa4016f218b8fd023e580"
     },
     "spec/control/methods/job.show.json": {
-      "blob": "594e7d401ee0d91af801e65f04309d7c719555ba",
-      "sha256": "1f1e0379501ccbfc4152c29aadfdb7803697e5a6b201dfb3cc9fffcd4e72078f"
+      "blob": "b22f3040cc413274575a626fcc50fee218312700",
+      "sha256": "6b14083780c5af12e1084a4cedde668eb730f7d78666f4bce790868fd4a0773b"
     },
     "spec/control/methods/job.status.json": {
-      "blob": "23a9f93da5376c3410160e3fd89904b314ce152f",
-      "sha256": "e03f5d8a7c8988a820c306fc8989e692ae3e24b5387f8e0e32f16a012a88a5bb"
+      "blob": "c12caac0282b0cd3d85356f4cd307d7c70999b9a",
+      "sha256": "a5032885eda3bd5e4d563e89cffbec2fdd082a8fd3c8d673d9114929f201cdcb"
     },
     "spec/control/methods/job.submit.json": {
       "blob": "b658e9f935095403097ff1ce493c855d9863593a",
@@ -1620,8 +1628,8 @@
       "sha256": "05e9959917e601ac46f2303a873b9910b04e0e1da9cc6393c7e0d4d33c33ed42"
     },
     "spec/control/methods/operation.describe.json": {
-      "blob": "6aabcbef62e79e5530324b89d03c31e927ff0c99",
-      "sha256": "b4e247d0ac9e2a14b52f8bf803f5e568fbb06689e1f2af28a3452588a056e2fb"
+      "blob": "5e016ec29c476f81afb4c8e982bd959181709346",
+      "sha256": "00d9f6b73ecb6dd6dcfb46408d5fa8a7a2198e93cf4a2f2a521ce74a26611ee0"
     },
     "spec/control/methods/operation.list.json": {
       "blob": "c5ea9305384c22622c8f6e92d1d20dee6dd293a2",
@@ -1804,7 +1812,7 @@
       "sha256": "1ef6817cfba3e40656466abee32920278e3ae1afe277ef2675ae8432b8c25afe"
     }
   },
-  "inputDigest": "abcc6090c713320ab8216b726b9a5f8a8ff5dbd7b3c8c7253db1ba5020283b5b",
+  "inputDigest": "2ac662c732cf36a5eb1cacbb876c8bb59250556d88aee421f7a1120c319dfaef",
   "kind": "development",
   "methodCount": 110,
   "protocolVersion": "1.0.0",

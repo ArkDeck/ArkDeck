@@ -381,6 +381,12 @@
                 },
                 "y": {
                   "type": "integer"
+                },
+                "sourceJobId": {
+                  "type": "string"
+                },
+                "budgetMs": {
+                  "type": "integer"
                 }
               },
               "type": "object"
