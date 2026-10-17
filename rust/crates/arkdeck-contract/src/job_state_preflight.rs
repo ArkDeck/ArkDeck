@@ -9,11 +9,9 @@
 //! unchanged). It also classes agent-execution states and capability-use
 //! outcomes.
 //!
-//! The table is compiled in from the copy Swift's
-//! `JobStatePreflightTableContractTests` records beside its oracle, which that
-//! test compares with `spec/` byte for byte; the copy lives under `rust/` so
-//! the contract views, which carry only `rust/` and the registered inputs, see
-//! it too.
+//! The table's copy beside the historical Swift oracle remains available to
+//! contract views that carry only `rust/` and the registered inputs. Keep that
+//! copy byte-identical to `spec/recovery/job-state-preflight.json`.
 //!
 //! - [`classify_restart`] is `runtime service restart`'s carry-over of the
 //!   daemon's current Jobs, as Swift's `RuntimeCLI.classifyAgentdRestartCurrentJobs`
@@ -30,7 +28,7 @@ use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
-/// The table as Swift records it.
+/// The shared table, with its historical Swift oracle kept separately.
 pub const JOB_STATE_PREFLIGHT_TABLE: &str =
     include_str!("../../../tests/fixtures/job-state-preflight/table.json");
 
@@ -123,6 +121,9 @@ pub fn capability_use_unsettled(outcome: &str) -> bool {
 pub struct RestartPreflight {
     pub blocking_job_ids: Vec<String>,
     pub preserved_unknown_job_ids: Vec<String>,
+    /// Runtime archive previews hash the complete durable record and journal.
+    /// A maintenance restart must preserve these bytes, including old budgets.
+    pub preserved_archive_review_sha256s: BTreeMap<String, String>,
 }
 
 /// A current Job the daemon answered in a shape the classifier cannot read:
@@ -149,8 +150,83 @@ fn exact_integer(value: Option<&Value>) -> Option<i64> {
 /// owes no cleanup residue, has no process in progress and has finished; every
 /// other current Job blocks the restart. Both lists are sorted.
 pub fn classify_restart(current: &[Value]) -> Result<RestartPreflight, MalformedCurrentJob> {
+    classify_restart_with_archive_previews(current, &BTreeMap::new())
+}
+
+fn digest(value: &Value) -> bool {
+    value.as_str().is_some_and(|text| {
+        text.len() == 64
+            && text
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    })
+}
+
+/// Only a completed, published retained-risk archive is a second carry-over
+/// case. The verified Runtime must freshly produce the preview: it checks the
+/// durable archive decision, original expired budget and capability lineage,
+/// an untorn journal and absence of a resident owner. This is not a caller
+/// assertion that an uncertain device or managed process is safe.
+fn retained_archive_proven(job: &Value, preview: &Value) -> bool {
+    if crate::validate_method_value("job.archive.preview", "result", preview).is_err() {
+        return false;
+    }
+    let Some(hazards) = preview["retainedHazards"].as_array() else {
+        return false;
+    };
+    job["state"] == "interrupted"
+        && job["actualEffect"] == "destructive"
+        && matches!(
+            job["operation"].as_str(),
+            Some("flash.full-restore@1" | "flash.dayu200" | "flash.dayu200@1")
+        )
+        && job["sessionPublication"]["state"] == "published"
+        && digest(&job["sessionPublication"]["manifestSha256"])
+        && ["jobId", "operation", "targetId", "sessionId", "state"]
+            .iter()
+            .all(|key| {
+                job[*key].as_str().is_some_and(|text| !text.is_empty())
+                    && job[*key] == preview[*key]
+            })
+        && preview["sessionId"] == format!("session-{}", job["jobId"].as_str().unwrap())
+        && preview["outcomeUnknown"] == true
+        && preview["canArchive"] == true
+        && preview["mode"] == "finishPublication"
+        && preview["blockers"].as_array().is_some_and(Vec::is_empty)
+        && preview["resourceReleaseAuthorized"] == false
+        && preview["userConfirmationId"]
+            .as_str()
+            .is_some_and(|text| !text.is_empty())
+        && digest(&preview["reviewSha256"])
+        && hazards.len() >= 3
+        && hazards
+            .iter()
+            .all(|value| value.as_str().is_some_and(|text| !text.is_empty()))
+        && hazards
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            == hazards.len()
+        && hazards
+            .iter()
+            .any(|hazard| hazard == "runtimeCapabilityLineageRetained")
+        && hazards
+            .iter()
+            .any(|hazard| hazard == "managedHostProcessStateUnknown")
+}
+
+/// The shared macOS/Windows maintenance predicate. `previews` may contain only
+/// fresh `job.archive.preview` replies from the identity-verified Runtime that
+/// supplied `current`. Neither list is device admission or recovery authority.
+/// Missing, unsupported, blocked or incomplete archive proof never exempts a Job.
+pub fn classify_restart_with_archive_previews(
+    current: &[Value],
+    previews: &BTreeMap<String, Value>,
+) -> Result<RestartPreflight, MalformedCurrentJob> {
     let mut blocking = Vec::new();
     let mut preserved = Vec::new();
+    let mut preserved_archives = BTreeMap::new();
     for value in current {
         let job = value.as_object().ok_or(MalformedCurrentJob)?;
         let job_id = job
@@ -177,7 +253,10 @@ pub fn classify_restart(current: &[Value]) -> Result<RestartPreflight, Malformed
             .get("finishedAtUtc")
             .and_then(Value::as_str)
             .is_some_and(|finished| !finished.is_empty());
-        if job_state_class(state) == JobStateClass::Parked
+        let archive = previews
+            .get(job_id)
+            .filter(|preview| retained_archive_proven(value, preview));
+        if (job_state_class(state) == JobStateClass::Parked || archive.is_some())
             && outcome_unknown
             && !waiting_for_human
             && residue == 0
@@ -185,6 +264,12 @@ pub fn classify_restart(current: &[Value]) -> Result<RestartPreflight, Malformed
             && finished
         {
             preserved.push(job_id.to_owned());
+            if let Some(preview) = archive {
+                preserved_archives.insert(
+                    job_id.to_owned(),
+                    preview["reviewSha256"].as_str().unwrap().to_owned(),
+                );
+            }
         } else {
             blocking.push(job_id.to_owned());
         }
@@ -194,6 +279,7 @@ pub fn classify_restart(current: &[Value]) -> Result<RestartPreflight, Malformed
     Ok(RestartPreflight {
         blocking_job_ids: blocking,
         preserved_unknown_job_ids: preserved,
+        preserved_archive_review_sha256s: preserved_archives,
     })
 }
 
@@ -401,6 +487,119 @@ mod tests {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/fixtures/job-state-preflight/restart.json");
         serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+    }
+
+    fn archived() -> (Value, Value) {
+        let job = json!({"jobId":"job-retained", "operation":"flash.full-restore@1",
+            "targetId":"TGT-RETAINED", "sessionId":"session-job-retained",
+            "state":"interrupted", "outcomeUnknown":true, "waitingForHuman":false,
+            "outstandingResidueCount":0, "processProgress":null,
+            "finishedAtUtc":"2026-10-04T06:00:00Z", "actualEffect":"destructive",
+            "sessionPublication":{"state":"published", "manifestSha256":"b".repeat(64)}});
+        let preview = json!({"jobId":"job-retained", "operation":"flash.full-restore@1",
+            "targetId":"TGT-RETAINED", "sessionId":"session-job-retained",
+            "state":"interrupted", "outcomeUnknown":true, "canArchive":true,
+            "mode":"finishPublication", "blockers":[], "resourceReleaseAuthorized":false,
+            "userConfirmationId":"original-decision", "reviewSha256":"a".repeat(64),
+            "lastConfirmedStepId":null, "retainedHazards":["deviceOutcomeUnknown",
+                "managedHostProcessStateUnknown", "runtimeCapabilityLineageRetained"]});
+        (job, preview)
+    }
+
+    #[test]
+    fn retained_archive_restart_needs_fresh_complete_proof_and_preserves_its_digest() {
+        let (job, preview) = archived();
+        let blocked = classify_restart(std::slice::from_ref(&job)).unwrap();
+        assert_eq!(blocked.blocking_job_ids, ["job-retained"]);
+        let proofs = BTreeMap::from([("job-retained".into(), preview.clone())]);
+        let accepted =
+            classify_restart_with_archive_previews(std::slice::from_ref(&job), &proofs).unwrap();
+        assert!(accepted.blocking_job_ids.is_empty());
+        assert_eq!(accepted.preserved_unknown_job_ids, ["job-retained"]);
+        assert_eq!(
+            accepted.preserved_archive_review_sha256s["job-retained"],
+            "a".repeat(64)
+        );
+        let mut changed = proofs.clone();
+        changed.get_mut("job-retained").unwrap()["reviewSha256"] = json!("c".repeat(64));
+        assert_ne!(
+            accepted,
+            classify_restart_with_archive_previews(std::slice::from_ref(&job), &changed).unwrap(),
+            "record or journal drift must fail the before/after restart comparison"
+        );
+        for (field, invalid) in [
+            ("jobId", json!("job-other")),
+            ("targetId", json!("TGT-OTHER")),
+            ("operation", json!("observe.device@1")),
+            ("sessionId", json!("session-other")),
+            ("state", json!("waitingForRecovery")),
+            ("outcomeUnknown", json!(false)),
+            ("canArchive", json!(false)),
+            ("mode", json!("archiveWithHazards")),
+            ("mode", json!("finishAudit")),
+            ("mode", json!("unavailable")),
+            ("blockers", json!(["jobHeldByActiveRuntime"])),
+            ("blockers", json!(["journalNeedsRecovery"])),
+            ("resourceReleaseAuthorized", json!(true)),
+            ("userConfirmationId", Value::Null),
+            ("userConfirmationId", json!("")),
+            ("reviewSha256", json!("bad")),
+            ("retainedHazards", json!([])),
+            ("retainedHazards", json!(["invented"])),
+            (
+                "retainedHazards",
+                json!([
+                    "managedHostProcessStateUnknown",
+                    "runtimeCapabilityLineageRetained",
+                    "runtimeCapabilityLineageRetained"
+                ]),
+            ),
+        ] {
+            let mut invalid_preview = preview.clone();
+            invalid_preview[field] = invalid;
+            let decision = classify_restart_with_archive_previews(
+                std::slice::from_ref(&job),
+                &BTreeMap::from([("job-retained".into(), invalid_preview)]),
+            )
+            .unwrap();
+            assert_eq!(decision, blocked, "incomplete archive proof: {field}");
+        }
+        for field in preview.as_object().unwrap().keys() {
+            let mut missing = preview.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            assert_eq!(
+                classify_restart_with_archive_previews(
+                    std::slice::from_ref(&job),
+                    &BTreeMap::from([("job-retained".into(), missing)])
+                )
+                .unwrap(),
+                blocked,
+                "missing archive proof field: {field}"
+            );
+        }
+        for (field, invalid) in [
+            ("state", json!("running")),
+            ("state", json!("failed")),
+            ("outcomeUnknown", json!(false)),
+            ("waitingForHuman", json!(true)),
+            ("outstandingResidueCount", json!(1)),
+            ("processProgress", json!({"pid":123})),
+            ("finishedAtUtc", Value::Null),
+            ("actualEffect", json!("readOnly")),
+            ("sessionPublication", json!({"state":"pending"})),
+            (
+                "sessionPublication",
+                json!({"state":"published","manifestSha256":"bad"}),
+            ),
+        ] {
+            let mut invalid_job = job.clone();
+            invalid_job[field] = invalid;
+            assert_eq!(
+                classify_restart_with_archive_previews(&[invalid_job], &proofs).unwrap(),
+                blocked,
+                "archive does not erase an active or incomplete row: {field}"
+            );
+        }
     }
 
     #[test]
