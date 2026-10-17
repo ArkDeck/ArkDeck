@@ -413,5 +413,92 @@ maintainer publication.
 
 ### CI
 
-The current-attachment fix requires its own PR CI and maintainer publication.
-The green runs above cover the preceding Job-state fix.
+PR [#2662](https://github.com/ArkDeck/ArkDeck/pull/2662) passed Swift CI
+[39041666892](https://github.com/ArkDeck/ArkDeck/actions/runs/39041666892) and
+SDD Guard [39045927141](https://github.com/ArkDeck/ArkDeck/actions/runs/39045927141).
+It merged at `2026-10-17T16:37:13Z`, publishing
+`998eae1e1b9a4ae5f68c58035be4210813f4197d`.
+
+## Published Windows execution: postflight parser
+
+The signed Runtime built from that published commit passed the fresh identity
+chain and plan checks, then admitted exactly one recommission execution. Its
+Catalog digest was
+`9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080`.
+The Provider recorded successful writes for all nine partitions and a successful
+device reset. Only `uboot` and `resource` received full-hash readback receipts;
+the other seven ranges received `typedSkip` with `skipped-lba-read-window`.
+Those skips do not prove full verification.
+
+The postflight `read-build-facts` control request expired after 120 seconds.
+The host continued its existing 600-second bound reconnect wait, then its late
+receipt was rejected with `NO_CONTROL_PENDING`. Runtime retained the correlated
+execution as `waitingForRecovery`, with `outcomeUnknown: true`. No successful
+supersession or new binding revision was published. A separate read-only HDC
+diagnostic observed the exact original target online with the expected model
+and build; that diagnostic is not Runtime hardware acceptance evidence.
+
+The `ResolvedHdc` wrapper omitted `registered_windows_tuple`, so a dispatch
+pinned to the registered Windows executable lost its target-list grammar.
+Its six-column USB row and UART host-port rows were parsed as the macOS
+five-column family and repeatedly classified as malformed. The wrapper now
+delegates that metadata to the same retained dispatcher. It grants no identity
+or authority when resolution fails and leaves the existing parsers unchanged.
+
+The regression exercises recommission postflight through the real executor and
+wrapper using registered Windows output, independent synthetic CID/CPU/vendor
+SN proofs, and a UART row. It requires one target-list read, the complete
+postflight identity observation and no early alias publication. The existing
+macOS-format case and identity-drift refusals remain covered.
+
+All 60 pre-existing Job records and protected source history remain unchanged.
+The capability store folded its two old ledger events into its checkpoint when
+installing the new capability. Reconstructing that prior checkpoint and the
+1,427 original event bytes reproduces the exact pre-execution hashes; the old
+consumption, unknown outcome and budget are unchanged. This checkpoint fold is
+not a new historical use. The new independent allocation is consumed and is not
+refunded or extended by this fix. A read-only `flash.verify@1` plan also refused
+this source before admission, with zero new dispatch.
+
+This is a partial hardware result, not `REAL_DEVICE_PASS`. Full verification and
+postflight remain incomplete; the original and new unknown intents are never
+replayed.
+
+### Local targeted checks
+
+Windows, 2026-10-18 local date. Logs use the prefix
+`D:/src/ArkDeck-wt/tools/recommission-windows-hdc-` and suffix `-20261018.log`.
+The existing per-chat Cargo cache is reused with two build jobs.
+
+- `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --lib
+  rockchip_executor::tests::recommission_postflight -- --nocapture` against the
+  original implementation exits 101 (`regression-red`): the Windows case reports
+  the same malformed five-column-family timeout as the real execution, while
+  the existing format passes.
+- With the fix, `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --lib
+  rockchip_executor::tests -- --nocapture` exits 0: 18 cases pass
+  (`regression-green`). These fixtures do not operate the connected board.
+- `clippy -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-soak --all-targets
+  -- -D warnings` through the same runner exits 0 (`clippy`).
+- `test -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-soak --lib` exits 0
+  (`libraries`): 415 hoststore cases pass with four existing ignored cases;
+  agentd and soak each pass three cases.
+- `test -p arkdeck-agentd --bin arkdeck-agentd --test windows_flash_lane_process`
+  exits 0 (`native-flash`): 43 binary cases and three isolated Windows lane
+  cases pass.
+- Required `fmt --all --check` reaches Windows command-line limit OS error 206
+  and exits 1 (`fmt`). Direct `rustfmt --edition 2024 --config skip_children=true
+  --check` over both changed Rust files exits 0 (`fmt-files`).
+- Fresh Cargo metadata and `catalog_test_views.load` validate the closed source,
+  fixture and target inventory, exit 0 (`catalog-inventory`). Only the two
+  changed source hashes were refreshed; fixture bytes and routes are unchanged.
+- `ARKDECK_PYTHON=python sh scripts/check-sdd.sh` exits 0 (`sdd-native`). The
+  sandboxed Git Bash attempt failed at Windows DLL initialization before running
+  the check (`sdd`); native execution completed normally.
+- `git diff --check` exits 0. No contract inputs, Swift or App code changed;
+  contract generation and platform builds are left to selected PR CI.
+
+### CI
+
+The parser fix requires checks on its own PR head. The runs above cover the
+published current-attachment fix, not this increment.

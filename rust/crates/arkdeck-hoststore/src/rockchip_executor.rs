@@ -637,6 +637,13 @@ impl ResolvedHdc<'_> {
 }
 
 impl HdcDispatch for ResolvedHdc<'_> {
+    fn registered_windows_tuple(&self) -> Option<&'static arkdeck_provider_hdc::WindowsHdcTuple> {
+        self.resolved()
+            .as_ref()
+            .ok()
+            .and_then(|hdc| hdc.registered_windows_tuple())
+    }
+
     fn mutation_identity_current(&self) -> bool {
         self.resolved()
             .as_ref()
