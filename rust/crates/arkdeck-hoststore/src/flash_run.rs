@@ -434,6 +434,23 @@ impl FlashRunner<'_> {
         descriptor: &CatalogOperation,
         completed: &BTreeSet<String>,
     ) -> Result<Option<String>, RunRefusal> {
+        let recovery = run
+            .record
+            .admission_evidence()
+            .is_some_and(|evidence| evidence.get("completeOverwriteRecovery").is_some());
+        if recovery || run.record.operation() == "flash.recommission@1" {
+            let flash = self.flash.ok_or_else(uncertain)?;
+            let state = self
+                .runner
+                .jobs
+                .arkforge_state(&run.record.job_id)
+                .map_err(|_| uncertain())?;
+            if let Err(reason) = state.require_recovery_completion(&run.record, flash.lane) {
+                run.record.timeline.push(reason);
+                run.persist(self.runner.jobs)?;
+                return Err(uncertain());
+            }
+        }
         let from = run.record.state.clone();
         run.transition(&from, "finalizing", "steps-complete")?;
         if let Err(detail) = self.publish_final(run, descriptor, completed) {
@@ -456,10 +473,6 @@ impl FlashRunner<'_> {
                 .map(|()| None);
         }
         run.record.set_operation_failure(None);
-        let recovery = run
-            .record
-            .admission_evidence()
-            .is_some_and(|evidence| evidence.get("completeOverwriteRecovery").is_some());
         let mut established = None;
         if recovery {
             // The covered intents keep their unknown outcomes; the epoch is
@@ -1529,6 +1542,9 @@ impl FlashRunner<'_> {
                 ),
             ))));
         }
+        job.state
+            .require_recovery_completion(&run.record, flash.lane)
+            .map_err(Stop::Unknown)?;
         job.state.completion = Some(receipt.clone());
         jobs.persist_arkforge_state(&job_id, &job.state)
             .map_err(|_| Stop::Refused(uncertain()))?;
@@ -1611,6 +1627,9 @@ impl FlashRunner<'_> {
                 "ArkForge returned no canonical completed-plan postflight receipt for {job_id}"
             )));
         }
+        job.state
+            .require_recovery_completion(&run.record, flash.lane)
+            .map_err(Stop::Unknown)?;
         let arguments = plan_completion_arguments(id).ok_or_else(|| Stop::Refused(uncertain()))?;
         let workflow = json!({
             "id": id, "kind": step.kind, "effect": step.effect,
@@ -1671,6 +1690,9 @@ impl FlashRunner<'_> {
                 "ArkForge returned no canonical completed-plan postflight receipt for {job_id}"
             )));
         }
+        job.state
+            .require_recovery_completion(&run.record, flash.lane)
+            .map_err(Stop::Unknown)?;
         let facts: BTreeMap<String, String> = receipt.facts.iter().cloned().collect();
         let confirmed = run.clock()?;
         let recommission = run

@@ -13,6 +13,8 @@ use arkdeck_provider_arkforge::{
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, PoisonError};
+#[path = "flash_lane/recovery_completion.rs"]
+mod recovery_completion;
 
 /// The lane's toolchain, which every StepPermit binds.
 pub const TOOLCHAIN: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
@@ -265,6 +267,13 @@ pub fn receipt(execution: &Execution, canonical: bool) -> ActionReceipt {
 }
 
 impl FlashLane for FakeLane {
+    fn maintenance_source(
+        &self,
+        execution: &Execution,
+    ) -> Result<arkdeck_provider_arkforge::maintenance::SourceRecords, String> {
+        recovery_completion::source(execution, &self.fakes.current().perform)
+    }
+
     fn recommission_quiescent(&self, source: &Execution) -> Result<(), String> {
         self.fakes.recommission_quiescent(source)
     }

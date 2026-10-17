@@ -502,3 +502,82 @@ The existing per-chat Cargo cache is reused with two build jobs.
 
 The parser fix requires checks on its own PR head. The runs above cover the
 published current-attachment fix, not this increment.
+
+## Complete readback proof before recovery publication
+
+The partial hardware readback exposed a separate completion defect: a canonical
+postflight receipt alone was projected onto all write, readback and reboot
+outcomes. An isolated runner regression reproduces the real two-full-hash,
+seven-typed-skip pattern; the previous implementation incorrectly published
+`recovered` and a superseding epoch.
+
+Runtime now checks the Provider's retained sealed plan and durable Job receipts
+before accepting complete-overwrite completion. The exact correlated Job must be
+terminal and contain one successful receipt for every step. All nine published
+partition effects must have a unique matching write and full-hash verification,
+including exact offsets, lengths and expected content hashes, followed by reboot
+and canonical postflight. Skips, sampled or short reads, missing or duplicate
+receipts, other-Job receipts, failed writes and unavailable proof retain the
+blocker. This enforces the existing full-verification requirement; it changes
+neither the Provider coverage declaration nor the allocation budget.
+
+The check covers live completion, later step projection, postflight publication,
+finalization and passive reconciliation. Reconciliation revalidates even an old
+cached postflight receipt, so restarting cannot promote that cache into full
+proof. All reads use the owned Provider's sealed-plan/Job store; no verification
+read, new permit or device action is dispatched by this check.
+
+The regression retains original unknown history and the consumed allocation,
+publishes no epoch or binding revision, and refuses another allocation after
+restart. Complete synthetic recovery and publication-crash recovery still pass.
+Synthetic receipts remain test data and do not complete hardware acceptance.
+A separate read-only HDC mount diagnostic confirmed that the booted `userdata`
+filesystem is mounted writable. It is diagnostic data, not Runtime evidence;
+the existing verification port must refuse full-hash claims on a writable mount.
+
+### Local targeted checks
+
+Windows, 2026-10-18 local date. Logs use
+`D:/src/ArkDeck-wt/tools/recommission-windows-hdc-full-readback-` and suffix
+`-20261018.log`, in the same two-job per-chat Cargo cache.
+
+- `test -p arkdeck-hoststore --test flash_run incomplete_recommission_readback
+  -- --nocapture` exits 101 on the previous implementation (`red`): actual
+  result `recovered`, expected `waitingForRecovery`.
+- `test -p arkdeck-hoststore --test flash_run recommission -- --nocapture`
+  exits 0 (`boundaries`): eight cases pass, including eleven incomplete-proof
+  variants and passive reconciliation with and without a cached postflight.
+- `clippy -p arkdeck-provider-arkforge -p arkdeck-hoststore -p arkdeck-agentd
+  -p arkdeck-soak --all-targets -- -D warnings` exits 0 (`clippy`).
+- Closed inventory validation exits 0 (`inventory`): 948 source files, with
+  both new cases assigned only to Catalogs declaring recommission; all original
+  fixture bytes remain unchanged.
+- The final focused recommission run exits 0 with all eight cases passing
+  after the final proof classification changes (`final`).
+- `test -p arkdeck-provider-arkforge -p arkdeck-hoststore -p arkdeck-agentd
+  -p arkdeck-soak --lib` exits 0 (`libraries`): 91 Provider, 415 hoststore,
+  three daemon and three soak cases pass; four existing hoststore cases remain
+  ignored.
+- `test -p arkdeck-agentd --bin arkdeck-agentd --test windows_flash_lane_process`
+  exits 0 (`native`): 43 binary and three isolated native lane cases pass.
+- Required `fmt --all --check` exits 1 at Windows OS error 206 (`fmt`); direct
+  rustfmt checks over all eleven changed Rust files exit 0 (`fmt-files`).
+- `ARKDECK_PYTHON=python sh scripts/check-sdd.sh` exits 0 (`sdd`), as does
+  `git diff --check`. No contract inputs, Swift or App code changed; the full
+  cross-platform and frozen-oracle checks remain selected PR CI work.
+
+### CI
+
+This increment is based on PR [#2663](https://github.com/ArkDeck/ArkDeck/pull/2663)
+and requires its own PR checks before publication. Its CI does not constitute
+hardware acceptance or renew the exhausted independent allocation.
+
+PR [#2664](https://github.com/ArkDeck/ArkDeck/pull/2664) initially failed the
+host-independent formatting step in run
+[39054024691](https://github.com/ArkDeck/ArkDeck/actions/runs/39054024691): the
+non-Windows daemon test imports `flash_lane.rs` through `#[path]`, so its new
+child module needed an explicit path relative to that shared file. A direct
+rustfmt check of that consumer reproduced the failure (`format-red`, exit 1).
+The explicit child path makes both consumers pass (`format-green`, exit 0),
+with no change to the test data or assertions. The refreshed source inventory
+retains all original fixture bytes and both new Catalog routes.

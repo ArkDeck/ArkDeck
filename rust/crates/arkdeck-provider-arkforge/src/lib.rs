@@ -33,6 +33,7 @@ pub use lane_preview::{LanePlanPreview, LanePreview, LanePreviewHost};
 mod loader;
 pub mod maintenance;
 pub mod managed_control;
+mod recovery_completion;
 
 pub use lane_client::{NativeLaneConnections, NativePlanConnections};
 

@@ -152,6 +152,18 @@ pub trait FlashLane: Send + Sync {
     ) -> Result<crate::maintenance::SourceRecords, String> {
         Err("maintenance source storage is unavailable".into())
     }
+    /// Read the sealed plan and durable receipts before projecting a complete
+    /// overwrite as successful. Postflight alone cannot prove every partition.
+    /// This passive check creates no Job, permit, control request or device I/O.
+    fn require_recovery_completion(&self, execution: &Execution) -> Result<(), String> {
+        if execution.execution_purpose != "supersedingRecovery" {
+            return Ok(());
+        }
+        let source = self
+            .maintenance_source(execution)
+            .map_err(|reason| format!("flash.recoveryFullReadbackMissing: {reason}"))?;
+        crate::recovery_completion::validate(execution, &source)
+    }
     fn restoration_plan(
         &self,
         _artifact: &LaneArtifact,

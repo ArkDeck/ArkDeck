@@ -176,6 +176,11 @@ impl JobReconciler<'_> {
                 held.persist(self.jobs)?;
                 return Ok(None);
             }
+            if let Err(reason) = state.require_recovery_completion(&held.run.record, lane) {
+                held.run.record.timeline.push(reason);
+                held.persist(self.jobs)?;
+                return Ok(None);
+            }
             // The receipt is durable before the outcome, as a live drive
             // makes it; a crash re-entering here reuses it.
             state.completion = Some(receipt.clone());
