@@ -434,6 +434,8 @@ pub struct FlashHostFacts {
     loader: Box<dyn LoaderObserver + Send + Sync>,
     normal_identity_records: PathBuf,
     normal_identity_observer: NormalHardwareIdentityObserver,
+    recommission_identity_observer: NormalHardwareIdentityObserver,
+    recommission_state: Option<PathBuf>,
     resolve_topology: arkdeck_provider_arkforge::TopologyResolver,
 }
 
@@ -452,6 +454,10 @@ impl FlashHostFacts {
             loader: Box::new(NoArkForgeLane),
             normal_identity_records: application_support_root.join("normal-loader-identity"),
             normal_identity_observer: observe_normal_loader_identity,
+            recommission_identity_observer: |hdc, usb, key, _| {
+                arkdeck_provider_hdc::observe_recommission_identity(hdc, usb, key)
+            },
+            recommission_state: None,
             resolve_topology: arkdeck_provider_arkforge::host_topology_digest,
         }
     }
@@ -477,6 +483,107 @@ impl FlashHostFacts {
     ) -> Self {
         self.normal_identity_observer = observer;
         self
+    }
+
+    /// Runtime composition only; no caller can supply identity proof.
+    pub fn with_recommission_identity_observer(
+        mut self,
+        observer: NormalHardwareIdentityObserver,
+    ) -> Self {
+        self.recommission_identity_observer = observer;
+        self
+    }
+
+    pub fn with_recommission_state(mut self, state: &Path) -> Self {
+        self.recommission_state = Some(state.to_path_buf());
+        self
+    }
+
+    /// Only the independent recommission operation requests discovery of the
+    /// Loader locator. Ordinary Flash retains its bound-identity check.
+    pub fn operation_facts(
+        &self,
+        targets: &TargetStore,
+        hdc: Option<&dyn HdcDispatch>,
+        target_id: &str,
+        recommission: bool,
+    ) -> Result<RockchipFacts, String> {
+        let mut facts = self.current_facts(targets, hdc, target_id)?;
+        if !recommission {
+            return Ok(facts);
+        }
+        let binding = self
+            .bindings
+            .load_if_present()
+            .map_err(self::binding)?
+            .ok_or("recommission.originalBindingMissing")?;
+        if binding.revision != 1
+            || facts.binding_revision != 1
+            || facts.device_mode != "hdc"
+            || binding.identity() != facts.identity_sha256
+            || sha256_hex(facts.execution_connect_key.as_bytes()) != facts.identity_sha256
+            || binding
+                .confirmed_hdc_normal_alias()
+                .map_err(self::binding)?
+                .is_some()
+            || binding
+                .evidence
+                .iter()
+                .any(|entry| entry == crate::loader_binding::LOADER_FIRST)
+        {
+            return Err("recommission.requiresOriginalNormalOnlyBinding".into());
+        }
+        let observation = (self.recommission_identity_observer)(
+            hdc.ok_or("recommission.hardwareReadUnavailable")?,
+            &RockchipUsbProbe(Arc::clone(&self.census)),
+            &facts.execution_connect_key,
+            &facts.identity_sha256,
+        )
+        .map_err(str::to_owned)?;
+        if observation.vendor_serial.is_none()
+            || observation.normal_identity_sha256 != facts.identity_sha256
+            || observation.usb_topology != binding.usb_topology
+        {
+            return Err("recommission.identityChainIncomplete".into());
+        }
+        let binding_bytes = serde_json::to_vec(&json!({
+            "revision": binding.revision, "serialSHA256": binding.identity(),
+            "usbTopology": binding.usb_topology, "evidence": binding.evidence,
+        }))
+        .map_err(|_| "recommission.bindingEncodingFailed")?;
+        let chain = crate::job_owner::flash_recommission::IdentityChain {
+            target_id: facts.target_id.clone(),
+            binding_revision: facts.binding_revision,
+            normal_identity_sha256: observation.normal_identity_sha256.clone(),
+            hardware_serial_sha256: observation.hardware_serial_sha256.clone(),
+            loader_serial_sha256: observation.loader_serial_sha256().to_owned(),
+            connector_sha256: observation.connector_identity_sha256.clone(),
+            usb_topology: observation.usb_topology.clone(),
+            provider_sha256: facts.tool_sha256.clone(),
+            binding_snapshot_sha256: sha256_hex(&binding_bytes),
+        };
+        chain.validate()?;
+        let record = persist_normal_hardware_identity(
+            &self.normal_identity_records,
+            &NormalIdentitySubject {
+                target_id: &facts.target_id,
+                binding_revision: facts.binding_revision,
+                stable_identity_sha256: &facts.identity_sha256,
+                provider_executable_sha256: &facts.tool_sha256,
+                job_id: None,
+                step_id: None,
+            },
+            &observation,
+        )?;
+        facts
+            .server_facts
+            .insert("dayu200RecommissionObservationSHA256".into(), record);
+        facts.server_facts.insert(
+            crate::job_owner::flash_recommission::CHAIN_FACT.into(),
+            serde_json::to_string(&chain).map_err(|_| "recommission.identityEncodingFailed")?,
+        );
+        crate::job_owner::flash_recommission::IdentityChain::from_facts(&facts)?;
+        Ok(facts)
     }
 
     /// Host connector observation port. The control surface cannot provide it.
@@ -536,6 +643,39 @@ impl FlashHostFacts {
         };
         let digest = sha256_hex(device.serial.as_bytes());
         let binding = self.bindings.load_if_present().map_err(self::binding)?;
+        if let Some(state) = &self.recommission_state {
+            let mut proven = Vec::new();
+            for target in target_records(targets)? {
+                if let Some(chain) = crate::job_owner::flash_recommission::verified_identity_chain(
+                    state,
+                    &target.target_id,
+                    &target.identity,
+                )? && target.identity == chain.loader_serial_sha256
+                    && target.binding_revision == chain.binding_revision + 1
+                    && (is_dayu200_hdc_normal(device) && digest == chain.normal_identity_sha256
+                        || is_dayu200_loader(device) && digest == chain.loader_serial_sha256)
+                    && (self.resolve_topology)(&device.topology).as_ref()
+                        == Some(&chain.connector_sha256)
+                {
+                    let origin =
+                        crate::job_owner::flash_recommission::verified_recovery_job(state, &chain)?;
+                    if targets.has_conflicting_hdc_alias_owner(
+                        &target.target_id,
+                        &target.connect_key,
+                        &chain.normal_identity_sha256,
+                        &origin,
+                    )? {
+                        return Ok(status("ambiguous", 1, Some(mode), None));
+                    }
+                    proven.push(target);
+                }
+            }
+            match proven.as_slice() {
+                [target] => return Ok(status("exactBoundTarget", 1, Some(mode), Some(target))),
+                [] => (),
+                _ => return Ok(status("ambiguous", 1, Some(mode), None)),
+            }
+        }
         if is_dayu200_hdc_normal(device)
             && let Some(binding) = &binding
             && let Some(routed) = self.aliases.load_if_present().map_err(post_flash)?
@@ -707,8 +847,55 @@ impl FlashHostFacts {
             CROSS_MODE_BINDING.into(),
             if covered { "satisfied" } else { "unprepared" }.into(),
         );
+        let recommission_chain = self
+            .recommission_state
+            .as_ref()
+            .map(|state| {
+                crate::job_owner::flash_recommission::verified_identity_chain(
+                    state,
+                    &target.target_id,
+                    &target.identity,
+                )
+            })
+            .transpose()?
+            .flatten();
+        if let Some(chain) = &recommission_chain {
+            let origin = crate::job_owner::flash_recommission::verified_recovery_job(
+                self.recommission_state
+                    .as_deref()
+                    .ok_or("recommission.stateUnavailable")?,
+                chain,
+            )?;
+            if targets.has_conflicting_hdc_alias_owner(
+                &target.target_id,
+                &execution_connect_key,
+                &chain.normal_identity_sha256,
+                &origin,
+            )? {
+                return Err("recommission.conflictingNormalIdentityOwner".into());
+            }
+            if target.identity != chain.loader_serial_sha256
+                || target.binding_revision != chain.binding_revision + 1
+                || sha256_hex(execution_connect_key.as_bytes()) != chain.normal_identity_sha256
+            {
+                return Err("recommission.verifiedBindingProjectionIncomplete".into());
+            }
+            server_facts.insert(CROSS_MODE_BINDING.into(), "satisfied".into());
+            server_facts.insert(ALIAS_IDENTITY.into(), chain.normal_identity_sha256.clone());
+            server_facts.insert(ALIAS_TOPOLOGY.into(), chain.usb_topology.clone());
+        }
         let (device_mode, build_fingerprint, profile_id, usb_topology) =
             self.live_facts(hdc, &execution_connect_key, &target.identity);
+        if let Some(chain) = &recommission_chain
+            && device_mode == "loader"
+            && usb_topology
+                .as_ref()
+                .and_then(|topology| (self.resolve_topology)(topology))
+                .as_ref()
+                != Some(&chain.connector_sha256)
+        {
+            return Err("recommission.verifiedLoaderConnectorDrifted".into());
+        }
         if device_mode == "loader"
             && !server_facts.contains_key(ALIAS_IDENTITY)
             && let Some(binding) = &covered_binding
@@ -740,6 +927,14 @@ impl FlashHostFacts {
                 });
             let status = match observed {
                 Ok(observation) => {
+                    if recommission_chain.as_ref().is_some_and(|chain| {
+                        observation.normal_identity_sha256 != chain.normal_identity_sha256
+                            || observation.hardware_serial_sha256 != chain.hardware_serial_sha256
+                            || observation.loader_serial_sha256() != chain.loader_serial_sha256
+                            || observation.connector_identity_sha256 != chain.connector_sha256
+                    }) {
+                        return Err("recommission.verifiedHardwareLineageDrifted".into());
+                    }
                     let persisted = persist_normal_hardware_identity(
                         &self.normal_identity_records,
                         &NormalIdentitySubject {

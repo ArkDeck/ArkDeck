@@ -39,7 +39,12 @@ use std::io;
 /// Swift `ArkForgeFlashOperation.containsDurableRecordReference`: the
 /// canonical reference, the alias as its records spell it, and the alias's
 /// retired versioned spelling.
-const ARKFORGE: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+const ARKFORGE: [&str; 4] = [
+    "flash.full-restore@1",
+    "flash.dayu200",
+    "flash.dayu200@1",
+    "flash.recommission@1",
+];
 /// The states whose ArkForge execution lived in the lane process a restart
 /// lost (Swift `lostArkForgeExecutionState`).
 const LANE_HELD: [&str; 7] = [

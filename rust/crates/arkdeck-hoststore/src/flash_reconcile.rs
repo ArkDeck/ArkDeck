@@ -19,7 +19,12 @@ use crate::job_owner::arkforge_job_state::ArkForgeJobState;
 use arkdeck_provider_arkforge::{Execution, FlashLane, Terminal, validate_completion};
 
 /// Swift `ArkForgeFlashOperation.containsDurableRecordReference`.
-pub(super) const ARKFORGE: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+pub(super) const ARKFORGE: [&str; 4] = [
+    "flash.full-restore@1",
+    "flash.dayu200",
+    "flash.dayu200@1",
+    "flash.recommission@1",
+];
 /// Swift `arkForgePlanCompletionSemanticCode`.
 const PLAN_COMPLETION_CODE: &str = "arkForgePlanCompletion";
 /// Swift `recordUnprovenLaneRecovery`'s reason.

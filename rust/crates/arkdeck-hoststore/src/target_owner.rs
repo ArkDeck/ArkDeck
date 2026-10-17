@@ -834,6 +834,15 @@ impl TargetStore {
         &self,
         advance: &crate::rockchip_binding::LineageAdvance,
     ) -> Result<AdvancedTarget, String> {
+        self.advance_binding_lineage_for_target(advance, None)
+    }
+
+    #[cfg(any(target_os = "macos", windows))]
+    pub(crate) fn advance_binding_lineage_for_target(
+        &self,
+        advance: &crate::rockchip_binding::LineageAdvance,
+        expected_target: Option<&str>,
+    ) -> Result<AdvancedTarget, String> {
         let mut advanced = None;
         self.publishing("", |targets, _| {
             let (record, updated) =
@@ -844,6 +853,13 @@ impl TargetStore {
                         message: refusal,
                         details: None,
                     })?;
+            if expected_target.is_some_and(|expected| record.target_id != expected) {
+                return Err(WireError {
+                    code: "storeFailure".into(),
+                    message: "recommission.bindingTargetMismatch".into(),
+                    details: None,
+                });
+            }
             let publications = if updated {
                 vec![Publication::Targets(
                     targets.encode().map_err(|_| unreadable(""))?,

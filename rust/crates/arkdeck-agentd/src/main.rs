@@ -621,6 +621,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                     development_usb::flash_census(source, file.clone()),
                 )
                 .with_rockusb(composed.rockusb())
+                .with_recommission_state(&root.join("jobs-state"))
                 .with_arkforge_loader(&composed.runtime_directory),
             )
             .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(

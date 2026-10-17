@@ -81,8 +81,21 @@ fn recovery(v: &Value) -> Result {
             ("profileReference", text),
             ("destructiveEpochOrdinal", integer),
         ],
-        &[],
+        &[("recommission", recommission_allocation)],
     )
+}
+fn recommission_allocation(v: &Value) -> Result {
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        let allocation: crate::job_owner::flash_recommission::Allocation =
+            serde_json::from_value(v.clone()).map_err(unreadable)?;
+        allocation.validate().map_err(unreadable)
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = v;
+        Err(unreadable(()))
+    }
 }
 fn covered_intent(v: &Value) -> Result {
     shape(

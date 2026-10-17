@@ -110,6 +110,7 @@ impl MaintenanceReads for NativeMaintenanceReads {
                 connect_key: facts.execution_connect_key,
                 usb_topology: execution.usb_topology.clone(),
                 loader_first_connector_sha256: None,
+                recommission: None,
             },
         ))
     }
@@ -336,6 +337,7 @@ pub(crate) fn materialize<'a>(
             artifact_facts: prepared.artifact_facts,
             identity: Some(prepared.execution.stable_identity_sha256),
             binding_revision: Some(prepared.execution.binding_revision),
+            recommission: None,
         },
         None,
     ))

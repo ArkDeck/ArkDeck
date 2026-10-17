@@ -15,6 +15,7 @@ public enum ArkForgeFlashOperation {
   /// admission. Callers on request or execution boundaries must use `contains`.
   public static func containsDurableRecordReference(_ reference: String) -> Bool {
     contains(reference) || legacyDurableReferences.contains(reference)
+      || reference == "flash.recommission@1"
   }
 
   public static func canonicalReference(for reference: String) -> String? {

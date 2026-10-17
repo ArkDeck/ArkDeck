@@ -100,8 +100,8 @@ def catalog_rust(inputs, info: dict, generator=None) -> str:
     return contract.formatted(generator.generate_rust(operations, info["catalogDigest"]))
 
 
-def historical_catalog_inputs(current):
-    return pinned_catalog_inputs(current, catalog_test_views.OLD)
+def historical_catalog_inputs(current, digest=catalog_test_views.OLD):
+    return pinned_catalog_inputs(current, digest)
 
 
 def pinned_catalog_inputs(current, digest):
@@ -122,7 +122,7 @@ def pinned_catalog_inputs(current, digest):
     files, blobs = dict(current.files), dict(current.blobs)
     for path, row in operation_paths.items():
         reference = f"{row['id']}@{row.get('version', 0)}"
-        if reference in catalog_test_views.MAINTENANCE_REFERENCES:
+        if reference in catalog_test_views.ADDITIONAL_REFERENCES:
             del files[path]
             del blobs[path]
             continue
@@ -138,6 +138,17 @@ def pinned_catalog_inputs(current, digest):
     expected_matrix = generator.generate_matrix(list(actual.values()), profiles, actual_digest)
     if current.files[matrix_path].decode().replace("\r\n", "\n") != expected_matrix:
         raise ValueError("historical input requires the full official Catalog matrix")
+    if actual_digest == catalog_test_views.RECOMMISSION:
+        for path in list(files):
+            if path.startswith('Catalog/profiles/') and path.endswith('.json'):
+                profile = json.loads(files[path])
+                if 'flash.recommission@1' in profile.get('supportedOperations', []):
+                    profile['supportedOperations'].remove('flash.recommission@1')
+                    data = (json.dumps(profile, indent=2, ensure_ascii=True) + '\n').encode()
+                    files[path] = data
+                    blobs[path] = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+        profiles = [json.loads(data) for path, data in files.items()
+                    if path.startswith('Catalog/profiles/') and path.endswith('.json')]
     matrix = generator.generate_matrix(list(selected.values()), profiles, digest).encode()
     files[matrix_path] = matrix
     blobs[matrix_path] = hashlib.sha1(f"blob {len(matrix)}\0".encode() + matrix).hexdigest()
@@ -152,7 +163,7 @@ def historical_review_projection(current: bytes, digest=catalog_test_views.OLD) 
     for key in old:
         if key.startswith("flash.") and old[key] != new[key]:
             raise ValueError("historical Flash descriptor drift")
-    known = (catalog_test_views.OLD, catalog_test_views.CURRENT, catalog_test_views.MAINTENANCE)
+    known = catalog_test_views.CATALOGS
     present = [digest for digest in known if current.count(digest.encode())]
     if len(present) != 1 or current.count(present[0].encode()) != 1:
         raise ValueError("exact current Flash projection Catalog required")
@@ -356,8 +367,10 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
                   "generatedRustSourceDigest": rust_digest(view / "rust"),
                   "deviceAcceptance": False, "completed": False, "commands": []}
     if historical:
+        if info['catalogDigest'] not in (catalog_test_views.OLD, catalog_test_views.CURRENT):
+            raise ValueError('unknown pinned historical execution Catalog')
         provenance['testView'] = 'pinned-historical-catalog'
-        provenance['historicalCatalogDigest'] = catalog_test_views.OLD
+        provenance['historicalCatalogDigest'] = info['catalogDigest']
         provenance['nonCatalogInputSource'] = provenance['sourceRevision']
     if observed:
         provenance['testView'] = 'pinned-observed-catalog'
@@ -399,7 +412,7 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
         if historical:
             receipt = output / 'test-execution/historical/catalog-execution.json'
             value = json.loads(receipt.read_bytes())
-            if (value.get('catalogDigest') != catalog_test_views.OLD
+            if (value.get('catalogDigest') != info['catalogDigest']
                     or value.get('completed') is not True
                     or not any(row.get('execution') == 'actual' and row.get('passed', 0) > 0
                                for row in value['targets'])):

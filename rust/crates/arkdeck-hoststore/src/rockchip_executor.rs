@@ -169,16 +169,35 @@ impl RockchipActionExecutor for RockchipExecutor {
         descriptor: &HostAction,
         action_directory: &Path,
     ) -> Result<ExecutionResult, LaneFailure> {
+        let (action, recommission) = match action {
+            RockchipAction::Recommission { action, binding } => {
+                if !crate::rockchip_action::recommission_budget_current(binding) {
+                    return Err(LaneFailure::ConfirmedNotExecuted(
+                        "recommission.independentBudgetExpired".into(),
+                    ));
+                }
+                (action.as_ref(), Some(binding))
+            }
+            action => (action, None),
+        };
         let hdc = ResolvedHdc {
             resolver: &*self.hdc,
             resolved: OnceCell::new(),
         };
         let transition =
             RockchipLoaderTransition::new(&hdc, &*self.usb, &*self.loader, &*self.clock);
+        let transition = if recommission.is_some() {
+            transition.requiring_normal_identity()
+        } else {
+            transition
+        };
         let observer = RockchipHdcObserver::new(&hdc, &*self.usb, &*self.clock);
         let request_id =
             |suffix: &str| format!("{}-{}-{suffix}", descriptor.job_id, descriptor.step_id);
         match action {
+            RockchipAction::Recommission { .. } => Err(LaneFailure::ConfirmedNotExecuted(
+                "nested recommission action is forbidden".into(),
+            )),
             RockchipAction::EnterLoader(connect_key) => {
                 let proven = transition
                     .enter_loader(
@@ -190,6 +209,16 @@ impl RockchipActionExecutor for RockchipExecutor {
                         },
                         &self.enter_loader_readback,
                         |identity| {
+                            if let Some(pin) = recommission {
+                                verify_recommission_hardware(
+                                    pin,
+                                    identity,
+                                    &descriptor.expected_identity_sha256,
+                                )?;
+                                if !crate::rockchip_action::recommission_budget_current(pin) {
+                                    return Err("recommission.independentBudgetExpired".into());
+                                }
+                            }
                             persist_normal_hardware_identity(
                                 action_directory,
                                 &NormalIdentitySubject {
@@ -472,6 +501,31 @@ impl RockchipActionExecutor for RockchipExecutor {
                         &WaitBudget::BOUND_RECONNECT,
                     )
                     .map_err(hdc_failure)?;
+                if let Some(pin) = recommission {
+                    let hardware = arkdeck_provider_hdc::observe_recommission_identity(
+                        &hdc,
+                        &*self.usb,
+                        &verified.identity.connect_key,
+                    )
+                    .map_err(|reason| LaneFailure::Failed(reason.into()))?;
+                    verify_recommission_hardware(
+                        pin,
+                        &hardware,
+                        &descriptor.expected_identity_sha256,
+                    )
+                    .map_err(LaneFailure::Failed)?;
+                    let observation =
+                        persist_postflight_hardware(action_directory, descriptor, &hardware)?;
+                    let mut summary = verified.summary();
+                    summary.extend(hardware.summary());
+                    summary.insert(
+                        "recommissionPostflightObservationSHA256".into(),
+                        observation,
+                    );
+                    // Recommissioning publishes its identity lineage only after
+                    // the complete Runtime recovery epoch, never here.
+                    return Ok(result(summary, verified.receipts));
+                }
                 let binding = PostFlashBinding {
                     schema_version: SCHEMA_VERSION.to_owned(),
                     target_id: descriptor.target_id.clone(),
@@ -548,6 +602,22 @@ fn persist_postflight_hardware(
         hardware,
     )
     .map_err(LaneFailure::Failed)
+}
+
+fn verify_recommission_hardware(
+    pin: &arkdeck_provider_arkforge::RecommissionBinding,
+    hardware: &arkdeck_provider_hdc::NormalHardwareIdentity,
+    expected_loader: &str,
+) -> Result<(), String> {
+    if hardware.vendor_serial.is_none()
+        || hardware.normal_identity_sha256 != pin.normal_identity_sha256
+        || hardware.hardware_serial_sha256 != pin.hardware_serial_sha256
+        || hardware.connector_identity_sha256 != pin.connector_sha256
+        || !hardware.matches_loader(expected_loader)
+    {
+        return Err("recommission.hardwareIdentityDrifted".into());
+    }
+    Ok(())
 }
 
 /// The descriptor-bound HDC of one action: Swift's `resolveHDC()`, resolved

@@ -34,7 +34,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         cls.packet = (cls.real_root / cls.packet_path).read_bytes()
         cls.generator = (cls.real_root / 'scripts/catalog_gen/generate.py').read_bytes()
         cls.projection = (cls.real_root / runner.REVIEW_PROJECTION).read_bytes()
-        cls.projection_digest = next(digest for digest in (views.CURRENT, views.MAINTENANCE)
+        cls.projection_digest = next(digest for digest in views.CATALOGS
                                      if cls.projection.count(digest.encode()) == 1)
 
     def setUp(self):
@@ -72,14 +72,14 @@ class HistoricalCatalogInputs(unittest.TestCase):
                           for row in operations.values()}, self.old)
         self.assertEqual(historical.directories, before.directories)
         additions = {path for path, row in self.operation_paths(before).items()
-                     if f"{row['id']}@{row.get('version', 0)}" in views.MAINTENANCE_REFERENCES}
+                     if f"{row['id']}@{row.get('version', 0)}" in views.ADDITIONAL_REFERENCES}
         self.assertEqual(set(historical.files), set(before.files) - additions)
-        allowed = set(operations) | {MATRIX}
+        allowed = set(operations) | {MATRIX, "Catalog/profiles/dayu200.json"}
         for path, data in before.files.items():
             if path not in allowed | additions:
                 self.assertEqual(historical.files[path], data, path)
                 self.assertEqual(historical.blobs[path], before.blobs[path], path)
-        for path in allowed:
+        for path in allowed & historical.files.keys():
             self.assertEqual(historical.blobs[path], blob(historical.files[path]), path)
         self.assertEqual(self.inputs, before, 'the caller snapshot must remain immutable')
         actual_info = runner.contract.baseline(historical)
@@ -105,17 +105,32 @@ class HistoricalCatalogInputs(unittest.TestCase):
         row = copy.deepcopy(paths[path])
         row['defaultPolicyIssuance'] = 'enabled'
         changed.files[path] = json.dumps(row).encode()
-        with self.assertRaisesRegex(ValueError, 'maintenance Catalog descriptor drift'):
+        with self.assertRaisesRegex(ValueError, 'Catalog descriptor drift'):
             runner.historical_catalog_inputs(changed)
 
     def test_historical_matrix_is_the_full_official_generation(self):
         historical = runner.historical_catalog_inputs(self.inputs)
-        profiles = [json.loads(data) for path, data in self.inputs.files.items()
+        profiles = [json.loads(data) for path, data in historical.files.items()
                     if path.startswith('Catalog/profiles/') and path.endswith('.json')]
         generator = runner.load_module('historical_catalog_expected_generator',
                                       self.base / 'scripts/catalog_gen/generate.py')
         expected = generator.generate_matrix(list(self.old.values()), profiles, views.OLD).encode()
         self.assertEqual(historical.files[MATRIX], expected)
+
+    def test_e4_oracles_keep_their_exact_catalog_after_recommission_is_published(self):
+        observed = runner.historical_catalog_inputs(self.inputs, views.CURRENT)
+        operations = self.operation_paths(observed)
+        self.assertEqual(len(operations), 32)
+        self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row
+                          for row in operations.values()}, self.new)
+        self.assertEqual(runner.contract.baseline(observed)['catalogDigest'], views.CURRENT)
+        self.assertFalse(runner.historical_workspace_covers(self.inputs, observed))
+        self.assertTrue(runner.historical_workspace_covers(observed, observed))
+        self.assertEqual(runner.historical_catalog_inputs(observed, views.CURRENT), observed)
+        projected = runner.historical_review_projection(self.projection, views.CURRENT)
+        self.assertEqual(projected, self.projection.replace(views.RECOMMISSION.encode(), views.CURRENT.encode()))
+        with self.assertRaises(ValueError):
+            runner.historical_catalog_inputs(self.inputs, views.RECOMMISSION)
 
     def test_materialized_development_baseline_pins_its_actual_selected_bytes(self):
         historical = runner.historical_catalog_inputs(self.inputs)
@@ -212,7 +227,7 @@ class HistoricalCatalogInputs(unittest.TestCase):
         result = runner.historical_review_projection(self.projection)
         self.assertEqual(result, self.projection.replace(self.projection_digest.encode(), views.OLD.encode()))
         self.assertEqual(result.count(views.OLD.encode()), 1)
-        self.assertNotIn(views.CURRENT.encode(), result)
+        self.assertNotIn(views.RECOMMISSION.encode(), result)
         self.assertEqual(runner.historical_review_projection(result), result)
 
     def test_unknown_missing_duplicate_or_mixed_projection_catalog_refuses(self):

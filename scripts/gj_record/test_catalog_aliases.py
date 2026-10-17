@@ -36,9 +36,10 @@ class CanonicalCatalogTests(Case):
         self.assertEqual(digest, catalog._DIGEST.search(text).group(1))
         self.assertNotIn("flash.dayu200", operations)
         self.assertIn("flash.full-restore@1", operations)
+        self.assertIn("flash.recommission@1", operations)
         self.assertIn("flash.verify@1", operations)
         self.assertIn("flash.restore-boot-loop@1", operations)
-        self.assertEqual(len(operations), 33)
+        self.assertEqual(len(operations), 34)
         with self.assertRaisesRegex(catalog.CatalogError, "does not hash"):
             catalog.parse_generated(text.replace("flash.dayu200", "flash.changed-alias"))
 

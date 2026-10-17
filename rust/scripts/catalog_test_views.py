@@ -1,4 +1,4 @@
-"""Closed test-only c6/e4/maintenance routing; frozen authority is never transplanted.
+"""Closed test-only Catalog routing; frozen authority is never transplanted.
 
 The source inventory closes additions to tests and target declarations. Mixed
 targets use exact libtest names. Receipts require execution of every selected
@@ -15,8 +15,11 @@ import tomllib
 
 OLD = 'c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036'
 CURRENT = 'e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7'
+RECOMMISSION = '9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080'
 MAINTENANCE = '0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c'
 MAINTENANCE_REFERENCES = {'flash.verify@1', 'flash.restore-boot-loop@1'}
+ADDITIONAL_REFERENCES = MAINTENANCE_REFERENCES | {'flash.recommission@1'}
+CATALOGS = [OLD, CURRENT, MAINTENANCE, RECOMMISSION]
 PACKET_SHA = 'd1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab'
 MANIFEST = 'scripts/catalog-test-views.json'
 
@@ -148,25 +151,34 @@ def classified_catalog(actual: dict, old: dict, current: dict) -> str:
         return OLD
     if actual == current:
         return CURRENT
-    if set(actual) != set(current) | MAINTENANCE_REFERENCES or any(actual[key] != current[key] for key in current):
+    additions = set(actual) - set(current)
+    if (additions not in (MAINTENANCE_REFERENCES, ADDITIONAL_REFERENCES)
+            or set(actual) != set(current) | additions
+            or any(actual[key] != current[key] for key in current)):
         raise ValueError('unclassified complete Catalog')
     rows = sorted(actual.values(), key=lambda row: (row['id'], row.get('version', 0)))
     digest = sha(json.dumps(rows, ensure_ascii=True, sort_keys=True, separators=(',', ':')).encode())
-    if digest != MAINTENANCE:
-        raise ValueError('maintenance Catalog descriptor drift')
+    expected = MAINTENANCE if additions == MAINTENANCE_REFERENCES else RECOMMISSION
+    if digest != expected:
+        raise ValueError('maintenance Catalog descriptor drift' if expected == MAINTENANCE
+                         else 'recommission Catalog descriptor drift')
     return digest
 
 
-def catalog(rust: Path) -> str:
+def catalog_table_digest(rust: Path, rows: list[dict]) -> str:
     old, current = catalogs(rust)
-    directory = rust.parent / 'Catalog/operations'
-    rows = [json.loads(path.read_bytes()) for path in sorted(directory.glob('*.json'))]
     actual = {f"{row['id']}@{row.get('version', 0)}": row for row in rows}
     if len(rows) != len(actual):
-        raise ValueError('duplicate actual Catalog source')
-    digest = classified_catalog(actual, old, current)
+        raise ValueError('complete actual Catalog source required')
+    return classified_catalog(actual, old, current)
+
+
+def catalog(rust: Path) -> str:
+    directory = rust.parent / 'Catalog/operations'
+    rows = [json.loads(path.read_bytes()) for path in sorted(directory.glob('*.json'))]
+    digest = catalog_table_digest(rust, rows)
     generated = (rust / 'crates/arkdeck-contract/src/catalog_generated.rs').read_text(encoding='utf-8')
-    if generated != generated_catalog(rows, digest):
+    if digest is None or generated != generated_catalog(rows, digest):
         raise ValueError('unknown Catalog or generated source drift')
     return digest
 
@@ -190,7 +202,7 @@ def load(rust: Path, metadata: dict) -> dict:
     value = json.loads((rust / MANIFEST).read_bytes())
     if set(value) != {'schemaVersion', 'catalogs', 'sources', 'fixtures', 'targets'} or value['schemaVersion'] != 'arkdeck.catalog-test-views/1':
         raise ValueError('unknown test routing manifest')
-    if value['catalogs'] != [OLD, CURRENT, MAINTENANCE] or value['sources'] != source_inventory(rust):
+    if value['catalogs'] != CATALOGS or value['sources'] != source_inventory(rust):
         raise ValueError('unclassified test source or manifest drift')
     if value['fixtures'] != fixture_inventory(rust):
         raise ValueError('closed original and versioned fixture inventory drift')
@@ -200,11 +212,11 @@ def load(rust: Path, metadata: dict) -> dict:
     custom = custom_harnesses(metadata)
     for key, row in value['targets'].items():
         fields = set(row) - {'platformFunctions', 'customCases', 'childEntries', 'optionalMaterial', 'modulePlatforms'}
-        if fields != {'route', 'functions', 'ignored'} or row['route'] not in ('both', 'current', 'historical', 'lineage', 'mixed'):
+        if fields != {'route', 'functions', 'ignored'} or row['route'] not in ('both', 'current', 'historical', 'recommission', 'lineage', 'mixed'):
             raise ValueError('unknown test target route')
         if (row['route'] == 'mixed') != bool(row['functions']):
             raise ValueError('mixed target requires explicit function routes')
-        if any(not re.fullmatch(r'[A-Za-z0-9_:]+', name) or route not in ('both', 'current', 'historical', 'lineage') for name, route in row['functions'].items()):
+        if any(not re.fullmatch(r'[A-Za-z0-9_:]+', name) or route not in ('both', 'current', 'historical', 'recommission', 'lineage') for name, route in row['functions'].items()):
             raise ValueError('unknown test function route')
         if not isinstance(row['ignored'], list) or len(row['ignored']) != len(set(row['ignored'])) or any(
                 not re.fullmatch(r'[A-Za-z0-9_:]+', name) for name in row['ignored']):
@@ -248,15 +260,15 @@ def listed(text: str) -> list[str]:
 
 
 def selected(row: dict, names: list[str], digest: str) -> list[str]:
-    if digest not in (OLD, CURRENT, MAINTENANCE):
+    if digest not in CATALOGS:
         raise ValueError('unknown test execution Catalog')
-    view = {OLD: 'historical', CURRENT: 'current', MAINTENANCE: 'maintenance'}[digest]
-    allowed = (view, 'both', 'lineage') if digest in (OLD, CURRENT) else (view, 'both')
+    view = {OLD: 'historical', CURRENT: 'current', MAINTENANCE: 'maintenance', RECOMMISSION: 'recommission'}[digest]
+    routes = {view, 'both'} | ({'lineage'} if digest in (OLD, CURRENT) else set())
     if row['route'] == 'mixed':
         if set(row['functions']) != set(names):
             raise ValueError('unclassified mixed-target function')
-        return [name for name in names if row['functions'][name] in allowed]
-    return names if row['route'] in allowed else []
+        return [name for name in names if row['functions'][name] in routes]
+    return names if row['route'] in routes else []
 
 
 def platform_row(row: dict, platform: str) -> dict:

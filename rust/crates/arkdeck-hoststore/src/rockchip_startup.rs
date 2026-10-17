@@ -119,6 +119,13 @@ pub fn reconcile_rockchip_startup(
     state_directory: &Path,
 ) -> Result<RockchipStartup, String> {
     let mut startup = RockchipStartup::default();
+    if let Err(reason) =
+        crate::job_owner::flash_recommission::reconcile_bindings(state_directory, targets)
+    {
+        startup.lines.push(format!(
+            "Recommission identity lineage remains fail-closed: {reason}"
+        ));
+    }
     let Some(root) = state_directory.parent() else {
         return Ok(startup);
     };
@@ -297,7 +304,7 @@ pub(crate) fn journal(directory: &Path) -> Result<(ReplayFacts, Vec<Value>), Str
 
 /// Swift `ArkForgeFlashRequest.profileReference(submittedReference:inputs:)`.
 fn profile_reference<'a>(operation: &str, inputs: &'a Value) -> Option<&'a str> {
-    let name = if operation == CANONICAL_FLASH {
+    let name = if matches!(operation, CANONICAL_FLASH | "flash.recommission@1") {
         "deviceProfileRef"
     } else {
         "deviceProfile"
@@ -308,7 +315,7 @@ fn profile_reference<'a>(operation: &str, inputs: &'a Value) -> Option<&'a str> 
 /// Swift `verification(record:)`: the requested post-flash verification,
 /// `full` when none is named.
 fn verification<'a>(operation: &str, inputs: &'a Value) -> &'a str {
-    let key = if operation == CANONICAL_FLASH {
+    let key = if matches!(operation, CANONICAL_FLASH | "flash.recommission@1") {
         "verification"
     } else {
         "postFlashVerification"
@@ -341,7 +348,7 @@ fn published_partition_plan() -> Option<Vec<String>> {
 /// Swift `partitionPlan(record:)`: the canonical operation's full restore is
 /// the published plan; the retired one names its partitions.
 fn partition_plan(operation: &str, inputs: &Value) -> Option<Vec<String>> {
-    if operation == CANONICAL_FLASH {
+    if matches!(operation, CANONICAL_FLASH | "flash.recommission@1") {
         if inputs["intent"] != "fullRestore" {
             return None;
         }

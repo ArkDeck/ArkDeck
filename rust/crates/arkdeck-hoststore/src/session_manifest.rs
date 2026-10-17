@@ -420,8 +420,13 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
     }
     if unresolved {
         require(
-            ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"]
-                .contains(&text(workflow, "kind")?)
+            [
+                "flash.full-restore@1",
+                "flash.dayu200",
+                "flash.dayu200@1",
+                "flash.recommission@1",
+            ]
+            .contains(&text(workflow, "kind")?)
                 && text(workflow, "providerIdentity")? == "arkforge"
                 && text(tool, "profileIdentifier")? == text(workflow, "kind")?
                 && array(doc, "compensations")?.is_empty()

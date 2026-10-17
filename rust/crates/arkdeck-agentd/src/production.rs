@@ -752,6 +752,7 @@ pub(crate) fn compose(
                 arkdeck_platform::usb_host_devices,
             )
             .with_rockusb(arkforge.rockusb())
+            .with_recommission_state(&layout.state)
             .with_arkforge_loader(&arkforge.runtime_directory),
         )
         .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(

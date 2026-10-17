@@ -232,6 +232,73 @@ fn every_permit_is_single_use_and_time_bounded() {
     assert_eq!(permit.signing_body[at + key.len()], 0xf5);
 }
 
+#[test]
+fn recommission_deadline_clips_permits_and_refuses_retransmission_and_clock_rollback() {
+    let clock = Arc::new(AtomicU64::new(1_000_100));
+    let observed = Arc::clone(&clock);
+    let mut authority = ExecutionAuthority::with_topology_resolver(
+        approved_plan(),
+        secret(),
+        crate::topology_digest,
+        move || observed.load(Ordering::SeqCst),
+    );
+    authority.set_dispatch_window(1_000_000, 1_000_200);
+    let permit = signed(authority.admit(&snapshot()));
+    let decoded = StepPermit::from_canonical_bytes(&permit.signing_body).unwrap();
+    assert_eq!(decoded.expires_at_epoch_ms, 1_000_200);
+    assert_eq!(signed(authority.admit(&snapshot())), permit);
+    clock.store(1_000_200, Ordering::SeqCst);
+    assert_eq!(
+        refused(authority.admit(&snapshot())),
+        Refusal::DispatchBudgetExpired
+    );
+    assert!(
+        !authority.dispatch_budget_current(),
+        "host control shares the deadline"
+    );
+    clock.store(1_000_150, Ordering::SeqCst);
+    authority.set_dispatch_window(1_000_000, 2_000_000);
+    assert_eq!(
+        refused(authority.admit(&snapshot())),
+        Refusal::DispatchBudgetExpired
+    );
+    assert_eq!(authority.issued_count(), 1);
+}
+
+#[test]
+fn recommission_invalid_windows_and_backward_clock_cannot_issue_authority() {
+    for (start, end) in [(2_000_000, 2_000_001), (1, 1), (1, 1_800_002)] {
+        let mut authority = authority();
+        authority.set_dispatch_window(start, end);
+        assert_eq!(
+            refused(authority.admit(&snapshot())),
+            Refusal::DispatchBudgetExpired
+        );
+        assert_eq!(authority.issued_count(), 0);
+    }
+    let clock = Arc::new(AtomicU64::new(1_000_100));
+    let observed = Arc::clone(&clock);
+    let mut authority = ExecutionAuthority::with_topology_resolver(
+        approved_plan(),
+        secret(),
+        crate::topology_digest,
+        move || observed.load(Ordering::SeqCst),
+    );
+    authority.set_dispatch_window(1_000_000, 2_000_000);
+    assert!(authority.dispatch_budget_current());
+    clock.store(1_000_099, Ordering::SeqCst);
+    assert_eq!(
+        refused(authority.admit(&snapshot())),
+        Refusal::DispatchBudgetExpired
+    );
+    clock.store(1_000_101, Ordering::SeqCst);
+    assert_eq!(
+        refused(authority.admit(&snapshot())),
+        Refusal::DispatchBudgetExpired
+    );
+    assert_eq!(authority.issued_count(), 0);
+}
+
 // MARK: the matrix — ways an admission must not be signed
 
 #[test]

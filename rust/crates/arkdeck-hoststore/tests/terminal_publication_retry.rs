@@ -570,14 +570,31 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
         );
     }
     let mut compiled = by_reference(&compiled);
-    if arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::MAINTENANCE {
+    if arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::RECOMMISSION {
+        assert_eq!(compiled.len(), 35);
+        assert!(compiled.remove("flash.recommission@1").is_some());
+        let complete: Vec<_> = compiled.values().cloned().collect();
+        assert_eq!(
+            arkdeck_contract::sha256_hex(
+                &support::catalog_lineage::catalog_bytes(&complete).unwrap()
+            ),
+            support::catalog_lineage::MAINTENANCE,
+            "every published maintenance descriptor remains exact"
+        );
+    }
+    if matches!(
+        arkdeck_contract::CATALOG_DIGEST,
+        support::catalog_lineage::MAINTENANCE | support::catalog_lineage::RECOMMISSION
+    ) {
         assert_eq!(compiled.len(), 34);
         assert!(compiled.remove("flash.verify@1").is_some());
         assert!(compiled.remove("flash.restore-boot-loop@1").is_some());
     }
     let expected = match arkdeck_contract::CATALOG_DIGEST {
         support::catalog_lineage::OLD => &old,
-        support::catalog_lineage::CURRENT | support::catalog_lineage::MAINTENANCE => &current,
+        support::catalog_lineage::CURRENT
+        | support::catalog_lineage::MAINTENANCE
+        | support::catalog_lineage::RECOMMISSION => &current,
         _ => panic!("a future Catalog needs an explicit input compatibility review"),
     };
     assert_eq!(&compiled, expected);
@@ -620,6 +637,8 @@ fn an_unfinalized_source_with_unknown_or_malformed_inputs_cannot_clear_any_impor
         "malformedLease",
         "unknownOperation",
         "operationNotInSourceCatalog",
+        "recommissionNotInSourceCatalog",
+        "recommissionNotInMaintenanceCatalog",
         "unknownDigest",
         "unknownField",
         "wrongEnum",
@@ -653,6 +672,24 @@ fn an_unfinalized_source_with_unknown_or_malformed_inputs_cannot_clear_any_impor
                         record[key]["inputs"] =
                             json!({"sourceJobId":"job-source", "budgetMs":1000});
                     }
+                    "recommissionNotInSourceCatalog" | "recommissionNotInMaintenanceCatalog" => {
+                        record[key]["operation"] = json!({"id":"flash.recommission", "version":1});
+                        record[key]["inputs"] = json!({
+                            "artifactLease": lease, "deviceProfileRef":"dayu200",
+                            "intent":"fullRestore", "verification":"full",
+                            "retainedJobId":"job-source"
+                        });
+                        if let Some(descriptor) =
+                            arkdeck_contract::operation_catalog::CatalogOperation::lookup(
+                                "flash.recommission",
+                                Some(1),
+                            )
+                        {
+                            descriptor
+                                .validate_inputs(record[key]["inputs"].as_object().unwrap())
+                                .unwrap();
+                        }
+                    }
                     "unknownDigest" => (),
                     "unknownField" => record[key]["inputs"]["unregistered"] = lease.clone(),
                     "wrongEnum" | "wrongType" => {
@@ -680,6 +717,17 @@ fn an_unfinalized_source_with_unknown_or_malformed_inputs_cannot_clear_any_impor
             if scenario == "operationNotInSourceCatalog" {
                 record["operationReference"] = json!("flash.verify@1");
                 record["catalogDigest"] = json!(support::catalog_lineage::OLD);
+            }
+            if matches!(
+                scenario,
+                "recommissionNotInSourceCatalog" | "recommissionNotInMaintenanceCatalog"
+            ) {
+                record["operationReference"] = json!("flash.recommission@1");
+                record["catalogDigest"] = json!(if scenario == "recommissionNotInSourceCatalog" {
+                    support::catalog_lineage::OLD
+                } else {
+                    support::catalog_lineage::MAINTENANCE
+                });
             }
             if scenario == "unknownDigest" {
                 record["catalogDigest"] = json!("b".repeat(64));

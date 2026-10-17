@@ -14,6 +14,8 @@ const OBSERVED_INPUT_CATALOG: &str =
 
 const MAINTENANCE_INPUT_CATALOG: &str =
     "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c";
+const RECOMMISSION_INPUT_CATALOG: &str =
+    "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080";
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ImportReference {
@@ -192,7 +194,17 @@ impl JobStore {
                     || (current == MAINTENANCE_INPUT_CATALOG
                         && matches!(record.catalog_digest(), HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG)
                         // The two new operations never existed in either source Catalog.
-                        && !matches!(request.reference().as_str(), "flash.verify@1" | "flash.restore-boot-loop@1"));
+                        && !matches!(request.reference().as_str(), "flash.verify@1" | "flash.restore-boot-loop@1"))
+                    || (current == RECOMMISSION_INPUT_CATALOG
+                        && request.reference() != "flash.recommission@1"
+                        && (record.catalog_digest() == MAINTENANCE_INPUT_CATALOG
+                            || (matches!(
+                                record.catalog_digest(),
+                                HISTORICAL_INPUT_CATALOG | OBSERVED_INPUT_CATALOG
+                            ) && !matches!(
+                                request.reference().as_str(),
+                                "flash.verify@1" | "flash.restore-boot-loop@1"
+                            ))));
                 if !compatible {
                     return Err(unreadable(()));
                 }

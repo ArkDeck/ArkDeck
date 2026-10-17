@@ -291,6 +291,7 @@ fn fixture(campaign: &str) -> (LaneHost, Arc<Mutex<Script>>, LaneArtifact, Devic
         profile_id: "org.openharmony.dayu200@1.0.0".into(),
     };
     let binding = DeviceBinding {
+        recommission: None,
         connect_key: "hdc-alias".into(),
         stable_identity_sha256: "aa".repeat(32),
         target_id: "TGT-1".into(),

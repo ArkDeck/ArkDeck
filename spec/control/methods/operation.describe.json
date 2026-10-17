@@ -265,7 +265,13 @@
                 "imageBundleLease": {
                   "type": "string"
                 },
+                "inputEpochUtc": {
+                  "type": "string"
+                },
                 "intent": {
+                  "type": "string"
+                },
+                "keyboardArtifactLease": {
                   "type": "string"
                 },
                 "kind": {
@@ -322,6 +328,9 @@
                 "retainLatestCount": {
                   "type": "integer"
                 },
+                "retainedJobId": {
+                  "type": "string"
+                },
                 "signingPresetRef": {
                   "type": "string"
                 },
@@ -361,17 +370,17 @@
                 "unsignedHapArtifactLease": {
                   "type": "string"
                 },
+                "verification": {
+                  "enum": [
+                    "full"
+                  ],
+                  "type": "string"
+                },
                 "x": {
                   "type": "integer"
                 },
                 "y": {
                   "type": "integer"
-                },
-                "inputEpochUtc": {
-                  "type": "string"
-                },
-                "keyboardArtifactLease": {
-                  "type": "string"
                 },
                 "sourceJobId": {
                   "type": "string"

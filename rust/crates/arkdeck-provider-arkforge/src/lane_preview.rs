@@ -69,6 +69,7 @@ impl LanePlanPreview for LanePreviewHost {
             profile_id: self.profile_reference.clone(),
         };
         let binding = DeviceBinding {
+            recommission: None,
             connect_key: String::new(),
             stable_identity_sha256: arkdeck_contract::sha256_hex(usb_topology.as_bytes()),
             target_id: format!(

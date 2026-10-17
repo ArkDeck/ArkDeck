@@ -539,10 +539,11 @@ impl JobRecord {
     /// is one of `ArkForgeFlashOperation`'s durable references (the canonical
     /// one, its compatibility alias, or the pre-singleton `@1` alias).
     pub(crate) fn dayu200_flash(&self) -> bool {
-        const DURABLE: [&str; 4] = [
+        const DURABLE: [&str; 5] = [
             "flash.full-restore@1",
             "flash.dayu200",
             "flash.dayu200@1",
+            "flash.recommission@1",
             "flash.restore-boot-loop@1",
         ];
         let operation = &self.request["operation"];
@@ -980,6 +981,7 @@ impl JobRecord {
             "flash.full-restore@1"
                 | "flash.dayu200"
                 | "flash.dayu200@1"
+                | "flash.recommission@1"
                 | "flash.verify@1"
                 | "flash.restore-boot-loop@1"
         ) {

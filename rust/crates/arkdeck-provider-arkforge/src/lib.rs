@@ -41,8 +41,8 @@ pub use device_access::{
 };
 pub use flash_lane::{
     ActionReceipt, DeviceBinding, Execution, FlashLane, HostAction, HostReceipt, LaneArtifact,
-    LaneFailure, PrewarmReceipt, RockchipHost, Terminal, canonical_facts_digest,
-    validate_completion,
+    LaneFailure, PrewarmReceipt, RecommissionBinding, RockchipHost, Terminal,
+    canonical_facts_digest, validate_completion,
 };
 #[cfg(any(target_os = "macos", windows))]
 pub use lane::{

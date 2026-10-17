@@ -1,0 +1,253 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "flash.recommission",
+  "version": 1,
+  "title": "Recommission one expired archived unknown DAYU200 with an independent recovery budget and verified hardware identity chain",
+  "provider": "arkforge",
+  "effect": {
+    "minimum": "destructive",
+    "permitted": [
+      "destructive"
+    ]
+  },
+  "authorization": {
+    "destructive": "runtimeCapability"
+  },
+  "defaultPolicyIssuance": "enabled",
+  "binding": "confirmedDevice",
+  "concurrencyKey": "device-exclusive",
+  "inputs": {
+    "fields": {
+      "artifactLease": {
+        "type": "artifactLease",
+        "required": true,
+        "description": "Trusted full-restore image bundle lease; Runtime resolves immutable Artifact bytes before authorization."
+      },
+      "deviceProfileRef": {
+        "type": "string",
+        "required": true,
+        "enum": [
+          "dayu200"
+        ],
+        "description": "Published device profile reference selected after target admission; DAYU200 is the currently published profile."
+      },
+      "intent": {
+        "type": "string",
+        "required": true,
+        "enum": [
+          "fullRestore"
+        ],
+        "description": "Closed restore intent. It requests the profile's complete overwrite contract and cannot name partitions, addresses or tools."
+      },
+      "verification": {
+        "type": "string",
+        "required": true,
+        "enum": [
+          "full"
+        ],
+        "default": "full",
+        "description": "Full readback, reboot, build and hardware identity-chain verification are mandatory."
+      },
+      "retainedJobId": {
+        "type": "string",
+        "required": true,
+        "description": "One completed retained-risk archive. Runtime validates its unchanged history, expiry and complete uncertain-effect coverage; callers provide no proof or budget."
+      }
+    }
+  },
+  "outputs": {
+    "fields": {
+      "flashReport": {
+        "type": "artifactReference",
+        "required": true
+      },
+      "postFlashFacts": {
+        "type": "artifactReference",
+        "required": true
+      }
+    }
+  },
+  "steps": [
+    {
+      "stepID": "verify-image-bundle",
+      "kind": "verifyArtifact",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Archive classification, member validation and per-image hash against capability pins."
+    },
+    {
+      "stepID": "hash-images",
+      "kind": "hashFile",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none"
+    },
+    {
+      "stepID": "confirm-flash-intent",
+      "kind": "requestConfirmation",
+      "effect": "hostOnly",
+      "cancellation": "immediate",
+      "binding": "none",
+      "compensation": "none",
+      "notes": "Durable exact flash intent persisted before any device transition."
+    },
+    {
+      "stepID": "enter-loader-mode",
+      "kind": "enterUpdater",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "wait-loader-disconnect",
+      "kind": "waitForDisconnect",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "wait-loader-reconnect",
+      "kind": "waitForReconnect",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Rebind uses expected-transition evidence; the first newly appeared USB device is never trusted implicitly."
+    },
+    {
+      "stepID": "rebind-loader-identity",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "flash-partitions",
+      "kind": "flashPartition",
+      "effect": "destructive",
+      "cancellation": "criticalNonInterruptible",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Descriptor-bound executable; per-partition semantic verification; unknown outcome enters reconcile with zero automatic replay."
+    },
+    {
+      "stepID": "verify-flash-readback",
+      "kind": "verifyRemoteState",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "reboot-device",
+      "kind": "rebootDevice",
+      "effect": "deviceMutation",
+      "cancellation": "atSafeBoundary",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "wait-for-hdc",
+      "kind": "waitForReconnect",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none"
+    },
+    {
+      "stepID": "rebind-and-verify-build",
+      "kind": "probeDevice",
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "compensation": "none",
+      "notes": "Build fingerprint/device facts readback against the flashed bundle."
+    },
+    {
+      "stepID": "capture-post-flash-diagnostics",
+      "kind": "captureRemoteStdout",
+      "actionRef": {
+        "catalogId": "arkdeck-diagnostics",
+        "actionId": "boundedHilog"
+      },
+      "effect": "readOnly",
+      "cancellation": "immediate",
+      "binding": "confirmedDevice",
+      "optional": true,
+      "compensation": "none"
+    },
+    {
+      "stepID": "finalize-session",
+      "kind": "finalizeSession",
+      "effect": "hostOnly",
+      "cancellation": "atSafeBoundary",
+      "binding": "none",
+      "compensation": "none"
+    }
+  ],
+  "timeoutSeconds": 1800,
+  "outputByteBudget": 134217728,
+  "retry": {
+    "preflightAttempts": 1,
+    "mutationAttempts": 1
+  },
+  "unknownOutcome": "reconcileRequired",
+  "completeOverwriteRecovery": {
+    "contractVersion": "1.0.0",
+    "profiles": [
+      {
+        "reference": "dayu200",
+        "coveredEffects": [
+          "partition:uboot",
+          "partition:resource",
+          "partition:boot_linux",
+          "partition:ramdisk",
+          "partition:system",
+          "partition:vendor",
+          "partition:updater",
+          "partition:chip_ckm",
+          "partition:userdata"
+        ]
+      }
+    ],
+    "overwriteStepID": "flash-partitions",
+    "verificationStepIDs": [
+      "verify-flash-readback",
+      "reboot-device",
+      "wait-for-hdc",
+      "rebind-and-verify-build"
+    ]
+  },
+  "artifacts": [
+    {
+      "name": "flash-report.json",
+      "role": "derived",
+      "mediaType": "application/json",
+      "privacy": "standard",
+      "required": true
+    },
+    {
+      "name": "post-flash-facts.json",
+      "role": "raw",
+      "mediaType": "application/json",
+      "privacy": "sensitive",
+      "required": true
+    },
+    {
+      "name": "post-flash-hilog.txt",
+      "role": "raw",
+      "mediaType": "text/plain",
+      "privacy": "sensitive",
+      "required": false
+    }
+  ],
+  "profiles": [
+    "dayu200"
+  ]
+}

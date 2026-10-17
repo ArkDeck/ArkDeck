@@ -14,6 +14,139 @@ const FACTORY_KEY: &str = "fedcba9876543210fedcba9876543210";
 const FACTORY_CPU: &str = "13579bdf2468ace0";
 const PROVIDER: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
+fn recommission_pin() -> arkdeck_provider_arkforge::RecommissionBinding {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    arkdeck_provider_arkforge::RecommissionBinding {
+        normal_identity_sha256: sha256_hex(FACTORY_KEY.as_bytes()),
+        hardware_serial_sha256: sha256_hex(FACTORY_CPU.as_bytes()),
+        connector_sha256: "d".repeat(64),
+        reserved_at_epoch_ms: now - 1000,
+        expires_at_epoch_ms: now - 1000 + 1_800_000,
+    }
+}
+
+#[test]
+fn recommission_hardware_drift_prevents_the_loader_command_and_expiry_reads_nothing() {
+    for changed in 0..3 {
+        let fixture = fixture(
+            Hdc::factory_answering(vec![]),
+            Usb::normal(FACTORY_KEY),
+            None,
+        );
+        let mut pin = recommission_pin();
+        match changed {
+            0 => pin.hardware_serial_sha256 = "a".repeat(64),
+            1 => pin.connector_sha256 = "a".repeat(64),
+            _ => {
+                pin.reserved_at_epoch_ms = 1;
+                pin.expires_at_epoch_ms = 1_800_001;
+            }
+        }
+        let action = RockchipAction::Recommission {
+            action: Box::new(RockchipAction::EnterLoader(FACTORY_KEY.into())),
+            binding: pin,
+        };
+        let refusal = fixture
+            .executor
+            .execute(
+                &action,
+                &action.descriptor(
+                    "job-recommission",
+                    "enter-loader",
+                    "TGT-HOST",
+                    1,
+                    FACTORY_KEY,
+                    &identity(),
+                    PROVIDER,
+                ),
+                &fixture.root.0,
+            )
+            .unwrap_err();
+        assert_eq!(
+            refusal,
+            if changed == 2 {
+                LaneFailure::ConfirmedNotExecuted("recommission.independentBudgetExpired".into())
+            } else {
+                LaneFailure::Failed("normalLoaderIdentity.observationPersistenceFailed; no Loader command dispatched".into())
+            }
+        );
+        let calls = fixture.hdc.arguments();
+        assert!(
+            calls
+                .iter()
+                .all(|args| !args.iter().any(|arg| arg == "reboot")),
+            "{calls:?}"
+        );
+        if changed == 2 {
+            assert!(calls.is_empty());
+        } else {
+            assert!(!calls.is_empty());
+        }
+    }
+}
+
+#[test]
+fn recommission_postflight_verifies_the_chain_without_publishing_an_early_alias() {
+    let mut usb = Usb::bound(FACTORY_KEY, "42", "42");
+    usb.normal = Usb::normal(FACTORY_KEY).normal;
+    let fixture = fixture(
+        Hdc::factory_answering(vec![targets(FACTORY_KEY), out("published-build\nrk3568\n")]),
+        usb,
+        None,
+    );
+    let alias_root = fixture.root.0.join("aliases");
+    let executor = fixture
+        .executor
+        .with_post_flash_aliases(PostFlashAliasStore::new(&alias_root), || {
+            "2026-10-17T00:00:00Z".into()
+        });
+    let action = RockchipAction::Recommission {
+        action: Box::new(RockchipAction::VerifyBoundBuild {
+            expectation: crate::rockchip_action::Expectation {
+                previous_connect_key: FACTORY_KEY.into(),
+                previous_identity_sha256: sha256_hex(FACTORY_KEY.as_bytes()),
+                usb_topology: "42".into(),
+            },
+            product_model: "rk3568".into(),
+            build_version: "published-build".into(),
+        }),
+        binding: recommission_pin(),
+    };
+    let verified = executor
+        .execute(
+            &action,
+            &action.descriptor(
+                "job-recommission",
+                "postflight",
+                "TGT-HOST",
+                1,
+                FACTORY_KEY,
+                &identity(),
+                PROVIDER,
+            ),
+            &fixture.root.0,
+        )
+        .unwrap();
+    assert_eq!(
+        verified.summary["hardwareSerialSha256"],
+        sha256_hex(FACTORY_CPU.as_bytes())
+    );
+    assert_eq!(verified.summary["loaderSerialSha256"], identity());
+    assert_eq!(
+        verified.summary["recommissionPostflightObservationSHA256"].len(),
+        64
+    );
+    assert!(
+        PostFlashAliasStore::new(&alias_root)
+            .load_if_present()
+            .unwrap()
+            .is_none()
+    );
+}
+
 fn identity() -> String {
     sha256_hex(b"0123456789abcdef")
 }

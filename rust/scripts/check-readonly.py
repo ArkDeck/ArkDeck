@@ -14,7 +14,8 @@ and `device candidates` must equal the recorded fixtures in
 `rust/tests/fixtures/readonly-machine-output` byte for byte on every host that runs the
 matrix (TASK-XPA-002: Windows output byte-equal to the macOS fixtures), once the one
 wall-clock member, `observedAt`, reads as its label. The closed c6/e4 source views
-also select their own Catalog digest; every other fixture byte remains exact.
+select their own Catalog digest. The closed recommission view additionally has
+one unavailable operation and counts of 33; all other fixture bytes stay exact.
 Rewrite them from a run with
 `--write-machine-output` after a change that legitimately moves them; every host's lane
 then has to reproduce the new bytes.
@@ -144,11 +145,11 @@ def assert_boundaries() -> None:
     # crates, never its mechanics (transport, platform, the daemon): the
     # client; the messages its controller surface takes and returns; the
     # authority API whose StepPermit the lane signs; and the typed ids and
-    # digests that permit is made of; the pure ArkDeck maintenance adapter
-    # orchestrates Runtime-owned ports without standalone authority or transport.
+    # digests that permit is made of (协调会话 2026-09-26). The maintenance
+    # adapter exports pure typed maintenance contracts over those same crates.
     arkforge = {"arkdeck-provider-arkforge": {
-        "arkforge-authority-api", "arkforge-client", "arkforge-core", "arkforge-ipc",
-        "arkforge-arkdeck-adapter"}}
+        "arkforge-arkdeck-adapter", "arkforge-authority-api", "arkforge-client",
+        "arkforge-core", "arkforge-ipc"}}
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
     for path in manifests:
@@ -384,24 +385,30 @@ def validate_spk3(directory: Path) -> None:
 
 
 def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
-    """Derive only the Catalog identity for the two fully verified source views.
+    """Project only the exact declared delta for fully verified source views.
 
-    This changes no recording or fixture. Operation counts and every byte outside
-    the single Catalog digest still have to equal the pinned machine output.
+    This changes no recording or fixture. The additive recommission view adds
+    only the declared unavailable operations; every other machine-output byte is pinned.
     """
-    assert digest in (catalog_test_views.OLD, catalog_test_views.CURRENT, catalog_test_views.MAINTENANCE), "unknown Catalog view"
+    assert digest in catalog_test_views.CATALOGS, "unknown Catalog view"
     assert name in MACHINE_OUTPUT_LEAVES, "unknown machine-output leaf"
-    if name == "operations" and digest == catalog_test_views.MAINTENANCE:
+    additions = []
+    if digest in (catalog_test_views.MAINTENANCE, catalog_test_views.RECOMMISSION):
+        additions = [("flash.verify@1", "readOnly"), ("flash.restore-boot-loop@1", "destructive")]
+    if digest == catalog_test_views.RECOMMISSION:
+        additions.append(("flash.recommission@1", "destructive"))
+    if name == 'operations' and additions:
         document = json.loads(data)
-        rows = document["result"]
-        assert len(rows) == 32 and len({row["reference"] for row in rows}) == 32
-        template = next(row for row in rows if row["reference"] == "flash.full-restore@1")
-        assert template["availability"] == "unavailable" and template["binding"] == "confirmedDevice"
-        assert template["reasons"] == ["provider arkforge is not registered"]
-        for reference, effect in [("flash.verify@1", "readOnly"), ("flash.restore-boot-loop@1", "destructive")]:
-            row = dict(template, reference=reference, canonicalReference=reference, minimumEffect=effect)
-            rows.append(row)
-        rows.sort(key=lambda row: row["reference"])
+        rows = document['result']
+        assert len(rows) == 32 and len({row['reference'] for row in rows}) == 32
+        source = [row for row in rows if row['reference'] == 'flash.full-restore@1']
+        assert len(source) == 1 and source[0]['availability'] == 'unavailable'
+        assert source[0]['binding'] == 'confirmedDevice'
+        assert source[0]['reasons'] == ['provider arkforge is not registered']
+        for reference, effect in additions:
+            assert not any(row['reference'] == reference for row in rows)
+            rows.append(dict(source[0], reference=reference, canonicalReference=reference, minimumEffect=effect))
+        rows.sort(key=lambda row: row['reference'])
         return (json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(',', ':')) + '\n').encode()
     if name not in ("doctor", "deep", "healthy"):
         return data
@@ -416,23 +423,28 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
         "unknown fixture Catalog"
     original = b'"digest":"' + declared["digest"].encode("ascii") + b'"'
     assert data.count(original) == 1, "machine-output Catalog digest must occur once"
-    if digest == catalog_test_views.MAINTENANCE:
-        encoded = json.dumps(declared, sort_keys=True, separators=(',', ':')).encode()
-        assert data.count(encoded) == 1
-        changed = dict(declared, digest=digest, operationCount=34, unavailableOperationCount=34)
-        finding = next(row for row in report["findings"] if row["code"] == "catalog.unavailableOperations")
-        assert finding["details"] == {"unavailableOperationCount": 32}
-        assert data.count(b'{"unavailableOperationCount":32}') == 1
-        projected = data.replace(encoded, json.dumps(changed, sort_keys=True, separators=(',', ':')).encode(), 1)
-        return projected.replace(b'{"unavailableOperationCount":32}', b'{"unavailableOperationCount":34}', 1)
-    return data.replace(original, b'"digest":"' + digest.encode("ascii") + b'"', 1)
-
+    result = data.replace(original, b'"digest":"' + digest.encode("ascii") + b'"', 1)
+    if additions:
+        count = 32 + len(additions)
+        encode = lambda row: json.dumps(row, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+        before = encode(declared)
+        assert data.count(before) == 1, 'exact Catalog summary required'
+        added = dict(declared, digest=digest, operationCount=count, unavailableOperationCount=count)
+        result = data.replace(before, encode(added), 1)
+        findings = [row for row in report['findings']
+                    if row['code'] == 'catalog.unavailableOperations']
+        assert len(findings) == 1 and findings[0]['details'] == {'unavailableOperationCount': 32}
+        before_finding = encode(findings[0])
+        assert result.count(before_finding) == 1, 'exact unavailable-operation finding required'
+        after_finding = dict(findings[0], details={'unavailableOperationCount': count})
+        result = result.replace(before_finding, encode(after_finding), 1)
+    return result
 
 
 def machine_output(directory: Path, rows: list, write: bool) -> None:
     """The pinned leaves' stdout, `observedAt` labelled, against the fixtures (or written
     to them): the same bytes on macOS, Linux and, through the signed pipe, Windows."""
-    # This validates all 32 operation sources and the complete generated Rust
+    # This validates the complete declared operation set and generated Rust
     # Catalog against the immutable lineage, rather than trusting an output hash.
     digest = None if write else catalog_test_views.catalog(ROOT / "rust")
     for name in MACHINE_OUTPUT_LEAVES:

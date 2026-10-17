@@ -193,6 +193,29 @@ impl MutationAuthority<'_> {
         self.prove(jobs, status.as_ref())
     }
 
+    pub(crate) fn require_recommission_state(
+        &self,
+        jobs: &JobStore,
+        source: &str,
+        now: &str,
+    ) -> Result<(), arkdeck_contract::WireError> {
+        let record = jobs.read_snapshot(source)?;
+        let identity = record.materialized_identity().ok_or_else(|| {
+            crate::job_record::failure("recordUnreadable", "recommission.sourceIdentityMissing")
+        })?;
+        jobs.recommission_source(source, identity, now)
+            .map_err(|reason| crate::job_record::failure("recordUnreadable", &reason))?;
+        let mut roots = Vec::new();
+        if let Some(sessions) = self.sessions {
+            let status = sessions.waited_status()?;
+            let root = status["rootPath"].as_str().ok_or_else(|| {
+                crate::job_record::failure("recordUnreadable", "Runtime Session root is unreadable")
+            })?;
+            roots.push(std::path::PathBuf::from(root));
+        }
+        jobs.require_recommission_mutation_state(self.default_root, &roots, source, now)
+    }
+
     /// Whether the mutation state is proved now, as the operation
     /// availability report asks it, without waiting for the storage lock: a
     /// held lock reads as not proved. Swift's availability reads no storage,

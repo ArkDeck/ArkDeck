@@ -221,6 +221,40 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             readonly.machine_output_fixture("doctor", unknown, old)
 
+    def test_recommission_doctor_counts_agree_with_the_unavailable_operation_finding(self):
+        digest = readonly.catalog_test_views.RECOMMISSION
+        for name in ("doctor", "deep", "healthy"):
+            with self.subTest(name=name):
+                original = (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes()
+                expected = json.loads(original)
+                report = expected["error"]["details"]["report"] if name == "healthy" else expected["result"]
+                report["checks"]["catalog"].update(
+                    digest=digest, operationCount=35, unavailableOperationCount=35)
+                findings = [row for row in report["findings"]
+                            if row["code"] == "catalog.unavailableOperations"]
+                self.assertEqual(len(findings), 1)
+                findings[0]["details"] = {"unavailableOperationCount": 35}
+                actual = readonly.machine_output_fixture(name, original, digest)
+                self.assertEqual(json.loads(actual), expected)
+
+    def test_recommission_view_preserves_original_and_maintenance_operations(self):
+        original = (readonly.MACHINE_OUTPUT / "operations.cli.jsonl").read_bytes()
+        digest = readonly.catalog_test_views.RECOMMISSION
+        projected = readonly.machine_output_fixture("operations", original, digest)
+        document = json.loads(projected)
+        added = [row for row in document["result"] if row["reference"] == "flash.recommission@1"]
+        self.assertEqual(len(document["result"]), 35)
+        self.assertEqual(len(added), 1)
+        self.assertEqual(added[0]["canonicalReference"], "flash.recommission@1")
+        self.assertEqual(added[0]["availability"], "unavailable")
+        document["result"].remove(added[0])
+        maintenance = readonly.machine_output_fixture(
+            "operations", original, readonly.catalog_test_views.MAINTENANCE)
+        self.assertEqual(document, json.loads(maintenance))
+        with self.assertRaises(AssertionError):
+            readonly.machine_output_fixture("operations", projected, digest)
+        self.assertEqual((readonly.MACHINE_OUTPUT / "operations.cli.jsonl").read_bytes(), original)
+
     def test_changed_counts_or_duplicate_digest_are_rejected(self):
         for name in ("doctor", "deep", "healthy"):
             original = (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes()
@@ -242,10 +276,11 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
             for name in readonly.MACHINE_OUTPUT_LEAVES}
         other = readonly.catalog_test_views.OLD if digest == readonly.catalog_test_views.CURRENT \
             else readonly.catalog_test_views.CURRENT
+        count = {readonly.catalog_test_views.RECOMMISSION: 35, readonly.catalog_test_views.MAINTENANCE: 34}.get(digest, 32)
         for name in ("doctor", "deep", "healthy"):
             for before, after in ((digest.encode(), other.encode()),
                                   (digest.encode(), b"0" * 64),
-                                  (b'"operationCount":34' if digest == readonly.catalog_test_views.MAINTENANCE else b'"operationCount":32', b'"operationCount":31')):
+                                  (f'"operationCount":{count}'.encode(), b'"operationCount":31')):
                 changed = dict(outputs, **{name: outputs[name].replace(before, after, 1)})
                 self.assertNotEqual(changed, outputs)
                 with tempfile.TemporaryDirectory() as temporary, self.subTest(name=name, after=after), \

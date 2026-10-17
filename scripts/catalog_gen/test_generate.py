@@ -55,6 +55,7 @@ class RealCatalogTests(unittest.TestCase):
                 "deploy.native-library.app-owned@1",
                 "flash.dayu200",
                 "flash.full-restore@1",
+                "flash.recommission@1",
                 "flash.restore-boot-loop@1",
                 "flash.verify@1",
                 "input.keyboard@1",
@@ -282,6 +283,9 @@ class RealCatalogTests(unittest.TestCase):
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
                 "flash.full-restore@1/capture-post-flash-diagnostics": (
+                    "arkdeck-diagnostics", "boundedHilog"
+                ),
+                "flash.recommission@1/capture-post-flash-diagnostics": (
                     "arkdeck-diagnostics", "boundedHilog"
                 ),
             },
@@ -721,7 +725,7 @@ class GeneratedSwiftShapeTests(unittest.TestCase):
                 'actionReference: CatalogActionReference('
                 'catalogID: "arkdeck-diagnostics", actionID: "boundedHilog")'
             ),
-            5,
+            6,
         )
         self.assertEqual(
             swift.count(

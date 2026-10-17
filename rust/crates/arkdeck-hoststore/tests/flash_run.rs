@@ -23,6 +23,8 @@
 //! platform wrote it (`AsSwift`) before it is compared; nothing else is.
 #![cfg(any(target_os = "macos", windows))]
 
+#[path = "flash_run/recommission.rs"]
+mod recommission;
 mod support;
 
 use arkdeck_hoststore::{
@@ -282,7 +284,11 @@ impl Owners {
             holds: DeviceHolds::default(),
             // Swift's lane may flash, its dispatcher has no reason to refuse,
             // and the lane's toolchain is the oracle's.
-            flash: FlashPlanning::new(None, || None, Some(TOOLCHAIN.into())),
+            flash: FlashPlanning::new(None, || None, Some(TOOLCHAIN.into()))
+                .with_recommission_quiescence({
+                    let fakes = fakes.clone();
+                    move |source| fakes.recommission_quiescent(source)
+                }),
         }
     }
 
@@ -303,8 +309,25 @@ impl Owners {
 
     /// One exchange's answer, as the daemon's control layer answers it.
     fn answer(&self, fakes: &Fakes, method: &str, params: &Map<String, Value>) -> Value {
+        self.answer_with_clock(fakes, method, params, now, precise_now)
+    }
+
+    fn answer_with_clock(
+        &self,
+        fakes: &Fakes,
+        method: &str,
+        params: &Map<String, Value>,
+        now: fn() -> Option<String>,
+        precise_now: fn() -> Option<String>,
+    ) -> Value {
         let state_root = self.state_root();
-        let facts = |target: &str| fakes.facts(target);
+        let facts = |target: &str, recommission: bool| {
+            if recommission {
+                fakes.recommission_facts(target)
+            } else {
+                fakes.facts(target)
+            }
+        };
         match method {
             "job.plan" => {
                 let planner = FlashPlanner {
@@ -939,6 +962,35 @@ fn the_oracle_records_every_story() {
 fn every_admission_refusal_is_swifts() {
     let differences = replay("admission");
     assert!(differences.is_empty(), "{}", differences.join("\n"));
+}
+
+#[test]
+fn ordinary_policy_refusal_keeps_the_recovery_census_without_authority_or_dispatch() {
+    let _lock = exclusive();
+    let root = lay_down();
+    let fakes = Fakes::default();
+    let owners = Owners::open(&root, &fakes);
+    let exchange = recorded("admission", "submit.callerCapability");
+    fakes.begin(Script::recorded(&exchange["script"]));
+    let lock = root.join("store/.superseding-recovery-epochs.lock");
+    assert!(!lock.exists());
+    let answer = owners.answer(
+        &fakes,
+        "job.submit",
+        exchange["params"].as_object().unwrap(),
+    );
+    assert_eq!(answer, exchange["answer"]);
+    assert_eq!(fs::read(lock).unwrap(), Vec::<u8>::new());
+    assert_eq!(fakes.calls(), (vec![], vec![]));
+    assert_eq!(
+        owners.answer(&fakes, "capability.list", &Map::new()),
+        json!({"ok": true, "result": []})
+    );
+    assert!(
+        !root
+            .join("store/flash-recommission-allocations.json")
+            .exists()
+    );
 }
 
 /// Two ordinary Flashes of the canonical operation, reviewed, deduplicated

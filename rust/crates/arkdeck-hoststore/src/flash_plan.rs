@@ -23,6 +23,7 @@ use std::sync::Mutex;
 
 /// Swift `ArkForgeFlashOperation.canonicalReference`.
 const CANONICAL: &str = "flash.full-restore@1";
+use crate::job_owner::flash_recommission::{IdentityChain, OPERATION as RECOMMISSION};
 /// Swift `RuntimeJobEngine.arkForgeDispatchedSteps`.
 const ARKFORGE_STEPS: [&str; 2] = ["flash-partitions", "verify-flash-readback"];
 /// Swift `ArkForgeNativeRockUSBToolchain.reportedVersion`.
@@ -49,14 +50,16 @@ pub(crate) const PARTITIONS: [&str; 9] = [
 /// Whether an operation is one of the ArkForge Flash operations (Swift
 /// `ArkForgeFlashOperation.contains`).
 pub(crate) fn is_flash(reference: &str) -> bool {
-    reference == CANONICAL
-        || reference == "flash.dayu200"
+    matches!(reference, CANONICAL | "flash.dayu200" | RECOMMISSION)
         || crate::flash_maintenance::is_maintenance(reference)
 }
 
 /// What a Flash plan reads beyond the Artifact and Import owners and the
 /// Target's facts, as the daemon composes it: the provider's availability,
 /// the dispatcher's and the lane's toolchain.
+type RecommissionQuiescence =
+    dyn Fn(&arkdeck_provider_arkforge::Execution) -> Result<(), String> + Send + Sync;
+
 pub struct FlashPlanning {
     pub(crate) maintenance:
         Mutex<Option<std::sync::Arc<crate::flash_maintenance::MaintenanceContext>>>,
@@ -66,6 +69,7 @@ pub struct FlashPlanning {
     /// Swift's daemon-lifetime `flashArchiveProfileCache`: the runtime
     /// build version each exact leased archive declares, or none.
     build_versions: Mutex<BTreeMap<(String, String), Option<String>>>,
+    recommission_quiescence: Option<Box<RecommissionQuiescence>>,
 }
 
 impl FlashPlanning {
@@ -93,7 +97,38 @@ impl FlashPlanning {
             dispatch_unavailable: Box::new(dispatch_unavailable),
             toolchain_sha256,
             build_versions: Mutex::new(BTreeMap::new()),
+            recommission_quiescence: None,
         }
+    }
+
+    pub fn with_recommission_quiescence(
+        mut self,
+        observe: impl Fn(&arkdeck_provider_arkforge::Execution) -> Result<(), String>
+        + Send
+        + Sync
+        + 'static,
+    ) -> Self {
+        self.recommission_quiescence = Some(Box::new(observe));
+        self
+    }
+
+    pub fn set_recommission_quiescence(
+        &mut self,
+        observe: impl Fn(&arkdeck_provider_arkforge::Execution) -> Result<(), String>
+        + Send
+        + Sync
+        + 'static,
+    ) {
+        self.recommission_quiescence = Some(Box::new(observe));
+    }
+
+    pub(crate) fn require_recommission_quiescence(
+        &self,
+        source: &arkdeck_provider_arkforge::Execution,
+    ) -> Result<(), String> {
+        self.recommission_quiescence
+            .as_ref()
+            .ok_or("recommission.providerQuiescenceUnavailable")?(source)
     }
 
     /// The standing host checks used by Flash planning, in the same order.
@@ -159,7 +194,7 @@ pub fn rockchip_dispatch_unavailable(
 
 /// The Target's facts as Swift's ArkForge facts port reads them
 /// (`resolveFacts`), each error as Swift interpolates it.
-pub type RockchipFactsPort<'a> = &'a dyn Fn(&str) -> Result<RockchipFacts, String>;
+pub type RockchipFactsPort<'a> = &'a dyn Fn(&str, bool) -> Result<RockchipFacts, String>;
 
 /// `job.plan` over the Flash composition: the ArkForge Flash operations are
 /// materialized here, every other request by the planner as before.
@@ -286,7 +321,7 @@ impl<'a> FlashPlanner<'a> {
         // Swift's adapter without a facts port refuses with its
         // `factsUnavailable` detail.
         let facts = match self.facts {
-            Some(port) => port(&request.target_id),
+            Some(port) => port(&request.target_id, reference == RECOMMISSION),
             None => Err("production ArkForge target facts are not registered".into()),
         }
         .map_err(|error| unmaterialized(&error))?;
@@ -296,7 +331,12 @@ impl<'a> FlashPlanner<'a> {
                     "failed(\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\")",
                 )
             })?;
-        let lease_name = if reference == CANONICAL {
+        let recommission = if reference == RECOMMISSION {
+            Some(IdentityChain::from_facts(&facts).map_err(|error| unmaterialized(&error))?)
+        } else {
+            None
+        };
+        let lease_name = if matches!(reference.as_str(), CANONICAL | RECOMMISSION) {
             "artifactLease"
         } else {
             "imageBundleLease"
@@ -377,7 +417,11 @@ impl<'a> FlashPlanner<'a> {
                 steps.push(materialized);
                 continue;
             }
-            let action = action(&step.step_id, &step.kind, &inputs, &facts, || {
+            let mut provider_facts = facts.clone();
+            if let Some(chain) = &recommission {
+                provider_facts.identity_sha256 = chain.loader_serial_sha256.clone();
+            }
+            let action = action(&step.step_id, &step.kind, &inputs, &provider_facts, || {
                 flash.build_version(lease, &leased)
             })
             .map_err(preflight)?;
@@ -397,7 +441,7 @@ impl<'a> FlashPlanner<'a> {
             steps.push(materialized);
         }
         let mut document = json!({
-            "operationReference": CANONICAL,
+            "operationReference": if reference == RECOMMISSION { RECOMMISSION } else { CANONICAL },
             "catalogDigest": CATALOG_DIGEST,
             "inputs": inputs,
             "targetID": request.target_id,
@@ -406,6 +450,9 @@ impl<'a> FlashPlanner<'a> {
             "providerID": "arkforge",
             "steps": steps,
         });
+        if let Some(chain) = &recommission {
+            document["recommissionIdentityChain"] = json!(chain);
+        }
         // Present only for a Runtime-owned debug attempt; an ordinary Job's
         // digest bytes are unchanged (Swift `encodeIfPresent`).
         if let Some(permit) = permit {
@@ -421,8 +468,9 @@ impl<'a> FlashPlanner<'a> {
                 artifact_facts,
                 identity: Some(facts.identity_sha256.clone()),
                 binding_revision: Some(facts.binding_revision),
+                recommission,
             },
-            admission_blocker(&facts),
+            operation_admission_blocker(&facts, reference == RECOMMISSION),
         ))
     }
 }
@@ -434,7 +482,7 @@ pub(crate) fn canonical_inputs(
     reference: &str,
     inputs: &Map<String, Value>,
 ) -> Result<Map<String, Value>, &'static str> {
-    if reference == CANONICAL {
+    if matches!(reference, CANONICAL | RECOMMISSION) {
         return Ok(inputs.clone());
     }
     let (Some(lease), Some(profile), Some(partitions)) = (
@@ -535,6 +583,17 @@ pub(crate) fn admission_blocker(facts: &RockchipFacts) -> Option<String> {
         ));
     }
     None
+}
+
+pub(crate) fn operation_admission_blocker(
+    facts: &RockchipFacts,
+    recommission: bool,
+) -> Option<String> {
+    if recommission {
+        IdentityChain::from_facts(facts).err()
+    } else {
+        admission_blocker(facts)
+    }
 }
 
 pub(crate) fn normal_loader_identity_ready(facts: &RockchipFacts) -> bool {

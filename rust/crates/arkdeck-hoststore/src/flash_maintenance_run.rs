@@ -259,7 +259,8 @@ impl m::RestorationPort for Port<'_, '_> {
         if Instant::now() >= deadline || self.prepared.restoration.as_ref() != Some(plan) {
             return Err(m::Error::SourceRefused);
         }
-        let facts = (self.flash.facts)(&self.prepared.execution.target_id).map_err(authority)?;
+        let facts =
+            (self.flash.facts)(&self.prepared.execution.target_id, false).map_err(authority)?;
         let resolved = self.owner.resolved_input(self.run).map_err(authority)?;
         self.owner
             .consume(
@@ -550,7 +551,8 @@ mod tests {
                 assert!(descriptor_of("flash.restore-boot-loop@1").is_none());
                 return;
             }
-            "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c" => (),
+            "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c"
+            | "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080" => (),
             _ => panic!("a future Catalog needs an explicit maintenance journal review"),
         }
         for operation in ["flash.verify@1", "flash.restore-boot-loop@1"] {

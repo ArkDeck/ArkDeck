@@ -147,13 +147,22 @@ fn flash_unavailability(
     flash: &crate::FlashPlanning,
     context: &OperationAvailabilityContext<'_>,
 ) -> Vec<(&'static str, String)> {
-    if !matches!(reference, "flash.full-restore@1" | "flash.dayu200") {
+    if !matches!(
+        reference,
+        "flash.full-restore@1" | "flash.dayu200" | "flash.recommission@1"
+    ) {
         return vec![(
             "operation_not_supported",
             format!("Rust arkforge provider has no complete production executor for {reference}"),
         )];
     }
     let mut reasons = Vec::new();
+    if reference == "flash.recommission@1" && !cfg!(target_os = "windows") {
+        reasons.push((
+            "provider_tool_unavailable",
+            "recommission.legacyHostProcessLifetimeUnproven".into(),
+        ));
+    }
     if let Some(reason) = flash.runtime_unavailable_reason() {
         reasons.push(("provider_tool_unavailable", reason));
     }

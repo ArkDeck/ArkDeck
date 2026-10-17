@@ -13,6 +13,7 @@ use std::path::Path;
 
 pub const OLD: &str = "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036";
 pub const CURRENT: &str = "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7";
+pub const RECOMMISSION: &str = "9c1d24df224723fc5fa46734a97800194361757320367092c826ae9c205c9080";
 pub const MAINTENANCE: &str = "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
 const PACKET_SHA: &str = "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab";
@@ -194,13 +195,22 @@ impl HapPlans {
         if self.exchanges.get(name) != Some(original) || !root.is_absolute() {
             return Err("HAP original exchange/root mismatch".into());
         }
-        let plan = Self::at_root(self.current_plan(name)?, root)?;
+        let mut plan = Self::at_root(self.current_plan(name)?, root)?;
+        let catalog = actual["result"]["catalogDigest"]
+            .as_str()
+            .ok_or("HAP Catalog missing")?;
+        if ![CURRENT, MAINTENANCE, RECOMMISSION].contains(&catalog) {
+            return Err("unknown HAP Catalog".into());
+        }
+        // The frozen capsule proves every old field before the exact additive
+        // Catalog's digest is used to hash this newly materialized plan.
+        plan["catalogDigest"] = json!(catalog);
         let observed_digest = sha256_hex(&plan_bytes(&plan)?);
         if actual["result"]["materializedPlanDigest"] != observed_digest {
             return Err("raw HAP host plan digest mismatch".into());
         }
         let mut expected = Self::at_root(&original["answer"], root)?;
-        expected["result"]["catalogDigest"] = json!(CURRENT);
+        expected["result"]["catalogDigest"] = json!(catalog);
         expected["result"]["materializedPlanDigest"] = json!(observed_digest);
         expected["result"]["stepSetDigestSHA256"] = json!(self.step_set_digest(name)?);
         if actual != &expected {
@@ -261,7 +271,7 @@ fn reference(operation: &Value) -> Result<String, String> {
 
 // Exactly scripts/catalog_gen/generate.py catalog_digest: sorted objects,
 // sorted operation id/version, compact JSON and ensure_ascii=True.
-fn catalog_bytes(operations: &[Value]) -> Result<Vec<u8>, String> {
+pub fn catalog_bytes(operations: &[Value]) -> Result<Vec<u8>, String> {
     let mut ordered = operations.to_vec();
     ordered.sort_by_key(|operation| {
         (
@@ -407,15 +417,17 @@ impl Lineage {
         directory: &Path,
         catalog_digest: &str,
     ) -> Result<(), String> {
-        if catalog_digest == MAINTENANCE {
+        if matches!(catalog_digest, MAINTENANCE | RECOMMISSION) {
             let mut observed = Self::read_sources(directory)?;
             let complete: Vec<_> = observed.values().cloned().collect();
-            if sha256_hex(&catalog_bytes(&complete)?) != MAINTENANCE
+            if sha256_hex(&catalog_bytes(&complete)?) != catalog_digest
+                || (catalog_digest == RECOMMISSION
+                    && observed.remove("flash.recommission@1").is_none())
                 || observed.remove("flash.verify@1").is_none()
                 || observed.remove("flash.restore-boot-loop@1").is_none()
                 || observed != self.operations
             {
-                return Err("maintenance Catalog differs beyond its exact two additions".into());
+                return Err("Flash Catalog differs beyond its exact declared additions".into());
             }
             return Ok(());
         }
@@ -478,7 +490,10 @@ impl Lineage {
             .as_str()
             .ok_or("plan operation")?;
         self.operation(name)?;
-        if current_plan["catalogDigest"] != CURRENT {
+        if ![CURRENT, MAINTENANCE, RECOMMISSION]
+            .iter()
+            .any(|digest| current_plan["catalogDigest"] == *digest)
+        {
             return Err("unknown plan Catalog".into());
         }
         if historical_digest.len() != 64
@@ -508,7 +523,9 @@ impl Lineage {
             || expected["ok"] != true
             || actual["result"]["schemaVersion"] != "arkdeck.job-plan/1"
             || expected["result"]["catalogDigest"] != OLD
-            || actual["result"]["catalogDigest"] != CURRENT
+            || ![CURRENT, MAINTENANCE, RECOMMISSION]
+                .iter()
+                .any(|digest| actual["result"]["catalogDigest"] == *digest)
             || actual["result"]["operation"] != current_plan["operationReference"]
             || expected["result"]["operation"] != current_plan["operationReference"]
         {
@@ -517,7 +534,9 @@ impl Lineage {
         let historical = expected["result"]["materializedPlanDigest"]
             .as_str()
             .ok_or("frozen plan digest")?;
-        let current = self.current_digest(current_plan, historical)?;
+        let mut active_plan = current_plan.clone();
+        active_plan["catalogDigest"] = actual["result"]["catalogDigest"].clone();
+        let current = self.current_digest(&active_plan, historical)?;
         if actual["result"]["materializedPlanDigest"] != current {
             return Err("actual complete plan hash mismatch".into());
         }

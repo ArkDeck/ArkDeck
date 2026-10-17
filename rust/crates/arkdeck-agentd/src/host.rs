@@ -848,11 +848,11 @@ impl Host {
                     hdc: hdc.as_ref(),
                     workspace: workspace.as_deref(),
                 };
-                let facts_port = |target: &str| {
+                let facts_port = |target: &str, recommission: bool| {
                     flash_facts
                         .as_ref()
                         .ok_or("Flash facts owner is absent".to_owned())?
-                        .current_facts(
+                        .operation_facts(
                             targets
                                 .as_deref()
                                 .ok_or("Target owner is absent".to_owned())?,
@@ -860,6 +860,7 @@ impl Host {
                                 .as_deref()
                                 .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
                             target,
+                            recommission,
                         )
                 };
                 let flash = flash_runtime
@@ -976,11 +977,11 @@ impl Host {
                 serde_json::Map::from_iter([("jobId".into(), serde_json::json!(start.job))]);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 // The Flash lane as `job.run` runs it.
-                let facts_port = |target: &str| {
+                let facts_port = |target: &str, recommission: bool| {
                     flash_facts
                         .as_ref()
                         .ok_or("Flash facts owner is absent".to_owned())?
-                        .current_facts(
+                        .operation_facts(
                             targets
                                 .as_deref()
                                 .ok_or("Target owner is absent".to_owned())?,
@@ -988,6 +989,7 @@ impl Host {
                                 .as_ref()
                                 .map(|(hdc, _)| &**hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
                             target,
+                            recommission,
                         )
                 };
                 let flash = flash_runtime
@@ -1212,6 +1214,15 @@ impl Host {
         host: std::sync::Arc<dyn arkdeck_provider_arkforge::RockchipHost>,
         profile_id: String,
     ) -> Self {
+        if let Some(planning) = self
+            .flash_planning
+            .as_mut()
+            .and_then(std::sync::Arc::get_mut)
+        {
+            let provider = lane.clone();
+            planning
+                .set_recommission_quiescence(move |source| provider.recommission_quiescent(source));
+        }
         if let (Some(planning), Some(jobs), Some(facts), Some(targets), Some(hdc)) = (
             &self.flash_planning,
             &self.jobs,
@@ -1392,17 +1403,18 @@ impl Host {
     #[cfg(target_os = "macos")]
     fn flash_facts_port(
         &self,
-    ) -> Option<impl Fn(&str) -> Result<arkdeck_hoststore::RockchipFacts, String> + '_> {
+    ) -> Option<impl Fn(&str, bool) -> Result<arkdeck_hoststore::RockchipFacts, String> + '_> {
         let (Some(facts), Some(targets)) = (&self.flash_facts, &self.targets) else {
             return None;
         };
-        Some(move |target_id: &str| {
-            facts.current_facts(
+        Some(move |target_id: &str, recommission: bool| {
+            facts.operation_facts(
                 targets,
                 self.hdc
                     .as_deref()
                     .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
                 target_id,
+                recommission,
             )
         })
     }
@@ -1413,11 +1425,13 @@ impl Host {
     #[cfg(windows)]
     fn flash_facts_port(
         &self,
-    ) -> Option<impl Fn(&str) -> Result<arkdeck_hoststore::RockchipFacts, String> + '_> {
+    ) -> Option<impl Fn(&str, bool) -> Result<arkdeck_hoststore::RockchipFacts, String> + '_> {
         let (Some(facts), Some(targets)) = (&self.flash_facts, &self.targets) else {
             return None;
         };
-        Some(move |target_id: &str| facts.current_facts(targets, self.flash_hdc(), target_id))
+        Some(move |target_id: &str, recommission: bool| {
+            facts.operation_facts(targets, self.flash_hdc(), target_id, recommission)
+        })
     }
 
     /// The Windows `job.plan` planner: the Job planner with the Flash

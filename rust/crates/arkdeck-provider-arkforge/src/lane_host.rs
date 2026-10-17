@@ -63,6 +63,9 @@ pub trait PlanConnections: Send + Sync {
 
 /// Execution ports are absent from the read-only preview owner.
 pub trait LaneConnections: PlanConnections {
+    fn recommission_quiescent(&self, _source: &Execution) -> Result<(), String> {
+        Err("recommission.providerQuiescenceUnavailable".into())
+    }
     fn execution(&self) -> Result<Box<dyn ExecutionClient>, String>;
     fn performer(&self, job_id: &str, binding: &DeviceBinding) -> Box<dyn ControlPerformer>;
 }
@@ -277,6 +280,12 @@ impl LaneHost {
                     .map_or(0, |time| time.as_millis().min(u64::MAX as u128) as u64)
             },
         );
+        if let Some(recommission) = &binding.recommission {
+            authority.set_dispatch_window(
+                recommission.reserved_at_epoch_ms,
+                recommission.expires_at_epoch_ms,
+            );
+        }
         authority.record_materialized_observation_mode(&execution.observation_mode);
         let mut performer = self
             .connections
@@ -293,6 +302,9 @@ impl LaneHost {
 }
 
 impl FlashLane for LaneHost {
+    fn recommission_quiescent(&self, source: &Execution) -> Result<(), String> {
+        self.connections.recommission_quiescent(source)
+    }
     fn maintenance_source(
         &self,
         execution: &Execution,

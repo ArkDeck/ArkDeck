@@ -50,6 +50,10 @@ pub(crate) mod arkforge_job_state;
 #[path = "flash_recovery.rs"]
 pub(crate) mod flash_recovery;
 
+#[cfg(any(target_os = "macos", windows))]
+#[path = "flash_recommission.rs"]
+pub(crate) mod flash_recommission;
+
 #[cfg(all(test, target_os = "macos"))]
 #[path = "job_hdc_interlock_tests.rs"]
 mod hdc_interlock_tests;

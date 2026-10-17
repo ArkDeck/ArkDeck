@@ -41,8 +41,8 @@ use crate::flash_facts::RockchipFacts;
 use crate::job_owner::arkforge_job_state::ArkForgeJobState;
 use crate::job_owner::flash_recovery::{OverwriteAdmission, OverwriteRefusal, RecoveryContext};
 use crate::job_plan::{
-    FlashPlanner, FlashPlanning, JobPlanner, RockchipFactsPort, admission_blocker,
-    canonical_inputs, delegated_arguments, is_flash, plan_completion_arguments,
+    FlashPlanner, FlashPlanning, JobPlanner, RockchipFactsPort, canonical_inputs,
+    delegated_arguments, is_flash, operation_admission_blocker, plan_completion_arguments,
 };
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
 use crate::operation_request::OperationRequest;
@@ -470,6 +470,18 @@ impl FlashRunner<'_> {
                 .jobs
                 .establish_recovery_epoch(&run.record, &descriptor.reference(), &now)
                 .map_err(|_| uncertain())?;
+            if let Some(allocation) = run
+                .record
+                .admission_evidence()
+                .and_then(RecoveryContext::from_evidence)
+                .and_then(|context| context.recommission)
+            {
+                let flash = self.flash.ok_or_else(uncertain)?;
+                self.runner
+                    .jobs
+                    .publish_recommission_binding(flash.targets, &allocation.identity_chain)
+                    .map_err(|_| uncertain())?;
+            }
             run.record.timeline.push(format!(
                 "superseding recovery epoch {} established; original outcomes remain unknown",
                 epoch.epoch_id
@@ -749,7 +761,10 @@ impl FlashRunner<'_> {
             .unwrap_or_default()
             .to_owned();
         let facts = if step.binding == "confirmedDevice" {
-            match (flash.facts)(&target) {
+            match (flash.facts)(
+                &target,
+                run.record.operation() == crate::job_owner::flash_recommission::OPERATION,
+            ) {
                 Ok(facts) => Some(facts),
                 Err(error) => {
                     run.record
@@ -762,7 +777,12 @@ impl FlashRunner<'_> {
             None
         };
         if effect_rank(&step.effect) >= effect_rank("deviceMutation")
-            && let Some(blocker) = facts.as_ref().and_then(admission_blocker)
+            && let Some(blocker) = facts.as_ref().and_then(|facts| {
+                operation_admission_blocker(
+                    facts,
+                    run.record.operation() == crate::job_owner::flash_recommission::OPERATION,
+                )
+            })
         {
             return Err(Stop::Failed(format!(
                 "provider execution prerequisite blocked before external effect: {blocker}"
@@ -1025,10 +1045,19 @@ impl FlashRunner<'_> {
             .holds
             .mutation_reservation_guard()
             .map_err(|detail| reject(&detail))?;
-        owner
-            .authority
-            .require_state(self.runner.jobs)
-            .map_err(|error| reject(&error.message))?;
+        if run.record.operation() == crate::job_owner::flash_recommission::OPERATION {
+            let source = run.record.request["inputs"]["retainedJobId"]
+                .as_str()
+                .ok_or_else(|| reject("recommission.sourceRequired"))?;
+            owner.authority.require_recommission_state(
+                self.runner.jobs,
+                source,
+                &(self.runner.now)().ok_or_else(|| reject("recommission.clockUnavailable"))?,
+            )
+        } else {
+            owner.authority.require_state(self.runner.jobs)
+        }
+        .map_err(|error| reject(&error.message))?;
         if run.record.admission_evidence().is_some() {
             return Err(reject("persisted mutation evidence cannot be replayed"));
         }
@@ -1076,7 +1105,6 @@ impl FlashRunner<'_> {
                 "fresh typed plan, target or binding drifted before dispatch",
             ));
         }
-        drop(fresh);
         let (Some(identity), Some(binding)) = (
             run.record
                 .materialized_identity()
@@ -1128,16 +1156,32 @@ impl FlashRunner<'_> {
         let jobs = self.runner.jobs;
         let store = owner.authority.capabilities;
         let campaign = flash.lane.hardware_acceptance_campaign();
-        let recovery = match jobs
-            .complete_overwrite_admission(
-                store,
-                &descriptor.reference(),
-                &Value::Object(request.inputs.clone()),
-                &identity,
-                binding,
-                &run.clock()?,
-                campaign.as_deref(),
-            )
+        let recovery =
+            match if descriptor.reference() == crate::job_owner::flash_recommission::OPERATION {
+                let source = request
+                    .inputs
+                    .get("retainedJobId")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| Stop::Failed("recommission.sourceRequired".into()))?;
+                let execution = jobs
+                    .recommission_source_execution(source)
+                    .map_err(Stop::Failed)?;
+                flash
+                    .planning
+                    .require_recommission_quiescence(&execution)
+                    .map_err(Stop::Failed)?;
+                jobs.recommission_admission(store, &request, &fresh, &run.clock()?)
+            } else {
+                jobs.complete_overwrite_admission(
+                    store,
+                    &descriptor.reference(),
+                    &Value::Object(request.inputs.clone()),
+                    &identity,
+                    binding,
+                    &run.clock()?,
+                    campaign.as_deref(),
+                )
+            }
             .map_err(|refusal| match refusal {
                 OverwriteRefusal::Blocked(reason) => Stop::Failed(format!(
                     "non-overridable recovery blocker: {}",
@@ -1145,9 +1189,9 @@ impl FlashRunner<'_> {
                 )),
                 OverwriteRefusal::Failed(detail) => undurable(detail),
             })? {
-            OverwriteAdmission::Recovery { context, .. } => Some(context),
-            OverwriteAdmission::Ordinary | OverwriteAdmission::Recognized(_) => None,
-        };
+                OverwriteAdmission::Recovery { context, .. } => Some(context),
+                OverwriteAdmission::Ordinary | OverwriteAdmission::Recognized(_) => None,
+            };
         let mut superseded = jobs
             .superseded_jobs(&identity, binding)
             .map_err(|error| undurable(format!("{error:?}")))?;
@@ -1186,7 +1230,7 @@ impl FlashRunner<'_> {
                 &query,
                 false,
                 recovery
-                    .as_ref()
+                    .as_deref()
                     .map(RecoveryContext::policy_lines)
                     .as_deref(),
             );
@@ -1196,13 +1240,29 @@ impl FlashRunner<'_> {
                 ));
             }
         }
-        owner
-            .authority
-            .require_state(self.runner.jobs)
-            .map_err(|error| reject(&error.message))?;
+        if request.reference() == crate::job_owner::flash_recommission::OPERATION {
+            let source = request
+                .inputs
+                .get("retainedJobId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| reject("recommission.sourceRequired"))?;
+            owner
+                .authority
+                .require_recommission_state(self.runner.jobs, source, &run.clock()?)
+        } else {
+            owner.authority.require_state(self.runner.jobs)
+        }
+        .map_err(|error| reject(&error.message))?;
         let now = run.clock()?;
         let step_set = crate::job_plan::step_set_digest(descriptor, &request.inputs)
             .map_err(|_| Stop::Refused(uncertain()))?;
+        if let Some(allocation) = recovery
+            .as_ref()
+            .and_then(|context| context.recommission.as_ref())
+        {
+            jobs.consume_recommission(allocation, &now)
+                .map_err(denied)?;
+        }
         let consumed = store
             .consume(
                 &capability,
@@ -1316,7 +1376,15 @@ impl FlashRunner<'_> {
             .unwrap_or(1);
         let binding = DeviceBinding {
             connect_key: facts.execution_connect_key.clone(),
-            stable_identity_sha256: facts.identity_sha256.clone(),
+            stable_identity_sha256: run
+                .record
+                .admission_evidence()
+                .and_then(RecoveryContext::from_evidence)
+                .and_then(|context| context.recommission)
+                .map_or_else(
+                    || facts.identity_sha256.clone(),
+                    |allocation| allocation.identity_chain.loader_serial_sha256,
+                ),
             target_id: run.record.request["target"]["targetId"]
                 .as_str()
                 .unwrap_or_default()
@@ -1324,7 +1392,38 @@ impl FlashRunner<'_> {
             binding_revision: revision,
             usb_topology: topology.clone(),
             loader_first_connector_sha256,
+            recommission: run
+                .record
+                .admission_evidence()
+                .and_then(RecoveryContext::from_evidence)
+                .and_then(|context| context.recommission)
+                .map(
+                    |allocation| arkdeck_provider_arkforge::RecommissionBinding {
+                        normal_identity_sha256: allocation.identity_chain.normal_identity_sha256,
+                        hardware_serial_sha256: allocation.identity_chain.hardware_serial_sha256,
+                        connector_sha256: allocation.identity_chain.connector_sha256,
+                        reserved_at_epoch_ms: allocation.reserved_at_epoch_ms,
+                        expires_at_epoch_ms: allocation.expires_at_epoch_ms,
+                    },
+                ),
         };
+        if binding.recommission.is_some() {
+            let allocation = run
+                .record
+                .admission_evidence()
+                .and_then(RecoveryContext::from_evidence)
+                .and_then(|context| context.recommission)
+                .ok_or_else(|| Stop::Refused(uncertain()))?;
+            let execution = self
+                .runner
+                .jobs
+                .recommission_source_execution(&allocation.source_job_id)
+                .map_err(Stop::Failed)?;
+            flash
+                .lane
+                .recommission_quiescent(&execution)
+                .map_err(Stop::Failed)?;
+        }
         let purpose = if run
             .record
             .admission_evidence()
@@ -1574,6 +1673,19 @@ impl FlashRunner<'_> {
         }
         let facts: BTreeMap<String, String> = receipt.facts.iter().cloned().collect();
         let confirmed = run.clock()?;
+        let recommission = run
+            .record
+            .admission_evidence()
+            .and_then(RecoveryContext::from_evidence)
+            .and_then(|context| context.recommission);
+        if let Some(allocation) = &recommission {
+            let fresh =
+                (flash.facts)(&allocation.identity_chain.target_id, true).map_err(Stop::Failed)?;
+            self.runner
+                .jobs
+                .record_recommission_postflight(allocation, &fresh, &run.clock()?)
+                .map_err(Stop::Failed)?;
+        }
         let target = &run.record.request["target"];
         let mut observation = json!({
             "providerID": run.record.provider(), "toolVersion": TOOL_VERSION,
@@ -1584,10 +1696,15 @@ impl FlashRunner<'_> {
         if let Some(revision) = target["expectedBindingRevision"].as_i64() {
             observation["bindingRevision"] = json!(revision);
         }
-        if let Some(identity) = facts
-            .get("stableIdentitySHA256")
-            .map(String::as_str)
-            .or(run.record.materialized_identity())
+        if let Some(identity) = recommission
+            .as_ref()
+            .map(|allocation| allocation.identity_chain.normal_identity_sha256.as_str())
+            .or_else(|| {
+                facts
+                    .get("stableIdentitySHA256")
+                    .map(String::as_str)
+                    .or(run.record.materialized_identity())
+            })
         {
             observation["stableIdentitySHA256"] = json!(identity);
         }

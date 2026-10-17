@@ -157,6 +157,7 @@ fn performer(
 ) -> ArkForgeControlPerformer {
     ArkForgeControlPerformer::new(
         ControlBinding {
+            recommission: None,
             job_id: "job-affe0011".into(),
             target_id: "TGT-1".into(),
             binding_revision: 4,

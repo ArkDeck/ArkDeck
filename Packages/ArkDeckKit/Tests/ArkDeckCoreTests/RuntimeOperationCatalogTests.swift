@@ -35,6 +35,7 @@ struct RuntimeOperationCatalogTests {
         "deploy.native-library.app-owned@1",
         "flash.dayu200",
         "flash.full-restore@1",
+        "flash.recommission@1",
         "flash.restore-boot-loop@1",
         "flash.verify@1",
         "input.keyboard@1",
@@ -139,8 +140,8 @@ struct RuntimeOperationCatalogTests {
       .flatMap(\.inputs)
       .filter { $0.defaultValue != nil }
     #expect(
-      withDefaults.count == 29,
-      "the catalog declares twenty-nine input defaults; the runtime must see all of them")
+      withDefaults.count == 30,
+      "the catalog declares thirty input defaults; the runtime must see all of them")
   }
 
   /// Every published input says what it is for.
@@ -208,8 +209,8 @@ struct RuntimeOperationCatalogTests {
       }
     }
     #expect(
-      checked == 29,
-      "the catalog declares twenty-nine input defaults; all of them must be exercised here")
+      checked == 30,
+      "the catalog declares thirty input defaults; all of them must be exercised here")
   }
 
   @Test func viewerCanOmitHilogWithoutChangingTheDefaultDiagnosticsPlan() throws {
@@ -245,6 +246,9 @@ struct RuntimeOperationCatalogTests {
     #expect(!ArkForgeFlashOperation.contains("flash.dayu200@1"))
     #expect(
       ArkForgeFlashOperation.containsDurableRecordReference("flash.dayu200@1"))
+    #expect(ArkForgeFlashOperation.containsDurableRecordReference("flash.recommission@1"))
+    #expect(!ArkForgeFlashOperation.contains("flash.recommission@1"))
+    #expect(ArkForgeFlashOperation.canonicalReference(for: "flash.recommission@1") == nil)
     #expect(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore@1") != nil)
     #expect(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore") == nil)
   }

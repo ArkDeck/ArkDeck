@@ -416,11 +416,15 @@ jobs:
     # failure. The complete routed workload needs room for all views and
     # evidence finalization. #2653 run 38831173671 completed the published
     # and candidate Windows views, then reached 50 minutes in the historical
-    # view with no assertion failure. Allow 75 minutes for all three Windows
-    # views and finalization; macOS keeps 50 minutes and Linux 30.
+    # view with no assertion failure. That workload needed 75 minutes on Windows.
+    # #2660 adds the exact e4 view alongside published, candidate and c6 so
+    # its original authority remains executable after the additive Catalog.
+    # Run 39007378286 reached 50 minutes in that final view's macOS unit tests;
+    # the full macOS views each took 12-16 minutes. Allow 65 minutes on macOS
+    # and another full Windows view (100 minutes total). Linux keeps 30 minutes.
     # Test/Runtime/operation deadlines, coverage and failure aggregation stay
     # unchanged; every selected check and isolated view must still complete.
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 75 || startsWith(matrix.os, 'xcode') && 50 || 30 }}
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 100 || startsWith(matrix.os, 'xcode') && 65 || 30 }}
     defaults:
       run:
         shell: bash

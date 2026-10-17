@@ -204,6 +204,7 @@ pub struct RockchipLoaderTransition<'a> {
     usb: &'a dyn UsbProbe,
     loader: &'a dyn LoaderObserver,
     clock: &'a dyn Clock,
+    require_normal_identity: bool,
 }
 
 impl<'a> RockchipLoaderTransition<'a> {
@@ -218,7 +219,15 @@ impl<'a> RockchipLoaderTransition<'a> {
             usb,
             loader,
             clock,
+            require_normal_identity: false,
         }
+    }
+
+    /// Recommissioning must sample the CPU and factory SN immediately before
+    /// its transition. An already-Loader shortcut cannot supply that proof.
+    pub fn requiring_normal_identity(mut self) -> Self {
+        self.require_normal_identity = true;
+        self
     }
 
     /// Swift `enterLoader`. A fresh exact Loader readback is already the
@@ -239,7 +248,9 @@ impl<'a> RockchipLoaderTransition<'a> {
         budget: &ReadbackBudget,
         persist_identity: impl FnOnce(&NormalHardwareIdentity) -> Result<String, String>,
     ) -> Result<LoaderTransition, LoaderTransitionFailure> {
-        if let Ok(loader) = self.exact_loader_identity(request.stable_identity_sha256) {
+        if !self.require_normal_identity
+            && let Ok(loader) = self.exact_loader_identity(request.stable_identity_sha256)
+        {
             let confirmed = self.confirm_loader(
                 &loader,
                 request.stable_identity_sha256,

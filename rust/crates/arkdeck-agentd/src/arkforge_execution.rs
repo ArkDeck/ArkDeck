@@ -61,6 +61,7 @@ pub(crate) fn install(
                     usb_topology: binding.usb_topology.clone(),
                     provider_executable_sha256: provider_digest.clone(),
                     loader_first_connector_sha256: binding.loader_first_connector_sha256.clone(),
+                    recommission: binding.recommission.clone(),
                 },
                 actions.clone(),
                 Box::new(ArkForgeLoader::new(move || census(), &directory)),

@@ -131,6 +131,7 @@ struct Verdicts<'a> {
     /// Session that holds its identity and no Manifest.
     jobs: PublicationSource<'a>,
     reuse: Reuse,
+    recommission_source: Option<(&'a str, &'a str)>,
     previous: &'a HashMap<PathBuf, Passed>,
     next: HashMap<PathBuf, Passed>,
     /// The Sessions read, and those not read again.
@@ -385,26 +386,60 @@ fn inspect_named_children(
         }
         let manifest = optional_read(&session, "manifest.json", DOCUMENT_BOUND)?;
         let journal = optional_read(&session, "journal.jsonl", JOURNAL_BOUND)?;
+        let mut retained_unknown = false;
         let verdict = (|| {
             if let Some((bytes, _)) = &manifest {
-                crate::session_manifest::decode_manifest(bytes).map_err(|_| refused())?;
+                crate::session_manifest::decode_manifest(bytes).map_err(|error| {
+                    if verdicts.recommission_source.is_some() {
+                        crate::job_record::failure(
+                            "recordUnreadable",
+                            &format!("recommission.retainedManifestInvalid: {error:?}"),
+                        )
+                    } else {
+                        refused()
+                    }
+                })?;
             }
             if let Some((bytes, _)) = &journal {
                 let replay =
                     crate::job_journal_replay::ReplayState::replay(bytes).map_err(|_| refused())?;
                 let facts = replay.state.facts(replay.torn);
                 let mutation = |effect: &str| matches!(effect, "deviceMutation" | "destructive");
-                if facts.has_torn_tail
-                    || facts
-                        .outstanding_intents
-                        .iter()
-                        .any(|intent| mutation(&intent.effect))
+                if facts.has_torn_tail {
+                    return Err(refused());
+                }
+                if facts
+                    .outstanding_intents
+                    .iter()
+                    .any(|intent| mutation(&intent.effect))
                     || facts
                         .unknown_outcomes
                         .iter()
                         .any(|outcome| mutation(&outcome.effect))
                 {
-                    return Err(refused());
+                    let PublicationSource::Owner(jobs) = verdicts.jobs else {
+                        return Err(refused());
+                    };
+                    if !manifest.as_ref().is_some_and(|(manifest, _)| {
+                        jobs.recommission_session_accounted(
+                            &child_path,
+                            manifest,
+                            bytes,
+                            verdicts.recommission_source,
+                        )
+                    }) {
+                        return Err(if verdicts.recommission_source.is_some() {
+                            crate::job_record::failure(
+                                "recordUnreadable",
+                                "recommission.retainedSessionNotAccounted",
+                            )
+                        } else {
+                            refused()
+                        });
+                    }
+                    // This proof depends on the live owner and supersession, not
+                    // only the Session files. Never put it in the file cache.
+                    retained_unknown = true;
                 }
             }
             // Current production SessionStore is YYYY/MM/session-ID. Inspect
@@ -420,13 +455,14 @@ fn inspect_named_children(
             Ok(())
         })();
         match verdict {
-            Ok(()) if manifest.is_some() || journal.is_some() => verdicts.read(
-                child_path.clone(),
-                Passed {
-                    manifest: manifest.map(|(_, identity)| identity),
-                    journal: journal.map(|(_, identity)| identity),
-                },
-            ),
+            Ok(()) if !retained_unknown && (manifest.is_some() || journal.is_some()) => verdicts
+                .read(
+                    child_path.clone(),
+                    Passed {
+                        manifest: manifest.map(|(_, identity)| identity),
+                        journal: journal.map(|(_, identity)| identity),
+                    },
+                ),
             Ok(()) => (),
             // A Session holding its identity and no Manifest is what a
             // publication that stopped short of it left. Refused as any
@@ -474,6 +510,31 @@ impl JobStore {
         default_root: &Path,
         session_roots: &[PathBuf],
         reuse: Reuse,
+    ) -> Result<(), WireError> {
+        self.require_mutation_state_scoped(default_root, session_roots, reuse, None)
+    }
+
+    pub(crate) fn require_recommission_mutation_state(
+        &self,
+        default_root: &Path,
+        session_roots: &[PathBuf],
+        source: &str,
+        now: &str,
+    ) -> Result<(), WireError> {
+        self.require_mutation_state_scoped(
+            default_root,
+            session_roots,
+            Reuse::Never,
+            Some((source, now)),
+        )
+    }
+
+    fn require_mutation_state_scoped(
+        &self,
+        default_root: &Path,
+        session_roots: &[PathBuf],
+        reuse: Reuse,
+        recommission_source: Option<(&str, &str)>,
     ) -> Result<(), WireError> {
         let expected = normalized(default_root)?;
         if normalized(&self.path)? != expected {
@@ -525,6 +586,7 @@ impl JobStore {
         let mut verdicts = Verdicts {
             jobs: PublicationSource::Owner(self),
             reuse,
+            recommission_source,
             previous: &kept.passed,
             next: HashMap::new(),
             #[cfg(test)]
@@ -598,6 +660,7 @@ fn retained_sessions(jobs: PublicationSource<'_>, root: &Path) -> Result<(), Wir
     let mut verdicts = Verdicts {
         jobs,
         reuse: Reuse::Never,
+        recommission_source: None,
         previous: &previous,
         next: HashMap::new(),
         #[cfg(test)]
@@ -1022,6 +1085,7 @@ mod tests {
         let mut verdicts = Verdicts {
             jobs: PublicationSource::Owner(&fixture.jobs),
             reuse: Reuse::Never,
+            recommission_source: None,
             previous: &previous,
             next: HashMap::new(),
             #[cfg(test)]
