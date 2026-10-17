@@ -13,6 +13,7 @@ use arkdeck_provider_arkforge::{
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, PoisonError};
+#[path = "flash_lane/recovery_completion.rs"]
 mod recovery_completion;
 
 /// The lane's toolchain, which every StepPermit binds.

@@ -571,3 +571,13 @@ Windows, 2026-10-18 local date. Logs use
 This increment is based on PR [#2663](https://github.com/ArkDeck/ArkDeck/pull/2663)
 and requires its own PR checks before publication. Its CI does not constitute
 hardware acceptance or renew the exhausted independent allocation.
+
+PR [#2664](https://github.com/ArkDeck/ArkDeck/pull/2664) initially failed the
+host-independent formatting step in run
+[39054024691](https://github.com/ArkDeck/ArkDeck/actions/runs/39054024691): the
+non-Windows daemon test imports `flash_lane.rs` through `#[path]`, so its new
+child module needed an explicit path relative to that shared file. A direct
+rustfmt check of that consumer reproduced the failure (`format-red`, exit 1).
+The explicit child path makes both consumers pass (`format-green`, exit 0),
+with no change to the test data or assertions. The refreshed source inventory
+retains all original fixture bytes and both new Catalog routes.
