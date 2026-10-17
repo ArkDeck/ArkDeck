@@ -193,6 +193,13 @@ No local unified gate or device operation is run.
   OS error 206 (`merge-fmt-workspace.log`); all 63 changed Rust files pass
   individual checks, exit 0 (`merge-fmt-files.log`). SDD exits 0 with no errors
   or warnings and 121 acceptance IDs; `merge-sdd.log`.
+- Post-merge CI reproductions exit 0 in `merge-ci-reproductions.log`: the
+  actual Windows/macOS CI listings each retain all 20 Flash tests, selecting
+  14/3/3/9 cases for c6/e4/maintenance/recommission. Missing cases still fail
+  closed. The current dependency graph passes; extra transport and missing
+  adapter edges still refuse. The source and fixture census is unchanged.
+  Catalog routing tests pass again (35 cases), `merge-ci-view-tests.log`.
+  SDD exits 0 with 121 acceptance IDs, `merge-ci-sdd.log`; diff checks pass.
 
 ## CI
 
@@ -252,6 +259,14 @@ ordinary-mode arguments and empty recommission state to its new consumers, and
 regenerates the combined Catalog. The candidate preserves the published
 maintenance Catalog and both immutable c6/e4 replay views. Fresh CI on the
 integrated head is required; the earlier green run does not cover this merge.
+Run `39018616264` passed Swift, App, Windows client, Linux workspace and
+host-independent checks, including the full 75-case Python contract suite.
+Windows/macOS workspace execution exposed seven added Flash cases missing from
+the platform census; the exact observed 20-case lists now include them. Linux
+parity exposed the existing main maintenance adapter missing from the explicit
+dependency boundary. Its pure contract-only edge is now registered; arbitrary
+ArkForge transport edges remain forbidden. Fresh CI on these corrections is
+required.
 
 CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval

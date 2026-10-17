@@ -145,9 +145,11 @@ def assert_boundaries() -> None:
     # crates, never its mechanics (transport, platform, the daemon): the
     # client; the messages its controller surface takes and returns; the
     # authority API whose StepPermit the lane signs; and the typed ids and
-    # digests that permit is made of (协调会话 2026-09-26).
+    # digests that permit is made of (协调会话 2026-09-26). The maintenance
+    # adapter exports pure typed maintenance contracts over those same crates.
     arkforge = {"arkdeck-provider-arkforge": {
-        "arkforge-authority-api", "arkforge-client", "arkforge-core", "arkforge-ipc"}}
+        "arkforge-arkdeck-adapter", "arkforge-authority-api", "arkforge-client",
+        "arkforge-core", "arkforge-ipc"}}
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
     for path in manifests:
