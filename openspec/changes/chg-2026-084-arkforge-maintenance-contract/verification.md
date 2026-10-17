@@ -60,6 +60,9 @@ Local targeted checks for this implementation:
   Fixed e4 plan/Job oracles retain a separate required execution view (or the
   complete published e4 workspace receipt), without relabeling their authority.
   The routing, input/provenance and pinned-view Python tests passed.
+- The maintenance journal test asserts both operations are absent in exact c6/e4
+  views; the maintenance view appends every declared step and reopens the journal.
+  This keeps historical parity from importing operations that did not exist.
 - Historical Import reference compatibility: nine terminal-publication tests
   passed, including refusal when an old Catalog record claims a new operation.
   This compatibility affects read-only input retention, not execution authority.
