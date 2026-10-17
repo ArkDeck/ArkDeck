@@ -10,8 +10,8 @@
 //! whether the service is loaded and asks the daemon for `health`. `verify
 //! --job` reopens one completed, profiled Job through durable reads only.
 //! `restart` proves the service ready, refuses while a current Job is not a
-//! closed unknown-outcome recovery lane (the shared preflight table's
-//! restart rule), boots the service out and back in, and waits for a new
+//! closed unknown-outcome recovery lane or a proven retained-risk archive
+//! (the shared preflight table's restart rule), boots the service out and back in, and waits for a new
 //! process speaking the same catalog. launchd is reached only through
 //! [`arkdeck_platform::launchd`]: fixed argument arrays, one fixed executable.
 //!
@@ -1363,8 +1363,16 @@ fn restart_job_preflight(
             break;
         }
     }
-    arkdeck_contract::classify_restart(&current)
-        .map_err(|_| PlainFailure::new(69, "daemon returned a malformed current Runtime Job"))
+    crate::runtime_service_preflight::classify(&current, |job_id| {
+        host.request(
+            socket,
+            id,
+            "job.archive.preview",
+            Some(Map::from_iter([("jobId".into(), json!(job_id))])),
+        )
+        .map_err(|error| format!("Runtime archive proof unavailable: {error}"))
+    })
+    .map_err(|error| PlainFailure::new(69, error))
 }
 
 /// Swift `waitForRestart`: polls until the service is ready again with a new
@@ -1492,9 +1500,7 @@ pub fn restart_leaf(
             maximum_wait_seconds,
         )?;
         let jobs_after = restart_job_preflight(host, &status.socket_path, id)?;
-        if !jobs_after.blocking_job_ids.is_empty()
-            || jobs_after.preserved_unknown_job_ids != jobs_before.preserved_unknown_job_ids
-        {
+        if jobs_after != jobs_before {
             return Err(PlainFailure::new(
                 69,
                 "Runtime current Job closure changed across daemon restart",
