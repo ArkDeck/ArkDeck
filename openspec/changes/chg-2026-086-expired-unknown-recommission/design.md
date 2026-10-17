@@ -22,6 +22,9 @@ Normal CID. Bounded reads establish CPU serial, CID, board profile, boot-tree SN
 the uniquely selected current vendor-slot SN, and USB connector. CPU and USB are
 read again. The two SN sources must agree. These stable fields and the original
 binding digest enter the materialized plan; varying observation timestamps do not.
+The retained binding's USB topology remains historical evidence. Recommissioning
+uses the freshly proved attachment for its plan and execution route; that route
+must match the identity chain, and subsequent connector drift still refuses.
 
 The Provider receives the proved Loader SN while Runtime history remains anchored
 to the original CID and revision. Managed transition controls carry the consumed

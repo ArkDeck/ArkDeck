@@ -73,6 +73,10 @@ impl IdentityChain {
             || facts.identity_sha256 != chain.normal_identity_sha256
             || sha256_hex(facts.execution_connect_key.as_bytes()) != chain.normal_identity_sha256
             || facts.tool_sha256 != chain.provider_sha256
+            || facts.server_facts.get("dayu200HDCNormalAliasSHA256")
+                != Some(&chain.normal_identity_sha256)
+            || facts.server_facts.get("dayu200HDCNormalAliasUSBTopology")
+                != Some(&chain.usb_topology)
             || facts
                 .server_facts
                 .get("dayu200CrossModeBinding")

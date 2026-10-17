@@ -338,5 +338,80 @@ The full write, readback, reboot and identity sequence remains
 
 ### CI
 
-The follow-up fix requires its own PR CI and maintainer publication. The earlier
-green runs cover PR #2660, not this fix. No `REAL_DEVICE_PASS` is claimed.
+PR [#2661](https://github.com/ArkDeck/ArkDeck/pull/2661) passed Swift CI
+[39026495445](https://github.com/ArkDeck/ArkDeck/actions/runs/39026495445) and
+SDD Guard [39029978330](https://github.com/ArkDeck/ArkDeck/actions/runs/39029978330).
+The maintainer merged it at `2026-10-17T14:00:59Z`, publishing
+`da26b650685376c889f310488926c6daa81d41f6`. No `REAL_DEVICE_PASS` is claimed.
+
+## Published Windows preflight: current attachment
+
+The signed Runtime built from that published commit passed the Job-state check,
+then refused the same-board plan with `recommission.identityChainIncomplete`.
+The exact Normal CID matched, but the currently observed USB topology differed
+from the original binding snapshot. Preflight created no new Job, independent
+allocation or destructive dispatch. All 106 protected files and 60 original Job
+records remain byte-identical.
+
+`operation_facts` incorrectly required the freshly proved attachment to equal
+the historical port, and inherited that port for execution. Within the already
+published fresh-chain requirement, it now pins the current observation into both
+the identity chain and the execution route. Chain validation rejects missing or
+different route pins. The original binding digest still includes its historical
+topology; ordinary Flash facts and durable history remain unchanged. The Provider
+still requires stable repeated CPU/CID/SN/USB reads, exact Loader readback before
+writing, and matching postflight. This clarification is recorded in the design.
+
+Synthetic regressions exercise the real host-facts owner with both unchanged and
+different attachment locations, malformed or missing proofs, Provider refusal,
+and inconsistent execution facts. The successful recovery integration now moves
+from historical port 42 to fresh port 84 and checks the allocation and Provider
+route while retaining all original history, budget, one-use and restart checks.
+
+### Local targeted checks
+
+Windows, 2026-10-17. Logs use the prefix
+`D:/src/ArkDeck-wt/tools/recommission-fresh-connector-` and suffix
+`-20261017.log`; names below are the middle part. The existing per-chat Cargo
+cache is reused with two build jobs. These isolated checks do not operate the
+connected board or create hardware evidence.
+
+- `python rust/scripts/run-cargo.py test -p arkdeck-hoststore --lib
+  flash_facts::recommission_tests -- --nocapture` against the original
+  implementation exits 101: the moved-attachment case refuses and inconsistent
+  execution facts are accepted (`regression-red`). The invalid-proof case
+  already passes. With the fix, `test -p arkdeck-hoststore --lib --test flash_run
+  recommission -- --nocapture` exits 0: 13 unit and 6 recovery cases (`fixed`).
+- `python rust/scripts/run-cargo.py clippy -p arkdeck-hoststore
+  -p arkdeck-agentd -p arkdeck-soak --all-targets -- -D warnings`: exit 0
+  (`clippy`).
+- Through the same Cargo runner, each command exits 0:
+  `test -p arkdeck-hoststore --lib` (414 passed, 4 existing ignored;
+  `hoststore-lib`), `test -p arkdeck-hoststore --test flash_run
+  ordinary_policy_refusal` (1; `ordinary`), `test -p arkdeck-hoststore --test
+  loader_binding_jobs --test post_flash_alias` (9; `binding`),
+  `test -p arkdeck-agentd --lib --bin arkdeck-agentd` (46; `agentd`),
+  `test -p arkdeck-soak --lib` (3; `soak`), and `test -p arkdeck-provider-hdc
+  --lib rockchip_vendor_identity` (7; `provider-identity`). The Provider cases
+  retain repeated-read, CID/profile, CPU/SN/USB drift and vendor-slot refusals.
+- `python rust/scripts/run-cargo.py fmt --all --check`: exit 1 on the existing
+  Windows OS error 206 (`fmt`). `rustfmt --edition 2024 --config
+  skip_children=true --check` on all five changed Rust sources exits 0
+  (`fmt-files`).
+- The closed Catalog census, using `catalog_test_views.load` with fresh Cargo
+  metadata, exits 0: 946 sources, 6,499 unchanged fixtures and 335 targets
+  (`metadata`, `inventory`). Only the five source entries change; historical
+  routes and fixtures remain byte-identical.
+- `ARKDECK_PYTHON=python sh scripts/check-sdd.sh` through the installed Git Bash
+  and `git diff --check` each exit 0 (`sdd-final`, `diff-final`).
+- No contract inputs, Swift or App code changed. The native and historical
+  replay checks remain assigned to PR CI; no local unified gate was run.
+
+The real write/readback/reboot/identity sequence remains
+`BLOCKED_BY_PRODUCT_DEFECT` until this fix passes its own PR checks and
+maintainer publication.
+
+### CI
+
+The current-attachment fix requires its own PR CI and maintainer publication.
+The green runs above cover the preceding Job-state fix.
