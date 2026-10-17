@@ -964,6 +964,35 @@ fn every_admission_refusal_is_swifts() {
     assert!(differences.is_empty(), "{}", differences.join("\n"));
 }
 
+#[test]
+fn ordinary_policy_refusal_keeps_the_recovery_census_without_authority_or_dispatch() {
+    let _lock = exclusive();
+    let root = lay_down();
+    let fakes = Fakes::default();
+    let owners = Owners::open(&root, &fakes);
+    let exchange = recorded("admission", "submit.callerCapability");
+    fakes.begin(Script::recorded(&exchange["script"]));
+    let lock = root.join("store/.superseding-recovery-epochs.lock");
+    assert!(!lock.exists());
+    let answer = owners.answer(
+        &fakes,
+        "job.submit",
+        exchange["params"].as_object().unwrap(),
+    );
+    assert_eq!(answer, exchange["answer"]);
+    assert_eq!(fs::read(lock).unwrap(), Vec::<u8>::new());
+    assert_eq!(fakes.calls(), (vec![], vec![]));
+    assert_eq!(
+        owners.answer(&fakes, "capability.list", &Map::new()),
+        json!({"ok": true, "result": []})
+    );
+    assert!(
+        !root
+            .join("store/flash-recommission-allocations.json")
+            .exists()
+    );
+}
+
 /// Two ordinary Flashes of the canonical operation, reviewed, deduplicated
 /// and run: the Runtime's one-use capability issued and consumed before the
 /// delegated write, the completed plan projected onto every later step, the

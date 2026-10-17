@@ -114,6 +114,23 @@ No local unified gate or device operation is run.
   still covers 939 sources, 6,499 unchanged frozen fixtures and 334 targets;
   `catalog-inventory-platform.log`. Targeted rustfmt and `git diff --check`
   exit 0; SDD exits 0 with no errors or warnings (`sdd-platform.log`).
+- `test -p arkdeck-hoststore --test flash_run ordinary_policy_refusal
+  -- --nocapture`: exit 0, 1 passed; `ordinary-admission-tests.log`. The
+  current-Catalog case requires the original recovery census before policy
+  refusal, the exact refusal response, and zero dispatch, capability issuance
+  or independent allocation. It runs in every declared Catalog view.
+- `test -p arkdeck-hoststore --lib --test flash_run recommission -- --nocapture`
+  after restoring that ordinary admission order: exit 0, 10 unit and 6 runner
+  cases passed; `recommission-admission-tests.log`. The five-crate Clippy
+  command above also exits 0 (`clippy-admission.log`), and the 33 routing tests
+  pass (`catalog-views-admission.log`). Source/fixture/target census remains
+  939/6,499/334 (`catalog-inventory-admission.log`); frozen fixtures are unchanged.
+- `python -X utf8 -m unittest discover -s scripts/ci -p test_event_checkout.py`:
+  exit 0, 2 tests passed (`ci-workflow-checks-utf8.log`), using Git Bash on PATH
+  and the writable task temp directory. Earlier invocations hit this Windows
+  host's restricted default temp directory, missing `sh`, then default GBK
+  decoding (`ci-workflow-checks.log`, `ci-workflow-checks-retry.log`,
+  `ci-workflow-checks-final.log`); no workflow-checkout code or test was changed.
 - `test -p arkdeck-hoststore --test loader_binding_jobs --test post_flash_alias`:
   exit 0, 9 passed; `binding-integrations.log`.
 - `test -p arkdeck-provider-arkforge --test consumer_contract --test lane`:
@@ -163,6 +180,19 @@ census and all archive device/inode/volume/hash pins. An absent ledger now has
 no write; unsafe existing ledgers still fail closed. Only the publisher's
 same-directory `/private` alias is accepted, with a canonical no-link root;
 arbitrary symlinks remain rejected. Fresh CI on these fixes is pending.
+Run `39007378286` passed all three workspace jobs, Swift tests, App build,
+Windows client checks, host-independent checks and Linux parity. The macOS
+parity job reached its 50-minute job limit in the additional exact e4 view's
+unit tests. Its saved provenance confirms the published and candidate views
+passed. The completed c6 replay also exposed one real ordinary-admission
+regression: moving recovery classification behind policy refusal omitted the
+historical recovery-ledger read. The ordinary path now keeps its original order;
+the independent path still validates policy and Provider quiescence before its
+irreversible reservation. The frozen c6 assertion and fixture remain unchanged.
+All four views remain required. Only contract-parity job ceilings increase to
+65 minutes on macOS and 100 on Windows to cover the extra full view; Linux,
+workspace limits, individual test deadlines and Runtime/device budgets stay
+unchanged. Full parity on the corrected head is still required.
 CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval
 and protected-main publication. macOS production recommissioning stays unavailable

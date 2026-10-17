@@ -399,7 +399,7 @@
     "crates/arkdeck-hoststore/src/diagnostic_session.rs": "1b35b714d4c3c6caf931feb5bb00a4befe748458deb3d00d443cc10ed1fe1f23",
     "crates/arkdeck-hoststore/src/diagnostic_session_tests.rs": "b2b1b79f6c05451173aefdc043e9d432e602f61057e1682feb4d4c2a55a245d4",
     "crates/arkdeck-hoststore/src/display_names.rs": "808e44d50230320007a29b573e5ea2cd6ad086a3be670421b8d9ea011ecb9045",
-    "crates/arkdeck-hoststore/src/flash_admission.rs": "ed04881fa4cf3c4ad8647c11399c1910546763971a10675e8b74de098406a7df",
+    "crates/arkdeck-hoststore/src/flash_admission.rs": "43940de98eae185ee7415a38a684e1b21d300f646044715eb4ce4bcd5ce61f0c",
     "crates/arkdeck-hoststore/src/flash_alias_reconcile.rs": "6c89d54a8b13fcf01368a8878f296ce0665c051ad655b2aba6bd4955ab7420ee",
     "crates/arkdeck-hoststore/src/flash_archive.rs": "f53d796cf0603e26b8ab89b1fb928eb68b71aba4fad3ec692d1e9b80e2542a29",
     "crates/arkdeck-hoststore/src/flash_facts.rs": "003deb700a65e4ee5f5f9c2c0595cb878a9b541cfe35b8ebd298047ea1087d88",
@@ -588,7 +588,7 @@
     "crates/arkdeck-hoststore/tests/flash_bundle_import.rs": "a33bf4591500ec88aedce36df29a41444df380ff8eab253781ed2320092a9b89",
     "crates/arkdeck-hoststore/tests/flash_plan.rs": "5d36f7b68c05f914a04b9f92edf0f3779ebfe4aa1299e90acd032d08113d8250",
     "crates/arkdeck-hoststore/tests/flash_run/recommission.rs": "c1856413b9702be0e8cedd5a95026b03902dfab1ce68e6285a95625770d666e3",
-    "crates/arkdeck-hoststore/tests/flash_run.rs": "d323e2650930a2eb5ac7d542e6892d00309a77d7f5fbcef04d54ea9b162d8099",
+    "crates/arkdeck-hoststore/tests/flash_run.rs": "86d9876c2d235391d5ba5c6d8ebd4bc79bbac72450a014eeba2b1c5067f69ddc",
     "crates/arkdeck-hoststore/tests/import_target.rs": "5b48b01ad808b93b3772aabfb15ce754f91808c6fc827eb9c68bad62c4385496",
     "crates/arkdeck-hoststore/tests/import_upload.rs": "9df7c6965dbffa0035fe1c347f04ba2288b08e5b5cd8af68e63d5ae1c3816bdf",
     "crates/arkdeck-hoststore/tests/import_upload_process_death.rs": "d453feb8c85633c4c09f7d58c8a5723eee1c29793e4d9c25fcfe76a58595e2e4",
@@ -9033,7 +9033,8 @@
         "recommission::postflight_identity_drift_retains_unknown_and_burns_the_independent_epoch": "recommission",
         "recommission::an_unknown_recommission_cannot_allocate_another_epoch_after_restart": "recommission",
         "recommission::durable_epoch_repairs_a_crash_before_binding_and_terminal_publication_without_dispatch": "recommission",
-        "recommission::changed_published_archive_blocks_without_allocating_or_dispatching": "recommission"
+        "recommission::changed_published_archive_blocks_without_allocating_or_dispatching": "recommission",
+        "ordinary_policy_refusal_keeps_the_recovery_census_without_authority_or_dispatch": "both"
       },
       "ignored": [],
       "platformFunctions": {
@@ -9049,6 +9050,7 @@
           "every_admission_refusal_is_swifts",
           "every_flash_failure_ends_as_swifts",
           "index_digest_labels_measured_wait_but_preserves_outcome",
+          "ordinary_policy_refusal_keeps_the_recovery_census_without_authority_or_dispatch",
           "recommission::an_unknown_recommission_cannot_allocate_another_epoch_after_restart",
           "recommission::changed_published_archive_blocks_without_allocating_or_dispatching",
           "recommission::durable_epoch_repairs_a_crash_before_binding_and_terminal_publication_without_dispatch",
@@ -9070,6 +9072,7 @@
           "every_admission_refusal_is_swifts",
           "every_flash_failure_ends_as_swifts",
           "index_digest_labels_measured_wait_but_preserves_outcome",
+          "ordinary_policy_refusal_keeps_the_recovery_census_without_authority_or_dispatch",
           "recommission::an_unknown_recommission_cannot_allocate_another_epoch_after_restart",
           "recommission::changed_published_archive_blocks_without_allocating_or_dispatching",
           "recommission::durable_epoch_repairs_a_crash_before_binding_and_terminal_publication_without_dispatch",
