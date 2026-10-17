@@ -6,3 +6,13 @@
 # one thing a union can get wrong: a duplicated bullet or heading.
 openspec/changes/*/tasks.md merge=union
 rust/README.md merge=union
+
+# Large binaries and frozen fixtures, tracked by Git LFS from this commit
+# forward. History is not rewritten. Patterns stay narrow so the small fixtures
+# under rust/tests/ stay ordinary Git objects. Jobs that read these bytes run
+# `git lfs pull` after checkout (the same step as actions/checkout `lfs: true`).
+*.systrace filter=lfs diff=lfs merge=lfs -text
+*.htrace filter=lfs diff=lfs merge=lfs -text
+Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/trace_streamer filter=lfs diff=lfs merge=lfs -text
+rust/tests/fixtures/device-mutation-reconcile-native-published-c6-v4/oracle.json filter=lfs diff=lfs merge=lfs -text
+rust/tests/fixtures/device-mutation-reconcile-native-published-c6-v4/raw-oracle.json filter=lfs diff=lfs merge=lfs -text

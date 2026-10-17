@@ -177,10 +177,14 @@ jobs:
         run: |
           set -eu
           git init .
+          # Same materialization as actions/checkout with lfs: true. These jobs
+          # read trace fixtures and the pinned trace_streamer binary.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
+          git lfs pull
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Exact Xcode 27.0 preflight
@@ -277,10 +281,14 @@ jobs:
         run: |
           set -eu
           git init .
+          # Same materialization as actions/checkout with lfs: true. These jobs
+          # read trace fixtures and the pinned trace_streamer binary.
+          git lfs install --local
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
+          git lfs pull
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
       - name: Exact Xcode 27.0 preflight
