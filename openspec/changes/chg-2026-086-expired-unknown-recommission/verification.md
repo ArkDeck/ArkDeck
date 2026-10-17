@@ -131,6 +131,9 @@ No local unified gate or device operation is run.
   host's restricted default temp directory, missing `sh`, then default GBK
   decoding (`ci-workflow-checks.log`, `ci-workflow-checks-retry.log`,
   `ci-workflow-checks-final.log`); no workflow-checkout code or test was changed.
+- `python -X utf8 scripts/test_agent_pr_workflow.py`: exit 0, 18 passed;
+  `workflow-contract-tests.log`. The exact contract-parity time-limit token and
+  its independent drift/removal/swap rejection tests match 100/65/30 minutes.
 - `test -p arkdeck-hoststore --test loader_binding_jobs --test post_flash_alias`:
   exit 0, 9 passed; `binding-integrations.log`.
 - `test -p arkdeck-provider-arkforge --test consumer_contract --test lane`:
@@ -193,6 +196,11 @@ All four views remain required. Only contract-parity job ceilings increase to
 65 minutes on macOS and 100 on Windows to cover the extra full view; Linux,
 workspace limits, individual test deadlines and Runtime/device budgets stay
 unchanged. Full parity on the corrected head is still required.
+The saved Windows parity log from that run confirms the same single c6
+admission-tree mismatch before the superseding push cancelled it. Run
+`39011187504` then stopped in the planner because the workflow-contract checker
+still pinned the previous job ceilings. Its exact token and negative mutations
+are now synchronized; all 18 workflow-contract tests pass locally.
 CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval
 and protected-main publication. macOS production recommissioning stays unavailable
