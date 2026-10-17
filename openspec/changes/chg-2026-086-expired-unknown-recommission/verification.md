@@ -48,10 +48,17 @@ No local unified gate or device operation is run.
   were fixed while preserving all frozen fixture bytes. The remaining existing
   `RunDirectoryTests` POSIX-mode assertion reports `0777` instead of `0700` on
   Windows; it remains unchanged and is verified on Unix CI.
-- Focused rerun with `-k ReadOnlyMachineOutputTests`: exit 0, 8 passed;
+- Focused rerun with `-k ReadOnlyMachineOutputTests`: exit 0, 9 passed;
   `machine-output-tests.log`. The new census case also proves that all original
   operation entries survive unchanged and precisely one unavailable entry is
   added, with no fixture rewrite or repeated projection.
+  All three doctor report forms also retain agreement between the Catalog
+  summary and its unavailable-operation finding.
+- Downloaded `rust-readonly-recordings-ubuntu-latest` from CI `39004994088`,
+  verified every recording SHA-256, then called `check-readonly.machine_output`
+  with `write=False` against the candidate recordings: exit 0, all five actual
+  CLI outputs matched; `ci-machine-output-recheck.log`. This checks saved host
+  execution output and is not a fresh CI run or hardware evidence.
 - `python -m unittest gj_record.test_catalog_aliases` from `scripts/`: exit 0,
   3 passed after the CI census correction; `gj-catalog-tests.log`.
 - `python -m unittest discover -s rust/scripts -p test_contract_checks.py
@@ -82,6 +89,15 @@ No local unified gate or device operation is run.
 - `test -p arkdeck-control --lib`: exit 0, 2 passed; `control-tests.log`.
   The new descriptor first exposed missing example-input declarations; the
   schema and generated Rust/Windows validators were updated together.
+- `test -p arkdeck-cli --test machine_contracts --test maintainer_contracts`:
+  exit 0, 14 passed; `cli-contract-consumer-tests.log`. The CLI's own export
+  regenerated only its command-registry Catalog digest and feature-coverage
+  entry/counts; all other 240 generated bundle products were byte-identical.
+- `test -p arkdeck-control --test read_only`: exit 0, 30 passed;
+  `control-readonly-tests.log`. The additional destructive operation is checked
+  explicitly while all recorded descriptors keep their exact comparisons.
+- `clippy -p arkdeck-control --all-targets -- -D warnings`: exit 0 after the
+  consumer-test correction; `clippy-control-consumers.log`.
 - `test -p arkdeck-agentd --bin arkdeck-agentd`: exit 0, 42 passed;
   `agentd-tests.log`.
 - `test -p arkdeck-hoststore --test flash_run recommission -- --nocapture`:
@@ -118,6 +134,12 @@ did not fail, and the isolated local rerun passed; fresh CI must still pass.
 The same run found three new XCTest assertions in a Swift Testing suite. They
 now use the suite's existing `#expect` syntax with identical conditions; native
 compilation and execution remain assigned to macOS CI.
+Run `39004994088` passed the App build, Windows client checks and host-independent
+Rust checks. Linux workspace/parity exposed missing current CLI generated
+products, the Control operation-list delta, and the doctor finding's count;
+these now have targeted passing checks. Swift execution exposed exact census
+expectations for the thirtieth input default and the additional bounded HiLog
+action reference; their closed expected sets now include the new operation.
 The protected-main required contexts were read back as `guard` and `swift`.
 CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval

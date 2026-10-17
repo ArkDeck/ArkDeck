@@ -138,8 +138,8 @@ struct RuntimeOperationCatalogTests {
       .flatMap(\.inputs)
       .filter { $0.defaultValue != nil }
     #expect(
-      withDefaults.count == 29,
-      "the catalog declares twenty-nine input defaults; the runtime must see all of them")
+      withDefaults.count == 30,
+      "the catalog declares thirty input defaults; the runtime must see all of them")
   }
 
   /// Every published input says what it is for.
@@ -207,8 +207,8 @@ struct RuntimeOperationCatalogTests {
       }
     }
     #expect(
-      checked == 29,
-      "the catalog declares twenty-nine input defaults; all of them must be exercised here")
+      checked == 30,
+      "the catalog declares thirty input defaults; all of them must be exercised here")
   }
 
   @Test func viewerCanOmitHilogWithoutChangingTheDefaultDiagnosticsPlan() throws {

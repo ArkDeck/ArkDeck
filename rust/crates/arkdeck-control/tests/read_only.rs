@@ -78,16 +78,22 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
             let actual = actual.as_array().unwrap();
             let expected = recorded["result"].as_array().unwrap();
             let catalog: Vec<Value> = serde_json::from_str(CATALOG_CANONICAL_JSON).unwrap();
-            let additions = ["input.keyboard", "capture.diagnostic-session"];
+            let additions = [
+                ("input.keyboard", "deviceMutation"),
+                ("capture.diagnostic-session", "deviceMutation"),
+                ("flash.recommission", "destructive"),
+            ];
             let mut added = 0;
-            for id in additions {
+            for (id, effect) in additions {
                 let present = catalog.iter().any(|entry| entry["id"] == id);
                 let reference = format!("{id}@1");
                 let row = actual.iter().find(|row| row["reference"] == reference);
                 if present {
                     added += 1;
                     let row = row.expect("current Catalog advertises the added operation");
-                    assert_eq!(row["minimumEffect"], "deviceMutation");
+                    assert_eq!(row["minimumEffect"], effect);
+                    assert_eq!(row["canonicalReference"], reference);
+                    assert!(row["aliasFor"].is_null());
                     assert_eq!(row["binding"], "confirmedDevice");
                     assert_eq!(row["availability"], "unavailable");
                     assert_eq!(row["reasonCodes"], json!(["provider_not_registered"]));

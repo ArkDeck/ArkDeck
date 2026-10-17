@@ -336,7 +336,7 @@
     "crates/arkdeck-control/src/target_availability.rs": "65400eb9836b8c6940f0936e6d7637f41ed1bd562ebfc776e3a2b75646130b55",
     "crates/arkdeck-control/tests/doctor_report.rs": "c9ad7b927eceac42203294b964f30fe2ccf0a4e602c730eb2bf8856d137ca8bc",
     "crates/arkdeck-control/tests/health_providers.rs": "5ba7ca1353793e9fcb153c4a445cf2a6c9a386abf5711ed2ff20d6c0ce608d5c",
-    "crates/arkdeck-control/tests/read_only.rs": "246e46626a3db040bad5e1cc18b746ecc71eda5d611d31d25a17b0e35f863024",
+    "crates/arkdeck-control/tests/read_only.rs": "ee2409a6e2c5b79480cc4c4f3ae03dfbdd438cbbaf3124bfe9a6c818a11c8bc6",
     "crates/arkdeck-control/tests/support/mod.rs": "241d173b300a7cdd82d0c14b7a6c26243e010c7114491fa9aca1c441ad7008ff",
     "crates/arkdeck-hoststore/Cargo.toml": "3f21d2459b99a6827f94f6b785142ed688cc8c3b3021441cce98948e4c2b8453",
     "crates/arkdeck-hoststore/src/absent_workspace_composition.rs": "8ed605affe21e5080cf7543869f0683a5a9a39a021b45607daeaf1534a260148",

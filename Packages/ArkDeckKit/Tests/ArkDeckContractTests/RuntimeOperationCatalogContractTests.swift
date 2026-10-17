@@ -95,6 +95,8 @@ final class DiagnosticsRuntimeOperationCatalogContractTests: XCTestCase {
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
         "flash.full-restore@1/capture-post-flash-diagnostics": CatalogActionReference(
           catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
+        "flash.recommission@1/capture-post-flash-diagnostics": CatalogActionReference(
+          catalogID: "arkdeck-diagnostics", actionID: "boundedHilog"),
       ])
   }
 

@@ -1,7 +1,7 @@
 {
   "appCapabilityRegistrySchemaVersion": "arkdeck.app-product-capability-registry/1",
   "bundleVersion": "arkdeck.cli.contracts/1",
-  "catalogDigest": "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7",
+  "catalogDigest": "d96478867d6250530095b3e1d873617cd5a9e78bba29af38c30748858b10dd07",
   "classificationVocabulary": [
     "direct",
     "generic",
@@ -2827,6 +2827,25 @@
       "targetCommand": "arkdeck flash preview"
     },
     {
+      "classification": "generic",
+      "conformanceFixture": "argv/job.submit.json",
+      "equivalentCommands": [],
+      "feature": "flash.recommission@1",
+      "implementationStatusByPlatform": {
+        "macos": "partial",
+        "windows": "partial"
+      },
+      "lifecycle": "current",
+      "note": "Windows Runtime only; macOS lacks the historical process-lifetime proof",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "catalog:flash.recommission@1",
+      "targetClassification": "generic",
+      "targetCommand": "arkdeck job submit --operation flash.recommission@1 --inputs-file <path>"
+    },
+    {
       "classification": "direct",
       "conformanceFixture": "argv/flash.reconcile-alias.json",
       "equivalentCommands": [],
@@ -4955,7 +4974,7 @@
     "blocked": [],
     "byClassification": {
       "direct": 129,
-      "generic": 2,
+      "generic": 3,
       "internal": 4,
       "local": 93,
       "platformService": 4,
@@ -4964,11 +4983,11 @@
     },
     "bySource": {
       "app": 68,
-      "catalog": 32,
+      "catalog": 33,
       "cli": 53,
       "daemon": 110
     },
-    "entries": 263,
+    "entries": 264,
     "fullFunction": true
   }
 }

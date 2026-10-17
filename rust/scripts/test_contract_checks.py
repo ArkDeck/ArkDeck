@@ -221,6 +221,22 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             readonly.machine_output_fixture("doctor", unknown, old)
 
+    def test_recommission_doctor_counts_agree_with_the_unavailable_operation_finding(self):
+        digest = readonly.catalog_test_views.RECOMMISSION
+        for name in ("doctor", "deep", "healthy"):
+            with self.subTest(name=name):
+                original = (readonly.MACHINE_OUTPUT / f"{name}.cli.jsonl").read_bytes()
+                expected = json.loads(original)
+                report = expected["error"]["details"]["report"] if name == "healthy" else expected["result"]
+                report["checks"]["catalog"].update(
+                    digest=digest, operationCount=33, unavailableOperationCount=33)
+                findings = [row for row in report["findings"]
+                            if row["code"] == "catalog.unavailableOperations"]
+                self.assertEqual(len(findings), 1)
+                findings[0]["details"] = {"unavailableOperationCount": 33}
+                actual = readonly.machine_output_fixture(name, original, digest)
+                self.assertEqual(json.loads(actual), expected)
+
     def test_recommission_view_preserves_every_original_operation_and_adds_one_unavailable(self):
         original = (readonly.MACHINE_OUTPUT / "operations.cli.jsonl").read_bytes()
         digest = readonly.catalog_test_views.RECOMMISSION

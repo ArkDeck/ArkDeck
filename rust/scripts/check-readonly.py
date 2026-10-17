@@ -420,13 +420,20 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
         assert data.count(before) == 1, 'exact Catalog summary required'
         added = dict(declared, digest=digest, operationCount=33, unavailableOperationCount=33)
         result = data.replace(before, encode(added), 1)
+        findings = [row for row in report['findings']
+                    if row['code'] == 'catalog.unavailableOperations']
+        assert len(findings) == 1 and findings[0]['details'] == {'unavailableOperationCount': 32}
+        before_finding = encode(findings[0])
+        assert result.count(before_finding) == 1, 'exact unavailable-operation finding required'
+        after_finding = dict(findings[0], details={'unavailableOperationCount': 33})
+        result = result.replace(before_finding, encode(after_finding), 1)
     return result
 
 
 def machine_output(directory: Path, rows: list, write: bool) -> None:
     """The pinned leaves' stdout, `observedAt` labelled, against the fixtures (or written
     to them): the same bytes on macOS, Linux and, through the signed pipe, Windows."""
-    # This validates all 32 operation sources and the complete generated Rust
+    # This validates the complete declared operation set and generated Rust
     # Catalog against the immutable lineage, rather than trusting an output hash.
     digest = None if write else catalog_test_views.catalog(ROOT / "rust")
     for name in MACHINE_OUTPUT_LEAVES:
