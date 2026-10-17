@@ -52,6 +52,12 @@ No local unified gate or device operation is run.
   `machine-output-tests.log`. The new census case also proves that all original
   operation entries survive unchanged and precisely one unavailable entry is
   added, with no fixture rewrite or repeated projection.
+- `python -m unittest gj_record.test_catalog_aliases` from `scripts/`: exit 0,
+  3 passed after the CI census correction; `gj-catalog-tests.log`.
+- `python -m unittest discover -s rust/scripts -p test_contract_checks.py
+  -k test_catalog_change_replays_original_fixtures_with_current_implementation`:
+  exit 0, 1 passed after CI reported a temporary-directory cleanup error;
+  `catalog-replay-cleanup-tests.log`. No assertion or cleanup code was relaxed.
 - `python scripts/catalog_gen/generate.py --check` and
   `python rust/scripts/generate-contract.py --check`: each exit 0;
   `catalog-generate-check.log` and `contract-generate-check.log`.
@@ -101,8 +107,16 @@ No local unified gate or device operation is run.
 
 ## CI
 
-PR creation and selected checks are pending. The protected-main required contexts
-were read back as `guard` and `swift`. CI success cannot replace maintainer review.
+PR [#2660](https://github.com/ArkDeck/ArkDeck/pull/2660), base `main`.
+Initial SDD Guard run `39004620388` failed on the Golden Journey generator's
+stale 31-canonical-operation assertion. The additive Catalog has 32 canonical
+operations and one alias; the assertion now checks the new reference explicitly
+and retains exact cardinality. Selected checks on the corrected head are pending.
+Initial Swift CI run `39004620503` also reported `Directory not empty` during
+temporary-directory cleanup in the contract replay test. Its behavior assertions
+did not fail, and the isolated local rerun passed; fresh CI must still pass.
+The protected-main required contexts were read back as `guard` and `swift`.
+CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval
 and protected-main publication. macOS production recommissioning stays unavailable
 until the historical process-lifetime guarantee is provable.
