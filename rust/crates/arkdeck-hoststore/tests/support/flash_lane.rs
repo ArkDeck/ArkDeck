@@ -195,7 +195,8 @@ impl Fakes {
             "normalIdentitySha256": facts.identity_sha256,
             "hardwareSerialSha256": sha256_hex(if drifted { b"other-cpu" } else { b"same--cpu" }),
             "loaderSerialSha256": sha256_hex(b"factory-loader-serial"),
-            "connectorSha256": "d".repeat(64), "usbTopology": "42",
+            "connectorSha256": "d".repeat(64),
+            "usbTopology": facts.server_facts.get("dayu200HDCNormalAliasUSBTopology"),
             "providerSha256": facts.tool_sha256, "bindingSnapshotSha256": "f".repeat(64),
         }).to_string());
         Ok(facts)

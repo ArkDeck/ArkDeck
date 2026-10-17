@@ -122,7 +122,12 @@ fn independent_recommission_preserves_history_and_publishes_one_verified_binding
     let target = source_record.request["target"]["targetId"]
         .as_str()
         .unwrap();
-    fakes.begin(Script::default());
+    // The retained source ran on port 42; the fresh, independently proved
+    // attachment is now on port 84. Only the new recovery uses that route.
+    fakes.begin(Script {
+        alias_topology: Some("84".into()),
+        ..Default::default()
+    });
     let params = request(&source, "success");
     let submit = call(&owners, &fakes, "job.submit", &params);
     let job = submit["result"]["jobId"]
@@ -135,6 +140,11 @@ fn independent_recommission_preserves_history_and_publishes_one_verified_binding
     );
     assert_eq!(fakes.calls(), (vec![], vec![]));
     let allocated = fs::read(root.join("store/flash-recommission-allocations.json")).unwrap();
+    let allocation: Value = serde_json::from_slice(&allocated).unwrap();
+    assert_eq!(
+        allocation["allocations"][0]["allocation"]["identityChain"]["usbTopology"],
+        "84"
+    );
     let again = call(&owners, &fakes, "job.submit", &request(&source, "new-id"));
     assert_eq!(again["ok"], false, "{again}");
     assert_eq!(
@@ -143,6 +153,13 @@ fn independent_recommission_preserves_history_and_publishes_one_verified_binding
     );
     let run = call(&owners, &fakes, "job.run", &json!({"jobId": job}));
     assert_eq!(run["result"]["state"], "recovered", "{run}");
+    let calls = fakes.calls().0;
+    let prepared: Vec<_> = calls
+        .iter()
+        .filter(|call| call.starts_with("prepare "))
+        .collect();
+    assert_eq!(prepared.len(), 1);
+    assert!(prepared[0].contains(" topology=84 "), "{prepared:?}");
     assert!(
         authority.require_state(&owners.jobs).is_ok(),
         "only durable supersession accounts for the retained Session"
@@ -176,7 +193,10 @@ fn independent_recommission_preserves_history_and_publishes_one_verified_binding
     let epochs = fs::read(root.join("store/superseding-recovery-epochs.json")).unwrap();
     drop(owners);
     let restarted = Owners::open(&root, &fakes);
-    fakes.begin(Script::default());
+    fakes.begin(Script {
+        alias_topology: Some("84".into()),
+        ..Default::default()
+    });
     let duplicate = call(&restarted, &fakes, "job.submit", &params);
     assert_eq!(duplicate["result"]["jobId"], job);
     assert_eq!(fakes.calls(), (vec![], vec![]));

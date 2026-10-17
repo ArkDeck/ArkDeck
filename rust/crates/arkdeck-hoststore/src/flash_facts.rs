@@ -542,7 +542,6 @@ impl FlashHostFacts {
         .map_err(str::to_owned)?;
         if observation.vendor_serial.is_none()
             || observation.normal_identity_sha256 != facts.identity_sha256
-            || observation.usb_topology != binding.usb_topology
         {
             return Err("recommission.identityChainIncomplete".into());
         }
@@ -582,6 +581,15 @@ impl FlashHostFacts {
             crate::job_owner::flash_recommission::CHAIN_FACT.into(),
             serde_json::to_string(&chain).map_err(|_| "recommission.identityEncodingFailed")?,
         );
+        // The retained binding's port remains part of its immutable snapshot.
+        // Only recommissioning uses this freshly proved CPU/CID/SN/connector
+        // chain for the plan and execution route, including after a cable move.
+        facts
+            .server_facts
+            .insert(ALIAS_IDENTITY.into(), chain.normal_identity_sha256.clone());
+        facts
+            .server_facts
+            .insert(ALIAS_TOPOLOGY.into(), chain.usb_topology.clone());
         crate::job_owner::flash_recommission::IdentityChain::from_facts(&facts)?;
         Ok(facts)
     }
@@ -1110,6 +1118,10 @@ impl FlashHostFacts {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "flash_facts/recommission_tests.rs"]
+mod recommission_tests;
 
 impl FlashHostFacts {
     /// Re-prove the durable cross-mode binding, not similarity of a USB arrival.
