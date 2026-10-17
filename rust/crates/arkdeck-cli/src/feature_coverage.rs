@@ -1517,7 +1517,12 @@ mod tests {
             .filter(|entry| {
                 !matches!(
                     entry["feature"].as_str(),
-                    Some("flash.verify@1" | "flash.restore-boot-loop@1")
+                    Some(
+                        "flash.verify@1"
+                            | "flash.restore-boot-loop@1"
+                            | "flash.verify"
+                            | "flash.restore-boot-loop"
+                    )
                 )
             })
             .map(|entry| {

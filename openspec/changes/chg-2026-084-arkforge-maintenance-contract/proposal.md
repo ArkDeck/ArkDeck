@@ -44,6 +44,8 @@ adapter with immutable source plans, exact target observations, bounded HDC full
 partition hashing, the existing Job journal, target exclusion and capability owner.
 CLI and both apps use `job.plan`, pin its digest, submit once and run the retained
 Job. Results include each range/hash/strength/reason and the source plan identity.
+Discovery examples declare the typed `sourceJobId` and `budgetMs` input fields
+in the closed `operation.describe` result contract.
 
 The destructive operation retains `defaultPolicyIssuance: disabled`. Enabling
 its default capability issuance remains a separate explicit approval decision.
