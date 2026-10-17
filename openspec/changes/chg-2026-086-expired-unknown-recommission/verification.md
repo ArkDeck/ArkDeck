@@ -115,6 +115,9 @@ and retains exact cardinality. Selected checks on the corrected head are pending
 Initial Swift CI run `39004620503` also reported `Directory not empty` during
 temporary-directory cleanup in the contract replay test. Its behavior assertions
 did not fail, and the isolated local rerun passed; fresh CI must still pass.
+The same run found three new XCTest assertions in a Swift Testing suite. They
+now use the suite's existing `#expect` syntax with identical conditions; native
+compilation and execution remain assigned to macOS CI.
 The protected-main required contexts were read back as `guard` and `swift`.
 CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval

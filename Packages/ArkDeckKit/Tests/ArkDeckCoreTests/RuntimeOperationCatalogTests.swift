@@ -244,9 +244,9 @@ struct RuntimeOperationCatalogTests {
     #expect(!ArkForgeFlashOperation.contains("flash.dayu200@1"))
     #expect(
       ArkForgeFlashOperation.containsDurableRecordReference("flash.dayu200@1"))
-    XCTAssertTrue(ArkForgeFlashOperation.containsDurableRecordReference("flash.recommission@1"))
-    XCTAssertFalse(ArkForgeFlashOperation.contains("flash.recommission@1"))
-    XCTAssertNil(ArkForgeFlashOperation.canonicalReference(for: "flash.recommission@1"))
+    #expect(ArkForgeFlashOperation.containsDurableRecordReference("flash.recommission@1"))
+    #expect(!ArkForgeFlashOperation.contains("flash.recommission@1"))
+    #expect(ArkForgeFlashOperation.canonicalReference(for: "flash.recommission@1") == nil)
     #expect(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore@1") != nil)
     #expect(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore") == nil)
   }
