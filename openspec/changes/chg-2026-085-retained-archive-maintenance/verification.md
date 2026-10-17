@@ -48,6 +48,15 @@ jobs. Logs below are relative to `D:/src/ArkDeck-wt/tools/`.
 - `ARKDECK_PYTHON=<installed Python> bash scripts/check-sdd.sh`: exit 0;
   0 errors and 0 warnings; `unknown-archive-sdd-2.log`. The initial restricted
   Git Bash launch failed before checking files; the same check passed with host access.
+- Catalog routing replay using the 49 cases listed by macOS CI: exit 0;
+  `unknown-archive-ci-routing-check-1.log`. Both added restart cases are required
+  in both Catalog views; all previous selections and the historical oracle remain
+  unchanged. Complete source/fixture/target inventory validation passed.
+- `python rust/scripts/test_catalog_test_views.py` and
+  `python rust/scripts/test_catalog_execution.py`: exit 0; 31 and 19 tests passed;
+  `unknown-archive-ci-routing-tests-2.log`. The first attempt could not create
+  fixtures under the sandbox temporary directory; the same tests passed with
+  normal host temporary-directory access.
 
 Initial failed attempts remain in `unknown-archive-cli-preflight-tests-1.log`,
 `unknown-archive-clippy-1.log`, `unknown-archive-clippy-2.log` and
@@ -64,7 +73,12 @@ and generated protocol pins are unchanged, so their generators are not rerun.
 
 ## CI
 
-At initial push, PR creation and selected checks are pending. Exact-head run IDs
-and conclusions will be recorded in the PR delivery record, without amending an
-already green head. No approval, verification or hardware pass is inferred from
-local tests.
+PR #2658 initial Swift CI run `38993002940` stopped the macOS workspace lane before
+executing `runtime_service`: the two new test functions were missing from the
+closed routing manifest. They are now explicitly registered for both Catalog views
+and the macOS function census. No assertion or execution guard was relaxed. The
+initial SDD Guard run `38993002992` passed.
+
+The corrected head's selected checks are pending. Exact-head run IDs and conclusions
+will be recorded in the PR delivery record, without amending an already green head.
+No approval, verification or hardware pass is inferred from local tests.
