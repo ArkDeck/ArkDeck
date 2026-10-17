@@ -64,6 +64,22 @@ public sealed class FlashMaintenanceTests
         Assert.ThrowsExactly<ContractException>(() => FlashMaintenanceResult.Parse(missing));
     }
     [TestMethod]
+    public void OriginalRamdiskFullHashSucceedsWithoutAStoppedReason()
+    {
+        var value = StrictJson.Parse(Encoding.UTF8.GetBytes("""
+            {"schema":"arkforge.boot-loop-restoration/v1","source_job_id":"JOB-1","restoration_job_id":"JOB-2","exit_code":0,"outcome":"verified","outcome_unknown":false,
+             "verification":{"schema":"arkforge.flash-verification/v1","source_job_id":"JOB-2","source_plan_id":"PLAN-2","source_plan_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "exit_code":0,"outcome":"verified","verified":1,"skipped":0,"failed":0,"targets":[{"target":"ramdisk","range_start":121634816,"range_length":4194304,
+              "expected_sha256":"bdd1f4eacbe545f5a553b529980bc487723d37554148058dd551c241abf86de4","observed_sha256":"bdd1f4eacbe545f5a553b529980bc487723d37554148058dd551c241abf86de4",
+              "outcome":"verified","verification_strength":"fullHash","reason":null}]}}
+            """));
+        var result = FlashMaintenanceResult.Parse(value);
+        Assert.AreEqual(0, result.ExitCode);
+        Assert.IsNull(result.Reason);
+        Assert.AreEqual("JOB-2", result.Verification!.SourceJobId);
+    }
+
+    [TestMethod]
     public void UnknownRestorationIsStoppedAndNeverSuccess()
     {
         var value = StrictJson.Parse(Encoding.UTF8.GetBytes("""

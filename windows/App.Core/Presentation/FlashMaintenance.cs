@@ -58,10 +58,11 @@ public sealed record FlashMaintenanceResult(int ExitCode, string Outcome, string
             return new(verification.ExitCode, verification.Outcome, verification.SourceJobId, null, false, null, verification);
         }
         if (schema != "arkforge.boot-loop-restoration/v1") throw FlashVerification.Invalid();
+        string? OptionalText(string key) => !o.TryGetValue(key, out var rawText) || rawText is JsonNull ? null : TypedJson.String(rawText);
         var result = new FlashMaintenanceResult(checked((int)TypedJson.Required(o, "exit_code", TypedJson.Int64)),
             TypedJson.Required(o, "outcome", TypedJson.String), TypedJson.Required(o, "source_job_id", TypedJson.String),
-            Json.NullableString(o, "restoration_job_id"), TypedJson.Required(o, "outcome_unknown", TypedJson.Bool), Json.NullableString(o, "reason"),
-            o.TryGetValue("verification", out var raw) ? FlashVerification.Parse(raw) : null);
+            OptionalText("restoration_job_id"), TypedJson.Required(o, "outcome_unknown", TypedJson.Bool), OptionalText("reason"),
+            o.TryGetValue("verification", out var raw) && raw is not JsonNull ? FlashVerification.Parse(raw) : null);
         if (result.ExitCode == 0 && result.Verification is { } v && v.Targets.Count == 1)
         {
             var t = v.Targets[0];
@@ -98,7 +99,7 @@ public sealed partial class SurfaceLoader
                 return (null, imported.Failure?.Detail ?? "Runtime returned no original image lease");
             inputs.Add(("artifactLease", new JsonString(lease)));
         }
-        var request = RuntimeRequest.Build("maintenance-ui", operation, 1, target.TargetId, target.BindingRevision,
+        var request = RuntimeRequest.Build("maintenance-ui", originalArchive is null ? "flash.verify" : "flash.restore-boot-loop", 1, target.TargetId, target.BindingRevision,
             inputs, ["rawArtifacts", "derivedArtifacts"], FlashOperations.Client);
         var planned = await PlanAsync(request, CliCommands.JobPlan).ConfigureAwait(false);
         if (planned.Answer.Value is not { } plan) return (null, planned.Answer.Unavailable?.Detail ?? "Maintenance plan unavailable");

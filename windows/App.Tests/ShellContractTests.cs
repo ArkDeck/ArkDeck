@@ -130,7 +130,7 @@ public sealed class ShellContractTests
         var published = new HashSet<string>(StringComparer.Ordinal)
         {
             "capture.diagnostics", "debug.hap", "debug.template", "deploy.native-library.app-owned", "port-forward.create", "port-forward.remove",
-            "flash.full-restore",
+            "flash.full-restore", "flash.verify", "flash.restore-boot-loop",
             // TASK-XPA-020 Device: the six existing DeviceControlFacade references;
             // request authority and capability reservation remain Runtime-owned.
             "input.tap", "input.long-press", "input.swipe", "input.keyboard", "capture.screen-sequence",
