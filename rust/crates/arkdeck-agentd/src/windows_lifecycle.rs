@@ -584,7 +584,8 @@ impl Authority {
             ),
         }
         let hdc_sha256 = managed.is_some().then_some(sha256.as_deref()).flatten();
-        let (host, composed) = self.compose_arkforge(host, hdc_sha256);
+        let (host, composed) =
+            self.compose_arkforge(host, hdc_sha256, arkdeck_platform::usb_host_devices)?;
         report(&format!(
             "arkdeck-agentd owners: {}",
             host.owner_census().join(", ")
@@ -613,8 +614,19 @@ impl Authority {
         &self,
         host: crate::host::Host,
         hdc_sha256: Option<&str>,
-    ) -> (crate::host::Host, crate::arkforge_lane::Composed) {
+        census: fn() -> Result<
+            Vec<arkdeck_platform::UsbHostDevice>,
+            arkdeck_platform::RegistryUnavailable,
+        >,
+    ) -> Result<(crate::host::Host, crate::arkforge_lane::Composed), String> {
         let root = self.root.path();
+        // Recommission allocations and their source Jobs belong to the Job
+        // owner's private child in both Windows layouts. The account's lane
+        // lives one level above it; that root also grants SYSTEM access and
+        // cannot be opened as a private HostDirectory.
+        let job_state = self.root.private_child("jobs-state").map_err(|error| {
+            format!("the recommission Job state is unusable: {error}; nothing was started")
+        })?;
         let (state, application_support) = if self.development {
             (root.join("jobs-state"), root.to_path_buf())
         } else {
@@ -629,13 +641,10 @@ impl Authority {
         let host = host
             .with_flash_planning(composed.planning(&state, hdc_sha256.is_some()))
             .with_flash_host_facts(
-                arkdeck_hoststore::FlashHostFacts::new(
-                    &application_support,
-                    arkdeck_platform::usb_host_devices,
-                )
-                .with_rockusb(composed.rockusb())
-                .with_recommission_state(&state)
-                .with_arkforge_loader(&composed.runtime_directory),
+                arkdeck_hoststore::FlashHostFacts::new(&application_support, census)
+                    .with_rockusb(composed.rockusb())
+                    .with_recommission_state(&job_state)
+                    .with_arkforge_loader(&composed.runtime_directory),
             )
             .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
                 &composed.runtime_directory,
@@ -646,7 +655,7 @@ impl Authority {
             // as the facts, as the macOS compositions compose it.
             .with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
                 &application_support,
-                arkdeck_platform::usb_host_devices,
+                census,
                 crate::host::utc_now,
             ))
             // The Loader binding coordinator, as the macOS compositions
@@ -655,11 +664,8 @@ impl Authority {
             // Runtime's records below the root.
             .with_loader_binding(arkdeck_hoststore::LoaderBinding::new(
                 &application_support,
-                arkdeck_platform::usb_host_devices,
-                arkdeck_hoststore::ArkForgeLoader::new(
-                    arkdeck_platform::usb_host_devices,
-                    &composed.runtime_directory,
-                ),
+                census,
+                arkdeck_hoststore::ArkForgeLoader::new(census, &composed.runtime_directory),
             ));
         // The executable lane, installed only with a lane and a
         // descriptor-bound HDC: on Windows only when the registered tuple's
@@ -669,9 +675,9 @@ impl Authority {
             &composed,
             &state,
             &application_support,
-            arkdeck_platform::usb_host_devices,
+            census,
         );
-        (host, composed)
+        Ok((host, composed))
     }
 
     /// Swift's union control-action owner (`ControlActionResources`) in
@@ -1814,6 +1820,91 @@ fn main() {
                 server_port: Some(OsString::from("8710")),
             }))
         );
+    }
+
+    #[test]
+    fn recommission_reads_the_private_job_ledger_in_both_windows_layouts() {
+        use arkdeck_control::HostServices;
+        use arkdeck_platform::HostDirectory;
+        use serde_json::json;
+
+        fn census() -> Result<Vec<arkdeck_platform::UsbHostDevice>, arkdeck_platform::RegistryUnavailable> {
+            Ok(vec![arkdeck_platform::UsbHostDevice {
+                serial: "fixture-normal-cid".into(),
+                vendor_id: 0x2207,
+                product_id: 0x5000,
+                topology: "fixture-connector".into(),
+                product_name: Some("HDC Device".into()),
+                registry_entry_id: Some(1),
+            }])
+        }
+
+        for development in [false, true] {
+            let temporary = std::env::temp_dir().canonicalize().unwrap();
+            let temporary = temporary.to_str().unwrap().strip_prefix(r"\\?\")
+                .map_or(temporary.clone(), std::path::PathBuf::from);
+            let directory = temporary.join(format!("arkdeck-recommission-layout-{:x}",
+                u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())));
+            let state = directory.join("ArkDeck/Agentd");
+            HostDirectory::open_or_create_private(&state).unwrap();
+            // Exercise the account layout without using the account guard,
+            // endpoint, files, process stop signal or a real USB/HDC observation.
+            let state_root = StateRoot::development(&state).unwrap();
+            let scope = state_root.scope().unwrap();
+            let GuardAcquisition::Owned { guard, .. } =
+                SingleInstanceGuard::acquire(&scope, Duration::ZERO).unwrap()
+            else {
+                panic!("the isolated root is this test's own");
+            };
+            let authority = Authority {
+                endpoint: state_root.endpoint().unwrap(),
+                development,
+                hdc: None,
+                account_hdc: None,
+                tuples: arkdeck_provider_hdc::WINDOWS_HDC_TUPLES,
+                owner: state_root.lock_owner().unwrap().unwrap(),
+                guard,
+                root: state_root,
+            };
+            let jobs = authority.job_store().unwrap();
+            let job_state = authority.root.private_child("jobs-state").unwrap();
+            let ledger = "flash-recommission-allocations.json";
+            let root = HostDirectory::open(&state).unwrap();
+            root.create_document(ledger, b"{}").unwrap();
+            let target_path = authority.root.private_child("targets").unwrap();
+            let targets = HostDirectory::open(&target_path).unwrap();
+            targets.create_document("targets.json", &serde_json::to_vec(&json!({
+                "schemaVersion": "1.0.0", "targets": [{
+                    "adoptedAtUTC": "2026-09-25T00:00:00Z", "bindingRevision": 1,
+                    "connectKey": "fixture-normal-cid",
+                    "stablePhysicalIdentitySHA256": arkdeck_contract::sha256_hex(b"fixture-normal-cid"),
+                    "targetID": "TGT-fixture", "toolVersion": "3.2.0f"
+                }]
+            })).unwrap()).unwrap();
+            let host = crate::host::Host::from_environment()
+                .with_jobs(jobs)
+                .with_targets(arkdeck_hoststore::TargetStore::open(&target_path).unwrap());
+            let (host, composed) = authority.compose_arkforge(host, None, census).unwrap();
+            let status = host.flash_bootloader_status().unwrap();
+            assert_eq!(status["disposition"], "targetBindingUnprepared", "{status}");
+            assert_eq!(status["targetId"], "TGT-fixture", "{status}");
+            assert!(!job_state.join(ledger).exists(), "a read must not allocate a recovery");
+            assert_eq!(std::fs::read(state.join(ledger)).unwrap(), b"{}");
+
+            // A malformed ledger in the actual Job store must fail closed;
+            // a valid observation never falls back to the lane's directory.
+            HostDirectory::open(&job_state).unwrap().create_document(ledger, b"{}").unwrap();
+            let refused = host.flash_bootloader_status().unwrap_err();
+            assert!(refused.message.contains("recommission.allocationLedgerMalformed"), "{refused:?}");
+            assert_eq!(std::fs::read(job_state.join(ledger)).unwrap(), b"{}");
+            drop(host);
+            drop(composed);
+            drop(targets);
+            drop(root);
+            authority.release();
+            assert_eq!(directory.parent(), Some(temporary.as_path()));
+            std::fs::remove_dir_all(directory).unwrap();
+        }
     }
 
     /// The account's HDC as macOS production composes it, over a root that
