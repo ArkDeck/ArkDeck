@@ -102,6 +102,18 @@ No local unified gate or device operation is run.
   `agentd-tests.log`.
 - `test -p arkdeck-hoststore --test flash_run recommission -- --nocapture`:
   exit 0, 6 passed after final Rust changes; `recommission-final.log`.
+- `test -p arkdeck-hoststore --lib --test flash_run recommission -- --nocapture`
+  after the startup/archive-root corrections: exit 0, 10 unit and 6 runner
+  cases passed; `recommission-platform-tests.log`. New cases prove that absent
+  ledgers leave a pristine Job repository, unsafe/malformed ledgers fail closed,
+  and substituted roots or changed receipt/proposal hashes cannot verify an
+  archive. The macOS-only alias and symlink cases require native CI.
+- `clippy -p arkdeck-hoststore -p arkdeck-control -p arkdeck-agentd
+  -p arkdeck-cli -p arkdeck-soak --all-targets -- -D warnings` after those
+  corrections: exit 0; `clippy-platform.log`. Source inventory validation
+  still covers 939 sources, 6,499 unchanged frozen fixtures and 334 targets;
+  `catalog-inventory-platform.log`. Targeted rustfmt and `git diff --check`
+  exit 0; SDD exits 0 with no errors or warnings (`sdd-platform.log`).
 - `test -p arkdeck-hoststore --test loader_binding_jobs --test post_flash_alias`:
   exit 0, 9 passed; `binding-integrations.log`.
 - `test -p arkdeck-provider-arkforge --test consumer_contract --test lane`:
@@ -141,6 +153,16 @@ these now have targeted passing checks. Swift execution exposed exact census
 expectations for the thirtieth input default and the additional bounded HiLog
 action reference; their closed expected sets now include the new operation.
 The protected-main required contexts were read back as `guard` and `swift`.
+Run `39005826577` passed Swift tests, App build, Windows client checks,
+host-independent Rust checks, Windows workspace and Linux workspace/contract parity. Its macOS
+workspace job `117318309300` exposed two implementation defects: startup
+reconciliation created a ledger lock before a fresh dedicated Job index, and
+the immutable archive reader did not invert SessionPublisher's Foundation
+`/private` alias. The fixes preserve the Job repository's strict initial-file
+census and all archive device/inode/volume/hash pins. An absent ledger now has
+no write; unsafe existing ledgers still fail closed. Only the publisher's
+same-directory `/private` alias is accepted, with a canonical no-link root;
+arbitrary symlinks remain rejected. Fresh CI on these fixes is pending.
 CI success cannot replace maintainer review.
 The change remains proposed; same-board acceptance starts only after approval
 and protected-main publication. macOS production recommissioning stays unavailable

@@ -5,7 +5,10 @@ use std::path::PathBuf;
 struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
-        let path = temporary_root().join(format!(
+        Self::under(&temporary_root())
+    }
+    fn under(parent: &std::path::Path) -> Self {
+        let path = parent.join(format!(
             "arkdeck-recommission-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
@@ -17,6 +20,128 @@ impl Drop for Root {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
     }
+}
+
+#[test]
+fn startup_without_an_allocation_keeps_a_pristine_job_repository() {
+    let state = Root::new();
+    let targets_root = Root::new();
+    let targets = crate::TargetStore::open(&targets_root.0).unwrap();
+    reconcile_bindings(&state.0, &targets).unwrap();
+    assert_eq!(std::fs::read_dir(&state.0).unwrap().count(), 0);
+    assert!(JobStore::open_owner(&state.0).is_ok());
+}
+
+#[test]
+fn startup_never_treats_a_malformed_or_unsafe_ledger_as_absent() {
+    for variant in 0..3 {
+        let state = Root::new();
+        let targets_root = Root::new();
+        let targets = crate::TargetStore::open(&targets_root.0).unwrap();
+        let root = HostDirectory::open(&state.0).unwrap();
+        match variant {
+            0 => root.create_document(DOCUMENT, b"{}").unwrap(),
+            1 => drop(root.private_child(DOCUMENT).unwrap()),
+            _ => {
+                root.create_document("linked.json", b"{}").unwrap();
+                crate::test_private::link(&state.0.join("linked.json"), &state.0.join(DOCUMENT));
+            }
+        }
+        assert!(reconcile_bindings(&state.0, &targets).is_err());
+        if variant == 0 {
+            assert_eq!(root.read_without_repair(DOCUMENT, LIMIT).unwrap(), b"{}");
+        } else {
+            assert!(!state.0.join(LOCK).exists());
+        }
+    }
+}
+
+fn archive_marker(root: &Root) -> serde_json::Value {
+    let directory = HostDirectory::open(&root.0).unwrap();
+    let session = directory
+        .private_child("2026")
+        .unwrap()
+        .private_child("10")
+        .unwrap()
+        .private_child("session-job-retained")
+        .unwrap();
+    let bytes = br#"{"jobId":"job-retained"}"#;
+    session.create_document("manifest.json", bytes).unwrap();
+    let facts = directory.export_facts().unwrap();
+    json!({
+        "root": {"path": root.0.to_str().unwrap(), "device": facts.device.to_string(),
+            "inode": facts.inode.to_string(), "volumeIdentity": facts.volume_identity},
+        "relativeSessionPath": "2026/10/session-job-retained",
+        "receipt": {"manifestSHA256": sha256_hex(bytes)},
+        "proposal": {"manifestSHA256": sha256_hex(bytes)}
+    })
+}
+
+#[test]
+fn published_archive_requires_the_original_root_and_manifest() {
+    let root = Root::new();
+    let marker = archive_marker(&root);
+    assert_eq!(
+        published_manifest(&marker, "job-retained").unwrap()["jobId"],
+        "job-retained"
+    );
+    for field in ["device", "inode", "volumeIdentity"] {
+        let mut changed = marker.clone();
+        changed["root"][field] = json!("changed");
+        assert!(published_manifest(&changed, "job-retained").is_err());
+    }
+    for field in ["receipt", "proposal"] {
+        let mut changed = marker.clone();
+        changed[field]["manifestSHA256"] = json!("0".repeat(64));
+        assert!(published_manifest(&changed, "job-retained").is_err());
+    }
+    let replacement = Root::new();
+    archive_marker(&replacement);
+    let mut changed = marker;
+    changed["root"]["path"] = json!(replacement.0.to_str().unwrap());
+    assert!(published_manifest(&changed, "job-retained").is_err());
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn foundation_archive_alias_requires_the_same_canonical_private_root() {
+    let parent = std::path::Path::new("/tmp").canonicalize().unwrap();
+    let root = Root::under(&parent);
+    let mut marker = archive_marker(&root);
+    let short = format!(
+        "/{}",
+        root.0.to_str().unwrap().strip_prefix("/private/").unwrap()
+    );
+    marker["root"]["path"] = json!(short);
+    assert!(HostDirectory::open(std::path::Path::new(&short)).is_err());
+    assert_eq!(
+        published_manifest(&marker, "job-retained").unwrap()["jobId"],
+        "job-retained"
+    );
+
+    let replacement = Root::under(&parent);
+    archive_marker(&replacement);
+    marker["root"]["path"] = json!(format!(
+        "/{}",
+        replacement
+            .0
+            .to_str()
+            .unwrap()
+            .strip_prefix("/private/")
+            .unwrap()
+    ));
+    assert!(published_manifest(&marker, "job-retained").is_err());
+
+    let link_parent = Root::under(&parent);
+    let link = link_parent.0.join("alias");
+    std::os::unix::fs::symlink(&root.0, &link).unwrap();
+    marker["root"]["path"] = json!(link.to_str().unwrap());
+    assert!(published_manifest(&marker, "job-retained").is_err());
+    marker["root"]["path"] = json!(format!(
+        "/{}",
+        link.to_str().unwrap().strip_prefix("/private/").unwrap()
+    ));
+    assert!(published_manifest(&marker, "job-retained").is_err());
 }
 
 fn candidate() -> Allocation {

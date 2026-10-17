@@ -538,7 +538,7 @@ fn source_digest(root: &HostDirectory, id: &str) -> Result<String, String> {
 /// Manifest. Caller paths are never inputs to this read.
 fn published_manifest(marker: &serde_json::Value, job: &str) -> Result<serde_json::Value, String> {
     let missing = || "recommission.publishedArchiveUnverifiable".to_owned();
-    let root = HostDirectory::open(std::path::Path::new(
+    let root = published_root(std::path::Path::new(
         marker["root"]["path"].as_str().ok_or_else(missing)?,
     ))
     .map_err(|_| missing())?;
@@ -574,6 +574,39 @@ fn published_manifest(marker: &serde_json::Value, job: &str) -> Result<serde_jso
         return Err(missing());
     }
     serde_json::from_slice(&bytes).map_err(|_| missing())
+}
+
+#[cfg(windows)]
+fn published_root(path: &std::path::Path) -> std::io::Result<HostDirectory> {
+    HostDirectory::open(path)
+}
+
+/// Invert only SessionPublisher's `/private` shortening. The long spelling
+/// must itself pass the canonical, no-link private-directory check, and the
+/// recorded spelling must still name that same directory. The receipt's
+/// device/inode/volume pins are checked against the held root by the caller.
+#[cfg(target_os = "macos")]
+fn published_root(path: &std::path::Path) -> std::io::Result<HostDirectory> {
+    use std::os::unix::fs::MetadataExt;
+    HostDirectory::open(path).or_else(|error| {
+        let Some(short) = path
+            .to_str()
+            .filter(|text| text.starts_with('/') && !text.starts_with("/private/"))
+        else {
+            return Err(error);
+        };
+        let canonical = std::path::PathBuf::from(format!("/private{short}"));
+        let root = HostDirectory::open(&canonical)?;
+        let facts = root.export_facts()?;
+        let alias = std::fs::metadata(path)?;
+        if !alias.is_dir()
+            || u64::from(alias.dev() as u32) != facts.device
+            || alias.ino() != facts.inode
+        {
+            return Err(error);
+        }
+        Ok(root)
+    })
 }
 
 /// A consumed allocation alone never grants a reusable identity mapping. The
@@ -674,6 +707,13 @@ pub(crate) fn reconcile_bindings(
     targets: &crate::TargetStore,
 ) -> Result<(), String> {
     let root = HostDirectory::open(state).map_err(|_| "recommission.stateUnavailable")?;
+    // Startup precedes the first Job index. An absent ledger has no lineage
+    // to reconcile and must not create a lock in that pristine repository.
+    match root.owned_kind_and_size(DOCUMENT) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Ok((arkdeck_platform::HostEntryKind::Regular, size)) if size <= LIMIT as u64 => (),
+        _ => return Err("recommission.allocationLedgerUnreadable".into()),
+    }
     let ledger = {
         let _guard = root
             .wait_lock(LOCK, false)
