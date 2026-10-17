@@ -1,7 +1,7 @@
 //! Trusted maintenance data and result projection. No frontend supplies these records.
 pub use arkforge_arkdeck_adapter::maintenance::*;
 pub use arkforge_ipc::messages::{
-    ActionReceiptSummary, Effect, ExecutablePlan, JobSummary, PublicStep,
+    ActionReceiptSummary, Effect, ExecutablePlan, JobSummary, KeyValue, PublicStep,
 };
 use serde_json::{Value, json};
 use std::path::Path;

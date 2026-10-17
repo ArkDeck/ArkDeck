@@ -559,7 +559,7 @@ fn unknown(reason: &str) -> LaneFailure {
     LaneFailure::OutcomeUnknown(reason.to_owned())
 }
 
-fn action_receipt(receipt: &ActionReceiptSummary) -> ActionReceipt {
+pub(crate) fn action_receipt(receipt: &ActionReceiptSummary) -> ActionReceipt {
     ActionReceipt {
         job_id: receipt.job_id.clone(),
         plan_id: receipt.plan_id.clone(),

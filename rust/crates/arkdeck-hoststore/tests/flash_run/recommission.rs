@@ -208,6 +208,179 @@ fn independent_recommission_preserves_history_and_publishes_one_verified_binding
 }
 
 #[test]
+fn incomplete_recommission_readback_retains_unknown_history_and_consumed_allocation() {
+    let _lock = exclusive();
+    for fault in [
+        "readbackSkip",
+        "readbackShort",
+        "readbackMissing",
+        "readbackUnavailable",
+        "readbackHash",
+        "readbackWeak",
+        "readbackRange",
+        "readbackDuplicate",
+        "readbackOtherJob",
+        "readbackMissingEffect",
+        "readbackWriteFailed",
+    ] {
+        let root = lay_down();
+        let fakes = Fakes::default();
+        let owners = Owners::open(&root, &fakes);
+        let source = archived(&owners, &fakes);
+        let original = history(&owners, &source);
+        fakes.begin(Script {
+            perform: fault.into(),
+            ..Default::default()
+        });
+        let submit = call(&owners, &fakes, "job.submit", &request(&source, fault));
+        let job = submit["result"]["jobId"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{submit}"));
+        let run = call(&owners, &fakes, "job.run", &json!({"jobId":job}));
+        assert_eq!(
+            run["result"]["state"], "waitingForRecovery",
+            "{fault}: {run}"
+        );
+        assert_eq!(run["result"]["outcomeUnknown"], true, "{fault}: {run}");
+        assert_eq!(history(&owners, &source), original);
+        assert!(!root.join("store/superseding-recovery-epochs.json").exists());
+        assert!(
+            owners
+                .targets
+                .records()
+                .unwrap()
+                .iter()
+                .all(|record| record["bindingRevision"] == 1)
+        );
+        let allocated = fs::read(root.join("store/flash-recommission-allocations.json")).unwrap();
+        let ledger: Value = serde_json::from_slice(&allocated).unwrap();
+        assert_eq!(ledger["allocations"][0]["consumed"], true);
+        assert_eq!(
+            fakes
+                .calls()
+                .0
+                .iter()
+                .filter(|call| call.starts_with("perform "))
+                .count(),
+            1
+        );
+        drop(owners);
+        let restarted = Owners::open(&root, &fakes);
+        fakes.begin(Script::default());
+        let refused = call(
+            &restarted,
+            &fakes,
+            "job.submit",
+            &request(&source, "after-readback-failure"),
+        );
+        assert_eq!(refused["ok"], false, "{fault}: {refused}");
+        assert_eq!(
+            fs::read(root.join("store/flash-recommission-allocations.json")).unwrap(),
+            allocated
+        );
+        assert_eq!(fakes.calls(), (vec![], vec![]));
+    }
+}
+
+#[test]
+fn passive_recommission_reconcile_rechecks_full_readback_including_cached_postflight() {
+    let _lock = exclusive();
+    for cached in [false, true] {
+        let root = lay_down();
+        let fakes = Fakes::default();
+        let owners = Owners::open(&root, &fakes);
+        let source = archived(&owners, &fakes);
+        let original = history(&owners, &source);
+        fakes.begin(Script {
+            perform: "outcomeUnknown".into(),
+            ..Default::default()
+        });
+        let submit = call(
+            &owners,
+            &fakes,
+            "job.submit",
+            &request(&source, "passive-readback"),
+        );
+        let job = submit["result"]["jobId"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{submit}"));
+        assert_eq!(
+            call(&owners, &fakes, "job.run", &json!({"jobId":job}))["result"]["state"],
+            "waitingForRecovery"
+        );
+        let path = owners
+            .state_root()
+            .join("jobs")
+            .join(job)
+            .join("arkforge-runtime-state.json");
+        if cached {
+            // Model the old writer's crash window: only a canonical postflight
+            // receipt is durable. It cannot stand in for the missing readback.
+            let mut sidecar: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            let execution = &sidecar["execution"];
+            let facts = vec![
+                ("const.product.model".into(), "DAYU200".into()),
+                ("const.ohos.fullname".into(), "fixture-build".into()),
+                (
+                    "usbTopology".into(),
+                    execution["usbTopology"].as_str().unwrap().into(),
+                ),
+            ];
+            sidecar["planCompletionReceipt"] = json!({
+                "jobID": execution["daemonJobID"], "planID": execution["planID"],
+                "stepID": "STEP-023", "actionID": "", "attemptID": "",
+                "permitID": "PERMIT-CACHED", "disposition": "semanticSuccess",
+                "evidenceSHA256": arkdeck_provider_arkforge::canonical_facts_digest(&facts).unwrap(),
+                "verificationOutcome": "", "verificationStrength": "", "verifiedRangeStart": 0,
+                "verifiedRangeLength": 0, "typedSkipReason": "", "failureClassification": "",
+                "facts": facts.into_iter().map(|(key, value)| json!({"key": key, "value": value})).collect::<Vec<_>>()
+            });
+            fs::write(&path, serde_json::to_vec_pretty(&sidecar).unwrap()).unwrap();
+        }
+        let before = fs::read(&path).unwrap();
+        let allocated = fs::read(root.join("store/flash-recommission-allocations.json")).unwrap();
+        drop(owners);
+        let restarted = Owners::open(&root, &fakes);
+        fakes.begin(Script {
+            perform: "readbackSkip".into(),
+            terminal: "completed".into(),
+            ..Default::default()
+        });
+        let answer = call(&restarted, &fakes, "job.reconcile", &json!({"jobId":job}));
+        let record = restarted.jobs.read_snapshot(job).unwrap();
+        assert_eq!(
+            record.state, "waitingForRecovery",
+            "cached={cached}: {answer}"
+        );
+        assert_eq!(
+            call(&restarted, &fakes, "job.status", &json!({"jobId":job}))["result"]["outcomeUnknown"],
+            true
+        );
+        assert!(
+            record
+                .timeline
+                .iter()
+                .any(|line| line.contains("recoveryFullReadbackMissing"))
+        );
+        assert_eq!(fs::read(&path).unwrap(), before);
+        assert_eq!(
+            fs::read(root.join("store/flash-recommission-allocations.json")).unwrap(),
+            allocated
+        );
+        assert_eq!(history(&restarted, &source), original);
+        assert!(!root.join("store/superseding-recovery-epochs.json").exists());
+        assert!(fakes.calls().1.is_empty());
+        assert!(
+            fakes
+                .calls()
+                .0
+                .iter()
+                .all(|call| call.starts_with("observe "))
+        );
+    }
+}
+
+#[test]
 fn expired_allocation_and_unclosed_provider_dispatch_nothing_and_never_renew() {
     let _lock = exclusive();
     let root = lay_down();

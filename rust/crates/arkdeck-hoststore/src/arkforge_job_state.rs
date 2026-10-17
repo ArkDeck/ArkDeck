@@ -9,9 +9,10 @@
 //! `CurrentDurableJSON`): the exact correlation is never discarded or
 //! guessed.
 use super::{DocumentPublishError, JobStore, JobWriteError, guard_unavailable};
+use crate::job_record::JobRecord;
 use crate::job_repository::identifier;
 use crate::session_json;
-use arkdeck_provider_arkforge::{ActionReceipt, Execution};
+use arkdeck_provider_arkforge::{ActionReceipt, Execution, FlashLane};
 use serde_json::{Map, Value, json};
 use std::io;
 
@@ -26,6 +27,37 @@ const BOUND: usize = 1024 * 1024;
 pub(crate) struct ArkForgeJobState {
     pub(crate) execution: Option<Execution>,
     pub(crate) completion: Option<ActionReceipt>,
+}
+
+impl ArkForgeJobState {
+    /// Revalidate the full Provider proof even when the postflight receipt was
+    /// cached before a restart. Old sidecar bytes are never upgraded into proof.
+    pub(crate) fn require_recovery_completion(
+        &self,
+        record: &JobRecord,
+        lane: &dyn FlashLane,
+    ) -> Result<(), String> {
+        let recovery = record.operation() == "flash.recommission@1"
+            || record
+                .admission_evidence()
+                .is_some_and(|evidence| evidence.get("completeOverwriteRecovery").is_some())
+            || self
+                .execution
+                .as_ref()
+                .is_some_and(|execution| execution.execution_purpose == "supersedingRecovery");
+        if !recovery {
+            return Ok(());
+        }
+        let execution = self
+            .execution
+            .as_ref()
+            .filter(|execution| {
+                execution.arkdeck_job_id == record.job_id
+                    && execution.execution_purpose == "supersedingRecovery"
+            })
+            .ok_or("flash.recoveryFullReadbackMissing: recovery execution correlation is absent")?;
+        lane.require_recovery_completion(execution)
+    }
 }
 
 fn execution_value(execution: &Execution) -> Value {
