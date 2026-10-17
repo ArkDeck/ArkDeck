@@ -10691,6 +10691,90 @@
       "table": null,
       "en": "Runtime trust assessment",
       "zh-Hans": "Runtime \u4fe1\u4efb\u8bc4\u4f30"
+    },
+    {
+      "key": "flash.maintenance.archive",
+      "table": "FlashLocalizable",
+      "en": "Select an original image bundle above to restore ramdisk.",
+      "zh-Hans": "恢复 ramdisk 前，请在上方选择原始镜像包。"
+    },
+    {
+      "key": "flash.maintenance.busy",
+      "table": "FlashLocalizable",
+      "en": "Maintenance is running…",
+      "zh-Hans": "维护任务执行中…"
+    },
+    {
+      "key": "flash.maintenance.counts",
+      "table": "FlashLocalizable",
+      "en": "Verified %lld · skipped %lld · failed %lld",
+      "zh-Hans": "匹配 %lld · 跳过 %lld · 失败 %lld"
+    },
+    {
+      "key": "flash.maintenance.detail",
+      "table": "FlashLocalizable",
+      "en": "Verification reads sealed partition ranges. Restoration writes only the original ramdisk from the selected image bundle, then independently verifies its full hash.",
+      "zh-Hans": "核验读取封存计划中的分区范围。恢复仅写入所选镜像包中的原始 ramdisk，随后独立核对全量哈希。"
+    },
+    {
+      "key": "flash.maintenance.expected",
+      "table": "FlashLocalizable",
+      "en": "Expected SHA-256",
+      "zh-Hans": "预期 SHA-256"
+    },
+    {
+      "key": "flash.maintenance.noSource",
+      "table": "FlashLocalizable",
+      "en": "A retained Flash job for the selected device is required.",
+      "zh-Hans": "需要所选设备的一条已留存刷写任务。"
+    },
+    {
+      "key": "flash.maintenance.observed",
+      "table": "FlashLocalizable",
+      "en": "Observed SHA-256",
+      "zh-Hans": "实测 SHA-256"
+    },
+    {
+      "key": "flash.maintenance.range",
+      "table": "FlashLocalizable",
+      "en": "Range: %lld + %lld bytes",
+      "zh-Hans": "范围：%lld + %lld 字节"
+    },
+    {
+      "key": "flash.maintenance.restore",
+      "table": "FlashLocalizable",
+      "en": "Restore original ramdisk",
+      "zh-Hans": "恢复原始 ramdisk"
+    },
+    {
+      "key": "flash.maintenance.result",
+      "table": "FlashLocalizable",
+      "en": "Result: %@ (exit %lld)",
+      "zh-Hans": "结果：%@（退出码 %lld）"
+    },
+    {
+      "key": "flash.maintenance.source",
+      "table": "FlashLocalizable",
+      "en": "Source Flash job",
+      "zh-Hans": "来源刷写任务"
+    },
+    {
+      "key": "flash.maintenance.stopped",
+      "table": "FlashLocalizable",
+      "en": "Stopped — inspect the record before another request.",
+      "zh-Hans": "已停止——再次请求前请检查记录。"
+    },
+    {
+      "key": "flash.maintenance.title",
+      "table": "FlashLocalizable",
+      "en": "Verify or restore ramdisk",
+      "zh-Hans": "核验或恢复 ramdisk"
+    },
+    {
+      "key": "flash.maintenance.verify",
+      "table": "FlashLocalizable",
+      "en": "Verify partitions",
+      "zh-Hans": "核验分区"
     }
   ]
 }

@@ -174,7 +174,7 @@ class ClosedSources(unittest.TestCase):
             'manifest_path': str(self.rust / 'crates/demo/Cargo.toml'), 'targets': [{
                 'name': 'positive', 'kind': ['test'], 'test': True}]}]}
         self.manifest = {'schemaVersion': 'arkdeck.catalog-test-views/1',
-                         'catalogs': [views.OLD, views.CURRENT],
+                         'catalogs': [views.OLD, views.CURRENT, views.MAINTENANCE],
                          'sources': views.source_inventory(self.rust),
                          'fixtures': views.fixture_inventory(self.rust),
                          'targets': {'demo/positive': {

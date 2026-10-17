@@ -7138,4 +7138,60 @@ SHA-256: %4$@</value>
     <value>Runtime trust assessment</value>
     <comment>windows.settings.bundles.trust (Windows only)</comment>
   </data>
+  <data name="flash_maintenance_archive" xml:space="preserve">
+    <value>Select an original image bundle above to restore ramdisk.</value>
+    <comment>flash.maintenance.archive (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_busy" xml:space="preserve">
+    <value>Maintenance is running…</value>
+    <comment>flash.maintenance.busy (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_counts" xml:space="preserve">
+    <value>Verified %lld · skipped %lld · failed %lld</value>
+    <comment>flash.maintenance.counts (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_detail" xml:space="preserve">
+    <value>Verification reads sealed partition ranges. Restoration writes only the original ramdisk from the selected image bundle, then independently verifies its full hash.</value>
+    <comment>flash.maintenance.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_expected" xml:space="preserve">
+    <value>Expected SHA-256</value>
+    <comment>flash.maintenance.expected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_noSource" xml:space="preserve">
+    <value>A retained Flash job for the selected device is required.</value>
+    <comment>flash.maintenance.noSource (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_observed" xml:space="preserve">
+    <value>Observed SHA-256</value>
+    <comment>flash.maintenance.observed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_range" xml:space="preserve">
+    <value>Range: %lld + %lld bytes</value>
+    <comment>flash.maintenance.range (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_restore" xml:space="preserve">
+    <value>Restore original ramdisk</value>
+    <comment>flash.maintenance.restore (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_result" xml:space="preserve">
+    <value>Result: %@ (exit %lld)</value>
+    <comment>flash.maintenance.result (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_source" xml:space="preserve">
+    <value>Source Flash job</value>
+    <comment>flash.maintenance.source (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_stopped" xml:space="preserve">
+    <value>Stopped — inspect the record before another request.</value>
+    <comment>flash.maintenance.stopped (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_title" xml:space="preserve">
+    <value>Verify or restore ramdisk</value>
+    <comment>flash.maintenance.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_verify" xml:space="preserve">
+    <value>Verify partitions</value>
+    <comment>flash.maintenance.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
 </root>

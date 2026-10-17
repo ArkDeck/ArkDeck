@@ -84,6 +84,8 @@
 		E10000000000000000000001 /* WorkspaceChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000002 /* WorkspaceChrome.swift */; };
 		E10000000000000000000004 /* RuntimeExecutionModeBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10000000000000000000005 /* RuntimeExecutionModeBadge.swift */; };
 		F20000000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F20000000000000000000002 /* Assets.xcassets */; };
+		D71C018AD20D4104B4D60001 /* FlashMaintenanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71C018AD20D4104B4D60002 /* FlashMaintenanceView.swift */; };
+		D71C018AD20D4104B4D60101 /* FlashMaintenanceResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71C018AD20D4104B4D60102 /* FlashMaintenanceResultView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -153,6 +155,8 @@
 		E10000000000000000000002 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
 		E10000000000000000000005 /* RuntimeExecutionModeBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeExecutionModeBadge.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D71C018AD20D4104B4D60002 /* FlashMaintenanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashMaintenanceView.swift; sourceTree = "<group>"; };
+		D71C018AD20D4104B4D60102 /* FlashMaintenanceResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashMaintenanceResultView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -335,6 +339,8 @@
 			isa = PBXGroup;
 			children = (
 				C10000000000000000000011 /* FlashLocalization.swift */,
+				D71C018AD20D4104B4D60002 /* FlashMaintenanceView.swift */,
+				D71C018AD20D4104B4D60102 /* FlashMaintenanceResultView.swift */,
 				A1000000000000000000003C /* FlashWorkspaceView.swift */,
 				A100000000000000000000A7 /* FlashPlanDetailsView.swift */,
 				A100000000000000000000A9 /* FlashRuntimeActivityView.swift */,
@@ -631,6 +637,8 @@
 				A100000000000000000000E7 /* OverviewResumeSheet.swift in Sources */,
 				D10000000000000000000001 /* DeviceWorkspace.swift in Sources */,
 				A1000000000000000000003D /* RuntimeHistoryView.swift in Sources */,
+				D71C018AD20D4104B4D60001 /* FlashMaintenanceView.swift in Sources */,
+				D71C018AD20D4104B4D60101 /* FlashMaintenanceResultView.swift in Sources */,
 				A1000000000000000000003B /* FlashWorkspaceView.swift in Sources */,
 				A100000000000000000000A8 /* FlashPlanDetailsView.swift in Sources */,
 				A100000000000000000000AA /* FlashRuntimeActivityView.swift in Sources */,

@@ -1082,3 +1082,190 @@ fn pagination<'a>(
 /// Swift `RuntimeJobListQuery`'s words for a cursor that is not a bounded
 /// string, on `job.list` and `job.timeline`.
 const MALFORMED_SNAPSHOT_CURSOR: &str = "cursor must be a bounded snapshot token";
+
+#[cfg(any(target_os = "macos", windows))]
+impl JobStore {
+    pub(crate) fn maintenance_source_is_latest(
+        &self,
+        source: &str,
+        target: &str,
+        request_key: &str,
+    ) -> Result<bool, String> {
+        let rows = self
+            .repository
+            .rows(None)
+            .map_err(|_| "source Job history is unreadable")?;
+        let mut latest = None;
+        for row in rows {
+            if row.id != source && row.idempotency_key == request_key {
+                continue;
+            }
+            let record = self
+                .read_snapshot(&row.id)
+                .map_err(|_| "source Job record is unreadable")?;
+            if record.request["target"]["targetId"] == target
+                && (record.operation() == "flash.full-restore@1"
+                    || record.operation() == "flash.dayu200"
+                    || record.operation() == "flash.restore-boot-loop@1")
+            {
+                let key = (row.admission_sequence, row.id);
+                if latest.as_ref().is_none_or(|old| &key > old) {
+                    latest = Some(key);
+                }
+            }
+        }
+        Ok(latest.is_some_and(|(_, id)| id == source))
+    }
+}
+
+#[cfg(any(target_os = "macos", windows))]
+impl JobStore {
+    /// Admission failures are separate immutable maintenance records, not fake
+    /// device Jobs. Invalid typed inputs never reach this method.
+    pub(crate) fn maintenance_stop(
+        &self,
+        request: &crate::operation_request::OperationRequest,
+        reason: Option<&str>,
+    ) -> Result<Option<(String, String)>, String> {
+        let id = format!("stop-{}", request.fingerprint());
+        self.root
+            .validate_path(&self.path)
+            .map_err(|e| e.to_string())?;
+        let root = self
+            .root
+            .private_child("maintenance-stops")
+            .map_err(|e| e.to_string())?;
+        let _lock = root
+            .lock_document(".stops.lock")
+            .map_err(|e| e.to_string())?;
+        let name = format!("{id}.json");
+        if let Some(bytes) = root
+            .read_owner_only(&name, 65536)
+            .map_err(|e| e.to_string())?
+        {
+            let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+            let message = value["reason"]
+                .as_str()
+                .ok_or("maintenance stop record is unreadable")?;
+            return Ok(Some((id, message.into())));
+        }
+        let Some(reason) = reason else {
+            return Ok(None);
+        };
+        let value = json!({"schema":"arkforge.boot-loop-restoration/v1", "record_id":id,
+            "source_job_id":request.inputs["sourceJobId"], "request_fingerprint":request.fingerprint(),
+            "outcome":"stopped", "exit_code":1, "reason":reason, "outcome_unknown":false,
+            "new_dispatch_count":0});
+        let bytes = crate::session_json::encode_pretty(&value).map_err(|e| format!("{e:?}"))?;
+        root.publish_document(&name, &bytes, 65536)
+            .map_err(|_| "maintenance stop record could not become durable")?;
+        Ok(Some((id, reason.into())))
+    }
+}
+
+#[cfg(all(test, any(target_os = "macos", windows)))]
+mod maintenance_tests {
+    use super::*;
+    #[test]
+    fn latest_flash_source_uses_admission_order_when_timestamps_tie() {
+        let path =
+            std::env::temp_dir().join(format!("arkdeck-maintenance-order-{}", std::process::id()));
+        #[cfg(windows)]
+        arkdeck_platform::create_private_directory(&path).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            std::fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&path)
+                .unwrap();
+        }
+        let path = path.canonicalize().unwrap();
+        let store = JobStore::open_owner(&path).unwrap();
+        for id in ["Z-source", "A-source"] {
+            let request = json!({"documentType":"runtime-operation-request", "schemaVersion":"1.0.0",
+                "requestId":id, "idempotencyKey":id,
+                "target":{"targetId":"target-1","expectedBindingRevision":1},
+                "operation":{"id":"flash.full-restore","version":1},
+                "inputs":{}, "requestedOutputs":["rawArtifacts"]});
+            let record = JobRecord::admitted(
+                id,
+                request.clone(),
+                request,
+                "flash.full-restore@1",
+                arkdeck_contract::CATALOG_DIGEST,
+                "arkforge",
+                "2026-10-17T00:00:00Z",
+                "destructive",
+                None,
+                &"a".repeat(64),
+            );
+            store
+                .admit(&record, &arkdeck_contract::sha256_hex(id.as_bytes()))
+                .unwrap();
+        }
+        assert!(
+            store
+                .maintenance_source_is_latest("A-source", "target-1", "maintenance-1")
+                .unwrap()
+        );
+        assert!(
+            !store
+                .maintenance_source_is_latest("Z-source", "target-1", "maintenance-1")
+                .unwrap()
+        );
+        drop(store);
+        std::fs::remove_dir_all(path).unwrap();
+    }
+
+    #[test]
+    fn stopped_admission_is_immutable_across_owner_restart() {
+        let path =
+            std::env::temp_dir().join(format!("arkdeck-maintenance-stop-{}", std::process::id()));
+        #[cfg(windows)]
+        arkdeck_platform::create_private_directory(&path).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            std::fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&path)
+                .unwrap();
+        }
+        let path = path.canonicalize().unwrap();
+        let request = crate::operation_request::OperationRequest::decode(
+            &serde_json::to_vec(&json!({
+                "documentType":"runtime-operation-request", "schemaVersion":"1.0.0",
+                "requestId":"maintenance-stop-test", "idempotencyKey":"maintenance-stop-test",
+                "target":{"targetId":"target-1","expectedBindingRevision":1},
+                "operation":{"id":"flash.restore-boot-loop","version":1},
+                "inputs":{"sourceJobId":"source-1","budgetMs":1000,"artifactLease":"lease-1"},
+                "requestedOutputs":["rawArtifacts"]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let first = {
+            let store = JobStore::open_owner(&path).unwrap();
+            assert!(store.maintenance_stop(&request, None).unwrap().is_none());
+            store
+                .maintenance_stop(&request, Some("source identity changed"))
+                .unwrap()
+                .unwrap()
+        };
+        {
+            let reopened = JobStore::open_owner(&path).unwrap();
+            assert_eq!(
+                reopened.maintenance_stop(&request, None).unwrap(),
+                Some(first.clone())
+            );
+            assert_eq!(
+                reopened
+                    .maintenance_stop(&request, Some("replacement reason"))
+                    .unwrap(),
+                Some(first)
+            );
+        }
+        std::fs::remove_dir_all(path).unwrap();
+    }
+}

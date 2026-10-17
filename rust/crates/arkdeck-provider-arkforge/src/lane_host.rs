@@ -47,6 +47,16 @@ pub trait PlanConnections: Send + Sync {
     fn topology_resolver(&self) -> crate::TopologyResolver {
         crate::host_topology_digest
     }
+    /// Persist the complete sealed plan before a Job can receive any permit.
+    fn retain_plan(&self, _plan: &arkforge_ipc::messages::ExecutablePlan) -> Result<(), String> {
+        Ok(())
+    }
+    fn maintenance_source(
+        &self,
+        _execution: &Execution,
+    ) -> Result<crate::maintenance::SourceRecords, String> {
+        Err("maintenance source storage is unavailable".into())
+    }
     fn controller(&self) -> Result<Box<dyn PlanSource>, String>;
     fn public(&self) -> Result<Box<dyn AssessmentSource>, String>;
 }
@@ -199,6 +209,9 @@ impl LaneHost {
                     .into(),
             ));
         }
+        self.connections
+            .retain_plan(&plan)
+            .map_err(LaneFailure::Other)?;
         state.purpose = Some(purpose.to_owned());
         let daemon_job_id = client.start(&plan.plan_id, &plan.plan_sha256, purpose, CONTROLLER_SESSION)
             .map_err(|error| LaneFailure::ConfirmedNotExecuted(format!("arkforged startExecution did not return a durable job identity; no permit was signed and the device was not touched: {error}")))?;
@@ -226,6 +239,7 @@ impl LaneHost {
         &self,
         execution: &Execution,
         binding: &DeviceBinding,
+        deadline: Option<Instant>,
     ) -> Result<SessionOutcome, LaneFailure> {
         let mut client = self.connections.execution().map_err(|error| {
             unknown(&format!(
@@ -250,7 +264,10 @@ impl LaneHost {
                     stable_identity_digest: identity,
                 },
                 controller_session_id: CONTROLLER_SESSION.into(),
-                permit_lifetime_ms: PERMIT_LIFETIME_MS,
+                permit_lifetime_ms: deadline.map_or(PERMIT_LIFETIME_MS, |limit| {
+                    (limit.saturating_duration_since(Instant::now()).as_millis() as u64)
+                        .min(PERMIT_LIFETIME_MS)
+                }),
             },
             self.secret.clone(),
             self.connections.topology_resolver(),
@@ -265,7 +282,7 @@ impl LaneHost {
             .connections
             .performer(&execution.arkdeck_job_id, binding);
         FlashSession::new(&mut *client, &mut authority, &mut *performer)
-            .run_existing(&execution.daemon_job_id)
+            .run_existing_until(&execution.daemon_job_id, deadline)
             .map_err(|error| {
                 unknown(&format!(
                     "lost control of correlated arkforged job {}: {error}",
@@ -276,6 +293,92 @@ impl LaneHost {
 }
 
 impl FlashLane for LaneHost {
+    fn maintenance_source(
+        &self,
+        execution: &Execution,
+    ) -> Result<crate::maintenance::SourceRecords, String> {
+        self.validate_identity(execution)
+            .map_err(|e| format!("{e:?}"))?;
+        self.connections.maintenance_source(execution)
+    }
+
+    fn restoration_plan(
+        &self,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+    ) -> Result<arkforge_ipc::messages::ExecutablePlan, String> {
+        let mut controller = self.connections.controller()?;
+        lane_plan::ensure_artifact(&mut *controller, artifact)?;
+        let mut public = self.connections.public()?;
+        let (plan, _) = lane_plan::materialize_intent(
+            &mut *controller,
+            &mut *public,
+            artifact,
+            binding,
+            "primaryFlash",
+            &self.support,
+            self.connections.topology_resolver(),
+            "restoreRamdisk",
+        )
+        .map_err(|e| e.detail)?;
+        self.connections.retain_plan(&plan)?;
+        Ok(plan)
+    }
+
+    fn prepare_restoration(
+        &self,
+        job_id: &str,
+        plan: &arkforge_ipc::messages::ExecutablePlan,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+    ) -> Result<Execution, LaneFailure> {
+        let job = self.job(job_id)?;
+        let mut state = job
+            .lock()
+            .map_err(|_| unknown("lane Job lock was poisoned"))?;
+        if state.purpose.is_some() || state.execution.is_some() {
+            return Err(unknown("a restoration start cannot be replayed"));
+        }
+        state.purpose = Some("primaryFlash".into());
+        self.connections
+            .retain_plan(plan)
+            .map_err(LaneFailure::Other)?;
+        let mut controller = self.connections.controller().map_err(LaneFailure::Other)?;
+        let observations = controller.discover().map_err(LaneFailure::Other)?;
+        let observed = crate::select_with_resolver(
+            &observations,
+            &binding.usb_topology,
+            self.connections.topology_resolver(),
+        )
+        .map_err(|e| LaneFailure::Other(e.to_string()))?;
+        let mut client = self.connections.execution().map_err(LaneFailure::Other)?;
+        let daemon_job_id = client
+            .start(
+                &plan.plan_id,
+                &plan.plan_sha256,
+                "primaryFlash",
+                CONTROLLER_SESSION,
+            )
+            .map_err(LaneFailure::Other)?;
+        let execution = Execution {
+            arkdeck_job_id: job_id.into(),
+            daemon_job_id,
+            plan_id: plan.plan_id.clone(),
+            plan_sha256: plan.plan_sha256.clone(),
+            execution_purpose: "primaryFlash".into(),
+            artifact_sha256: artifact.sha256.clone(),
+            artifact_profile_id: artifact.profile_id.clone(),
+            target_id: binding.target_id.clone(),
+            binding_revision: binding.binding_revision,
+            stable_identity_sha256: binding.stable_identity_sha256.clone(),
+            usb_topology: binding.usb_topology.clone(),
+            observation_mode: observed.mode.clone(),
+            toolchain_sha256: self.toolchain_sha256.clone(),
+        };
+        state.execution = Some(execution.clone());
+        Ok(execution)
+    }
+
     fn toolchain_sha256(&self) -> &str {
         &self.toolchain_sha256
     }
@@ -372,59 +475,22 @@ impl FlashLane for LaneHost {
         artifact: &LaneArtifact,
         binding: &DeviceBinding,
     ) -> Result<ActionReceipt, LaneFailure> {
-        self.validate(
+        self.perform_until(step_id, execution, artifact, binding, None)
+    }
+    fn perform_restoration(
+        &self,
+        execution: &Execution,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+        deadline: Instant,
+    ) -> Result<ActionReceipt, LaneFailure> {
+        self.perform_until(
+            "restore-ramdisk",
             execution,
-            &execution.arkdeck_job_id,
             artifact,
             binding,
-            &execution.execution_purpose,
-        )?;
-        let job = self.job(&execution.arkdeck_job_id)?;
-        let mut state = job
-            .lock()
-            .map_err(|_| unknown("lane Job lock was poisoned"))?;
-        if let Some(failure) = &state.failure {
-            return Err(failure.clone());
-        }
-        if state
-            .execution
-            .as_ref()
-            .is_some_and(|existing| existing != execution)
-        {
-            return Err(unknown(
-                "another daemon execution is already correlated with this Job",
-            ));
-        }
-        if state.completed.is_some() {
-            return projected(&state, step_id);
-        }
-        state.execution = Some(execution.clone());
-        state.purpose = Some(execution.execution_purpose.clone());
-        let result = self.drive(execution, binding);
-        let (receipts, failure) = match result {
-            Ok(SessionOutcome::Completed(receipts)) => (receipts, None),
-            Ok(SessionOutcome::ConfirmedFailed { reason, receipts }) => (receipts, Some(LaneFailure::Failed(reason))),
-            Ok(SessionOutcome::CancelledSafe(receipts)) => (receipts, Some(LaneFailure::ConfirmedNotExecuted("arkforged cancelled the plan before any external effect; no completion receipt exists".into()))),
-            Ok(SessionOutcome::OutcomeUnknown { reason, receipts }) => (receipts, Some(unknown(&reason))),
-            Err(failure) => (Vec::new(), Some(failure)),
-        };
-        for receipt in &receipts {
-            state
-                .receipts
-                .entry(receipt.step_id.clone())
-                .or_insert_with(|| action_receipt(receipt));
-        }
-        if let Some(failure) = failure {
-            state.failure = Some(failure.clone());
-            return Err(failure);
-        }
-        let Some(last) = receipts.last() else {
-            let failure = unknown("arkforged completed without an action receipt");
-            state.failure = Some(failure.clone());
-            return Err(failure);
-        };
-        state.completed = Some(action_receipt(last));
-        projected(&state, step_id)
+            Some(deadline),
+        )
     }
 
     fn observe_terminal(&self, execution: &Execution) -> Result<Option<Terminal>, String> {
@@ -465,9 +531,12 @@ fn projected(state: &JobState, step_id: &str) -> Result<ActionReceipt, LaneFailu
         .get(step_id)
         .cloned()
         .or_else(|| {
-            matches!(step_id, "flash-partitions" | "verify-flash-readback")
-                .then(|| state.completed.clone())
-                .flatten()
+            matches!(
+                step_id,
+                "flash-partitions" | "verify-flash-readback" | "restore-ramdisk"
+            )
+            .then(|| state.completed.clone())
+            .flatten()
         })
         .ok_or_else(|| {
             LaneFailure::Other(format!("arkforged returned no receipt for step {step_id}"))
@@ -504,3 +573,68 @@ fn action_receipt(receipt: &ActionReceiptSummary) -> ActionReceipt {
 
 #[cfg(test)]
 mod tests;
+
+impl LaneHost {
+    fn perform_until(
+        &self,
+        step_id: &str,
+        execution: &Execution,
+        artifact: &LaneArtifact,
+        binding: &DeviceBinding,
+        deadline: Option<Instant>,
+    ) -> Result<ActionReceipt, LaneFailure> {
+        self.validate(
+            execution,
+            &execution.arkdeck_job_id,
+            artifact,
+            binding,
+            &execution.execution_purpose,
+        )?;
+        let job = self.job(&execution.arkdeck_job_id)?;
+        let mut state = job
+            .lock()
+            .map_err(|_| unknown("lane Job lock was poisoned"))?;
+        if let Some(failure) = &state.failure {
+            return Err(failure.clone());
+        }
+        if state
+            .execution
+            .as_ref()
+            .is_some_and(|existing| existing != execution)
+        {
+            return Err(unknown(
+                "another daemon execution is already correlated with this Job",
+            ));
+        }
+        if state.completed.is_some() {
+            return projected(&state, step_id);
+        }
+        state.execution = Some(execution.clone());
+        state.purpose = Some(execution.execution_purpose.clone());
+        let result = self.drive(execution, binding, deadline);
+        let (receipts, failure) = match result {
+            Ok(SessionOutcome::Completed(receipts)) => (receipts, None),
+            Ok(SessionOutcome::ConfirmedFailed { reason, receipts }) => (receipts, Some(LaneFailure::Failed(reason))),
+            Ok(SessionOutcome::CancelledSafe(receipts)) => (receipts, Some(LaneFailure::ConfirmedNotExecuted("arkforged cancelled the plan before any external effect; no completion receipt exists".into()))),
+            Ok(SessionOutcome::OutcomeUnknown { reason, receipts }) => (receipts, Some(unknown(&reason))),
+            Err(failure) => (Vec::new(), Some(failure)),
+        };
+        for receipt in &receipts {
+            state
+                .receipts
+                .entry(receipt.step_id.clone())
+                .or_insert_with(|| action_receipt(receipt));
+        }
+        if let Some(failure) = failure {
+            state.failure = Some(failure.clone());
+            return Err(failure);
+        }
+        let Some(last) = receipts.last() else {
+            let failure = unknown("arkforged completed without an action receipt");
+            state.failure = Some(failure.clone());
+            return Err(failure);
+        };
+        state.completed = Some(action_receipt(last));
+        projected(&state, step_id)
+    }
+}

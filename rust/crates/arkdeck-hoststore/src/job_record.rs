@@ -84,6 +84,8 @@ pub struct JobRecord {
         skip_serializing_if = "Option::is_none"
     )]
     binding: Option<i64>,
+    #[serde(rename = "maintenanceResult", skip_serializing_if = "Option::is_none")]
+    maintenance_result: Option<Value>,
     pub state: String,
     #[serde(rename = "outcomeUnknown")]
     unknown: bool,
@@ -275,6 +277,10 @@ fn request(value: &Value) -> Result<(), WireError> {
 }
 
 impl JobRecord {
+    pub(crate) fn set_maintenance_result(&mut self, result: Value) {
+        self.maintenance_result = Some(result);
+    }
+
     pub(super) fn requires_session_retention(&self) -> bool {
         self.unknown || !terminal(&self.state)
     }
@@ -337,6 +343,10 @@ impl JobRecord {
             || record.residues.is_some_and(|v| v < 0)
         {
             return Err(unreadable(()));
+        }
+        if record.maintenance_result.is_some() {
+            arkdeck_contract::validate_method_value("job.status", "result", &record.status())
+                .map_err(unreadable)?;
         }
         request(&record.request)?;
         if let Some(original) = &record.original_request {
@@ -529,7 +539,12 @@ impl JobRecord {
     /// is one of `ArkForgeFlashOperation`'s durable references (the canonical
     /// one, its compatibility alias, or the pre-singleton `@1` alias).
     pub(crate) fn dayu200_flash(&self) -> bool {
-        const DURABLE: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+        const DURABLE: [&str; 4] = [
+            "flash.full-restore@1",
+            "flash.dayu200",
+            "flash.dayu200@1",
+            "flash.restore-boot-loop@1",
+        ];
         let operation = &self.request["operation"];
         let reference = match (operation["id"].as_str(), operation["version"].as_i64()) {
             (Some(id), Some(version)) => format!("{id}@{version}"),
@@ -838,6 +853,7 @@ impl JobRecord {
             plan: Some(plan.into()),
             identity: None,
             binding: None,
+            maintenance_result: None,
             state: "preflight".into(),
             unknown: false,
             operation_failure: None,
@@ -905,7 +921,7 @@ impl JobRecord {
         if !uncertain && !finalizing && !terminal(&self.state) {
             next["retryAfter"] = json!("250ms");
         }
-        json!({
+        let mut status = json!({
             "schemaVersion":"arkdeck.job-status/1", "jobId":self.job_id, "operation":self.operation,
             "targetId":self.request["target"]["targetId"], "state":self.state,
             "outcome":if self.unknown {"outcomeUnknown"} else {&self.state}, "waitingForHuman":false,
@@ -917,7 +933,11 @@ impl JobRecord {
             "supersededByRecoveryEpochId":null, "recoveryEpochId":null, "resolvedByTargetAliasResolutionId":null,
             "sessionPublication":super::job_record_fields::publication_fact(self.session_publication.as_ref()),
             "failure":self.failure_projection(), "processProgress":null, "nextAction":next
-        })
+        });
+        if let Some(result) = &self.maintenance_result {
+            status["maintenanceResult"] = result.clone();
+        }
+        status
     }
     fn failure_projection(&self) -> Value {
         if let Some(failure) = &self.operation_failure {
@@ -957,7 +977,11 @@ impl JobRecord {
         // versioned spelling among them.
         if matches!(
             self.operation.as_str(),
-            "flash.full-restore@1" | "flash.dayu200" | "flash.dayu200@1"
+            "flash.full-restore@1"
+                | "flash.dayu200"
+                | "flash.dayu200@1"
+                | "flash.verify@1"
+                | "flash.restore-boot-loop@1"
         ) {
             return Some("flash");
         }

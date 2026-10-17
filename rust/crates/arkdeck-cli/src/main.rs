@@ -78,7 +78,74 @@ fn runtime_endpoint(invocation: &Invocation) -> Result<(LocalEndpoint, ServerIde
     Ok((endpoint, identity))
 }
 
+fn run_flash_maintenance(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
+    // Validate all local inputs before resolving or starting the Runtime.
+    let (params, budget) = arkdeck_cli::flash_maintenance::request(invocation)?;
+    let (endpoint, identity) = runtime_endpoint(invocation)?;
+    let mut client = Client::connect_bounded(
+        &endpoint,
+        &identity,
+        Duration::from_millis(invocation.timeout_ms.unwrap_or(budget + 30_000)),
+    )
+    .map_err(|error| CliError::from_connect(error, "job.submit"))?;
+    let planned = client
+        .request(id, "job.plan", Some(params.clone()))
+        .map_err(|error| CliError::from_client(error, "job.plan"))?;
+    arkdeck_cli::validate_plan(&planned)?;
+    let mut request: Value = serde_json::from_str(params["requestJson"].as_str().unwrap())
+        .map_err(|_| CliError::new("invalidOption", "maintenance request cannot be decoded"))?;
+    if planned["operation"] != format!("{}@1", invocation.command)
+        || planned["targetId"] != request["target"]["targetId"]
+        || planned["bindingRevision"] != request["target"]["expectedBindingRevision"]
+        || planned["providerId"] != "arkforge"
+        || planned["effectiveEffect"]
+            != if invocation.command == "flash.verify" {
+                "readOnly"
+            } else {
+                "destructive"
+            }
+    {
+        return Err(CliError::new(
+            "protocolMalformed",
+            "Runtime returned a mismatched maintenance plan",
+        ));
+    }
+    request["reviewedPlanDigest"] = planned["materializedPlanDigest"].clone();
+    let params = json!({"requestJson":request.to_string()})
+        .as_object()
+        .unwrap()
+        .clone();
+    let accepted = client
+        .request(&arkdeck_cli::client_frame_id(), "job.submit", Some(params))
+        .map_err(|error| CliError::from_client(error, "job.submit"))?;
+    arkdeck_cli::validate_acceptance(&accepted)?;
+    let job = accepted["jobId"].as_str().ok_or_else(|| {
+        CliError::new("protocolMalformed", "maintenance acceptance has no Job ID")
+    })?;
+    let params = json!({"jobId":job}).as_object().unwrap().clone();
+    let current = client
+        .request(
+            &arkdeck_cli::client_frame_id(),
+            "job.status",
+            Some(params.clone()),
+        )
+        .map_err(|error| CliError::from_client(error, "job.status"))?;
+    // A repeated idempotency key reads its existing Job, never runs it again.
+    if current["state"] != "preflight" {
+        return Ok(current);
+    }
+    client
+        .request(&arkdeck_cli::client_frame_id(), "job.run", Some(params))
+        .map_err(|error| CliError::from_client(error, "job.run"))
+}
+
 fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
+    if arkdeck_cli::flash_maintenance::serves(invocation.command) {
+        return run_flash_maintenance(invocation, id).map_err(|mut e| {
+            e.command = Some(invocation.command);
+            e
+        });
+    }
     if invocation.command == "debug.template.list" {
         return arkdeck_cli::debug_template_list();
     }
@@ -1834,7 +1901,9 @@ fn main() -> std::process::ExitCode {
                 }
                 _ => None,
             };
-            let exit: u8 = if invocation.command == "job.evidence" {
+            let exit: u8 = if arkdeck_cli::flash_maintenance::serves(invocation.command) {
+                arkdeck_cli::flash_maintenance::exit_code(invocation.command, &result)
+            } else if invocation.command == "job.evidence" {
                 arkdeck_cli::evidence_exit(&result)
             } else {
                 attention.as_ref().map_or(0, |(code, _)| *code)

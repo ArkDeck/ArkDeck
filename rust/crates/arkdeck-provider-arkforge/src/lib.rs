@@ -31,6 +31,7 @@ mod lane_plan;
 mod lane_preview;
 pub use lane_preview::{LanePlanPreview, LanePreview, LanePreviewHost};
 mod loader;
+pub mod maintenance;
 pub mod managed_control;
 
 pub use lane_client::{NativeLaneConnections, NativePlanConnections};

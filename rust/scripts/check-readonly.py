@@ -144,9 +144,11 @@ def assert_boundaries() -> None:
     # crates, never its mechanics (transport, platform, the daemon): the
     # client; the messages its controller surface takes and returns; the
     # authority API whose StepPermit the lane signs; and the typed ids and
-    # digests that permit is made of (协调会话 2026-09-26).
+    # digests that permit is made of; the pure ArkDeck maintenance adapter
+    # orchestrates Runtime-owned ports without standalone authority or transport.
     arkforge = {"arkdeck-provider-arkforge": {
-        "arkforge-authority-api", "arkforge-client", "arkforge-core", "arkforge-ipc"}}
+        "arkforge-authority-api", "arkforge-client", "arkforge-core", "arkforge-ipc",
+        "arkforge-arkdeck-adapter"}}
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
     for path in manifests:
@@ -387,8 +389,20 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
     This changes no recording or fixture. Operation counts and every byte outside
     the single Catalog digest still have to equal the pinned machine output.
     """
-    assert digest in (catalog_test_views.OLD, catalog_test_views.CURRENT), "unknown Catalog view"
+    assert digest in (catalog_test_views.OLD, catalog_test_views.CURRENT, catalog_test_views.MAINTENANCE), "unknown Catalog view"
     assert name in MACHINE_OUTPUT_LEAVES, "unknown machine-output leaf"
+    if name == "operations" and digest == catalog_test_views.MAINTENANCE:
+        document = json.loads(data)
+        rows = document["result"]
+        assert len(rows) == 32 and len({row["reference"] for row in rows}) == 32
+        template = next(row for row in rows if row["reference"] == "flash.full-restore@1")
+        assert template["availability"] == "unavailable" and template["binding"] == "confirmedDevice"
+        assert template["reasons"] == ["provider arkforge is not registered"]
+        for reference, effect in [("flash.verify@1", "readOnly"), ("flash.restore-boot-loop@1", "destructive")]:
+            row = dict(template, reference=reference, canonicalReference=reference, minimumEffect=effect)
+            rows.append(row)
+        rows.sort(key=lambda row: row["reference"])
+        return (json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(',', ':')) + '\n').encode()
     if name not in ("doctor", "deep", "healthy"):
         return data
     document = json.loads(data)
@@ -402,7 +416,17 @@ def machine_output_fixture(name: str, data: bytes, digest: str) -> bytes:
         "unknown fixture Catalog"
     original = b'"digest":"' + declared["digest"].encode("ascii") + b'"'
     assert data.count(original) == 1, "machine-output Catalog digest must occur once"
+    if digest == catalog_test_views.MAINTENANCE:
+        encoded = json.dumps(declared, sort_keys=True, separators=(',', ':')).encode()
+        assert data.count(encoded) == 1
+        changed = dict(declared, digest=digest, operationCount=34, unavailableOperationCount=34)
+        finding = next(row for row in report["findings"] if row["code"] == "catalog.unavailableOperations")
+        assert finding["details"] == {"unavailableOperationCount": 32}
+        assert data.count(b'{"unavailableOperationCount":32}') == 1
+        projected = data.replace(encoded, json.dumps(changed, sort_keys=True, separators=(',', ':')).encode(), 1)
+        return projected.replace(b'{"unavailableOperationCount":32}', b'{"unavailableOperationCount":34}', 1)
     return data.replace(original, b'"digest":"' + digest.encode("ascii") + b'"', 1)
+
 
 
 def machine_output(directory: Path, rows: list, write: bool) -> None:

@@ -245,7 +245,7 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
         for name in ("doctor", "deep", "healthy"):
             for before, after in ((digest.encode(), other.encode()),
                                   (digest.encode(), b"0" * 64),
-                                  (b'"operationCount":32', b'"operationCount":31')):
+                                  (b'"operationCount":34' if digest == readonly.catalog_test_views.MAINTENANCE else b'"operationCount":32', b'"operationCount":31')):
                 changed = dict(outputs, **{name: outputs[name].replace(before, after, 1)})
                 self.assertNotEqual(changed, outputs)
                 with tempfile.TemporaryDirectory() as temporary, self.subTest(name=name, after=after), \

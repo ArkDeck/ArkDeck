@@ -33,7 +33,7 @@ impl<'a> JobPlanner<'a> {
     /// input: the lease's Artifact must name the request's target and binding
     /// revision and the identity the Target's facts carry. A refusal is the
     /// error Swift interpolates.
-    pub(super) fn resolve_bound_lease(
+    pub(crate) fn resolve_bound_lease(
         &self,
         artifacts: &ArtifactReadStore,
         lease: &str,

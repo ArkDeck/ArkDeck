@@ -34,6 +34,8 @@ class HistoricalCatalogInputs(unittest.TestCase):
         cls.packet = (cls.real_root / cls.packet_path).read_bytes()
         cls.generator = (cls.real_root / 'scripts/catalog_gen/generate.py').read_bytes()
         cls.projection = (cls.real_root / runner.REVIEW_PROJECTION).read_bytes()
+        cls.projection_digest = next(digest for digest in (views.CURRENT, views.MAINTENANCE)
+                                     if cls.projection.count(digest.encode()) == 1)
 
     def setUp(self):
         self.base = Path(tempfile.mkdtemp(prefix='arkdeck-historical-view-')).resolve()
@@ -69,10 +71,12 @@ class HistoricalCatalogInputs(unittest.TestCase):
         self.assertEqual({f"{row['id']}@{row.get('version', 0)}": row
                           for row in operations.values()}, self.old)
         self.assertEqual(historical.directories, before.directories)
-        self.assertEqual(set(historical.files), set(before.files))
+        additions = {path for path, row in self.operation_paths(before).items()
+                     if f"{row['id']}@{row.get('version', 0)}" in views.MAINTENANCE_REFERENCES}
+        self.assertEqual(set(historical.files), set(before.files) - additions)
         allowed = set(operations) | {MATRIX}
         for path, data in before.files.items():
-            if path not in allowed:
+            if path not in allowed | additions:
                 self.assertEqual(historical.files[path], data, path)
                 self.assertEqual(historical.blobs[path], before.blobs[path], path)
         for path in allowed:
@@ -81,6 +85,16 @@ class HistoricalCatalogInputs(unittest.TestCase):
         actual_info = runner.contract.baseline(historical)
         self.assertEqual(actual_info['catalogDigest'], views.OLD)
         self.assertNotEqual(actual_info['inputDigest'], runner.contract.baseline(before)['inputDigest'])
+
+    def test_maintenance_descriptors_cannot_drift_under_the_declared_view(self):
+        paths = self.operation_paths(self.inputs)
+        path = next(path for path, row in paths.items() if row['id'] == 'flash.restore-boot-loop')
+        changed = copy.deepcopy(self.inputs)
+        row = copy.deepcopy(paths[path])
+        row['defaultPolicyIssuance'] = 'enabled'
+        changed.files[path] = json.dumps(row).encode()
+        with self.assertRaisesRegex(ValueError, 'maintenance Catalog descriptor drift'):
+            runner.historical_catalog_inputs(changed)
 
     def test_historical_matrix_is_the_full_official_generation(self):
         historical = runner.historical_catalog_inputs(self.inputs)
@@ -184,14 +198,14 @@ class HistoricalCatalogInputs(unittest.TestCase):
 
     def test_projection_changes_only_its_single_exact_catalog_occurrence(self):
         result = runner.historical_review_projection(self.projection)
-        self.assertEqual(result, self.projection.replace(views.CURRENT.encode(), views.OLD.encode()))
+        self.assertEqual(result, self.projection.replace(self.projection_digest.encode(), views.OLD.encode()))
         self.assertEqual(result.count(views.OLD.encode()), 1)
         self.assertNotIn(views.CURRENT.encode(), result)
         self.assertEqual(runner.historical_review_projection(result), result)
 
     def test_unknown_missing_duplicate_or_mixed_projection_catalog_refuses(self):
-        for value in [self.projection.replace(views.CURRENT.encode(), b'0' * 64),
-                      self.projection.replace(views.CURRENT.encode(), b''),
+        for value in [self.projection.replace(self.projection_digest.encode(), b'0' * 64),
+                      self.projection.replace(self.projection_digest.encode(), b''),
                       self.projection + views.CURRENT.encode(),
                       self.projection + views.OLD.encode()]:
             with self.subTest(value_length=len(value)), self.assertRaises(ValueError):

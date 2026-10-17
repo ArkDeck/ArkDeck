@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "verify",
+        "--request-file",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.verify",
+        "handlerArguments": [
+          "flash",
+          "verify",
+          "--request-file",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "verify",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.verify",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "verify",
+        "--request-file",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.verify",
+        "exitCode": 7,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "verify",
+        "--request-file",
+        "sample",
+        "--request-file",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.verify",
+        "exitCode": 7,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "verify"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.verify",
+        "exitCode": 7,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "flash",
+        "verify",
+        "--request-file",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.verify",
+        "exitCode": 7,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "verify",
+        "--request-file",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.verify",
+        "handlerArguments": [
+          "flash",
+          "verify",
+          "--request-file",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.verify",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "flash",
+    "verify"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

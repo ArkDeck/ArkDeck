@@ -915,3 +915,58 @@ impl FlashHostFacts {
         }
     }
 }
+
+impl FlashHostFacts {
+    /// Re-prove the durable cross-mode binding, not similarity of a USB arrival.
+    /// Identity is the canonical Loader binding; Normal mode must independently
+    /// prove the hardware serial before it may represent that identity.
+    pub(crate) fn maintenance_identity(
+        &self,
+        targets: &TargetStore,
+        hdc: &dyn HdcDispatch,
+        execution: &arkdeck_provider_arkforge::Execution,
+    ) -> Result<arkdeck_provider_arkforge::maintenance::Identity, String> {
+        let facts = self.current_facts(targets, Some(hdc), &execution.target_id)?;
+        if facts.binding_revision != execution.binding_revision
+            || facts.identity_sha256 != execution.stable_identity_sha256
+            || facts.tool_sha256 != execution.toolchain_sha256
+        {
+            return Err("maintenance source binding or toolchain changed".into());
+        }
+        let usb = RockchipUsbProbe(Arc::clone(&self.census));
+        let topology = match facts.device_mode.as_str() {
+            "hdc"
+                if facts
+                    .server_facts
+                    .get("dayu200NormalLoaderHardwareIdentity")
+                    .map(String::as_str)
+                    == Some("satisfied") =>
+            {
+                usb.single_hdc_normal(&sha256_hex(facts.execution_connect_key.as_bytes()))
+                    .map_err(|e| format!("{e:?}"))?
+                    .topology
+            }
+            "loader" => {
+                usb.single_loader(&execution.stable_identity_sha256)
+                    .map_err(|e| format!("{e:?}"))?
+                    .topology
+            }
+            _ => {
+                return Err(
+                    "maintenance requires a freshly proven Normal or Loader identity".into(),
+                );
+            }
+        };
+        if topology != execution.usb_topology {
+            return Err("maintenance source topology changed".into());
+        }
+        let descriptor = usb
+            .connector_identity(&topology)
+            .map_err(|e| format!("{e:?}"))?;
+        Ok(arkdeck_provider_arkforge::maintenance::Identity {
+            serial_sha256: facts.identity_sha256,
+            topology_sha256: sha256_hex(topology.as_bytes()),
+            descriptor_sha256: descriptor,
+        })
+    }
+}

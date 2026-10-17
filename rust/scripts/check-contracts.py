@@ -110,11 +110,16 @@ def historical_catalog_inputs(current):
     operation_paths = {path: json.loads(data) for path, data in current.files.items()
                        if path.startswith("Catalog/operations/") and path.endswith(".json")}
     actual = {f"{row['id']}@{row.get('version', 0)}": row for row in operation_paths.values()}
-    if len(operation_paths) != 32 or actual not in (old, new):
-        raise ValueError("unclassified complete Catalog for historical test view")
+    if len(operation_paths) != len(actual):
+        raise ValueError("duplicate Catalog for historical test view")
+    actual_digest = catalog_test_views.classified_catalog(actual, old, new)
     files, blobs = dict(current.files), dict(current.blobs)
     for path, row in operation_paths.items():
         reference = f"{row['id']}@{row.get('version', 0)}"
+        if reference in catalog_test_views.MAINTENANCE_REFERENCES:
+            del files[path]
+            del blobs[path]
+            continue
         data = (json.dumps(old[reference], indent=2, ensure_ascii=True, sort_keys=True) + "\n").encode()
         files[path] = data
         # ContractInputs records real Git blob identities, even for this
@@ -124,7 +129,6 @@ def historical_catalog_inputs(current):
     profiles = [json.loads(data) for path, data in current.files.items()
                 if path.startswith("Catalog/profiles/") and path.endswith(".json")]
     matrix_path = "Catalog/generated/effect-authorization-matrix.md"
-    actual_digest = catalog_test_views.OLD if actual == old else catalog_test_views.CURRENT
     expected_matrix = generator.generate_matrix(list(actual.values()), profiles, actual_digest)
     if current.files[matrix_path].decode().replace("\r\n", "\n") != expected_matrix:
         raise ValueError("historical input requires the full official Catalog matrix")
@@ -140,11 +144,11 @@ def historical_review_projection(current: bytes) -> bytes:
     for key in old:
         if key.startswith("flash.") and old[key] != new[key]:
             raise ValueError("historical Flash descriptor drift")
-    if current.count(catalog_test_views.OLD.encode()) == 1 and catalog_test_views.CURRENT.encode() not in current:
-        return current
-    if current.count(catalog_test_views.CURRENT.encode()) != 1 or catalog_test_views.OLD.encode() in current:
+    known = (catalog_test_views.OLD, catalog_test_views.CURRENT, catalog_test_views.MAINTENANCE)
+    present = [digest for digest in known if current.count(digest.encode())]
+    if len(present) != 1 or current.count(present[0].encode()) != 1:
         raise ValueError("exact current Flash projection Catalog required")
-    return current.replace(catalog_test_views.CURRENT.encode(), catalog_test_views.OLD.encode())
+    return current.replace(present[0].encode(), catalog_test_views.OLD.encode())
 
 
 def historical_workspace_covers(published, historical) -> bool:
