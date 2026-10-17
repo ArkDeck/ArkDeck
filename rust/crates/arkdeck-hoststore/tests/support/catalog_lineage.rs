@@ -13,6 +13,7 @@ use std::path::Path;
 
 pub const OLD: &str = "c6e92eb252fe7653ed303a9ce34d12635bbc5f71ffb2a54fb8eb1fa3a9b99036";
 pub const CURRENT: &str = "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7";
+pub const MAINTENANCE: &str = "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
 const PACKET_SHA: &str = "d1a2614926275e9e8b38783ca5ac3054b6ea4fa63f051e2aedacfe59d7c937ab";
 const PACKET: &[u8] =
@@ -406,6 +407,18 @@ impl Lineage {
         directory: &Path,
         catalog_digest: &str,
     ) -> Result<(), String> {
+        if catalog_digest == MAINTENANCE {
+            let mut observed = Self::read_sources(directory)?;
+            let complete: Vec<_> = observed.values().cloned().collect();
+            if sha256_hex(&catalog_bytes(&complete)?) != MAINTENANCE
+                || observed.remove("flash.verify@1").is_none()
+                || observed.remove("flash.restore-boot-loop@1").is_none()
+                || observed != self.operations
+            {
+                return Err("maintenance Catalog differs beyond its exact two additions".into());
+            }
+            return Ok(());
+        }
         let expected = match catalog_digest {
             CURRENT => &self.operations,
             OLD => &self.historical_operations,
@@ -419,6 +432,13 @@ impl Lineage {
         directory: &Path,
         expected: &BTreeMap<String, Value>,
     ) -> Result<(), String> {
+        if &Self::read_sources(directory)? != expected {
+            return Err("current descriptor source drift".into());
+        }
+        Ok(())
+    }
+
+    fn read_sources(directory: &Path) -> Result<BTreeMap<String, Value>, String> {
         let mut observed = BTreeMap::new();
         for entry in fs::read_dir(directory).map_err(|_| "current Catalog source")? {
             let entry = entry.map_err(|_| "current Catalog entry")?;
@@ -437,10 +457,7 @@ impl Lineage {
                 return Err("duplicate source".into());
             }
         }
-        if &observed != expected {
-            return Err("current descriptor source drift".into());
-        }
-        Ok(())
+        Ok(observed)
     }
 
     pub fn operation(&self, name: &str) -> Result<&Value, String> {

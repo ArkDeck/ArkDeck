@@ -242,7 +242,8 @@ public sealed partial record JobPlan(
     string PlanDigest,
     string? AdmissionBlocker,
     JsonObject Inputs,
-    IReadOnlyList<OperationStep> Steps)
+    IReadOnlyList<OperationStep> Steps,
+    string? TargetId = null)
 {
     public static JobPlan Parse(JsonValue value)
     {
@@ -271,7 +272,8 @@ public sealed partial record JobPlan(
                     TypedJson.Required(step, "kind", TypedJson.String),
                     TypedJson.Required(step, "effect", TypedJson.String),
                     step.TryGetValue("optional", out var optional) && optional is JsonBool { Value: true });
-            })));
+            })),
+            TypedJson.Required(o, "targetId", TypedJson.String));
     }
 
     [GeneratedRegex("^[0-9a-f]{64}$")]

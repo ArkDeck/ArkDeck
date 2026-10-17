@@ -33,6 +33,8 @@
 //! leaves the Job where it stood. The record is persisted exactly where
 //! Swift persists it, so its index row counts the same writes.
 use super::*;
+#[path = "flash_maintenance_run.rs"]
+mod maintenance;
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::capability_store::{CapabilityQuery, Effect, UseOutcome};
 use crate::flash_facts::RockchipFacts;
@@ -288,6 +290,9 @@ impl FlashRunner<'_> {
         descriptor: &CatalogOperation,
         state: ArkForgeJobState,
     ) -> Result<Option<String>, RunRefusal> {
+        if crate::flash_maintenance::is_maintenance(&descriptor.reference()) {
+            return self.run_maintenance(run, flash, descriptor);
+        }
         let started = run.clock()?;
         run.record.start(&started);
         // Swift `completedStepIDs`: none from the admitted boundary; from a

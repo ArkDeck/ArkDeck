@@ -7138,4 +7138,60 @@ SHA-256：%4$@</value>
     <value>Runtime 信任评估</value>
     <comment>windows.settings.bundles.trust (Windows only)</comment>
   </data>
+  <data name="flash_maintenance_archive" xml:space="preserve">
+    <value>恢复 ramdisk 前，请在上方选择原始镜像包。</value>
+    <comment>flash.maintenance.archive (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_busy" xml:space="preserve">
+    <value>维护任务执行中…</value>
+    <comment>flash.maintenance.busy (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_counts" xml:space="preserve">
+    <value>匹配 %lld · 跳过 %lld · 失败 %lld</value>
+    <comment>flash.maintenance.counts (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_detail" xml:space="preserve">
+    <value>核验读取封存计划中的分区范围。恢复仅写入所选镜像包中的原始 ramdisk，随后独立核对全量哈希。</value>
+    <comment>flash.maintenance.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_expected" xml:space="preserve">
+    <value>预期 SHA-256</value>
+    <comment>flash.maintenance.expected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_noSource" xml:space="preserve">
+    <value>需要所选设备的一条已留存刷写任务。</value>
+    <comment>flash.maintenance.noSource (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_observed" xml:space="preserve">
+    <value>实测 SHA-256</value>
+    <comment>flash.maintenance.observed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_range" xml:space="preserve">
+    <value>范围：%lld + %lld 字节</value>
+    <comment>flash.maintenance.range (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_restore" xml:space="preserve">
+    <value>恢复原始 ramdisk</value>
+    <comment>flash.maintenance.restore (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_result" xml:space="preserve">
+    <value>结果：%@（退出码 %lld）</value>
+    <comment>flash.maintenance.result (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_source" xml:space="preserve">
+    <value>来源刷写任务</value>
+    <comment>flash.maintenance.source (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_stopped" xml:space="preserve">
+    <value>已停止——再次请求前请检查记录。</value>
+    <comment>flash.maintenance.stopped (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_title" xml:space="preserve">
+    <value>核验或恢复 ramdisk</value>
+    <comment>flash.maintenance.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_maintenance_verify" xml:space="preserve">
+    <value>核验分区</value>
+    <comment>flash.maintenance.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
 </root>

@@ -21,7 +21,7 @@ public static partial class FlashOperations
 
     /// <summary>The Flash operations whose Jobs the workspace shows (the canonical reference and
     /// its alias).</summary>
-    public static readonly IReadOnlySet<string> JobOperations = new HashSet<string>(StringComparer.Ordinal) { Reference, "flash.dayu200" };
+    public static readonly IReadOnlySet<string> JobOperations = new HashSet<string>(StringComparer.Ordinal) { Reference, "flash.dayu200", "flash.verify@1", "flash.restore-boot-loop@1" };
 
     /// <summary>States after which the live status stops (macOS <c>isTerminalLiveState</c>).</summary>
     public static readonly IReadOnlySet<string> LiveTerminalStates = new HashSet<string>(StringComparer.Ordinal)
@@ -187,7 +187,7 @@ public sealed record FlashPreparation(FlashPlan? Plan, FlashReviewFailureCode? F
 public sealed record FlashProcessProgress(string StepId, string Phase, string? UnitName, int CompletedUnitCount, int TotalUnitCount, int? CurrentUnitPercent);
 
 /// <summary>A Flash Job as <c>job.show</c> reads it: state, outcome, timeline and progress.</summary>
-public sealed record FlashRunStatus(string JobId, string State, bool OutcomeUnknown, IReadOnlyList<string> Timeline, FlashProcessProgress? Progress)
+public sealed record FlashRunStatus(string JobId, string State, bool OutcomeUnknown, IReadOnlyList<string> Timeline, FlashProcessProgress? Progress, FlashMaintenanceResult? MaintenanceResult = null)
 {
     public bool IsLiveTerminal => OutcomeUnknown || FlashOperations.LiveTerminalStates.Contains(State);
 }
@@ -462,7 +462,7 @@ public sealed partial class SurfaceLoader
         var shown = await ShowAsync(jobId, cli).ConfigureAwait(false);
         if (shown.Answer.Unavailable is { } why) return new(Loaded<FlashRunStatus>.Not(why), shown.DaemonFailure, shown.Reached);
         var (terminal, status) = shown.Answer.Value!;
-        return new(Loaded<FlashRunStatus>.Of(new FlashRunStatus(jobId, terminal.State, terminal.OutcomeUnknown, terminal.Timeline, Progress(status))),
+        return new(Loaded<FlashRunStatus>.Of(new FlashRunStatus(jobId, terminal.State, terminal.OutcomeUnknown, terminal.Timeline, Progress(status), status.TryGetValue("maintenanceResult", out var maintenance) ? FlashMaintenanceResult.Parse(maintenance) : null)),
             shown.DaemonFailure, shown.Reached);
     }
 

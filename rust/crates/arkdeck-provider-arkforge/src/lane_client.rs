@@ -55,6 +55,16 @@ impl PlanConnections for NativePlanConnections {
 }
 
 impl PlanConnections for NativeLaneConnections {
+    fn retain_plan(&self, plan: &arkforge_ipc::messages::ExecutablePlan) -> Result<(), String> {
+        crate::maintenance::retain_plan(&self.runtime_directory, plan)
+    }
+    fn maintenance_source(
+        &self,
+        execution: &crate::Execution,
+    ) -> Result<crate::maintenance::SourceRecords, String> {
+        crate::maintenance::read_source(&self.runtime_directory, execution)
+    }
+
     fn controller(&self) -> Result<Box<dyn PlanSource>, String> {
         NativePlanConnections(self.runtime_directory.clone()).controller()
     }

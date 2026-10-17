@@ -1789,6 +1789,20 @@ public static class UiStrings
     public const string WindowsSettingsBundlesRetained = "windows.settings.bundles.retained";
     public const string WindowsSettingsBundlesReferences = "windows.settings.bundles.references";
     public const string WindowsSettingsBundlesTrust = "windows.settings.bundles.trust";
+    public const string FlashMaintenanceArchive = "flash.maintenance.archive";
+    public const string FlashMaintenanceBusy = "flash.maintenance.busy";
+    public const string FlashMaintenanceCounts = "flash.maintenance.counts";
+    public const string FlashMaintenanceDetail = "flash.maintenance.detail";
+    public const string FlashMaintenanceExpected = "flash.maintenance.expected";
+    public const string FlashMaintenanceNoSource = "flash.maintenance.noSource";
+    public const string FlashMaintenanceObserved = "flash.maintenance.observed";
+    public const string FlashMaintenanceRange = "flash.maintenance.range";
+    public const string FlashMaintenanceRestore = "flash.maintenance.restore";
+    public const string FlashMaintenanceResult = "flash.maintenance.result";
+    public const string FlashMaintenanceSource = "flash.maintenance.source";
+    public const string FlashMaintenanceStopped = "flash.maintenance.stopped";
+    public const string FlashMaintenanceTitle = "flash.maintenance.title";
+    public const string FlashMaintenanceVerify = "flash.maintenance.verify";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -3574,5 +3588,19 @@ public static class UiStrings
         WindowsSettingsBundlesRetained,
         WindowsSettingsBundlesReferences,
         WindowsSettingsBundlesTrust,
+        FlashMaintenanceArchive,
+        FlashMaintenanceBusy,
+        FlashMaintenanceCounts,
+        FlashMaintenanceDetail,
+        FlashMaintenanceExpected,
+        FlashMaintenanceNoSource,
+        FlashMaintenanceObserved,
+        FlashMaintenanceRange,
+        FlashMaintenanceRestore,
+        FlashMaintenanceResult,
+        FlashMaintenanceSource,
+        FlashMaintenanceStopped,
+        FlashMaintenanceTitle,
+        FlashMaintenanceVerify,
     ];
 }

@@ -314,6 +314,11 @@ fn type_matches(value: &Value, raw_type: &str) -> bool {
 fn pattern_matches(pattern: &str, text: &str) -> bool {
     let bytes = text.as_bytes();
     match pattern {
+        "^[A-Za-z0-9][A-Za-z0-9._-]*$" => head_then(
+            bytes,
+            |b| b.is_ascii_alphanumeric(),
+            |b| b.is_ascii_alphanumeric() || b"._-".contains(&b),
+        ),
         // An identifier, and the dotted identifier of a process or class.
         "^[a-zA-Z][a-zA-Z0-9_.]*$" => head_then(
             bytes,
@@ -579,6 +584,11 @@ mod tests {
     #[test]
     fn hand_matched_patterns_accept_and_refuse_what_the_pattern_says() {
         for (pattern, accepted, refused) in [
+            (
+                "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                vec!["JOB-1", "source.2_a"],
+                vec!["", "-job", "job/1", "job\n"],
+            ),
             (
                 "^[a-zA-Z][a-zA-Z0-9_.]*$",
                 vec!["a", "com.example_1"],

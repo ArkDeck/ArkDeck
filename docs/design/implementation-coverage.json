@@ -47,6 +47,8 @@
     "ArkDeckApp/Features/Device/DeviceWorkspaceView.swift",
     "ArkDeckApp/Features/Devices/DeviceWorkspace.swift",
     "ArkDeckApp/Features/Diagnostics/DiagnosticsWorkspaceView.swift",
+    "ArkDeckApp/Features/Flash/FlashMaintenanceResultView.swift",
+    "ArkDeckApp/Features/Flash/FlashMaintenanceView.swift",
     "ArkDeckApp/Features/Flash/FlashPlanDetailsView.swift",
     "ArkDeckApp/Features/Flash/FlashRuntimeActivityView.swift",
     "ArkDeckApp/Features/Flash/FlashWorkspaceView.swift",

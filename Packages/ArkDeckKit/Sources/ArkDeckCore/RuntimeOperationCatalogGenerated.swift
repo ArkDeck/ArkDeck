@@ -4,7 +4,7 @@
 // Drift is a check-sdd error (bidirectional byte comparison).
 
 extension RuntimeOperationCatalog {
-  public static let catalogDigest = "e4e8a47cc4e9f6f099c9f4c47ef701fc928c20103cc42a23a46e887f624ab5f7"
+  public static let catalogDigest = "0e0eedcf4ba379c0553ce0df8f3d1ee3a535b52ed4101cf04d5461d7b8c2ac5c"
 
   public static let operations: [CatalogOperationDescriptor] = [
     CatalogOperationDescriptor(
@@ -550,6 +550,66 @@ extension RuntimeOperationCatalog {
         profiles: [CatalogCompleteOverwriteRecoveryProfileDescriptor(reference: "dayu200", coveredEffects: ["partition:uboot", "partition:resource", "partition:boot_linux", "partition:ramdisk", "partition:system", "partition:vendor", "partition:updater", "partition:chip_ckm", "partition:userdata"])],
         overwriteStepID: "flash-partitions",
         verificationStepIDs: ["verify-flash-readback", "reboot-device", "wait-for-hdc", "rebind-and-verify-build"])
+    ),
+    CatalogOperationDescriptor(
+      id: "flash.restore-boot-loop",
+      version: 1,
+      title: "Restore the original ramdisk and independently verify its full hash",
+      provider: .arkforge,
+      minimumEffect: .destructive,
+      permittedEffects: [.destructive],
+      authorization: [.destructive: .runtimeCapability],
+      defaultPolicyIssuanceEnabled: false,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "artifactLease", type: .artifactLease, isRequired: true, summary: "Immutable original image bundle. Runtime materializes only the pinned original ramdisk."),
+        CatalogFieldDescriptor(name: "budgetMs", type: .integer, isRequired: true, minimum: 1000, maximum: 600000, summary: "Total maintenance execution budget in milliseconds."),
+        CatalogFieldDescriptor(name: "sourceJobId", type: .string, isRequired: true, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$", maxLength: 128, summary: "Latest durable ArkDeck Flash Job for this exact bound target.")
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "maintenanceResult", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "restore-ramdisk", kind: .flashPartition, effect: .destructive, cancellation: .criticalNonInterruptible, binding: .confirmedDevice, isOptional: false, compensation: .none),
+        CatalogStepDescriptor(stepID: "verify-restored-ramdisk", kind: .verifyRemoteState, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 600,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "maintenance-result.json", role: .derived, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["dayu200"]
+    ),
+    CatalogOperationDescriptor(
+      id: "flash.verify",
+      version: 1,
+      title: "Verify sealed Flash partition ranges against independent full hashes",
+      provider: .arkforge,
+      minimumEffect: .readOnly,
+      permittedEffects: [.readOnly],
+      authorization: [.readOnly: .defaultReadOnly],
+      defaultPolicyIssuanceEnabled: true,
+      binding: .confirmedDevice,
+      concurrencyKey: .deviceExclusive,
+      inputs: [
+        CatalogFieldDescriptor(name: "budgetMs", type: .integer, isRequired: true, minimum: 1000, maximum: 600000, summary: "Total maintenance execution budget in milliseconds."),
+        CatalogFieldDescriptor(name: "sourceJobId", type: .string, isRequired: true, pattern: "^[A-Za-z0-9][A-Za-z0-9._-]*$", maxLength: 128, summary: "Latest durable ArkDeck Flash Job for this exact bound target.")
+      ],
+      outputs: [
+        CatalogFieldDescriptor(name: "maintenanceResult", type: .artifactReference, isRequired: true)
+      ],
+      steps: [
+        CatalogStepDescriptor(stepID: "verify-flash-readback", kind: .verifyRemoteState, effect: .readOnly, cancellation: .immediate, binding: .confirmedDevice, isOptional: false, compensation: .none)
+      ],
+      timeoutSeconds: 600,
+      outputByteBudget: 1048576,
+      preflightAttempts: 1,
+      artifacts: [
+        CatalogArtifactDescriptor(name: "maintenance-result.json", role: .derived, mediaType: "application/json", privacy: .sensitive, isRequired: true, retentionClass: .default)
+      ],
+      profiles: ["dayu200"]
     ),
     CatalogOperationDescriptor(
       id: "input.keyboard",

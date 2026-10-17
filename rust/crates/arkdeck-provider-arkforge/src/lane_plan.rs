@@ -138,6 +138,29 @@ pub(crate) fn materialize(
     support: &Configuration,
     resolve: TopologyResolver,
 ) -> Result<(ExecutablePlan, String), MaterializationFailure> {
+    materialize_intent(
+        controller,
+        public,
+        artifact,
+        binding,
+        purpose,
+        support,
+        resolve,
+        "fullRestore",
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn materialize_intent(
+    controller: &mut dyn PlanSource,
+    public: &mut dyn AssessmentSource,
+    artifact: &LaneArtifact,
+    binding: &DeviceBinding,
+    purpose: &str,
+    support: &Configuration,
+    resolve: TopologyResolver,
+    intent: &str,
+) -> Result<(ExecutablePlan, String), MaterializationFailure> {
     let identity = digest_bytes(&binding.stable_identity_sha256).ok_or_else(|| {
         unusable(
             "the ArkDeck binding has no exact 32-byte stable identity digest",
@@ -149,7 +172,7 @@ pub(crate) fn materialize(
     let public_observation = select_with_resolver(&observations, &binding.usb_topology, resolve)
         .map_err(observation_failure)?;
     let input = |observation_id, key, state, detail| MaterializeInput {
-        intent: "fullRestore",
+        intent,
         artifact_id: &artifact.sha256,
         profile_id: &artifact.profile_id,
         device_id: observation_id,

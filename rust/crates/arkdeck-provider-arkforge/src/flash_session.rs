@@ -16,7 +16,7 @@ use arkforge_ipc::messages::{
     SubmissionOutcome, SubmitManagedControlReceiptRequest, SubmitStepPermitRequest,
 };
 use std::collections::BTreeSet;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Swift `pollIntervalMilliseconds`: the wait before polling again when the
 /// daemon has nothing queued.
@@ -219,6 +219,14 @@ impl<'a> FlashSession<'a> {
     /// requests, each in event order. A quiet poll waits and polls again;
     /// past [`QUIET_POLL_LIMIT`] of them the outcome is unknown.
     pub fn run_existing(&mut self, daemon_job_id: &str) -> Result<SessionOutcome, SessionError> {
+        self.run_existing_until(daemon_job_id, None)
+    }
+
+    pub fn run_existing_until(
+        &mut self,
+        daemon_job_id: &str,
+        deadline: Option<Instant>,
+    ) -> Result<SessionOutcome, SessionError> {
         self.authority.adopt_daemon_job(daemon_job_id);
         let mut terminal = None;
         // The last sequence answered; the daemon's cursor is exclusive.
@@ -227,6 +235,12 @@ impl<'a> FlashSession<'a> {
         // Steps whose permit was signed and whose receipt has not arrived.
         let mut awaiting_receipts = BTreeSet::new();
         while terminal.is_none() {
+            if deadline.is_some_and(|limit| Instant::now() >= limit) {
+                return Ok(SessionOutcome::OutcomeUnknown {
+                    reason: "maintenance execution budget exhausted".into(),
+                    receipts: self.receipts.clone(),
+                });
+            }
             let mut admissions = Vec::new();
             let mut controls = Vec::new();
             let mut saw_event = false;
@@ -256,7 +270,19 @@ impl<'a> FlashSession<'a> {
                     _ => {}
                 }
             }
+            if deadline.is_some_and(|limit| Instant::now() >= limit) {
+                return Ok(SessionOutcome::OutcomeUnknown {
+                    reason: "maintenance execution budget exhausted before admission".into(),
+                    receipts: self.receipts.clone(),
+                });
+            }
             for admission in &admissions {
+                if deadline.is_some_and(|limit| Instant::now() >= limit) {
+                    return Ok(SessionOutcome::OutcomeUnknown {
+                        reason: "maintenance execution budget exhausted before dispatch".into(),
+                        receipts: self.receipts.clone(),
+                    });
+                }
                 if self.answer_admission(admission, daemon_job_id)?
                     && !self
                         .receipts
@@ -267,6 +293,12 @@ impl<'a> FlashSession<'a> {
                 }
             }
             for control in &controls {
+                if deadline.is_some_and(|limit| Instant::now() >= limit) {
+                    return Ok(SessionOutcome::OutcomeUnknown {
+                        reason: "maintenance execution budget exhausted before dispatch".into(),
+                        receipts: self.receipts.clone(),
+                    });
+                }
                 self.answer_control(control, daemon_job_id, cursor)?;
             }
             if terminal.is_some() {

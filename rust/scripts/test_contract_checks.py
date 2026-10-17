@@ -245,7 +245,7 @@ class ReadOnlyMachineOutputTests(unittest.TestCase):
         for name in ("doctor", "deep", "healthy"):
             for before, after in ((digest.encode(), other.encode()),
                                   (digest.encode(), b"0" * 64),
-                                  (b'"operationCount":32', b'"operationCount":31')):
+                                  (b'"operationCount":34' if digest == readonly.catalog_test_views.MAINTENANCE else b'"operationCount":32', b'"operationCount":31')):
                 changed = dict(outputs, **{name: outputs[name].replace(before, after, 1)})
                 self.assertNotEqual(changed, outputs)
                 with tempfile.TemporaryDirectory() as temporary, self.subTest(name=name, after=after), \
@@ -319,7 +319,7 @@ class CandidateConsumerRoutingTests(unittest.TestCase):
             self.assertEqual(provenance["result"], "pass")
             self.assertEqual(provenance["candidateExecutionReceiptSHA256"], contract.sha(receipt.read_bytes()))
             self.assertFalse(provenance["deviceAcceptance"])
-            self.assertEqual(len(calls), 4)
+            self.assertEqual(len(calls), 16 if sys.platform == "darwin" else 4)
 
     def test_absent_wrong_view_scope_and_nonexecution_receipts_refuse(self):
         original = candidate_execution_receipt({"catalogDigest": "c" * 64})
@@ -386,7 +386,8 @@ class ContractChecksTests(unittest.TestCase):
             # Catalog. The real immutable 32-operation reconstruction and full
             # matrix/projection guards live in test_historical_catalog_views.py.
             (runner, "historical_catalog_inputs", self.fake_historical_inputs),
-            (runner, "historical_review_projection", lambda source: source),
+            (runner, "pinned_catalog_inputs", self.fake_pinned_inputs),
+            (runner, "historical_review_projection", lambda source, digest=None: source),
         ]:
             replacement = patch.object(module, key, value)
             replacement.start()
@@ -434,9 +435,12 @@ class ContractChecksTests(unittest.TestCase):
         self.published_info = contract.baseline(self.published, self.commit)
 
     def fake_historical_inputs(self, current):
+        return self.fake_pinned_inputs(current, runner.catalog_test_views.OLD)
+
+    def fake_pinned_inputs(self, current, digest):
         historical = copy.deepcopy(current)
         matrix = "Catalog/generated/effect-authorization-matrix.md"
-        data = b"Catalog digest: `" + runner.catalog_test_views.OLD.encode() + b"`\n"
+        data = b"Catalog digest: `" + digest.encode() + b"`\n"
         historical.files[matrix] = data
         historical.blobs[matrix] = runner.hashlib.sha1(
             f"blob {len(data)}\0".encode() + data).hexdigest()
@@ -871,19 +875,19 @@ class ContractChecksTests(unittest.TestCase):
 
     def test_failure_in_either_view_cannot_leave_combined_check_green(self):
         self.drift_and_regenerate()
-        for failing_view in ("development", "candidate", "historical"):
+        for failing_view in ("development", "candidate", "historical", "observed"):
             with self.subTest(view=failing_view):
                 calls = []
 
                 def check_view(view, output, info, published_info, **kwargs):
-                    calls.append("historical" if kwargs.get("historical") else info["kind"])
+                    calls.append("observed" if kwargs.get("observed") else "historical" if kwargs.get("historical") else info["kind"])
                     if calls[-1] == failing_view:
                         raise ValueError("expected test failure")
 
                 with patch.object(runner, "run_view", check_view):
                     with self.assertRaisesRegex(ValueError, "contract checks failed"):
                         runner.check(self.root / "outputs")
-                self.assertEqual(calls, ["development", "candidate", "historical"])
+                self.assertEqual(calls, ["development", "candidate", "historical", "observed"])
 
     def test_both_views_use_one_source_snapshot_and_report_concurrent_edits(self):
         self.drift_and_regenerate()
@@ -894,7 +898,7 @@ class ContractChecksTests(unittest.TestCase):
         generator = (self.root / "scripts/catalog_gen/generate.py").read_bytes()
 
         def check_view(view, output, info, published_info, **kwargs):
-            calls.append("historical" if kwargs.get("historical") else info["kind"])
+            calls.append("observed" if kwargs.get("observed") else "historical" if kwargs.get("historical") else info["kind"])
             self.assertEqual((view / "rust/scripts/check-readonly.py").read_bytes(), original)
             self.assertEqual((view / runner.REVIEW_PROJECTION).read_bytes(), projection)
             self.assertEqual((view / "scripts/catalog_gen/generate.py").read_bytes(), generator)
@@ -908,14 +912,16 @@ class ContractChecksTests(unittest.TestCase):
         with patch.object(runner, "run_view", check_view):
             with self.assertRaisesRegex(ValueError, "Rust sources changed.*App review projection changed.*Catalog generator changed"):
                 runner.check(self.root / "outputs")
-        self.assertEqual(calls, ["development", "candidate", "historical"])
+        self.assertEqual(calls, ["development", "candidate", "historical", "observed"])
 
     def test_identical_inputs_run_the_native_checks_once_and_record_the_coverage(self):
         calls = []
 
         def check_view(view, output, info, published_info, **kwargs):
-            calls.append("historical" if kwargs.get("historical") else info["kind"])
-            if kwargs.get("historical"):
+            calls.append("observed" if kwargs.get("observed") else "historical" if kwargs.get("historical") else info["kind"])
+            if kwargs.get("observed"):
+                self.assertEqual(info["catalogDigest"], runner.catalog_test_views.CURRENT)
+            elif kwargs.get("historical"):
                 self.assertEqual(info["catalogDigest"], runner.catalog_test_views.OLD)
                 self.assertNotEqual(info["inputDigest"], published_info["inputDigest"])
             else:
@@ -926,7 +932,7 @@ class ContractChecksTests(unittest.TestCase):
         outputs = self.root / "outputs"
         with patch.object(runner, "run_view", check_view):
             runner.check(outputs)
-        self.assertEqual(calls, ["candidate", "historical"])
+        self.assertEqual(calls, ["candidate", "historical", "observed"])
         (run,) = outputs.iterdir()
         summary = json.loads((run / "summary.json").read_bytes())
         self.assertTrue(summary["completed"])
@@ -953,7 +959,7 @@ class ContractChecksTests(unittest.TestCase):
         with patch.object(runner, "run_view", check_view):
             with self.assertRaisesRegex(ValueError, "historical.*mandatory historical failure"):
                 runner.check(self.root / "outputs")
-        self.assertEqual(calls, ["candidate", "historical"])
+        self.assertEqual(calls, ["candidate", "historical", "observed"])
 
     def test_identical_inputs_still_fail_when_the_candidate_view_fails(self):
         def check_view(view, output, info, published_info, **kwargs):
@@ -968,13 +974,13 @@ class ContractChecksTests(unittest.TestCase):
         calls = []
 
         def check_view(view, output, info, published_info, **kwargs):
-            calls.append("historical" if kwargs.get("historical") else info["kind"])
+            calls.append("observed" if kwargs.get("observed") else "historical" if kwargs.get("historical") else info["kind"])
             runner.write_json(output / "provenance.json", {"completed": True, "result": "pass"})
 
         outputs = self.root / "outputs"
         with patch.object(runner, "run_view", check_view):
             runner.check(outputs)
-        self.assertEqual(calls, ["development", "candidate", "historical"])
+        self.assertEqual(calls, ["development", "candidate", "historical", "observed"])
         (run,) = outputs.iterdir()
         self.assertEqual(json.loads((run / "summary.json").read_bytes())["publishedView"], "run")
 
@@ -989,7 +995,7 @@ class ContractChecksTests(unittest.TestCase):
         stamps = {}
 
         def check_view(view, output, info, published_info, **kwargs):
-            name = "historical" if kwargs.get("historical") else "candidate" if info["kind"] == "candidate" else "published"
+            name = "observed" if kwargs.get("observed") else "historical" if kwargs.get("historical") else "candidate" if info["kind"] == "candidate" else "published"
             self.assertEqual(view, self.root / "rust/target/contract-check" / name)
             count = visits.get(name, 0)
             visits[name] = count + 1
@@ -1018,7 +1024,7 @@ class ContractChecksTests(unittest.TestCase):
             runner.check(self.root / "outputs")
             self.drift_and_regenerate()
             runner.check(self.root / "outputs")
-        self.assertEqual(visits, {"published": 3, "candidate": 3, "historical": 3})
+        self.assertEqual(visits, {"published": 3, "candidate": 3, "historical": 3, "observed": 3})
 
     def test_parallel_view_keeps_native_checks_and_labels_its_own_timing_report(self):
         self.drift_and_regenerate()

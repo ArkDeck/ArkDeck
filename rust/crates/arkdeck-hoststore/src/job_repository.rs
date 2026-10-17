@@ -46,6 +46,8 @@ pub(super) struct JobRow {
     pub version: i64,
     pub record: Vec<u8>,
     pub order_key: String,
+    #[cfg(any(target_os = "macos", windows))]
+    pub admission_sequence: i64,
 }
 
 pub(super) fn identifier(value: &str) -> bool {
@@ -199,6 +201,8 @@ fn job_row(row: Vec<SqliteValue>) -> io::Result<JobRow> {
         version: row[6].integer().filter(|v| *v > 0).ok_or_else(corrupt)?,
         record: row[7].blob().ok_or_else(corrupt)?.to_vec(),
         order_key: text(8)?,
+        #[cfg(any(target_os = "macos", windows))]
+        admission_sequence: row[9].integer().ok_or_else(corrupt)?,
     };
     if !identifier(&row.id) || row.order_key != order_key(&row.created)? {
         return Err(corrupt());

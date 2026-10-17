@@ -49,13 +49,17 @@ pub(crate) const PARTITIONS: [&str; 9] = [
 /// Whether an operation is one of the ArkForge Flash operations (Swift
 /// `ArkForgeFlashOperation.contains`).
 pub(crate) fn is_flash(reference: &str) -> bool {
-    reference == CANONICAL || reference == "flash.dayu200"
+    reference == CANONICAL
+        || reference == "flash.dayu200"
+        || crate::flash_maintenance::is_maintenance(reference)
 }
 
 /// What a Flash plan reads beyond the Artifact and Import owners and the
 /// Target's facts, as the daemon composes it: the provider's availability,
 /// the dispatcher's and the lane's toolchain.
 pub struct FlashPlanning {
+    pub(crate) maintenance:
+        Mutex<Option<std::sync::Arc<crate::flash_maintenance::MaintenanceContext>>>,
     unavailable: Option<String>,
     dispatch_unavailable: Box<dyn Fn() -> Option<String> + Send + Sync>,
     toolchain_sha256: Option<String>,
@@ -65,6 +69,15 @@ pub struct FlashPlanning {
 }
 
 impl FlashPlanning {
+    pub fn install_maintenance(
+        &self,
+        context: std::sync::Arc<crate::flash_maintenance::MaintenanceContext>,
+    ) {
+        if let Ok(mut slot) = self.maintenance.lock() {
+            *slot = Some(context);
+        }
+    }
+
     /// `unavailable` is the provider's runtime availability as Swift's lane
     /// composition decides it (none when available); `dispatch_unavailable`
     /// answers Swift's dispatcher `unavailableReason`; `toolchain_sha256` is
@@ -75,6 +88,7 @@ impl FlashPlanning {
         toolchain_sha256: Option<String>,
     ) -> Self {
         Self {
+            maintenance: Mutex::new(None),
             unavailable,
             dispatch_unavailable: Box::new(dispatch_unavailable),
             toolchain_sha256,
@@ -236,6 +250,9 @@ impl<'a> FlashPlanner<'a> {
         descriptor: &CatalogOperation,
     ) -> Result<(Materialized<'b>, Option<String>), PlanRefusal> {
         let reference = descriptor.reference();
+        if crate::flash_maintenance::is_maintenance(&reference) {
+            return crate::flash_maintenance::materialize(self, flash, request, descriptor);
+        }
         // Converted before anything else is read; a legacy request that
         // cannot be converted fails outside the typed preflight.
         let inputs =

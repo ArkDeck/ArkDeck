@@ -1212,6 +1212,25 @@ impl Host {
         host: std::sync::Arc<dyn arkdeck_provider_arkforge::RockchipHost>,
         profile_id: String,
     ) -> Self {
+        if let (Some(planning), Some(jobs), Some(facts), Some(targets), Some(hdc)) = (
+            &self.flash_planning,
+            &self.jobs,
+            &self.flash_facts,
+            self.rockchip_target_store(),
+            self.rockchip_hdc_resolver(),
+        ) {
+            planning.install_maintenance(std::sync::Arc::new(
+                arkdeck_hoststore::MaintenanceContext::new(
+                    jobs.clone(),
+                    lane.clone(),
+                    std::sync::Arc::new(arkdeck_hoststore::NativeMaintenanceReads::new(
+                        facts.clone(),
+                        targets,
+                        hdc,
+                    )),
+                ),
+            ));
+        }
         self.flash_runtime = Some(std::sync::Arc::new(FlashRuntime {
             lane,
             host,

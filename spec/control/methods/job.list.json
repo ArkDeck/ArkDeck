@@ -142,6 +142,238 @@
               "jobId": {
                 "type": "string"
               },
+              "maintenanceResult": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "exit_code": {
+                        "type": "integer"
+                      },
+                      "failed": {
+                        "type": "integer"
+                      },
+                      "outcome": {
+                        "type": "string"
+                      },
+                      "schema": {
+                        "const": "arkforge.flash-verification/v1"
+                      },
+                      "skipped": {
+                        "type": "integer"
+                      },
+                      "source_job_id": {
+                        "type": "string"
+                      },
+                      "source_plan_id": {
+                        "type": "string"
+                      },
+                      "source_plan_sha256": {
+                        "type": "string"
+                      },
+                      "targets": {
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "expected_sha256": {
+                              "type": "string"
+                            },
+                            "observed_sha256": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            },
+                            "outcome": {
+                              "type": "string"
+                            },
+                            "range_length": {
+                              "type": "integer"
+                            },
+                            "range_start": {
+                              "type": "integer"
+                            },
+                            "reason": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            },
+                            "target": {
+                              "type": "string"
+                            },
+                            "verification_strength": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "target",
+                            "expected_sha256",
+                            "outcome",
+                            "range_start",
+                            "range_length",
+                            "observed_sha256",
+                            "verification_strength",
+                            "reason"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "verified": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "schema",
+                      "source_job_id",
+                      "source_plan_id",
+                      "source_plan_sha256",
+                      "outcome",
+                      "exit_code",
+                      "verified",
+                      "skipped",
+                      "failed",
+                      "targets"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "exit_code": {
+                        "type": "integer"
+                      },
+                      "outcome": {
+                        "type": "string"
+                      },
+                      "outcome_unknown": {
+                        "type": "boolean"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "restoration_job_id": {
+                        "type": "string"
+                      },
+                      "schema": {
+                        "const": "arkforge.boot-loop-restoration/v1"
+                      },
+                      "source_job_id": {
+                        "type": "string"
+                      },
+                      "verification": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "exit_code": {
+                            "type": "integer"
+                          },
+                          "failed": {
+                            "type": "integer"
+                          },
+                          "outcome": {
+                            "type": "string"
+                          },
+                          "schema": {
+                            "const": "arkforge.flash-verification/v1"
+                          },
+                          "skipped": {
+                            "type": "integer"
+                          },
+                          "source_job_id": {
+                            "type": "string"
+                          },
+                          "source_plan_id": {
+                            "type": "string"
+                          },
+                          "source_plan_sha256": {
+                            "type": "string"
+                          },
+                          "targets": {
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "expected_sha256": {
+                                  "type": "string"
+                                },
+                                "observed_sha256": {
+                                  "type": [
+                                    "null",
+                                    "string"
+                                  ]
+                                },
+                                "outcome": {
+                                  "type": "string"
+                                },
+                                "range_length": {
+                                  "type": "integer"
+                                },
+                                "range_start": {
+                                  "type": "integer"
+                                },
+                                "reason": {
+                                  "type": [
+                                    "null",
+                                    "string"
+                                  ]
+                                },
+                                "target": {
+                                  "type": "string"
+                                },
+                                "verification_strength": {
+                                  "type": [
+                                    "null",
+                                    "string"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "target",
+                                "expected_sha256",
+                                "outcome",
+                                "range_start",
+                                "range_length",
+                                "observed_sha256",
+                                "verification_strength",
+                                "reason"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "verified": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "schema",
+                          "source_job_id",
+                          "source_plan_id",
+                          "source_plan_sha256",
+                          "outcome",
+                          "exit_code",
+                          "verified",
+                          "skipped",
+                          "failed",
+                          "targets"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "schema",
+                      "outcome",
+                      "exit_code",
+                      "source_job_id",
+                      "outcome_unknown"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
               "nextAction": {
                 "additionalProperties": false,
                 "properties": {

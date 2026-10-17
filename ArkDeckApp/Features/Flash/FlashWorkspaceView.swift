@@ -90,6 +90,7 @@ struct FlashWorkspaceView: View {
       pageLead
       currentDeviceSurface
       primarySurface
+      FlashMaintenanceView(model: model, jobs: runtimeHistory.jobs)
       flashDetails
     }
     .toolbar {
@@ -1426,6 +1427,43 @@ final class FlashWorkspaceViewModel {
   private(set) var isRefreshingDeviceAccess = false
   private(set) var profileReference =
     FlashApplicationFacade.profileReferences.last ?? "dayu200"
+
+  private var maintenanceGeneration = 0
+  private(set) var maintenanceTargetID: String?
+  private(set) var isMaintaining = false
+  private(set) var maintenanceStatus: FlashSubmissionPresentation?
+  private(set) var maintenanceFailure: String?
+
+  func runMaintenance(sourceJobID: String, restoring: Bool, budgetMs: Int) async {
+    guard !isMaintaining, !isSubmitting, let target = selectedTarget,
+      !restoring || selectedArchiveURL != nil else { return }
+    isMaintaining = true
+    maintenanceGeneration += 1
+    maintenanceTargetID = target.id
+    maintenanceFailure = nil
+    maintenanceStatus = nil
+    let archive = restoring ? selectedArchiveURL : nil
+    let result = await provider.maintenance(sourceJobID: sourceJobID, target: target,
+      archiveURL: archive, budgetMs: budgetMs)
+    isMaintaining = false
+    guard selectedTarget == target else { return }
+    switch result {
+    case .completed(let status): maintenanceStatus = status
+    case .failed(let detail): maintenanceFailure = detail
+    }
+  }
+
+  func readMaintenance(jobID: String) async {
+    guard !isMaintaining else { return }
+    let target = selectedTarget
+    let generation = maintenanceGeneration
+    let result = await provider.status(jobID: jobID)
+    guard !isMaintaining, generation == maintenanceGeneration, target == selectedTarget else { return }
+    if case .available(let status) = result {
+      maintenanceTargetID = target?.id
+      maintenanceStatus = status
+    }
+  }
 
   private let provider: any FlashApplicationProviding
   private let detailProvider: any RuntimeJobDetailApplicationProviding

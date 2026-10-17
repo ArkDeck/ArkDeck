@@ -157,7 +157,11 @@ pub(crate) fn validate_status(status: &Value, expected: Option<&str>) -> Result<
     } else {
         status["state"].clone()
     };
-    if !keys(status, &STATUS_KEYS)
+    let mut base = status.clone();
+    if let Some(fields) = base.as_object_mut() {
+        fields.remove("maintenanceResult");
+    }
+    if !keys(&base, &STATUS_KEYS)
         || expected.is_some_and(|expected| expected != id)
         || status["outcome"] != outcome
         || !date(&status["createdAtUtc"])

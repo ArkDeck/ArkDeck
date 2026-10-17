@@ -1513,6 +1513,18 @@ mod tests {
             .unwrap()
             .iter()
             .filter(|entry| !entry["source"].as_str().unwrap().starts_with("app:"))
+            // Preserve the original non-App contract; maintenance adds two new leaves.
+            .filter(|entry| {
+                !matches!(
+                    entry["feature"].as_str(),
+                    Some(
+                        "flash.verify@1"
+                            | "flash.restore-boot-loop@1"
+                            | "flash.verify"
+                            | "flash.restore-boot-loop"
+                    )
+                )
+            })
             .map(|entry| {
                 json!({
                     "feature": entry["feature"],

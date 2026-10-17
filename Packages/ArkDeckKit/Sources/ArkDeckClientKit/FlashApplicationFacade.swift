@@ -310,19 +310,22 @@ public struct FlashSubmissionPresentation: Sendable, Equatable {
   public let outcomeUnknown: Bool
   public let timeline: [String]
   public let processProgress: FlashProcessProgressPresentation?
+  public let maintenanceResult: FlashMaintenanceResult?
 
   public init(
     jobID: String,
     state: String,
     outcomeUnknown: Bool,
     timeline: [String],
-    processProgress: FlashProcessProgressPresentation? = nil
+    processProgress: FlashProcessProgressPresentation? = nil,
+    maintenanceResult: FlashMaintenanceResult? = nil
   ) {
     self.jobID = jobID
     self.state = state
     self.outcomeUnknown = outcomeUnknown
     self.timeline = timeline
     self.processProgress = processProgress
+    self.maintenanceResult = maintenanceResult
   }
 }
 
@@ -506,12 +509,19 @@ enum FlashJobStatusResponseDecoding {
       processProgress = nil
     }
 
+    let maintenance: FlashMaintenanceResult?
+    if let value = fields["maintenanceResult"] {
+      guard let data = try? JSONSerialization.data(withJSONObject: value),
+        let decoded = try? JSONDecoder().decode(FlashMaintenanceResult.self, from: data)
+      else { return nil }
+      maintenance = decoded
+    } else { maintenance = nil }
     return FlashSubmissionPresentation(
       jobID: expectedJobID,
       state: state,
       outcomeUnknown: outcomeUnknown,
       timeline: timeline,
-      processProgress: processProgress)
+      processProgress: processProgress, maintenanceResult: maintenance)
   }
 
   private static func decodeProcessProgress(
@@ -614,10 +624,19 @@ public protocol FlashApplicationProviding: Sendable {
     archiveURL: URL,
     plan: FlashExactPlanPresentation
   ) async -> FlashSubmissionResult
+  func maintenance(sourceJobID: String, target: FlashTargetPresentation,
+    archiveURL: URL?, budgetMs: Int) async -> FlashRunResult
   func status(jobID: String) async -> FlashJobStatusResult
   func run(jobID: String) async -> FlashRunResult
   func bindCurrentLoader(target: FlashTargetPresentation) async -> FlashLoaderBindingResult
   func cancel(jobID: String) async -> Bool
+}
+
+public extension FlashApplicationProviding {
+  func maintenance(sourceJobID: String, target: FlashTargetPresentation,
+    archiveURL: URL?, budgetMs: Int) async -> FlashRunResult {
+    .failed("Maintenance is unavailable in this Runtime composition")
+  }
 }
 
 public enum FlashApplicationFacade {
@@ -957,6 +976,58 @@ actor FlashProductionApplicationProvider: FlashApplicationProviding {
         message: "Runtime plan-only steps no longer match the reviewed Flash plan")
     }
     return FlashRuntimePlanPreview(materializedPlanDigest: preview.materializedPlanDigest)
+  }
+
+  func maintenance(sourceJobID: String, target: FlashTargetPresentation,
+    archiveURL: URL?, budgetMs: Int) async -> FlashRunResult {
+    let identifier = Array(sourceJobID.utf8)
+    let alphanumeric: (UInt8) -> Bool = { (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) }
+    guard (1...128).contains(identifier.count), identifier.first.map(alphanumeric) == true,
+      identifier.allSatisfy({ alphanumeric($0) || [45, 46, 95].contains($0) }),
+      (1_000...600_000).contains(budgetMs), target.bindingRevision > 0 else {
+      return .failed("Invalid maintenance parameters (exit 2); no request or record was created")
+    }
+    let gainedScope = archiveURL?.startAccessingSecurityScopedResource() ?? false
+    defer { if gainedScope { archiveURL?.stopAccessingSecurityScopedResource() } }
+    do {
+      var inputs: [String: JSONValue] = ["sourceJobId": .string(sourceJobID), "budgetMs": .integer(Int64(budgetMs))]
+      let operation = archiveURL == nil ? "flash.verify" : "flash.restore-boot-loop"
+      if let archiveURL {
+        let prepared = await Task.detached {
+          FlashPlanPresentationBuilder.prepare(archiveURL: archiveURL, profileReference: "dayu200", mode: .execute, target: target)
+        }.value
+        guard case .ready(let plan) = prepared else {
+          return .failed("The original image bundle could not be read; no restoration was submitted")
+        }
+        let artifact = try await importFlashBundle(archiveURL: archiveURL, plan: plan, target: target)
+        inputs["artifactLease"] = .string(artifact.lease)
+      }
+      let nonce = "maintenance-ui-\(UUID().uuidString.lowercased())"
+      let request = try RuntimeOperationRequest(requestID: nonce, idempotencyKey: nonce,
+        target: DurableTargetReference(targetID: target.id, expectedBindingRevision: target.bindingRevision),
+        operation: RuntimeOperationReference(id: operation, version: 1), inputs: inputs,
+        requestedOutputs: [.rawArtifacts, .derivedArtifacts],
+        clientContext: RuntimeWorkspaceThread.clientContext(clientName: ArkDeckAgentClientName.flashWorkspace, targetID: target.id))
+      let requestData = try CanonicalJSONEncoders.canonical().encode(request)
+      let requestJSON = String(decoding: requestData, as: UTF8.self)
+      let plan = try await FlashXPCResponseDecoding.resultObject(await self.request(
+        method: "job.plan", params: ["requestJson": .string(requestJSON)]))
+      guard plan["operation"] as? String == "\(operation)@1",
+        plan["providerId"] as? String == "arkforge",
+        plan["effectiveEffect"] as? String == (archiveURL == nil ? "readOnly" : "destructive"),
+        plan["targetId"] as? String == target.id, plan["bindingRevision"] as? Int == target.bindingRevision,
+        plan["jobAdmitted"] as? Bool == false, plan["dispatchDisposition"] as? String == "notDispatched",
+        let digest = plan["materializedPlanDigest"] as? String, SHA256Hex.isLowercaseSHA256(digest)
+      else { return .failed("Runtime returned a mismatched maintenance plan") }
+      var reviewed = try JSONDecoder().decode([String: JSONValue].self, from: requestData)
+      reviewed["reviewedPlanDigest"] = .string(digest)
+      let submitted = try await FlashXPCResponseDecoding.resultObject(await self.request(
+        method: "job.submit", params: ["requestJson": .string(String(decoding: try CanonicalJSONEncoders.canonical().encode(reviewed), as: UTF8.self))]))
+      guard let jobID = submitted["jobId"] as? String else { return .failed("Runtime returned no maintenance Job ID") }
+      return await run(jobID: jobID)
+    } catch {
+      return .failed("Maintenance stopped; inspect Runtime records before another request: \(error)")
+    }
   }
 
   func run(jobID: String) async -> FlashRunResult {

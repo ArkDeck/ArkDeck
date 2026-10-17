@@ -569,12 +569,18 @@ fn historical_input_compatibility_requires_all_32_complete_frozen_schemas() {
             "{reference}"
         );
     }
+    let mut compiled = by_reference(&compiled);
+    if arkdeck_contract::CATALOG_DIGEST == support::catalog_lineage::MAINTENANCE {
+        assert_eq!(compiled.len(), 34);
+        assert!(compiled.remove("flash.verify@1").is_some());
+        assert!(compiled.remove("flash.restore-boot-loop@1").is_some());
+    }
     let expected = match arkdeck_contract::CATALOG_DIGEST {
         support::catalog_lineage::OLD => &old,
-        support::catalog_lineage::CURRENT => &current,
+        support::catalog_lineage::CURRENT | support::catalog_lineage::MAINTENANCE => &current,
         _ => panic!("a future Catalog needs an explicit input compatibility review"),
     };
-    assert_eq!(&by_reference(&compiled), expected);
+    assert_eq!(&compiled, expected);
 }
 
 #[test]
@@ -613,6 +619,7 @@ fn an_unfinalized_source_with_unknown_or_malformed_inputs_cannot_clear_any_impor
         "hiddenObject",
         "malformedLease",
         "unknownOperation",
+        "operationNotInSourceCatalog",
         "unknownDigest",
         "unknownField",
         "wrongEnum",
@@ -641,6 +648,11 @@ fn an_unfinalized_source_with_unknown_or_malformed_inputs_cannot_clear_any_impor
                     "unknownOperation" => {
                         record[key]["operation"]["id"] = json!("unknown.operation")
                     }
+                    "operationNotInSourceCatalog" => {
+                        record[key]["operation"] = json!({"id":"flash.verify", "version":1});
+                        record[key]["inputs"] =
+                            json!({"sourceJobId":"job-source", "budgetMs":1000});
+                    }
                     "unknownDigest" => (),
                     "unknownField" => record[key]["inputs"]["unregistered"] = lease.clone(),
                     "wrongEnum" | "wrongType" => {
@@ -664,6 +676,10 @@ fn an_unfinalized_source_with_unknown_or_malformed_inputs_cannot_clear_any_impor
             }
             if scenario == "unknownOperation" {
                 record["operationReference"] = json!("unknown.operation@1");
+            }
+            if scenario == "operationNotInSourceCatalog" {
+                record["operationReference"] = json!("flash.verify@1");
+                record["catalogDigest"] = json!(support::catalog_lineage::OLD);
             }
             if scenario == "unknownDigest" {
                 record["catalogDigest"] = json!("b".repeat(64));

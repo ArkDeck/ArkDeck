@@ -35,6 +35,8 @@ struct RuntimeOperationCatalogTests {
         "deploy.native-library.app-owned@1",
         "flash.dayu200",
         "flash.full-restore@1",
+        "flash.restore-boot-loop@1",
+        "flash.verify@1",
         "input.keyboard@1",
         "input.long-press@1",
         "input.swipe@1",
