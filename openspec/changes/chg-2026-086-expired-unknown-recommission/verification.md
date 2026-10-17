@@ -500,8 +500,14 @@ The existing per-chat Cargo cache is reused with two build jobs.
 
 ### CI
 
-The parser fix requires checks on its own PR head. The runs above cover the
-published current-attachment fix, not this increment.
+PR [#2663](https://github.com/ArkDeck/ArkDeck/pull/2663), head
+`75152cfb0e63f5daa34daa21b42e0480da7dcbb0`, passed Swift CI
+[39052972261](https://github.com/ArkDeck/ArkDeck/actions/runs/39052972261) and
+SDD Guard [39053054852](https://github.com/ArkDeck/ArkDeck/actions/runs/39053054852).
+All selected Linux, macOS and Windows Rust workspace and contract checks
+passed, including the complete formatting check. Unchanged Swift/App lanes
+were skipped by the planner. Both required `guard` and aggregate `swift`
+reported success on this exact head.
 
 ## Complete readback proof before recovery publication
 
@@ -568,9 +574,15 @@ Windows, 2026-10-18 local date. Logs use
 
 ### CI
 
-This increment is based on PR [#2663](https://github.com/ArkDeck/ArkDeck/pull/2663)
-and requires its own PR checks before publication. Its CI does not constitute
-hardware acceptance or renew the exhausted independent allocation.
+PR [#2664](https://github.com/ArkDeck/ArkDeck/pull/2664), based on
+[#2663](https://github.com/ArkDeck/ArkDeck/pull/2663), passed Swift CI
+[39054333985](https://github.com/ArkDeck/ArkDeck/actions/runs/39054333985) and
+SDD Guard [39054333735](https://github.com/ArkDeck/ArkDeck/actions/runs/39054333735)
+on head `ecdf8fdad26d6c4cff5c3ab599628226cd0efef7`. All selected Linux, macOS
+and Windows workspace and contract checks passed, including complete formatting;
+both required `guard` and aggregate `swift` reported success. Unchanged Swift/App
+lanes were skipped. These results do not constitute hardware acceptance or renew
+the exhausted independent allocation.
 
 PR [#2664](https://github.com/ArkDeck/ArkDeck/pull/2664) initially failed the
 host-independent formatting step in run
