@@ -1,0 +1,648 @@
+{
+  "schema": "arktrace.cli-distribution.windows-x86_64/1",
+  "formatVersion": 1,
+  "source": {
+    "revision": "6f2a510bc6da306d786531a4949738609f8d82c7",
+    "dirty": false
+  },
+  "product": {
+    "name": "arktrace",
+    "version": "0.1.0",
+    "build": "1",
+    "architecture": "x86_64",
+    "jsonContract": {
+      "major": 1,
+      "minor": 0
+    }
+  },
+  "layout": {
+    "executable": "arktrace.exe",
+    "helperExecutable": "resources/Helpers/arktrace-host-process.exe",
+    "parserExecutable": "resources/Helpers/trace_streamer.exe",
+    "parserManifest": "resources/TraceStreamer/manifest.json",
+    "runtimeManifest": "resources/ArkTraceRust/runtime.json",
+    "selfTestFixture": "resources/zlib.htrace",
+    "licenseDirectory": "resources/licenses"
+  },
+  "tool": {
+    "binarySHA256": "978f3a222fb1a11056e1396ef6b14e1a3fcffb6a93f85351a2b361b252eaf085",
+    "byteCount": 4460888,
+    "unsignedBinarySHA256": "e75aa6f0435c5427d2ce94e662d3cda588ceba0b16592a16a3f8cf49ebfd321f"
+  },
+  "helper": {
+    "binarySHA256": "c8a439c882fea283dc9416de7f3856665ebe8d7bec0673db1dbbd45310984956",
+    "byteCount": 228184,
+    "unsignedBinarySHA256": "ba17523debd84901f5aeb25b3a06dbf5f38af14a5715d54931561d0b92de7c0f"
+  },
+  "traceStreamer": {
+    "unsignedBinarySHA256": "d0e5a19762456cf25d17bac7801e38e38f183ee78ebc04aa2417a94f89afc338",
+    "binarySHA256": "ed522d6e6ed06cf5ae17c8f9e90ed896d0477fe32f0bed843cf2afbadaa7f9e5",
+    "byteCount": 15560024,
+    "manifestSHA256": "9cb195d080b5de4b57f8314f1551b774c7f4cb01e2122374fd9f89b808470770",
+    "manifestByteCount": 1867,
+    "reportedVersion": "4.3.7",
+    "upstreamRevision": "447a0a49a7b3b914d6e9bd00648ba5a340f6fbf6",
+    "buildRecipeVersion": "ffb9f0c0fd3478f8d9bb4b962cea795469748c69460f396dce949998d0fe7075"
+  },
+  "provenance": {
+    "parserAdapterVersion": "1",
+    "schemaAdapterVersion": "2",
+    "indexSchemaVersion": 4
+  },
+  "signing": {
+    "policy": "authenticode-publisher",
+    "publisher": "ArkDeck Development Daemon (host-trusted only)",
+    "timestamped": false
+  },
+  "integrity": {
+    "treeDigest": "arktrace-windows-x86_64-tree/1",
+    "treeSHA256": "4cf67778626212ee4ae4f65a33c904cee5475166087cc813c5dfdc8f51eb90d9",
+    "fileCount": 110,
+    "executables": [
+      "arktrace.exe",
+      "resources/Helpers/arktrace-host-process.exe",
+      "resources/Helpers/trace_streamer.exe"
+    ],
+    "files": [
+      {
+        "path": "arktrace.exe",
+        "sha256": "978f3a222fb1a11056e1396ef6b14e1a3fcffb6a93f85351a2b361b252eaf085",
+        "byteCount": 4460888
+      },
+      {
+        "path": "resources/ArkTraceRust/runtime.json",
+        "sha256": "3f86d4c068cc1fb6bf4c9b521130924a9270c1a8dacc7546e8d7f4df9f32b1f3",
+        "byteCount": 833
+      },
+      {
+        "path": "resources/Helpers/arktrace-host-process.exe",
+        "sha256": "c8a439c882fea283dc9416de7f3856665ebe8d7bec0673db1dbbd45310984956",
+        "byteCount": 228184
+      },
+      {
+        "path": "resources/Helpers/trace_streamer.exe",
+        "sha256": "ed522d6e6ed06cf5ae17c8f9e90ed896d0477fe32f0bed843cf2afbadaa7f9e5",
+        "byteCount": 15560024
+      },
+      {
+        "path": "resources/TraceStreamer/manifest.json",
+        "sha256": "9cb195d080b5de4b57f8314f1551b774c7f4cb01e2122374fd9f89b808470770",
+        "byteCount": 1867
+      },
+      {
+        "path": "resources/licenses/LICENSE",
+        "sha256": "27ec10adbe109a67f514a5620190460e52b09352214aaf1d9869be568b6f46d9",
+        "byteCount": 1078
+      },
+      {
+        "path": "resources/licenses/LICENSES-windows/gcc-GCC-exception-3.1.txt",
+        "sha256": "90077ba306ee9d8ed966cab1b4abd69b6e728acf08777283cc50283cd9503fa6",
+        "byteCount": 3397
+      },
+      {
+        "path": "resources/licenses/LICENSES-windows/gcc-GPL-3.0.txt",
+        "sha256": "0b383d5a63da644f628d99c33976ea6487ed89aaa59f0b3257992deac1171e6b",
+        "byteCount": 35821
+      },
+      {
+        "path": "resources/licenses/LICENSES-windows/gn-BSD-3-Clause.txt",
+        "sha256": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308",
+        "byteCount": 1559
+      },
+      {
+        "path": "resources/licenses/LICENSES-windows/mingw-w64-runtime.txt",
+        "sha256": "e7a33fd8d164abd188ee629bbe3b07912419b29192a6bbfdce29de0ad4f0e7fb",
+        "byteCount": 11158
+      },
+      {
+        "path": "resources/licenses/LICENSES-windows/ninja-Apache-2.0.txt",
+        "sha256": "eb7e9ab9690124c5c9f42bdc81383d886a3dede26345b6ed15bbad7caf81f7ea",
+        "byteCount": 11358
+      },
+      {
+        "path": "resources/licenses/LICENSES-windows/winpthreads-MIT-and-BSD-3-Clause.txt",
+        "sha256": "1c8d23063c3772b9435831410b31b51fef3d9cf2138a442dc367ef5d72239f67",
+        "byteCount": 2940
+      },
+      {
+        "path": "resources/licenses/LICENSES/bounds_checking_function-MulanPSL-2.0.txt",
+        "sha256": "a60fd35084fbae31b57d35b339ef60d110fb5fd50cf429bdef9887b192989f73",
+        "byteCount": 9172
+      },
+      {
+        "path": "resources/licenses/LICENSES/bzip2-bzip2-1.0.6.txt",
+        "sha256": "c6dbbf828498be844a89eaa3b84adbab3199e342eb5cb2ed2f0d4ba7ec0f38a3",
+        "byteCount": 1896
+      },
+      {
+        "path": "resources/licenses/LICENSES/c_utils-Apache-2.0.txt",
+        "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9",
+        "byteCount": 10173
+      },
+      {
+        "path": "resources/licenses/LICENSES/faultloggerd-Apache-2.0.txt",
+        "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+        "byteCount": 10174
+      },
+      {
+        "path": "resources/licenses/LICENSES/gn-BSD-3-Clause.txt",
+        "sha256": "845022e0c1db1abb41a6ba4cd3c4b674ec290f3359d9d3c78ae558d4c0ed9308",
+        "byteCount": 1559
+      },
+      {
+        "path": "resources/licenses/LICENSES/googletest-BSD-3-Clause.txt",
+        "sha256": "9702de7e4117a8e2b20dafab11ffda58c198aede066406496bef670d40a22138",
+        "byteCount": 1475
+      },
+      {
+        "path": "resources/licenses/LICENSES/hiperf-Apache-2.0.txt",
+        "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+        "byteCount": 11560
+      },
+      {
+        "path": "resources/licenses/LICENSES/json-MIT.txt",
+        "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14",
+        "byteCount": 1076
+      },
+      {
+        "path": "resources/licenses/LICENSES/libbpf-BSD-2-Clause.txt",
+        "sha256": "e1638b9a0c68ca90fad3df1d6b4e430804d2fbdc15e58d02cffddfae38953bbf",
+        "byteCount": 1649
+      },
+      {
+        "path": "resources/licenses/LICENSES/libbpf-LGPL-2.1.txt",
+        "sha256": "0b9a4febcdee6de55872501d5c1a8f5d8b0d1650cd4d5351995ceb22e889f8ca",
+        "byteCount": 27413
+      },
+      {
+        "path": "resources/licenses/LICENSES/libbpf-NOTICE.txt",
+        "sha256": "fba33f70723f65e75157848e1ecaaf7ed8f37f66c6c3cb250730fbc1374a2d0a",
+        "byteCount": 29324
+      },
+      {
+        "path": "resources/licenses/LICENSES/llvm-Apache-2.0-WITH-LLVM-exception.txt",
+        "sha256": "8d85c1057d742e597985c7d4e6320b015a9139385cff4cbae06ffc0ebe89afee",
+        "byteCount": 15141
+      },
+      {
+        "path": "resources/licenses/LICENSES/ninja-Apache-2.0.txt",
+        "sha256": "eb7e9ab9690124c5c9f42bdc81383d886a3dede26345b6ed15bbad7caf81f7ea",
+        "byteCount": 11358
+      },
+      {
+        "path": "resources/licenses/LICENSES/profiler-Apache-2.0-and-GPL-2.0-or-BSD-3-Clause.txt",
+        "sha256": "864a42cabb5763495bcd62bfc0f0304ec24a6c1020de0a26d34b2a384c21c596",
+        "byteCount": 10755
+      },
+      {
+        "path": "resources/licenses/LICENSES/protobuf-BSD-3-Clause.txt",
+        "sha256": "6e5e117324afd944dcf67f36cf329843bc1a92229a8cd9bb573d7a83130fea7d",
+        "byteCount": 1732
+      },
+      {
+        "path": "resources/licenses/LICENSES/sqlite-Public-Domain.txt",
+        "sha256": "2e99d45c57dd3bb68c176754d92a532da55c7776e6501e8fe2f04da952e3e756",
+        "byteCount": 3642
+      },
+      {
+        "path": "resources/licenses/LICENSES/trace_streamer-Apache-2.0.txt",
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "byteCount": 11357
+      },
+      {
+        "path": "resources/licenses/LICENSES/zlib-Zlib.txt",
+        "sha256": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243",
+        "byteCount": 1002
+      },
+      {
+        "path": "resources/licenses/THIRD_PARTY_NOTICES.md",
+        "sha256": "b76b946f5f7cecaac31fc61f8e6710c4febf8a60e990f70cb5def8a375eea784",
+        "byteCount": 3068
+      },
+      {
+        "path": "resources/licenses/license-inventory.json",
+        "sha256": "b16397dbbe593a067a0906a496627c8f300b2a4a860eab489181549b35c81e1e",
+        "byteCount": 6939
+      },
+      {
+        "path": "resources/licenses/rust/dependency-licenses.json",
+        "sha256": "fd328ba7bbe7c14ba080acc253af229a1340771e51d347b0ffbfd1511f1edac0",
+        "byteCount": 20287
+      },
+      {
+        "path": "resources/licenses/rust/licenses/bitflags-2.13.2/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/bitflags-2.13.2/LICENSE-MIT",
+        "sha256": "6485b8ed310d3f0340bf1ad1f47645069ce4069dcc6bb46c7d5c6faf41de1fdb",
+        "byteCount": 1071
+      },
+      {
+        "path": "resources/licenses/rust/licenses/block-buffer-0.10.4/LICENSE-APACHE",
+        "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+        "byteCount": 10849
+      },
+      {
+        "path": "resources/licenses/rust/licenses/block-buffer-0.10.4/LICENSE-MIT",
+        "sha256": "d5c22aa3118d240e877ad41c5d9fa232f9c77d757d4aac0c2f943afc0a95e0ef",
+        "byteCount": 1082
+      },
+      {
+        "path": "resources/licenses/rust/licenses/cc-1.5.1/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/cc-1.5.1/LICENSE-MIT",
+        "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397",
+        "byteCount": 1057
+      },
+      {
+        "path": "resources/licenses/rust/licenses/cfg-if-1.0.5/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/cfg-if-1.0.5/LICENSE-MIT",
+        "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397",
+        "byteCount": 1057
+      },
+      {
+        "path": "resources/licenses/rust/licenses/cpufeatures-0.2.17/LICENSE-APACHE",
+        "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+        "byteCount": 10849
+      },
+      {
+        "path": "resources/licenses/rust/licenses/cpufeatures-0.2.17/LICENSE-MIT",
+        "sha256": "ae9baa7beea910273c2f384c2a6b721fb7bd02bda3436074a1072e4ee689f985",
+        "byteCount": 1082
+      },
+      {
+        "path": "resources/licenses/rust/licenses/crypto-common-0.1.7/LICENSE-APACHE",
+        "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+        "byteCount": 10849
+      },
+      {
+        "path": "resources/licenses/rust/licenses/crypto-common-0.1.7/LICENSE-MIT",
+        "sha256": "3521672491a3479422d5fe1aca6645dd2984090f85da6e5205abfb18fb7a6897",
+        "byteCount": 1065
+      },
+      {
+        "path": "resources/licenses/rust/licenses/digest-0.10.7/LICENSE-APACHE",
+        "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+        "byteCount": 10849
+      },
+      {
+        "path": "resources/licenses/rust/licenses/digest-0.10.7/LICENSE-MIT",
+        "sha256": "9e0dfd2dd4173a530e238cb6adb37aa78c34c6bc7444e0e10c1ab5d8881f63ba",
+        "byteCount": 1057
+      },
+      {
+        "path": "resources/licenses/rust/licenses/fallible-iterator-0.3.0/LICENSE-APACHE",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+        "byteCount": 11358
+      },
+      {
+        "path": "resources/licenses/rust/licenses/fallible-iterator-0.3.0/LICENSE-MIT",
+        "sha256": "0816e154b159ba255c563f7c8c7df5bbb8cc5fc96f5ab8cf9f4743b4f41fe7eb",
+        "byteCount": 1078
+      },
+      {
+        "path": "resources/licenses/rust/licenses/fallible-streaming-iterator-0.1.9/LICENSE-APACHE",
+        "sha256": "c6596eb7be8581c18be736c846fb9173b69eccf6ef94c5135893ec56bd92ba08",
+        "byteCount": 11358
+      },
+      {
+        "path": "resources/licenses/rust/licenses/fallible-streaming-iterator-0.1.9/LICENSE-MIT",
+        "sha256": "8dcec5569a9be5b0e086c80faed6f1aefa670af0ec29cecc2f714303096887e0",
+        "byteCount": 1086
+      },
+      {
+        "path": "resources/licenses/rust/licenses/find-msvc-tools-0.1.14/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/find-msvc-tools-0.1.14/LICENSE-MIT",
+        "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397",
+        "byteCount": 1057
+      },
+      {
+        "path": "resources/licenses/rust/licenses/generic-array-0.14.7/LICENSE",
+        "sha256": "c09aae9d3c77b531f56351a9947bc7446511d6b025b3255312d3e3442a9a7583",
+        "byteCount": 1107
+      },
+      {
+        "path": "resources/licenses/rust/licenses/itoa-1.0.18/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/itoa-1.0.18/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/libc-0.2.189/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/libc-0.2.189/LICENSE-MIT",
+        "sha256": "123a331b5dbf04c30097fa43b8f858bc85df671fe776de498d01f3d6b7c1f69e",
+        "byteCount": 1066
+      },
+      {
+        "path": "resources/licenses/rust/licenses/libsqlite3-sys-0.38.2/LICENSE",
+        "sha256": "c10c1f27337546471e5f7e4e97fdd398b35b9d4e126115dcd22de8d8e65abf6f",
+        "byteCount": 1067
+      },
+      {
+        "path": "resources/licenses/rust/licenses/memchr-2.8.3/COPYING",
+        "sha256": "01c266bced4a434da0051174d6bee16a4c82cf634e2679b6155d40d75012390f",
+        "byteCount": 126
+      },
+      {
+        "path": "resources/licenses/rust/licenses/memchr-2.8.3/LICENSE-MIT",
+        "sha256": "0f96a83840e146e43c0ec96a22ec1f392e0680e6c1226e6f3ba87e0740af850f",
+        "byteCount": 1081
+      },
+      {
+        "path": "resources/licenses/rust/licenses/memchr-2.8.3/UNLICENSE",
+        "sha256": "7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c",
+        "byteCount": 1211
+      },
+      {
+        "path": "resources/licenses/rust/licenses/pkg-config-0.3.34/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/pkg-config-0.3.34/LICENSE-MIT",
+        "sha256": "378f5840b258e2779c39418f3f2d7b2ba96f1c7917dd6be0713f88305dbda397",
+        "byteCount": 1057
+      },
+      {
+        "path": "resources/licenses/rust/licenses/proc-macro2-1.0.107/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/proc-macro2-1.0.107/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/quote-1.0.47/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/quote-1.0.47/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/rusqlite-0.40.2/LICENSE",
+        "sha256": "c10c1f27337546471e5f7e4e97fdd398b35b9d4e126115dcd22de8d8e65abf6f",
+        "byteCount": 1067
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde-1.0.229/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde-1.0.229/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde_core-1.0.229/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde_core-1.0.229/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde_derive-1.0.229/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde_derive-1.0.229/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde_json-1.0.151/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/serde_json-1.0.151/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/sha2-0.10.9/LICENSE-APACHE",
+        "sha256": "a9040321c3712d8fd0b09cf52b17445de04a23a10165049ae187cd39e5c86be5",
+        "byteCount": 10849
+      },
+      {
+        "path": "resources/licenses/rust/licenses/sha2-0.10.9/LICENSE-MIT",
+        "sha256": "b4eb00df6e2a4d22518fcaa6a2b4646f249b3a3c9814509b22bd2091f1392ff1",
+        "byteCount": 1138
+      },
+      {
+        "path": "resources/licenses/rust/licenses/shlex-2.0.1/LICENSE-APACHE",
+        "sha256": "553fffcd9b1cb158bc3e9edc35da85ca5c3b3d7d2e61c883ebcfa8a65814b583",
+        "byteCount": 566
+      },
+      {
+        "path": "resources/licenses/rust/licenses/shlex-2.0.1/LICENSE-MIT",
+        "sha256": "4455bf75a91154108304cb283e0fea9948c14f13e20d60887cf2552449dea3b1",
+        "byteCount": 1092
+      },
+      {
+        "path": "resources/licenses/rust/licenses/smallvec-1.16.2/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/smallvec-1.16.2/LICENSE-MIT",
+        "sha256": "0b28172679e0009b655da42797c03fd163a3379d5cfa67ba1f1655e974a2a1a9",
+        "byteCount": 1072
+      },
+      {
+        "path": "resources/licenses/rust/licenses/syn-3.0.6/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/syn-3.0.6/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/tinyvec-1.11.0/LICENSE-APACHE.md",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+        "byteCount": 11358
+      },
+      {
+        "path": "resources/licenses/rust/licenses/tinyvec-1.11.0/LICENSE-MIT.md",
+        "sha256": "fd80a26fbb3f644af1fa994134446702932968519797227e07a1368dea80f0bc",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/tinyvec-1.11.0/LICENSE-ZLIB.md",
+        "sha256": "84b34dd7608f7fb9b17bd588a6bf392bf7de504e2716f024a77d89f1b145a151",
+        "byteCount": 851
+      },
+      {
+        "path": "resources/licenses/rust/licenses/tinyvec_macros-0.1.1/LICENSE-APACHE.md",
+        "sha256": "4f44572785f35152c1fd2eadf565b7e079c0f300b4324f0af653419f9d76b735",
+        "byteCount": 11350
+      },
+      {
+        "path": "resources/licenses/rust/licenses/tinyvec_macros-0.1.1/LICENSE-MIT.md",
+        "sha256": "1dd8eca0f83669e75fa119e34fb9e1be9d16e3e9b6368962b8019db6e8ae5f7b",
+        "byteCount": 1062
+      },
+      {
+        "path": "resources/licenses/rust/licenses/tinyvec_macros-0.1.1/LICENSE-ZLIB.md",
+        "sha256": "41ace205715d9f19a3214218cc1c01d57c533e02cd0fef7c8e51a49a7fce5ac5",
+        "byteCount": 864
+      },
+      {
+        "path": "resources/licenses/rust/licenses/typenum-1.20.1/LICENSE",
+        "sha256": "db11fec9946737df39ca3898d9cd8c10ec6f6c3a884a6802b0ad0b81b4e8f23a",
+        "byteCount": 17
+      },
+      {
+        "path": "resources/licenses/rust/licenses/typenum-1.20.1/LICENSE-APACHE",
+        "sha256": "516b24e051bf5630880ebbd55c40a25ce9552ebaf8970a53e8976eb70e522406",
+        "byteCount": 10835
+      },
+      {
+        "path": "resources/licenses/rust/licenses/typenum-1.20.1/LICENSE-MIT",
+        "sha256": "a825bd853ab71619a4923d7b4311221427848070ff44d990da39b0b274c1683f",
+        "byteCount": 1083
+      },
+      {
+        "path": "resources/licenses/rust/licenses/unicode-ident-1.0.26/LICENSE-APACHE",
+        "sha256": "62c7a1e35f56406896d7aa7ca52d0cc0d272ac022b5d2796e7d6905db8a3636a",
+        "byteCount": 9723
+      },
+      {
+        "path": "resources/licenses/rust/licenses/unicode-ident-1.0.26/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/rust/licenses/unicode-ident-1.0.26/LICENSE-UNICODE",
+        "sha256": "f7db81051789b729fea528a63ec4c938fdcb93d9d61d97dc8cc2e9df6d47f2a1",
+        "byteCount": 1995
+      },
+      {
+        "path": "resources/licenses/rust/licenses/unicode-normalization-0.1.25/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/unicode-normalization-0.1.25/LICENSE-MIT",
+        "sha256": "7b63ecd5f1902af1b63729947373683c32745c16a10e8e6292e2e2dcd7e90ae0",
+        "byteCount": 1071
+      },
+      {
+        "path": "resources/licenses/rust/licenses/vcpkg-0.2.15/LICENSE-APACHE",
+        "sha256": "60c93a31f490375aadf64098b75f10715010379541021e00261045d7800611d3",
+        "byteCount": 11050
+      },
+      {
+        "path": "resources/licenses/rust/licenses/vcpkg-0.2.15/LICENSE-MIT",
+        "sha256": "016d20f335060a70e79d9fcf8dfaa6201114d65d592211f4bdfb8ae9ca2bc1dc",
+        "byteCount": 1082
+      },
+      {
+        "path": "resources/licenses/rust/licenses/version_check-0.9.5/LICENSE-APACHE",
+        "sha256": "a60eea817514531668d7e00765731449fe14d059d3249e0bc93b36de45f759f2",
+        "byteCount": 10847
+      },
+      {
+        "path": "resources/licenses/rust/licenses/version_check-0.9.5/LICENSE-MIT",
+        "sha256": "b7e650f3fce5c53249d1cdc608b54df156a97edd636cf9d23498d0cfe7aec63e",
+        "byteCount": 1085
+      },
+      {
+        "path": "resources/licenses/rust/licenses/windows-link-0.2.1/license-apache-2.0",
+        "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b",
+        "byteCount": 11351
+      },
+      {
+        "path": "resources/licenses/rust/licenses/windows-link-0.2.1/license-mit",
+        "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "byteCount": 1141
+      },
+      {
+        "path": "resources/licenses/rust/licenses/windows-sys-0.61.2/license-apache-2.0",
+        "sha256": "c16f8dcf1a368b83be78d826ea23de4079fe1b4469a0ab9ee20563f37ff3d44b",
+        "byteCount": 11351
+      },
+      {
+        "path": "resources/licenses/rust/licenses/windows-sys-0.61.2/license-mit",
+        "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "byteCount": 1141
+      },
+      {
+        "path": "resources/licenses/rust/licenses/zmij-1.0.23/LICENSE-MIT",
+        "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+        "byteCount": 1023
+      },
+      {
+        "path": "resources/licenses/windows-license-inventory.json",
+        "sha256": "aac9b630b1544a2ae71012ef4870da24d7de7373ffd8d0d94b73f8874d5146a0",
+        "byteCount": 2882
+      },
+      {
+        "path": "resources/zlib.htrace",
+        "sha256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+        "byteCount": 67837
+      }
+    ]
+  },
+  "attribution": {
+    "license": "resources/licenses/LICENSE",
+    "licenseSHA256": "27ec10adbe109a67f514a5620190460e52b09352214aaf1d9869be568b6f46d9",
+    "licenseByteCount": 1078,
+    "notice": "resources/licenses/THIRD_PARTY_NOTICES.md",
+    "noticeSHA256": "b76b946f5f7cecaac31fc61f8e6710c4febf8a60e990f70cb5def8a375eea784",
+    "noticeByteCount": 3068,
+    "inventory": "resources/licenses/license-inventory.json",
+    "inventorySHA256": "b16397dbbe593a067a0906a496627c8f300b2a4a860eab489181549b35c81e1e",
+    "inventoryByteCount": 6939,
+    "windowsInventory": "resources/licenses/windows-license-inventory.json",
+    "windowsInventorySHA256": "aac9b630b1544a2ae71012ef4870da24d7de7373ffd8d0d94b73f8874d5146a0",
+    "windowsInventoryByteCount": 2882,
+    "rustInventory": "resources/licenses/rust/dependency-licenses.json",
+    "rustInventorySHA256": "fd328ba7bbe7c14ba080acc253af229a1340771e51d347b0ffbfd1511f1edac0",
+    "rustInventoryByteCount": 20287,
+    "licenseFileCount": 18,
+    "windowsLicenseFileCount": 6,
+    "rustDependencyCount": 37,
+    "rustLicenseFileCount": 75,
+    "selfTestFixtureSHA256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+    "selfTestFixtureByteCount": 67837
+  },
+  "upgradePolicy": {
+    "identity": "distribution-manifest+tool-parser-hashes",
+    "installMode": "versioned-directory",
+    "pathSelection": "reviewed-absolute-descriptor-only",
+    "rollback": "retain-prior-exact-directory"
+  }
+}

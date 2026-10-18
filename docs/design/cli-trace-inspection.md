@@ -2,7 +2,8 @@
 
 `arkdeck trace inspect` 对已发布的原始 Trace Artifact 做确定性本地解析。它不采集设备、
 不提交 Job，也不把派生结果登记成新的 evidence。采集仍由
-`arkdeck agent run --operation capture.diagnostics@1` 的 typed trace preset 完成。
+`arkdeck agent run --operation capture.diagnostics@1` 的 typed trace preset 或
+`capture.diagnostic-session@1` 完成。
 
 ## 命令
 
@@ -37,17 +38,20 @@ arkdeck trace inspect \
 
 1. Job record 存在且可读；
 2. Artifact 属于该 Job，并且状态为 `published`；
-3. `sourceOperation == capture.diagnostics@1`；
+3. `sourceOperation` 为 `capture.diagnostics@1` 或 `capture.diagnostic-session@1`；
 4. name 为 `trace.htrace`，media type 为 `application/octet-stream`；
 5. privacy 为 `sensitive` 且未标记 redaction；
 6. lease 的 Artifact ID、SHA-256、byte count 与 binding snapshot 和 metadata 完全一致；
-7. 以 `VerifiedRegularFileDescriptor` 打开并校验源文件，只把持有期间的 inode path 交给
-   固定 parser owner；解析后再次校验 descriptor identity。
+7. 持有并校验源文件，只把持有期间的文件身份路径交给固定 parser owner；Windows 为
+   禁止写入和删除共享的 canonical path，解析后再次校验 Artifact 内容与 metadata。
 
-生产 parser 由 `trace-summary@1` AnalyzerProfile 固定。ArkDeck 使用 ArkTrace protected-main
-commit `9172c9525f954ec397e0555d7d03cd4367f3efcf` 的
-`TraceOfflineInspectionService`，parser executable 与 manifest 来自同一可信 distribution bundle。
-ArkTrace session 固定为 `ephemeral`，不读写共享 derived cache。
+Windows parser 由 `trace-summary@1` AnalyzerProfile 固定。Runtime 从
+`ARKDECK_ARKTRACE_DESCRIPTOR` 指定的精确 manifest 加载 Windows x64 CLI 分发，核对
+Authenticode publisher、全部文件 hash、许可证闭包和独立的 Windows tree digest，复制到
+Runtime 私有版本目录后运行 `doctor --self-test`。调用 `inspect --json --no-cache` 期间持有
+整个分发与源 Artifact；CLI 在 Runtime 私有目录中创建 ephemeral session。
+`engine.sourceRevision` 是该分发 manifest 的 `source.revision`。未配置或校验失败时仍返回
+`operationUnavailable`，不搜索 PATH。这里不改变 macOS Rust daemon 的 owner-absent 答复。
 
 ## Machine result
 

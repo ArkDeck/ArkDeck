@@ -180,6 +180,11 @@ impl VerifiedTool {
         let stdout = out.finish(stdout, deadline);
         let stderr = err.finish(stderr, deadline);
         let unobservable = ToolRunError::Unobservable;
+        if matches!(&stopped, Some(ToolTermination::TimedOut)) && cleanup.is_err() {
+            return Err(unobservable(io::Error::other(
+                "the timed-out child tree could not be drained",
+            )));
+        }
         let ((stdout, stdout_dropped), (stderr, stderr_dropped)) = if stopped.is_some() {
             // A terminated child's partial output is kept, never judged.
             (stdout.unwrap_or_default(), stderr.unwrap_or_default())

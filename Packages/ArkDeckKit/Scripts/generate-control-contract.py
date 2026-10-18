@@ -128,6 +128,10 @@ AGENT_RESUME_OWNER_ERROR_CODES = [
 # needs the derived data are not composed (maintainer ruling 18's shape, the
 # one `target.adopt` answers without a registered HDC; delegated 2026-09-30).
 TRACE_CACHE_PURGE_OWNER_ERROR_CODES = ["operationUnavailable"]
+# These existing Trace-owner refusals were published from recordings whose
+# shapes the minimal corpus no longer selects. Preserve them when adding the
+# native Windows resourceNotFound recordings.
+TRACE_INSPECTION_OWNER_ERROR_CODES = ["artifactIntegrityFailed", "invalidInput"]
 # The Target display-name owner's refusals, as Swift's CLI failure mapper
 # names them for both mutations (`CLIControlMethodRegistry`): a clear of a
 # Target that is not an active durable Target is `resourceNotFound`, as a set
@@ -444,6 +448,7 @@ def derive_method_schemas(source):
                        | (set(TOOL_INSPECT_OWNER_ERROR_CODES) if method == "runtime.tool.inspect" else set())
                        | (set(AGENT_RESUME_OWNER_ERROR_CODES) if method in {"agent.resume", "human-action.resume"} else set())
                        | (set(TRACE_CACHE_PURGE_OWNER_ERROR_CODES) if method == "trace.cache.purge" else set())
+                       | (set(TRACE_INSPECTION_OWNER_ERROR_CODES) if method == "trace.inspect" else set())
                        | (set(TARGET_DISPLAY_NAME_OWNER_ERROR_CODES) if method in {
                            "target.display-name.set", "target.display-name.clear"
                        } else set())

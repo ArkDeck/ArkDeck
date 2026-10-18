@@ -299,11 +299,11 @@ impl AnalyzerProfile {
         })
     }
 
-    /// On Windows no profile pins anything: only the ArkTrace profiles do,
-    /// and none loads there (TASK-XPA-021).
+    /// Windows ArkTrace profiles bind their closed signed installation tree;
+    /// the crash-ledger and HiLog profiles have no additional resources.
     #[cfg(windows)]
     pub(crate) fn pins_still_match(&self) -> bool {
-        self.pinned_files.is_empty() && self.pinned_trees.is_empty()
+        crate::arktrace_windows::pins_match(self)
     }
 }
 

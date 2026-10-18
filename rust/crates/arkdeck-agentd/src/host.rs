@@ -120,8 +120,8 @@ pub struct Host {
     #[cfg(any(target_os = "macos", windows))]
     capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
     /// The state root `job.plan` and `job.submit` plan against, and the
-    /// analyzers the host composed (on Windows the crash-ledger and HiLog
-    /// summary ones; no ArkTrace analyzer loads there, TASK-XPA-021).
+    /// analyzers the host composed, including a reviewed ArkTrace generation
+    /// when its descriptor loaded on this host.
     #[cfg(any(target_os = "macos", windows))]
     planning: Option<(std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles)>,
     #[cfg(any(target_os = "macos", windows))]
@@ -3740,6 +3740,23 @@ impl HostServices for Host {
                 details: None,
             })?
             .trace_probe(target_id)
+    }
+
+    #[cfg(windows)]
+    fn trace_inspection(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        use arkdeck_hoststore::AnalyzerComposition;
+        let configured = self.jobs.as_deref().zip(self.artifacts.as_deref()).zip(
+            self.planning
+                .as_ref()
+                .and_then(|(_, profiles)| profiles.profile("trace-summary@1")),
+        );
+        let Some(((jobs, artifacts), profile)) = configured else {
+            return Err(arkdeck_hoststore::trace_inspection_unavailable());
+        };
+        arkdeck_hoststore::inspect_trace_artifact(jobs, artifacts, profile, params)
     }
     /// Swift composes the reconciler over its Target store; a host without
     /// either answers as Swift's daemon without the reconciler does.

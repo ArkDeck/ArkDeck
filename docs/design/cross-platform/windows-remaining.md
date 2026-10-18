@@ -47,8 +47,12 @@ Owners: every owner of the macOS owner census is composed by the Windows daemon
 (`Host::owner_census` lists the same names on both), so no owner is absent. Carved: the development root
 still refuses `ARKDECK_DEVELOPMENT_USB_RELATIONS(_WITH_REGISTERED_HDC)`,
 `ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER`, `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY`,
-`ARKDECK_APP_INGRESS` and `ARKDECK_ARKTRACE_DESCRIPTOR` (`windows_lifecycle::NOT_COMPOSED`);
-the ArkTrace analyzer profiles are absent (no ArkTrace distribution on Windows).
+`ARKDECK_APP_INGRESS` (`windows_lifecycle::NOT_COMPOSED`). The Windows ArkTrace
+loader now accepts an exact reviewed descriptor; its signed development package
+and host-only Artifact inspection/analysis/export passed native qualification on
+2026-10-18. Production signing, clean-host packaging and installed acceptance
+remain separate from that qualification. See the
+[integration record](../../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/windows-arktrace-cli-integration-20261018-run.md).
 
 Blocker classes: **external** (AF-W1 / ArkForge), **board** (needs the real board, GJ-1/2/3/5
 board window), **now** (Swift-oracle parity work we can do now), **dependency** (waits on reachable operations), **closed** (keeps an existing ruling),
@@ -68,7 +72,7 @@ board window), **now** (Swift-oracle parity work we can do now), **dependency** 
 | `workspace.symbolize-crash@1` and named crash capture | 1, 5 | done | Measured by the signed CLI (`workspace_symbolize_leaf.rs`): the Swift oracle's crash resolves to its ArkTS source, and a named crash captured by the Windows daemon is symbolized through its lease. `crashLogs: true` alone selects the index; `crashLogName` selects the dump. The former's `missing` dump row is expected, not a Windows defect |
 | `flash.reconcile-alias` | 4 | done | Signed CLI checks 21 `flash-host-reads` alias exchanges and the `post-flash-alias` reissued lineage, exact private/archive bytes, restart durability and zero HDC dispatch (`flash_alias_cli.rs`) |
 | `debug.template@1`, `debug.template.run` | 2 | done | Signed CLI checks all four closed template Jobs, sensitive/raw binary Artifacts, failure paths and unknown-intent restart/reconcile without replay (`debug_template_cli.rs`). Delegated reference: macOS Rust `debug_template_run.rs` owner semantics plus existing Swift `debug-probe` normal payloads; pending next rulings batch |
-| `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | external | Await a reviewed Windows ArkTrace `trace_streamer` distribution (ruling 72); keep the descriptor/trust refusal. Delegated scope decision: do not substitute a fixture for a trusted distribution |
+| `analyzer.analyze-trace@1`, `analyzer.summarize-trace@1`, `trace.inspect` | — | external | Windows loader, doctor, exact Artifact inspection, summary/CPU analysis Jobs and export pass with the recipe-built parser and host-trusted signed CLI. Production signed publication, clean-host and installed acceptance remain open; absent/invalid distributions keep typed refusals |
 | `agent.run`, `agent.resume`, `human-action.resume`, `job.plan`, `job.submit`, `job.run` | all | dependency | Count only when every reachable operation answers as Swift does; external `flash.dayu200` and the missing Windows ArkTrace distribution prevent completion |
 | `flash.dayu200` | 4 | external | Real flash through the ArkForge lane (AF-W1) |
 | `runtime.service.install`, `runtime.service.update` | — | closed | Keep ruling 42: the client-started daemon has no installer. Runtime RC updates continue through reinstall (ruling 78); delegated decision of 2026-10-05 keeps these leaves `notImplemented` |
