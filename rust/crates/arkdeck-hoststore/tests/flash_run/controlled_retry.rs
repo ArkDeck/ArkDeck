@@ -150,6 +150,46 @@ fn ledger(root: &Path) -> Value {
 }
 
 #[test]
+fn controlled_retry_plan_uses_the_job_owner_when_runtime_state_is_separate() {
+    let _lock = exclusive();
+    let root = lay_down();
+    let fakes = Fakes::default();
+    let owners = Owners::open(&root, &fakes);
+    let source = archived(&owners, &fakes);
+    let failed = failed_first(&owners, &fakes, &source);
+    let originals = [history(&owners, &source), history(&owners, &failed)];
+    let first_budget = ledger(&root);
+    fakes.begin(Script::default());
+    let params = retry_request(&owners, &fakes, &source, &failed, "separate-state-plan");
+    // Windows production has a Runtime parent and a separate private Job store.
+    // The planner's other owners may use that parent; retry programs belong to
+    // the Job owner that also reads the proof during completion/reconciliation.
+    let runtime_state = root.join("runtime-parent");
+    HostDirectory::open_or_create_private(&runtime_state).unwrap();
+    let facts = |target: &str, recommission: bool| {
+        assert!(recommission);
+        fakes.recommission_facts(target)
+    };
+    let planner = FlashPlanner {
+        planner: owners.planner(&runtime_state),
+        flash: Some(&owners.flash),
+        facts: Some(&facts),
+    };
+    let plan = planner
+        .handle(params.as_object().unwrap())
+        .unwrap_or_else(|error| panic!("{}: {}", error.code, error.message));
+    assert_eq!(plan["jobAdmitted"], false);
+    assert_eq!(plan["dispatchDisposition"], "notDispatched");
+    assert!(plan["providerAdmissionBlocker"].is_null());
+    assert!(!runtime_state.join("recommission-retry-plans").exists());
+    assert_eq!(ledger(&root), first_budget);
+    assert_eq!(
+        [history(&owners, &source), history(&owners, &failed)],
+        originals
+    );
+}
+
+#[test]
 fn explicit_retry_covers_both_unknowns_and_restores_original_ramdisk_before_success() {
     let _lock = exclusive();
     let root = lay_down();

@@ -277,13 +277,19 @@ fn persist(root: &HostDirectory, ledger: &Ledger) -> Result<(), String> {
 }
 
 impl JobStore {
+    pub(crate) fn controlled_retry_program_root(&self) -> Result<HostDirectory, String> {
+        self.root
+            .private_child("recommission-retry-plans")
+            .map_err(|_| "recommission.retryProgramStoreUnavailable".into())
+    }
+
     pub(crate) fn require_controlled_retry_proof(
         &self,
         record: &crate::job_record::JobRecord,
         execution: &arkdeck_provider_arkforge::Execution,
         lane: &dyn arkdeck_provider_arkforge::FlashLane,
     ) -> Result<serde_json::Value, String> {
-        crate::flash_recommission_retry::require_proof(self, &self.path, record, execution, lane)
+        crate::flash_recommission_retry::require_proof(self, record, execution, lane)
     }
 
     pub(crate) fn check_active_recommission(
